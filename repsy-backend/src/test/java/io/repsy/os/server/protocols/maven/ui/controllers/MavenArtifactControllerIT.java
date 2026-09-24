@@ -234,6 +234,45 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
     }
 
     /**
+     * RPS-1288: the search matches the whole {@code group:artifact} key a list row shows, next to
+     * its parts, so typing the pair finds the row.
+     */
+    @Test
+    void searchMatchesTheWholeGroupArtifactKeyAndItsParts() throws Exception {
+      final var key = GROUP + ":" + ARTIFACT;
+      for (final var term : new String[] {key, GROUP, ARTIFACT, "app:dem"}) {
+        MavenArtifactControllerIT.this
+            .mockMvc
+            .perform(
+                get("/api/mvn/artifacts/{repo}", MavenArtifactControllerIT.this.repoName)
+                    .param("groupName", term)
+                    .with(apiPort()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.content", hasSize(1)))
+            .andExpect(jsonPath("$.data.content[0].artifactName").value(ARTIFACT));
+      }
+      MavenArtifactControllerIT.this
+          .mockMvc
+          .perform(
+              get(
+                      "/api/mvn/artifacts/{repo}/{group}",
+                      MavenArtifactControllerIT.this.repoName,
+                      GROUP)
+                  .param("artifactName", key)
+                  .with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(1)));
+      MavenArtifactControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/mvn/artifacts/{repo}", MavenArtifactControllerIT.this.repoName)
+                  .param("groupName", ARTIFACT + ":" + GROUP)
+                  .with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(0)));
+    }
+
+    /**
      * RPS-1296: the detail of a version that is not the artifact's latest must describe that
      * version. {@code artifactVersionName} feeds the dependency snippets and the detail page's
      * Delete button, so the latest version's name there deleted the wrong version.

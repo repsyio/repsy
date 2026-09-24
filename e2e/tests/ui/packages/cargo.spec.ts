@@ -146,21 +146,22 @@ test.describe('Cargo crate pages', { tag: '@packages' }, () => {
     );
   });
 
-  test('PKG-cargo-07 the sorts order crates by highest version and by name', async ({
+  test('PKG-cargo-07 the sorts order crates by publish time and by name', async ({
     adminPage,
     seeder,
   }) => {
     const repo = await seeder.createRepo(RepoType.CARGO);
-    // Named against their versions, so name order (a, b, c) is not version order (2, 3, 1).
-    const a = await publishCrate(repo.name, `e2e_${seeder.runId}_a`, '2.0.0');
+    // Published one after the other as b, c, a, against their versions (3, 2, 1) and their names
+    // (a, b, c): the time order matches neither, so only a sort by publish time gives it.
     const b = await publishCrate(repo.name, `e2e_${seeder.runId}_b`, '3.0.0');
-    const c = await publishCrate(repo.name, `e2e_${seeder.runId}_c`, '1.0.0');
+    const c = await publishCrate(repo.name, `e2e_${seeder.runId}_c`, '2.0.0');
+    const a = await publishCrate(repo.name, `e2e_${seeder.runId}_a`, '1.0.0');
     const list = protocolPages(adminPage, cargo, repo.name).list();
     await list.goto();
 
     const order: Record<string, string[]> = {
-      Newest: [b.name, a.name, c.name],
-      Oldest: [c.name, a.name, b.name],
+      Newest: [a.name, c.name, b.name],
+      Oldest: [b.name, c.name, a.name],
       'Name (A-Z)': [a.name, b.name, c.name],
       'Name (Z-A)': [c.name, b.name, a.name],
     };
@@ -171,19 +172,19 @@ test.describe('Cargo crate pages', { tag: '@packages' }, () => {
     }
   });
 
-  // RPS-1301: the crate list's Newest/Oldest order by `max_version`, a text column,
-  // not by when a crate was published, so a crate published later at a lower version is not "newest".
-  test.fail(
-    'PKG-cargo-07 Newest puts the crate published last on top (RPS-1301: it sorts by max_version)',
-    async ({ adminPage, seeder }) => {
-      const repo = await seeder.createRepo(RepoType.CARGO);
-      const older = await publishCrate(repo.name, `e2e_${seeder.runId}_older`, '3.0.0');
-      const newer = await publishCrate(repo.name, `e2e_${seeder.runId}_newer`, '1.0.0');
-      const list = protocolPages(adminPage, cargo, repo.name).list();
-      await list.goto();
-      await expect.poll(() => rowKeys(list)).toEqual([newer.name, older.name]);
-    },
-  );
+  // RPS-1301: Newest/Oldest ordered by `max_version`, a text column, so a crate published later at a
+  // lower version was not "newest"; they now order by the crate's last update (the id ends every sort, RPS-1298).
+  test('PKG-cargo-07 Newest puts the crate published last on top, whatever its version', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.CARGO);
+    const older = await publishCrate(repo.name, `e2e_${seeder.runId}_older`, '3.0.0');
+    const newer = await publishCrate(repo.name, `e2e_${seeder.runId}_newer`, '1.0.0');
+    const list = protocolPages(adminPage, cargo, repo.name).list();
+    await list.goto();
+    await expect.poll(() => rowKeys(list)).toEqual([newer.name, older.name]);
+  });
 
   test('PKG-cargo-07 the crate row shows the highest version, and the versions list every one', async ({
     adminPage,
@@ -236,7 +237,7 @@ test.describe('Cargo crate pages', { tag: '@packages' }, () => {
     await expect(versions.rows()).toHaveCount(0);
   });
 
-  test('PKG-cargo-07 a yanked version stays listed and its detail opens (the panel shows no yank state)', async ({
+  test('PKG-cargo-07 a yanked version stays listed and is marked yanked on the list and on its detail (RPS-1301)', async ({
     adminPage,
     seeder,
   }) => {
@@ -253,12 +254,18 @@ test.describe('Cargo crate pages', { tag: '@packages' }, () => {
     await versions.expectRow(first);
     await versions.expectRow(second);
     await expect(versions.inRow(second, 'row-name')).toHaveText('2.0.0');
-    await expect(adminPage.getByTestId('pkg-versions-table')).not.toContainText(/yanked/i);
+    // Only the yanked version carries the badge.
+    await expect(versions.inRow(second, 'row-yanked')).toBeVisible();
+    await expect(versions.inRow(second, 'row-yanked')).toHaveText(/yanked/i);
+    await expect(versions.inRow(first, 'row-yanked')).toHaveCount(0);
 
     const detail = pages.detail(second);
     await detail.goto();
-    await expect(detail.byId('pkg-detail-version')).toHaveText('2.0.0');
-    await expect(detail.root).not.toContainText(/yanked/i);
+    await expect(detail.byId('pkg-detail-version')).toContainText('2.0.0');
+    await expect(detail.byId('pkg-detail-yanked')).toHaveText('(yanked)');
+    const other = pages.detail(first);
+    await other.goto();
+    await expect(other.byId('pkg-detail-yanked')).toHaveCount(0);
   });
 
   // RPS-1299: the open menu of a non-last row used to paint under the NEXT row, so a real mouse click

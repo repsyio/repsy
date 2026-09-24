@@ -205,6 +205,38 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
           .andExpect(jsonPath("$.data.page.totalPages").value(3));
     }
 
+    /**
+     * RPS-1288: the search matches the whole {@code @scope/name} key a list row shows (the bare
+     * name of an unscoped package), next to its parts, with or without the {@code @}.
+     */
+    @Test
+    void searchMatchesTheWholeScopeNameKeyAndItsParts() throws Exception {
+      for (final var term :
+          new String[] {"@tools/scoped-package", "tools/scoped", "scoped-package"}) {
+        NpmPackageApiControllerIT.this
+            .perform(get("/api/npm/packages/{repo}", repoName).param("scope", term))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.content", hasSize(1)))
+            .andExpect(jsonPath("$.data.content[0].scope").value("tools"))
+            .andExpect(jsonPath("$.data.content[0].name").value("scoped-package"));
+      }
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}", repoName).param("scope", "plain-package"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(1)))
+          .andExpect(jsonPath("$.data.content[0].name").value("plain-package"));
+      NpmPackageApiControllerIT.this
+          .perform(
+              get("/api/npm/scopes/{repo}/{scope}/packages", repoName, "tools")
+                  .param("name", "@tools/scoped-package"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(1)));
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}", repoName).param("scope", "scoped-package/tools"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(0)));
+    }
+
     @Test
     void resolvesVersionRoutesAndTheLiteralScopePackagePredictably() throws Exception {
       NpmPackageApiControllerIT.this

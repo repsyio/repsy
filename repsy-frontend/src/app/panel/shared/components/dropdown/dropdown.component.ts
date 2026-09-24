@@ -89,6 +89,21 @@ export class DropdownComponent {
     items[next].focus();
   }
 
+  /**
+   * Choosing an action closes the menu (the action's own click handler has already run by now). When it
+   * was chosen from the keyboard (`detail` 0), focus goes back to the trigger instead of being lost with
+   * the removed item.
+   */
+  onMenuClick(event: MouseEvent) {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('[role="menuitem"]')) {
+      this.close();
+      if (event.detail === 0) {
+        this.trigger()?.focus();
+      }
+    }
+  }
+
   @HostListener('keydown.escape', ['$event'])
   onEscape(event: Event) {
     if (this.isOpen) {

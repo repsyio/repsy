@@ -41,6 +41,7 @@ import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.utils.PackageUtils;
@@ -49,8 +50,11 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -244,6 +248,69 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     final var npmPackage = this.findPackageByRepoIdAndScopeAndName(repoId, scopeName, packageName);
 
     return this.npmPackageConverter.toPackageInfo(npmPackage, npmPackage.getRepo());
+  }
+
+  @Override
+  public NpmPackageSnapshot getSnapshot(
+      final UUID repoId, final @Nullable String scopeName, final String packageName) {
+
+    final var npmPackage = this.findPackageByRepoIdAndScopeAndName(repoId, scopeName, packageName);
+
+    final var versions =
+        this.packageVersionRepository.findByNpmPackageId(npmPackage.getId()).stream()
+            .sorted(
+                Comparator.comparing(PackageVersion::getCreatedAt)
+                    .thenComparing(PackageVersion::getVersion))
+            .map(this::toSnapshot)
+            .toList();
+
+    final var tags = new LinkedHashMap<String, String>();
+
+    for (final var tag : this.packageDistTagRepository.findAllTagsOfPackage(npmPackage.getId())) {
+      tags.put(tag.getTag(), tag.getVersion());
+    }
+
+    return new NpmPackageSnapshot(
+        npmPackage.getScope(),
+        npmPackage.getName(),
+        npmPackage.getLatest(),
+        npmPackage.getCreatedAt(),
+        versions,
+        tags);
+  }
+
+  private NpmPackageSnapshot.Version toSnapshot(final PackageVersion version) {
+
+    final var keywords =
+        this.packageKeywordRepository.findAllByPackageVersionId(version.getId()).stream()
+            .map(PackageKeywordListItem::getKeyword)
+            .toList();
+    final var maintainers =
+        this.packageMaintainerRepository.findAllByPackageVersionId(version.getId()).stream()
+            .map(
+                maintainer ->
+                    new NpmPackageSnapshot.Maintainer(
+                        maintainer.getName(), maintainer.getEmail(), maintainer.getUrl()))
+            .toList();
+
+    return new NpmPackageSnapshot.Version(
+        version.getVersion(),
+        version.getCreatedAt(),
+        version.getDescription(),
+        version.getHomepage(),
+        version.getLicense(),
+        version.getRepositoryType(),
+        version.getRepositoryUrl(),
+        version.getAuthorName(),
+        version.getAuthorEmail(),
+        version.getAuthorUrl(),
+        version.getBugsUrl(),
+        version.getBugsEmail(),
+        version.isDeprecated()
+            ? Objects.requireNonNullElse(version.getDeprecationMessage(), "")
+            : null,
+        keywords,
+        maintainers);
   }
 
   // The storage strategy throws the IOException of a failed removal unchecked (sneaky), which only
@@ -478,7 +545,7 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
       final UUID repoId, final @Nullable String scope, final Pageable pageable) {
 
     return this.npmPackageRepository
-        .findAllByRepoIdAndLatestVersionContainsScope(repoId, scope, pageable)
+        .findAllByRepoIdAndLatestVersionContainsScope(repoId, withoutAtSign(scope), pageable)
         .map(this.npmPackageConverter::toPackageListItemDto);
   }
 
@@ -492,8 +559,18 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     }
 
     return this.npmPackageRepository
-        .findAllByRepoIdAndLatestVersionAndScopeContainsName(repoId, scope, name, pageable)
+        .findAllByRepoIdAndLatestVersionAndScopeContainsName(
+            repoId, scope, withoutAtSign(name), pageable)
         .map(this.npmPackageConverter::toPackageListItemDto);
+  }
+
+  /**
+   * The list search matches the {@code scope/name} key, in which the scope is stored without its
+   * {@code @}, so a term typed as {@code @scope/name} loses the leading {@code @}.
+   */
+  private static @Nullable String withoutAtSign(final @Nullable String term) {
+
+    return term != null && term.startsWith("@") ? term.substring(1) : term;
   }
 
   public PackageVersionInfo getPackageVersion(final UUID packageId, final String versionName) {

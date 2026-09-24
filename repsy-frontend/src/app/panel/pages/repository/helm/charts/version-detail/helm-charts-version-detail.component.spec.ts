@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
@@ -52,10 +53,15 @@ describe('HelmChartsVersionDetailComponent', () => {
 
   beforeEach(() => {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    helmService = jasmine.createSpyObj<HelmService>('HelmService', ['getChartDetail', 'deleteChart'], {
-      repoChanges,
-    });
+    helmService = jasmine.createSpyObj<HelmService>(
+      'HelmService',
+      ['getChartDetail', 'getChartVersions', 'deleteChart'],
+      {
+        repoChanges,
+      },
+    );
     helmService.getChartDetail.and.returnValue(of(FULL));
+    helmService.getChartVersions.and.returnValue(of([{ version: '1.2.3' }, { version: '1.2.4' }] as never));
     helmService.deleteChart.and.returnValue(of(undefined));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
@@ -159,14 +165,28 @@ describe('HelmChartsVersionDetailComponent', () => {
       expect(helmService.deleteChart).not.toHaveBeenCalled();
     });
 
-    it('deletes the version, then goes up to the chart and toasts', async () => {
+    it('deletes the version, then goes up to the chart and toasts while others remain', async () => {
+      component.deleteVersion();
+
+      dangerModalService.call();
+      await Promise.resolve();
+
+      expect(helmService.getChartVersions).toHaveBeenCalledOnceWith('nginx');
+      expect(helmService.deleteChart).toHaveBeenCalledOnceWith('nginx', '1.2.3');
+      expect(router.navigate).toHaveBeenCalledOnceWith(['..'], { relativeTo: route });
+      expect(toastService.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
+    });
+
+    // RPS-1302: the chart is gone with its last version, so its versions page answers 404.
+    it('goes to the chart list, never to the versions page of the removed chart, after the last version', async () => {
+      helmService.getChartVersions.and.returnValue(of([{ version: '1.2.3' }] as never));
       component.deleteVersion();
 
       dangerModalService.call();
       await Promise.resolve();
 
       expect(helmService.deleteChart).toHaveBeenCalledOnceWith('nginx', '1.2.3');
-      expect(router.navigate).toHaveBeenCalledOnceWith(['..'], { relativeTo: route });
+      expect(router.navigate).toHaveBeenCalledOnceWith(['/', REPO]);
       expect(toastService.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
     });
 
@@ -182,13 +202,29 @@ describe('HelmChartsVersionDetailComponent', () => {
       expect(component.loading).toBeFalse();
     });
 
-    it('toasts the failure and stays on the page when the delete fails', () => {
-      helmService.deleteChart.and.returnValue(throwError(() => 'Chart is locked'));
+    // The error interceptor shows the failure; the component passing the HttpErrorResponse to the
+    // toast service read "[object Object]" (RPS-1302).
+    it('shows no toast of its own and stays on the page when the delete fails', () => {
+      helmService.deleteChart.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 500, error: { text: 'Chart is locked' } })),
+      );
       component.deleteVersion();
 
       dangerModalService.call();
 
-      expect(toastService.show).toHaveBeenCalledOnceWith('Chart is locked', 'error');
+      expect(toastService.show).not.toHaveBeenCalled();
+      expect(router.navigate).not.toHaveBeenCalled();
+      expect(component.loading).toBeFalse();
+    });
+
+    it('deletes nothing when the versions of the chart cannot be read', () => {
+      helmService.getChartVersions.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+      component.deleteVersion();
+
+      dangerModalService.call();
+
+      expect(helmService.deleteChart).not.toHaveBeenCalled();
+      expect(toastService.show).not.toHaveBeenCalled();
       expect(router.navigate).not.toHaveBeenCalled();
       expect(component.loading).toBeFalse();
     });

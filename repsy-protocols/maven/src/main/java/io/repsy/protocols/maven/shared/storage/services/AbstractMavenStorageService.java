@@ -208,13 +208,9 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
     final var versionPath = this.getPath(groupId, artifactId, versionName);
     final var storagePath = StoragePath.of(repoUuid, versionPath.toString());
 
-    if (!this.directoryExists(storagePath)) {
-      // An earlier partial delete or a manual cleanup can leave the DB row without a directory.
-      // Treat the delete as already done instead of failing on Files.move's NoSuchFileException;
-      // the caller still deletes the row and rewrites the metadata (RPS-1190).
-      return 0L;
-    }
-
+    // An earlier partial delete or a manual cleanup can leave the DB row without a directory
+    // (RPS-1190): the usage of a directory that is gone is zero and deleting it is a no-op, so the
+    // caller still deletes the row and rewrites the metadata.
     final var usage = this.storageStrategy.calculatePathUsage(storagePath);
 
     this.storageStrategy.delete(storagePath);
@@ -232,16 +228,6 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
       return this.storageStrategy.listDirectoryContents(storagePath);
     } catch (final ItemNotFoundException _) {
       return List.of();
-    }
-  }
-
-  private boolean directoryExists(final StoragePath storagePath) {
-
-    try {
-      this.storageStrategy.listDirectoryContents(storagePath);
-      return true;
-    } catch (final ItemNotFoundException e) {
-      return false;
     }
   }
 

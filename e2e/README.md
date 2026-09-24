@@ -2482,8 +2482,8 @@ so `panelApi` and `seeder` (per-test run id, cleanup) work unchanged, and adds:
 - **Timing facts a test must respect.** A routed view renders after its own requests answer: never
   assert "navigation finished", wait for the element or response that drives the view
   (`Shell.waitForView`, `expect(...).toBeVisible()`); there are no fixed sleeps
-  (`eslint-plugin-playwright` errors on `waitForTimeout`). Toasts live 3 s and at most 3 are kept:
-  assert a toast right after the action. (`PanelLayoutComponent` used to hide the outlet for a fixed
+  (`eslint-plugin-playwright` errors on `waitForTimeout`). A success toast lives 3 s, an error toast 7 s
+  (held while hovered or focused, RPS-1266) and at most 3 are kept: assert a toast right after the action. (`PanelLayoutComponent` used to hide the outlet for a fixed
   500 ms and the header "Profile" link used to be a full reload, RPS-1264; both are fixed, PRO-04
   proves the link with `src/ui/document-marker.ts`.)
 - **Opt-in suites** (`@throttle`, `@scanner`, ...) skip themselves with
@@ -2804,7 +2804,7 @@ protocol-only scenarios. The template is `src/ui/package-scenarios.ts`, the UI c
 registerPackageScenarios(DESCRIPTORS.nuget, {
   knownFailures: {
     '02-versions-search':
-      'RPS-1262: the NuGet version list has no search box (the API has no search parameter)',
+      'RPS-1304: the NuGet version list has no search box (the API has no search parameter)',
   },
 });
 ```
@@ -2825,7 +2825,7 @@ differs the descriptor carries the value (`repoUrlIn`, `detail.delete.landsOn`,
 | 06  | Configure modal (repo name, `YOUR_PASSWORD` where the protocol has one) and the deploy-token variant opened from a token row in the settings                     |
 
 `knownFailures` keys (`PackageScenarioKey`) run their step under `test.fail`, so a fix turns it red and
-the title carries the reason. Pinned today: NuGet `02-versions-search` (RPS-1262, the API has no
+the title carries the reason. Pinned today: NuGet `02-versions-search` (RPS-1304, the API has no
 version search). The RPS-1261 (Maven Gradle Groovy block, Docker desktop Digest/Config Digest cells,
 npm Bugs URL/Keywords, PyPI "Post release:" and the mobile "Latest" link), RPS-1262 (mobile Delete
 gate, Cargo/NuGet mobile cards, Helm pager, Go empty pager, the Maven browser's Settings button) and
@@ -2877,29 +2877,27 @@ keys a crate by its normalised name, `-` becoming `_`), NuGet and Helm `e2e-<run
 (`clients/{cargo,nuget,helm,helm-chart,golang,ruby}-raw.ts`); the only edits there are
 `buildPublishBody`'s optional `readme`/`deps` and `export` on Helm's two OCI body builders.
 
-| ID        | What it does                                                                                                                                                                                                                                                                                             |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| cargo-07  | README renders (and is absent when none was published); deps in the Cargo.toml block; Add Dependency vs Install Binary; the four sorts (crates at different versions); latest version and every version; delete a crate with two versions; a yanked version still listed (the panel shows no yank state) |
-| nuget-07  | stable and pre-release side by side; a stable-only repo (`releases`/`snapshots`) refuses a pre-release and keeps the list; unlist/relist flips `Listed` on the detail (the version stays listed); the four install snippets, no dependencies, nuspec metadata                                            |
-| helm-07   | a chart published to each module (OCI and classic) in one list, both open with digest and Chart.yaml; one chart with versions from both modules; deleting a classic chart; the Latest link                                                                                                               |
-| golang-07 | list -> `/modules?modulePath=` -> `/modules/version?modulePath=&version=` with the breadcrumb; deep link; GOPROXY endpoints; "Version 'x' not found"; the detail without its query goes to the list; a module path with slashes is searchable                                                            |
-| ruby-07   | yanked badge on the versions list and on the detail after a yank through the API; install commands, platform and checksum; the Latest link                                                                                                                                                               |
+| ID        | What it does                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| cargo-07  | README renders (and is absent when none was published); deps in the Cargo.toml block; Add Dependency vs Install Binary; the four sorts (crates published out of version and name order); Newest puts the crate published last on top; latest version and every version; delete a crate with two versions; a yanked version stays listed and is marked yanked on the list and on its detail (RPS-1301) |
+| nuget-07  | stable and pre-release side by side; a stable-only repo (`releases`/`snapshots`) refuses a pre-release and keeps the list; unlist/relist flips `Listed` on the detail (the version stays listed); the four install snippets, no dependencies, nuspec metadata                                                                                                                                         |
+| helm-07   | a chart published to each module (OCI and classic) in one list, both open with digest and Chart.yaml; one chart with versions from both modules; deleting a classic chart; the Latest link; deleting the last version toasts once and lands on the chart list (RPS-1302)                                                                                                                              |
+| golang-07 | list -> `/modules?modulePath=` -> `/modules/version?modulePath=&version=` with the breadcrumb; deep link; GOPROXY endpoints; "Version 'x' not found"; the detail without its query goes to the list; a module path with slashes is searchable                                                                                                                                                         |
+| ruby-07   | yanked badge on the versions list and on the detail after a yank through the API; install commands, platform and checksum; the Latest link                                                                                                                                                                                                                                                            |
 
 What the descriptors record (found by running each protocol): a version row's link appends `#security`
 (the template accepts a fragment); a detail Delete lands on the list (Cargo, Ruby), on the versions page
-(NuGet, Helm, Go) and, for the LAST version, on the list for NuGet (`landsOnLast`) and on the empty
-versions page for Helm and Go; deleting the last version removes the package for all but Go, whose module
+(NuGet, Helm, Go) and, for the LAST version, on the list for NuGet and Helm (`landsOnLast`) and on the empty
+versions page for Go; deleting the last version removes the package for all but Go, whose module
 stays listed with no versions (like Docker, RPS-1288 (5)); Cargo/NuGet/Helm/Ruby Configure texts have
 `<YOUR_...>` placeholders and the same body in the deploy-token variant (`deployTokenMarker` is optional
 now: absent = same body, only the title differs), Ruby's title is the same in both.
 
 Pinned with `test.fail` / `knownFailures` (each still fails for the stated reason, checked un-pinned):
 
-| Where                             | Bug                                                                                                                                                                                                                                           |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| nuget `02-versions-search`        | RPS-1262 (3): no search box on the version list: the API has no version search parameter                                                                                                                                                      |
-| cargo-07 Newest by publish time   | RPS-1301: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort has distinct keys (RPS-1298: ties go by id), and cargo-07 asserts sorts by version |
-| helm-07 deleting the last version | RPS-1302: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                                                                                            |
+| Where                      | Bug                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| nuget `02-versions-search` | RPS-1304: no search box on the version list: the API has no version search parameter |
 
 `seed-proof.spec.ts` (RPS-1255) now covers all nine protocols; its generic search/sort/delete walk stays on
 the first four (the other five have the protocol-aware version of it in PKG-<proto>-02 and -04).
@@ -2909,7 +2907,7 @@ mobile-Delete `canWrite` bug of RPS-1262 (1) never existed in these five protoco
 
 ### Errors, navigation, mobile and accessibility (RPS-1258)
 
-`tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..04, NAV-01..03, A11Y-01) plus `src/ui/a11y.ts` (the axe
+`tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..04, NAV-01..03, A11Y-01..04) plus `src/ui/a11y.ts` (the axe
 helper) and `tests/ui/nav/breadcrumb.ts` (the breadcrumb page object). Run them with
 `./run.sh test --protocol ui --grep "ERR-|NAV-|A11Y-"`. `@axe-core/playwright` is the only dependency
 this story added (`package.json`, `pnpm-lock.yaml`), so the `ui` runner image must be rebuilt once
@@ -2930,7 +2928,7 @@ Things a later author must know:
 
 - **Routes are stubs, everything else is real.** ERR tests answer one URL with `page.route`, remove it
   again in a `finally` (`withRoute`), and start asserting the toast BEFORE the navigation that raises it
-  (`expectToastLater`): a toast lives 3 s. The interceptor's mapping is status 0 -> `Connection error`,
+  (`expectToastLater`): a toast is short-lived (3 s success, 7 s error). The interceptor's mapping is status 0 -> `Connection error`,
   403 -> the server's `text` or `Access denied`, >= 500 -> `Server error`, other 4xx -> the server's `text`.
 - **The repository list renders whatever arrives** of its nine parallel `info` calls, so one failing type
   loses only its own rows and the page shows `repo-warning`; only when EVERY request failed does it show
@@ -2941,6 +2939,14 @@ Things a later author must know:
   navigation), the layout closes it when the viewport reaches `md` and while it is open sets
   `document.body.style.overflow = 'hidden'` (the same style the splash screen uses, so NAV-03 checks that
   style rather than a class).
+- **Shared components (A11Y-02..04, `a11y/shared-components.spec.ts`, RPS-1266 part 1).** The ARIA
+  contract of the row `...` menu, the toast stack and pagination on the real pages, each with an axe scan
+  scoped to the component (the page-level scans cannot see an open menu or a toast): the menu toggle is
+  labelled and carries `aria-haspopup`/`aria-expanded`/`aria-controls`, the menu is `role=menu` with
+  `menuitem`s and closes on Escape (focus back on the toggle), on an outside click and after an item is
+  chosen; the stack is `role=status` + `aria-live=polite`, an error toast is `role=alert`, its close button
+  is named, it lasts 7 s and is held while hovered or focused (driven with `page.clock`, so no test sleeps);
+  pagination is a `nav` named `Pagination` with `aria-current=page` and named previous/next buttons.
 - **axe, report-only by default.** `scanPage()` (`src/ui/a11y.ts`) runs the WCAG 2.0/2.1 A and AA rules,
   attaches `axe-<page>.json` (summary + every violation with its nodes) and `axe-<page>.txt` to the report,
   writes the JSON to `test-results/<test>/axe-<page>.json` and prints one `AXE <page> [report]: ...` line, and

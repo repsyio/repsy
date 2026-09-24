@@ -13,23 +13,23 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 ///
-import {CommonModule, NgOptimizedImage} from '@angular/common';
-import {Component, OnDestroy} from '@angular/core';
-import {ActivatedRoute, Router} from '@angular/router';
-import {Highlight} from 'ngx-highlightjs';
-import {HighlightLineNumbers} from 'ngx-highlightjs/line-numbers';
-import {Subscription} from 'rxjs';
-import {finalize} from 'rxjs/operators';
+import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { Component, OnDestroy } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Highlight } from 'ngx-highlightjs';
+import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
+import { Subscription } from 'rxjs';
+import { finalize, map, switchMap } from 'rxjs/operators';
 
-import {environment} from '../../../../../../../environments/environment';
-import {HelmChartDetail, RepoPermissionInfo} from '../../../../../../../generated/api';
-import {SpinnerComponent} from '../../../../../../shared/components/spinner/spinner.component';
-import {CopyClipboardComponent} from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
-import {DangerModalService} from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
-import {SecurityScanSectionComponent} from '../../../../../shared/components/security-scan-section/security-scan-section.component';
-import {ToastService} from '../../../../../shared/components/toast/toast.service';
-import {ByteFormatter} from '../../../../../shared/util/byte-formatter';
-import {HelmService} from '../../service/helm.service';
+import { environment } from '../../../../../../../environments/environment';
+import { HelmChartDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
+import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
+import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { ByteFormatter } from '../../../../../shared/util/byte-formatter';
+import { HelmService } from '../../service/helm.service';
 
 @Component({
   selector: 'app-helm-charts-version-detail',
@@ -81,16 +81,29 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
   public deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
+      // Deleting the last version removes the chart, so its versions page would answer 404: the page
+      // to land on is decided from the versions the chart has right before the delete.
       this.helmService
-        .deleteChart(this.chartName, this.versionName)
-        .pipe(finalize(() => { this.loading = false; }))
+        .getChartVersions(this.chartName)
+        .pipe(
+          switchMap((versions) =>
+            this.helmService.deleteChart(this.chartName, this.versionName).pipe(map(() => versions.length <= 1)),
+          ),
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
         .subscribe({
-          next: () => {
-            this.router.navigate(['..'], { relativeTo: this.route }).then(() => {
+          next: (wasLastVersion) => {
+            const target = wasLastVersion
+              ? this.router.navigate(['/', this.activeRepo.repoName])
+              : this.router.navigate(['..'], { relativeTo: this.route });
+            target.then(() => {
               this.toastService.show('Version deleted successfully', 'success');
             });
           },
-          error: (err: string) => this.toastService.show(err, 'error'),
+          // The error interceptor has already shown the failure to the user.
+          error: () => {},
         });
     });
   }
@@ -114,7 +127,11 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
 
     this.helmService
       .getChartDetail(name, version)
-      .pipe(finalize(() => { this.loading = false; }))
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
       .subscribe({
         next: (detail) => {
           this.chart = detail;
@@ -127,7 +144,9 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
             this.chart.description ? `description: ${this.chart.description}` : null,
             this.chart.appVersion ? `appVersion: "${this.chart.appVersion}"` : null,
             this.chart.type ? `type: ${this.chart.type}` : null,
-          ].filter(Boolean).join('\n');
+          ]
+            .filter(Boolean)
+            .join('\n');
         },
         error: () => {},
       });

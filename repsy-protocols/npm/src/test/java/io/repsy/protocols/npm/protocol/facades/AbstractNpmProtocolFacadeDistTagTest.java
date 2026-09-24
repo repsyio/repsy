@@ -25,18 +25,23 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
-import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
+import io.repsy.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,8 +53,8 @@ import org.springframework.data.util.Pair;
 /**
  * RPS-1272: {@link AbstractNpmProtocolFacade#addDistributionTag} and {@link
  * AbstractNpmProtocolFacade#removeDistributionTag} hand the package metadata write to {@link
- * NpmPackageService}, which writes the tag row first, and put the metadata back when that write
- * fails.
+ * NpmPackageService}, which writes the tag row first, and the metadata change to {@link
+ * AbstractNpmStorageService#changeMetadata}, which puts the metadata back when that write fails.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractNpmProtocolFacade dist-tags (RPS-1272)")
@@ -61,7 +66,8 @@ class AbstractNpmProtocolFacadeDistTagTest {
   private static final String TAG = "next";
   private static final String VERSION = "1.2.3";
   private static final Path BASE_PATH = Path.of(PACKAGE);
-  private static final byte[] PREVIOUS_METADATA = "{\"name\":\"demo\"}".getBytes();
+  private static final NpmPackageSnapshot SNAPSHOT =
+      new NpmPackageSnapshot(null, PACKAGE, "1.2.3", Instant.EPOCH, List.of(), Map.of());
 
   @Mock private NpmPackageService<UUID> packageService;
   @Mock private AbstractNpmStorageService storageService;
@@ -114,6 +120,23 @@ class AbstractNpmProtocolFacadeDistTagTest {
             invocation -> invocation.<NpmPackageService.MetadataWriter>getArgument(4).write());
   }
 
+  /**
+   * Makes the mocked storage service run the change it is given, as the real one does whether or
+   * not it had to rebuild the file first, and hand out the rows it is given.
+   */
+  private void metadataChangesRun() throws IOException {
+    when(this.storageService.changeMetadata(
+            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              assertThat(invocation.<Supplier<NpmPackageSnapshot>>getArgument(3).get())
+                  .as("the rows the storage service rebuilds a lost file from")
+                  .isSameAs(SNAPSHOT);
+              return invocation.<NpmStorageService.MetadataChange>getArgument(4).apply();
+            });
+    when(this.packageService.getSnapshot(REPO_ID, null, PACKAGE)).thenReturn(SNAPSHOT);
+  }
+
   private void add() throws IOException {
     // npm sends the version as a JSON string, quotes included.
     this.facade.addDistributionTag(this.context, null, PACKAGE, TAG, "\"" + VERSION + "\"");
@@ -125,53 +148,30 @@ class AbstractNpmProtocolFacadeDistTagTest {
     this.basePath();
     this.addRuns();
     final var metadata = new LinkedHashMap<String, Object>();
-    when(this.storageService.readMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH))
-        .thenReturn(PREVIOUS_METADATA);
+    this.metadataChangesRun();
     when(this.storageService.addDistributionTag(REPO_ID, REPO_NAME, BASE_PATH, TAG, VERSION))
         .thenReturn(Pair.of(metadata, 7L));
 
     this.add();
 
     verify(this.storageService).writeMetadataToFile(eq(REPO_NAME), eq(metadata), any());
-    verify(this.storageService, never()).restoreMetadataBytes(any(), any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(7L);
   }
 
   @Test
-  @DisplayName("add puts the metadata back and reports nothing when the write fails")
-  void addRestoresTheMetadataWhenTheWriteFails() throws Exception {
+  @DisplayName("add reports nothing when the write fails")
+  void addReportsNothingWhenTheWriteFails() throws Exception {
     final var failure = new IOException("disk full");
     this.basePath();
     this.addRuns();
-    when(this.storageService.readMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH))
-        .thenReturn(PREVIOUS_METADATA);
+    this.metadataChangesRun();
     when(this.storageService.addDistributionTag(any(), any(), any(), any(), any()))
         .thenReturn(Pair.of(new LinkedHashMap<>(), 7L));
     doThrow(failure).when(this.storageService).writeMetadataToFile(any(), any(), any());
 
     assertThatThrownBy(this::add).isSameAs(failure);
 
-    verify(this.storageService)
-        .restoreMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH, PREVIOUS_METADATA);
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
-  }
-
-  @Test
-  @DisplayName("add keeps the write failure, with the restore failure attached, when both fail")
-  void addKeepsTheWriteFailureWhenTheRestoreFails() throws Exception {
-    final var failure = new IOException("disk full");
-    final var restoreFailure = new IOException("disk gone");
-    this.basePath();
-    this.addRuns();
-    when(this.storageService.readMetadataBytes(any(), any(), any())).thenReturn(PREVIOUS_METADATA);
-    when(this.storageService.addDistributionTag(any(), any(), any(), any(), any()))
-        .thenReturn(Pair.of(new LinkedHashMap<>(), 7L));
-    doThrow(failure).when(this.storageService).writeMetadataToFile(any(), any(), any());
-    doThrow(restoreFailure)
-        .when(this.storageService)
-        .restoreMetadataBytes(any(), any(), any(), any());
-
-    assertThatThrownBy(this::add).isSameAs(failure).hasSuppressedException(restoreFailure);
   }
 
   @Test
@@ -183,8 +183,7 @@ class AbstractNpmProtocolFacadeDistTagTest {
 
     assertThatThrownBy(this::add).isInstanceOf(BadRequestException.class);
 
-    verify(this.storageService, never()).writeMetadataToFile(any(), any(), any());
-    verify(this.storageService, never()).restoreMetadataBytes(any(), any(), any(), any());
+    verify(this.storageService, never()).changeMetadata(any(), any(), any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
   }
 
@@ -193,49 +192,28 @@ class AbstractNpmProtocolFacadeDistTagTest {
   void removeWritesTheMetadata() throws Exception {
     this.basePath();
     this.removeRuns();
-    when(this.storageService.readMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH))
-        .thenReturn(PREVIOUS_METADATA);
+    this.metadataChangesRun();
     when(this.storageService.removeDistributionTag(REPO_ID, REPO_NAME, BASE_PATH, TAG))
         .thenReturn(-9L);
 
     this.facade.removeDistributionTag(this.context, null, PACKAGE, TAG);
 
-    verify(this.storageService, never()).restoreMetadataBytes(any(), any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(-9L);
   }
 
   @Test
-  @DisplayName("remove puts the metadata back and reports nothing when the write fails")
-  void removeRestoresTheMetadataWhenTheWriteFails() throws Exception {
+  @DisplayName("remove reports nothing when the write fails")
+  void removeReportsNothingWhenTheWriteFails() throws Exception {
     final var failure = new IllegalStateException("storage went away");
     this.basePath();
     this.removeRuns();
-    when(this.storageService.readMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH))
-        .thenReturn(PREVIOUS_METADATA);
+    this.metadataChangesRun();
     when(this.storageService.removeDistributionTag(any(), any(), any(), any())).thenThrow(failure);
 
     assertThatThrownBy(() -> this.facade.removeDistributionTag(this.context, null, PACKAGE, TAG))
         .isSameAs(failure);
 
-    verify(this.storageService)
-        .restoreMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH, PREVIOUS_METADATA);
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
-  }
-
-  @Test
-  @DisplayName(
-      "remove of a package without stored metadata is a not-found, with nothing to restore")
-  void removeOfAPackageWithoutMetadata() throws Exception {
-    this.basePath();
-    this.removeRuns();
-    when(this.storageService.readMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH))
-        .thenThrow(new ItemNotFoundException("itemNotFound"));
-
-    assertThatThrownBy(() -> this.facade.removeDistributionTag(this.context, null, PACKAGE, TAG))
-        .isInstanceOf(ItemNotFoundException.class);
-
-    verify(this.storageService, never()).removeDistributionTag(any(), any(), any(), any());
-    verify(this.storageService, never()).restoreMetadataBytes(any(), any(), any(), any());
   }
 
   @Test
