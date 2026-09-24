@@ -104,6 +104,7 @@ e2e/
       fixtures.ts                # Playwright fixtures: panelApi, seeder, world(scenario, adapter)
       remote-throttle.ts        # RemoteAuthBudget/withBackoff429 -- see "Remote hardening" below
       gradle-extras.ts          # registerGradleExtras(dsl): the Gradle-only checks (module metadata, gradle.properties credential), RPS-133
+      gradle-plugin-extras.ts   # registerGradlePluginExtras(dsl): legacy eachPlugin route, missing plugin marker, no Plugin Portal fallback
     ui/                        # the panel UI suite's plumbing (fixtures, session seeding, page objects) -- see "UI suite"
     clients/
       stack.ts                  # findRepsyContainer()/dockerExec()/logLinesContaining(): docker exec + docker logs against the local stack's Repsy container ("Stack runner")
@@ -120,6 +121,8 @@ e2e/
       maven-signing.ts           # a real `mvn deploy` with maven-gpg-plugin and a Gradle maven-publish + signing publish (RPS-1316)
       gradle.ts                  # the Gradle client: publish()/resolve()/seedPublish() with a Groovy or a Kotlin DSL build file (RPS-133)
       gradle-adapter.ts          # gradleAdapter(dsl): the ProtocolAdapter registerPublishConsumeLoop takes, one per DSL (`gradle-groovy`, `gradle-kotlin`)
+      gradle-plugin.ts           # the Gradle client as a plugin consumer: publish a plugin, apply it from pluginManagement (RPS-133)
+      gradle-plugin-adapter.ts   # gradlePluginAdapter(dsl): the same loop with a plugin as the artifact (`gradle-plugin-groovy`, `gradle-plugin-kotlin`)
       cargo-raw.ts                 # cargo-specific raw PUT/GET (publish/config.json/sparse-index/download), body builder
       cargo.ts                     # the cargo client + cargoAdapter: publish()/resolve()/seedPublish(), cargo package/publish/fetch
       nuget-raw.ts                  # nuget-specific raw PUT/GET (publish/versions/download/registration/service-index), buildNupkg (fflate)
@@ -140,7 +143,7 @@ e2e/
       ruby.ts                              # the ruby client + rubyAdapter: publish()/resolve()/seedPublish(), real gem push / bundle install
     packages/
       maven/                     # mustache templates of the tiny jar project + settings.xml
-      gradle/                    # mustache templates of the tiny library (publish) and its consumer, as build.gradle and build.gradle.kts
+      gradle/                    # mustache templates of the tiny library (publish) and its consumer, as build.gradle and build.gradle.kts; plugin/ holds the plugin fixture (its one class and the publish/consumer templates)
       npm/                       # mustache templates of the tiny package.json/index.js + .npmrc
       cargo/                     # mustache templates of the tiny crate + consumer Cargo.toml + .cargo/config.toml
       nuget/                     # mustache templates of nuget.config + the consumer .csproj (the .nupkg itself is built in code, see nuget-raw.ts)
@@ -163,6 +166,8 @@ e2e/
       remote-throttle.spec.ts   # sanity check of RemoteAuthBudget/withBackoff429, no server needed
       gradle-groovy.spec.ts     # RPS-133: registerPublishConsumeLoop(gradleAdapter('groovy')) + the Gradle extras, build.gradle
       gradle-kotlin.spec.ts     # RPS-133: the same for the Kotlin DSL, build.gradle.kts
+      gradle-plugin-groovy.spec.ts  # RPS-133: the catalog's RELEASE scenarios with a Gradle plugin as the artifact + the plugin extras, Groovy
+      gradle-plugin-kotlin.spec.ts  # RPS-133: the same for the Kotlin DSL
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
@@ -621,6 +626,29 @@ the same `registerPublishConsumeLoop` as `mvn`: two more protocol keys, `gradle-
 - `scenarios/gradle-extras.ts` adds what the catalog cannot say: the sources jar, POM and module
   metadata a Gradle publish stores (the module metadata's listed jar digest is the stored jar's), and
   the credential coming from `gradle.properties` instead of the environment.
+
+**Repsy as a Gradle plugin repository (`gradle-plugin-{groovy,kotlin}.spec.ts`, RPS-133).** The way a
+team uses a private plugin repository: `clients/gradle-plugin.ts` builds a tiny plugin
+(`java-gradle-plugin` + `maven-publish`, `src/packages/gradle/plugin/`) and publishes it with
+`gradle publish`, which stores the plugin jar and the plugin marker artifact
+(`<plugin id>:<plugin id>.gradle.plugin`, a POM depending on the jar) that a `plugins { id ... }`
+block resolves through; a consumer build then applies it, from a `settings.gradle[.kts]` whose
+`pluginManagement { repositories { maven { ... } } }` names Repsy as the only plugin repository. Naming
+one switches Gradle's default, the Gradle Plugin Portal, off, so a plugin can only come from Repsy.
+Repsy OS has no remote (proxy) Maven repository, so mirroring the portal itself is not covered.
+
+The plugin jar carries a random marker resource, and the plugin's `e2eMarker` task prints it: the marker
+a consumer's build printed proves which published jar it applied, the way the jar digest does for a
+library (`contentSha256` is the marker's digest on both sides). The adapters `gradle-plugin-groovy` and
+`gradle-plugin-kotlin` run the catalog's RELEASE scenarios with it (authentication and tokens, override,
+the releases switch: `MAVEN_RELEASE_CLIENTS` in `catalog.ts`; the SNAPSHOT scenarios stay with the
+library adapters). `scenarios/gradle-plugin-extras.ts` adds: the legacy
+`resolutionStrategy.eachPlugin { useModule(...) }` route, which needs no marker artifact; a plugin
+published without its marker artifact (`plugins { id }` fails with Gradle's "was not found", the legacy
+route still applies the same jar); and a plugin id Repsy does not have, whose search names Repsy and
+never `plugins.gradle.org`. The shared Gradle home is also primed with a plugin build (compiling the
+plugin class generates the Gradle API jar), and its ready marker is versioned (`WARM_VERSION`) so a
+volume primed by an older harness is primed again.
 
 A cold Gradle home costs tens of seconds of CPU per build (native libraries, the generated Gradle API
 and Kotlin DSL jars, the plugin accessors), which a dozen parallel workers turn into timeouts. Like
