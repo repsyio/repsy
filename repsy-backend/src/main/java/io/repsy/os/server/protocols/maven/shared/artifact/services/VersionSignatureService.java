@@ -71,6 +71,25 @@ public class VersionSignatureService {
     this.versionSignatureRepository.save(signature);
   }
 
+  /**
+   * Takes the version's row lock, which every request that changes what the version's signed state
+   * is computed from holds from its recording of a signature to its commit. What is read after it
+   * has been taken is what all the requests before it committed (RPS-1188, RPS-1320).
+   */
+  public void lock(final ArtifactVersion version) {
+
+    this.artifactVersionRepository.lockForSignedUpdate(version.getId());
+  }
+
+  /** Whether a verified signature is recorded for the file. */
+  @Transactional(readOnly = true)
+  public boolean isRecorded(final ArtifactVersion version, final String fileName) {
+
+    return this.versionSignatureRepository
+        .findByArtifactVersionIdAndFileName(version.getId(), fileName)
+        .isPresent();
+  }
+
   /** Forgets the verified signature of a file that was stored again: its bytes are new. */
   public void forget(final ArtifactVersion version, final String fileName) {
 
@@ -92,7 +111,7 @@ public class VersionSignatureService {
   public void refreshSigned(
       final UUID storageKey, final ArtifactVersion version, final String versionPath) {
 
-    this.artifactVersionRepository.lockForSignedUpdate(version.getId());
+    this.lock(version);
 
     final var items =
         this.storageStrategy.listStorageItems(StoragePath.of(storageKey, versionPath));
