@@ -33,6 +33,7 @@ import io.repsy.os.shared.repo.mappers.RepoConverter;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -348,6 +349,145 @@ class RepoTxServiceTest {
 
       assertThat(settings.getReleases()).isTrue();
       assertThat(settings.getSnapshots()).isTrue();
+    }
+  }
+
+  /**
+   * RPS-1188 and RPS-1204: the two PGP signature settings only apply to Maven, and are updated and
+   * read like the other settings, field by field.
+   */
+  @Nested
+  @DisplayName("PGP signature settings")
+  class PgpSettings {
+
+    private static Repo repoOfType(final RepoType type) {
+      final var repo = new Repo();
+      repo.setId(UUID.randomUUID());
+      repo.setType(type);
+      repo.setAllowOverride(true);
+      repo.setReleases(true);
+      repo.setSnapshots(true);
+      repo.setSecurityScanEnabled(true);
+      return repo;
+    }
+
+    private static RepoInfo toRepoInfo(final Repo repo) {
+      return RepoInfo.builder()
+          .id(repo.getId())
+          .name("repo")
+          .type(repo.getType())
+          .securityScanEnabled(repo.isSecurityScanEnabled())
+          .pgpVerifyAllSignaturesEnabled(repo.isPgpVerifyAllSignaturesEnabled())
+          .pgpKeyServerLookupEnabled(repo.isPgpKeyServerLookupEnabled())
+          .build();
+    }
+
+    private Repo storedRepoOfType(final RepoType type) {
+      final var repo = repoOfType(type);
+      when(RepoTxServiceTest.this.repoRepository.findById(repo.getId()))
+          .thenReturn(Optional.of(repo));
+      return repo;
+    }
+
+    @Test
+    @DisplayName("a new repo looks the key servers up and verifies only the POM signature")
+    void newRepoDefaults() {
+      final var repo = new Repo();
+
+      assertThat(repo.isPgpVerifyAllSignaturesEnabled()).isFalse();
+      assertThat(repo.isPgpKeyServerLookupEnabled()).isTrue();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"NPM", "PYPI", "DOCKER", "CARGO", "GOLANG", "HELM", "RUBY", "NUGET"})
+    @DisplayName("rejects either PGP setting for a repo that is not a Maven one")
+    void rejectsPgpSettingsForANonMavenRepo(final RepoType type) {
+      final var repo = this.storedRepoOfType(type);
+
+      for (final var settings :
+          List.of(
+              RepoSettingsForm.builder().pgpVerifyAllSignaturesEnabled(true).build(),
+              RepoSettingsForm.builder().pgpKeyServerLookupEnabled(false).build(),
+              RepoSettingsForm.builder()
+                  .securityScanEnabled(false)
+                  .pgpKeyServerLookupEnabled(false)
+                  .build())) {
+        assertThatThrownBy(
+                () -> RepoTxServiceTest.this.service.updateSettings(repo.getId(), settings))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("pgpSettingsUnsupported");
+      }
+
+      assertThat(repo.isSecurityScanEnabled()).isTrue();
+      assertThat(repo.isPgpKeyServerLookupEnabled()).isTrue();
+      verify(RepoTxServiceTest.this.repoRepository, never()).save(any(Repo.class));
+    }
+
+    @Test
+    @DisplayName("a Maven PUT with only one PGP field changes that field and nothing else")
+    void aPartialPutChangesOnlyItsField() {
+      final var repo = this.storedRepoOfType(RepoType.MAVEN);
+
+      RepoTxServiceTest.this.service.updateSettings(
+          repo.getId(), RepoSettingsForm.builder().pgpKeyServerLookupEnabled(false).build());
+
+      assertThat(repo.isPgpKeyServerLookupEnabled()).isFalse();
+      assertThat(repo.isPgpVerifyAllSignaturesEnabled()).isFalse();
+      assertThat(repo.isAllowOverride()).isTrue();
+      assertThat(repo.getReleases()).isTrue();
+      assertThat(repo.isSecurityScanEnabled()).isTrue();
+
+      RepoTxServiceTest.this.service.updateSettings(
+          repo.getId(), RepoSettingsForm.builder().pgpVerifyAllSignaturesEnabled(true).build());
+
+      assertThat(repo.isPgpKeyServerLookupEnabled()).isFalse();
+      assertThat(repo.isPgpVerifyAllSignaturesEnabled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a PUT that leaves the PGP fields out keeps them, whatever else it changes")
+    void anOmittedPgpFieldIsKept() {
+      final var repo = this.storedRepoOfType(RepoType.MAVEN);
+      repo.setPgpVerifyAllSignaturesEnabled(true);
+      repo.setPgpKeyServerLookupEnabled(false);
+
+      RepoTxServiceTest.this.service.updateSettings(
+          repo.getId(), RepoSettingsForm.builder().securityScanEnabled(false).build());
+
+      assertThat(repo.isSecurityScanEnabled()).isFalse();
+      assertThat(repo.isPgpVerifyAllSignaturesEnabled()).isTrue();
+      assertThat(repo.isPgpKeyServerLookupEnabled()).isFalse();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"NPM", "PYPI", "DOCKER", "CARGO", "GOLANG", "HELM", "RUBY", "NUGET"})
+    @DisplayName("omits both PGP settings for a repo that is not a Maven one")
+    void nullsPgpSettingsForANonMavenRepo(final RepoType type) {
+      final var repo = this.storedRepoOfType(type);
+      when(RepoTxServiceTest.this.repoConverter.toRepoInfo(repo)).thenReturn(toRepoInfo(repo));
+
+      final var settings = RepoTxServiceTest.this.service.getRepoSettings(repo.getId());
+
+      assertThat(settings.getPgpVerifyAllSignaturesEnabled()).isNull();
+      assertThat(settings.getPgpKeyServerLookupEnabled()).isNull();
+    }
+
+    @Test
+    @DisplayName("exposes both PGP settings of a Maven repo")
+    void exposesPgpSettingsOfAMavenRepo() {
+      final var repo = this.storedRepoOfType(RepoType.MAVEN);
+      repo.setPgpVerifyAllSignaturesEnabled(true);
+      repo.setPgpKeyServerLookupEnabled(false);
+      when(RepoTxServiceTest.this.repoConverter.toRepoInfo(repo)).thenReturn(toRepoInfo(repo));
+
+      final var settings = RepoTxServiceTest.this.service.getRepoSettings(repo.getId());
+
+      assertThat(settings.getPgpVerifyAllSignaturesEnabled()).isTrue();
+      assertThat(settings.getPgpKeyServerLookupEnabled()).isFalse();
     }
   }
 }

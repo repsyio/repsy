@@ -50,7 +50,8 @@
  *    `artifactSignatureNotVerified` and changes nothing: no file, no row, no other version and no
  *    metadata is removed, and the `.asc` itself is not stored (RPS-1186). It used to be stored
  *    first and the whole version, the artifact and the group deleted on a refusal. Only a `.pom.asc`
- *    is verified; a `.jar.asc` is stored as sent.
+ *    is verified by default; a `.jar.asc` is stored as sent unless the repo turns on
+ *    `pgpVerifyAllSignaturesEnabled` (RPS-1188, pinned in `pgp-signature.spec.ts`).
  *  - The same holds for an `.asc` that is not a signature at all (invalid armor, a bad CRC, binary
  *    garbage): 422 `artifactSignatureNotVerified`, where it used to be a 500 (RPS-1191). And an
  *    `.asc` of a stored POM that has no registered version is refused with 404

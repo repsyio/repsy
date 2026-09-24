@@ -276,6 +276,27 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
         version);
   }
 
+  /** The files of a version whose signature was verified (RPS-1188), sorted. */
+  private List<String> verifiedFiles(final Repo repo, final String version) {
+    return this.jdbcTemplate.queryForList(
+        """
+        select s.file_name from maven_version_signature s
+          join maven_artifact_version v on v.id = s.artifact_version_id
+          join maven_artifact a on a.id = v.artifact_id
+         where a.repo_id = ? and v.version_name = ?
+         order by s.file_name""",
+        String.class,
+        repo.getId(),
+        version);
+  }
+
+  /** Switches the key-server lookup of a repo off (RPS-1204). */
+  private void disableKeyServerLookup(final Repo repo) {
+    final var managed = this.repoRepository.findByName(repo.getName()).orElseThrow();
+    managed.setPgpKeyServerLookupEnabled(false);
+    this.repoRepository.saveAndFlush(managed);
+  }
+
   private int artifactCount(final Repo repo) {
     return this.jdbcTemplate.queryForObject(
         "select count(*) from maven_artifact where repo_id = ?", Integer.class, repo.getId());
@@ -407,7 +428,57 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
 
     assertThat(Files.readAllBytes(stored(repo, RELEASE_ASC))).isEqualTo(signature);
     assertThat(this.signedOf(repo, "lib", "1.0")).containsExactly(true);
+    assertThat(this.verifiedFiles(repo, "1.0")).containsExactly("lib-1.0.pom");
     assertThat(this.reportedUsage()).containsExactly(usageOf(repo, pom), usageOf(repo, signature));
+  }
+
+  @Test
+  @DisplayName("a new repo looks the key servers up: the setting defaults to true (RPS-1204)")
+  void aNewRepoLooksTheKeyServersUp() {
+    final var repo = this.mavenRepo(false);
+
+    assertThat(repo.isPgpKeyServerLookupEnabled()).isTrue();
+    assertThat(repo.isPgpVerifyAllSignaturesEnabled()).isFalse();
+  }
+
+  @Test
+  @DisplayName("with the lookup off an unregistered key answers 404 at once, no server asked")
+  void lookupOffRefusesAnUnregisteredKeyWithoutAskingTheKeyServer() throws Exception {
+    final var repo = this.mavenRepo(false);
+    this.disableKeyServerLookup(repo);
+    final var admin = this.admin();
+    final var pom = pom("1.0");
+    this.uploadOk(repo, admin, RELEASE_POM, pom);
+
+    expectError(
+        this.upload(repo, admin, RELEASE_ASC, goodSignatureOf(pom)),
+        HttpStatus.NOT_FOUND,
+        "artifactSigningKeyNotRegistered",
+        "artifactSigningKeyNotRegistered",
+        "The key that signed this artifact is not registered, and key-server lookup is off.");
+
+    assertThat(KEY_SERVER_REQUESTS.get()).isZero();
+    assertThat(stored(repo, RELEASE_ASC)).doesNotExist();
+    assertThat(Files.readAllBytes(stored(repo, RELEASE_POM))).isEqualTo(pom);
+    assertThat(this.signedOf(repo, "lib", "1.0")).containsExactly(false);
+    assertThat(this.verifiedFiles(repo, "1.0")).isEmpty();
+  }
+
+  @Test
+  @DisplayName("with the lookup off a registered key still verifies, still without a server")
+  void lookupOffStillVerifiesARegisteredKey() throws Exception {
+    final var repo = this.mavenRepo(false);
+    this.disableKeyServerLookup(repo);
+    final var admin = this.admin();
+    final var registeredKeys = PgpTestKeys.generate();
+    this.registerPublicKey(repo, admin, registeredKeys);
+    final var pom = pom("1.0");
+    this.uploadOk(repo, admin, RELEASE_POM, pom);
+
+    this.uploadOk(repo, admin, RELEASE_ASC, registeredKeys.detachedSignature(pom).getBytes(UTF_8));
+
+    assertThat(this.signedOf(repo, "lib", "1.0")).containsExactly(true);
+    assertThat(KEY_SERVER_REQUESTS.get()).isZero();
   }
 
   @Test

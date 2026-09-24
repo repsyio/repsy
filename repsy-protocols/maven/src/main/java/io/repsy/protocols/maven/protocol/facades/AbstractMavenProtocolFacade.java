@@ -77,21 +77,23 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * when present). A POM is parsed, and refused if its groupId is not the one of its path, before
    * it is stored. A POM signature ({@code .pom.asc}) is verified against the stored POM before it
    * is stored, so a refused one never reaches the repo and takes nothing else with it: an existing
-   * version, its previous signature and its {@code signed} flag are left as they were. A checksum
-   * is judged by the file it belongs to, so it is refused, and nothing is stored, when that file
-   * would be (RPS-1183). A metadata signature ({@code maven-metadata.xml.asc}) is stored unparsed
-   * and unverified, judged like a metadata checksum (RPS-1185). A POM, its signature and its
-   * checksum are told by the file name, never by the directory (RPS-1196).
+   * version, its previous signature and its {@code signed} flag are left as they were. So is every
+   * other artifact signature ({@code .jar.asc}, {@code -sources.jar.asc}, {@code .module.asc}, ...)
+   * on a repo that verifies every signature (RPS-1188); on any other repo those are stored as sent.
+   * A checksum is judged by the file it belongs to, so it is refused, and nothing is stored, when
+   * that file would be (RPS-1183). A metadata signature ({@code maven-metadata.xml.asc}) is stored
+   * unparsed and unverified, judged like a metadata checksum (RPS-1185). A POM, its signature and
+   * its checksum are told by the file name, never by the directory (RPS-1196).
    *
    * <p>What is left to fail after the store is the registration itself (a repo or a signed version
    * deleted meanwhile, a database error). The usage is set on the context whether it succeeds or
    * not, and a POM or POM signature that was new is taken back out of the repo first when it fails
    * (RPS-1199, see {@code register}).
    *
-   * <p>A metadata-family file and a POM signature are read fully into memory, and a POM is spooled
-   * to a temporary file, before anything about them is parsed or stored; each is capped by {@link
-   * MavenUploadLimits} and refused with a 400 naming the limit, before anything is read, when the
-   * client declares a larger body, and while it is read otherwise (RPS-1121).
+   * <p>A metadata-family file and a signature that is verified are read fully into memory, and a
+   * POM is spooled to a temporary file, before anything about them is parsed or stored; each is
+   * capped by {@link MavenUploadLimits} and refused with a 400 naming the limit, before anything is
+   * read, when the client declares a larger body, and while it is read otherwise (RPS-1121).
    */
   @Override
   public void upload(
@@ -117,13 +119,15 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
     this.artifactService.checkDeploymentRules(repoInfo, versionType, storagePath);
 
-    if (content == null && ArtifactUtils.isPomSignature(storagePath)) {
+    if (content == null
+        && ArtifactUtils.isSignatureToVerify(
+            storagePath, repoInfo.isPgpVerifyAllSignaturesEnabled())) {
       // A signature is well below 1 KB, and it is read once here to be verified and then stored.
-      content = readBoundedPomSignature(inputStream, contentLength);
+      content = readBoundedSignature(inputStream, contentLength);
       this.artifactService.verifySignature(repoInfo, storagePath, new ByteArrayResource(content));
     }
 
-    final var isNewRegisteredFile = this.isNewRegisteredFile(repoInfo.getName(), storagePath);
+    final var isNewRegisteredFile = this.isNewRegisteredFile(repoInfo, storagePath);
 
     final var afterUploadUsage = this.store(repoInfo.getName(), storagePath, inputStream, content);
 
@@ -138,15 +142,19 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
   }
 
   /**
-   * A POM, or the signature of one, is the only file whose registration ({@code
+   * A POM, or a signature that is verified (the signature of one, or of any artifact file when the
+   * repo verifies every signature), is the only file whose registration ({@code
    * createOrUpdateArtifact}) can still fail once it is stored, and the only one that is worth
    * taking back: it is told here, before the store, whether the file is a new one. A file that is
    * already there is a redeploy, and storing over it cannot be undone.
    */
-  private boolean isNewRegisteredFile(final String repoName, final StoragePath storagePath) {
+  private boolean isNewRegisteredFile(
+      final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath) {
 
-    return (ArtifactUtils.isPomToParse(storagePath) || ArtifactUtils.isPomSignature(storagePath))
-        && !this.mavenStorageService.exists(storagePath, repoName);
+    return (ArtifactUtils.isPomToParse(storagePath)
+            || ArtifactUtils.isSignatureToVerify(
+                storagePath, repoInfo.isPgpVerifyAllSignaturesEnabled()))
+        && !this.mavenStorageService.exists(storagePath, repoInfo.getName());
   }
 
   /**
@@ -281,16 +289,16 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
   }
 
   /**
-   * Reads a POM signature ({@code .pom.asc}) whole, refusing one larger than {@link
-   * MavenUploadLimits#MAX_POM_SIGNATURE_BYTES} with a 400 before it is verified or stored
-   * (RPS-1121).
+   * Reads a signature that is verified ({@code .pom.asc}, or any artifact {@code .asc} when the
+   * repo verifies every signature) whole, refusing one larger than {@link
+   * MavenUploadLimits#MAX_SIGNATURE_BYTES} with a 400 before it is verified or stored (RPS-1121).
    */
-  private static byte[] readBoundedPomSignature(
+  private static byte[] readBoundedSignature(
       final InputStream inputStream, final long contentLength) throws IOException {
 
     try {
       return BoundedEntryReader.readAllBytes(
-          inputStream, contentLength, MavenUploadLimits.MAX_POM_SIGNATURE_BYTES);
+          inputStream, contentLength, MavenUploadLimits.MAX_SIGNATURE_BYTES);
     } catch (final EntryTooLargeException e) {
       throw new BadRequestException("mavenSignatureTooLarge");
     }

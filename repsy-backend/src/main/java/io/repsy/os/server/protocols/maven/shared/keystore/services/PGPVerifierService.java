@@ -18,6 +18,10 @@ package io.repsy.os.server.protocols.maven.shared.keystore.services;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.bouncycastle.openpgp.PGPUtil.getDecoderStream;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Ticker;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
@@ -27,11 +31,11 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Security;
+import java.time.Duration;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -46,6 +50,7 @@ import org.bouncycastle.openpgp.operator.jcajce.JcaPGPContentVerifierBuilderProv
 import org.bouncycastle.util.encoders.Hex;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -53,7 +58,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PGPVerifierService {
 
   private static final String KEY_ID_FORMAT = "%016X";
@@ -66,20 +70,49 @@ public class PGPVerifierService {
           "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x%s",
           "https://keys.openpgp.org/pks/lookup?op=get&search=0x%s");
 
-  @Qualifier("pgpVerifierWebClient")
+  // RPS-1188: verifying every signature of a deploy asks for the same key once per file, so a key
+  // block a server answered is remembered for ten minutes. Only an answer that parsed and holds
+  // the key is kept (a miss or an error is asked again), and it is keyed by the lookup URL, so a
+  // repo's own key-server hosts are never mixed up with another repo's.
+  private static final Duration KEY_BLOCK_TTL = Duration.ofMinutes(10);
+  private static final long KEY_BLOCK_CACHE_SIZE = 1_000;
+
   private final @NonNull WebClient webClient;
+  private final Cache<String, String> keyBlocksByUrl;
+
+  @Autowired
+  public PGPVerifierService(final @Qualifier("pgpVerifierWebClient") @NonNull WebClient webClient) {
+
+    this(webClient, Ticker.systemTicker());
+  }
+
+  @VisibleForTesting
+  PGPVerifierService(final @NonNull WebClient webClient, final @NonNull Ticker ticker) {
+
+    this.webClient = webClient;
+    this.keyBlocksByUrl =
+        CacheBuilder.newBuilder()
+            .expireAfterWrite(KEY_BLOCK_TTL)
+            .maximumSize(KEY_BLOCK_CACHE_SIZE)
+            .ticker(ticker)
+            .build();
+  }
 
   /**
    * Verifies the detached {@code signedFile} signature of {@code file}. The signer's public key is
    * looked up in {@code sources}: its registered armored keys first (RPS-1189), then the repo's
-   * custom key-server hosts, then the two hardcoded default key servers.
+   * custom key-server hosts, then the two hardcoded default key servers. The last two are skipped
+   * when {@code sources} says the key-server lookup is off (RPS-1204). A key block a server
+   * answered is cached for ten minutes.
    *
    * @throws SignatureNotVerifiedException {@code artifactSignatureNotVerified} when {@code
    *     signedFile} is not a parseable OpenPGP signature, does not verify against {@code file}, or
    *     verifies against a key (or its primary key) that is revoked or was expired at the
    *     signature's creation time (RPS-1202)
-   * @throws ItemNotFoundException when no source in {@code sources} (nor the default servers) has
-   *     the signer's public key
+   * @throws ItemNotFoundException {@code artifactSigningKeyNotFound} when no source in {@code
+   *     sources} (nor the default servers) has the signer's public key
+   * @throws ItemNotFoundException {@code artifactSigningKeyNotRegistered} when the key is not
+   *     registered and the key-server lookup is off; no server was asked (RPS-1204)
    */
   @SneakyThrows
   public void verify(
@@ -150,6 +183,19 @@ public class PGPVerifierService {
     if (registeredKey.isPresent()) {
       return registeredKey;
     }
+
+    if (sources != null && !sources.keyServerLookupEnabled()) {
+      // The key id is for the log, the client gets a fixed msgId (RPS-1127).
+      log.warn("public key {} is not registered and key-server lookup is off", keyIdHex);
+      throw new ItemNotFoundException("artifactSigningKeyNotRegistered");
+    }
+
+    return this.findOnKeyServers(sources, keyIdHex, keyId);
+  }
+
+  /** The repo's own key-server hosts first, then the two default key servers. */
+  private @NonNull Optional<MatchedKey> findOnKeyServers(
+      final @Nullable PublicKeySources sources, final @NonNull String keyIdHex, final long keyId) {
 
     final var customHosts = sources != null ? sources.keyServerHosts() : null;
 
@@ -247,20 +293,31 @@ public class PGPVerifierService {
   private @NonNull Optional<MatchedKey> fetchKeyFromServer(
       final @NonNull String serverUrl, final long keyId) {
 
-    final var keyData =
-        this.webClient
-            .get()
-            .uri(serverUrl)
-            .retrieve()
-            .bodyToMono(String.class)
-            .doOnError(
-                error ->
-                    log.debug(
-                        "Failed to fetch key from server {}: {}", serverUrl, error.getMessage()))
-            .onErrorReturn("")
-            .block();
+    final var cachedKeyData = this.keyBlocksByUrl.getIfPresent(serverUrl);
 
-    if (keyData == null || !keyData.contains("-----BEGIN PGP PUBLIC KEY BLOCK-----")) {
+    if (cachedKeyData != null) {
+      // A hit is not stored again: it must not push its own expiry back.
+      return this.parseKeyData(cachedKeyData, serverUrl, keyId);
+    }
+
+    final var keyData = this.downloadKeyData(serverUrl);
+
+    if (keyData == null) {
+      return Optional.empty();
+    }
+
+    final var key = this.parseKeyData(keyData, serverUrl, keyId);
+
+    // Only an answer that parsed and holds the key is remembered.
+    key.ifPresent(matched -> this.keyBlocksByUrl.put(serverUrl, keyData));
+
+    return key;
+  }
+
+  private @NonNull Optional<MatchedKey> parseKeyData(
+      final @NonNull String keyData, final @NonNull String serverUrl, final long keyId) {
+
+    if (!keyData.contains("-----BEGIN PGP PUBLIC KEY BLOCK-----")) {
       return Optional.empty();
     }
 
@@ -276,6 +333,20 @@ public class PGPVerifierService {
           exception.toString());
       return Optional.empty();
     }
+  }
+
+  private @Nullable String downloadKeyData(final @NonNull String serverUrl) {
+
+    return this.webClient
+        .get()
+        .uri(serverUrl)
+        .retrieve()
+        .bodyToMono(String.class)
+        .doOnError(
+            error ->
+                log.debug("Failed to fetch key from server {}: {}", serverUrl, error.getMessage()))
+        .onErrorReturn("")
+        .block();
   }
 
   private @NonNull Optional<MatchedKey> parsePublicKey(
