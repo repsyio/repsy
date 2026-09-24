@@ -74,17 +74,39 @@ public interface NuGetPackageService<ID> {
 
   List<NuGetVersionInfo> getAllVersionInfos(BaseRepoInfo<ID> repoInfo, String packageId);
 
+  /**
+   * @param semVer2 whether SemVer 2.0.0-only versions count: when they do not, a package that only
+   *     has such versions is left out
+   */
   List<String> autocomplete(
-      BaseRepoInfo<ID> repoInfo, String query, int skip, int take, boolean prerelease);
+      BaseRepoInfo<ID> repoInfo,
+      String query,
+      int skip,
+      int take,
+      boolean prerelease,
+      boolean semVer2);
 
   Page<NuGetVersionInfo> getVersionInfosPage(
       BaseRepoInfo<ID> repoInfo, String packageId, Pageable pageable);
 
+  /**
+   * @param semVer2 whether SemVer 2.0.0-only versions count: when they do not, they are left out of
+   *     each result's versions, and a package that only has such versions is not a result
+   */
   Page<NuGetPackageSearchResult> search(
-      BaseRepoInfo<ID> repoInfo, String query, int skip, int take, boolean prerelease);
+      BaseRepoInfo<ID> repoInfo,
+      String query,
+      int skip,
+      int take,
+      boolean prerelease,
+      boolean semVer2);
 
   Page<NuGetPackageSearchResult> searchPage(
-      BaseRepoInfo<ID> repoInfo, String query, Pageable pageable, boolean prerelease);
+      BaseRepoInfo<ID> repoInfo,
+      String query,
+      Pageable pageable,
+      boolean prerelease,
+      boolean semVer2);
 
   /** Stores the files of a version whose row {@link #publishVersion} has just written. */
   @FunctionalInterface

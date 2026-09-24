@@ -23,6 +23,7 @@ import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.checkVersi
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.copyStreamToFile;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractPackageId;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractPackageIdAndVersion;
+import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.isSemVer2;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.normalizeNuGetVersion;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.readNuspecMetadata;
 import static io.repsy.protocols.nuget.shared.utils.NuGetServiceIndexResources.build;
@@ -215,10 +216,11 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
       final int skip,
       final int take,
       final boolean prerelease,
+      final boolean semVer2,
       final String baseUrl) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var page = this.packageService.search(repoInfo, q, skip, take, prerelease);
+    final var page = this.packageService.search(repoInfo, q, skip, take, prerelease, semVer2);
 
     final var data =
         page.getContent().stream()
@@ -235,19 +237,22 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
       final @Nullable String id,
       final int skip,
       final int take,
-      final boolean prerelease) {
+      final boolean prerelease,
+      final boolean semVer2) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
     if (id != null && !id.isBlank()) {
-      List<String> versions = this.packageService.getVersions(repoInfo, id);
-      if (!prerelease) {
-        versions = versions.stream().filter(v -> !v.contains("-")).toList();
-      }
+      final var versions =
+          this.packageService.getVersions(repoInfo, id).stream()
+              .filter(v -> prerelease || !v.contains("-"))
+              .filter(v -> semVer2 || !isSemVer2(v))
+              .toList();
       return new NuGetAutocompleteResponse(versions.size(), versions);
     }
 
-    final var results = this.packageService.autocomplete(repoInfo, q, skip, take, prerelease);
+    final var results =
+        this.packageService.autocomplete(repoInfo, q, skip, take, prerelease, semVer2);
     return new NuGetAutocompleteResponse(results.size(), results);
   }
 

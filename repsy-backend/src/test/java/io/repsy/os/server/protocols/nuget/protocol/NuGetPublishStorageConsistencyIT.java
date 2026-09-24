@@ -238,9 +238,9 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
   private void assertNoPackageListed(final Repo repo, final String id) {
     final var repoInfo = this.repoTxService.getRepoByName(repo.getName());
 
-    assertThat(this.nugetPackageService.searchPage(repoInfo, id, PageRequest.of(0, 20), true))
+    assertThat(this.nugetPackageService.searchPage(repoInfo, id, PageRequest.of(0, 20), true, true))
         .isEmpty();
-    assertThat(this.nugetPackageService.autocomplete(repoInfo, id, 0, 20, true)).isEmpty();
+    assertThat(this.nugetPackageService.autocomplete(repoInfo, id, 0, 20, true, true)).isEmpty();
   }
 
   /** Writes the files like the real service, then fails, as a storage that dies mid-push would. */
@@ -387,7 +387,11 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
     assertThat(this.storedVersionCount(repo, id)).isEqualTo(1);
     assertThat(
             this.nugetPackageService.searchPage(
-                this.repoTxService.getRepoByName(repo.getName()), id, PageRequest.of(0, 20), true))
+                this.repoTxService.getRepoByName(repo.getName()),
+                id,
+                PageRequest.of(0, 20),
+                true,
+                true))
         .hasSize(1);
   }
 

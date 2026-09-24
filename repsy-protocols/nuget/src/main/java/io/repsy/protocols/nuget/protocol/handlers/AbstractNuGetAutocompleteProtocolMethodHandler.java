@@ -90,6 +90,7 @@ public abstract class AbstractNuGetAutocompleteProtocolMethodHandler
       final var skipStr = request.getParameter("skip");
       final var takeStr = request.getParameter("take");
       final var prerelease = "true".equalsIgnoreCase(request.getParameter("prerelease"));
+      final var semVer2 = NuGetPackageUtils.acceptsSemVer2(request.getParameter("semVerLevel"));
 
       final var skip = NuGetPackageUtils.parseNonNegativeParam(skipStr, 0, "skip");
       final var take =
@@ -98,7 +99,8 @@ public abstract class AbstractNuGetAutocompleteProtocolMethodHandler
               NuGetPackageUtils.MAX_SEARCH_TAKE);
 
       final var results =
-          this.facade.autocomplete(context, q != null ? q : "", id, skip, take, prerelease);
+          this.facade.autocomplete(
+              context, q != null ? q : "", id, skip, take, prerelease, semVer2);
 
       return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(results);
     } catch (final IllegalArgumentException | ArithmeticException e) {

@@ -130,6 +130,52 @@ class NuGetPackageUtilsTest {
   }
 
   @ParameterizedTest
+  @CsvSource({
+    "1.0.0, false",
+    "1.2.3.4, false",
+    "1.0.0-beta, false",
+    "1.0.0-beta2, false",
+    "1.0.0-a-b, false",
+    "1.0.0-beta.1, true",
+    "1.0.0-RC.1, true",
+    "1.0.0-a-b.c, true",
+    "1.0.0+build, true",
+    "1.0.0-beta+build, true",
+    "1.0.0-beta.1+build.7, true",
+  })
+  @DisplayName(
+      "tells a SemVer 2.0.0-only version from one a SemVer 1.0.0 client can use (RPS-1275)")
+  void detectsSemVer2(final String version, final boolean expected) {
+    assertThat(NuGetPackageUtils.isSemVer2(version)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "2.0.0, true",
+    "2.0.0-beta, true",
+    " 2.0.0 , true",
+    "2, true",
+    "10.0.0, true",
+    "1.0.0, false",
+    "1, false",
+    "0.9, false",
+    "abc, false",
+    "'', false",
+    "-2.0.0, false",
+    "2abc, false",
+  })
+  @DisplayName("opts in to SemVer 2.0.0 for a semVerLevel of 2.0.0 or more (RPS-1275)")
+  void acceptsSemVer2(final String level, final boolean expected) {
+    assertThat(NuGetPackageUtils.acceptsSemVer2(level)).isEqualTo(expected);
+  }
+
+  @Test
+  @DisplayName("does not opt in to SemVer 2.0.0 without a semVerLevel (RPS-1275)")
+  void noSemVerLevel() {
+    assertThat(NuGetPackageUtils.acceptsSemVer2(null)).isFalse();
+  }
+
+  @ParameterizedTest
   @ValueSource(
       strings = {"1", "1.0", "1.2.3", "1.2.3.4", "1.0-beta.1", "1.0+build", "1.0.0-rc.1+build.5"})
   @DisplayName("accepts one to four numeric parts, with optional pre-release and build")
