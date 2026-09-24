@@ -76,7 +76,7 @@ export const helmDescriptor: ProtocolDescriptor = {
         dialogTitle: 'Delete Version',
         successToast: 'Version deleted successfully',
         landsOn: 'versions',
-        landsOnLast: 'versions',
+        landsOnLast: 'list',
       },
     },
   },

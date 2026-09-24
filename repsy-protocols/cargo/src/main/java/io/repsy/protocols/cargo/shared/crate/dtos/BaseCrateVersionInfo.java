@@ -62,6 +62,8 @@ public class BaseCrateVersionInfo<ID> {
 
   private boolean hasLib;
 
+  private boolean yanked;
+
   @JsonProperty("created_at")
   private Instant createdAt;
 }

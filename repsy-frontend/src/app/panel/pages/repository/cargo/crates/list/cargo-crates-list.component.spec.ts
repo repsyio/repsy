@@ -88,6 +88,19 @@ describe('CargoCratesListComponent', () => {
     }));
   });
 
+  describe('sort options', () => {
+    beforeEach(() => build());
+
+    it('sorts Newest and Oldest by when the crate was last updated, not by its version text', () => {
+      const byName = (name: string) => component.sortOptions.find((option) => option.name === name);
+
+      expect(component.sortOption).toEqual({ name: 'Newest', column: 'lastUpdatedAt', type: 'DESC' });
+      expect(byName('Newest')).toEqual({ name: 'Newest', column: 'lastUpdatedAt', type: 'DESC' });
+      expect(byName('Oldest')).toEqual({ name: 'Oldest', column: 'lastUpdatedAt', type: 'ASC' });
+      expect(component.sortOptions.map((option) => option.column)).not.toContain('maxVersion');
+    });
+  });
+
   describe('helpers', () => {
     beforeEach(() => build());
 

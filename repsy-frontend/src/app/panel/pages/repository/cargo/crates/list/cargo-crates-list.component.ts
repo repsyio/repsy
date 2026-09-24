@@ -74,10 +74,10 @@ export class CargoCratesListComponent implements OnDestroy {
   public activeRepo: RepoPermissionInfo;
   public securitySummary: Record<string, VersionSecuritySummary> = {};
 
-  public sortOption: Sort = { name: 'Newest', column: 'maxVersion', type: 'DESC' };
+  public sortOption: Sort = { name: 'Newest', column: 'lastUpdatedAt', type: 'DESC' };
   public sortOptions: Sort[] = [
-    { name: 'Newest', column: 'maxVersion', type: 'DESC' },
-    { name: 'Oldest', column: 'maxVersion', type: 'ASC' },
+    { name: 'Newest', column: 'lastUpdatedAt', type: 'DESC' },
+    { name: 'Oldest', column: 'lastUpdatedAt', type: 'ASC' },
     { name: 'Name (A-Z)', column: 'name', type: 'ASC' },
     { name: 'Name (Z-A)', column: 'name', type: 'DESC' },
   ];

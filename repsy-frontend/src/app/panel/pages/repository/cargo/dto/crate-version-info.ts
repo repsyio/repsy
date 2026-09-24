@@ -23,6 +23,7 @@ export class CrateVersionInfo {
   public documentation: string;
   public edition: string;
   public hasLib: boolean;
+  public yanked: boolean;
   public rust_version: string;
   public deps: CrateDependencyInfo[];
   public downloads: number;

@@ -480,10 +480,10 @@ class CrateUtilsTest {
 
     private List<CrateVersionListItem> tied() {
       return List.of(
-          new CrateVersionListItem("1.0.2", this.sameInstant),
-          new CrateVersionListItem("1.0.0", this.sameInstant),
-          new CrateVersionListItem("1.0.10", this.sameInstant),
-          new CrateVersionListItem("1.0.1", this.sameInstant));
+          new CrateVersionListItem("1.0.2", false, this.sameInstant),
+          new CrateVersionListItem("1.0.0", false, this.sameInstant),
+          new CrateVersionListItem("1.0.10", false, this.sameInstant),
+          new CrateVersionListItem("1.0.1", false, this.sameInstant));
     }
 
     private List<String> sorted(final PageRequest pageable, final boolean shuffled) {

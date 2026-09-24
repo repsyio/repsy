@@ -121,7 +121,7 @@ test.describe('npm scopes', { tag: '@packages' }, () => {
     await expect(tildeDetail.installText).toContainText(`npm install ${unscoped.name}`);
   });
 
-  test('PKG-npm-07 the list search takes a scope with or without its @ and does not match the package name', async ({
+  test('PKG-npm-07 the list search takes a scope with or without its @ and matches the whole @scope/name', async ({
     adminPage,
     seeder,
     seedPackage,
@@ -144,15 +144,21 @@ test.describe('npm scopes', { tag: '@packages' }, () => {
     await list.search(`@e2e-${id}-b`);
     await expect.poll(() => rowKeys(list)).toEqual([inB.name]);
 
-    // A shared prefix finds both scopes; the package name alone finds none (recorded, RPS-1288 (2):
-    // the search matches the scope only, not the whole `@scope/name`).
+    // A shared prefix finds both scopes; the package name alone finds both packages, and the whole
+    // `@scope/name` key of a row finds that row (RPS-1288 (2): it used to match the scope only).
     await list.search(`@e2e-${id}`);
     await expect
       .poll(async () => (await rowKeys(list)).sort())
       .toEqual([inA.name, inB.name].sort());
     await list.search('widget');
-    await expect(list.emptyList.root).toBeVisible();
+    await expect
+      .poll(async () => (await rowKeys(list)).sort())
+      .toEqual([inA.name, inB.name].sort());
     await list.search(inA.name);
+    await expect.poll(() => rowKeys(list)).toEqual([inA.name]);
+    await list.search(`e2e-${id}-b/widget`);
+    await expect.poll(() => rowKeys(list)).toEqual([inB.name]);
+    await list.search(`@e2e-${id}-a/no-such-package`);
     await expect(list.emptyList.root).toBeVisible();
 
     await list.search('');
