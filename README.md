@@ -551,12 +551,22 @@ instance per team.
   Deleting a tag in the web UI removes the pointer only, in the same way.
 - **Untagged manifests accumulate.** Nothing deletes a manifest automatically, so every override
   and every deleted tag leaves the previous manifest, and the layers only it used, on disk and in
-  the repository's usage. Deleting a whole image removes its manifests (a manifest file that
+  the repository's usage until you remove them with **"Delete untagged manifests"** in the
+  repository settings. Deleting a whole image removes its manifests too (a manifest file that
   another image of the repository shares is kept until the last image that has it is gone).
-  Removing untagged manifests without deleting the image is not offered yet; it is tracked as
-  follow-up work.
+- **"Delete untagged manifests"** (repository settings, needs the manage permission; API:
+  `DELETE /api/docker/images/manifests/{repoName}/untagged`, optionally `?image=<name>`) deletes
+  every manifest that no tag points to, directly or through a tag's index, together with its file,
+  and refunds the disk usage right away. Those manifests stop being pullable by digest. It then
+  deletes the layers that no manifest uses any more, which is what actually frees the space: the
+  manifest files themselves are only kilobytes. The layer blobs are deleted in the background, and
+  the usage drops as they go. Run it when nobody is pushing to the repository: a manifest pushed by
+  digest whose tag or index has not arrived yet counts as untagged, and a client pushing an index
+  right after would have to push that manifest again.
 - **"Delete orphan layers"** in the repository settings deletes the layer blobs that no manifest
-  uses (for example, left by a refused push). It does not touch manifests.
+  uses (for example, left by a refused push). It does not touch manifests, so it frees nothing that
+  an untagged manifest still uses: use "Delete untagged manifests" first, which runs this sweep
+  itself, and "Delete orphan layers" for blobs no manifest ever used.
 - There is no `tags/list`, referrers API or protocol-level `DELETE` yet.
 
 ### Signed Maven Deploys

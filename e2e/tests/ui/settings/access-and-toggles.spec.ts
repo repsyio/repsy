@@ -210,22 +210,34 @@ test.describe('Repository settings: package override', { tag: SETTINGS }, () => 
 /**
  * Which sections `/:repo/settings` renders per repo type (`repository-settings.component.html`):
  * Visibility, Deploy Tokens, Storage, Repository Info and Delete for all nine; Package Override for
- * all but Cargo and Go; Version Allowance for Maven and NuGet; PGP key stores for Maven; Orphan
- * Layers for Docker. The Vulnerability Scanning section depends on a scanner and is left out.
+ * all but Cargo and Go; Version Allowance for Maven and NuGet; PGP key stores for Maven; Untagged
+ * Manifests and Orphan Layers for Docker. The Vulnerability Scanning section depends on a scanner and is left out.
  */
 const SECTIONS_BY_TYPE: Record<
   RepoType,
-  { override: boolean; allowance: boolean; pgp: boolean; orphan: boolean }
+  { override: boolean; allowance: boolean; pgp: boolean; orphan: boolean; untagged: boolean }
 > = {
-  [RepoType.MAVEN]: { override: true, allowance: true, pgp: true, orphan: false },
-  [RepoType.NPM]: { override: true, allowance: false, pgp: false, orphan: false },
-  [RepoType.PYPI]: { override: true, allowance: false, pgp: false, orphan: false },
-  [RepoType.DOCKER]: { override: true, allowance: false, pgp: false, orphan: true },
-  [RepoType.CARGO]: { override: false, allowance: false, pgp: false, orphan: false },
-  [RepoType.NUGET]: { override: true, allowance: true, pgp: false, orphan: false },
-  [RepoType.GOLANG]: { override: false, allowance: false, pgp: false, orphan: false },
-  [RepoType.HELM]: { override: true, allowance: false, pgp: false, orphan: false },
-  [RepoType.RUBY]: { override: true, allowance: false, pgp: false, orphan: false },
+  [RepoType.MAVEN]: { override: true, allowance: true, pgp: true, orphan: false, untagged: false },
+  [RepoType.NPM]: { override: true, allowance: false, pgp: false, orphan: false, untagged: false },
+  [RepoType.PYPI]: { override: true, allowance: false, pgp: false, orphan: false, untagged: false },
+  [RepoType.DOCKER]: { override: true, allowance: false, pgp: false, orphan: true, untagged: true },
+  [RepoType.CARGO]: {
+    override: false,
+    allowance: false,
+    pgp: false,
+    orphan: false,
+    untagged: false,
+  },
+  [RepoType.NUGET]: { override: true, allowance: true, pgp: false, orphan: false, untagged: false },
+  [RepoType.GOLANG]: {
+    override: false,
+    allowance: false,
+    pgp: false,
+    orphan: false,
+    untagged: false,
+  },
+  [RepoType.HELM]: { override: true, allowance: false, pgp: false, orphan: false, untagged: false },
+  [RepoType.RUBY]: { override: true, allowance: false, pgp: false, orphan: false, untagged: false },
 };
 
 test.describe('Repository settings: sections per repo type', { tag: SETTINGS }, () => {
@@ -250,6 +262,7 @@ test.describe('Repository settings: sections per repo type', { tag: SETTINGS }, 
       await expect(settings.allowance.root).toHaveCount(expected.allowance ? 1 : 0);
       await expect(settings.pgp.root).toHaveCount(expected.pgp ? 1 : 0);
       await expect(settings.orphanLayers.root).toHaveCount(expected.orphan ? 1 : 0);
+      await expect(settings.untaggedManifests.root).toHaveCount(expected.untagged ? 1 : 0);
     });
   }
 });

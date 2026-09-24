@@ -30,4 +30,13 @@ public interface ManifestChildRepository extends JpaRepository<ManifestChild, Ma
 
   @Query("select c from ManifestChild c join fetch c.child where c.parent.id = :parentId")
   List<ManifestChild> findAllByParentId(UUID parentId);
+
+  /** Every index-to-child edge among the manifests of an image, without loading the manifests. */
+  @Query(
+      """
+      select c.parent.id as parentId, c.child.id as childId
+      from ManifestChild c
+      where c.parent.image.id = :imageId
+    """)
+  List<ManifestEdgeView> findEdgesByImageId(UUID imageId);
 }
