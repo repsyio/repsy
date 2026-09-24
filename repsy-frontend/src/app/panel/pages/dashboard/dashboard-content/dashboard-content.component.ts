@@ -16,7 +16,7 @@
 
 import { ChangeDetectorRef, Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { forkJoin, map, of, switchMap } from 'rxjs';
+import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
 
 import { RepoListInfo, RepoType, TotalUsageInfo } from '../../../../../generated/api';
 import { ProtocolRepoControllerService } from '../../../../../generated/api';
@@ -70,16 +70,25 @@ export class DashboardContentComponent {
     private readonly profileService: ProfileService,
     private readonly cdRef: ChangeDetectorRef,
   ) {
-    this.usageService.getTotalUsage().subscribe((usage) => {
-      Object.assign(this.usage, usage);
+    // The HTTP error interceptor already shows a failed request. Every subscription here still
+    // needs its own error handler, so that one failing source leaves that part of the dashboard
+    // empty instead of becoming an unhandled RxJS error.
+    this.usageService.getTotalUsage().subscribe({
+      next: (usage) => {
+        Object.assign(this.usage, usage);
+      },
+      error: () => {},
     });
 
-    this.profileService.get().subscribe((profile) => {
-      this.isAdmin = profile.role === 'ADMIN';
-      if (this.isAdmin) {
-        this.fetchRepoCounts();
-      }
-      this.cdRef.markForCheck();
+    this.profileService.get().subscribe({
+      next: (profile) => {
+        this.isAdmin = profile.role === 'ADMIN';
+        if (this.isAdmin) {
+          this.fetchRepoCounts();
+        }
+        this.cdRef.markForCheck();
+      },
+      error: () => {},
     });
     this.fetchRepoInfos();
   }
@@ -91,76 +100,28 @@ export class DashboardContentComponent {
   }
 
   private fetchRepoCounts(): void {
-    this.protocolRepoControllerService
-      .getCount(RepoType.Npm)
-      .pipe(map((r) => r.data ?? 0))
-      .subscribe((c) => {
-        this.npmRegistryCount = c;
-        this.cdRef.markForCheck();
-      });
+    this.fetchRepoCount(RepoType.Npm, (c) => (this.npmRegistryCount = c));
+    this.fetchRepoCount(RepoType.Pypi, (c) => (this.pypiRepoCount = c));
+    this.fetchRepoCount(RepoType.Maven, (c) => (this.mavenRepoCount = c));
+    this.fetchRepoCount(RepoType.Docker, (c) => (this.dockerRepoCount = c));
+    this.fetchRepoCount(RepoType.Cargo, (c) => (this.cargoRepoCount = c));
+    this.fetchRepoCount(RepoType.Golang, (c) => (this.golangRepoCount = c));
+    this.fetchRepoCount(RepoType.Helm, (c) => (this.helmRepoCount = c));
+    this.fetchRepoCount(RepoType.Nuget, (c) => (this.nugetRepoCount = c));
+    this.fetchRepoCount(RepoType.Ruby, (c) => (this.rubyRepoCount = c));
+  }
 
+  private fetchRepoCount(repoType: RepoType, assign: (count: number) => void): void {
     this.protocolRepoControllerService
-      .getCount(RepoType.Pypi)
+      .getCount(repoType)
       .pipe(map((r) => r.data ?? 0))
-      .subscribe((c) => {
-        this.pypiRepoCount = c;
-        this.cdRef.markForCheck();
-      });
-
-    this.protocolRepoControllerService
-      .getCount(RepoType.Maven)
-      .pipe(map((r) => r.data ?? 0))
-      .subscribe((c) => {
-        this.mavenRepoCount = c;
-        this.cdRef.markForCheck();
-      });
-
-    this.protocolRepoControllerService
-      .getCount(RepoType.Docker)
-      .pipe(map((r) => r.data ?? 0))
-      .subscribe((c) => {
-        this.dockerRepoCount = c;
-        this.cdRef.markForCheck();
-      });
-
-    this.protocolRepoControllerService
-      .getCount(RepoType.Cargo)
-      .pipe(map((r) => r.data ?? 0))
-      .subscribe((c) => {
-        this.cargoRepoCount = c;
-        this.cdRef.markForCheck();
-      });
-
-    this.protocolRepoControllerService
-      .getCount(RepoType.Golang)
-      .pipe(map((r) => r.data ?? 0))
-      .subscribe((c) => {
-        this.golangRepoCount = c;
-        this.cdRef.markForCheck();
-      });
-
-    this.protocolRepoControllerService
-      .getCount(RepoType.Helm)
-      .pipe(map((r) => r.data ?? 0))
-      .subscribe((c) => {
-        this.helmRepoCount = c;
-        this.cdRef.markForCheck();
-      });
-
-    this.protocolRepoControllerService
-      .getCount(RepoType.Nuget)
-      .pipe(map((r) => r.data ?? 0))
-      .subscribe((c) => {
-        this.nugetRepoCount = c;
-        this.cdRef.markForCheck();
-      });
-
-    this.protocolRepoControllerService
-      .getCount(RepoType.Ruby)
-      .pipe(map((r) => r.data ?? 0))
-      .subscribe((c) => {
-        this.rubyRepoCount = c;
-        this.cdRef.markForCheck();
+      .subscribe({
+        next: (count) => {
+          assign(count);
+          this.cdRef.markForCheck();
+        },
+        // A count that cannot be fetched stays at zero.
+        error: () => {},
       });
   }
 
@@ -176,8 +137,12 @@ export class DashboardContentComponent {
           return forkJoin(
             repos.map((repo) =>
               this.protocolRepoControllerService.getUsage(repo.name).pipe(
-                map((r) => {
-                  repo.diskUsage = r.data?.diskUsed?.value;
+                // A repository whose usage cannot be fetched still shows, with an unknown disk usage,
+                // instead of failing the forkJoin and dropping every repository of its type.
+                map((r) => r.data?.diskUsed?.value),
+                catchError(() => of(undefined)),
+                map((diskUsage) => {
+                  repo.diskUsage = diskUsage;
                   repo.type = repoType;
                   return repo;
                 }),
