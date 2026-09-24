@@ -16,6 +16,7 @@
 package io.repsy.protocols.npm.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -54,19 +55,35 @@ public final class PackageUtils {
     }
   }
 
+  /**
+   * The one version the client removed from the packument it sends back on {@code npm unpublish}:
+   * the version stored but absent from the payload.
+   *
+   * <p>Exactly one is required. A payload that lacks none removes nothing, and one that lacks more
+   * than one is stale: a version was published after the client read the metadata, so it is absent
+   * from the payload too, and picking one of them could delete a version nobody asked to remove
+   * (RPS-1289). The payload cannot be reconciled by a lock, so the client is told to read it again.
+   *
+   * @throws ItemAlreadyExistException With the fixed {@code unpublishPayloadStale} id (409).
+   * @throws BadRequestException When the payload has no {@code versions} object.
+   */
   public static String findUnpublishedVersion(
       final Map<String, Object> oldMetadata, final Map<String, Object> newMetadata) {
 
     final var oldVersions = (Map<String, Object>) oldMetadata.get(NpmConstants.VERSIONS);
-    final var newVersions = (Map<String, Object>) newMetadata.get(NpmConstants.VERSIONS);
 
-    for (final var entry : oldVersions.entrySet()) {
-      if (!newVersions.containsKey(entry.getKey())) {
-        return entry.getKey();
-      }
+    if (!(newMetadata.get(NpmConstants.VERSIONS) instanceof final Map<?, ?> newVersions)) {
+      throw new BadRequestException("badRequest");
     }
 
-    return "";
+    final var missing =
+        oldVersions.keySet().stream().filter(name -> !newVersions.containsKey(name)).toList();
+
+    if (missing.size() != 1) {
+      throw new ItemAlreadyExistException("unpublishPayloadStale");
+    }
+
+    return missing.getFirst();
   }
 
   public static List<Pair<String, String>> findDeprecatedVersions(

@@ -153,6 +153,7 @@ e2e/
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
+      unpublish.spec.ts         # real `npm unpublish` (RPS-1289): one version (unscoped/scoped), the only version, a whole package
     cargo/
       publish-consume.spec.ts   # registerPublishConsumeLoop(cargoAdapter) + a hyphenated-crate-name real-client test
       registry-rules.spec.ts    # raw-HTTP pins of the duplicate-version/version-validation/config.json/name-normalisation rules

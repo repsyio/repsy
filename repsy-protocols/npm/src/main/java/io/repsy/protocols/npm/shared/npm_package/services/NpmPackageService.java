@@ -80,6 +80,9 @@ public interface NpmPackageService<ID> {
   BasePackageInfo<ID> getPackage(
       UUID storageKey, @Nullable String scopeName, @NonNull String packageName);
 
+  /** The names of the versions the package has. */
+  @NonNull List<String> getVersionNames(ID packageId);
+
   /**
    * Deletes the package and its versions and, while that write is still open, removes its files
    * through {@code remover}.

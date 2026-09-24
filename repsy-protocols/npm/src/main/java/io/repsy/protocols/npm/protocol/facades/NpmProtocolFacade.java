@@ -63,4 +63,18 @@ public interface NpmProtocolFacade {
       throws IOException;
 
   void deletePackage(ProtocolContext context, @Nullable String scopeName, String packageName);
+
+  /**
+   * The tarball request that ends {@code npm unpublish pkg@x}: the packument PUT before it already
+   * removed the version and its tarball, so this succeeds without touching anything when the
+   * version is gone.
+   *
+   * @throws io.repsy.core.error_handling.exceptions.ItemAlreadyExistException When the version is
+   *     still published.
+   */
+  void deletePackageTarball(
+      ProtocolContext context,
+      @Nullable String scopeName,
+      String packageName,
+      String tarballFilename);
 }

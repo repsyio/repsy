@@ -24,6 +24,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.shared.utils.ExtractPath;
+import io.repsy.protocols.npm.shared.utils.NpmRevPath;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -45,6 +46,7 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
     implements ProtocolMethodHandler {
 
   private static final Pattern PACKAGE_PATTERN = Pattern.compile("^/(.++)$");
+  private static final String REV_MARKER = "/-rev/";
 
   private final PathParser basePathParser;
   private final NpmProtocolFacade npmProtocolFacade;
@@ -88,15 +90,33 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
 
       final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
 
-      // Must match package pattern and not be login or dist-tags
-      if (!PACKAGE_PATTERN.matcher(relativePath).matches()
-          || relativePath.contains("/-/user/")
-          || // Not login
-          relativePath.contains("dist-tags")) { // Not dist-tags
+      if (!isPublishDeprecateOrUnpublish(relativePath)) {
         return Optional.empty();
       }
       return parsedPathOpt;
     };
+  }
+
+  /**
+   * Must match the package pattern and not be login or dist-tags. A path with {@code /-rev/} is
+   * only the packument of an unpublish ({@code /<package>/-rev/<rev>}), never a tarball's; every
+   * other path is a publish or a deprecate.
+   */
+  private static boolean isPublishDeprecateOrUnpublish(final String relativePath) {
+
+    if (!PACKAGE_PATTERN.matcher(relativePath).matches()
+        || relativePath.contains("/-/user/") // Not login
+        || relativePath.contains("dist-tags")) { // Not dist-tags
+      return false;
+    }
+
+    if (!relativePath.contains(REV_MARKER)) {
+      return true;
+    }
+
+    return NpmRevPath.parse(relativePath)
+        .filter(path -> path.tarballFilename() == null)
+        .isPresent();
   }
 
   @Override
@@ -117,18 +137,20 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
     final var packagePath = matcher.group(1);
 
     try {
-      final var pathVars = ExtractPath.extractPathVars(packagePath);
-
       final var payload =
           this.objectMapper.readValue(
               request.getInputStream(), new TypeReference<Map<String, Object>>() {});
 
-      if (relativePath.contains("/-rev/")) {
-        // Unpublish version
+      final var revPath = NpmRevPath.parse(relativePath);
+
+      if (revPath.isPresent()) {
+        // Unpublish version: the package is what precedes /-rev/<rev>, not the whole path
         this.npmProtocolFacade.unPublishPackageVersion(
-            protocolContext, pathVars.scopeName(), pathVars.packageName(), payload);
+            protocolContext, revPath.get().scopeName(), revPath.get().packageName(), payload);
       } else {
         // Publish or deprecate
+        final var pathVars = ExtractPath.extractPathVars(packagePath);
+
         this.npmProtocolFacade.publishOrDeprecate(
             protocolContext, pathVars.scopeName(), pathVars.packageName(), payload);
       }

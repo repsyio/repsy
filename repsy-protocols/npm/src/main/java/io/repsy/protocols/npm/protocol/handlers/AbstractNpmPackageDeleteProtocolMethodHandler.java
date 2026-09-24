@@ -20,7 +20,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
-import io.repsy.protocols.npm.shared.utils.ExtractPath;
+import io.repsy.protocols.npm.shared.utils.NpmRevPath;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,7 +28,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
@@ -38,8 +37,6 @@ import org.springframework.http.ResponseEntity;
 @NullMarked
 public abstract class AbstractNpmPackageDeleteProtocolMethodHandler
     implements ProtocolMethodHandler {
-
-  private static final Pattern DELETE_PATTERN = Pattern.compile("^/(.+?)/-rev/.*");
 
   private final PathParser basePathParser;
   private final NpmProtocolFacade npmProtocolFacade;
@@ -78,7 +75,7 @@ public abstract class AbstractNpmPackageDeleteProtocolMethodHandler
 
       final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
 
-      if (!DELETE_PATTERN.matcher(relativePath).matches()
+      if (NpmRevPath.parse(relativePath).isEmpty()
           || relativePath.contains("dist-tags")) { // Not dist-tags delete
         return Optional.empty();
       }
@@ -95,18 +92,23 @@ public abstract class AbstractNpmPackageDeleteProtocolMethodHandler
       throws Exception {
 
     final var relativePath = ProtocolContextUtils.getRelativePath(protocolContext).getPath();
-    final var matcher = DELETE_PATTERN.matcher(relativePath);
+    final var revPathOpt = NpmRevPath.parse(relativePath);
 
-    if (!matcher.matches()) {
+    if (revPathOpt.isEmpty()) {
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
 
-    final var packagePath = matcher.group(1);
+    final var revPath = revPathOpt.get();
 
-    final var pathVars = ExtractPath.extractPathVars(packagePath);
-
-    this.npmProtocolFacade.deletePackage(
-        protocolContext, pathVars.scopeName(), pathVars.packageName());
+    if (revPath.tarballFilename() == null) {
+      // Unpublish of the only version, or a delete of the whole package
+      this.npmProtocolFacade.deletePackage(
+          protocolContext, revPath.scopeName(), revPath.packageName());
+    } else {
+      // The last request of an unpublish of one version, after its packument PUT
+      this.npmProtocolFacade.deletePackageTarball(
+          protocolContext, revPath.scopeName(), revPath.packageName(), revPath.tarballFilename());
+    }
 
     return ResponseEntity.ok().build();
   }

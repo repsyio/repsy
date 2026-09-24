@@ -266,6 +266,53 @@ export async function seedPublish(world: World): Promise<SeedResult> {
   return { contentSha256: sha256Hex(published.marker) };
 }
 
+/** What a real `npm unpublish` did: the raw process outcome, since npm hides the HTTP status. */
+export interface UnpublishRun {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  command: string;
+}
+
+/**
+ * Runs the real `npm unpublish <spec>` (RPS-1289) against `world`'s repo with `world.credential`.
+ * `spec` is `<name>@<version>` for one version, or the bare name with `force` for the whole package
+ * (npm refuses that one without `--force`). The client reads the packument, PUTs it back without the
+ * version to `/<pkg>/-rev/<rev>` and then DELETEs the version's tarball, or DELETEs
+ * `/<pkg>/-rev/<rev>` when the version is the only one -- and it reports success on a 404 too, so a
+ * caller asserts the registry's state afterwards, not just the exit code.
+ */
+export async function unpublish(
+  world: World,
+  spec: string,
+  options: { force?: boolean } = {},
+): Promise<UnpublishRun> {
+  const { home, work } = await isolatedWorkDir(`npm-unpublish-${world.scenario.id}`);
+  const npmrcPath = await renderNpmrc(home, world.repoName, world.credential);
+  const cacheDir = await isolatedCache(home);
+
+  const secrets = world.credential.password ? [world.credential.password] : [];
+  const args = ['unpublish', spec, '--userconfig', npmrcPath, '--cache', cacheDir];
+  if (options.force) {
+    args.push('--force');
+  }
+
+  const result = await run('npm', args, {
+    cwd: work,
+    env: { ...process.env, HOME: home },
+    timeoutMs: PUBLISH_TIMEOUT_MS,
+    redact: secrets,
+    label: `npm-unpublish-${world.scenario.id}`,
+  });
+
+  return {
+    exitCode: result.exitCode,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    command: result.command,
+  };
+}
+
 /** The directory `npm install` would place `packageName` into, under a consumer's `node_modules`. */
 function installedPackageDir(work: string, packageName: string): string {
   return path.join(work, 'node_modules', ...packageName.split('/'));

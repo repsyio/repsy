@@ -16,6 +16,8 @@
 package io.repsy.protocols.npm.protocol.facades;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -24,6 +26,7 @@ import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService.PublishKind;
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
 import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
+import io.repsy.protocols.npm.shared.utils.NpmRevPath;
 import io.repsy.protocols.npm.shared.utils.PackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -86,11 +89,45 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
     final var metadata = this.npmStorageService.getMetadata(storagePath, repoInfo.getName());
     final var unpublishedVersion = PackageUtils.findUnpublishedVersion(metadata, payload);
 
-    if (!unpublishedVersion.isEmpty()) {
-      this.deletePackageVersion(context, scopeName, packageName, unpublishedVersion);
-    }
+    this.deletePackageVersion(context, scopeName, packageName, unpublishedVersion);
 
     return unpublishedVersion;
+  }
+
+  @Override
+  public void deletePackageTarball(
+      final ProtocolContext context,
+      @Nullable final String scopeName,
+      final String packageName,
+      final String tarballFilename) {
+
+    final var versionName =
+        NpmRevPath.versionOfTarball(packageName, tarballFilename)
+            .orElseThrow(() -> new BadRequestException("badRequest"));
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+
+    // The tarball is removed with the version by the packument PUT that comes first in an unpublish
+    // (RPS-1289), so this request finds nothing left to delete. A version that is still published
+    // is not deleted here: removing its file alone would leave a version without a tarball.
+    if (this.isPublished(repoInfo, scopeName, packageName, versionName)) {
+      throw new ItemAlreadyExistException("npmVersionStillPublished");
+    }
+  }
+
+  private boolean isPublished(
+      final BaseRepoInfo<ID> repoInfo,
+      @Nullable final String scopeName,
+      final String packageName,
+      final String versionName) {
+
+    try {
+      final var packageInfo =
+          this.npmPackageService.getPackage(repoInfo.getStorageKey(), scopeName, packageName);
+
+      return this.npmPackageService.getVersionNames(packageInfo.getId()).contains(versionName);
+    } catch (final ItemNotFoundException _) {
+      return false;
+    }
   }
 
   @Override
