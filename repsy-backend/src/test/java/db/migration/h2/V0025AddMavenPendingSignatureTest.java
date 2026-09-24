@@ -34,8 +34,8 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
  * Runs the real migrations against an in-memory H2 database, so it needs no Docker. The PostgreSQL
  * script has the same statements, and every integration test runs it against a real PostgreSQL.
  */
-@DisplayName("V0024 Maven pending signature (H2)")
-class V0024AddMavenPendingSignatureTest {
+@DisplayName("V0025 Maven pending signature (H2)")
+class V0025AddMavenPendingSignatureTest {
 
   private SingleConnectionDataSource dataSource;
   private JdbcTemplate jdbc;
@@ -54,7 +54,7 @@ class V0024AddMavenPendingSignatureTest {
         .locations("classpath:db/migration/h2")
         .schemas("public")
         .defaultSchema("public")
-        .target("24")
+        .target("25")
         .load()
         .migrate();
   }
