@@ -88,9 +88,54 @@ export class Seeder {
     public readonly runId: string,
   ) {}
 
-  async createUser(opts: CreateUserOptions = {}): Promise<SeededUser> {
+  /**
+   * The next unique repo name for this test (`e2e-<runid>-<type>-<n>`), NOT created and NOT tracked.
+   * For flows where the UI creates the repo (the create-repository modal): type the reserved name
+   * into the form, then `adoptRepo()` it so `cleanup()` deletes it. `createRepo()` draws from the
+   * same counter, so a reserved name never clashes with a seeded one.
+   */
+  reserveRepoName(repoType: RepoType): string {
+    const seq = (this.repoSeq.get(repoType) ?? 0) + 1;
+    this.repoSeq.set(repoType, seq);
+    return repoName(this.runId, repoType.toLowerCase(), seq);
+  }
+
+  /**
+   * The next unique username for this test (`e2e-<runid>-user-<n>`), NOT created and NOT tracked.
+   * Also the source of a rename target (a profile/user-edit rename must keep the `e2e-` prefix that
+   * sweep.ts relies on). `createUser()` draws from the same counter.
+   */
+  reserveUsername(): string {
     this.userSeq += 1;
-    const username = opts.username ?? userName(this.runId, this.userSeq);
+    return userName(this.runId, this.userSeq);
+  }
+
+  /** Tracks a repo the UI created, so `cleanup()` deletes it (a 404, e.g. deleted in the UI, is tolerated). */
+  adoptRepo(name: string): void {
+    this.created.push({ kind: 'repo', name });
+  }
+
+  /** Tracks a user the UI created, by id, so a later rename does not orphan it. */
+  adoptUser(id: string): void {
+    this.created.push({ kind: 'user', id });
+  }
+
+  /** Looks a user up by exact username through the panel API, adopts it and returns its id. */
+  async adoptUserByUsername(username: string): Promise<string> {
+    const matches = await this.api.listUsers({ search: username });
+    const user = matches.find((candidate) => candidate.username === username);
+    if (!user) {
+      throw new Error(`Seeder.adoptUserByUsername: no user named "${username}" to adopt`);
+    }
+    this.adoptUser(user.id);
+    return user.id;
+  }
+
+  async createUser(opts: CreateUserOptions = {}): Promise<SeededUser> {
+    // Always draw a number, even when the caller names the user, so the numbering of the default
+    // names is unchanged for tests that pass their own.
+    const reserved = this.reserveUsername();
+    const username = opts.username ?? reserved;
     const pwd = opts.password ?? password(this.runId);
     const role = opts.role ?? UserRole.USER;
 
@@ -102,9 +147,8 @@ export class Seeder {
   }
 
   async createRepo(repoType: RepoType, opts: CreateRepoOptions = {}): Promise<SeededRepo> {
-    const seq = (this.repoSeq.get(repoType) ?? 0) + 1;
-    this.repoSeq.set(repoType, seq);
-    const name = opts.name ?? repoName(this.runId, repoType.toLowerCase(), seq);
+    const reserved = this.reserveRepoName(repoType);
+    const name = opts.name ?? reserved;
 
     await this.api.createRepo(repoType, {
       name,

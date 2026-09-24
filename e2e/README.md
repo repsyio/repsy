@@ -65,11 +65,11 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
-  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" (the panel in headless Chromium, see "UI suite")
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
   docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven; see "Adding a protocol adapter" below
   runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
@@ -80,6 +80,8 @@ e2e/
   runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
   runners/ruby.Dockerfile      # + a pinned Ruby toolchain (ruby/gem/bundle/bundler + stdlib) copied out of the official ruby image
+  runners/ui.Dockerfile        # + Playwright's own headless Chromium (build-time install, /ms-playwright); the "ui" runner, see "UI suite"
+  runners/ui-seccomp.json      # Playwright's seccomp profile, so Chromium's sandbox works as a non-root uid in Docker
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
@@ -89,7 +91,7 @@ e2e/
       generated/                # `pnpm gen:api` output, git-ignored
     seed/
       run-id.ts                 # e2e-<runid>- naming, length/pattern limits
-      seeder.ts                 # createUser/createRepo/setSettings/createToken + cleanup()
+      seeder.ts                 # createUser/createRepo/setSettings/createToken + cleanup(); reserve*/adopt* for entities the UI creates
       sweep.ts                  # deletes e2e-* leftovers older than N hours (or --all)
     scenarios/
       types.ts                  # Scenario/Outcome model, outcomeForStatus(), expectationFor()
@@ -100,6 +102,7 @@ e2e/
       world.ts                  # World/Coordinates/MaterializedCredential types
       fixtures.ts                # Playwright fixtures: panelApi, seeder, world(scenario, adapter)
       remote-throttle.ts        # RemoteAuthBudget/withBackoff429 -- see "Remote hardening" below
+    ui/                        # the panel UI suite's plumbing (fixtures, session seeding, page objects) -- see "UI suite"
     clients/
       exec.ts                   # execa wrapper: isolated work dir/HOME, redacted logs, attach-on-fail
       raw-http.ts                # shared raw-HTTP building blocks: RawResponse, adminCredential(), authHeader(), sha256Hex, 429 backoff
@@ -139,6 +142,7 @@ e2e/
       golang/                    # go.template.mod + hello.template.go (rendered into the zip in code) + consumer-go.template.mod/consumer-main.template.go
       ruby/                      # metadata.template.yaml (the hand-built .gem's gzipped gemspec YAML) + lib.template.rb + Gemfile.template
   tests/
+    ui/                         # the panel UI suite (Playwright + headless Chromium): smoke.spec.ts (@smoke) and harness.spec.ts, one folder per area from here on -- see "UI suite"
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe; both tests tagged @smoke
     skeleton/repo-settings.spec.ts  # RPS-1200 settings-PUT field-by-field matrix across RepoTypes; untagged (not smoke-sized)
     maven/
@@ -193,6 +197,10 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_TARGET`                | `local`                    | `local` \| `remote` \| `ci` — see Targets below                                                                                                                                                                                                                                                                                                                                                                                          |
 | `REPSY_E2E_RUN_ID`            | random 6-char lowercase id | shared by every runner in one `run.sh test`                                                                                                                                                                                                                                                                                                                                                                                              |
 | `REPSY_E2E_STACK`             | _(unset — postgres)_       | `local up\|down` stack profile: unset/anything but `h2` is the postgres profile, `h2` is the embedded-H2 profile; equivalent to `--h2` on the command line. Unread by `run.sh test`, which is identical against either profile — see "Stack profiles" below                                                                                                                                                                              |
+| `REPSY_UI_BASE_URL`           | _(REPSY_API_BASE_URL)_     | ui runner only: where the panel SPA is (it is served on the API port 8080, not the protocol port 9090)                                                                                                                                                                                                                                                                                                                                   |
+| `REPSY_UI_WORKERS`            | `4` (compose)              | ui runner only: Playwright workers (each is a Chromium, ~250-400 MB)                                                                                                                                                                                                                                                                                                                                                                     |
+| `REPSY_UI_NO_SANDBOX`         | _(unset — sandbox on)_     | ui runner only: `1` launches Chromium with `chromiumSandbox: false`, see "UI suite"                                                                                                                                                                                                                                                                                                                                                      |
+| `REPSY_UI_OPT_IN`             | _(unset)_                  | ui runner only: comma list of opt-in UI suites (`throttle`, `scanner`); read by `optedIn()`                                                                                                                                                                                                                                                                                                                                              |
 | `REPSY_E2E_INSECURE_REGISTRY` | _(unset)_                  | docker runner's `--insecure` (only needed for a remote plain-HTTP host; `localhost` already works without it); helm runner's `--insecure-skip-tls-verify` (a REMOTE HTTPS target with a bad cert only -- helm's own `--plain-http` is derived from `REPSY_REPO_BASE_URL`'s scheme instead, unconditionally on this harness's own `http://localhost:9090` stack, confirmed live H3: unlike `crane`, Helm has no localhost auto-detection) |
 
 ## Targets (`src/target.ts`)
@@ -2360,6 +2368,182 @@ remote target that is plain `http://` with an UNTRUSTED certificate is unsupport
 no per-request "skip TLS verification" knob for a `GOPROXY` URL the way `curl -k`/`--insecure` does,
 so there is no equivalent of `REPSY_E2E_INSECURE_REGISTRY` this protocol could honour.
 
+## UI suite
+
+Runs the real Angular panel (`repsy-frontend/`) in **headless Chromium** against the same built Repsy
+image and stack the protocol runners use (epic RPS-1248). It is a Playwright project, `ui`, and a
+runner service, `ui`, inside this harness rather than in `repsy-frontend/`: it needs the real stack,
+the panel-API `Seeder` with its `e2e-<runid>-` naming and sweep, and the admin bootstrap, all of which
+live here. Specs are `tests/ui/**/*.spec.ts`; the plumbing is `src/ui/`. `repsy-frontend/` keeps its
+Karma unit tests.
+
+### Running
+
+```bash
+./run.sh local up && ./run.sh test --protocol ui            # the whole UI suite, PostgreSQL stack
+./run.sh test --protocol ui --grep @smoke                   # the ~1 minute subset
+./run.sh local up --h2 && ./run.sh test --protocol ui --grep @smoke   # embedded-H2 stack
+./run.sh test --protocol ui -b                              # after a Playwright bump or a ui.Dockerfile change
+REPSY_UI_OPT_IN=throttle ./run.sh test --protocol ui        # also run an opt-in suite
+```
+
+The host needs Docker only: Chromium lives in the `ui` runner image (`runners/ui.Dockerfile`), never
+on the host. **The base URL is the API port**: the SPA is served on 8080 (`REPSY_UI_BASE_URL`, falling
+back to `REPSY_API_BASE_URL`), not on the protocol port 9090, where a deep link 404s. `src/` and
+`tests/` are bind-mounted like for every runner, so editing a spec or a page object needs no rebuild;
+only `runners/ui.Dockerfile` or `pnpm-lock.yaml` does (`-b`), because the browser build must equal
+the locked `@playwright/test` version (the image installs it from `node_modules/.bin/playwright`, so
+it follows the lockfile by itself).
+
+**`REPSY_ADMIN_PASSWORD` must satisfy the panel's login form** (6-50 chars, a lower-case letter, an
+upper-case letter and a digit, no whitespace) or UI login is impossible. The backend already refuses
+to boot with a password that fails the complexity part but does not check the length, so the `ui`
+project runs a worker-scoped preflight (`assertAdminCredentialsUsableInUi`) that fails every test with
+a message saying exactly that. `e2e/.env.example` documents it next to the `REPSY_UI_*` variables.
+
+| Variable              | Default                                            | Effect                                                                                  |
+| --------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `REPSY_UI_BASE_URL`   | `REPSY_API_BASE_URL`, else `http://localhost:8080` | Playwright `baseURL`                                                                    |
+| `REPSY_UI_WORKERS`    | `4` (compose)                                      | Playwright `workers`; config-wide, so only the `ui` service sets it                     |
+| `REPSY_UI_NO_SANDBOX` | unset                                              | `1` = `chromiumSandbox: false`, see "Chromium sandbox" below                            |
+| `REPSY_UI_OPT_IN`     | unset                                              | comma list of opt-in suites; `optedIn('throttle')` in `src/ui/session.ts`               |
+| `CI`                  | unset                                              | forwarded to the `ui` service only: `retries: 1`, `forbidOnly`, `trace: on-first-retry` |
+
+Where things land (all under the existing bind mounts): `test-results/` holds, per failed test, the
+trace (`trace.zip`; open it with `pnpm exec playwright show-trace <path>` on the host), the failure
+screenshot and, for the built-in `page`, the video (`video: retain-on-failure`), plus
+`test-results/junit.xml`; `playwright-report/` is the HTML report. Outside CI the trace mode is
+`retain-on-failure` (`on-first-retry` would never fire with `retries: 0`); in CI it is
+`on-first-retry`.
+
+### Chromium sandbox
+
+The sandbox stays **on**: `playwright.config.ts` sets `chromiumSandbox: true` explicitly (Playwright's
+own default is `false`), never a bare `--no-sandbox` argument. As a non-root uid, Docker's default
+seccomp profile blocks the user namespaces the sandbox needs ("Chromium sandboxing failed!"), so the
+`ui` service runs with `security_opt: seccomp=./runners/ui-seccomp.json`, Playwright's own profile
+(the default one plus exactly those syscalls; vendored from `microsoft/playwright`
+`utils/docker/seccomp_profile.json`, reformatted for prettier). `ipc: host` gives Chromium a real
+`/dev/shm` (Docker's 64 MB default crashes tabs under parallel workers). On a kernel or container
+runtime that forbids unprivileged user namespaces even so, set `REPSY_UI_NO_SANDBOX=1` (in `.env` or
+the shell); that is the only way to turn the sandbox off. Verified locally on Linux 7.0 with
+`kernel.apparmor_restrict_unprivileged_userns=1` as a non-root uid (with the shipped profile the
+sandbox works; with Docker's default profile it fails; `REPSY_UI_NO_SANDBOX=1` then passes); **not**
+verified on a CI-hosted runner, which is the CI story's (RPS-1260) to check.
+
+### Fixtures (`src/ui/fixtures.ts`)
+
+`import { test, expect } from '../../src/ui/fixtures.js'`. It extends `scenarios/fixtures.ts`'s `test`,
+so `panelApi` and `seeder` (per-test run id, cleanup) work unchanged, and adds:
+
+| Fixture                               | What it is                                                                                                                                 |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `page` / `context`                    | Playwright's built-ins, with the flake defaults applied (below). Anonymous.                                                                |
+| `adminPage`                           | the built-in `page`, already logged in as the harness admin before its first navigation. **Refuses** a test tagged `@credentials`.         |
+| `adminSession`                        | the `{ username, token, refreshToken }` behind `adminPage`, one fresh API login per test                                                   |
+| `seededUser`                          | a USER created by `seeder` for this test                                                                                                   |
+| `userPage`                            | a second `BrowserContext`, logged in as `seededUser`. No video (Playwright only records its own default context); trace and screenshot yes |
+| `openUiPage({ session?, viewport? })` | opens more contexts (a second admin, a mobile viewport); all are closed after the test, before `seeder` cleans up                          |
+| `uiPreflight`                         | automatic, per worker: the admin-password check above                                                                                      |
+
+- **Session seeding.** A logged-in page gets the three `localStorage` keys the SPA reads (`username`,
+  `token`, `refresh-token`) from a context init script (`seedSession` in `src/ui/session.ts`): no
+  `storageState` file, because tokens are per run and the SPA's refresh flow rewrites them. The write
+  is **one-shot per tab** (a `sessionStorage` flag, plus an origin check), so a reload after logout
+  stays logged out and a token the SPA has refreshed is not overwritten with the stale one. Login is
+  **per test, never per worker**: refresh tokens are single-use with family revocation on reuse, so a
+  token pair shared by a worker's tests is revoked the moment the first of them refreshes it.
+- **Admin guard.** The harness admin is what the stack and every later test logs in with. Tests that
+  change a password or username, or delete an account, are tagged `@credentials` and use `userPage`;
+  `adminPage` throws for them. Page-object methods that change credentials must also call
+  `assertNotAdmin(username)` / `assertPageNotAdmin(page)` (`session.ts`) before acting.
+- **Flake defaults** (`src/ui/defaults.ts`, applied to every context): `reducedMotion: 'reduce'`
+  (the app itself ignores it) plus an injected stylesheet that sets animation-duration to `1ms` and
+  transitions to `0s` (`1ms`, not `animation: none`: Angular's `animate.enter`/`animate.leave` wait for
+  `animationend`); and an **allow-list** for network access: any http(s) request whose origin is not
+  the UI, API or repo base URL is aborted (Google Tag Manager, gtag, the Font Awesome CDN and Gravatar
+  today), so runs are offline-safe. A test's own `page.route()` mock still wins over it.
+- **Guards redirect to `/`, not `/login`.** `AuthGuard` sends an anonymous visitor of a protected route
+  to `/`, and `/` renders the login form _in place_ (`AuthRedirectComponent` picks `LoginComponent` or
+  the dashboard from the session), so the URL stays `/`. Only logout and a direct visit navigate to
+  `/login`. Assert the login form is visible, not a `/login` URL, for a guard redirect.
+- **Timing facts a test must respect.** `PanelLayoutComponent` hides `<router-outlet>` for a fixed
+  500 ms after load, and a splash screen covers it: never assert "navigation finished", wait for the
+  element or response that drives the view (`Shell.waitForView`, `expect(...).toBeVisible()`); there
+  are no fixed sleeps (`eslint-plugin-playwright` errors on `waitForTimeout`). Toasts live 3 s and at
+  most 3 are kept: assert a toast right after the action. The header "Profile" link is a raw relative
+  `href` (a full reload, and from a nested route it resolves under the repo): state does not survive it.
+- **Opt-in suites** (`@throttle`, `@scanner`, ...) skip themselves with
+  `test.skip(!optedIn('throttle'), 'set REPSY_UI_OPT_IN=throttle')`, never through a `grepInvert` in
+  the config.
+- **Isolation.** Tests are `fullyParallel`, use their own `e2e-<runid>...` names, and never touch
+  `admin` or the 9 default repos. Entities the **UI** creates are named with `seeder.reserveRepoName(type)`
+  / `seeder.reserveUsername()` (the next unique name from the same counters `createRepo`/`createUser`
+  use, nothing created) and then tracked with `seeder.adoptRepo(name)` / `adoptUser(id)` /
+  `await adoptUserByUsername(name)` so `cleanup()` deletes them; a user renamed later is tracked by id,
+  and the new name must also come from `reserveUsername()` so it keeps the `e2e-` prefix `sweep.ts`
+  finds. Global counts (dashboard cards) are asserted against a same-moment API read.
+
+### Page objects (`src/ui/pages/`)
+
+Selectors are `data-testid` first (see "UI test ids" at the end of this file), `getByRole`/label
+second, never CSS classes or visible text alone: every list renders a desktop grid and a mobile card
+list at once, and strict mode counts hidden matches too.
+
+| File            | Exports                                                                                                                                                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `base.ts`       | `UiPage` (`page`, `tid()`, abstract `goto()`)                                                                                                                                                                                  |
+| `components.ts` | `Toasts` (`success()/error()/expectSuccess()/expectError()`), `DangerModal`, `Pagination`, `EmptyList`, `Spinner`, `DesktopList(page, 'repo')` (desktop container, `row(key)`, `rows()`, `inRow(key, id)`, `openRowMenu(key)`) |
+| `shell.ts`      | `Shell` (`sidebar`, `mobileSidebar`, `header`, `toasts`, `dangerModal`, `openAvatarMenu()`, `logoutViaSidebar()`, `logoutViaHeader()`, `waitForView()`)                                                                        |
+| `login.ts`      | `LoginPage` (`goto()`, `login(u, p)`, `error(field, validator)`)                                                                                                                                                               |
+| `dashboard.ts`  | `DashboardPage` (welcome card only; RPS-1252 extends it)                                                                                                                                                                       |
+
+**Shared files.** `playwright.config.ts`, `docker-compose.runners.yml`, `runners/ui.*`, `run.sh`,
+`.env.example`, `src/ui/{fixtures,session,defaults}.ts` and `src/ui/pages/{base,components,shell,login}.ts`
+belong to RPS-1250; a later story does not edit them. Need another fixture? Create
+`src/ui/<area>-fixtures.ts` with `export const test = uiTest.extend<...>({...})` on top of
+`src/ui/fixtures.ts` and import that in your specs. Need a shell or component helper that is missing?
+Compose it inside your own page object (or a subclass) and list it in the PR description so the owner
+can promote it. Need another viewport? `test.use({ viewport: { width: 390, height: 844 } })` in the
+spec, or `openUiPage({ viewport })`; never a new Playwright project. Every later story replaces only its
+own stub below, so the unchanged heading lines keep git's hunks apart; the Layout tree is not edited.
+
+### Auth, guards and session (RPS-1251)
+
+_Not implemented yet._
+
+### Repositories and dashboard (RPS-1252)
+
+_Not implemented yet._
+
+### Users and profile (RPS-1253)
+
+_Not implemented yet._
+
+### Repository settings and deploy tokens (RPS-1254)
+
+_Not implemented yet._
+
+### Package seeding and protocol page objects (RPS-1255)
+
+_Not implemented yet._
+
+### Package tests: Maven, npm, Docker, PyPI (RPS-1256)
+
+_Not implemented yet._
+
+### Package tests: Cargo, NuGet, Helm, Go, Ruby (RPS-1257)
+
+_Not implemented yet._
+
+### Errors, navigation, mobile and accessibility (RPS-1258)
+
+_Not implemented yet._
+
+### Security scanning UI (RPS-1259)
+
+_Not implemented yet._
+
 ## Running
 
 ```bash
@@ -2375,6 +2559,7 @@ so there is no equivalent of `REPSY_E2E_INSECURE_REGISTRY` this protocol could h
 ./run.sh test --protocol pypi
 ./run.sh test --protocol golang
 ./run.sh test --protocol ruby
+./run.sh test --protocol ui     # the panel UI suite in headless Chromium (see "UI suite")
 ./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby
 ./run.sh test --grep '@smoke'
 ./run.sh test -b             # rebuild the runner image(s) first (Dockerfile/lockfile changed)
@@ -2390,7 +2575,7 @@ so there is no equivalent of `REPSY_E2E_INSECURE_REGISTRY` this protocol could h
 
 `run.sh test` accepts `--target local|remote|ci` and `--protocol a,b` (a comma-separated list of
 runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`,
-`ruby`) — identically whichever stack profile is up (see "Stack profiles (postgres and H2)" above).
+`ruby`, `ui`) — identically whichever stack profile is up (see "Stack profiles (postgres and H2)" above).
 Reports land under `e2e/test-results/` (JUnit
 XML) and
 `e2e/playwright-report/` (HTML) — one `run.sh test` invocation covering several `--protocol` services
@@ -2574,22 +2759,22 @@ Selector priority: `getByTestId` first, then `getByRole`/`getByLabel`, never CSS
 
 ### Shared component ids (fixed, scoped by the host id of rule 5)
 
-| Component | Ids |
-| --- | --- |
-| `danger-modal` | `danger-modal`, `-backdrop`, `-title`, `-close`, `-question`, `-message`, `-cancel`, `-confirm` |
-| `pagination` | `pagination`, `pagination-prev`, `pagination-next`, `pagination-page-<n>` (1-based), `pagination-ellipsis` |
-| `breadcrumb` | `breadcrumb`, `breadcrumb-item-<i>` (0-based), `breadcrumb-link`, `breadcrumb-current` |
-| `toast` | `toast-stack`, `toast` (+ `data-toast-type` = `success`/`error`), `toast-message`, `toast-close` |
-| `searchbox` | `searchbox`, `search-input` |
-| `selector` | `selector`, `selector-toggle`, `selector-menu`, `selector-option-<raw value>` |
-| `sort-selector` | `sort-selector`, `sort-selector-toggle`, `sort-selector-menu`, `sort-option-<name>` |
-| `dropdown` | `dropdown`, `dropdown-toggle`, `dropdown-menu` |
-| `toggle` | `toggle`, `toggle-input` (click it, assert `toBeChecked()`), `toggle-label` |
-| `radio-group` | `radio-group`, `radio-option-<value>` |
-| `copy-clipboard` | `copy-button` (+ `data-copied`) |
-| `tooltip` | `tooltip-text`, `tooltip-popup` |
-| others | `empty-list`, `spinner`, `splash-screen`, `markdown`, `avatar`, `avatar-image`, `avatar-fallback`, `severity-badge` (+ `data-severity`), `severity-breakdown`, `rescan-note`, `status-polling-indicator`, `security-details-link`, `security-badge` |
-| shell | `header`, `header-menu`, `sidebar`, `mobile-sidebar`, `panel-content`, `footer`, `login-page` |
+| Component        | Ids                                                                                                                                                                                                                                                 |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `danger-modal`   | `danger-modal`, `-backdrop`, `-title`, `-close`, `-question`, `-message`, `-cancel`, `-confirm`                                                                                                                                                     |
+| `pagination`     | `pagination`, `pagination-prev`, `pagination-next`, `pagination-page-<n>` (1-based), `pagination-ellipsis`                                                                                                                                          |
+| `breadcrumb`     | `breadcrumb`, `breadcrumb-item-<i>` (0-based), `breadcrumb-link`, `breadcrumb-current`                                                                                                                                                              |
+| `toast`          | `toast-stack`, `toast` (+ `data-toast-type` = `success`/`error`), `toast-message`, `toast-close`                                                                                                                                                    |
+| `searchbox`      | `searchbox`, `search-input`                                                                                                                                                                                                                         |
+| `selector`       | `selector`, `selector-toggle`, `selector-menu`, `selector-option-<raw value>`                                                                                                                                                                       |
+| `sort-selector`  | `sort-selector`, `sort-selector-toggle`, `sort-selector-menu`, `sort-option-<name>`                                                                                                                                                                 |
+| `dropdown`       | `dropdown`, `dropdown-toggle`, `dropdown-menu`                                                                                                                                                                                                      |
+| `toggle`         | `toggle`, `toggle-input` (click it, assert `toBeChecked()`), `toggle-label`                                                                                                                                                                         |
+| `radio-group`    | `radio-group`, `radio-option-<value>`                                                                                                                                                                                                               |
+| `copy-clipboard` | `copy-button` (+ `data-copied`)                                                                                                                                                                                                                     |
+| `tooltip`        | `tooltip-text`, `tooltip-popup`                                                                                                                                                                                                                     |
+| others           | `empty-list`, `spinner`, `splash-screen`, `markdown`, `avatar`, `avatar-image`, `avatar-fallback`, `severity-badge` (+ `data-severity`), `severity-breakdown`, `rescan-note`, `status-polling-indicator`, `security-details-link`, `security-badge` |
+| shell            | `header`, `header-menu`, `sidebar`, `mobile-sidebar`, `panel-content`, `footer`, `login-page`                                                                                                                                                       |
 
 Modal families use one prefix each (`repo-create-*`, `user-create-*`, `user-edit-*`,
 `user-reset-password-*`, `token-create-*`, `token-info-*`, `config-modal-*`, `*-security-modal-*`),
@@ -2599,13 +2784,13 @@ each with `-backdrop`, `-close` and its form fields.
 
 The protocol prefix is neutral: one descriptor-driven page object serves all nine formats.
 
-| Prefix | Meaning | Where |
-| --- | --- | --- |
-| `pkg-list` | first level at `/:repo` | maven group list, npm/docker/pypi/cargo/helm/nuget/ruby/go lists |
-| `pkg-sublist` | grouping level | maven `/:repo/:group`, npm `/:repo/:scope` |
-| `pkg-versions` | versions of one item | all version lists, docker tag list |
-| `pkg-manifests` | docker only | `/:repo/:image/:tag` |
-| `pkg-detail` | one version | all version details, docker tag detail |
+| Prefix          | Meaning                 | Where                                                            |
+| --------------- | ----------------------- | ---------------------------------------------------------------- |
+| `pkg-list`      | first level at `/:repo` | maven group list, npm/docker/pypi/cargo/helm/nuget/ruby/go lists |
+| `pkg-sublist`   | grouping level          | maven `/:repo/:group`, npm `/:repo/:scope`                       |
+| `pkg-versions`  | versions of one item    | all version lists, docker tag list                               |
+| `pkg-manifests` | docker only             | `/:repo/:image/:tag`                                             |
+| `pkg-detail`    | one version             | all version details, docker tag detail                           |
 
 Every list has `pkg-toolbar`, `pkg-search`, `pkg-sort`, `pkg-refresh`, `pkg-configure`,
 `pkg-settings`, `<L>-table`/`<L>-row-<key>`, `<L>-cards`/`<L>-card-<key>` and `pkg-error`. Every
