@@ -508,7 +508,9 @@ export function registerPackageScenarios(
       test(
         title(
           '04',
-          'deleting a version from its detail page toasts and lands on the versions page',
+          detailDelete.landsOn
+            ? 'deleting a version from its detail page toasts and lands where the descriptor records (not yet the shared convention)'
+            : 'deleting a version from its detail page toasts and lands on the versions page',
           '04-detail',
         ),
         async ({ adminPage, seeder, seedVersions }) => {
@@ -530,7 +532,7 @@ export function registerPackageScenarios(
           );
 
           // Only that version is gone, and the page it landed on says so.
-          if (landed instanceof ProtocolListPage) {
+          if (landed instanceof ProtocolListPage && landed.levelName === 'versions') {
             await landed.expectLoaded();
             await landed.expectNoRow(first);
             await landed.expectRow(second);
