@@ -159,11 +159,11 @@ test.describe('Dialogs: semantics, focus and keyboard', { tag: '@a11y' }, () => 
       opener: keyButton,
     });
 
-    // Confirming it shows the one-time secret, which is a dialog of its own.
+    // Confirming it shows the one-time secret, which is a dialog of its own. The list reloads
+    // meanwhile and re-renders the key button, so there is no element left to give the focus back to.
     await users.resetPassword(seededUser.username);
     await expectDialogContract(adminPage, users.resetPasswordModal.root, {
       name: `New password for ${seededUser.username}`,
-      opener: keyButton,
     });
   });
 
@@ -291,9 +291,7 @@ test.describe('Forms: labels, names and unique ids', { tag: '@a11y' }, () => {
     await expect(adminPage.getByLabel('New Repository Name')).toHaveCount(1);
   });
 
-  test('A11Y-06: the create-repository and create-user forms are labelled', async ({
-    adminPage,
-  }) => {
+  test('A11Y-06: the create-repository form is labelled', async ({ adminPage }) => {
     const repos = new RepositoriesPage(adminPage);
     await repos.goto();
     const repoModal = await repos.openCreateModal();
@@ -303,8 +301,9 @@ test.describe('Forms: labels, names and unique ids', { tag: '@a11y' }, () => {
     await repoModal.root.getByLabel('Description', { exact: true }).fill('by-label');
     // The type selector is named by its label and its value.
     await expect(repoModal.root.getByTestId('selector-toggle')).toHaveAccessibleName(/^Type \w+/);
-    await adminPage.keyboard.press('Escape');
+  });
 
+  test('A11Y-06: the create-user form is labelled', async ({ adminPage }) => {
     const users = new UsersPage(adminPage);
     await users.goto();
     await users.openCreateModal();

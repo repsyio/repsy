@@ -83,7 +83,13 @@ test.describe('Accessibility (axe)', { tag: '@a11y' }, () => {
     await repos.goto();
     const modal = await repos.openCreateModal();
     await expect(modal.root).toBeVisible();
-    await scanPage(adminPage, testInfo, 'modal-repo-create', '[data-testid="repo-create-modal"]');
+    const summary = await scanPage(
+      adminPage,
+      testInfo,
+      'modal-repo-create',
+      '[data-testid="repo-create-modal"]',
+    );
+    expect(summary.label).toBe('modal-repo-create');
   });
 
   test('A11Y-01: create-token modal', async ({ adminPage, seeder }, testInfo) => {
@@ -91,7 +97,13 @@ test.describe('Accessibility (axe)', { tag: '@a11y' }, () => {
     const settings = new RepoSettingsPage(adminPage, repo.name);
     await settings.goto();
     await settings.tokens.openCreateModal();
-    await scanPage(adminPage, testInfo, 'modal-token-create', '[data-testid="token-create-modal"]');
+    const summary = await scanPage(
+      adminPage,
+      testInfo,
+      'modal-token-create',
+      '[data-testid="token-create-modal"]',
+    );
+    expect(summary.label).toBe('modal-token-create');
   });
 
   test('A11Y-01: user modals (create, delete confirmation, one-time password)', async ({
@@ -102,8 +114,15 @@ test.describe('Accessibility (axe)', { tag: '@a11y' }, () => {
     await users.goto();
     await users.search(seededUser.username);
     await users.openCreateModal();
-    await scanPage(adminPage, testInfo, 'modal-user-create', '[data-testid="user-create-modal"]');
+    const create = await scanPage(
+      adminPage,
+      testInfo,
+      'modal-user-create',
+      '[data-testid="user-create-modal"]',
+    );
+    expect(create.label).toBe('modal-user-create');
     await adminPage.keyboard.press('Escape');
+    await expect(users.createModal.root).toHaveCount(0);
 
     await users.clickResetPassword(seededUser.username);
     await scanPage(adminPage, testInfo, 'modal-danger', '[data-testid="danger-modal"]');

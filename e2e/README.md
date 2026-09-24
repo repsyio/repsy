@@ -2708,9 +2708,9 @@ How the tests are written, and what they had to work around:
   nine types with `toHaveCount`, so an absent section and a hidden one are told apart.
 
 Known product bugs are pinned with `test.fail('... RPS-nnnn')`, so the test turns red the day the
-bug is fixed and the marker has to go: `#name`/`#description` are duplicated between the
-rename form and the create-token modal (RPS-1266). The Visibility and Package Override help texts
-(RPS-1261) are fixed and asserted unpinned, and so is RPS-1285: TOK-03 revokes the only token on page 2
+bug is fixed and the marker has to go. The Visibility and Package Override help texts
+(RPS-1261) are fixed and asserted unpinned, and so is the duplicated `#name`/`#description` of the rename form and the
+create-token modal (RPS-1266, TOK-05), and so is RPS-1285: TOK-03 revokes the only token on page 2
 with the page-2 answer delayed and asserts a single list request (the first page) and the three
 remaining rows. Not covered here: the Vulnerability Scanning toggle
 (hidden without a scanner, RPS-1259), the per-protocol "configure" modal behind a token row, the
@@ -2935,6 +2935,17 @@ Things a later author must know:
   chosen; the stack is `role=status` + `aria-live=polite`, an error toast is `role=alert`, its close button
   is named, it lasts 7 s and is held while hovered or focused (driven with `page.clock`, so no test sleeps);
   pagination is a `nav` named `Pagination` with `aria-current=page` and named previous/next buttons.
+- **Dialogs and forms (A11Y-05..07, `a11y/dialogs.spec.ts`, RPS-1266 parts 2 and 3).** `expectDialogContract()`
+  asserts, for each modal (create repository, create token, create/edit/reset user, the delete confirmation,
+  the config modal and a security modal), `role=dialog` (`alertdialog` for the confirmation), `aria-modal`, the
+  accessible name (its title), focus inside after it opens, 14 Tab and 14 Shift+Tab presses that never leave it,
+  and Escape, which closes it and returns focus to the button that opened it (a row-menu item or a list that
+  re-renders has nothing to return to). The backdrop is an `aria-hidden` `div`. The forms are checked by
+  label (`getByLabel(..., { exact: true })` reaches the field it names, also on `/:repo/settings` with the
+  create-token modal open), by element ids (none twice in the document, every `label[for]` resolves to a form
+  control), by the accessible names of the icon-only buttons (refresh, PGP add, token rotate/configure/revoke,
+  modal X) and by the password eyes, whose name and `aria-pressed` follow the state (they are still clicked with
+  `dispatchEvent`: the blocked Font Awesome CDN leaves them without a box).
 - **axe, report-only by default.** `scanPage()` (`src/ui/a11y.ts`) runs the WCAG 2.0/2.1 A and AA rules,
   attaches `axe-<page>.json` (summary + every violation with its nodes) and `axe-<page>.txt` to the report,
   writes the JSON to `test-results/<test>/axe-<page>.json` and prints one `AXE <page> [report]: ...` line, and
@@ -2942,18 +2953,22 @@ Things a later author must know:
   serious/critical violations (RPS-1266 flips it once the baseline is clean); for a single run use
   `REPSY_UI_OPT_IN=a11y-enforce` (or `a11y-report`), because `docker-compose.runners.yml` forwards that
   variable already. Font Awesome (a blocked CDN in this harness) icons render as empty boxes; each summary
-  counts them as `faNodes` per rule so they stay separable. Axe cannot judge a modal or dropdown that is not
-  open: the five scans are of the pages at rest.
+  counts them as `faNodes` per rule so they stay separable. The five page scans are of the pages at rest;
+  A11Y-01 also scans the open create-repository, create-token, create-user, confirmation and one-time-password
+  modals (`scanPage(page, testInfo, label, selector)` scopes a scan to one element).
 
-Baseline on `main` (RPS-1266 tracks fixing it; serious/critical only, WCAG A/AA):
+Baseline (RPS-1266 tracks fixing it; serious/critical only, WCAG A/AA). `main` before parts 2 and 3, then after:
 
-| Page                | Violations                                                                                                                                   |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| login               | `button-name` (critical, 1): the password eye toggle                                                                                         |
-| dashboard           | none                                                                                                                                         |
-| repository list     | `button-name` (critical, 1): the refresh button; `nested-interactive` (serious, 1): a `role="button"` row containing a link and the row menu |
-| repository settings | `button-name` (critical, 1): the PGP add button; `color-contrast` (serious, 2): the disabled keyserver rows                                  |
-| users (admin)       | `color-contrast` (serious, 1): the `USER` role badge                                                                                         |
+| Page                | Before                                                                                                                                       | After parts 2 and 3                                                 |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| login               | `button-name` (critical, 1): the password eye toggle                                                                                         | none                                                                |
+| dashboard           | none                                                                                                                                         | none                                                                |
+| repository list     | `button-name` (critical, 1): the refresh button; `nested-interactive` (serious, 1): a `role="button"` row containing a link and the row menu | `nested-interactive` (serious, 1): the row (part 4, rows as links)  |
+| repository settings | `button-name` (critical, 1): the PGP add button; `color-contrast` (serious, 3): the disabled keyserver rows and the description counter      | `color-contrast` (serious, 2): the disabled built-in keyserver rows |
+| users (admin)       | `color-contrast` (serious, 1): the `USER` role badge                                                                                         | none                                                                |
+
+The package lists and version lists show the same `nested-interactive` row (part 4); the Docker manifest page has
+`color-contrast` (13 highlight.js tokens) and `scrollable-region-focusable` (its code block), not scanned by the suite yet.
 
 ### Security scanning UI (RPS-1259)
 

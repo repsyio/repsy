@@ -19,9 +19,9 @@
  * Every row is reached through `row(name)`: the ids inside a row (`row-name`, `row-rotate`, ...)
  * repeat per row, and the mobile card list repeats them again, so the desktop table scopes them.
  *
- * `#name`, `#username` and `#description` exist BOTH in the rename form of Repository Info and in
- * the create-token modal on the same page, so the modal's fields are only ever reached through its
- * own `token-create-*` ids, never a label or an `#id`.
+ * The modal's fields are reached through their `token-create-*` ids. They used to share `#name`,
+ * `#username` and `#description` with the rename form of Repository Info (RPS-1266); element ids are
+ * scoped per component now, so a label (`modal.root.getByLabel('Name *', { exact: true })`) works too.
  */
 import { expect, type Locator, type Page } from '@playwright/test';
 
