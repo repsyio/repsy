@@ -20,6 +20,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -28,6 +29,8 @@ import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -97,6 +100,12 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
     repo.setDiskUsage(diskUsage);
 
     return this.repoRepository.saveAndFlush(repo);
+  }
+
+  private static long directoryCount(final RepoType type) throws IOException {
+    try (var children = Files.list(STORAGE_ROOT.resolve(protocolDir(type)))) {
+      return children.count();
+    }
   }
 
   private ResultActions list(final String authHeader, final String... params) throws Exception {
@@ -454,24 +463,38 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("lists a repo the old per-type endpoint also lists")
-    void agreesWithTheOldEndpoint() throws Exception {
-      final var name = uniqueRepoName("both");
-      RepoCollectionControllerIT.this.seedRepo(RepoType.NUGET, name);
+    @DisplayName("keeps a renamed repo in its place under its new name, and drops a deleted one")
+    void followsRenameAndDelete() throws Exception {
+      final var tag = tag();
+      final var admin = RepoCollectionControllerIT.this.adminBearerToken();
+      final var oldest = RepoCollectionControllerIT.this.seedRepo(RepoType.CARGO, tag + "-zulu");
+      final var middle = RepoCollectionControllerIT.this.seedRepo(RepoType.CARGO, tag + "-alpha");
+      final var newest = RepoCollectionControllerIT.this.seedRepo(RepoType.CARGO, tag + "-bravo");
+      final var renamed = tag + "-aardvark";
 
-      final var old =
-          RepoCollectionControllerIT.this
-              .perform(
-                  get("/api/repos/NUGET/info")
-                      .header(AUTHORIZATION, RepoCollectionControllerIT.this.userBearerToken()))
-              .andExpect(status().isOk())
-              .andReturn()
-              .getResponse()
-              .getContentAsString();
+      assertThat(RepoCollectionControllerIT.this.listedNames("q", tag))
+          .containsExactly(newest.getName(), middle.getName(), oldest.getName());
 
-      assertThat(JsonPath.<List<String>>read(old, "$.data[*].name")).contains(name);
-      assertThat(RepoCollectionControllerIT.this.listedNames("q", name, "type", "NUGET"))
-          .containsExactly(name);
+      expectSuccess(
+          RepoCollectionControllerIT.this.perform(
+              json(
+                      patch("/api/repos/" + oldest.getName() + "/name"),
+                      "{\"name\":\"%s\"}".formatted(renamed))
+                  .header(AUTHORIZATION, admin)),
+          "repoRenamed",
+          "Repo renamed.");
+
+      assertThat(RepoCollectionControllerIT.this.listedNames("q", tag))
+          .containsExactly(newest.getName(), middle.getName(), renamed);
+
+      expectSuccess(
+          RepoCollectionControllerIT.this.perform(
+              delete("/api/repos/" + middle.getName()).header(AUTHORIZATION, admin)),
+          "repoDeleted",
+          "Repo deleted.");
+
+      assertThat(RepoCollectionControllerIT.this.listedNames("q", tag))
+          .containsExactly(newest.getName(), renamed);
     }
   }
 
@@ -528,6 +551,26 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
 
       assertThat(counts).hasSize(9);
       assertThat(counts.values()).allSatisfy(count -> assertThat(count).isEqualTo(0));
+    }
+
+    @Test
+    @DisplayName("follows a create and a delete")
+    void followsCreateAndDelete() throws Exception {
+      final var admin = RepoCollectionControllerIT.this.adminBearerToken();
+      final var before = ((Number) this.counts(admin).get("NPM")).longValue();
+      final var first =
+          RepoCollectionControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("cnt1"));
+      RepoCollectionControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("cnt2"));
+
+      assertThat(((Number) this.counts(admin).get("NPM")).longValue()).isEqualTo(before + 2);
+
+      expectSuccess(
+          RepoCollectionControllerIT.this.perform(
+              delete("/api/repos/" + first.getName()).header(AUTHORIZATION, admin)),
+          "repoDeleted",
+          "Repo deleted.");
+
+      assertThat(((Number) this.counts(admin).get("NPM")).longValue()).isEqualTo(before + 1);
     }
 
     @Test
@@ -597,8 +640,8 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("lists the new repo and keeps it usable by the per-type endpoints")
-    void listedAndUsableByTheOldEndpoints() throws Exception {
+    @DisplayName("lists the new repo, and the repo routes and DELETE reach it")
+    void listedAndUsable() throws Exception {
       final var name = uniqueRepoName("madenew");
       final var admin = RepoCollectionControllerIT.this.adminBearerToken();
 
@@ -612,23 +655,6 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
       RepoCollectionControllerIT.this
           .perform(get("/api/repos/" + name + "/settings").header(AUTHORIZATION, admin))
           .andExpect(status().isOk());
-      final var old =
-          RepoCollectionControllerIT.this
-              .perform(get("/api/repos/CARGO/info").header(AUTHORIZATION, admin))
-              .andExpect(status().isOk())
-              .andReturn()
-              .getResponse()
-              .getContentAsString();
-      assertThat(JsonPath.<List<String>>read(old, "$.data[*].name")).contains(name);
-      // The old create endpoint refuses the name too.
-      expectError(
-          RepoCollectionControllerIT.this.perform(
-              json(post("/api/repos/CARGO"), "{\"name\":\"%s\"}".formatted(name))
-                  .header(AUTHORIZATION, admin)),
-          HttpStatus.CONFLICT,
-          "repoExists",
-          "repoExists",
-          "The repository exists. Please try another name.");
       RepoCollectionControllerIT.this
           .perform(delete("/api/repos/" + name).header(AUTHORIZATION, admin))
           .andExpect(status().isOk());
@@ -636,17 +662,94 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("also lists a repo created through the per-type endpoint")
-    void listsARepoOfTheOldCreate() throws Exception {
-      final var name = uniqueRepoName("madeold");
-      RepoCollectionControllerIT.this.seedRepo(RepoType.PYPI, name, true, "old");
+    @DisplayName("creates nothing through the removed POST /api/repos/{repoType}")
+    void removedPerTypeCreateCreatesNothing() throws Exception {
+      final var name = uniqueRepoName("oldurl");
+      final var dirsBefore = directoryCount(RepoType.MAVEN);
 
-      final var body = RepoCollectionControllerIT.this.listBody("q", name);
+      expectError(
+          RepoCollectionControllerIT.this.perform(
+              json(post("/api/repos/MAVEN"), "{\"name\":\"%s\"}".formatted(name))
+                  .header(AUTHORIZATION, RepoCollectionControllerIT.this.adminBearerToken())),
+          HttpStatus.NOT_FOUND,
+          "itemNotFound",
+          null,
+          "The requested item is not found.");
 
-      assertThat(JsonPath.<Map<String, Object>>read(body, "$.data.content[0]"))
-          .containsEntry("type", "PYPI")
-          .containsEntry("privateRepo", true)
-          .containsEntry("description", "old");
+      assertThat(RepoCollectionControllerIT.this.repoRepository.findByName(name)).isEmpty();
+      assertThat(directoryCount(RepoType.MAVEN)).isEqualTo(dirsBefore);
+    }
+
+    @ParameterizedTest(name = "privateRepo={0}")
+    @ValueSource(strings = {"true", "false", "null"})
+    @DisplayName("honors an explicit private flag, and treats null as false")
+    void explicitPrivateFlag(final String flag) throws Exception {
+      final var name = uniqueRepoName("flag");
+
+      expectSuccess(
+          RepoCollectionControllerIT.this.create(
+              RepoCollectionControllerIT.this.adminBearerToken(),
+              "{\"name\":\"%s\",\"type\":\"DOCKER\",\"privateRepo\":%s}".formatted(name, flag)),
+          "repoCreated",
+          "Repo created.");
+
+      assertThat(RepoCollectionControllerIT.this.reloadRepo(name).isPrivateRepo())
+          .isEqualTo(Boolean.parseBoolean(flag));
+    }
+
+    @ParameterizedTest(name = "\"{0}\"")
+    @ValueSource(strings = {"a", "Repo_Name-1", "UPPER", "under_score", "hy-phen", "1234567890"})
+    @DisplayName("accepts every character the name pattern allows")
+    void acceptsAllowedNames(final String name) throws Exception {
+      final var unique = name + "-" + randomTag();
+
+      expectSuccess(
+          RepoCollectionControllerIT.this.create(
+              RepoCollectionControllerIT.this.adminBearerToken(), createBody(unique, "MAVEN")),
+          "repoCreated",
+          "Repo created.");
+
+      assertThat(RepoCollectionControllerIT.this.reloadRepo(unique).getName()).isEqualTo(unique);
+    }
+
+    @Test
+    @DisplayName("accepts a name of exactly 25 characters")
+    void acceptsMaxLengthName() throws Exception {
+      final var name = "a".repeat(24) + randomTag().charAt(0);
+
+      expectSuccess(
+          RepoCollectionControllerIT.this.create(
+              RepoCollectionControllerIT.this.adminBearerToken(), createBody(name, "MAVEN")),
+          "repoCreated",
+          "Repo created.");
+
+      assertThat(RepoCollectionControllerIT.this.reloadRepo(name).getName()).hasSize(25);
+    }
+
+    @Test
+    @DisplayName("stores a description of 500 characters and rejects one of 501")
+    void descriptionOverColumnLength() throws Exception {
+      final var admin = RepoCollectionControllerIT.this.adminBearerToken();
+      final var ok = uniqueRepoName("d500");
+      expectSuccess(
+          RepoCollectionControllerIT.this.create(
+              admin,
+              "{\"name\":\"%s\",\"type\":\"NPM\",\"description\":\"%s\"}"
+                  .formatted(ok, "d".repeat(500))),
+          "repoCreated",
+          "Repo created.");
+      assertThat(RepoCollectionControllerIT.this.reloadRepo(ok).getDescription()).hasSize(500);
+
+      final var tooLong = uniqueRepoName("d501");
+      final var dirsBefore = directoryCount(RepoType.NPM);
+      expectValidationError(
+          RepoCollectionControllerIT.this.create(
+              admin,
+              "{\"name\":\"%s\",\"type\":\"NPM\",\"description\":\"%s\"}"
+                  .formatted(tooLong, "d".repeat(501))),
+          null);
+      assertThat(RepoCollectionControllerIT.this.repoRepository.findByName(tooLong)).isEmpty();
+      assertThat(directoryCount(RepoType.NPM)).isEqualTo(dirsBefore);
     }
 
     @Test
@@ -685,11 +788,50 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
           .isEqualTo(RepoType.MAVEN);
     }
 
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(RepoType.class)
+    @DisplayName("returns 409 repoExists for the default repo names seeded at startup")
+    void startupDefaultNamesAreTaken(final RepoType type) throws Exception {
+      final var defaultName = type == RepoType.GOLANG ? "go" : type.name().toLowerCase(Locale.ROOT);
+      assertThat(RepoCollectionControllerIT.this.repoRepository.findByName(defaultName))
+          .as("startup-seeded default repo '%s'", defaultName)
+          .isPresent();
+
+      // Use a different type than the default's, so only the name can clash.
+      final var otherType = type == RepoType.MAVEN ? "NPM" : "MAVEN";
+
+      expectError(
+          RepoCollectionControllerIT.this.create(
+              RepoCollectionControllerIT.this.adminBearerToken(),
+              createBody(defaultName, otherType)),
+          HttpStatus.CONFLICT,
+          "repoExists",
+          "repoExists",
+          "The repository exists. Please try another name.");
+    }
+
     @ParameterizedTest(name = "\"{0}\"")
     @ValueSource(
-        strings = {"login", "api", "counts", "security-summary", "Counts", "SECURITY-SUMMARY"})
+        strings = {
+          "login",
+          "profile",
+          "repositories",
+          "users",
+          "security",
+          "not-found",
+          "api",
+          "assets",
+          "counts",
+          "security-summary",
+          "LOGIN",
+          "Users",
+          "Counts",
+          "SECURITY-SUMMARY"
+        })
     @DisplayName("returns 400 repoNameReserved for a reserved name and creates nothing")
     void reservedName(final String name) throws Exception {
+      final var dirsBefore = directoryCount(RepoType.MAVEN);
+
       expectError(
           RepoCollectionControllerIT.this.create(
               RepoCollectionControllerIT.this.adminBearerToken(), createBody(name, "MAVEN")),
@@ -699,6 +841,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
           "This name is reserved for the panel. Please try another name.");
 
       assertThat(RepoCollectionControllerIT.this.repoRepository.findByName(name)).isEmpty();
+      assertThat(directoryCount(RepoType.MAVEN)).isEqualTo(dirsBefore);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -706,6 +849,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
     @DisplayName("returns 400 validationError for an invalid body and creates nothing")
     void invalidBody(final String label, final String body) throws Exception {
       final var rowsBefore = RepoCollectionControllerIT.this.repoRepository.count();
+      final var dirsBefore = directoryCount(RepoType.MAVEN);
 
       expectValidationError(
           RepoCollectionControllerIT.this.create(
@@ -713,6 +857,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
           null);
 
       assertThat(RepoCollectionControllerIT.this.repoRepository.count()).isEqualTo(rowsBefore);
+      assertThat(directoryCount(RepoType.MAVEN)).isEqualTo(dirsBefore);
     }
 
     static Stream<Arguments> invalidBodies() {
@@ -724,9 +869,21 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
           Arguments.of("unknown type", createBody(name, "FOO")),
           Arguments.of("type of the wrong kind", "{\"name\":\"%s\",\"type\":7}".formatted(name)),
           Arguments.of("missing name", "{\"type\":\"MAVEN\"}"),
+          Arguments.of("empty object", "{}"),
+          Arguments.of("null name", "{\"name\":null,\"type\":\"MAVEN\"}"),
+          Arguments.of("blank name", createBody("", "MAVEN")),
           Arguments.of("space in the name", createBody("has space", "MAVEN")),
           Arguments.of("26 characters", createBody("a".repeat(26), "MAVEN")),
-          Arguments.of("malformed JSON", "{not json"));
+          Arguments.of("slash", createBody("a/b", "MAVEN")),
+          Arguments.of("dot", createBody("dot.name", "MAVEN")),
+          Arguments.of("non-ascii letter", createBody("café", "MAVEN")),
+          Arguments.of("path traversal", createBody("..", "MAVEN")),
+          Arguments.of(
+              "privateRepo of the wrong type",
+              "{\"name\":\"ok\",\"type\":\"MAVEN\",\"privateRepo\":\"maybe\"}"),
+          Arguments.of("malformed JSON", "{not json"),
+          Arguments.of("empty body", ""),
+          Arguments.of("array instead of object", "[]"));
     }
 
     @Test

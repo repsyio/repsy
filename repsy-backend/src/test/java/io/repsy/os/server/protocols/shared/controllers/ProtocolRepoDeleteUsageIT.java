@@ -194,15 +194,15 @@ class ProtocolRepoDeleteUsageIT extends AbstractIntegrationTest {
     return this.bearerTokenFor(userInfo.getId(), username);
   }
 
-  /** Creates a committed repo through {@code POST /api/repos/{repoType}}: row and storage dir. */
+  /** Creates a committed repo through {@code POST /api/repos}: row and storage dir. */
   private Repo createRepo(final RepoType type) throws Exception {
     final var name = uniqueRepoName("del" + type.name().toLowerCase(Locale.ROOT).substring(0, 3));
 
     this.perform(
-            post("/api/repos/" + type.name())
+            post("/api/repos")
                 .header(AUTHORIZATION, this.token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"%s\"}".formatted(name)))
+                .content("{\"name\":\"%s\",\"type\":\"%s\"}".formatted(name, type.name())))
         .andExpect(status().isOk());
 
     final var repo = this.repoRepository.findByName(name).orElseThrow();

@@ -135,12 +135,12 @@ class RepoNameRaceIT extends AbstractIntegrationTest {
   void concurrentCreateSameName() throws Exception {
     final var token = this.committedAdminToken();
     final var name = uniqueRepoName("race");
-    final var body = "{\"name\":\"%s\"}".formatted(name);
+    final var body = "{\"name\":\"%s\",\"type\":\"MAVEN\"}".formatted(name);
 
     final Callable<MvcResult> create =
         () ->
             this.perform(
-                    post("/api/repos/MAVEN")
+                    post("/api/repos")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
                         .header(AUTHORIZATION, token))

@@ -34,8 +34,6 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -64,9 +62,11 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * containerized PostgreSQL database and a temporary storage directory. See {@link
  * AbstractIntegrationTest} for the shared setup.
  *
- * <p>Repo types appear in URLs in <strong>upper case</strong> ({@code /api/repos/MAVEN/info}),
- * exactly as the OpenAPI {@code RepoType} enum and the frontend spell them; other spellings are
- * pinned in {@link RepoTypePathVariable}.
+ * <p>The repository collection ({@code GET /api/repos}, {@code GET /api/repos/counts} and {@code
+ * POST /api/repos}) is {@code RepoCollectionController}, tested in {@code
+ * RepoCollectionControllerIT}. Every route here names a repo. The three per-type routes that used
+ * to live here ({@code GET /api/repos/{repoType}/info}, {@code GET /api/repos/{repoType}/count} and
+ * {@code POST /api/repos/{repoType}}) are gone, and {@link Routing} pins that.
  *
  * <p>Notes on what is deliberately pinned rather than "fixed", because these are characterization
  * tests of today's behavior:
@@ -74,10 +74,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * <ul>
  *   <li>authorization is only {@code READ}/{@code WRITE} for any authenticated user and {@code
  *       MANAGE} for {@code ADMIN}; there is no repo owner concept;
- *   <li>the {@code {repoType}}-only routes carry no repo name, so the interceptor authenticates the
- *       caller and applies the handler's declared permission; {@code /info} is readable by all
- *       authenticated users while creation and {@code /count} require {@code MANAGE};
- *   <li>a request without an {@code Authorization} header on those routes returns 401;
+ *   <li>a request without credentials to a repo that does not exist gets 401, like one to a private
+ *       repo, so a missing repo cannot be told from a private one;
  * </ul>
  *
  * <p>{@code UsageUpdateService.updateUsage} is {@code @Async}, so it runs on another thread and can
@@ -89,7 +87,6 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
-  private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String REPO_NOT_FOUND_TEXT = "Repository not found";
   private static final String REPO_EXISTS_TEXT = "The repository exists. Please try another name.";
   private static final String REPO_NAME_RESERVED_TEXT =
@@ -100,15 +97,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   private static final String ITEM_NOT_FOUND_TEXT = "The requested item is not found.";
   private static final String REPO_SCOPE_NOT_MATCHED_TEXT = "Repository scope does not match.";
   private static final String ERROR_OCCURRED_TEXT = "An error occurred.";
-
-  private static final String[] REPO_LIST_KEYS = {
-    "name", "type", "privateRepo", "diskUsage", "createdAt"
-  };
-
-  /** {@code description} is part of the item only when the repo has one (JSON omits nulls). */
-  private static final String[] REPO_LIST_KEYS_WITH_DESCRIPTION = {
-    "name", "type", "privateRepo", "diskUsage", "createdAt", "description"
-  };
 
   private static final String[] SETTINGS_KEYS = {
     "privateRepo", "releases", "snapshots", "allowOverride", "searchable", "securityScanEnabled"
@@ -141,8 +129,9 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     return request.contentType(MediaType.APPLICATION_JSON).content(body);
   }
 
+  /** The body of {@code POST /api/repos} for a Maven repo. */
   private static String createBody(final String name) {
-    return "{\"name\":\"%s\"}".formatted(name);
+    return "{\"name\":\"%s\",\"type\":\"MAVEN\"}".formatted(name);
   }
 
   private static String nameBody(final String name) {
@@ -194,12 +183,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     Files.writeString(file, content);
   }
 
-  private static long directoryCount(final RepoType type) throws IOException {
-    try (var children = Files.list(STORAGE_ROOT.resolve(protocolDir(type)))) {
-      return children.count();
-    }
-  }
-
   // ---------------------------------------------------------------------------------------------
   // Response helpers
   // ---------------------------------------------------------------------------------------------
@@ -226,15 +209,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
   private static void expectRepoExists(final ResultActions result) throws Exception {
     expectError(result, HttpStatus.CONFLICT, "repoExists", "repoExists", REPO_EXISTS_TEXT);
-  }
-
-  private static void expectRepoNameReserved(final ResultActions result) throws Exception {
-    expectError(
-        result,
-        HttpStatus.BAD_REQUEST,
-        "repoNameReserved",
-        "repoNameReserved",
-        REPO_NAME_RESERVED_TEXT);
   }
 
   private static void expectUnauthorized(final ResultActions result) throws Exception {
@@ -271,28 +245,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
   }
 
-  /** Asserts a freshly created repo row: everything at its creation default. */
-  private static void assertCreatedRow(
-      final Repo repo,
-      final String name,
-      final RepoType type,
-      final boolean privateRepo,
-      final String description) {
-
-    assertThat(repo.getId()).isNotNull();
-    assertThat(repo.getName()).isEqualTo(name);
-    assertThat(repo.getType()).isEqualTo(type);
-    assertThat(repo.isPrivateRepo()).isEqualTo(privateRepo);
-    assertThat(repo.getDescription()).isEqualTo(description);
-    assertThat(repo.isAllowOverride()).isTrue();
-    assertThat(repo.getSnapshots()).isTrue();
-    assertThat(repo.getReleases()).isTrue();
-    assertThat(repo.isSearchable()).isFalse();
-    assertThat(repo.isSecurityScanEnabled()).isTrue();
-    assertThat(repo.getDiskUsage()).isZero();
-    assertThat(repo.getCreatedAt()).isNotNull();
-  }
-
   // ---------------------------------------------------------------------------------------------
   // Authentication & authorization -- identical rules, so parameterized over every endpoint
   // ---------------------------------------------------------------------------------------------
@@ -302,15 +254,11 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     /** Route with a repo name and {@code READ}: public repos are readable without credentials. */
     REPO_READ,
     /** Route with a repo name and {@code MANAGE}: only an ADMIN gets in. */
-    REPO_MANAGE,
-    /** Route with only a repo type and a READ annotation. */
-    TYPE_ONLY_READ,
-    /** Route with only a repo type and a MANAGE annotation. */
-    TYPE_ONLY_MANAGE
+    REPO_MANAGE
   }
 
-  /** What a request targets: an existing repo and the {@code {repoType}} spelling to use. */
-  private record Target(String repoName, String repoType) {}
+  /** What a request targets: the name of a repo. */
+  private record Target(String repoName) {}
 
   /** One row per {@code ProtocolRepoController} handler. */
   private record Endpoint(
@@ -323,10 +271,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
   private static List<Endpoint> allEndpoints() {
     return List.of(
-        new Endpoint(
-            "POST /api/repos/{repoType}",
-            Kind.TYPE_ONLY_MANAGE,
-            t -> json(post("/api/repos/" + t.repoType()), createBody("probe-" + randomTag()))),
         new Endpoint(
             "DELETE /api/repos/{repoName}",
             Kind.REPO_MANAGE,
@@ -347,14 +291,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
             "GET /api/repos/{repoName}/usage",
             Kind.REPO_MANAGE,
             t -> get("/api/repos/" + t.repoName() + "/usage")),
-        new Endpoint(
-            "GET /api/repos/{repoType}/info",
-            Kind.TYPE_ONLY_READ,
-            t -> get("/api/repos/" + t.repoType() + "/info")),
-        new Endpoint(
-            "GET /api/repos/{repoType}/count",
-            Kind.TYPE_ONLY_MANAGE,
-            t -> get("/api/repos/" + t.repoType() + "/count")),
         new Endpoint(
             "PATCH /api/repos/{repoName}/name",
             Kind.REPO_MANAGE,
@@ -397,18 +333,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     return endpointsOfKind(Kind.REPO_MANAGE);
   }
 
-  private static Stream<Endpoint> typeOnlyEndpoints() {
-    return Stream.concat(typeOnlyReadEndpoints(), typeOnlyManageEndpoints());
-  }
-
-  private static Stream<Endpoint> typeOnlyReadEndpoints() {
-    return endpointsOfKind(Kind.TYPE_ONLY_READ);
-  }
-
-  private static Stream<Endpoint> typeOnlyManageEndpoints() {
-    return endpointsOfKind(Kind.TYPE_ONLY_MANAGE);
-  }
-
   @Nested
   @DisplayName("authentication & authorization")
   class Security {
@@ -429,16 +353,8 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       return ProtocolRepoControllerIT.repoManageEndpoints();
     }
 
-    static Stream<Endpoint> typeOnlyEndpoints() {
-      return ProtocolRepoControllerIT.typeOnlyEndpoints();
-    }
-
-    static Stream<Endpoint> typeOnlyManageEndpoints() {
-      return ProtocolRepoControllerIT.typeOnlyManageEndpoints();
-    }
-
     private Target target() {
-      return new Target(ProtocolRepoControllerIT.this.seedMaven().getName(), "MAVEN");
+      return new Target(ProtocolRepoControllerIT.this.seedMaven().getName());
     }
 
     @ParameterizedTest(name = "{0}")
@@ -511,7 +427,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     @MethodSource("repoScopedEndpoints")
     @DisplayName("returns 404 repoNotFound for an unknown repo once the caller is authorized")
     void unknownRepo(final Endpoint endpoint) throws Exception {
-      final var target = new Target("nope-" + randomTag(), "MAVEN");
+      final var target = new Target("nope-" + randomTag());
 
       expectRepoNotFound(
           ProtocolRepoControllerIT.this.perform(
@@ -526,7 +442,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     @DisplayName("returns 401 unAuthorized, not 404, for an unknown repo without credentials")
     void unknownRepoWithoutHeader(final Endpoint endpoint) throws Exception {
       // Checked after authentication, so a missing repo looks like a private one (RPS-887).
-      final var target = new Target("nope-" + randomTag(), "MAVEN");
+      final var target = new Target("nope-" + randomTag());
 
       expectUnauthorized(ProtocolRepoControllerIT.this.perform(endpoint.request().apply(target)));
     }
@@ -558,30 +474,9 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var repo =
           ProtocolRepoControllerIT.this.seedRepo(
               RepoType.MAVEN, uniqueRepoName("priv"), true, null);
-      final var target = new Target(repo.getName(), "MAVEN");
+      final var target = new Target(repo.getName());
 
       expectUnauthorized(ProtocolRepoControllerIT.this.perform(endpoint.request().apply(target)));
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("typeOnlyEndpoints")
-    @DisplayName("returns 401 unAuthorized for a missing Authorization header on a repoType route")
-    void typeOnlyRouteWithoutHeader(final Endpoint endpoint) throws Exception {
-      expectUnauthorized(
-          ProtocolRepoControllerIT.this.perform(
-              endpoint.request().apply(new Target("unused", "MAVEN"))));
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("typeOnlyManageEndpoints")
-    @DisplayName("returns 403 accessDenied for a plain USER on a type-only MANAGE route")
-    void typeOnlyManageRouteAsPlainUser(final Endpoint endpoint) throws Exception {
-      expectForbidden(
-          ProtocolRepoControllerIT.this.perform(
-              endpoint
-                  .request()
-                  .apply(new Target("unused", "MAVEN"))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -591,7 +486,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     void manageRouteAsPlainUser(final Endpoint endpoint) throws Exception {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
       final var before = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
-      final var target = new Target(repo.getName(), "MAVEN");
+      final var target = new Target(repo.getName());
 
       expectForbidden(
           ProtocolRepoControllerIT.this.perform(
@@ -613,10 +508,9 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
       expectSuccess(
           ProtocolRepoControllerIT.this.perform(
-              get("/api/repos/MAVEN/count")
-                  .header(AUTHORIZATION, basicAuth(username, VALID_PASSWORD))),
-          "repoCountFetched",
-          "Repo count fetched.");
+              get(this.basicUrl()).header(AUTHORIZATION, basicAuth(username, VALID_PASSWORD))),
+          "settingsFetched",
+          "Settings fetched.");
     }
 
     @Test
@@ -627,7 +521,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
       expectUnauthorized(
           ProtocolRepoControllerIT.this.perform(
-              get("/api/repos/MAVEN/count").header(AUTHORIZATION, basicAuth(username, "wrong"))));
+              get(this.basicUrl()).header(AUTHORIZATION, basicAuth(username, "wrong"))));
     }
 
     @Test
@@ -645,11 +539,16 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           .allSatisfy(response -> assertThat(response).isEqualTo(wrongPassword));
     }
 
+    /** A MANAGE route of a repo that exists, which takes Basic credentials as well as a Bearer. */
+    private String basicUrl() {
+      return repoUrl(ProtocolRepoControllerIT.this.seedMaven(), "/settings");
+    }
+
     /** The status and error envelope of a Basic-authenticated call, minus the random errorCode. */
     private Map<String, Object> basicError(final String authHeader) throws Exception {
       final var response =
           ProtocolRepoControllerIT.this
-              .perform(get("/api/repos/MAVEN/count").header(AUTHORIZATION, authHeader))
+              .perform(get(this.basicUrl()).header(AUTHORIZATION, authHeader))
               .andExpect(status().isUnauthorized())
               .andReturn()
               .getResponse();
@@ -658,389 +557,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       envelope.remove("errorCode");
       envelope.put("status", response.getStatus());
       return envelope;
-    }
-  }
-
-  // ---------------------------------------------------------------------------------------------
-  // {repoType} path variable
-  // ---------------------------------------------------------------------------------------------
-
-  @Nested
-  @DisplayName("{repoType} path variable")
-  class RepoTypePathVariable {
-
-    private MockHttpServletRequestBuilder request(final String route, final String type) {
-      return switch (route) {
-        case "post" -> json(post("/api/repos/" + type), createBody("probe-" + randomTag()));
-        case "info" -> get("/api/repos/" + type + "/info");
-        default -> get("/api/repos/" + type + "/count");
-      };
-    }
-
-    @ParameterizedTest(name = "{0}: {1}")
-    @MethodSource("typeCases")
-    @DisplayName("rejects a value that is not exactly a RepoType constant")
-    void invalidRepoType(
-        final String label,
-        final String route,
-        final String type,
-        final HttpStatus status,
-        final String msgId,
-        final String data,
-        final String text)
-        throws Exception {
-
-      expectError(
-          ProtocolRepoControllerIT.this.perform(
-              this.request(route, type)
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          status,
-          msgId,
-          data,
-          text);
-    }
-
-    static Stream<Arguments> typeCases() {
-      final var routes = List.of("post", "info", "count");
-      final var result = new ArrayList<Arguments>();
-
-      for (final var route : routes) {
-        // The interceptor accepts only the exact RepoType names.
-        result.add(
-            Arguments.of(
-                "unknown type",
-                route,
-                "bogus",
-                HttpStatus.NOT_FOUND,
-                "repoTypeNotFound",
-                "repoTypeNotFound",
-                "Repository type not found."));
-        result.add(
-            Arguments.of(
-                "short go alias",
-                route,
-                "GO",
-                HttpStatus.NOT_FOUND,
-                "repoTypeNotFound",
-                "repoTypeNotFound",
-                "Repository type not found."));
-        // RepoType lookup is deliberately case-sensitive, so the interceptor rejects these
-        // consistently before Spring's enum conversion runs.
-        result.add(
-            Arguments.of(
-                "lower case",
-                route,
-                "maven",
-                HttpStatus.NOT_FOUND,
-                "repoTypeNotFound",
-                "repoTypeNotFound",
-                "Repository type not found."));
-        result.add(
-            Arguments.of(
-                "mixed case",
-                route,
-                "Maven",
-                HttpStatus.NOT_FOUND,
-                "repoTypeNotFound",
-                "repoTypeNotFound",
-                "Repository type not found."));
-        result.add(
-            Arguments.of(
-                "lower case golang",
-                route,
-                "golang",
-                HttpStatus.NOT_FOUND,
-                "repoTypeNotFound",
-                "repoTypeNotFound",
-                "Repository type not found."));
-      }
-
-      return result.stream();
-    }
-
-    @Test
-    @DisplayName("creates nothing for a rejected type")
-    void rejectedTypeCreatesNothing() throws Exception {
-      final var name = uniqueRepoName("badtype");
-
-      expectError(
-          ProtocolRepoControllerIT.this.perform(
-              json(post("/api/repos/maven"), createBody(name))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          HttpStatus.NOT_FOUND,
-          "repoTypeNotFound",
-          "repoTypeNotFound",
-          "Repository type not found.");
-
-      assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(name)).isEmpty();
-    }
-  }
-
-  // ---------------------------------------------------------------------------------------------
-  // POST /api/repos/{repoType}
-  // ---------------------------------------------------------------------------------------------
-
-  @Nested
-  @DisplayName("POST /api/repos/{repoType}")
-  class Create {
-
-    @ParameterizedTest(name = "{0}")
-    @EnumSource(RepoType.class)
-    @DisplayName("creates the repo row and its storage directory for every RepoType")
-    void createsRepoForEveryType(final RepoType type) throws Exception {
-      final var name = uniqueRepoName(type.name().toLowerCase(Locale.ROOT));
-
-      final var body =
-          expectSuccess(
-              ProtocolRepoControllerIT.this.perform(
-                  json(post("/api/repos/" + type.name()), createBody(name))
-                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-              "repoCreated",
-              "Repo created.");
-
-      assertThat(JsonPath.<Object>read(body, "$.data")).isNull();
-      final var repo = ProtocolRepoControllerIT.this.reloadRepo(name);
-      assertCreatedRow(repo, name, type, false, null);
-      assertThat(storageDirOf(repo)).isDirectory();
-    }
-
-    @Test
-    @DisplayName("defaults private to false and stores the description")
-    void defaultsAndDescription() throws Exception {
-      final var name = uniqueRepoName("desc");
-
-      expectSuccess(
-          ProtocolRepoControllerIT.this.perform(
-              json(
-                      post("/api/repos/NPM"),
-                      "{\"name\":\"%s\",\"description\":\"my npm repo\"}".formatted(name))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "repoCreated",
-          "Repo created.");
-
-      assertCreatedRow(
-          ProtocolRepoControllerIT.this.reloadRepo(name), name, RepoType.NPM, false, "my npm repo");
-    }
-
-    @ParameterizedTest(name = "privateRepo={0}")
-    @ValueSource(strings = {"true", "false", "null"})
-    @DisplayName("honors an explicit private flag, and treats null as false")
-    void explicitPrivateFlag(final String flag) throws Exception {
-      final var name = uniqueRepoName("flag");
-
-      expectSuccess(
-          ProtocolRepoControllerIT.this.perform(
-              json(
-                      post("/api/repos/DOCKER"),
-                      "{\"name\":\"%s\",\"privateRepo\":%s}".formatted(name, flag))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "repoCreated",
-          "Repo created.");
-
-      assertCreatedRow(
-          ProtocolRepoControllerIT.this.reloadRepo(name),
-          name,
-          RepoType.DOCKER,
-          Boolean.parseBoolean(flag),
-          null);
-    }
-
-    @ParameterizedTest(name = "\"{0}\"")
-    @ValueSource(strings = {"a", "Repo_Name-1", "UPPER", "under_score", "hy-phen", "1234567890"})
-    @DisplayName("accepts every character the name pattern allows")
-    void acceptsAllowedNames(final String name) throws Exception {
-      final var unique = name + "-" + randomTag();
-
-      expectSuccess(
-          ProtocolRepoControllerIT.this.perform(
-              json(post("/api/repos/MAVEN"), createBody(unique))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "repoCreated",
-          "Repo created.");
-
-      assertThat(ProtocolRepoControllerIT.this.reloadRepo(unique).getName()).isEqualTo(unique);
-    }
-
-    @Test
-    @DisplayName("accepts a name of exactly 25 characters")
-    void acceptsMaxLengthName() throws Exception {
-      final var name = "a".repeat(24) + randomTag().charAt(0);
-
-      expectSuccess(
-          ProtocolRepoControllerIT.this.perform(
-              json(post("/api/repos/MAVEN"), createBody(name))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "repoCreated",
-          "Repo created.");
-
-      assertThat(ProtocolRepoControllerIT.this.reloadRepo(name).getName()).hasSize(25);
-    }
-
-    @ParameterizedTest(name = "\"{0}\"")
-    @ValueSource(
-        strings = {
-          "login",
-          "profile",
-          "repositories",
-          "users",
-          "security",
-          "not-found",
-          "api",
-          "assets",
-          "LOGIN",
-          "Users"
-        })
-    @DisplayName(
-        "returns 400 repoNameReserved for a name reserved by the panel's routes, creating nothing"
-            + " (RPS-1158)")
-    void rejectsReservedName(final String name) throws Exception {
-      final var dirsBefore = directoryCount(RepoType.MAVEN);
-
-      expectRepoNameReserved(
-          ProtocolRepoControllerIT.this.perform(
-              json(post("/api/repos/MAVEN"), createBody(name))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
-
-      assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(name)).isEmpty();
-      assertThat(directoryCount(RepoType.MAVEN)).isEqualTo(dirsBefore);
-    }
-
-    @Test
-    @DisplayName("rejects a plain USER because repository creation requires MANAGE")
-    void plainUserCannotCreate() throws Exception {
-      final var name = uniqueRepoName("byuser");
-
-      expectForbidden(
-          ProtocolRepoControllerIT.this.perform(
-              json(post("/api/repos/MAVEN"), createBody(name))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));
-
-      assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(name)).isEmpty();
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("invalidBodies")
-    @DisplayName("returns 400 validationError for an invalid body and creates nothing")
-    void invalidBody(final String label, final String body) throws Exception {
-      final var rowsBefore = ProtocolRepoControllerIT.this.repoRepository.count();
-      final var dirsBefore = directoryCount(RepoType.MAVEN);
-
-      expectValidationError(
-          ProtocolRepoControllerIT.this.perform(
-              json(post("/api/repos/MAVEN"), body)
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
-
-      assertThat(ProtocolRepoControllerIT.this.repoRepository.count()).isEqualTo(rowsBefore);
-      assertThat(directoryCount(RepoType.MAVEN)).isEqualTo(dirsBefore);
-    }
-
-    static Stream<Arguments> invalidBodies() {
-      return Stream.of(
-          Arguments.of("empty object", "{}"),
-          Arguments.of("null name", "{\"name\":null}"),
-          Arguments.of("blank name", "{\"name\":\"\"}"),
-          Arguments.of("26 characters", "{\"name\":\"" + "a".repeat(26) + "\"}"),
-          Arguments.of("space", "{\"name\":\"has space\"}"),
-          Arguments.of("slash", "{\"name\":\"a/b\"}"),
-          Arguments.of("dot", "{\"name\":\"dot.name\"}"),
-          Arguments.of("non-ascii letter", "{\"name\":\"café\"}"),
-          Arguments.of("path traversal", "{\"name\":\"..\"}"),
-          Arguments.of(
-              "privateRepo of the wrong type", "{\"name\":\"ok\",\"privateRepo\":\"maybe\"}"),
-          Arguments.of("malformed JSON", "{not json"),
-          Arguments.of("empty body", ""),
-          Arguments.of("array instead of object", "[]"));
-    }
-
-    @Test
-    @DisplayName("returns 415 unsupportedMediaType when the body has no JSON content type")
-    void unsupportedMediaType() throws Exception {
-      expectError(
-          ProtocolRepoControllerIT.this.perform(
-              post("/api/repos/MAVEN")
-                  .content("{\"name\":\"" + uniqueRepoName("nomedia") + "\"}")
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          HttpStatus.UNSUPPORTED_MEDIA_TYPE,
-          "unsupportedMediaType",
-          null,
-          UNSUPPORTED_MEDIA_TYPE_TEXT);
-    }
-
-    @Test
-    @DisplayName("returns 409 repoExists for a duplicate name of the same type, creating nothing")
-    void duplicateSameType() throws Exception {
-      final var existing = ProtocolRepoControllerIT.this.seedMaven();
-      final var dirsBefore = directoryCount(RepoType.MAVEN);
-
-      expectRepoExists(
-          ProtocolRepoControllerIT.this.perform(
-              json(post("/api/repos/MAVEN"), createBody(existing.getName()))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
-
-      assertThat(directoryCount(RepoType.MAVEN)).isEqualTo(dirsBefore);
-      assertThat(ProtocolRepoControllerIT.this.reloadRepo(existing.getName()).getId())
-          .isEqualTo(existing.getId());
-    }
-
-    @Test
-    @DisplayName("returns 409 repoExists for a name used by a repo of another type")
-    void duplicateAcrossTypes() throws Exception {
-      final var existing = ProtocolRepoControllerIT.this.seedMaven();
-      final var dirsBefore = directoryCount(RepoType.NPM);
-
-      expectRepoExists(
-          ProtocolRepoControllerIT.this.perform(
-              json(post("/api/repos/NPM"), createBody(existing.getName()))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
-
-      assertThat(directoryCount(RepoType.NPM)).isEqualTo(dirsBefore);
-      assertThat(ProtocolRepoControllerIT.this.reloadRepo(existing.getName()).getType())
-          .isEqualTo(RepoType.MAVEN);
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @EnumSource(RepoType.class)
-    @DisplayName("returns 409 repoExists for the default repo names seeded at startup")
-    void startupDefaultNamesAreTaken(final RepoType type) throws Exception {
-      final var defaultName = type == RepoType.GOLANG ? "go" : type.name().toLowerCase(Locale.ROOT);
-      assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(defaultName))
-          .as("startup-seeded default repo '%s'", defaultName)
-          .isPresent();
-
-      // Use a different type than the default's, so only the name can clash.
-      final var otherType = type == RepoType.MAVEN ? "NPM" : "MAVEN";
-
-      expectRepoExists(
-          ProtocolRepoControllerIT.this.perform(
-              json(post("/api/repos/" + otherType), createBody(defaultName))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
-    }
-
-    @Test
-    @DisplayName("returns 400 validationError for a 501-character description")
-    void descriptionOverColumnLength() throws Exception {
-      final var ok = uniqueRepoName("d500");
-      expectSuccess(
-          ProtocolRepoControllerIT.this.perform(
-              json(
-                      post("/api/repos/NPM"),
-                      "{\"name\":\"%s\",\"description\":\"%s\"}".formatted(ok, "d".repeat(500)))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "repoCreated",
-          "Repo created.");
-      assertThat(ProtocolRepoControllerIT.this.reloadRepo(ok).getDescription()).hasSize(500);
-
-      final var tooLong = uniqueRepoName("d501");
-      final var dirsBefore = directoryCount(RepoType.NPM);
-      expectValidationError(
-          ProtocolRepoControllerIT.this.perform(
-              json(
-                      post("/api/repos/NPM"),
-                      "{\"name\":\"%s\",\"description\":\"%s\"}"
-                          .formatted(tooLong, "d".repeat(501)))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
-      assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(tooLong)).isEmpty();
-      assertThat(directoryCount(RepoType.NPM)).isEqualTo(dirsBefore);
     }
   }
 
@@ -1279,7 +795,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
       expectSuccess(
           ProtocolRepoControllerIT.this.perform(
-              json(post("/api/repos/MAVEN"), createBody(name)).header(AUTHORIZATION, token)),
+              json(post("/api/repos"), createBody(name)).header(AUTHORIZATION, token)),
           "repoCreated",
           "Repo created.");
 
@@ -2019,250 +1535,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // GET /api/repos/{repoType}/info
-  // ---------------------------------------------------------------------------------------------
-
-  @Nested
-  @DisplayName("GET /api/repos/{repoType}/info")
-  class Info {
-
-    private String info(final String type, final String token) throws Exception {
-      return expectSuccess(
-          ProtocolRepoControllerIT.this.perform(
-              get("/api/repos/" + type + "/info").header(AUTHORIZATION, token)),
-          "reposFetched",
-          "Repos fetched.");
-    }
-
-    private static List<String> names(final String body) {
-      return dataList(body).stream().map(node -> (String) node.get("name")).toList();
-    }
-
-    @Test
-    @DisplayName("lists only the startup default repo of a type before anything is created")
-    void startupDefault() throws Exception {
-      final var items =
-          dataList(this.info("MAVEN", ProtocolRepoControllerIT.this.adminBearerToken()));
-
-      assertThat(items).hasSize(1);
-      assertThat(items.get(0)).containsEntry("name", "maven").containsEntry("privateRepo", true);
-    }
-
-    @Test
-    @DisplayName("returns an empty array when the type has no repos")
-    void emptyList() throws Exception {
-      ProtocolRepoControllerIT.this.deleteDefaultRepos();
-
-      final var body = this.info("NPM", ProtocolRepoControllerIT.this.adminBearerToken());
-
-      assertThat(JsonPath.<List<Object>>read(body, "$.data")).isEmpty();
-    }
-
-    @Test
-    @DisplayName("returns every repo of the type, private ones included, with the full item shape")
-    void severalRepos() throws Exception {
-      ProtocolRepoControllerIT.this.deleteDefaultRepos();
-      final var open =
-          ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("open"), false, null);
-      final var secret =
-          ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("secret"), true, "s");
-      final var used = ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("used"));
-      ProtocolRepoControllerIT.this.repoRepository.updateDiskUsage(used.getId(), 4096);
-      ProtocolRepoControllerIT.this.entityManager.clear();
-
-      final var items = dataList(this.info("NPM", ProtocolRepoControllerIT.this.userBearerToken()));
-
-      assertThat(items).hasSize(3);
-      final var expectedNames =
-          Stream.of(open, secret, used)
-              .sorted(
-                  Comparator.comparing(Repo::getCreatedAt).reversed().thenComparing(Repo::getName))
-              .map(Repo::getName)
-              .toList();
-      assertThat(names(this.info("NPM", ProtocolRepoControllerIT.this.userBearerToken())))
-          .containsExactlyElementsOf(expectedNames);
-      final var byName =
-          items.stream().collect(Collectors.toMap(i -> (String) i.get("name"), i -> i));
-      assertThat(byName).containsOnlyKeys(open.getName(), secret.getName(), used.getName());
-      for (final var repo : List.of(open, secret, used)) {
-        final var item = byName.get(repo.getName());
-        final var row = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
-        assertThat(item)
-            .containsOnlyKeys(
-                row.getDescription() == null ? REPO_LIST_KEYS : REPO_LIST_KEYS_WITH_DESCRIPTION)
-            .containsEntry("name", row.getName())
-            .containsEntry("type", "NPM")
-            .containsEntry("privateRepo", row.isPrivateRepo());
-        assertThat(((Number) item.get("diskUsage")).longValue()).isEqualTo(row.getDiskUsage());
-        assertThat(instantOrNull(item.get("createdAt"))).isEqualTo(row.getCreatedAt());
-      }
-      assertThat(byName.get(secret.getName())).containsEntry("privateRepo", true);
-      assertThat(((Number) byName.get(used.getName()).get("diskUsage")).longValue())
-          .isEqualTo(4096L);
-    }
-
-    @Test
-    @DisplayName("keeps creation order stable after a repo is renamed")
-    void stableOrderAfterRename() throws Exception {
-      ProtocolRepoControllerIT.this.deleteDefaultRepos();
-      final var oldest =
-          ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("zulu"));
-      final var middle =
-          ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("alpha"));
-      final var newest =
-          ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("bravo"));
-      final var token = ProtocolRepoControllerIT.this.adminBearerToken();
-      final var renamed = uniqueRepoName("aardvark");
-
-      assertThat(names(this.info("NPM", token)))
-          .containsExactly(newest.getName(), middle.getName(), oldest.getName());
-
-      expectSuccess(
-          ProtocolRepoControllerIT.this.perform(
-              json(patch(repoUrl(oldest, "/name")), nameBody(renamed))
-                  .header(AUTHORIZATION, token)),
-          "repoRenamed",
-          "Repo renamed.");
-
-      assertThat(names(this.info("NPM", token)))
-          .containsExactly(newest.getName(), middle.getName(), renamed);
-    }
-
-    @Test
-    @DisplayName("returns only repos of the requested type")
-    void onlyRequestedType() throws Exception {
-      ProtocolRepoControllerIT.this.deleteDefaultRepos();
-      final var npm = ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("n"));
-      final var maven = ProtocolRepoControllerIT.this.seedRepo(RepoType.MAVEN, uniqueRepoName("m"));
-      final var token = ProtocolRepoControllerIT.this.adminBearerToken();
-
-      assertThat(names(this.info("NPM", token))).containsExactly(npm.getName());
-      assertThat(names(this.info("MAVEN", token))).containsExactly(maven.getName());
-      assertThat(names(this.info("PYPI", token))).isEmpty();
-    }
-
-    @Test
-    @DisplayName("shows a renamed repo under its new name, and drops a deleted one")
-    void reflectsRenameAndDelete() throws Exception {
-      ProtocolRepoControllerIT.this.deleteDefaultRepos();
-      final var keep = ProtocolRepoControllerIT.this.seedRepo(RepoType.CARGO, uniqueRepoName("k"));
-      final var gone = ProtocolRepoControllerIT.this.seedRepo(RepoType.CARGO, uniqueRepoName("g"));
-      final var token = ProtocolRepoControllerIT.this.adminBearerToken();
-      final var renamed = uniqueRepoName("renamed");
-
-      expectSuccess(
-          ProtocolRepoControllerIT.this.perform(
-              json(patch(repoUrl(keep, "/name")), nameBody(renamed)).header(AUTHORIZATION, token)),
-          "repoRenamed",
-          "Repo renamed.");
-      expectSuccess(
-          ProtocolRepoControllerIT.this.perform(
-              delete(repoUrl(gone, "")).header(AUTHORIZATION, token)),
-          "repoDeleted",
-          "Repo deleted.");
-
-      assertThat(names(this.info("CARGO", token))).containsExactly(renamed);
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @EnumSource(RepoType.class)
-    @DisplayName("lists the repo created for every RepoType under that type")
-    void everyType(final RepoType type) throws Exception {
-      final var repo =
-          ProtocolRepoControllerIT.this.seedRepo(
-              type, uniqueRepoName(type.name().toLowerCase(Locale.ROOT)));
-
-      final var items =
-          dataList(this.info(type.name(), ProtocolRepoControllerIT.this.adminBearerToken()));
-
-      assertThat(items).extracting(i -> i.get("name")).contains(repo.getName());
-      assertThat(items).allSatisfy(i -> assertThat(i).containsEntry("type", type.name()));
-    }
-  }
-
-  // ---------------------------------------------------------------------------------------------
-  // GET /api/repos/{repoType}/count
-  // ---------------------------------------------------------------------------------------------
-
-  @Nested
-  @DisplayName("GET /api/repos/{repoType}/count")
-  class Count {
-
-    private long count(final String type, final String token) throws Exception {
-      final var body =
-          expectSuccess(
-              ProtocolRepoControllerIT.this.perform(
-                  get("/api/repos/" + type + "/count").header(AUTHORIZATION, token)),
-              "repoCountFetched",
-              "Repo count fetched.");
-      return ((Number) JsonPath.read(body, "$.data")).longValue();
-    }
-
-    @Test
-    @DisplayName("counts the startup default repo of a type")
-    void startupDefault() throws Exception {
-      assertThat(this.count("MAVEN", ProtocolRepoControllerIT.this.adminBearerToken()))
-          .isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("returns 0 when the type has no repos")
-    void zero() throws Exception {
-      ProtocolRepoControllerIT.this.deleteDefaultRepos();
-
-      assertThat(this.count("NPM", ProtocolRepoControllerIT.this.adminBearerToken())).isZero();
-    }
-
-    @Test
-    @DisplayName("returns the number of repos of the type, and follows create and delete")
-    void countsRepos() throws Exception {
-      ProtocolRepoControllerIT.this.deleteDefaultRepos();
-      final var token = ProtocolRepoControllerIT.this.adminBearerToken();
-      final var first = ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("a"));
-      ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("b"));
-      ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("c"));
-
-      assertThat(this.count("NPM", token)).isEqualTo(3);
-
-      expectSuccess(
-          ProtocolRepoControllerIT.this.perform(
-              delete(repoUrl(first, "")).header(AUTHORIZATION, token)),
-          "repoDeleted",
-          "Repo deleted.");
-
-      assertThat(this.count("NPM", token)).isEqualTo(2);
-    }
-
-    @Test
-    @DisplayName("counts each type separately")
-    void perTypeIsolation() throws Exception {
-      ProtocolRepoControllerIT.this.deleteDefaultRepos();
-      final var token = ProtocolRepoControllerIT.this.adminBearerToken();
-      ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("n1"));
-      ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("n2"));
-      ProtocolRepoControllerIT.this.seedRepo(RepoType.MAVEN, uniqueRepoName("m1"));
-      ProtocolRepoControllerIT.this.seedRepo(RepoType.GOLANG, uniqueRepoName("g1"));
-
-      assertThat(this.count("NPM", token)).isEqualTo(2);
-      assertThat(this.count("MAVEN", token)).isEqualTo(1);
-      assertThat(this.count("GOLANG", token)).isEqualTo(1);
-      assertThat(this.count("DOCKER", token)).isZero();
-    }
-
-    @Test
-    @DisplayName("returns 403 accessDenied for a plain USER because count requires MANAGE")
-    void plainUserIsRejected() throws Exception {
-      ProtocolRepoControllerIT.this.deleteDefaultRepos();
-      ProtocolRepoControllerIT.this.seedRepo(RepoType.PYPI, uniqueRepoName("p"));
-
-      expectForbidden(
-          ProtocolRepoControllerIT.this.perform(
-              get("/api/repos/PYPI/count")
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));
-    }
-  }
-
-  // ---------------------------------------------------------------------------------------------
   // PATCH /api/repos/{repoName}/name
   // ---------------------------------------------------------------------------------------------
 
@@ -2663,12 +1935,20 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       return Stream.of(
           Arguments.of("PUT /api/repos", "PUT", "/api/repos"),
           Arguments.of("DELETE /api/repos", "DELETE", "/api/repos"),
-          Arguments.of("GET /api/repos/{repoType}", "GET", "/api/repos/MAVEN"),
-          Arguments.of("PUT /api/repos/{repoType}", "PUT", "/api/repos/MAVEN"),
-          Arguments.of("PATCH /api/repos/{repoType}", "PATCH", "/api/repos/MAVEN"),
-          Arguments.of("DELETE /api/repos/{repoType}/info", "DELETE", "/api/repos/MAVEN/info"),
-          Arguments.of("POST /api/repos/{repoType}/info", "POST", "/api/repos/MAVEN/info"),
-          Arguments.of("PUT /api/repos/{repoType}/count", "PUT", "/api/repos/MAVEN/count"),
+          Arguments.of("GET /api/repos/{repoName}", "GET", "/api/repos/some-repo"),
+          Arguments.of("PUT /api/repos/{repoName}", "PUT", "/api/repos/some-repo"),
+          Arguments.of("PATCH /api/repos/{repoName}", "PATCH", "/api/repos/some-repo"),
+          Arguments.of("POST /api/repos/{repoName}", "POST", "/api/repos/some-repo"),
+          // The per-type routes RPS-1268 removed: GET /api/repos/{repoType}/info and /count, and
+          // POST /api/repos/{repoType}. Their replacements are GET /api/repos, GET
+          // /api/repos/counts and POST /api/repos.
+          Arguments.of("GET /api/repos/MAVEN/info (removed)", "GET", "/api/repos/MAVEN/info"),
+          Arguments.of("GET /api/repos/MAVEN/count (removed)", "GET", "/api/repos/MAVEN/count"),
+          Arguments.of("POST /api/repos/MAVEN (removed)", "POST", "/api/repos/MAVEN"),
+          Arguments.of("POST /api/repos/maven (removed)", "POST", "/api/repos/maven"),
+          Arguments.of("DELETE /api/repos/MAVEN/info", "DELETE", "/api/repos/MAVEN/info"),
+          Arguments.of("POST /api/repos/MAVEN/info", "POST", "/api/repos/MAVEN/info"),
+          Arguments.of("PUT /api/repos/MAVEN/count", "PUT", "/api/repos/MAVEN/count"),
           Arguments.of("POST /api/repos/{repoName}/format", "POST", "/api/repos/some-repo/format"),
           Arguments.of(
               "DELETE /api/repos/{repoName}/format", "DELETE", "/api/repos/some-repo/format"),

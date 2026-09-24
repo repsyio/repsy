@@ -22,9 +22,7 @@ import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
-import io.repsy.os.generated.model.RepoCreateForm;
 import io.repsy.os.generated.model.RepoDescriptionForm;
-import io.repsy.os.generated.model.RepoListInfo;
 import io.repsy.os.generated.model.RepoPermissionInfo;
 import io.repsy.os.generated.model.RepoRenameForm;
 import io.repsy.os.generated.model.RepoSettingsForm;
@@ -40,7 +38,6 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.RepoScope;
-import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Locale;
@@ -49,7 +46,6 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -69,25 +65,6 @@ public class ProtocolRepoController {
   private final UsageService usageService;
   private final RestResponseFactory responseFactory;
   private final JwtUtils jwtUtils;
-
-  @PostMapping("/{repoType}")
-  @RepoOperation(permission = MANAGE)
-  public RestResponse<Void> create(
-      final ProtocolApiFacade facade,
-      @PathVariable final RepoType repoType,
-      @RequestBody @Valid final RepoCreateForm form) {
-
-    final var repoInfo =
-        this.repoTxService.createRepo(
-            form.getName(),
-            repoType,
-            Boolean.TRUE.equals(form.getPrivateRepo()),
-            form.getDescription());
-
-    facade.createRepo(repoInfo.getStorageKey());
-
-    return this.responseFactory.success("repoCreated");
-  }
 
   @DeleteMapping("/{repoName}")
   @RepoOperation(permission = MANAGE)
@@ -159,24 +136,6 @@ public class ProtocolRepoController {
         this.usageService.getRepoUsageInfo(repoInfo.getName(), repoInfo.getType());
 
     return this.responseFactory.success("usageFetched", usageInfo);
-  }
-
-  @GetMapping("/{repoType}/info")
-  @RepoOperation
-  public RestResponse<List<RepoListInfo>> getInfo(@PathVariable final RepoType repoType) {
-
-    final var repositoryList = this.repoTxService.findAllByRepoType(repoType);
-
-    return this.responseFactory.success("reposFetched", repositoryList);
-  }
-
-  @GetMapping("/{repoType}/count")
-  @RepoOperation(permission = MANAGE)
-  public RestResponse<Long> getCount(@PathVariable final RepoType repoType) {
-
-    final var repoCount = this.repoTxService.getRepoCount(repoType);
-
-    return this.responseFactory.success("repoCountFetched", repoCount);
   }
 
   @PatchMapping("/{repoName}/name")

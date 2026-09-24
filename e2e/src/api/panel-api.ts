@@ -30,7 +30,7 @@ import type { DeployTokenInfoListItem } from './generated/models/DeployTokenInfo
 import type { LoginInfo } from './generated/models/LoginInfo.js';
 import type { PagedModelRepoListInfo } from './generated/models/PagedModelRepoListInfo.js';
 import type { PgpPublicKeyItem } from './generated/models/PgpPublicKeyItem.js';
-import type { RepoCreateForm } from './generated/models/RepoCreateForm.js';
+import type { RepoCreateRequest } from './generated/models/RepoCreateRequest.js';
 import type { RepoListInfo } from './generated/models/RepoListInfo.js';
 import type { RepoSettingsForm } from './generated/models/RepoSettingsForm.js';
 import type { RepoSettingsInfo } from './generated/models/RepoSettingsInfo.js';
@@ -46,7 +46,6 @@ export type {
   LoginInfo,
   PagedModelRepoListInfo,
   PgpPublicKeyItem,
-  RepoCreateForm,
   RepoListInfo,
   RepoSettingsForm,
   RepoSettingsInfo,
@@ -54,6 +53,9 @@ export type {
   UserCreateForm,
   UserResponse,
 };
+
+/** The body of `POST /api/repos` without its `type`, which `createRepo` takes as its own argument. */
+export type RepoCreateForm = Omit<RepoCreateRequest, 'type'>;
 
 /** Thrown when a successful REST response's envelope unexpectedly carries no `data`. */
 export class PanelApiError extends Error {}

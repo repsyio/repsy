@@ -387,21 +387,22 @@ public abstract class AbstractIntegrationTest {
   // ---------------------------------------------------------------------------------------------
 
   /**
-   * Creates a repo through the real {@code POST /api/repos/{repoType}} endpoint, so both the
-   * database row and the storage directory exist, and returns the persisted row.
+   * Creates a repo through the real {@code POST /api/repos} endpoint, so both the database row and
+   * the storage directory exist, and returns the persisted row.
    */
   protected Repo seedRepo(
       final RepoType type, final String name, final boolean privateRepo, final String description) {
 
     final var body =
         description == null
-            ? "{\"name\":\"%s\",\"privateRepo\":%s}".formatted(name, privateRepo)
-            : "{\"name\":\"%s\",\"privateRepo\":%s,\"description\":\"%s\"}"
-                .formatted(name, privateRepo, description);
+            ? "{\"name\":\"%s\",\"type\":\"%s\",\"privateRepo\":%s}"
+                .formatted(name, type.name(), privateRepo)
+            : "{\"name\":\"%s\",\"type\":\"%s\",\"privateRepo\":%s,\"description\":\"%s\"}"
+                .formatted(name, type.name(), privateRepo, description);
 
     try {
       this.perform(
-              post("/api/repos/" + type.name())
+              post("/api/repos")
                   .header(HttpHeaders.AUTHORIZATION, this.adminBearerToken())
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body))

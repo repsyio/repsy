@@ -209,12 +209,6 @@ public class RepoTxService {
         .build();
   }
 
-  public List<@NonNull RepoListInfo> findAllByRepoType(final @NonNull RepoType repoType) {
-    return this.repoRepository.findAllByTypeOrderByCreatedAtDescNameAsc(repoType).stream()
-        .map(this::mapToRepoListInfo)
-        .toList();
-  }
-
   /**
    * One page of the repos of every type, or of one type, whose name contains {@code query}.
    *
@@ -252,10 +246,6 @@ public class RepoTxService {
 
   public @NonNull RepoListInfo getRepoListInfo(final @NonNull UUID repoId) {
     return this.mapToRepoListInfo(this.findRepoById(repoId));
-  }
-
-  public long getRepoCount(final @NonNull RepoType repoType) {
-    return this.repoRepository.countAllByType(repoType);
   }
 
   public @NonNull List<String> getAllRepoNames() {

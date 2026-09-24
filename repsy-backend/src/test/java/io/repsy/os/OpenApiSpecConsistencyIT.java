@@ -100,18 +100,6 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
   private static final Set<String> PUBLIC_OPERATIONS =
       Set.of("login", "refreshToken", "getSupportedRepoTypes", "checkSumdbSupported");
 
-  /**
-   * Findings of the sibling-variable rule that exist today. {@code /api/repos/{repoType}/...}
-   * (list, count and create by repo type) and {@code /api/repos/{repoName}/...} put two different
-   * variables at the same position. Spring tells them apart only because the literal segment after
-   * them differs, and a client generator cannot. Removed by the repo collection endpoints (RPS-1268
-   * PR-2a adds them, PR-2c deletes the {@code {repoType}} routes).
-   */
-  private static final Map<String, String> KNOWN_VARIABLE_CLASHES =
-      Map.of(
-          "/api/repos/ -> {repoName} | {repoType}",
-          "RPS-1268 (PR-2c removes the {repoType} routes)");
-
   @Autowired private RequestMappingHandlerMapping handlerMapping;
 
   // ---------------------------------------------------------------------------------------------
@@ -230,7 +218,7 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
     names.forEach(
         (prefix, variables) -> findings.add(prefix + " -> " + String.join(" | ", variables)));
 
-    assertNoNewFindings("sibling variable names", findings, KNOWN_VARIABLE_CLASHES);
+    assertNoNewFindings("sibling variable names", findings, Map.of());
   }
 
   @Test
@@ -267,9 +255,7 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
     final var findings = new TreeSet<String>();
 
     for (final var route : this.panelRoutes()) {
-      if (route.repoOperation() != null
-          && !route.variables().contains("repoName")
-          && !route.variables().contains("repoType")) {
+      if (route.repoOperation() != null && !route.variables().contains("repoName")) {
         findings.add(route.key());
       }
     }

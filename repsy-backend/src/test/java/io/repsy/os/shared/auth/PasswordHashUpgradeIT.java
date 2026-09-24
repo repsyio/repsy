@@ -55,8 +55,16 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
 
   private static final String BCRYPT_PREFIX = "{bcrypt}$2";
 
-  /** Needs MANAGE, so the users below are admins; the Basic check itself is what is under test. */
-  private static final String COUNT_URL = "/api/repos/MAVEN/count";
+  /**
+   * A route that takes Basic credentials and needs an admin: {@code MANAGE} on a repo that does not
+   * exist. The auth interceptor authenticates the caller and checks the role as for a private repo
+   * before it answers {@code repoNotFound}, so {@link #AUTHENTICATED} (404) means "the credentials
+   * were accepted" and a 401 means they were not. No repo has to exist, which keeps the class free
+   * of rows other than its users.
+   */
+  private static final String PROBE_URL = "/api/repos/no-such-repo/settings";
+
+  private static final int AUTHENTICATED = 404;
 
   private final List<UUID> createdUserIds = new ArrayList<>();
 
@@ -95,7 +103,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
   private void basicRequest(final String username, final String password, final int expectedStatus)
       throws Exception {
 
-    this.perform(get(COUNT_URL).header(AUTHORIZATION, basicAuth(username, password)))
+    this.perform(get(PROBE_URL).header(AUTHORIZATION, basicAuth(username, password)))
         .andExpect(status().is(expectedStatus));
   }
 
@@ -143,13 +151,13 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
   void basicAuthUpgradesOutdatedHash() throws Exception {
     final var user = this.createWeakUser(VALID_PASSWORD);
 
-    this.basicRequest(user.getUsername(), VALID_PASSWORD, 200);
+    this.basicRequest(user.getUsername(), VALID_PASSWORD, AUTHENTICATED);
 
     final var after = this.reload(user.getId());
-    assertThat(after.getHash()).startsWith(BCRYPT_PREFIX);
+    assertThat(after.getHash()).startsWith(BCRYPT_PREFIX).isNotEqualTo(user.getHash());
     assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash())).isTrue();
 
-    this.basicRequest(user.getUsername(), VALID_PASSWORD, 200);
+    this.basicRequest(user.getUsername(), VALID_PASSWORD, AUTHENTICATED);
   }
 
   @Test
@@ -169,7 +177,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
     final var user = this.commitUser(PasswordHasher.hash(VALID_PASSWORD));
 
     this.panelLogin(user.getUsername(), VALID_PASSWORD, 200);
-    this.basicRequest(user.getUsername(), VALID_PASSWORD, 200);
+    this.basicRequest(user.getUsername(), VALID_PASSWORD, AUTHENTICATED);
 
     assertThat(this.reload(user.getId()).getHash()).isEqualTo(user.getHash());
   }
