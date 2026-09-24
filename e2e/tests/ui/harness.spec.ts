@@ -148,8 +148,7 @@ test.describe('UI harness fixtures', () => {
       if (mainRequests === 1) {
         await route.abort('failed');
       } else if (mainRequests === 2) {
-        // The reload is hit too, later than the stragglers of the first load can arrive.
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        // The reload is hit too, at once (the burst of a container start): this is what PRO-04 met.
         await route.abort('failed');
       } else {
         await route.fallback();
