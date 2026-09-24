@@ -15,7 +15,7 @@
 ///
 
 import { SimpleChange, SimpleChanges } from '@angular/core';
-import { fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { FormBuilder } from '@angular/forms';
 import { config, of, Subject, throwError } from 'rxjs';
 
@@ -254,5 +254,80 @@ describe('UserEditModalComponent', () => {
       expect(component.form.get('username').value).toBeNull();
       expect(openChange).toEqual([false]);
     });
+  });
+});
+
+describe('UserEditModalComponent role switch', () => {
+  let fixture: ComponentFixture<UserEditModalComponent>;
+  let toastService: jasmine.SpyObj<ToastService>;
+
+  const roleInput = (): HTMLInputElement =>
+    fixture.nativeElement.querySelector('[data-testid="user-edit-role"] [data-testid="toggle-input"]');
+  const roleLabel = (): string =>
+    fixture.nativeElement
+      .querySelector('[data-testid="user-edit-role"] [data-testid="toggle-label"]')
+      .textContent.trim();
+
+  function open(user: UserResponse, isLastAdmin: boolean): void {
+    const component = fixture.componentInstance;
+    component.user = user;
+    component.open = true;
+    component.isLastAdmin = isLastAdmin;
+    component.ngOnChanges({ user: new SimpleChange(null, user, true), open: new SimpleChange(false, true, true) });
+    fixture.detectChanges();
+  }
+
+  beforeEach(() => {
+    toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
+    TestBed.configureTestingModule({
+      imports: [UserEditModalComponent],
+      providers: [
+        { provide: UserService, useValue: jasmine.createSpyObj<UserService>('UserService', ['updateUser']) },
+        { provide: ToastService, useValue: toastService },
+      ],
+    });
+    fixture = TestBed.createComponent(UserEditModalComponent);
+  });
+
+  it('locks the switch for the last administrator, which stays on', () => {
+    open(ADMIN, true);
+
+    expect(roleInput().disabled).toBeTrue();
+    expect(roleInput().checked).toBeTrue();
+    expect(fixture.nativeElement.querySelector('[data-testid="user-edit-last-admin-warning"]')).not.toBeNull();
+
+    roleInput().click();
+    fixture.detectChanges();
+
+    expect(roleLabel()).toBe('Admin');
+    expect(fixture.componentInstance.form.getRawValue().isAdmin).toBeTrue();
+  });
+
+  it('lets the role of any other user be switched, and follows the click in the form', () => {
+    open(REGULAR, false);
+
+    expect(roleInput().disabled).toBeFalse();
+    expect(roleLabel()).toBe('User');
+
+    roleInput().click();
+    fixture.detectChanges();
+
+    expect(roleLabel()).toBe('Admin');
+    expect(fixture.componentInstance.form.get('isAdmin').value).toBeTrue();
+  });
+
+  it('unlocks the switch when the modal is opened for another user after the last administrator', () => {
+    open(ADMIN, true);
+    open(REGULAR, false);
+
+    expect(roleInput().disabled).toBeFalse();
+    expect(roleInput().checked).toBeFalse();
+  });
+
+  it('shows the role of an administrator who is not the last one as operable', () => {
+    open(ADMIN, false);
+
+    expect(roleInput().disabled).toBeFalse();
+    expect(roleInput().checked).toBeTrue();
   });
 });

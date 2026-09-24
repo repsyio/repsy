@@ -234,11 +234,6 @@ test.describe('SEC-02d /security', { tag: MOCKED }, () => {
   });
 
   test('Refresh also empties the search box', async ({ adminPage, seeder }) => {
-    test.fail(
-      true,
-      'Refresh clears the query (the list is unfiltered again) but leaves the typed text in the ' +
-        'search box, the same defect as the repository list: RPS-1283',
-    );
     const { scans } = scanDataset(seeder.runId);
     await stubSupportedRepoTypes(adminPage, SUPPORTED);
     await stubSecurityScans(adminPage, scans);

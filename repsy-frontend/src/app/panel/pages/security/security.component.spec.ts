@@ -14,7 +14,8 @@
 /// limitations under the License.
 ///
 
-import { Router } from '@angular/router';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 
 import { PagedModelVulnerabilityScanInfo } from '../../../../generated/api';
@@ -69,5 +70,58 @@ describe('SecurityComponent', () => {
 
       expect(component.repoTypeOptions).toEqual(['ALL']);
     });
+  });
+
+  describe('search', () => {
+    it('refresh empties the search text and the filters and loads the first page again', () => {
+      component.search('my-repo');
+      component.filterBySeverity('HIGH');
+      component.loadPage(2);
+      securityService.listScans.calls.reset();
+
+      component.refreshPage();
+
+      expect(component.repoNameSearch).toBe('');
+      expect(component.pageNum).toBe(0);
+      expect(component.severityOption).toBe('ALL');
+      expect(securityService.listScans).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe('SecurityComponent search box', () => {
+  it('is emptied by the refresh button together with the query', () => {
+    const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['listScans', 'getScansSummary']);
+    securityService.listScans.and.returnValue(
+      of({ content: [], page: { totalPages: 0 } } as PagedModelVulnerabilityScanInfo),
+    );
+    securityService.getScansSummary.and.returnValue(of({ totalCount: 0 }));
+    TestBed.configureTestingModule({
+      imports: [SecurityComponent],
+      providers: [
+        provideRouter([]),
+        { provide: SecurityService, useValue: securityService },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+        {
+          provide: SecurityScanSupportService,
+          useValue: { getSupportedRepoTypes: () => of(new Set(['MAVEN'])) },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(SecurityComponent);
+    fixture.detectChanges();
+    const box: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="security-search"] input');
+
+    box.value = 'my-repo';
+    box.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(box.value).toBe('my-repo');
+    expect(securityService.listScans.calls.mostRecent().args).toContain('my-repo');
+
+    fixture.nativeElement.querySelector('[data-testid="security-refresh"]').click();
+    fixture.detectChanges();
+
+    expect(box.value).toBe('');
+    expect(securityService.listScans.calls.mostRecent().args).not.toContain('my-repo');
   });
 });

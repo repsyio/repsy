@@ -10,6 +10,7 @@
     <app-searchbox
       data-testid="repo-search"
       placeholder="repository"
+      [value]="searchQuery"
       (filter)="search($event)"
       class="w-full sm:max-w-[192px]"
     />

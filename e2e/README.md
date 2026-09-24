@@ -2586,9 +2586,10 @@ Things a test here relies on, which a change to the page can break:
 - **The visibility toggle** is toggled by clicking its label text: the `toggle-input` checkbox is `sr-only`
   under a covering span, so Playwright refuses to click it (read `isChecked()` from it, though).
 - **Known defects, pinned as `test.fail`** (a `✘` line in the list reporter with a passing summary is the
-  expectation): the description textarea's `maxlength="500"` hides the ">500" error (RPS-1265), and the
-  search box keeps its text and the page index stays stale after a refresh or a new search (RPS-1283).
-  Drop the `test.fail` when the fix lands. (A USER's Recent Activity was pinned to RPS-1276 until that
+  expectation): the description textarea's `maxlength="500"` hides the ">500" error (RPS-1265). Drop the
+  `test.fail` when the fix lands. (The search box and page index after a refresh or a new search were
+  pinned to RPS-1283 and are fixed; a refresh during a load, RPS-1293, is covered by a route that holds
+  the first maven answer. A USER's Recent Activity was pinned to RPS-1276 until that
   fix; the row now shows, so DASH-04 asserts it plainly.)
 
 ### Users and profile (RPS-1253)
@@ -2604,7 +2605,7 @@ user the UI is about to create so a failing test still cleans it up).
 | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | USR-01   | create a USER and an Admin, log in as each from a fresh context (an Admin sees Users, a USER does not), cancel resets the form |
 | USR-02   | one test per validator of the create form, the message texts, a valid form, a duplicate username                               |
-| USR-03   | rename, promote, demote next to another admin, the last-admin warning, edit validation, taken name, cancel                     |
+| USR-03   | rename, promote, demote next to another admin, the last-admin warning and locked switch, edit validation, taken name, cancel   |
 | USR-04   | reset password: one-time modal, the new password logs in, the old one is refused, cancel resets nothing                        |
 | USR-05   | delete (cancel, then confirm), delete next to another admin, the last-admin toast                                              |
 | USR-06   | 11 users: search (incl. case-insensitive, no match), pagination both ways, refresh                                             |
@@ -2630,8 +2631,8 @@ Rules these specs follow (and a later spec on these pages should too):
 - **Search first.** The list is server-paged (10, newest first) and server-searched (case-insensitive
   substring), and other tests add users, so every list view is a search for a username or for
   `seeder.runId`, which is in exactly the names this test seeded (with 10 or more users, `-user-1` also
-  matches `-user-10`: search the run id, not a name). After an edit or a delete the panel reloads with the
-  OLD search text, so a renamed user is not in the refreshed list until searched again.
+  matches `-user-10`: search the run id, not a name). After an edit or a delete the panel reloads without
+  the search (and empties the box), so a test that checks a row afterwards searches for it again.
 - **Toggle.** Click the `toggle` label (`UserCreateModal.roleToggle`), assert on `toggle-input`
   (`roleSwitch`): a click on the sr-only input is intercepted by the slider.
 - **Eye buttons** (show/hide password) are Font Awesome glyphs, and the network allow-list blocks the
@@ -2986,9 +2987,8 @@ How the stubs are typed, and the rules they follow:
   `/security` then shows its empty states with a type filter that offers only `ALL`.
 
 Known product defects, pinned with `test.fail` so the test turns red the day it is fixed and the marker
-has to go (a `✘` in the list reporter with a passing summary is the expectation): the `/security`
-Refresh button clears the query but not the search box (RPS-1283 is the same defect on the repository
-list), and three security-modal defects (RPS-1295): the X of a repository or package modal
+has to go (a `✘` in the list reporter with a passing summary is the expectation): three security-modal
+defects (RPS-1295): the X of a repository or package modal
 also opens the row it sits in (the modal is rendered inside the clickable row and only the backdrop and
 the links stop the click), and with a chart the dialog is tall enough that the page header covers its
 title and X at 1440x900.
