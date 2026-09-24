@@ -390,8 +390,7 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
         HttpStatus.UNPROCESSABLE_ENTITY,
         "pendingSignatureNotVerified",
         "pendingSignatureNotVerified",
-        "The signature uploaded earlier for this file does not verify against it; upload both"
-            + " again.");
+        "The signature uploaded earlier for this file does not verify; upload both" + " again.");
 
     assertThat(stored(f.repo(), JAR)).doesNotExist();
     assertThat(stored(f.repo(), JAR + ".asc")).doesNotExist();
@@ -417,8 +416,7 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
         HttpStatus.UNPROCESSABLE_ENTITY,
         "pendingSignatureNotVerified",
         "pendingSignatureNotVerified",
-        "The signature uploaded earlier for this file does not verify against it; upload both"
-            + " again.");
+        "The signature uploaded earlier for this file does not verify; upload both" + " again.");
 
     assertThat(stored(f.repo(), POM)).doesNotExist();
     assertThat(this.artifactCount(f.repo())).isZero();

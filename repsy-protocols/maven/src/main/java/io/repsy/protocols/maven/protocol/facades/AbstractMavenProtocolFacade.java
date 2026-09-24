@@ -127,9 +127,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
     this.artifactService.checkDeploymentRules(repoInfo, versionType, storagePath);
 
-    if (content == null
-        && ArtifactUtils.isSignatureToVerify(
-            storagePath, repoInfo.isPgpVerifyAllSignaturesEnabled())) {
+    if (isSignatureToVerify(content, repoInfo, storagePath)) {
       // A signature is well below 1 KB, and it is read once here to be verified and then stored.
       content = readBoundedSignature(inputStream, contentLength);
 
@@ -323,6 +321,17 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     } catch (final EntryTooLargeException e) {
       throw new BadRequestException("mavenSignatureTooLarge");
     }
+  }
+
+  /** A signature this repo verifies, that has not been read into memory as metadata already. */
+  private static boolean isSignatureToVerify(
+      final byte @Nullable [] content,
+      final BaseRepoInfo<?> repoInfo,
+      final StoragePath storagePath) {
+
+    return content == null
+        && ArtifactUtils.isSignatureToVerify(
+            storagePath, repoInfo.isPgpVerifyAllSignaturesEnabled());
   }
 
   private static String resolveLogicalVersion(final Gav gav) {
