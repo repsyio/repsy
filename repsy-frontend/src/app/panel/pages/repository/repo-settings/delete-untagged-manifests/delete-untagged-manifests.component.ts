@@ -36,6 +36,8 @@ import { ByteFormatter } from '../../../../shared/util/byte-formatter';
 })
 export class DeleteUntaggedManifestsComponent {
   @Input() public activeRepository: RepoPermissionInfo;
+  /** When set, only the untagged manifests of this image are deleted, and only a button is shown. */
+  @Input() public imageName?: string;
 
   public deleting = false;
 
@@ -49,12 +51,13 @@ export class DeleteUntaggedManifestsComponent {
     this.dangerModalService.showWithMessage(
       'Delete Untagged Manifests',
       'Delete',
-      'Manifests that no tag points to will be deleted and stop being pullable by digest. ' +
+      `Manifests of ${this.imageName ? `the image ${this.imageName}` : 'this repository'} that no tag points to ` +
+        'will be deleted and stop being pullable by digest. ' +
         'The layers that only they used are deleted afterwards. This cannot be undone.',
       () => {
         this.deleting = true;
         this.dockerImageControllerService
-          .deleteUntaggedManifests(this.activeRepository.repoName)
+          .deleteUntaggedManifests(this.activeRepository.repoName, this.imageName)
           .pipe(
             finalize(() => {
               this.deleting = false;

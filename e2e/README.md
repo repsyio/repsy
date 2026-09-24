@@ -80,6 +80,7 @@ e2e/
   runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
   runners/ruby.Dockerfile      # + a pinned Ruby toolchain (ruby/gem/bundle/bundler + stdlib) copied out of the official ruby image
+  runners/stack.Dockerfile     # + the static `docker` CLI copied out of docker-cli; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
   runners/ui.Dockerfile        # + Playwright's own headless Chromium (build-time install, /ms-playwright); the "ui" runner, see "UI suite"
   runners/ui-seccomp.json      # Playwright's seccomp profile, so Chromium's sandbox works as a non-root uid in Docker
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
@@ -104,6 +105,7 @@ e2e/
       remote-throttle.ts        # RemoteAuthBudget/withBackoff429 -- see "Remote hardening" below
     ui/                        # the panel UI suite's plumbing (fixtures, session seeding, page objects) -- see "UI suite"
     clients/
+      stack.ts                  # findRepsyContainer()/dockerExec()/logLinesContaining(): docker exec + docker logs against the local stack's Repsy container ("Stack runner")
       exec.ts                   # execa wrapper: isolated work dir/HOME, redacted logs, attach-on-fail
       raw-http.ts                # shared raw-HTTP building blocks: RawResponse, adminCredential(), authHeader(), sha256Hex, 429 backoff
       maven.ts                  # the maven client: publish()/resolve()/seedPublish(), raw-HTTP status pinning
@@ -203,6 +205,7 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_UI_WORKERS`            | `4` (compose)              | ui runner only: Playwright workers (each is a Chromium, ~250-400 MB)                                                                                                                                                                                                                                                                                                                                                                     |
 | `REPSY_UI_NO_SANDBOX`         | _(unset — sandbox on)_     | ui runner only: `1` launches Chromium with `chromiumSandbox: false`, see "UI suite"                                                                                                                                                                                                                                                                                                                                                      |
 | `REPSY_UI_OPT_IN`             | _(unset)_                  | ui runner only: comma list of opt-in UI suites (`throttle`, `scanner`); read by `optedIn()`                                                                                                                                                                                                                                                                                                                                              |
+| `REPSY_E2E_STACK_PROJECT`     | `repsy-e2e`                | stack runner only: the compose project whose `repsy` container `docker exec` targets (README "Stack runner")                                                                                                                                                                                                                                                                                                                             |
 | `REPSY_E2E_INSECURE_REGISTRY` | _(unset)_                  | docker runner's `--insecure` (only needed for a remote plain-HTTP host; `localhost` already works without it); helm runner's `--insecure-skip-tls-verify` (a REMOTE HTTPS target with a bad cert only -- helm's own `--plain-http` is derived from `REPSY_REPO_BASE_URL`'s scheme instead, unconditionally on this harness's own `http://localhost:9090` stack, confirmed live H3: unlike `crane`, Helm has no localhost auto-detection) |
 
 ## Targets (`src/target.ts`)
@@ -2374,6 +2377,46 @@ re-verifies that a refused re-publish under `allowOverride:false` changes NOTHIN
 byte). No regression from the RPS-1060 fix this codebase's other protocols' own equivalent stories
 reference.
 
+## Stack runner
+
+Some behaviour is decided by the Docker **image** and is invisible to an HTTP client: which user the
+process runs as, who owns a directory the Dockerfile creates, the exact log line an operator copies a
+password from. The `stack` runner (`runners/stack.Dockerfile`, Playwright project `stack`, specs under
+`tests/stack/`) covers that by running `docker exec` and `docker logs` against the Repsy container of
+the local stack (`src/clients/stack.ts`). It finds the container by its compose labels (project
+`REPSY_E2E_STACK_PROJECT`, default `repsy-e2e`, the `name:` of both stack files; service `repsy`), so
+it works against either stack profile.
+
+```bash
+./run.sh local up
+./run.sh test --protocol stack -b     # -b the first time: builds the runner image with the docker CLI
+```
+
+It is the only runner with the host's Docker socket (`/var/run/docker.sock`, added to the non-root
+runner uid through `group_add: DOCKER_GID`, which `run.sh` reads off the socket). A socket is root on
+the host, which is why every other runner stays daemon-free (see "Docker runner"), and why these
+specs are tagged `@local-only` and skip themselves on a `remote` target (`target.ownsStack`). A
+daemon reached any other way than that socket (`DOCKER_HOST`, rootless Docker) is not supported.
+
+### Password reset marker file (RPS-1313)
+
+`tests/stack/password-reset-marker.spec.ts` proves RPS-1107 part B in the real image:
+
+- the runtime user is `appuser`, `/app/data/password-reset` is owned by `appuser:appgroup` and
+  `PASSWORD_RESET_MARKER_DIR` points at it (the Dockerfile's `mkdir`/`chown`/`ENV`);
+- `docker exec <repsy> touch /app/data/password-reset/<user>` (the README's recipe): within the 5 s
+  poll the marker is gone, the log carries `Password of user <user> has been reset by the marker file
+... New password: <password>`, the old password is rejected, the new one logs in, and a second user
+  is untouched;
+- a marker for a user that does not exist, and one whose name is not a valid username, are removed
+  with a warning and create nothing.
+
+The reset user is always one the test created through the panel API (the seeder deletes it), never
+`admin`, and a marker a failed test leaves behind is removed in `afterEach`. Only the log lines about
+the test's own users are read, so no other password is ever printed. Flip check: `docker exec -u root
+<repsy> chown root:root /app/data/password-reset` (the Dockerfile bug the case guards against) makes
+all four tests fail on the owner assertion or on `touch: Permission denied`.
+
 ## Remote hardening
 
 On a `remote` target (`target.isRemote`, see `src/target.ts`), `AUTH_THROTTLE_MAX_FAILURES` cannot
@@ -3110,6 +3153,7 @@ How the stubs are typed, and the rules they follow:
 ./run.sh test --protocol pypi
 ./run.sh test --protocol golang
 ./run.sh test --protocol ruby
+./run.sh test --protocol stack  # docker-exec cases against the local stack's Repsy container (see "Stack runner")
 ./run.sh test --protocol ui     # the panel UI suite in headless Chromium (see "UI suite")
 ./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby
 ./run.sh test --grep '@smoke'
@@ -3126,7 +3170,7 @@ How the stubs are typed, and the rules they follow:
 
 `run.sh test` accepts `--target local|remote|ci` and `--protocol a,b` (a comma-separated list of
 runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`,
-`ruby`, `ui`) — identically whichever stack profile is up (see "Stack profiles (postgres and H2)" above).
+`ruby`, `stack`, `ui`) — identically whichever stack profile is up (see "Stack profiles (postgres and H2)" above).
 Reports land under `e2e/test-results/` (JUnit
 XML) and
 `e2e/playwright-report/` (HTML) — one `run.sh test` invocation covering several `--protocol` services

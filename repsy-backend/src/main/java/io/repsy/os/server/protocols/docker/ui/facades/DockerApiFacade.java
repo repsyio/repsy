@@ -50,6 +50,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -239,16 +241,37 @@ public class DockerApiFacade implements ProtocolApiFacade {
    */
   public @NonNull List<OrphanLayerInfo> deleteOrphanLayers(final @NonNull RepoInfo repoInfo) {
 
-    // The rows go first, in their own transaction, so a concurrent push cannot re-reference a row
-    // whose blob is about to be deleted. The price: a blob whose delete fails stays on disk, still
-    // charged to the repo and unreachable from the DB. AbandonedBlobUploadCleanupService sweeps it
-    // once it is older than the TTL: it also collects a digest-named blob with no docker_layer row,
-    // not just UUID-named upload files (RPS-1172).
+    // The rows go first so a concurrent push cannot re-reference a row whose blob is about to be
+    // deleted. The price: a blob whose delete fails stays on disk, still charged to the repo and
+    // unreachable from the DB. AbandonedBlobUploadCleanupService sweeps it once it is older than
+    // the TTL: it also collects a digest-named blob with no docker_layer row, not just UUID-named
+    // upload files (RPS-1172).
     final var orphans = this.layerTxService.deleteOrphanLayers(repoInfo.getStorageKey());
 
-    this.orphanLayerCleanupService.cleanupBlobs(repoInfo.getStorageKey(), orphans);
+    // The blobs are deleted on another thread, so only once the row deletion has committed: were
+    // it to roll back, the rows would come back without their blobs (RPS-1318).
+    this.afterCommit(
+        () -> this.orphanLayerCleanupService.cleanupBlobs(repoInfo.getStorageKey(), orphans));
 
     return orphans;
+  }
+
+  /** Runs the action when the current transaction commits, and never if it rolls back. */
+  private void afterCommit(final @NonNull Runnable action) {
+
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      action.run();
+
+      return;
+    }
+
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            action.run();
+          }
+        });
   }
 
   @Override

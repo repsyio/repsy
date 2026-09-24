@@ -63,6 +63,7 @@
       Configure
     </button>
     @if (canManage) {
+      <app-delete-untagged-manifests class="w-full sm:w-auto" [activeRepository]="activeRepo" [imageName]="imageName" />
       <button
         data-testid="pkg-settings"
         [disabled]="!activeRepo.canManage"

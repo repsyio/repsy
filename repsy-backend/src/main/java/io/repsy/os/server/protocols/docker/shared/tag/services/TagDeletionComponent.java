@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Deletes a tag from the panel. That removes the tag pointer only: the manifest it pointed at stays
@@ -37,6 +38,7 @@ public class TagDeletionComponent {
   private final ManifestTxService manifestService;
   private final ApplicationEventPublisher eventPublisher;
 
+  @Transactional
   public void deleteTag(final RepoInfo repoInfo, final String imageName, final String tagName) {
 
     final var imageInfo =
@@ -46,6 +48,9 @@ public class TagDeletionComponent {
         this.manifestService.findTag(repoInfo.getStorageKey(), imageInfo.getId(), tagName);
 
     this.manifestService.deleteTag(tag);
+
+    // In this transaction: the image is listed with the size and the digest of what its tags reach.
+    this.imageService.refreshImageSize(repoInfo.getStorageKey(), imageInfo.getId());
 
     this.eventPublisher.publishEvent(
         new ArtifactVersionDeletedEvent(
