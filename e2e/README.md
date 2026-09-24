@@ -163,7 +163,7 @@ e2e/
       registry-rules.spec.ts    # raw-HTTP pins of the 409/422 override & version-kind rules, service index, X-NuGet-ApiKey (H7)
     docker/
       publish-consume.spec.ts   # registerPublishConsumeLoop(dockerAdapter) + D1-D4 real-client tests (OCI family, auth login, by-digest, retag)
-      registry-rules.spec.ts    # raw-HTTP pins R1-R13: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type
+      registry-rules.spec.ts    # raw-HTTP pins R1-R14: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type, sha512 digests
     helm/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
@@ -1213,7 +1213,7 @@ applies unchanged, with the SAME shared `expect` maven already pins.
 | `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*` | n/a                         | `protocols` excludes docker — no releases/snapshots/SNAPSHOT-file concept exists |
 | everything else (`password-admin`, `token-rw`, ...)                      | matches the shared `expect` | unchanged                                                                        |
 
-`registry-rules.spec.ts` additionally pins (R1-R13, mirroring the plan's own hypothesis numbering):
+`registry-rules.spec.ts` additionally pins (R1-R13, mirroring the plan's own hypothesis numbering, plus R14):
 the ping challenge's exact `realm`/`service`/`scope` (R1); the token-endpoint matrix — issuance is
 never scope-checked, only an expired/revoked/wrong credential fails at the token hop (R2); a
 read-only token's write refusal at the OPERATION hop, reads still working (R3); monolithic/chunked
@@ -1222,9 +1222,11 @@ blob upload, a wrong digest, and dedup (R4); manifest push validation — missin
 after a refusal (R6); overriding a tag leaving the OLD manifest pullable by digest (R7, **B2, fixed by RPS-1216**);
 `HEAD` vs. `GET` by digest (R8, **B1, fixed by RPS-1215**); retagging the same digest under a second tag (R9); a
 config blob missing `os`/`architecture` (R12, **B5**); a multi-arch index referencing a
-digest-pushed child (R13); and that even a PUBLIC repo still needs real credentials to WRITE,
-refused at the token hop with no OCI body at all (distinct from an operation-hop 401's Bearer
-challenge + OCI envelope).
+digest-pushed child (R13); a manifest being addressable by both its `sha256` and its `sha512`
+digest, with `Docker-Content-Digest` (and the push's `Location`) reporting the algorithm the client
+used and no tag ever created by a digest push (R14, **RPS-1244**); and that even a PUBLIC repo still
+needs real credentials to WRITE, refused at the token hop with no OCI body at all (distinct from an
+operation-hop 401's Bearer challenge + OCI envelope).
 
 ### H1-H14, confirmed live
 
@@ -1330,6 +1332,14 @@ createdAt DESC`, could pick a DB-only "this manifest is also part of that multi-
   pointer, so a second tag adds a pointer and deleting a tag (panel `DELETE .../tags/{tag}`, which only
   removes the pointer) cannot affect another tag. The protocol has no `DELETE`, so this is pinned by the
   backend integration test `DockerManifestOverrideIT.retagSharesOneRowAndOneFile`, not by R9.
+- **sha512 manifest digests (filed as [RPS-1244](https://zyfera.atlassian.net/browse/RPS-1244), fixed)** —
+  RPS-1242 made a `sha512:` reference routable, but a manifest pushed by it was stored as a tag-like row
+  named `sha512:...` and every response reported the `sha256`. A manifest now stores both digests
+  (`digest_sha512` is filled at push time and, for a row an earlier version wrote, by the manifest-layout
+  repair job or the next identical push), so it is served by either, and `Docker-Content-Digest` (and the
+  push's `Location`) carry the algorithm the client used: a reference by `sha512` gets the `sha512` digest
+  back, a tag or a `sha256` reference the `sha256`. A push by digest never creates a tag. A wrong `sha512`
+  reference is still `400 DIGEST_INVALID`. `registry-rules.spec.ts`'s R14 pins it with raw HTTP.
 - **B4 (pre-existing story, [RPS-1110](https://zyfera.atlassian.net/browse/RPS-1110) — commented with
   this live evidence, not a new ticket)** — An unknown manifest `Content-Type` (anything outside the
   5 known docker/OCI types) answers a flat `500 UNKNOWN`, not a `4xx`: `saveManifest`'s `switch`
