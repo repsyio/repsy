@@ -13,25 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.docker.shared.image.dtos;
+package io.repsy.protocols.docker.shared.image.exceptions;
 
-import java.time.Instant;
-import java.time.LocalDateTime;
+import org.jspecify.annotations.NullMarked;
 
-public interface ImageListItem {
-  String getName();
+/**
+ * The image a manifest push looked up was deleted before the push could write to it: an image goes
+ * with its last manifest (RPS-1288). Not an error for the client: the push handler creates the
+ * image again and runs the save once more.
+ */
+@NullMarked
+public class ImageDeletedException extends RuntimeException {
 
-  String getDigest();
-
-  Long getSize();
-
-  LocalDateTime getUpdatedAt();
-
-  Instant getLastUpdatedAt();
-
-  Long getTagCount();
-
-  Long getUntaggedManifestCount();
-
-  Long getUntaggedSize();
+  public ImageDeletedException(final Object imageId) {
+    super("The image " + imageId + " was deleted while a manifest was being pushed into it");
+  }
 }

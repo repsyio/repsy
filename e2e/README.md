@@ -174,6 +174,7 @@ e2e/
     docker/
       publish-consume.spec.ts   # registerPublishConsumeLoop(dockerAdapter) + D1-D4 real-client tests (OCI family, auth login, by-digest, retag)
       registry-rules.spec.ts    # raw-HTTP pins R1-R15: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type, sha512 digests, protocol DELETE
+      image-lifecycle.spec.ts   # crane: the last tag keeps the image (manifest pullable by digest), the last manifest removes it, a new push recreates it (RPS-1288)
     helm/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
@@ -3007,9 +3008,9 @@ keys a crate by its normalised name, `-` becoming `_`), NuGet and Helm `e2e-<run
 
 What the descriptors record (found by running each protocol): a version row's link appends `#security`
 (the template accepts a fragment); a detail Delete lands on the list (Cargo, Ruby), on the versions page
-(NuGet, Helm, Go) and, for the LAST version, on the list for NuGet and Helm (`landsOnLast`) and on the empty
-versions page for Go; deleting the last version removes the package for all but Go, whose module
-stays listed with no versions (like Docker, RPS-1288 (5)); Cargo/NuGet/Helm/Ruby Configure texts have
+(NuGet, Helm, Go, and Docker since RPS-1288 (7)) and, for the LAST version, on the list for NuGet and Helm (`landsOnLast`) and on the empty
+versions page for Go and Docker; deleting the last version removes the package for all but Go and Docker: Go's module
+stays listed with no versions, and Docker keeps an emptied image, by design, as "No tags" while it stores a manifest (RPS-1288 (5)); Cargo/NuGet/Helm/Ruby Configure texts have
 `<YOUR_...>` placeholders and the same body in the deploy-token variant (`deployTokenMarker` is optional
 now: absent = same body, only the title differs), Ruby's title is the same in both.
 

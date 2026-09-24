@@ -141,6 +141,24 @@ export class DockerImagesListComponent implements OnDestroy {
     return ByteFormatter.formatBytes(bytes, decimals);
   }
 
+  /**
+   * An image stays while it stores any manifest, so it may have no tag (RPS-1288): its digest and
+   * size, which describe what the tags reach, are then empty, and the row says what it stores.
+   */
+  public hasNoTags(image: ImageListItem): boolean {
+    return image.tagCount === 0;
+  }
+
+  public untaggedLabel(image: ImageListItem): string {
+    const count = image.untaggedManifestCount ?? 0;
+
+    if (count === 0) {
+      return 'no manifests';
+    }
+
+    return `${count} untagged ${count === 1 ? 'manifest' : 'manifests'}`;
+  }
+
   public deleteImage(image: ImageListItem) {
     this.dangerModalService.show('Delete Image', 'Delete', () => {
       this.loading = true;

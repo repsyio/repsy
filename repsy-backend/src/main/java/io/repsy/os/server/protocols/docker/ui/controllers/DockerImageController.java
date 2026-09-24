@@ -89,6 +89,21 @@ public class DockerImageController {
     return this.restResponseFactory.success("imagesFetched", new PagedModel<>(packages));
   }
 
+  /**
+   * The image as the list shows it (tags, untagged manifests, their size): what the image's page
+   * says when the image has no tag left.
+   */
+  @GetMapping("/{repoName}/{imageName}/summary")
+  @RepoOperation
+  public RestResponse<ImageListItem> getImageSummary(
+      final RepoInfo repoInfo, @PathVariable final String imageName) {
+
+    final var image =
+        this.imageService.findListItemByRepoIdAndName(repoInfo.getStorageKey(), imageName);
+
+    return this.restResponseFactory.success("imageFetched", image);
+  }
+
   @GetMapping("/{repoName}/{imageName}/tags")
   @RepoOperation
   public RestResponse<PagedModel<ImageTagListItem>> listTags(

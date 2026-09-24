@@ -33,6 +33,11 @@ public interface GoModuleVersionRepository extends JpaRepository<GoModuleVersion
 
   Optional<GoModuleVersion> findByGoModuleIdAndVersion(UUID moduleId, String version);
 
+  long countByGoModuleId(UUID moduleId);
+
+  @Query("select v.version from GoModuleVersion v where v.goModule.id = :moduleId")
+  List<String> findVersionsByModuleId(UUID moduleId);
+
   @Query(
       """
       select v.id as id, v.version as version, v.goVersion as goVersion, v.createdAt as createdAt

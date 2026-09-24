@@ -549,6 +549,12 @@ instance per team.
   repository allows overriding) moves the pointer; the manifest it pointed at before stays stored
   and pullable by its digest. Pushing the manifest a tag already points at changes nothing.
   Deleting a tag in the web UI removes the pointer only, in the same way.
+- **An image lives as long as it stores a manifest.** Deleting the last tag of an image does not
+  delete the image: its manifests stay pullable by digest, so the web UI keeps listing it as "No
+  tags", with how many untagged manifests it still stores and their size, and its page offers
+  "Delete untagged manifests" and "Delete image". The image is removed automatically when its last
+  manifest goes, whether by a protocol `DELETE` by digest or by "Delete untagged manifests"; the next
+  push of that name creates it again.
 - **Untagged manifests accumulate.** Nothing deletes a manifest automatically, so every override
   and every deleted tag leaves the previous manifest, and the layers only it used, on disk and in
   the repository's usage until you remove them with **"Delete untagged manifests"** in the
@@ -585,6 +591,20 @@ instance per team.
   - The layers a deleted manifest used are not deleted with it: "Delete orphan layers" (or "Delete
     untagged manifests", which runs that sweep) removes the ones no manifest uses any more.
 - There is no `tags/list` or referrers API yet.
+
+### Go Module Semantics
+
+- **A module lasts as long as it has a version.** Deleting the last version of a Go module in the
+  web UI (or with `DELETE /api/go/modules/{repoName}/versions`) also deletes the module: it leaves
+  the module list and its stored files are moved to the trash, like the version's own. Publishing a
+  version of that path again creates the module again. Deleting a module as a whole is the same
+  operation for all of its versions. The disk usage of what was deleted is given back to the
+  repository, and a deleted version is reported to the vulnerability scanner as deleted.
+- **The Go proxy answers as it does for a module that was never published.** `@v/list` of a module
+  without versions is `200` with an empty body (not `404`, which would make the `go` command try the
+  next `GOPROXY` entry), and `@latest` is `404`.
+- A delete and a publish of the same module take turns, so a publish that arrives while the last
+  version is being deleted is stored, in a module that is created again, and never fails.
 
 ### Signed Maven Deploys
 

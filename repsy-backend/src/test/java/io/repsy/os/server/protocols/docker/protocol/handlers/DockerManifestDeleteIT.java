@@ -212,6 +212,10 @@ class DockerManifestDeleteIT extends AbstractIntegrationTest {
     assertThat(this.wire.putImage(repo, IMAGE, "v1", manifest).getStatus()).isEqualTo(201);
     final var digest = sha256(bytes(manifest));
     final var reference = "sha512".equals(algorithm) ? sha512(bytes(manifest)) : digest;
+    // Another manifest keeps the image: with none, the image goes with this one (RPS-1288) and
+    // every
+    // read below is NAME_UNKNOWN instead (see the tests of the last manifest).
+    this.push(repo, IMAGE, "other", "layer-two");
     final var image = this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE).orElseThrow();
     clearInvocations(this.usageUpdateService);
 
@@ -231,9 +235,12 @@ class DockerManifestDeleteIT extends AbstractIntegrationTest {
         this.wire.getManifest(repo, IMAGE, "latest"), 404, "MANIFEST_UNKNOWN", "tagNotFound");
     this.expectOciError(
         this.wire.getManifest(repo, IMAGE, "v1"), 404, "MANIFEST_UNKNOWN", "tagNotFound");
-    assertThat(this.manifestRepository.findAllByImageId(image.getId())).isEmpty();
+    assertThat(this.manifestRepository.findAllByImageId(image.getId()))
+        .extracting(row -> row.getDigest())
+        .containsExactly(sha256(bytes(imageManifest("layer-two"))));
     assertThat(this.tagRepository.findAllByImageRepoIdAndImageId(repo.getId(), image.getId()))
-        .isEmpty();
+        .extracting(tag -> tag.getName())
+        .containsExactly("other");
     assertThat(this.manifestFileExists(repo, digest)).isFalse();
     assertThat(this.netUsage(repo)).isEqualTo(-bytes(manifest).length);
     assertThat(this.deletedVersions()).containsExactlyInAnyOrder("latest", "v1");
@@ -300,10 +307,67 @@ class DockerManifestDeleteIT extends AbstractIntegrationTest {
         .as("the tag is gone")
         .isEqualTo(404);
     assertThat(this.wire.getManifest(repo, IMAGE, digest).getStatus()).isEqualTo(200);
+    assertThat(this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE))
+        .as("deleting the last tag never removes the image (RPS-1288)")
+        .isPresent();
 
     assertThat(this.deleteReference(repo, IMAGE, digest).getStatus()).isEqualTo(202);
-    assertThat(this.wire.getManifest(repo, IMAGE, digest).getStatus()).isEqualTo(404);
+    this.expectOciError(
+        this.wire.getManifest(repo, IMAGE, digest), 404, "NAME_UNKNOWN", "imageNotFound");
     assertThat(this.manifestFileExists(repo, digest)).isFalse();
+    assertThat(this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE))
+        .as("the last manifest took the image with it (RPS-1288)")
+        .isEmpty();
+  }
+
+  @Test
+  @DisplayName(
+      "an image whose last manifest was deleted by digest is created again by the next push")
+  void anImageRemovedWithItsLastManifestIsCreatedAgainByAPush() throws Exception {
+    final var repo = this.dockerRepo();
+    final var manifest = this.push(repo, IMAGE, "latest", "layer-one");
+    assertThat(this.deleteReference(repo, IMAGE, sha256(bytes(manifest))).getStatus())
+        .isEqualTo(202);
+    assertThat(this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE)).isEmpty();
+
+    this.push(repo, IMAGE, "v2", "layer-two");
+
+    final var image = this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE).orElseThrow();
+    assertThat(this.tagRepository.findAllByImageRepoIdAndImageId(repo.getId(), image.getId()))
+        .extracting(tag -> tag.getName())
+        .containsExactly("v2");
+    assertThat(this.wire.getManifest(repo, IMAGE, "v2").getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  @DisplayName("deleting one of two manifests by digest keeps the image")
+  void deletingOneOfTwoManifestsKeepsTheImage() throws Exception {
+    final var repo = this.dockerRepo();
+    final var first = this.push(repo, IMAGE, "v1", "layer-one");
+    final var second = this.push(repo, IMAGE, "v2", "layer-two");
+
+    assertThat(this.deleteReference(repo, IMAGE, sha256(bytes(first))).getStatus()).isEqualTo(202);
+
+    assertThat(this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE)).isPresent();
+    assertThat(this.wire.getManifest(repo, IMAGE, "v2").getContentAsString()).isEqualTo(second);
+  }
+
+  @Test
+  @DisplayName("an index and its children: the image goes with the last of them, not before")
+  void anImageWithAnIndexGoesWithItsLastManifest() throws Exception {
+    final var repo = this.dockerRepo();
+    final var one = this.push(repo, IMAGE, sha256(bytes(imageManifest("layer-one"))), "layer-one");
+    final var list = index(one);
+    assertThat(this.wire.putManifest(repo, IMAGE, "multi", DockerWire.OCI_INDEX, list).getStatus())
+        .isEqualTo(201);
+
+    assertThat(this.deleteReference(repo, IMAGE, sha256(bytes(list))).getStatus()).isEqualTo(202);
+    assertThat(this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE))
+        .as("its child manifest is still stored")
+        .isPresent();
+
+    assertThat(this.deleteReference(repo, IMAGE, sha256(bytes(one))).getStatus()).isEqualTo(202);
+    assertThat(this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE)).isEmpty();
   }
 
   @Test
@@ -428,11 +492,12 @@ class DockerManifestDeleteIT extends AbstractIntegrationTest {
         "manifestNotFound");
     assertThat(this.deleteReference(repo, IMAGE, sha256(bytes(manifest))).getStatus())
         .isEqualTo(202);
+    // It was the image's last manifest, so the image is gone with it (RPS-1288).
     this.expectOciError(
         this.deleteReference(repo, IMAGE, sha256(bytes(manifest))),
         404,
-        "MANIFEST_UNKNOWN",
-        "manifestNotFound");
+        "NAME_UNKNOWN",
+        "imageNotFound");
   }
 
   @Test
