@@ -17,6 +17,7 @@
 /**
  * The login page (`/login`). Client-side validation shows inline errors (`login-<field>-error-
  * <validator>`) and keeps the form from submitting; a wrong password is a 401 with a toast instead.
+ * The password only has `required` and `maxlength` messages (RPS-1308): a weak password is submitted.
  */
 import { expect, type Locator, type Page } from '@playwright/test';
 

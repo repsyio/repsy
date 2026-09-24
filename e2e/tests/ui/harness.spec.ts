@@ -51,20 +51,17 @@ plainTest.describe('UI harness guards', () => {
     try {
       plainExpect(() => assertAdminCredentialsUsableInUi()).not.toThrow();
       // Synchronous set/check/restore, so no other test of this worker can observe the value.
-      for (const unusable of [
-        'Ab1',
-        'alllowercase1',
-        'ALLUPPERCASE1',
-        'NoDigitsHere',
-        'Has Space1a',
-      ]) {
+      for (const unusable of ['', `Aa1${'x'.repeat(70)}`]) {
         env.adminPassword = unusable;
         plainExpect(() => assertAdminCredentialsUsableInUi(), unusable).toThrow(
-          /REPSY_ADMIN_PASSWORD must be 6-50 chars/,
+          /REPSY_ADMIN_PASSWORD must be 1-72 chars/,
         );
       }
-      env.adminPassword = `Aa1${'x'.repeat(50)}`;
-      plainExpect(() => assertAdminCredentialsUsableInUi()).toThrow(/6-50 chars/);
+      // Login only checks the shape (RPS-1308): a weak or a 72-character password is usable.
+      for (const usable of ['a', 'abc', 'alllowercase1', 'Has Space1a', `Aa1${'x'.repeat(69)}`]) {
+        env.adminPassword = usable;
+        plainExpect(() => assertAdminCredentialsUsableInUi(), usable).not.toThrow();
+      }
     } finally {
       env.adminPassword = original;
     }

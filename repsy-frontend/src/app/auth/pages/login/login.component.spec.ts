@@ -59,6 +59,30 @@ describe('LoginComponent', () => {
     expect(toastService.show).not.toHaveBeenCalled();
   });
 
+  describe('form validity (RPS-1308)', () => {
+    it('lets a password the creation rule would reject be submitted', () => {
+      for (const password of ['a', 'abc', 'lowercase1', 'has space', 'x'.repeat(72)]) {
+        component.form.setValue({ username: 'someone', password });
+
+        expect(component.form.valid).withContext(password).toBeTrue();
+      }
+    });
+
+    it('needs a password, at most 72 characters of it', () => {
+      component.form.setValue({ username: 'someone', password: '' });
+      expect(component.form.get('password')?.errors).toEqual({ required: true });
+
+      component.form.setValue({ username: 'someone', password: 'x'.repeat(73) });
+      expect(Object.keys(component.form.get('password')?.errors ?? {})).toEqual(['maxlength']);
+    });
+
+    it('still checks the username', () => {
+      component.form.setValue({ username: 'ab', password: 'abc' });
+
+      expect(component.form.valid).toBeFalse();
+    });
+  });
+
   describe('returnUrl (RPS-1278)', () => {
     function loginAt(url: string): void {
       spyOnProperty(router, 'url', 'get').and.returnValue(url);

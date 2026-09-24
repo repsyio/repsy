@@ -26,10 +26,10 @@ import { LoginForm } from '../../../../generated/api';
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
 import { idFactory } from '../../../shared/util/unique-id';
 import {
+  LOGIN_PASSWORD_MESSAGES,
   LOGIN_USERNAME_MESSAGES,
+  loginPasswordValidators,
   loginUsernameValidators,
-  PASSWORD_MESSAGES,
-  passwordValidators,
 } from '../../../shared/validators/credentials.validators';
 import { RETURN_URL_PARAM, safeReturnUrl } from '../../util/return-url';
 import { AuthService } from '../service/auth.service';
@@ -48,7 +48,7 @@ export class LoginComponent implements OnInit {
 
   public form: FormGroup;
   public readonly usernameMessages = LOGIN_USERNAME_MESSAGES;
-  public readonly passwordMessages = PASSWORD_MESSAGES;
+  public readonly passwordMessages = LOGIN_PASSWORD_MESSAGES;
   public inputType = 'password';
   public visible = false;
   public loading = false;
@@ -70,8 +70,8 @@ export class LoginComponent implements OnInit {
     this.setRandomImage();
     this.form = this.fb.group({
       username: ['', loginUsernameValidators()],
-      // The backend's LoginForm holds the password to the same rule as a new one (RPS-1265).
-      password: ['', passwordValidators()],
+      // Only the shape: the complexity rule is for a password that is set, not one that exists (RPS-1308).
+      password: ['', loginPasswordValidators()],
     });
   }
 
