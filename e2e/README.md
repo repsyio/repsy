@@ -104,6 +104,7 @@ e2e/
       fixtures.ts                # Playwright fixtures: panelApi, seeder, world(scenario, adapter)
       remote-throttle.ts        # RemoteAuthBudget/withBackoff429 -- see "Remote hardening" below
       gradle-extras.ts          # registerGradleExtras(dsl): the Gradle-only checks (module metadata, gradle.properties credential), RPS-133
+      gradle-locking.ts         # registerGradleLocking(dsl): dependency locking against Repsy (RPS-133)
       gradle-plugin-extras.ts   # registerGradlePluginExtras(dsl): legacy eachPlugin route, missing plugin marker, no Plugin Portal fallback
     ui/                        # the panel UI suite's plumbing (fixtures, session seeding, page objects) -- see "UI suite"
     clients/
@@ -121,6 +122,7 @@ e2e/
       maven-signing.ts           # a real `mvn deploy` with maven-gpg-plugin and a Gradle maven-publish + signing publish (RPS-1316)
       gradle.ts                  # the Gradle client: publish()/resolve()/seedPublish() with a Groovy or a Kotlin DSL build file (RPS-133)
       gradle-adapter.ts          # gradleAdapter(dsl): the ProtocolAdapter registerPublishConsumeLoop takes, one per DSL (`gradle-groovy`, `gradle-kotlin`)
+      gradle-consumer.ts         # GradleConsumer: one project + Gradle home for several runs, for dependency locking (RPS-133)
       gradle-plugin.ts           # the Gradle client as a plugin consumer: publish a plugin, apply it from pluginManagement (RPS-133)
       gradle-plugin-adapter.ts   # gradlePluginAdapter(dsl): the same loop with a plugin as the artifact (`gradle-plugin-groovy`, `gradle-plugin-kotlin`)
       cargo-raw.ts                 # cargo-specific raw PUT/GET (publish/config.json/sparse-index/download), body builder
@@ -168,6 +170,8 @@ e2e/
       gradle-kotlin.spec.ts     # RPS-133: the same for the Kotlin DSL, build.gradle.kts
       gradle-plugin-groovy.spec.ts  # RPS-133: the catalog's RELEASE scenarios with a Gradle plugin as the artifact + the plugin extras, Groovy
       gradle-plugin-kotlin.spec.ts  # RPS-133: the same for the Kotlin DSL
+      gradle-locking-groovy.spec.ts  # RPS-133: Gradle dependency locking, Groovy
+      gradle-locking-kotlin.spec.ts  # RPS-133: the same for the Kotlin DSL
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
@@ -649,6 +653,20 @@ route still applies the same jar); and a plugin id Repsy does not have, whose se
 never `plugins.gradle.org`. The shared Gradle home is also primed with a plugin build (compiling the
 plugin class generates the Gradle API jar), and its ready marker is versioned (`WARM_VERSION`) so a
 volume primed by an older harness is primed again.
+
+**Dependency locking (`gradle-locking-{groovy,kotlin}.spec.ts`, RPS-133).** Locking pins what a dynamic
+version (`1.+`) resolved to in `gradle.lockfile`, so it also checks that Repsy keeps the artifact-level
+`maven-metadata.xml` right after every Gradle publish and every version delete: a dynamic version is
+resolved through it. Unlike `resolve`, which starts every build from nothing, locking is about what
+survives between builds, so `clients/gradle-consumer.ts`'s `GradleConsumer` keeps one project
+directory and one `GRADLE_USER_HOME` for a whole test (and, because that home caches what it
+resolved, a test that has to see the repository as it is now creates a second consumer). The tests
+(`scenarios/gradle-locking.ts`) pin: `--write-locks` pins the newest version and a newer publish does
+not move it (a control build without locking does see it), until `--update-locks` (with
+`--refresh-dependencies`: the home caches a dynamic version's metadata for 24 hours) moves it; an
+artifact outside the lockfile fails a locked build, and STRICT mode fails a build with no lock state;
+and a locked version deleted through the panel API fails a fresh build until the lock is updated.
+Dependency verification (`verification-metadata.xml`) is not covered.
 
 A cold Gradle home costs tens of seconds of CPU per build (native libraries, the generated Gradle API
 and Kotlin DSL jars, the plugin accessors), which a dozen parallel workers turn into timeouts. Like

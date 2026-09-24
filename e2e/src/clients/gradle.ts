@@ -72,7 +72,7 @@ const WARM_LOCK_STALE_MS = 600_000;
 export const SHARED_GRADLE_HOME_DIR =
   process.env.GRADLE_SHARED_HOME_DIR ?? path.join(os.tmpdir(), 'repsy-e2e-gradle-home');
 /** Bumped whenever the warm-up learns to prime more, so a volume primed by an older one is primed again. */
-const WARM_VERSION = 2;
+const WARM_VERSION = 3;
 const WARM_READY = path.join(SHARED_GRADLE_HOME_DIR, `.e2e-warm-ready-${WARM_VERSION}`);
 const WARM_LOCK = path.join(SHARED_GRADLE_HOME_DIR, `.e2e-warm-lock-${WARM_VERSION}`);
 
@@ -133,7 +133,7 @@ async function waitForWarm(): Promise<boolean> {
 /** Primes `SHARED_GRADLE_HOME_DIR` with everything a build of `dsl`'s templates needs to start. */
 async function warmDsl(dsl: GradleDsl): Promise<void> {
   const { home, work } = await isolatedWorkDir(`gradle-warm-${dsl}`);
-  for (const template of ['publish', 'consumer']) {
+  for (const template of ['publish', 'consumer', 'locking-consumer']) {
     const project = path.join(work, template);
     await fs.mkdir(project, { recursive: true });
     await renderGradleTemplate(dsl, 'settings', path.join(project, settingsFileName(dsl)), {
@@ -145,6 +145,8 @@ async function warmDsl(dsl: GradleDsl): Promise<void> {
       repoUrl: 'http://localhost/none',
       hasCredential: false,
       coordinates: 'io.repsy.e2e.warm:warm:0.0.0',
+      locking: true,
+      dependencies: ['io.repsy.e2e.warm:warm:0.0.0'],
     });
     // `help` configures the project (compiles the build script, generates the accessors of the
     // plugins it applies) and resolves nothing.
