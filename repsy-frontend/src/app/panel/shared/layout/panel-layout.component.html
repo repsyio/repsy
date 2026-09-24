@@ -1,4 +1,8 @@
-<app-panel-header [isMobileMenuOpen]="isMobileMenuOpen" (mobileMenuToggle)="isMobileMenuOpen = $event" />
+<app-panel-header
+  [isMobileMenuOpen]="isMobileMenuOpen"
+  [hasMobileMenu]="isAuthenticated"
+  (mobileMenuToggle)="setMobileMenuOpen($event)"
+/>
 
 <main
   class="flex min-h-screen w-full p-4 pt-[80px] sm:p-6 sm:pt-[90px] md:space-x-8 md:p-8 md:pt-[120px] lg:space-x-[75px] lg:p-[75px] lg:pt-[170px]"
@@ -16,6 +20,7 @@
     }"
   >
     <router-outlet />
+    <ng-content />
   </div>
 </main>
 

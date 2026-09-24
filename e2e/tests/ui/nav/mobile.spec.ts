@@ -21,9 +21,15 @@
  * menu"`) opens the mobile sidebar, which only exists in the DOM while open; below `lg` every list
  * shows its mobile card variant (`<page>-cards`, `<page>-card-<key>`) and its desktop grid is hidden.
  *
+ * NAV-03: the two edge cases of the menu itself. It closes when the viewport reaches `md` and does not
+ * come back when the viewport narrows again, and the page behind it does not scroll while it is open
+ * (`document.body.style.overflow`, the same style the splash screen uses).
+ *
  * Known mobile gaps are not pinned here: the Cargo and NuGet version lists have no card variant and
  * npm/PyPI mobile lists gate Delete on the wrong permission (RPS-1262); the package stories own those.
  */
+import type { Page } from '@playwright/test';
+
 import { RepoType } from '../../../src/api/panel-api.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
@@ -34,6 +40,8 @@ import { UsersPage } from '../../../src/ui/pages/users.js';
 import { loginSession } from '../../../src/ui/session.js';
 
 const PHONE = { width: 390, height: 844 };
+/** From `md` (768 px) on the desktop sidebar is shown and the mobile menu cannot be. */
+const TABLET = { width: 1024, height: 800 };
 
 test.describe('Mobile viewport', () => {
   test('NAV-02: at phone width the desktop sidebar is hidden and the burger is the way in', async ({
@@ -188,4 +196,89 @@ test.describe('Mobile viewport', () => {
       await expect(list.row(pkg)).toBeHidden();
     }
   });
+
+  test('NAV-03: widening the viewport past md closes the menu and narrowing does not bring it back', async ({
+    openUiPage,
+    adminSession,
+  }) => {
+    const page = await openUiPage({ session: adminSession, viewport: PHONE });
+    const shell = new Shell(page);
+    await new DashboardPage(page).goto();
+
+    await shell.header.burger.click();
+    await expect(shell.mobileSidebar.root).toBeVisible();
+    await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'true');
+
+    await page.setViewportSize(TABLET);
+    await expect(shell.sidebar.root).toBeVisible();
+    await expect(shell.mobileSidebar.root).toHaveCount(0);
+    expect(await bodyOverflow(page)).toBe('');
+
+    await page.setViewportSize(PHONE);
+    await expect(shell.header.burger).toBeVisible();
+    await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'false');
+    await expect(shell.mobileSidebar.root).toHaveCount(0);
+    expect(await bodyOverflow(page)).toBe('');
+
+    // Closed, not broken: the burger opens it again.
+    await shell.header.burger.click();
+    await expect(shell.mobileSidebar.root).toBeVisible();
+  });
+
+  test('NAV-03: the page behind the open menu does not scroll, and scrolls again once it is closed', async ({
+    openUiPage,
+    adminSession,
+  }) => {
+    const page = await openUiPage({ session: adminSession, viewport: PHONE });
+    const shell = new Shell(page);
+    await new DashboardPage(page).goto();
+    expect(await bodyOverflow(page)).toBe('');
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollHeight))
+      .toBeGreaterThan(PHONE.height);
+
+    await shell.header.burger.click();
+    await expect(shell.mobileSidebar.root).toBeVisible();
+    expect(await bodyOverflow(page)).toBe('hidden');
+    await page.mouse.move(360, 400); // over the backdrop, not the 240 px panel
+    await page.mouse.wheel(0, 400);
+    await nextFrames(page); // scrolling is asynchronous: give a scroll that should NOT happen a chance to
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+
+    await shell.mobileSidebar.close.click();
+    await expect(shell.mobileSidebar.root).toHaveCount(0);
+    expect(await bodyOverflow(page)).toBe('');
+    await page.mouse.wheel(0, 400);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  });
+
+  test('NAV-03: following a link leaves the page scrollable', async ({
+    openUiPage,
+    adminSession,
+  }) => {
+    const page = await openUiPage({ session: adminSession, viewport: PHONE });
+    const shell = new Shell(page);
+    await new DashboardPage(page).goto();
+
+    await shell.header.burger.click();
+    await shell.mobileSidebar.link('repositories').click();
+    await expect(page).toHaveURL(/\/repositories$/);
+    await expect(shell.mobileSidebar.root).toHaveCount(0);
+    expect(await bodyOverflow(page)).toBe('');
+  });
 });
+
+/** The inline `overflow` of `<body>`: `hidden` while the mobile menu (or the splash screen) locks scrolling. */
+function bodyOverflow(page: Page): Promise<string> {
+  return page.evaluate(() => document.body.style.overflow);
+}
+
+/** Resolves after two animation frames, i.e. once the browser has had the chance to act on a scroll. */
+function nextFrames(page: Page): Promise<void> {
+  return page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+}

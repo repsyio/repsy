@@ -2894,20 +2894,22 @@ mobile-Delete `canWrite` bug of RPS-1262 (1) does not exist in these five protoc
 
 ### Errors, navigation, mobile and accessibility (RPS-1258)
 
-`tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..03, NAV-01..02, A11Y-01) plus `src/ui/a11y.ts` (the axe
+`tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..04, NAV-01..03, A11Y-01) plus `src/ui/a11y.ts` (the axe
 helper) and `tests/ui/nav/breadcrumb.ts` (the breadcrumb page object). Run them with
 `./run.sh test --protocol ui --grep "ERR-|NAV-|A11Y-"`. `@axe-core/playwright` is the only dependency
 this story added (`package.json`, `pnpm-lock.yaml`), so the `ui` runner image must be rebuilt once
 (`./run.sh test --protocol ui -b`).
 
-| Spec              | Scenarios | What is pinned                                                                                                                                                                                                                                                                                                                                                         |
-| ----------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `errors/errors`   | ERR-01    | all nine `.../{TYPE}/info` calls answered 500: exactly `Server error` (never the body's text), no rows, page alive; ONE type (NPM) failing: the toast plus the `repo-warning`, others still list; all types failing: `repo-error`, not `empty-list`, and the refresh button retries; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast |
-| `errors/errors`   | ERR-02    | an aborted request (status 0): `Connection error`, on the repository list and on the users page                                                                                                                                                                                                                                                                        |
-| `errors/errors`   | ERR-03    | 403 on `GET /api/users`: `Access denied` (no body) or the server's own `text`; 403 on `/security`: `Access denied` plus `You do not have permission to view this page`, and the redirect to the dashboard                                                                                                                                                              |
-| `nav/breadcrumbs` | NAV-01    | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                         |
-| `nav/mobile`      | NAV-02    | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`; `test.fail`: the burger never opens the mobile sidebar (x2: admin flow, USER flow)                                                                                                             |
-| `a11y/a11y`       | A11Y-01   | axe on login, dashboard, repository list, repository settings, users (admin); report-only                                                                                                                                                                                                                                                                              |
+| Spec               | Scenarios | What is pinned                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `errors/errors`    | ERR-01    | all nine `.../{TYPE}/info` calls answered 500: exactly `Server error` (never the body's text), no rows, page alive; ONE type (NPM) failing: the toast plus the `repo-warning`, others still list; all types failing: `repo-error`, not `empty-list`, and the refresh button retries; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast |
+| `errors/errors`    | ERR-02    | an aborted request (status 0): `Connection error`, on the repository list and on the users page                                                                                                                                                                                                                                                                        |
+| `errors/errors`    | ERR-03    | 403 on `GET /api/users`: `Access denied` (no body) or the server's own `text`; 403 on `/security`: `Access denied` plus `You do not have permission to view this page`, and the redirect to the dashboard                                                                                                                                                              |
+| `nav/breadcrumbs`  | NAV-01    | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                         |
+| `nav/mobile`       | NAV-02    | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); the burger opens the mobile sidebar, its links, the X, the backdrop and Escape close it (admin, and a USER without Users/Security); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`                                                             |
+| `nav/mobile`       | NAV-03    | the mobile menu closes when the viewport widens past `md` and stays closed when it narrows again; `document.body.style.overflow` is `hidden` (and the wheel does not scroll the page) while it is open, `''` after every way of closing it                                                                                                                             |
+| `errors/not-found` | ERR-04    | `/not-found` in the panel layout: an anonymous visitor (phone and desktop) gets no sidebar, no burger and no `/api/profile` request; an admin and a USER at phone width open the mobile sidebar from it; at desktop the sidebar shows and the burger does not                                                                                                          |
+| `a11y/a11y`        | A11Y-01   | axe on login, dashboard, repository list, repository settings, users (admin); report-only                                                                                                                                                                                                                                                                              |
 
 Things a later author must know:
 
@@ -2918,10 +2920,12 @@ Things a later author must know:
 - **The repository list renders whatever arrives** of its nine parallel `info` calls, so one failing type
   loses only its own rows and the page shows `repo-warning`; only when EVERY request failed does it show
   `repo-error` (never the empty state), and the refresh button retries.
-- **The mobile sidebar cannot be opened.** `PanelLayoutComponent` renders `<app-panel-header />` without a
-  `(mobileMenuToggle)` handler, so `isMobileMenuOpen` stays false. The two `test.fail` NAV-02 tests are
-  written from the templates (open, link, X, backdrop, USER without Users/Security, logout); the steps after
-  the burger have not run against a working sidebar and may need adjusting when it is fixed.
+- **One layout owns the mobile menu.** `PanelLayoutComponent` (routed pages and, through content projection,
+  the dashboard) keeps `isMobileMenuOpen`; the header burger only asks for a state and exists only when the
+  layout has a sidebar, i.e. with a session. The sidebar closes it (X, backdrop, Escape, a link, any
+  navigation), the layout closes it when the viewport reaches `md` and while it is open sets
+  `document.body.style.overflow = 'hidden'` (the same style the splash screen uses, so NAV-03 checks that
+  style rather than a class).
 - **axe, report-only by default.** `scanPage()` (`src/ui/a11y.ts`) runs the WCAG 2.0/2.1 A and AA rules,
   attaches `axe-<page>.json` (summary + every violation with its nodes) and `axe-<page>.txt` to the report,
   writes the JSON to `test-results/<test>/axe-<page>.json` and prints one `AXE <page> [report]: ...` line, and
