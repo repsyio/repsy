@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.google.common.base.Ticker;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
@@ -29,9 +30,11 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.CompressionAlgorithmTags;
@@ -120,11 +123,131 @@ class PGPVerifierServiceTest {
   }
 
   private static PublicKeySources hosts(final String... hosts) {
-    return new PublicKeySources(List.of(), List.of(hosts));
+    return new PublicKeySources(List.of(), List.of(hosts), true);
   }
 
   private static PublicKeySources registeredKeys(final String... armoredKeys) {
-    return new PublicKeySources(List.of(armoredKeys), List.of());
+    return new PublicKeySources(List.of(armoredKeys), List.of(), true);
+  }
+
+  private static PublicKeySources lookupOff(final String... armoredKeys) {
+    return new PublicKeySources(List.of(armoredKeys), List.of("keys.acme.com"), false);
+  }
+
+  /** A clock the test moves by hand, to expire cached key blocks without waiting. */
+  private static final class ManualTicker extends Ticker {
+    private final AtomicLong nanos = new AtomicLong();
+
+    @Override
+    public long read() {
+      return this.nanos.get();
+    }
+
+    void advance(final Duration duration) {
+      this.nanos.addAndGet(duration.toNanos());
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "with the lookup off a registered key still verifies and no server is asked (RPS-1204)")
+  void lookupOffStillVerifiesARegisteredKey() {
+    final var signature = resource(keys.detachedSignature(POM));
+
+    assertThatCode(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM), signature, lookupOff(keys.armoredPublicKey())))
+        .doesNotThrowAnyException();
+
+    assertThat(this.asked).isEmpty();
+  }
+
+  @Test
+  @DisplayName("with the lookup off an unregistered key is refused without asking any server")
+  void lookupOffRefusesAnUnregisteredKeyWithoutAskingAServer() {
+    final var signature = resource(keys.detachedSignature(POM));
+    final var service = this.serviceWithTheKey();
+
+    assertThatThrownBy(() -> service.verify(new ByteArrayResource(POM), signature, lookupOff()))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("artifactSigningKeyNotRegistered");
+
+    assertThat(this.asked).isEmpty();
+  }
+
+  @Test
+  @DisplayName("with the lookup on an unregistered key is asked for on the servers, as before")
+  void lookupOnAsksTheServersForAnUnregisteredKey() {
+    final var signature = resource(keys.detachedSignature(POM));
+
+    assertThatCode(
+            () ->
+                this.serviceWithTheKey()
+                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+        .doesNotThrowAnyException();
+
+    assertThat(this.asked).isNotEmpty();
+  }
+
+  @Test
+  @DisplayName("a key block a server answered is asked for once, however many signatures use it")
+  void aKeyBlockIsCachedAcrossVerifications() {
+    final var signature = resource(keys.detachedSignature(POM));
+    final var service = this.serviceWithTheKey();
+
+    for (int i = 0; i < 3; i++) {
+      service.verify(new ByteArrayResource(POM), signature, noRegisteredKeys());
+    }
+
+    assertThat(this.asked).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("a cached key block is asked for again after ten minutes")
+  void aCachedKeyBlockExpires() {
+    final var signature = resource(keys.detachedSignature(POM));
+    final var ticker = new ManualTicker();
+    final var service =
+        new PGPVerifierService(
+            WebClient.builder()
+                .exchangeFunction(
+                    request -> {
+                      this.asked.add(request.url());
+
+                      return Mono.just(keyResponse());
+                    })
+                .build(),
+            ticker);
+
+    service.verify(new ByteArrayResource(POM), signature, noRegisteredKeys());
+    ticker.advance(Duration.ofMinutes(9));
+    service.verify(new ByteArrayResource(POM), signature, noRegisteredKeys());
+
+    assertThat(this.asked).hasSize(1);
+
+    ticker.advance(Duration.ofMinutes(2));
+    service.verify(new ByteArrayResource(POM), signature, noRegisteredKeys());
+
+    assertThat(this.asked).hasSize(2);
+  }
+
+  @Test
+  @DisplayName("a server that did not have the key is asked again: a miss is not cached")
+  void aMissIsNotCached() {
+    final var signature = resource(keys.detachedSignature(POM));
+    final var service = this.serviceAnswering(uri -> notFound());
+
+    for (int i = 0; i < 2; i++) {
+      assertThatThrownBy(
+              () -> service.verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+          .isInstanceOf(ItemNotFoundException.class)
+          .hasMessage("artifactSigningKeyNotFound");
+    }
+
+    // Two default servers per verification, none of them cached.
+    assertThat(this.asked).hasSize(4);
   }
 
   @Test

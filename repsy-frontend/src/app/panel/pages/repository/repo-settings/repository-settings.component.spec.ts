@@ -72,6 +72,8 @@ describe('RepositorySettingsComponent', () => {
       snapshots: false,
       allowOverride: true,
       securityScanEnabled: true,
+      pgpVerifyAllSignaturesEnabled: false,
+      pgpKeyServerLookupEnabled: true,
     });
   });
 
@@ -124,8 +126,13 @@ describe('RepositorySettingsComponent', () => {
     });
   });
 
-  it('fills the Maven form, including releases and snapshots, for a Maven repository', () => {
-    const info = settings({ releases: true, snapshots: false });
+  it('fills the Maven form, including releases, snapshots and the PGP settings, for a Maven repository', () => {
+    const info = settings({
+      releases: true,
+      snapshots: false,
+      pgpVerifyAllSignaturesEnabled: true,
+      pgpKeyServerLookupEnabled: false,
+    });
     repoApi.getSettings.and.returnValue(reply(info));
     component.ngOnInit();
 
@@ -138,6 +145,8 @@ describe('RepositorySettingsComponent', () => {
       snapshots: false,
       allowOverride: false,
       securityScanEnabled: false,
+      pgpVerifyAllSignaturesEnabled: true,
+      pgpKeyServerLookupEnabled: false,
     });
     expect(component.repositorySettings).toBeUndefined();
     expect(component.generalSettingsForm.get('privateRepository').value).toBeFalse();
@@ -157,6 +166,9 @@ describe('RepositorySettingsComponent', () => {
       snapshots: true,
       allowOverride: false,
       securityScanEnabled: false,
+      // NuGet's settings carry no PGP fields, so its form keeps their defaults.
+      pgpVerifyAllSignaturesEnabled: false,
+      pgpKeyServerLookupEnabled: true,
     });
     expect(component.generalSettingsForm.get('privateRepository').value).toBeFalse();
     expect(component.mavenRepositorySettings).toBeUndefined();

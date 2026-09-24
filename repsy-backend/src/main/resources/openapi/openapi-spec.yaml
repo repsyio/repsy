@@ -3553,6 +3553,23 @@ components:
           description: >-
             Whether newly pushed versions are scanned automatically. Manually triggered scans ignore
             this setting.
+        pgpVerifyAllSignaturesEnabled:
+          type: boolean
+          nullable: false
+          description: >-
+            Maven only; rejected with 400 pgpSettingsUnsupported for any other repo type. When true,
+            every artifact signature (.jar.asc, -sources.jar.asc, .module.asc, ...) is verified
+            against the file it signs before it is stored, exactly like the .pom.asc, and a version
+            is signed only when every file of it has a verified signature. When false (the default)
+            only the .pom.asc is verified.
+        pgpKeyServerLookupEnabled:
+          type: boolean
+          nullable: false
+          description: >-
+            Maven only; rejected with 400 pgpSettingsUnsupported for any other repo type. When
+            false, a signature made with a key that is not registered on the repository is refused
+            with 404 artifactSigningKeyNotRegistered, without asking any public key server (for
+            installs that cannot reach the internet). Defaults to true.
     RestResponseVoid:
       type: object
       properties:
@@ -4095,6 +4112,16 @@ components:
           description: >-
             Whether newly pushed versions are scanned automatically. Manually triggered scans ignore
             this setting.
+        pgpVerifyAllSignaturesEnabled:
+          type: boolean
+          description: >-
+            Maven only; omitted for any other repo type. Whether every artifact signature is
+            verified, not only the .pom.asc.
+        pgpKeyServerLookupEnabled:
+          type: boolean
+          description: >-
+            Maven only; omitted for any other repo type. Whether public key servers are asked for a
+            signer's key that is not registered on the repository.
       required:
         - privateRepo
         - allowOverride
@@ -4691,6 +4718,10 @@ components:
       properties:
         signed:
           type: boolean
+          description: >-
+            True when the POM signature was verified or, on a repository with
+            pgpVerifyAllSignaturesEnabled, when every file of the version has a verified signature
+            (for a snapshot, every file of its newest build).
         lastUpdatedAt:
           type: string
           format: date-time
@@ -4778,6 +4809,10 @@ components:
             "$ref": "#/components/schemas/VersionDeveloperInfo"
         signed:
           type: boolean
+          description: >-
+            True when the POM signature was verified or, on a repository with
+            pgpVerifyAllSignaturesEnabled, when every file of the version has a verified signature
+            (for a snapshot, every file of its newest build).
     RestResponseArtifactVersionInfo:
       type: object
       properties:

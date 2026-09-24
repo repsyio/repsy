@@ -24,6 +24,7 @@
  * resolver supplies it on every request, so no call here passes it explicitly.
  */
 import { ApiError, PanelClient, RepoType, UserRole } from './generated/index.js';
+import type { ArtifactVersionInfo } from './generated/models/ArtifactVersionInfo.js';
 import type { DeployTokenForm } from './generated/models/DeployTokenForm.js';
 import type { DeployTokenInfoListItem } from './generated/models/DeployTokenInfoListItem.js';
 import type { LoginInfo } from './generated/models/LoginInfo.js';
@@ -38,6 +39,7 @@ import type { UserResponse } from './generated/models/UserResponse.js';
 
 export { ApiError, RepoType, UserRole };
 export type {
+  ArtifactVersionInfo,
   DeployTokenForm,
   DeployTokenInfoListItem,
   LoginInfo,
@@ -304,6 +306,25 @@ export class PanelApi {
       PGP_PUBLIC_KEY_LIST_PAGE_SIZE,
     );
     return content;
+  }
+
+  /**
+   * One version of a Maven artifact, as the panel shows it (RPS-1188: its `signed` flag says
+   * whether the POM signature, or with `pgpVerifyAllSignaturesEnabled` every file's, is verified).
+   */
+  async getMavenArtifactVersion(
+    repoName: string,
+    groupName: string,
+    artifactName: string,
+    versionName: string,
+  ): Promise<ArtifactVersionInfo> {
+    const res = await this.client.mavenArtifactController.getMavenArtifactVersion({
+      repoName,
+      groupName,
+      artifactName,
+      versionName,
+    });
+    return unwrap(res.data, 'getMavenArtifactVersion');
   }
 
   /** Removes a registered PGP public key from a Maven repo's key store (RPS-1189). */

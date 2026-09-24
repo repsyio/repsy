@@ -30,6 +30,15 @@
  *    status is asserted.
  *  - A key registered on one repo does not verify a signature on a different repo: still 404.
  *  - Deleting a registered key makes a signature that used to verify get 404 too.
+ *
+ * Two per-repo Maven settings change what is verified:
+ *  - `pgpVerifyAllSignaturesEnabled` (RPS-1188): every artifact `.asc` (`.jar.asc`, ...) is verified
+ *    against the file it signs like the `.pom.asc`, and the version is `signed` only once every file
+ *    of it has a verified signature. Off by default, when only the `.pom.asc` is verified and the
+ *    other signatures are stored as sent (pinned in `upload-rules.spec.ts`).
+ *  - `pgpKeyServerLookupEnabled` (RPS-1204): with it off, a signature by a key that is not
+ *    registered on the repo is refused at once with 404 `artifactSigningKeyNotRegistered`, without
+ *    asking any key server.
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import {
@@ -181,4 +190,149 @@ test.describe('maven PGP registered public keys (raw HTTP)', () => {
       expect(afterDelete.status, 'PUT after the key was deleted').toBe(404);
     },
   );
+});
+
+test.describe('maven verifies every signature when the repo asks for it (RPS-1188)', () => {
+  /** The layout of `newRepoWithPom`, with the setting on, and the jar stored beside the POM. */
+  async function newRepoWithPomAndJar(seeder: Seeder) {
+    const layout = await newRepoWithPom(seeder);
+    await seeder.setSettings(layout.repoName, { pgpVerifyAllSignaturesEnabled: true });
+    const jarPath = `${versionDir(layout.groupId, ARTIFACT_ID, VERSION)}/${ARTIFACT_ID}-${VERSION}.jar`;
+    const jarBody = `jar of ${layout.repoName}`;
+    const uploaded = await layout.put(jarPath, jarBody, OCTET);
+    expect(uploaded.status, 'seed PUT of the jar').toBe(200);
+    return { layout, jarPath, jarBody };
+  }
+
+  test(
+    'a jar signature made over other bytes is refused and stores nothing',
+    { tag: ['@settings', '@negative'] },
+    async ({ seeder }) => {
+      const { layout, jarPath } = await newRepoWithPomAndJar(seeder);
+      const key = await generateKeyPair();
+      await seeder.registerPgpPublicKey(layout.repoName, key.publicKeyArmored);
+      const before = await repoTree(layout.repoName);
+
+      const armorOnly = '-----BEGIN PGP SIGNATURE-----\n\n-----END PGP SIGNATURE-----\n';
+      const garbage = await layout.put(`${jarPath}.asc`, armorOnly, OCTET);
+      expect(garbage.status, 'an armor-only .jar.asc').toBe(422);
+      expect(garbage.msgId).toBe('artifactSignatureNotVerified');
+
+      const wrong = await detachedSign(key.privateKeyArmored, Buffer.from('not the jar'));
+      const refused = await layout.put(`${jarPath}.asc`, wrong, OCTET);
+      expect(refused.status, 'a signature over other bytes').toBe(422);
+      expect(refused.msgId).toBe('artifactSignatureNotVerified');
+
+      expect(await repoTree(layout.repoName), 'repo tree unchanged').toEqual(before);
+    },
+  );
+
+  test(
+    'the version is signed only once the POM and the jar are both signed',
+    { tag: ['@settings'] },
+    async ({ seeder, panelApi }) => {
+      const { layout, jarPath, jarBody } = await newRepoWithPomAndJar(seeder);
+      const key = await generateKeyPair();
+      await seeder.registerPgpPublicKey(layout.repoName, key.publicKeyArmored);
+      const signed = async () =>
+        (
+          await panelApi.getMavenArtifactVersion(
+            layout.repoName,
+            layout.groupId,
+            ARTIFACT_ID,
+            VERSION,
+          )
+        ).signed;
+      expect(await signed(), 'before any signature').toBe(false);
+
+      const jarSignature = await detachedSign(key.privateKeyArmored, Buffer.from(jarBody));
+      const jarPut = await layout.put(`${jarPath}.asc`, jarSignature, OCTET);
+      expect(
+        jarPut.status,
+        `PUT ${jarPath}.asc answered ${jarPut.status} ${jarPut.msgId ?? ''}`,
+      ).toBe(200);
+      expect(await signed(), 'after the jar signature only').toBe(false);
+
+      const pomSignature = await detachedSign(key.privateKeyArmored, Buffer.from(layout.pomBody));
+      const pomPut = await layout.put(layout.ascPath, pomSignature, OCTET);
+      expect(pomPut.status, `PUT ${layout.ascPath} answered ${pomPut.status}`).toBe(200);
+      expect(await signed(), 'after both signatures').toBe(true);
+
+      const stored = await rawGet(layout.repoName, adminCredential(), `${jarPath}.asc`);
+      expect(stored.body.toString('utf8'), 'stored .jar.asc bytes').toBe(jarSignature);
+    },
+  );
+
+  test(
+    'a signature before the file it signs answers 404 itemNotFound and stores nothing',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const { layout, jarPath } = await newRepoWithPomAndJar(seeder);
+      const key = await generateKeyPair();
+      await seeder.registerPgpPublicKey(layout.repoName, key.publicKeyArmored);
+      const before = await repoTree(layout.repoName);
+
+      const sourcesPath = jarPath.replace(/\.jar$/, '-sources.jar');
+      const signature = await detachedSign(key.privateKeyArmored, Buffer.from('sources'));
+      const put = await layout.put(`${sourcesPath}.asc`, signature, OCTET);
+
+      expect(put.status, `PUT ${sourcesPath}.asc answered ${put.status}`).toBe(404);
+      expect(put.msgId, 'error message id').toBe('itemNotFound');
+      expect(await repoTree(layout.repoName), 'repo tree unchanged').toEqual(before);
+    },
+  );
+
+  test(
+    'with the setting off (the default) a jar signature is stored as sent, unverified',
+    { tag: ['@settings'] },
+    async ({ seeder }) => {
+      const layout = await newRepoWithPom(seeder);
+      const jarPath = `${versionDir(layout.groupId, ARTIFACT_ID, VERSION)}/${ARTIFACT_ID}-${VERSION}.jar`;
+      expect((await layout.put(jarPath, 'jar', OCTET)).status, 'seed PUT of the jar').toBe(200);
+
+      const put = await layout.put(`${jarPath}.asc`, 'not a signature', OCTET);
+
+      expect(put.status, `PUT ${jarPath}.asc answered ${put.status}`).toBe(200);
+    },
+  );
+});
+
+test.describe('maven key-server lookup switched off (RPS-1204)', () => {
+  test(
+    'a signature by an unregistered key is refused at once with 404 artifactSigningKeyNotRegistered',
+    { tag: ['@settings', '@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepoWithPom(seeder);
+      await seeder.setSettings(layout.repoName, { pgpKeyServerLookupEnabled: false });
+      const unregistered = await generateKeyPair();
+      const before = await repoTree(layout.repoName);
+
+      const signature = await detachedSign(
+        unregistered.privateKeyArmored,
+        Buffer.from(layout.pomBody),
+      );
+      const started = Date.now();
+      const put = await layout.put(layout.ascPath, signature, OCTET);
+      const elapsedMs = Date.now() - started;
+
+      expect(put.status, `PUT ${layout.ascPath} answered ${put.status}`).toBe(404);
+      expect(put.msgId, 'error message id').toBe('artifactSigningKeyNotRegistered');
+      // With the lookup on, the default key servers are asked and may take their whole timeout
+      // when this sandbox has no network; switched off, nothing is asked.
+      expect(elapsedMs, 'answered without waiting for a key server').toBeLessThan(2_000);
+      expect(await repoTree(layout.repoName), 'repo tree unchanged').toEqual(before);
+    },
+  );
+
+  test('a registered key still verifies', { tag: ['@settings'] }, async ({ seeder }) => {
+    const layout = await newRepoWithPom(seeder);
+    await seeder.setSettings(layout.repoName, { pgpKeyServerLookupEnabled: false });
+    const key = await generateKeyPair();
+    await seeder.registerPgpPublicKey(layout.repoName, key.publicKeyArmored);
+
+    const signature = await detachedSign(key.privateKeyArmored, Buffer.from(layout.pomBody));
+    const put = await layout.put(layout.ascPath, signature, OCTET);
+
+    expect(put.status, `PUT ${layout.ascPath} answered ${put.status} ${put.msgId ?? ''}`).toBe(200);
+  });
 });

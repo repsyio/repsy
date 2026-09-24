@@ -79,7 +79,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   private static final String JAVADOC_CLASSIFIER = "javadoc";
   private static final String METADATA_FILENAME = "maven-metadata.xml";
   private static final String POM_SUFFIX = ".pom";
-  private static final String SIGNED_POM_SUFFIX = ".asc";
+  private static final String SIGNATURE_SUFFIX = ".asc";
   private static final String ERR_ARTIFACT_VERSION_NOT_FOUND = "artifactVersionNotFound";
   private static final String ERR_ARTIFACT_NOT_FOUND = "artifactNotFound";
   private static final String ARTIFACT_UNIQUE_CONSTRAINT =
@@ -97,6 +97,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   private final KeyStoreService keyStoreService;
   private final ArtifactUpsertHelper artifactUpsertHelper;
   private final ArtifactVersionWriteService artifactVersionWriteService;
+  private final VersionSignatureService versionSignatureService;
 
   @Qualifier("osStorageStrategyMaven")
   private final StorageStrategy storageStrategy;
@@ -209,14 +210,20 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   }
 
   /**
-   * Registers a stored POM, or marks a version signed for a stored POM signature. Neither is
-   * decided from the whole path any more: a file is told to be a POM (or the signature of one) by
-   * its file name's {@code .pom} (or {@code .pom.asc}) suffix alone, the same rule {@link
-   * ArtifactUtils#isPomToParse} and {@link ArtifactUtils#isPomSignature} apply before the file is
-   * stored. Before, an artifactId or directory that merely contained {@code .pom} (for example
-   * {@code bar.pom.utils}) made every one of its files, checksums and signatures look like a POM or
-   * a POM signature, so a jar answered {@code malformedPomFile} and a stored {@code
+   * Registers a stored POM, or records a verified signature and updates whether the version is
+   * signed. Neither is decided from the whole path any more: a file is told to be a POM (or the
+   * signature of one) by its file name's {@code .pom} (or {@code .pom.asc}) suffix alone, the same
+   * rule {@link ArtifactUtils#isPomToParse} and {@link ArtifactUtils#isPomSignature} apply before
+   * the file is stored. Before, an artifactId or directory that merely contained {@code .pom} (for
+   * example {@code bar.pom.utils}) made every one of its files, checksums and signatures look like
+   * a POM or a POM signature, so a jar answered {@code malformedPomFile} and a stored {@code
    * maven-metadata.xml} failed the same way right after being written (RPS-1196).
+   *
+   * <p>On a repo that verifies every signature (RPS-1188) a stored artifact {@code .asc} is a
+   * verified signature too, and a stored signable file (a POM included, once it is registered)
+   * loses the verified signature of its previous bytes, so {@code signed} is recomputed after every
+   * upload into a registered version. On any other repo nothing of that is done: no query is made
+   * for a file that registers nothing.
    */
   @Override
   @Transactional
@@ -224,16 +231,19 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath, final Resource resource) {
 
     // Cannot create artifact for signed files. The signature itself was verified before it was
-    // stored (see verifySignature), so here it only marks the version signed. It is looked up by
-    // the repo's storage key, so it does not need the repo row.
-    if (ArtifactUtils.isPomSignature(storagePath)) {
-      this.processSignedFileProcess(storagePath, repoInfo.getStorageKey());
+    // stored (see verifySignature), so here it only records that and marks the version signed. It
+    // is looked up by the repo's storage key, so it does not need the repo row.
+    if (ArtifactUtils.isSignatureToVerify(
+        storagePath, repoInfo.isPgpVerifyAllSignaturesEnabled())) {
+      this.processSignedFileProcess(repoInfo, storagePath);
       return;
     }
 
     // A jar, a classifier file, a checksum or a metadata file registers nothing. Nothing below is
-    // loaded for them, so a normal `mvn deploy` does not pay a repo query per file (RPS-1179).
+    // loaded for them, so a normal `mvn deploy` does not pay a repo query per file (RPS-1179). A
+    // repo that verifies every signature does look at a signable one, see refreshSignedForFile.
     if (!ArtifactUtils.isPomToParse(storagePath)) {
+      this.refreshSignedForFile(repoInfo, storagePath);
       return;
     }
 
@@ -242,9 +252,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
             .findByNameAndType(repoInfo.getName(), RepoType.MAVEN)
             .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
 
-    final var fullPath = storagePath.getPath().replace("\\", "/");
-    final var versionPath =
-        fullPath.substring(fullPath.indexOf("/") + 1, fullPath.lastIndexOf("/"));
+    final var versionPath = versionPathOf(storagePath);
 
     final var gav = ArtifactUtils.convertPathToGav(storagePath.getRelativePath().getPath());
     final var pomModel = ArtifactUtils.readModel(resource);
@@ -255,7 +263,45 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       // rather than failing the row insert (RPS-1138).
       MavenPublishLimits.dropOverLongFields(pomModel);
       this.createOrUpdateArtifactByPomFile(repo, gav, versionPath, pomModel);
+      this.refreshSignedForFile(repoInfo, storagePath);
     }
+  }
+
+  /**
+   * A signable file was stored into a repo that verifies every signature (RPS-1188): its bytes are
+   * new, so the verified signature of the previous ones is forgotten, and whether the version is
+   * signed is recomputed. A file of a version that is not registered yet (a jar before its POM) is
+   * skipped: the POM's registration recomputes.
+   */
+  private void refreshSignedForFile(
+      final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {
+
+    final var relativePath = storagePath.getRelativePath();
+
+    if (!repoInfo.isPgpVerifyAllSignaturesEnabled()
+        || !ArtifactUtils.isSignableFile(relativePath.getFileName())) {
+      return;
+    }
+
+    final var gav = ArtifactUtils.convertPathToGav(relativePath.getPath());
+    final var version =
+        gav == null ? null : this.findArtifactVersion(repoInfo.getStorageKey(), gav);
+
+    if (version == null) {
+      return;
+    }
+
+    this.versionSignatureService.forget(version, relativePath.getFileName());
+    this.versionSignatureService.refreshSigned(
+        repoInfo.getStorageKey(), version, versionPathOf(storagePath));
+  }
+
+  /** The version directory a file sits in, {@code <group>/<artifactId>/<version>}. */
+  private static String versionPathOf(final StoragePath storagePath) {
+
+    final var fullPath = storagePath.getPath().replace("\\", "/");
+
+    return fullPath.substring(fullPath.indexOf("/") + 1, fullPath.lastIndexOf("/"));
   }
 
   @Override
@@ -263,7 +309,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
     final var signaturePath = signedStoragePath.getRelativePath().getPath();
 
-    final var suffixLength = SIGNED_POM_SUFFIX.length();
+    final var suffixLength = SIGNATURE_SUFFIX.length();
 
     final var nonSignedFileName = signaturePath.substring(0, signaturePath.length() - suffixLength);
 
@@ -595,23 +641,23 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     this.updateArtifactVersion(repo, existingVersion, versionPath, pomModel);
   }
 
-  private void processSignedFileProcess(final StoragePath storagePath, final UUID repoId) {
+  /**
+   * Records the verified signature of the file {@code signaturePath} signs and updates {@code
+   * signed}: set directly on a repo that only verifies the POM signature, recomputed from all the
+   * files of the version on one that verifies every signature (RPS-1188).
+   */
+  private void processSignedFileProcess(
+      final BaseRepoInfo<UUID> repoInfo, final StoragePath signaturePath) {
 
-    final var nonSignedStoragePath = this.getNonSignedStoragePath(storagePath);
+    final var signedStoragePath = this.getNonSignedStoragePath(signaturePath);
 
-    final var gav =
-        ArtifactUtils.convertPathToGav(nonSignedStoragePath.getRelativePath().getPath());
+    final var gav = ArtifactUtils.convertPathToGav(signedStoragePath.getRelativePath().getPath());
 
     if (null == gav) {
       throw new ItemNotFoundException("itemNotFound");
     }
 
-    this.markArtifactSigned(repoId, gav);
-  }
-
-  private void markArtifactSigned(final UUID repoId, final Gav gav) {
-
-    final var artifactVersion = this.findArtifactVersion(repoId, gav);
+    final var artifactVersion = this.findArtifactVersion(repoInfo.getStorageKey(), gav);
 
     // verifySignature refuses a signature without a registered version before it is stored, so
     // this is a defensive check for a version that vanished in between.
@@ -619,9 +665,17 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       throw new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND);
     }
 
-    artifactVersion.setSigned(true);
+    this.versionSignatureService.recordVerified(
+        artifactVersion, signedStoragePath.getRelativePath().getFileName());
 
-    this.artifactVersionRepository.save(artifactVersion);
+    if (repoInfo.isPgpVerifyAllSignaturesEnabled()) {
+      this.versionSignatureService.refreshSigned(
+          repoInfo.getStorageKey(), artifactVersion, versionPathOf(signedStoragePath));
+    } else {
+      artifactVersion.setSigned(true);
+
+      this.artifactVersionRepository.save(artifactVersion);
+    }
   }
 
   /**
@@ -645,8 +699,10 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * to run after the signature was stored, and the facade then rolled the whole version back.
    *
    * @throws ItemNotFoundException {@code itemNotFound} when the signed file is not stored
-   * @throws ItemNotFoundException {@code artifactVersionNotFound} when the POM is stored but its
-   *     version is not registered (RPS-1191)
+   * @throws ItemNotFoundException {@code artifactVersionNotFound} when the version of the signed
+   *     file is not registered, which the POM's upload does (RPS-1191)
+   * @throws ItemNotFoundException {@code artifactSigningKeyNotRegistered} when the repo switched
+   *     the key-server lookup off and the signer's key is not registered (RPS-1204)
    */
   @Override
   public void verifySignature(
@@ -662,9 +718,10 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
             .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
 
     // A POM stored before RPS-1193, or whose rows are gone, can lack a registered version (a POM of
-    // another group was stored but skipped by checkExtractedInfos). A signature could then not be
-    // recorded, so it is refused here, before the key lookup and before anything is stored
-    // (RPS-1191).
+    // another group was stored but skipped by checkExtractedInfos), and so does a file whose POM
+    // was
+    // not uploaded yet. A signature could then not be recorded, so it is refused here, before the
+    // key lookup and before anything is stored (RPS-1191, RPS-1188).
     final var gav =
         ArtifactUtils.convertPathToGav(nonSignedStoragePath.getRelativePath().getPath());
 
@@ -672,7 +729,9 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       throw new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND);
     }
 
-    final var sources = this.keyStoreService.findPublicKeySources(repoInfo.getStorageKey());
+    final var sources =
+        this.keyStoreService.findPublicKeySources(
+            repoInfo.getStorageKey(), repoInfo.isPgpKeyServerLookupEnabled());
 
     this.pgpVerifierService.verify(nonSignedFileResource, signature, sources);
   }
@@ -969,14 +1028,8 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   private List<String> filesOfVersionDir(
       final String versionPath, final List<StorageItemInfo> itemsInVersionDir) {
 
-    return itemsInVersionDir.stream()
-        .filter(item -> !item.isDirectory())
-        .filter(
-            item ->
-                item.getPath()
-                    .replace("\\", "/")
-                    .endsWith("/" + versionPath + "/" + item.getName()))
-        .map(item -> versionPath + "/" + item.getName())
+    return ArtifactUtils.versionDirFileNames(versionPath, itemsInVersionDir).stream()
+        .map(name -> versionPath + "/" + name)
         .toList();
   }
 

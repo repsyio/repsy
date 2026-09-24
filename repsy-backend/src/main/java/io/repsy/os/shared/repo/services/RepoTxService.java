@@ -37,6 +37,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -63,6 +64,12 @@ public class RepoTxService {
    */
   private static final Set<RepoType> RELEASES_SNAPSHOTS_SUPPORTED_TYPES =
       EnumSet.of(RepoType.MAVEN, RepoType.NUGET);
+
+  /**
+   * Repo types whose upload path verifies PGP signatures (RPS-1188, RPS-1204): only Maven does. The
+   * settings are refused for any other type, like {@code releases}/{@code snapshots} above.
+   */
+  private static final Set<RepoType> PGP_SETTINGS_SUPPORTED_TYPES = EnumSet.of(RepoType.MAVEN);
 
   private final @NonNull RepoConverter repoConverter;
   private final @NonNull RepoRepository repoRepository;
@@ -123,6 +130,9 @@ public class RepoTxService {
    *
    * @throws BadRequestException {@code releasesSnapshotsUnsupported} if {@code releases} or {@code
    *     snapshots} is present for a repo type whose publish path does not consult them (RPS-1210)
+   * @throws BadRequestException {@code pgpSettingsUnsupported} if {@code
+   *     pgpVerifyAllSignaturesEnabled} or {@code pgpKeyServerLookupEnabled} is present for a repo
+   *     that is not a Maven one (RPS-1188, RPS-1204)
    */
   @Transactional
   public void updateSettings(final @NonNull UUID repoId, final @NonNull RepoSettingsForm settings) {
@@ -130,24 +140,26 @@ public class RepoTxService {
     final var repo = this.findRepoById(repoId);
 
     this.rejectReleasesSnapshotsForUnsupportedType(repo, settings);
+    this.rejectPgpSettingsForUnsupportedType(repo, settings);
 
-    if (settings.getPrivateRepo() != null) {
-      repo.setPrivateRepo(settings.getPrivateRepo());
-    }
-    if (settings.getAllowOverride() != null) {
-      repo.setAllowOverride(settings.getAllowOverride());
-    }
-    if (settings.getReleases() != null) {
-      repo.setReleases(settings.getReleases());
-    }
-    if (settings.getSnapshots() != null) {
-      repo.setSnapshots(settings.getSnapshots());
-    }
-    if (settings.getSecurityScanEnabled() != null) {
-      repo.setSecurityScanEnabled(settings.getSecurityScanEnabled());
-    }
+    applyIfPresent(settings.getPrivateRepo(), repo::setPrivateRepo);
+    applyIfPresent(settings.getAllowOverride(), repo::setAllowOverride);
+    applyIfPresent(settings.getReleases(), repo::setReleases);
+    applyIfPresent(settings.getSnapshots(), repo::setSnapshots);
+    applyIfPresent(settings.getSecurityScanEnabled(), repo::setSecurityScanEnabled);
+    applyIfPresent(
+        settings.getPgpVerifyAllSignaturesEnabled(), repo::setPgpVerifyAllSignaturesEnabled);
+    applyIfPresent(settings.getPgpKeyServerLookupEnabled(), repo::setPgpKeyServerLookupEnabled);
 
     this.repoRepository.save(repo);
+  }
+
+  /** Hands {@code value} to {@code setter} unless it is absent from the request. */
+  private static void applyIfPresent(
+      final @Nullable Boolean value, final @NonNull Consumer<Boolean> setter) {
+    if (value != null) {
+      setter.accept(value);
+    }
   }
 
   @Transactional
@@ -183,6 +195,7 @@ public class RepoTxService {
     final var repoInfo = this.getRepo(repoId);
     final var supportsReleasesSnapshots =
         RELEASES_SNAPSHOTS_SUPPORTED_TYPES.contains(repoInfo.getType());
+    final var supportsPgp = PGP_SETTINGS_SUPPORTED_TYPES.contains(repoInfo.getType());
     return RepoSettingsInfo.builder()
         .privateRepo(repoInfo.isPrivateRepo())
         .releases(supportsReleasesSnapshots ? repoInfo.getReleases() : null)
@@ -190,6 +203,9 @@ public class RepoTxService {
         .searchable(repoInfo.isSearchable())
         .allowOverride(repoInfo.isAllowOverride())
         .securityScanEnabled(repoInfo.isSecurityScanEnabled())
+        .pgpVerifyAllSignaturesEnabled(
+            supportsPgp ? repoInfo.isPgpVerifyAllSignaturesEnabled() : null)
+        .pgpKeyServerLookupEnabled(supportsPgp ? repoInfo.isPgpKeyServerLookupEnabled() : null)
         .build();
   }
 
@@ -270,6 +286,16 @@ public class RepoTxService {
         settings.getReleases() != null || settings.getSnapshots() != null;
     if (touchesReleasesSnapshots && !RELEASES_SNAPSHOTS_SUPPORTED_TYPES.contains(repo.getType())) {
       throw new BadRequestException("releasesSnapshotsUnsupported");
+    }
+  }
+
+  private void rejectPgpSettingsForUnsupportedType(
+      final @NonNull Repo repo, final @NonNull RepoSettingsForm settings) {
+    final var touchesPgp =
+        settings.getPgpVerifyAllSignaturesEnabled() != null
+            || settings.getPgpKeyServerLookupEnabled() != null;
+    if (touchesPgp && !PGP_SETTINGS_SUPPORTED_TYPES.contains(repo.getType())) {
+      throw new BadRequestException("pgpSettingsUnsupported");
     }
   }
 

@@ -180,13 +180,17 @@ public class KeyStoreService {
 
   /**
    * Everywhere {@link PGPVerifierService#verify} may look for a repo's signers' public keys
-   * (RPS-1189): its registered armored keys, then its allowed key-server hosts.
+   * (RPS-1189): its registered armored keys, then its allowed key-server hosts. When {@code
+   * keyServerLookupEnabled} is {@code false} (RPS-1204) the hosts are not even read: no key server
+   * is going to be asked.
    */
-  public PublicKeySources findPublicKeySources(final UUID repoId) {
+  public PublicKeySources findPublicKeySources(
+      final UUID repoId, final boolean keyServerLookupEnabled) {
 
     return new PublicKeySources(
         this.pgpPublicKeyRepository.findArmoredKeysByRepoId(repoId),
-        this.findHostsByRepoId(repoId));
+        keyServerLookupEnabled ? this.findHostsByRepoId(repoId) : List.of(),
+        keyServerLookupEnabled);
   }
 
   public List<AllowedKeyserverItem> findAllActiveKeyservers() {

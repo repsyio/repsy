@@ -113,6 +113,19 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   private static final String[] SETTINGS_KEYS = {
     "privateRepo", "releases", "snapshots", "allowOverride", "searchable", "securityScanEnabled"
   };
+
+  /** What GET returns for a Maven repo: the settings plus the two PGP ones (RPS-1188, RPS-1204). */
+  private static final String[] MAVEN_SETTINGS_KEYS = {
+    "privateRepo",
+    "releases",
+    "snapshots",
+    "allowOverride",
+    "searchable",
+    "securityScanEnabled",
+    "pgpVerifyAllSignaturesEnabled",
+    "pgpKeyServerLookupEnabled"
+  };
+
   private static final String[] STORAGE_ITEM_KEYS = {
     "name", "createdAt", "size", "directory", "path"
   };
@@ -1531,13 +1544,15 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
 
       assertThat(this.settingsOf(repo))
-          .containsOnlyKeys(SETTINGS_KEYS)
+          .containsOnlyKeys(MAVEN_SETTINGS_KEYS)
           .containsEntry("privateRepo", false)
           .containsEntry("releases", true)
           .containsEntry("snapshots", true)
           .containsEntry("allowOverride", true)
           .containsEntry("searchable", false)
-          .containsEntry("securityScanEnabled", true);
+          .containsEntry("securityScanEnabled", true)
+          .containsEntry("pgpVerifyAllSignaturesEnabled", false)
+          .containsEntry("pgpKeyServerLookupEnabled", true);
     }
 
     @Test
@@ -1563,7 +1578,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       this.updateSettings(repo, settingsBody(true, false, false, false, false));
 
       assertThat(this.settingsOf(repo))
-          .containsOnlyKeys(SETTINGS_KEYS)
+          .containsOnlyKeys(MAVEN_SETTINGS_KEYS)
           .containsEntry("privateRepo", true)
           .containsEntry("releases", false)
           .containsEntry("snapshots", false)
@@ -1685,7 +1700,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
       assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName())).isEqualTo(before);
       assertThat(this.settingsOf(repo))
-          .containsOnlyKeys(SETTINGS_KEYS)
+          .containsOnlyKeys(MAVEN_SETTINGS_KEYS)
           .containsEntry("privateRepo", true)
           .containsEntry("allowOverride", false)
           .containsEntry("releases", true)
@@ -1811,6 +1826,70 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var row = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
       assertThat(row.getReleases()).isFalse();
       assertThat(row.getSnapshots()).isFalse();
+    }
+
+    @Test
+    @DisplayName("the PGP settings of a Maven repo are updated field by field (RPS-1188, RPS-1204)")
+    void pgpSettingsAreUpdatedFieldByField() throws Exception {
+      final var repo = ProtocolRepoControllerIT.this.seedMaven();
+
+      this.updateSettings(repo, "{\"pgpVerifyAllSignaturesEnabled\":true}");
+
+      assertThat(this.settingsOf(repo))
+          .containsEntry("pgpVerifyAllSignaturesEnabled", true)
+          .containsEntry("pgpKeyServerLookupEnabled", true);
+
+      this.updateSettings(repo, "{\"pgpKeyServerLookupEnabled\":false}");
+
+      assertThat(this.settingsOf(repo))
+          .containsEntry("pgpVerifyAllSignaturesEnabled", true)
+          .containsEntry("pgpKeyServerLookupEnabled", false)
+          .containsEntry("securityScanEnabled", true);
+      final var row = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
+      assertThat(row.isPgpVerifyAllSignaturesEnabled()).isTrue();
+      assertThat(row.isPgpKeyServerLookupEnabled()).isFalse();
+
+      // A body that leaves the PGP fields out, or sends null, keeps them (RPS-1200 style).
+      this.updateSettings(repo, settingsBody(true, false, true, false, true));
+      this.updateSettings(repo, "{}");
+      this.updateSettings(
+          repo, "{\"pgpVerifyAllSignaturesEnabled\":null,\"pgpKeyServerLookupEnabled\":null}");
+
+      assertThat(this.settingsOf(repo))
+          .containsEntry("pgpVerifyAllSignaturesEnabled", true)
+          .containsEntry("pgpKeyServerLookupEnabled", false)
+          .containsEntry("privateRepo", true);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"NPM", "PYPI", "DOCKER", "CARGO", "GOLANG", "HELM", "RUBY", "NUGET"})
+    @DisplayName(
+        "PUT rejects a PGP setting with 400 pgpSettingsUnsupported for a repo that is not a Maven"
+            + " one, changes nothing, and GET omits both (RPS-1188, RPS-1204)")
+    void rejectsPgpSettingsForANonMavenRepo(final RepoType repoType) throws Exception {
+      final var repo = ProtocolRepoControllerIT.this.seedRepo(repoType, uniqueRepoName("pgpset"));
+      final var before = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
+
+      for (final var body :
+          List.of(
+              "{\"pgpVerifyAllSignaturesEnabled\":true}",
+              "{\"pgpKeyServerLookupEnabled\":false}",
+              "{\"securityScanEnabled\":false,\"pgpKeyServerLookupEnabled\":false}")) {
+        expectError(
+            ProtocolRepoControllerIT.this.perform(
+                json(put(repoUrl(repo, "/settings")), body)
+                    .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
+            HttpStatus.BAD_REQUEST,
+            "pgpSettingsUnsupported",
+            "pgpSettingsUnsupported",
+            "The PGP signature settings only apply to Maven repositories.");
+      }
+
+      assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName())).isEqualTo(before);
+      assertThat(this.settingsOf(repo))
+          .doesNotContainKeys("pgpVerifyAllSignaturesEnabled", "pgpKeyServerLookupEnabled");
     }
 
     @Test
