@@ -235,6 +235,29 @@ services:
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
 
+  # The "stack" runner: cases that drive the Repsy CONTAINER itself with `docker exec`/`docker logs`
+  # (tests/stack/, README.md "Stack runner"). The only runner with the host's Docker socket, added
+  # through group_add so the non-root host uid can use it. Local/ci stacks only.
+  stack:
+    <<: *runner-common
+    build:
+      context: .
+      dockerfile: runners/stack.Dockerfile
+      args:
+        DOCKER_CLI_VERSION: '29.8.1'
+    group_add:
+      - '${DOCKER_GID:-999}'
+    environment:
+      <<: *runner-environment
+      REPSY_E2E_STACK_PROJECT: ${REPSY_E2E_STACK_PROJECT:-repsy-e2e}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
+      - ./src:/app/src
+      - ./tests:/app/tests:ro
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+
   ui:
     <<: *runner-common
     build:

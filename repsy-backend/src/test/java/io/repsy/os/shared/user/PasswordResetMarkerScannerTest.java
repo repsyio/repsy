@@ -36,6 +36,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -149,6 +150,66 @@ class PasswordResetMarkerScannerTest {
       verifyNoInteractions(this.userTxService);
       assertThat(marker).exists();
       assertThat(output.getAll()).contains("Could not apply the password reset marker");
+    } finally {
+      assertThat(this.dir.toFile().setWritable(true)).isTrue();
+    }
+  }
+
+  private static final String FAILURE = "Could not apply the password reset marker";
+
+  private static int count(final String text, final String needle) {
+    return text.split(Pattern.quote(needle), -1).length - 1;
+  }
+
+  /** Read-only directory: a marker in it cannot be deleted, as on a read-only volume. */
+  private void makeDirectoryReadOnly() {
+    assumeFalse(!this.dir.toFile().setWritable(false), "cannot make the directory read-only");
+    assumeFalse(Files.isWritable(this.dir), "running as a user that ignores permissions");
+  }
+
+  @Test
+  @DisplayName("a marker that cannot be removed is logged once, not on every poll (RPS-1313)")
+  void logsAMarkerItCannotRemoveOnce(final CapturedOutput output) throws IOException {
+    this.existingUser("alice");
+    final var marker = this.marker("alice");
+    try {
+      this.makeDirectoryReadOnly();
+
+      this.scanner.scan(this.dir);
+      this.scanner.scan(this.dir);
+      this.scanner.poll();
+      this.scanner.poll();
+
+      assertThat(count(output.getAll(), FAILURE)).as("ERROR lines for the marker").isEqualTo(1);
+      assertThat(marker).exists();
+      verifyNoInteractions(this.userTxService);
+    } finally {
+      assertThat(this.dir.toFile().setWritable(true)).isTrue();
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "an undeletable marker is logged again after it disappeared and came back (RPS-1313)")
+  void logsAgainOnceTheMarkerWasGone(final CapturedOutput output) throws IOException {
+    this.existingUser("alice");
+    final var marker = this.marker("alice");
+    try {
+      this.makeDirectoryReadOnly();
+      this.scanner.scan(this.dir);
+      this.scanner.scan(this.dir);
+      assertThat(count(output.getAll(), FAILURE)).isEqualTo(1);
+
+      // The marker is removed by hand: the scanner forgets it, then it is created again and fails.
+      assertThat(this.dir.toFile().setWritable(true)).isTrue();
+      Files.delete(marker);
+      this.scanner.scan(this.dir);
+      this.marker("alice");
+      assertThat(this.dir.toFile().setWritable(false)).isTrue();
+      this.scanner.scan(this.dir);
+      this.scanner.scan(this.dir);
+
+      assertThat(count(output.getAll(), FAILURE)).as("ERROR lines in total").isEqualTo(2);
     } finally {
       assertThat(this.dir.toFile().setWritable(true)).isTrue();
     }
