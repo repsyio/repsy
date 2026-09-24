@@ -24,15 +24,19 @@
  * Everything lives inside the repo, so deleting the repo (which `seeder.cleanup()` does) is the whole
  * cleanup; nothing here is tracked separately.
  *
- * `SEEDERS` is the registry the next stories extend: RPS-1257 replaces the five `notImplemented`
- * entries with `packages/<proto>.ts` modules. A seeder is `(repoName, ctx, opts) => SeededPackage`
+ * `SEEDERS` is the registry, one `packages/<proto>.ts` module per protocol. A seeder is `(repoName, ctx, opts) => SeededPackage`
  * and must throw (never return) when the server refuses the publish.
  */
 import type { RepoType } from '../api/panel-api.js';
+import { seedCargo } from './packages/cargo.js';
 import { seedDocker } from './packages/docker.js';
+import { seedGolang } from './packages/golang.js';
+import { seedHelm } from './packages/helm.js';
 import { seedMaven } from './packages/maven.js';
 import { seedNpm } from './packages/npm.js';
+import { seedNuget } from './packages/nuget.js';
 import { seedPypi } from './packages/pypi.js';
+import { seedRuby } from './packages/ruby.js';
 import type { SeededRepo } from './seeder.js';
 
 export type PackageProtocol =
@@ -100,26 +104,16 @@ export type PackageSeeder = (
 
 export { DEFAULT_VERSION, defaultPackageName } from './packages/shared.js';
 
-function notImplemented(protocol: PackageProtocol): PackageSeeder {
-  return () =>
-    Promise.reject(
-      new Error(
-        `Package seeding for "${protocol}" is not implemented yet (RPS-1257 adds it: ` +
-          `create src/seed/packages/${protocol}.ts and replace this entry in SEEDERS)`,
-      ),
-    );
-}
-
 export const SEEDERS: Record<PackageProtocol, PackageSeeder> = {
   maven: seedMaven,
   npm: seedNpm,
   docker: seedDocker,
   pypi: seedPypi,
-  cargo: notImplemented('cargo'),
-  nuget: notImplemented('nuget'),
-  helm: notImplemented('helm'),
-  golang: notImplemented('golang'),
-  ruby: notImplemented('ruby'),
+  cargo: seedCargo,
+  nuget: seedNuget,
+  helm: seedHelm,
+  golang: seedGolang,
+  ruby: seedRuby,
 };
 
 /** The protocol a repo of `type` serves (`RepoType` is upper-case, protocols lower-case). */

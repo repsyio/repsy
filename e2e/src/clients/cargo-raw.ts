@@ -235,17 +235,21 @@ export function buildPublishBody(opts: {
   crateBytes: Buffer;
   description?: string;
   license?: string;
+  /** README text the panel renders on the version detail (RPS-1257); default none. */
+  readme?: string;
+  /** Dependencies in the registry-API shape (`name`, `version_req`, `kind`, ...); default none. */
+  deps?: readonly Record<string, unknown>[];
 }): Buffer {
   const metadata = {
     name: opts.name,
     vers: opts.version,
-    deps: [] as unknown[],
+    deps: [...(opts.deps ?? [])] as unknown[],
     features: {} as Record<string, unknown>,
     authors: [] as string[],
     description: opts.description ?? `e2e ${opts.name}@${opts.version}`,
     documentation: null,
     homepage: null,
-    readme: null,
+    readme: opts.readme ?? null,
     readme_file: null,
     keywords: [] as string[],
     categories: [] as string[],

@@ -15,11 +15,10 @@
 
 /**
  * Proof that the seeding layer and the descriptor-driven page objects work end to end (RPS-1255),
- * before the real package scenarios (RPS-1256/1257) build on them: for each first-batch protocol a
+ * before the real package scenarios (RPS-1256/1257) build on them: for each protocol a
  * package is published over raw HTTP into a fresh repo (no toolchain in the ui image) and the panel
- * shows it on its list, versions and detail pages. The two structural tests need no stack: the
- * registry and the descriptors cover all nine protocols, and a protocol whose seeder is not written
- * yet fails with a clear message rather than a confusing one.
+ * shows it on its list, versions and detail pages. The structural test needs no stack: the registry
+ * and the descriptors cover all nine protocols (RPS-1257 wrote the last five seeders).
  */
 import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
@@ -38,8 +37,13 @@ import {
   VersionDetailPage,
 } from '../../../src/ui/pages/protocol.js';
 
-const SEEDED_NOW: readonly PackageProtocol[] = ['maven', 'npm', 'docker', 'pypi'];
-const NOT_YET: readonly PackageProtocol[] = ['cargo', 'nuget', 'helm', 'golang', 'ruby'];
+const SEEDED_NOW: readonly PackageProtocol[] = PACKAGE_PROTOCOLS;
+/**
+ * The generic search/sort/delete walk assumes a publish order and a delete landing that hold for the
+ * first four; the other five have the same steps, protocol-aware, in PKG-<proto>-02 and -04
+ * (`registerPackageScenarios`), with their pinned bugs.
+ */
+const GENERIC_WALK: readonly PackageProtocol[] = ['maven', 'npm', 'docker', 'pypi'];
 
 const REPO_TYPE: Record<PackageProtocol, RepoType> = {
   maven: RepoType.MAVEN,
@@ -96,14 +100,6 @@ test.describe('package seeding proof', () => {
     }
   });
 
-  for (const protocol of NOT_YET) {
-    test(`the ${protocol} seeder says it is not implemented yet`, async () => {
-      await expect(SEEDERS[protocol]('any-repo', { runId: 'x' }, {})).rejects.toThrow(
-        /not implemented yet \(RPS-1257/,
-      );
-    });
-  }
-
   for (const protocol of SEEDED_NOW) {
     test(`a raw-seeded ${protocol} package shows on the list, versions and detail pages`, async ({
       adminPage,
@@ -136,52 +132,54 @@ test.describe('package seeding proof', () => {
       await expectRepoUrlIn(detail);
     });
 
-    // The descriptor's own data (search term, sort names, delete dialogs and toasts) is only worth
-    // having if the panel agrees, so drive the page objects through it once.
-    test(`the ${protocol} descriptor drives search, sort and both deletes`, async ({
-      adminPage,
-      seeder,
-      seedPackage,
-    }) => {
-      const repo = await seeder.createRepo(REPO_TYPE[protocol]);
-      // One after the other, so "Oldest" and "Newest" have an order to show.
-      const first = await seedPackage(repo, { index: 1 });
-      const second = await seedPackage(repo, { index: 2 });
-      const list = protocolPages(adminPage, DESCRIPTORS[protocol], repo.name).list();
-      await list.goto();
-      await list.expectRow(first);
-      await list.expectRow(second);
+    if (GENERIC_WALK.includes(protocol)) {
+      // The descriptor's own data (search term, sort names, delete dialogs and toasts) is only worth
+      // having if the panel agrees, so drive the page objects through it once.
+      test(`the ${protocol} descriptor drives search, sort and both deletes`, async ({
+        adminPage,
+        seeder,
+        seedPackage,
+      }) => {
+        const repo = await seeder.createRepo(REPO_TYPE[protocol]);
+        // One after the other, so "Oldest" and "Newest" have an order to show.
+        const first = await seedPackage(repo, { index: 1 });
+        const second = await seedPackage(repo, { index: 2 });
+        const list = protocolPages(adminPage, DESCRIPTORS[protocol], repo.name).list();
+        await list.goto();
+        await list.expectRow(first);
+        await list.expectRow(second);
 
-      await list.search('zzz-no-such-package');
-      await expect(list.emptyList.root).toBeVisible();
-      await list.searchFor(first);
-      await list.expectRow(first);
+        await list.search('zzz-no-such-package');
+        await expect(list.emptyList.root).toBeVisible();
+        await list.searchFor(first);
+        await list.expectRow(first);
 
-      await list.search('');
-      await list.expectRow(second);
-      await list.sortBy('Oldest');
-      await expect(list.rows().first()).toHaveAttribute(
-        'data-testid',
-        `pkg-list-row-${list.keyOf(first)}`,
-      );
-      await list.sortBy('Newest');
-      await expect(list.rows().first()).toHaveAttribute(
-        'data-testid',
-        `pkg-list-row-${list.keyOf(second)}`,
-      );
+        await list.search('');
+        await list.expectRow(second);
+        await list.sortBy('Oldest');
+        await expect(list.rows().first()).toHaveAttribute(
+          'data-testid',
+          `pkg-list-row-${list.keyOf(first)}`,
+        );
+        await list.sortBy('Newest');
+        await expect(list.rows().first()).toHaveAttribute(
+          'data-testid',
+          `pkg-list-row-${list.keyOf(second)}`,
+        );
 
-      // Delete from the list's row menu: the dialog title and the toast are the descriptor's.
-      await list.deleteRow(second);
-      await list.expectNoRow(second);
-      await list.expectRow(first);
+        // Delete from the list's row menu: the dialog title and the toast are the descriptor's.
+        await list.deleteRow(second);
+        await list.expectNoRow(second);
+        await list.expectRow(first);
 
-      // Delete from the detail page: it lands where the descriptor says (the list, for these four).
-      const detail = protocolPages(adminPage, DESCRIPTORS[protocol], repo.name).detail(first);
-      await detail.goto();
-      await detail.delete();
-      expect(detail.detail.delete?.landsOn).toBe('list');
-      await expectAfterLastVersionDelete(list, first);
-    });
+        // Delete from the detail page: it lands where the descriptor says (the list, for these four).
+        const detail = protocolPages(adminPage, DESCRIPTORS[protocol], repo.name).detail(first);
+        await detail.goto();
+        await detail.delete();
+        expect(detail.detail.delete?.landsOn).toBe('list');
+        await expectAfterLastVersionDelete(list, first);
+      });
+    }
 
     test(`a mobile viewport shows the ${protocol} card list, not the table`, async ({
       openUiPage,

@@ -182,7 +182,7 @@ interface PublishRun {
 
 /** The Helm OCI config blob: chart metadata JSON (`pkg/registry/client.go`'s `Push`), media type
  *  `application/vnd.cncf.helm.config.v1+json`. */
-function buildConfigBytes(built: BuiltChart): Buffer {
+export function buildConfigBytes(built: BuiltChart): Buffer {
   return Buffer.from(
     JSON.stringify({
       name: built.name,
@@ -200,7 +200,7 @@ function buildConfigBytes(built: BuiltChart): Buffer {
  *  hand-built manifest byte-different from the real client's on every run for no benefit, since
  *  this adapter never compares the manifest bytes THEMSELVES -- only the tgz `contentSha256` and
  *  the outcome of the raw re-PUT this manifest fronts). */
-function buildManifestBytes(
+export function buildManifestBytes(
   built: BuiltChart,
   configBytes: Buffer,
 ): { bytes: Buffer; digest: string } {

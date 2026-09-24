@@ -73,11 +73,17 @@ export const rubyDescriptor: ProtocolDescriptor = {
       delete: {
         dialogTitle: 'Delete Version',
         successToast: 'Version deleted successfully',
-        landsOn: 'unverified',
+        landsOn: 'list',
       },
     },
   },
-  lastVersionRemovesPackage: 'unverified',
+  lastVersionRemovesPackage: true,
+  configure: {
+    // Ruby's modal has no deploy-token branch: the title and the body are the same in both variants.
+    title: 'Ruby Configuration',
+    deployTokenTitle: 'Ruby Configuration',
+    contains: (repo, url) => [`source "${url}" do`, `gem push your_gem-1.0.0.gem --host ${url}`],
+  },
   toolbar: { browseFiles: false },
   extraPaths: {},
 };

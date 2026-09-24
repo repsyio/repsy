@@ -80,7 +80,14 @@ export const golangDescriptor: ProtocolDescriptor = {
       },
     },
   },
-  lastVersionRemovesPackage: 'unverified',
+  lastVersionRemovesPackage: false,
+  configure: {
+    title: 'Golang Configuration',
+    deployTokenTitle: 'Deploy Token Usage',
+    contains: (repo, url) => [`GOPROXY="${url}`, `${url}/\${MODULE_PATH}/@v/\${VERSION}.zip`],
+    passwordMarker: 'YOUR_PASSWORD',
+    deployTokenMarker: 'YOUR_DEPLOY_TOKEN',
+  },
   toolbar: { browseFiles: false },
   extraPaths: {},
 };

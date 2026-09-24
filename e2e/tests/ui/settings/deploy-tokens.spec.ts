@@ -251,7 +251,7 @@ test.describe('Deploy tokens: rotate, revoke and paging', { tag: SETTINGS }, () 
     expect(await repoRootStatus(repo.name, revoked)).toBe(401);
   });
 
-  // Not filed yet (reported with this PR). Revoking the only token on page 2 makes `revokeDeployToken`
+  // RPS-1285. Revoking the only token on page 2 makes `revokeDeployToken`
   // refetch page 2 (now past the end, an empty list) and, in the same tick, page 1, because it tests
   // `deployTokens.length === 1` right after starting the first request. Whichever response lands LAST
   // wins, so when the empty page-2 answer is the slower one the section shows "Your list is empty"
