@@ -154,10 +154,13 @@ export interface ProtocolDescriptor {
   toolbar: { browseFiles: boolean };
   /**
    * Whether deleting a package's LAST version removes the package from the list (true for maven, npm,
-   * pypi, nuget). Docker keeps the image listed (probed: an image with no tags stays, digest empty,
-   * size 0 B). `unverified` = read from the code only.
+   * pypi, nuget). Docker keeps the image listed BY DESIGN (RPS-1288 item 5): deleting a tag removes
+   * only the tag, the manifest stays pullable by digest, and the image goes with its last manifest.
+   * `unverified` = read from the code only.
    */
   lastVersionRemovesPackage: boolean | 'unverified';
+  /** What a package kept after its last version was deleted says in its list row (Docker: "No tags"). */
+  lastVersionKeptRowText?: string;
   /** Routes that are not a level (maven's `/:repo/browser`). */
   extraPaths: Readonly<Record<string, (repo: string) => string>>;
   /** The Configure modal's texts (RPS-1256); absent = the template's default. */

@@ -162,7 +162,9 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
         )
         .subscribe({
           next: () => {
-            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+            // The image's tag list, also after the last tag: deleting a tag never deletes the image
+            // (its manifest stays pullable by digest), and that page says what is left (RPS-1288).
+            this.router.navigateByUrl(`/${this.activeRepo.repoName}/${this.imageName}`).then(() => {
               this.toastService.show('Tag deleted successfully', 'success');
             });
           },

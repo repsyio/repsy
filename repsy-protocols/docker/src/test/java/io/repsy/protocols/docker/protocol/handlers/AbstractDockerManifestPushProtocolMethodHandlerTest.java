@@ -34,6 +34,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
+import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.layer.services.AbstractDockerLayerRenamer;
@@ -433,5 +434,51 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
         .isInstanceOf(BadRequestException.class);
 
     verify(this.dockerFacade).saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class));
+  }
+
+  @Test
+  @DisplayName("creates the image again and saves once more when it was deleted under the push")
+  void recreatesAnImageDeletedUnderThePush() throws Exception {
+    final var context = context();
+    final var gone = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
+    final var recreated = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
+    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(gone, recreated);
+    when(this.dockerFacade.saveManifest(eq(context), eq(gone), any(ManifestForm.class)))
+        .thenThrow(new ImageDeletedException(gone.getId()));
+    when(this.dockerFacade.saveManifest(eq(context), eq(recreated), any(ManifestForm.class)))
+        .thenReturn("sha256:manifest");
+    when(this.layerRenamer.findLayersToRename(any(BaseRepoInfo.class), eq(MANIFEST_JSON)))
+        .thenReturn(Map.of());
+    when(this.layerRenamer.renameLayers(any(BaseRepoInfo.class), any()))
+        .thenReturn(BaseUsages.ofDisk(0));
+
+    final var response =
+        this.handler().handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    verify(this.imageService).refreshImageSize(REPO_ID, recreated.getId());
+    verify(this.imageService, never()).refreshImageSize(REPO_ID, gone.getId());
+  }
+
+  @Test
+  @DisplayName("gives up when the image keeps being deleted, without touching the layers")
+  void givesUpWhenTheImageKeepsBeingDeleted() throws Exception {
+    final var context = context();
+    final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
+    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(imageInfo);
+    when(this.dockerFacade.saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class)))
+        .thenThrow(new ImageDeletedException(imageInfo.getId()));
+
+    assertThatThrownBy(
+            () ->
+                this.handler()
+                    .handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse()))
+        .isInstanceOf(ImageDeletedException.class);
+
+    // The first lookup plus twenty creations, and twenty-one saves.
+    verify(this.imageService, times(21)).findOrCreateImage(REPO_ID, "app");
+    verify(this.dockerFacade, times(21))
+        .saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class));
+    verifyNoInteractions(this.layerRenamer);
   }
 }

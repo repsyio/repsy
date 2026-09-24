@@ -39,7 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
  * algorithm, removes the manifest itself: the tags that point at it go with it, so neither the
  * digest nor those tags can be pulled afterwards, as the distribution specification requires. The
  * manifests an index lists are not deleted with it: another index may still list them, so they stay
- * as untagged manifests until they are deleted by their own digest or by the repo's cleanup.
+ * as untagged manifests until they are deleted by their own digest or by the repo's cleanup. The
+ * image itself goes with its last manifest; deleting a tag never removes it.
  */
 @Component
 @RequiredArgsConstructor
@@ -82,6 +83,10 @@ public class ManifestDeletionComponent {
     final var imageInfo =
         this.imageService.findImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
 
+    // First, as in every transaction that deletes rows of the image: it waits for a push that is
+    // writing to the image, and holds off the next one until the count below is done.
+    this.imageService.lockImage(imageInfo.getId());
+
     final var manifest =
         this.manifestRepository
             .findByImageIdAndAnyDigest(imageInfo.getId(), digest)
@@ -98,8 +103,11 @@ public class ManifestDeletionComponent {
     this.manifestRepository.delete(manifest);
     this.manifestRepository.flush();
 
-    // In this transaction: the image is listed with the size and the digest of what its tags reach.
-    this.imageService.refreshImageSize(repoInfo.getStorageKey(), imageInfo.getId());
+    // An image lives as long as it stores a manifest: the last one takes it along (RPS-1288). If it
+    // stays, in this transaction, it is listed with the size and the digest of what its tags reach.
+    if (!this.imageService.deleteImageIfEmpty(repoInfo.getStorageKey(), imageInfo.getId())) {
+      this.imageService.refreshImageSize(repoInfo.getStorageKey(), imageInfo.getId());
+    }
 
     this.publishVersionsDeleted(repoInfo, imageInfo.getName(), tagNames);
 

@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
+import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Manifest;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
@@ -50,6 +51,7 @@ class UntaggedManifestCleanupServiceTest {
       RepoInfo.builder().storageKey(REPO_ID).name("docker").build();
 
   private final ImageRepository imageRepository = mock(ImageRepository.class);
+  private final ImageTxService imageService = mock(ImageTxService.class);
   private final ManifestRepository manifestRepository = mock(ManifestRepository.class);
   private final ManifestFileService manifestFileService = mock(ManifestFileService.class);
   private final UntaggedManifestFinder finder = mock(UntaggedManifestFinder.class);
@@ -57,6 +59,7 @@ class UntaggedManifestCleanupServiceTest {
   private final UntaggedManifestCleanupService service =
       new UntaggedManifestCleanupService(
           this.imageRepository,
+          this.imageService,
           this.manifestRepository,
           this.manifestFileService,
           this.finder,
@@ -152,5 +155,52 @@ class UntaggedManifestCleanupServiceTest {
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessageContaining("imageNotFound");
     verifyNoInteractions(this.manifestRepository, this.storage);
+  }
+
+  @Test
+  @DisplayName("locks each image, then deletes it if the rows it deleted were its last manifests")
+  void locksThenDeletesTheImageItEmptied() {
+    final var app = image("app");
+    final var old = manifest("sha256:old");
+    when(this.imageRepository.findAllByRepoId(REPO_ID)).thenReturn(List.of(app));
+    when(this.finder.findUntagged(app.getId())).thenReturn(List.of(old));
+    when(this.manifestFileService.findUnreferencedFileNames(any(), any(), any(), anyCollection()))
+        .thenReturn(Set.of());
+
+    this.service.deleteUntagged(REPO, null);
+
+    final var order = inOrder(this.imageService, this.finder, this.manifestRepository);
+    order.verify(this.imageService).lockImage(app.getId());
+    order.verify(this.finder).findUntagged(app.getId());
+    order.verify(this.manifestRepository).flush();
+    order.verify(this.imageService).deleteImageIfEmpty(REPO_ID, app.getId());
+  }
+
+  @Test
+  @DisplayName("an image with no untagged manifest is still checked, so one with no manifest goes")
+  void anImageWithoutUntaggedManifestsIsStillChecked() {
+    final var empty = image("empty");
+    when(this.imageRepository.findAllByRepoId(REPO_ID)).thenReturn(List.of(empty));
+    when(this.finder.findUntagged(empty.getId())).thenReturn(List.of());
+
+    this.service.deleteUntagged(REPO, null);
+
+    verify(this.imageService).deleteImageIfEmpty(REPO_ID, empty.getId());
+    verifyNoInteractions(this.storage);
+  }
+
+  @Test
+  @DisplayName("locks the images of a repo in id order, so two cleanups cannot deadlock")
+  void locksTheImagesInIdOrder() {
+    final var images = new java.util.ArrayList<>(List.of(image("a"), image("b"), image("c")));
+    when(this.imageRepository.findAllByRepoId(REPO_ID)).thenReturn(List.copyOf(images));
+    images.forEach(image -> when(this.finder.findUntagged(image.getId())).thenReturn(List.of()));
+
+    this.service.deleteUntagged(REPO, null);
+
+    final var expected = images.stream().map(Image::getId).sorted().toList();
+    final var captor = org.mockito.ArgumentCaptor.forClass(UUID.class);
+    verify(this.imageService, times(3)).lockImage(captor.capture());
+    assertThat(captor.getAllValues()).containsExactlyElementsOf(expected);
   }
 }

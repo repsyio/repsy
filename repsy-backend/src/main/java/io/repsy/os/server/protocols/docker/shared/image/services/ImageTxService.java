@@ -22,6 +22,7 @@ import io.repsy.os.server.protocols.docker.shared.image.mappers.ImageConverter;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
+import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
@@ -48,6 +49,7 @@ public class ImageTxService implements ImageService<UUID> {
   private final RepoRepository repoRepository;
   private final LayerRepository layerRepository;
   private final TagRepository tagRepository;
+  private final ManifestRepository manifestRepository;
 
   @Override
   @Transactional
@@ -103,11 +105,67 @@ public class ImageTxService implements ImageService<UUID> {
         repoId, imageId, digest, totalSize, Instant.now());
   }
 
+  /**
+   * Takes the image row's exclusive lock, held until the caller's transaction ends, and returns the
+   * image. Every transaction that deletes tags or manifests of an image takes it first, so that
+   * they meet a push (which holds the row's share lock while it writes) in the same order and can
+   * never deadlock with it, and so that {@link #deleteImageIfEmpty} counts the manifests of an
+   * image no push is in the middle of writing to.
+   *
+   * @throws ItemNotFoundException {@code imageNotFound} if the image is gone
+   */
+  @Transactional
+  public Image lockImage(final UUID imageId) {
+
+    return this.imageRepository
+        .findByIdForUpdate(imageId)
+        .orElseThrow(() -> new ItemNotFoundException("imageNotFound"));
+  }
+
+  /**
+   * Deletes the image when it stores no manifest any more (RPS-1288): an image lives as long as it
+   * has a manifest, tagged or not, and goes with the last one. Deleting the last tag never gets
+   * here, because the manifest stays. The image row is locked first, so a push that is writing a
+   * manifest into it is waited for and its manifest is counted; a push that has looked the image up
+   * but not written yet finds it gone and creates it again (see the manifest push handler).
+   *
+   * @return {@code true} when the image is gone (also when it already was), {@code false} when it
+   *     still has manifests
+   */
+  @Transactional
+  public boolean deleteImageIfEmpty(final UUID repoId, final UUID imageId) {
+
+    final var image = this.imageRepository.findByIdForUpdate(imageId).orElse(null);
+
+    if (image == null) {
+      return true;
+    }
+
+    if (!repoId.equals(image.getRepo().getId())) {
+      throw new ItemNotFoundException("imageNotFound");
+    }
+
+    // Flushed first: the count must see the manifests this transaction deleted.
+    this.imageRepository.flush();
+
+    if (this.manifestRepository.countByImageId(imageId) > 0) {
+      return false;
+    }
+
+    this.imageRepository.delete(image);
+    this.imageRepository.flush();
+
+    return true;
+  }
+
   @Override
   @Transactional
   public void deleteImage(final UUID repoId, final String imageName) {
 
     final var image = this.findByRepoIdAndName(repoId, imageName);
+
+    // The same lock, and the same order, as every other delete of the image's rows.
+    this.imageRepository.findByIdForUpdate(image.getId());
 
     // The image's tags go with it through the mapping; its manifests, their layer links and their
     // index edges go through the database's ON DELETE CASCADE. Flushed here, so a caller that asks
@@ -127,6 +185,20 @@ public class ImageTxService implements ImageService<UUID> {
     return this.imageRepository
         .findAllByRepoIdAndContainsName(repo.getId(), imageName, pageable)
         .map(this.imageConverter::toDto);
+  }
+
+  /**
+   * The image as the list shows it, for the panel's image page.
+   *
+   * @throws ItemNotFoundException {@code imageNotFound}
+   */
+  public io.repsy.os.generated.model.ImageListItem findListItemByRepoIdAndName(
+      final UUID repoId, final String imageName) {
+
+    return this.imageRepository
+        .findListItemByRepoIdAndName(repoId, imageName)
+        .map(this.imageConverter::toDto)
+        .orElseThrow(() -> new ItemNotFoundException("imageNotFound"));
   }
 
   @Override

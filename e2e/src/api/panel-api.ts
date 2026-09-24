@@ -27,6 +27,7 @@ import { ApiError, PanelClient, RepoType, UserRole } from './generated/index.js'
 import type { ArtifactVersionInfo } from './generated/models/ArtifactVersionInfo.js';
 import type { DeployTokenForm } from './generated/models/DeployTokenForm.js';
 import type { DeployTokenInfoListItem } from './generated/models/DeployTokenInfoListItem.js';
+import type { ImageListItem } from './generated/models/ImageListItem.js';
 import type { LoginInfo } from './generated/models/LoginInfo.js';
 import type { PagedModelRepoListInfo } from './generated/models/PagedModelRepoListInfo.js';
 import type { PgpPublicKeyItem } from './generated/models/PgpPublicKeyItem.js';
@@ -43,6 +44,7 @@ export type {
   ArtifactVersionInfo,
   DeployTokenForm,
   DeployTokenInfoListItem,
+  ImageListItem,
   LoginInfo,
   PagedModelRepoListInfo,
   PgpPublicKeyItem,
@@ -460,6 +462,19 @@ export class PanelApi {
         `deleteRubyGemVersion failed with status ${res.status}`,
       );
     }
+  }
+
+  /**
+   * `GET /api/docker/images/{repoName}/{imageName}/summary` (RPS-1288): the image as the list shows
+   * it, with `tagCount`, `untaggedManifestCount` and `untaggedSize`; a 404 `ApiError` when the image
+   * is gone (an image goes with its last manifest).
+   */
+  async getDockerImageSummary(repoName: string, imageName: string): Promise<ImageListItem> {
+    const res = await this.client.dockerImageController.getDockerImageSummary({
+      repoName,
+      imageName,
+    });
+    return unwrap(res.data, 'getDockerImageSummary');
   }
 
   /**

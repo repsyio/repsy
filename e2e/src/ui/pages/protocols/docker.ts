@@ -29,6 +29,9 @@ import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
  *  - RPS-1261 (fixed): the manifest table's DESKTOP Digest / Config Digest cells used to show the
  *    platform / the digest; PKG-docker-07 asserts them now. A manifest row is still found by its
  *    `pkg-manifests-row-<key>` id.
+ *  - An image with no tag is still listed while it stores a manifest (RPS-1288 item 5): its row says
+ *    "No tags" (`row-no-tags`) and how many untagged manifests it keeps (`row-untagged`), its size cell
+ *    is the untagged size, and its tag list page shows `pkg-no-tags` instead of the empty list.
  *  - The tag and manifest lists carry the install bar `pkg-install-snippet` above the toolbar; the
  *    image list does not. Detail deletes are titled "Delete Version" but toast "Tag deleted
  *    successfully"; the tag list's own dialog is "Delete Tag".
@@ -92,11 +95,16 @@ export const dockerDescriptor: ProtocolDescriptor = {
       delete: {
         dialogTitle: 'Delete Version',
         successToast: 'Tag deleted successfully',
-        landsOn: 'list',
+        // The image's tag list, also after the last tag (the image is still there): RPS-1288 item 7.
+        landsOn: 'versions',
       },
     },
   },
+  // By design (RPS-1288 item 5): a tag delete removes only the tag, the manifest stays stored and
+  // pullable by digest, so the image stays listed as "No tags" (with its untagged manifests) until its
+  // last manifest goes (a delete by digest, or "Delete untagged manifests").
   lastVersionRemovesPackage: false,
+  lastVersionKeptRowText: 'No tags',
   toolbar: { browseFiles: false },
   configure: {
     title: 'Docker Configuration',

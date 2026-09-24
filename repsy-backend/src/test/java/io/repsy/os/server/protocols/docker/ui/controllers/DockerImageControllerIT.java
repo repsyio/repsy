@@ -67,6 +67,13 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
   private static final String CONFIG_MEDIA_TYPE = "application/vnd.docker.container.image.v1+json";
   private static final String LAYER_MEDIA_TYPE =
       "application/vnd.docker.image.rootfs.diff.tar.gzip";
+
+  /**
+   * What {@code seedImage} stores as the config blob of every manifest (the architecture aside).
+   */
+  private static final String CONFIG_JSON = "{\"architecture\":\"amd64\",\"os\":\"linux\"}";
+
+  private static final int LAYER_SIZE = 3;
   private static final String MANIFEST_LIST_MEDIA_TYPE =
       "application/vnd.docker.distribution.manifest.list.v2+json";
 
@@ -286,7 +293,135 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
       assertThat(page).containsKeys("content", "page");
       assertThat((java.util.List<?>) page.get("content")).hasSize(1);
       assertThat((Map<String, Object>) ((java.util.List<?>) page.get("content")).getFirst())
-          .containsKeys("name", "size", "updatedAt");
+          .containsKeys(
+              "name", "size", "updatedAt", "tagCount", "untaggedManifestCount", "untaggedSize");
+    }
+
+    private Map<String, Object> listedImage(final Repo repo, final String imageName)
+        throws Exception {
+      final var body =
+          DockerImageControllerIT.this.expectSuccess(
+              DockerImageControllerIT.this.perform(
+                  get("/api/docker/images/%s".formatted(repo.getName()))
+                      .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
+              "imagesFetched",
+              "Packages are fetched.");
+      final List<Map<String, Object>> content = JsonPath.read(body, "$.data.content");
+
+      return content.stream()
+          .filter(image -> imageName.equals(image.get("name")))
+          .findFirst()
+          .orElseThrow();
+    }
+
+    private void deleteTag(final Repo repo, final String imageName, final String tag)
+        throws Exception {
+      DockerImageControllerIT.this.expectSuccess(
+          DockerImageControllerIT.this.perform(
+              delete("/api/docker/images/%s/%s/tags/%s".formatted(repo.getName(), imageName, tag))
+                  .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
+          "tagDeleted",
+          "Tag deleted.");
+    }
+
+    @Test
+    @DisplayName("an image whose last tag was deleted is still listed, with what it stores")
+    void anImageWithoutTagsIsListedWithItsUntaggedManifests() throws Exception {
+      final var repo = DockerImageControllerIT.this.dockerRepo();
+      final var config = "sha256:" + "5".repeat(64);
+      DockerImageControllerIT.this.seedImage(repo, "app", "latest", config);
+
+      final var tagged = this.listedImage(repo, "app");
+      assertThat(tagged)
+          .containsEntry("tagCount", 1)
+          .containsEntry("untaggedManifestCount", 0)
+          .containsEntry("untaggedSize", 0);
+
+      this.deleteTag(repo, "app", "latest");
+
+      final var emptied = this.listedImage(repo, "app");
+      assertThat(emptied)
+          .containsEntry("tagCount", 0)
+          .containsEntry("untaggedManifestCount", 1)
+          .containsEntry("size", 0)
+          .doesNotContainKey("digest");
+      assertThat(((Number) emptied.get("untaggedSize")).longValue())
+          .as("the config blob and the layer of the manifest it keeps")
+          .isEqualTo(CONFIG_JSON.length() + LAYER_SIZE);
+      assertThat(emptied.get("updatedAt"))
+          .as("no tag to date it by: the last change of the image")
+          .isNotNull();
+    }
+
+    @Test
+    @DisplayName("an untagged manifest counts only the layers no tagged manifest of the image uses")
+    void untaggedSizeExcludesLayersATaggedManifestUses() throws Exception {
+      final var repo = DockerImageControllerIT.this.dockerRepo();
+      final var otherConfig = "sha256:" + "6".repeat(64);
+      DockerImageControllerIT.this.seedImage(repo, "app", "kept");
+      DockerImageControllerIT.this.seedImage(repo, "app", "dropped", otherConfig);
+
+      this.deleteTag(repo, "app", "dropped");
+
+      final var image = this.listedImage(repo, "app");
+      assertThat(image).containsEntry("tagCount", 1).containsEntry("untaggedManifestCount", 1);
+      // Both manifests use the same layer; only the config blob of the dropped one is its own.
+      assertThat(((Number) image.get("untaggedSize")).longValue()).isEqualTo(CONFIG_JSON.length());
+    }
+
+    @Test
+    @DisplayName("the manifests an index lists are not untagged while a tag points at the index")
+    void manifestsOfATaggedIndexAreNotUntagged() throws Exception {
+      final var repo = DockerImageControllerIT.this.dockerRepo();
+      final var fixture = DockerImageControllerIT.this.seedMultiPlatformImage(repo, "multi", "v1");
+
+      final var tagged = this.listedImage(repo, "multi");
+      assertThat(tagged)
+          .containsEntry("tagCount", 1)
+          .containsEntry("untaggedManifestCount", 0)
+          .containsEntry("untaggedSize", 0);
+
+      this.deleteTag(repo, "multi", fixture.tag());
+
+      final var emptied = this.listedImage(repo, "multi");
+      assertThat(emptied)
+          .containsEntry("tagCount", 0)
+          .containsEntry("untaggedManifestCount", 3)
+          .containsEntry("size", 0);
+      assertThat(((Number) emptied.get("untaggedSize")).longValue())
+          .as("the shared layer once, and the two config blobs")
+          .isEqualTo(LAYER_SIZE + 2L * CONFIG_JSON.length());
+    }
+
+    @Test
+    @DisplayName("the summary of an image is its list row, and 404 imageNotFound when it is gone")
+    void summarizesOneImage() throws Exception {
+      final var repo = DockerImageControllerIT.this.dockerRepo();
+      DockerImageControllerIT.this.seedImage(repo, "app", "latest");
+      DockerImageControllerIT.this.seedImage(repo, "app-2", "latest");
+      final var token = DockerImageControllerIT.this.adminBearerToken();
+      this.deleteTag(repo, "app", "latest");
+
+      final var body =
+          DockerImageControllerIT.this.expectSuccess(
+              DockerImageControllerIT.this.perform(
+                  get("/api/docker/images/%s/app/summary".formatted(repo.getName()))
+                      .header(AUTHORIZATION, token)),
+              "imageFetched",
+              "Image is fetched.");
+
+      assertThat(data(body))
+          .containsEntry("name", "app")
+          .containsEntry("tagCount", 0)
+          .containsEntry("untaggedManifestCount", 1);
+      DockerImageControllerIT.this.expectError(
+          DockerImageControllerIT.this.perform(
+              get("/api/docker/images/%s/ghost/summary".formatted(repo.getName()))
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.NOT_FOUND,
+          "imageNotFound",
+          "imageNotFound",
+          "Image not found.");
     }
 
     @Test

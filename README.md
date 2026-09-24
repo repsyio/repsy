@@ -549,6 +549,12 @@ instance per team.
   repository allows overriding) moves the pointer; the manifest it pointed at before stays stored
   and pullable by its digest. Pushing the manifest a tag already points at changes nothing.
   Deleting a tag in the web UI removes the pointer only, in the same way.
+- **An image lives as long as it stores a manifest.** Deleting the last tag of an image does not
+  delete the image: its manifests stay pullable by digest, so the web UI keeps listing it as "No
+  tags", with how many untagged manifests it still stores and their size, and its page offers
+  "Delete untagged manifests" and "Delete image". The image is removed automatically when its last
+  manifest goes, whether by a protocol `DELETE` by digest or by "Delete untagged manifests"; the next
+  push of that name creates it again.
 - **Untagged manifests accumulate.** Nothing deletes a manifest automatically, so every override
   and every deleted tag leaves the previous manifest, and the layers only it used, on disk and in
   the repository's usage until you remove them with **"Delete untagged manifests"** in the
