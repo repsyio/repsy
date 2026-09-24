@@ -624,10 +624,14 @@ what is verified and where keys are looked up:
   signature holds nothing: there a `.pom.asc` before its POM is refused with `404` as before.
   Uploading a new file, or storing a file again (with *Allow override*), makes the version
   *Unsigned* until that file's signature is uploaded and verified. For a snapshot only the files of
-  its newest build count. Turning the setting on is not retroactive: a version keeps the *Signed*
-  value it had until the next file is uploaded into it, which recomputes it under this rule (so an
-  already *Signed* version can show *Unsigned* after a redeploy that does not sign every file).
-  Turning it off again leaves held signatures alone: they are deleted when they expire.
+  its newest build count. Turning the setting on or off recomputes *Signed* of every existing
+  version of the repository in the background, under the rule of the new setting (with it off, a
+  version is *Signed* when its POM signature is verified; with it on, when every file has a
+  verified signature). The settings request does not wait for it, so a large repository shows the
+  new values within moments, not at once. A signature that was stored while the setting was off was
+  never verified, so it does not count when the setting is turned on: it counts once its file and
+  signature are uploaded again (so an already *Signed* version can show *Unsigned* after turning
+  the setting on). Turning it off leaves held signatures alone: they are deleted when they expire.
 - **Air-gapped registries (`pgpKeyServerLookupEnabled` off):** the repository consults its
   registered keys only. A signature made with a key that is not registered is refused at once with
   `404 artifactSigningKeyNotRegistered`, without contacting any key server (custom hosts,
