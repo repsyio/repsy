@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.maven.shared.artifact.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -23,12 +24,15 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.shared.repo.events.PgpVerifyAllSignaturesToggledEvent;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.RejectedExecutionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,10 +54,30 @@ class SignedRecomputeServiceTest {
   private SignedRecomputeService service;
   private final UUID repoId = UUID.randomUUID();
 
+  /** The jobs that were handed to the executor, and have not been run. */
+  private final List<Runnable> queue = new ArrayList<>();
+
+  private boolean full;
+
   @BeforeEach
   void setUp() {
     this.service =
-        new SignedRecomputeService(this.artifactVersionRepository, this.versionSignatureService, 2);
+        new SignedRecomputeService(
+            this.artifactVersionRepository, this.versionSignatureService, this::submit, 2);
+  }
+
+  private void submit(final Runnable job) {
+    if (this.full) {
+      throw new RejectedExecutionException("full");
+    }
+
+    this.queue.add(job);
+  }
+
+  private void runQueued() {
+    final var jobs = List.copyOf(this.queue);
+    this.queue.clear();
+    jobs.forEach(Runnable::run);
   }
 
   private static List<UUID> ids(final int count) {
@@ -124,20 +148,94 @@ class SignedRecomputeServiceTest {
   }
 
   @Test
-  @DisplayName("the event of a toggle recomputes the repo it names")
-  void theEventRecomputesItsRepo() {
+  @DisplayName("the event of a toggle queues the recomputation of the repo it names")
+  void theEventQueuesTheRecomputationOfItsRepo() {
     this.pageAfter(BEFORE_THE_FIRST, ids(1));
 
     this.service.onToggled(new PgpVerifyAllSignaturesToggledEvent(this.repoId));
 
+    // Handed to the executor, not run on the thread that committed the toggle.
+    assertThat(this.queue).hasSize(1);
+    verify(this.versionSignatureService, never()).recompute(any());
+
+    this.runQueued();
+
     verify(this.versionSignatureService).recompute(ids(1).getFirst());
+  }
+
+  @Test
+  @DisplayName("a repo whose recomputation is still waiting is not queued a second time")
+  void aWaitingRepoIsQueuedOnce() {
+    this.pageAfter(BEFORE_THE_FIRST, ids(1));
+
+    this.service.onToggled(new PgpVerifyAllSignaturesToggledEvent(this.repoId));
+    this.service.onToggled(new PgpVerifyAllSignaturesToggledEvent(this.repoId));
+
+    assertThat(this.queue).hasSize(1);
+
+    this.runQueued();
+
+    verify(this.versionSignatureService).recompute(ids(1).getFirst());
+  }
+
+  @Test
+  @DisplayName("a toggle while the repo's run is going queues another run behind it")
+  void aToggleDuringARunQueuesAnotherRun() {
+    this.pageAfter(BEFORE_THE_FIRST, ids(1));
+    this.service.onToggled(new PgpVerifyAllSignaturesToggledEvent(this.repoId));
+    this.runQueued();
+
+    this.service.onToggled(new PgpVerifyAllSignaturesToggledEvent(this.repoId));
+
+    assertThat(this.queue).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("another repo is queued next to a waiting one")
+  void anotherRepoIsQueuedToo() {
+    this.service.onToggled(new PgpVerifyAllSignaturesToggledEvent(this.repoId));
+    this.service.onToggled(new PgpVerifyAllSignaturesToggledEvent(UUID.randomUUID()));
+
+    assertThat(this.queue).hasSize(2);
+  }
+
+  @Test
+  @DisplayName("a full queue rejects the job: nothing runs on the caller, nothing is thrown")
+  void aFullQueueRunsNothingOnTheCaller() {
+    this.full = true;
+
+    this.service.onToggled(new PgpVerifyAllSignaturesToggledEvent(this.repoId));
+
+    verifyNoInteractions(this.versionSignatureService, this.artifactVersionRepository);
+
+    // The repo is not stuck as waiting: the next toggle is queued once there is room again.
+    this.full = false;
+    this.service.onToggled(new PgpVerifyAllSignaturesToggledEvent(this.repoId));
+
+    assertThat(this.queue).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("a run that fails is logged and does not throw into the executor")
+  void aFailingRunDoesNotThrow() {
+    when(this.artifactVersionRepository.findIdsByRepoIdAfter(
+            eq(this.repoId), eq(BEFORE_THE_FIRST), any(Pageable.class)))
+        .thenThrow(new IllegalStateException("database is down"));
+    this.service.onToggled(new PgpVerifyAllSignaturesToggledEvent(this.repoId));
+
+    assertThatCode(this::runQueued).doesNotThrowAnyException();
+
+    // and the repo can be queued again.
+    this.service.onToggled(new PgpVerifyAllSignaturesToggledEvent(this.repoId));
+    assertThat(this.queue).hasSize(1);
   }
 
   @Test
   @DisplayName("a batch size below one is read as one")
   void aBatchSizeBelowOneIsOne() {
     final var single =
-        new SignedRecomputeService(this.artifactVersionRepository, this.versionSignatureService, 0);
+        new SignedRecomputeService(
+            this.artifactVersionRepository, this.versionSignatureService, this::submit, 0);
     final var all = ids(2);
     this.pageAfter(BEFORE_THE_FIRST, all.subList(0, 1));
     this.pageAfter(all.get(0), all.subList(1, 2));

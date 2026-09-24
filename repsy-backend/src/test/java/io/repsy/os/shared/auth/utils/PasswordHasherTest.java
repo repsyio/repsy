@@ -88,6 +88,33 @@ class PasswordHasherTest {
   }
 
   @Nested
+  @DisplayName("requireFitsBcrypt")
+  class RequireFitsBcrypt {
+
+    @Test
+    @DisplayName("accepts 72 bytes, also as multi-byte characters")
+    void acceptsTheLimit() {
+      assertThatCode(
+              () -> {
+                PasswordHasher.requireFitsBcrypt("a".repeat(PasswordHasher.MAX_PASSWORD_BYTES));
+                PasswordHasher.requireFitsBcrypt("é".repeat(36));
+              })
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("rejects 73 bytes, counting bytes and not characters")
+    void rejectsOverTheLimit() {
+      assertThatThrownBy(() -> PasswordHasher.requireFitsBcrypt("a".repeat(73)))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("passwordTooLong");
+      assertThatThrownBy(() -> PasswordHasher.requireFitsBcrypt("é".repeat(37)))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("passwordTooLong");
+    }
+  }
+
+  @Nested
   @DisplayName("matches")
   class Matches {
 
@@ -139,6 +166,16 @@ class PasswordHasherTest {
     @DisplayName("rejects a password over 72 bytes on a BCrypt hash without failing")
     void rejectsOverlongPasswordOnBcrypt() {
       assertThat(PasswordHasher.matches("a".repeat(200), PasswordHasher.hash(PASSWORD))).isFalse();
+    }
+
+    @Test
+    @DisplayName("does not accept a password that only has the 72-byte prefix of the hashed one")
+    void doesNotIgnoreBytesPastTheLimit() {
+      final var hashed = "a".repeat(PasswordHasher.MAX_PASSWORD_BYTES);
+
+      assertThat(PasswordHasher.matches(hashed + "tail", PasswordHasher.hash(hashed))).isFalse();
+      assertThat(PasswordHasher.matches("é".repeat(37), PasswordHasher.hash("é".repeat(36))))
+          .isFalse();
     }
   }
 

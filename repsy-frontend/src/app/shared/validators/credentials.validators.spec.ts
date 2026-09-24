@@ -16,7 +16,10 @@
 import { FormControl, ValidatorFn } from '@angular/forms';
 
 import {
+  LOGIN_PASSWORD_MAX_LENGTH,
+  LOGIN_PASSWORD_MESSAGES,
   LOGIN_USERNAME_MESSAGES,
+  loginPasswordValidators,
   loginUsernameValidators,
   PASSWORD_MESSAGES,
   PASSWORD_MISMATCH_MESSAGE,
@@ -127,6 +130,39 @@ describe('loginUsernameValidators (backend LoginForm: 3-150 of a-z, A-Z, 0-9, @,
   });
 });
 
+describe('loginPasswordValidators (backend LoginForm: 1-72 characters, no complexity rule)', () => {
+  const validators = loginPasswordValidators();
+
+  it('accepts any existing password that fits, whatever the creation rule says', () => {
+    for (const value of [
+      'a',
+      'abc',
+      '12345',
+      'Ab1de',
+      'lowercase1',
+      'UPPERCASE1',
+      'NoDigitsHere',
+      'has space',
+      '   ',
+    ]) {
+      expect(errorsOf(validators, value)).withContext(value).toEqual([]);
+    }
+    expect(errorsOf(validators, 'x'.repeat(60))).toEqual([]);
+    expect(errorsOf(validators, 'x'.repeat(LOGIN_PASSWORD_MAX_LENGTH))).toEqual([]);
+  });
+
+  it('rejects an empty password and one over the BCrypt limit of 72', () => {
+    expect(LOGIN_PASSWORD_MAX_LENGTH).toBe(72);
+    expect(errorsOf(validators, '')).toEqual(['required']);
+    expect(errorsOf(validators, 'x'.repeat(LOGIN_PASSWORD_MAX_LENGTH + 1))).toEqual(['maxlength']);
+  });
+
+  it('is looser than the creation rule, which stays as it was', () => {
+    expect(errorsOf(passwordValidators(), 'abc')).not.toEqual([]);
+    expect(errorsOf(validators, 'abc')).toEqual([]);
+  });
+});
+
 describe('credential messages', () => {
   it('names the limits the validators enforce', () => {
     expect(USERNAME_MESSAGES.minlength).toBe('Should be minimum 3 characters');
@@ -135,6 +171,7 @@ describe('credential messages', () => {
     expect(PASSWORD_MESSAGES.maxlength).toBe('Should be maximum 50 characters');
     expect(LOGIN_USERNAME_MESSAGES.minlength).toBe('Should be minimum 3 characters');
     expect(LOGIN_USERNAME_MESSAGES.maxlength).toBe('Should be maximum 150 characters');
+    expect(LOGIN_PASSWORD_MESSAGES.maxlength).toBe('Should be maximum 72 characters');
   });
 
   it('describes the alphabets, and says that a password has no whitespace', () => {
@@ -149,11 +186,12 @@ describe('credential messages', () => {
     expect(USERNAME_MESSAGES.required).toBe(REQUIRED_MESSAGE);
     expect(PASSWORD_MESSAGES.required).toBe(REQUIRED_MESSAGE);
     expect(LOGIN_USERNAME_MESSAGES.required).toBe(REQUIRED_MESSAGE);
+    expect(LOGIN_PASSWORD_MESSAGES.required).toBe(REQUIRED_MESSAGE);
     expect(PASSWORD_MISMATCH_MESSAGE).toBe('Passwords do not match');
   });
 
   it('starts every message with "Should", never with the old "must" or "can" wordings', () => {
-    for (const messages of [USERNAME_MESSAGES, PASSWORD_MESSAGES, LOGIN_USERNAME_MESSAGES]) {
+    for (const messages of [USERNAME_MESSAGES, PASSWORD_MESSAGES, LOGIN_USERNAME_MESSAGES, LOGIN_PASSWORD_MESSAGES]) {
       for (const message of Object.values(messages)) {
         expect(message).toMatch(/^Should /);
       }

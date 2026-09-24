@@ -96,6 +96,8 @@ class AuthControllerIT extends AbstractIntegrationTest {
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
   private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String INVALID_CREDENTIALS_TEXT = "Username or password is incorrect.";
+  private static final String PASSWORD_TOO_LONG_TEXT =
+      "Password is too long. Use at most 72 bytes; non-ASCII characters take more than one.";
   private static final String ACCESS_NOT_ALLOWED_TEXT = "Access isn't allowed.";
   private static final String INTERNAL_ERROR_TEXT = "An error occurred.";
 
@@ -512,16 +514,10 @@ class AuthControllerIT extends AbstractIntegrationTest {
           Arguments.of("empty username", loginBody("", VALID_PASSWORD)),
           Arguments.of("blank username", loginBody("   ", VALID_PASSWORD)),
           Arguments.of("empty password", loginBody("someuser", "")),
-          Arguments.of("blank password", loginBody("someuser", "      ")),
           Arguments.of("username too short", loginBody("ab", VALID_PASSWORD)),
           Arguments.of("username too long", loginBody("a".repeat(151), VALID_PASSWORD)),
           Arguments.of("username with illegal characters", loginBody("bad!name", VALID_PASSWORD)),
-          Arguments.of("password too short", loginBody("someuser", "Ab1de")),
-          Arguments.of("password too long", loginBody("someuser", "Aa1" + "x".repeat(48))),
-          Arguments.of("password without uppercase", loginBody("someuser", "lowercase1")),
-          Arguments.of("password without lowercase", loginBody("someuser", "UPPERCASE1")),
-          Arguments.of("password without digit", loginBody("someuser", "NoDigitsHere")),
-          Arguments.of("password with whitespace", loginBody("someuser", "Has Space1")),
+          Arguments.of("password too long", loginBody("someuser", "x".repeat(73))),
           Arguments.of("null body", "null"),
           Arguments.of("empty body", ""),
           Arguments.of("malformed JSON", "{not-json"),
@@ -540,6 +536,90 @@ class AuthControllerIT extends AbstractIntegrationTest {
       return Stream.of(
           Arguments.of("3-char username", "abc"),
           Arguments.of("150-char username", "a".repeat(150)));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("passwordsThePolicyRejects")
+    @DisplayName("answers a wrong password the creation policy would reject with 401, not 400")
+    void weakWrongPassword(final String name, final String password) throws Exception {
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("weakwrong"), UserRole.USER);
+
+      // The same answer as for a strong wrong password and for an unknown user.
+      expectInvalidCredentials(AuthControllerIT.this.login(user.getUsername(), password));
+      expectInvalidCredentials(AuthControllerIT.this.login(uniqueUsername("ghost"), password));
+      expectInvalidCredentials(
+          AuthControllerIT.this.login(user.getUsername(), OTHER_VALID_PASSWORD));
+    }
+
+    static Stream<Arguments> passwordsThePolicyRejects() {
+      return Stream.of(
+          Arguments.of("1 character", "a"),
+          Arguments.of("too short", "Ab1de"),
+          Arguments.of("without uppercase", "lowercase1"),
+          Arguments.of("without lowercase", "UPPERCASE1"),
+          Arguments.of("without digit", "NoDigitsHere"),
+          Arguments.of("with whitespace", "Has Space1"),
+          Arguments.of("only whitespace", "      "),
+          Arguments.of("longer than 50 characters", "Aa1" + "x".repeat(60)),
+          Arguments.of("72 characters", "x".repeat(72)));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("legacyPasswords")
+    @DisplayName("logs in an account whose password the creation policy would reject")
+    void logsInWithALegacyPassword(final String name, final String password) throws Exception {
+      // Created below the form validators, like an account from before the policy.
+      final var userInfo =
+          AuthControllerIT.this.userTxService.create(
+              uniqueUsername("legacy"), UserRole.USER, PasswordHasher.hash(password));
+      AuthControllerIT.this.entityManager.flush();
+
+      final var before = Instant.now();
+      final var body =
+          expectSuccess(
+              AuthControllerIT.this.login(userInfo.getUsername(), password), "loginSucceeded");
+      final var after = Instant.now();
+
+      AuthControllerIT.this.assertLoginInfo(
+          body, userInfo.getId(), userInfo.getUsername(), before, after);
+      // The password is still checked: another one, weak or strong, does not get in.
+      // One character changed, so a 72-character password stays within the limit.
+      expectInvalidCredentials(
+          AuthControllerIT.this.login(userInfo.getUsername(), "!" + password.substring(1)));
+      expectInvalidCredentials(
+          AuthControllerIT.this.login(userInfo.getUsername(), OTHER_VALID_PASSWORD));
+    }
+
+    static Stream<Arguments> legacyPasswords() {
+      return Stream.of(
+          Arguments.of("abc", "abc"),
+          Arguments.of("1 character", "a"),
+          Arguments.of("digits only", "12345"),
+          Arguments.of("with whitespace", "pass word"),
+          Arguments.of("60 characters", "Aa1" + "x".repeat(57)),
+          Arguments.of("72 characters", "Aa1" + "x".repeat(69)),
+          Arguments.of("72 bytes of 2-byte characters", "é".repeat(36)));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("passwordsOverTheBcryptLimit")
+    @DisplayName("returns 400 passwordTooLong for a password of more than 72 bytes")
+    void passwordOverTheBcryptLimit(final String name, final String password) throws Exception {
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("toolong"), UserRole.USER);
+
+      expectError(
+          AuthControllerIT.this.login(user.getUsername(), password),
+          HttpStatus.BAD_REQUEST,
+          "passwordTooLong",
+          "passwordTooLong",
+          PASSWORD_TOO_LONG_TEXT);
+    }
+
+    static Stream<Arguments> passwordsOverTheBcryptLimit() {
+      return Stream.of(
+          // Within the form's 72 characters, but 74 bytes: BCrypt would ignore the tail.
+          Arguments.of("37 two-byte characters", "é".repeat(37)),
+          Arguments.of("72 three-byte characters", "€".repeat(72)));
     }
 
     @Test

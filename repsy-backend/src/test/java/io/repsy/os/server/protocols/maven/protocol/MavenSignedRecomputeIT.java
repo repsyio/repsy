@@ -27,7 +27,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.generated.model.RepoSettingsForm;
+import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.SignedRecomputeService;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.VersionSignatureService;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
@@ -81,6 +83,8 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
   @Autowired private MavenStorageService mavenStorageService;
   @Autowired private PlatformTransactionManager transactionManager;
   @Autowired private ObjectMapper objectMapper;
+  @Autowired private ArtifactVersionRepository artifactVersionRepository;
+  @Autowired private VersionSignatureService versionSignatureService;
 
   private final List<UUID> createdRepoIds = new ArrayList<>();
   private final List<UUID> createdUserIds = new ArrayList<>();
@@ -164,6 +168,23 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
                     .header(AUTHORIZATION, this.bearerTokenFor(admin))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"pgpVerifyAllSignaturesEnabled\":" + enabled + "}"))
+            .andReturn()
+            .getResponse()
+            .getStatus();
+
+    assertThat(status).as("PUT settings").isEqualTo(200);
+  }
+
+  /** Turns the key-server lookup off, so a key that is not registered is refused without a call. */
+  private void putKeyServerLookupOff(final Repo repo, final User admin) throws Exception {
+    final var status =
+        this.mockMvc
+            .perform(
+                put("/api/repos/" + repo.getName() + "/settings")
+                    .with(apiPort())
+                    .header(AUTHORIZATION, this.bearerTokenFor(admin))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"pgpKeyServerLookupEnabled\":false}"))
             .andReturn()
             .getResponse()
             .getStatus();
@@ -280,6 +301,189 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
 
     this.awaitSigned(
         repo, Map.of("1.0", true, "2.0", true, "3.0", false, "4.0", true, "5.0", true));
+  }
+
+  @Test
+  @DisplayName("turning verify-all on verifies the .asc files that were stored while it was off")
+  void aToggleOnVerifiesTheStoredSignatures() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    this.registerPublicKey(repo, admin);
+    this.putKeyServerLookupOff(repo, admin);
+    final var stranger = PgpTestKeys.generate();
+
+    // Uploaded while only the POM's signature is verified: every other .asc is stored as sent.
+    // 1.0: an honest publisher, everything signed by the registered key.
+    this.uploadPom(repo, admin, "1.0");
+    this.uploadPomSignature(repo, admin, "1.0");
+    this.uploadJar(repo, admin, "1.0");
+    this.uploadJarSignature(repo, admin, "1.0");
+    // 2.0: the jar's signature is the one of other bytes.
+    this.uploadPom(repo, admin, "2.0");
+    this.uploadPomSignature(repo, admin, "2.0");
+    this.uploadJar(repo, admin, "2.0");
+    this.uploadOk(
+        repo, admin, dir("2.0") + "lib-2.0.jar.asc", sign("not the jar of 2.0".getBytes(UTF_8)));
+    // 3.0: the jar's signature is by a key the repo does not know.
+    this.uploadPom(repo, admin, "3.0");
+    this.uploadPomSignature(repo, admin, "3.0");
+    this.uploadJar(repo, admin, "3.0");
+    this.uploadOk(
+        repo,
+        admin,
+        dir("3.0") + "lib-3.0.jar.asc",
+        stranger.detachedSignature(jar("3.0")).getBytes(UTF_8));
+    // 4.0: a jar with no signature at all.
+    this.uploadPom(repo, admin, "4.0");
+    this.uploadPomSignature(repo, admin, "4.0");
+    this.uploadJar(repo, admin, "4.0");
+    assertThat(this.signedByVersion(repo))
+        .isEqualTo(Map.of("1.0", true, "2.0", true, "3.0", true, "4.0", true));
+
+    this.putVerifyAll(repo, admin, true);
+
+    // Only the honest publisher's version stays signed.
+    this.awaitSigned(repo, Map.of("1.0", true, "2.0", false, "3.0", false, "4.0", false));
+    assertThat(this.signedFileNames(repo, "1.0"))
+        .containsExactlyInAnyOrder("lib-1.0.pom", "lib-1.0.jar");
+    assertThat(this.signedFileNames(repo, "2.0")).containsExactly("lib-2.0.pom");
+    assertThat(this.signedFileNames(repo, "3.0")).containsExactly("lib-3.0.pom");
+
+    // The two rules still tell them apart on the way back.
+    this.putVerifyAll(repo, admin, false);
+
+    this.awaitSigned(repo, Map.of("1.0", true, "2.0", true, "3.0", true, "4.0", true));
+  }
+
+  @Test
+  @DisplayName("a signature that was recorded for bytes that were replaced while off is dropped")
+  void aToggleOnForgetsARecordOfReplacedBytes() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    this.registerPublicKey(repo, admin);
+    this.putKeyServerLookupOff(repo, admin);
+    this.putVerifyAll(repo, admin, true);
+    this.uploadPom(repo, admin, "1.0");
+    this.uploadJar(repo, admin, "1.0");
+    this.uploadPomSignature(repo, admin, "1.0");
+    this.uploadJarSignature(repo, admin, "1.0");
+    assertThat(this.signedByVersion(repo)).isEqualTo(Map.of("1.0", true));
+    this.putVerifyAll(repo, admin, false);
+    // The jar is stored again with the flag off: nothing looks at the record of the old bytes.
+    this.uploadOk(repo, admin, dir("1.0") + "lib-1.0.jar", "another jar".getBytes(UTF_8));
+    this.uploadJarSignature(repo, admin, "1.0");
+    assertThat(this.signedFileNames(repo, "1.0")).contains("lib-1.0.jar");
+
+    this.putVerifyAll(repo, admin, true);
+
+    this.awaitSigned(repo, Map.of("1.0", false));
+    assertThat(this.signedFileNames(repo, "1.0")).containsExactly("lib-1.0.pom");
+  }
+
+  @Test
+  @DisplayName(
+      "a snapshot is recomputed by its newest build, and a legacy one by its stored POM signature")
+  void aToggleRecomputesASnapshot() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    this.registerPublicKey(repo, admin);
+    this.putKeyServerLookupOff(repo, admin);
+    final var dir = "com/acme/lib/1.0-SNAPSHOT/";
+    final var build = dir + "lib-1.0-20260921.101010-1";
+    final var pom = pom("1.0-SNAPSHOT");
+    final var jar = jar("1.0-SNAPSHOT");
+
+    // Off: the POM's signature is verified, the jar's is stored as sent (and is a good one).
+    this.uploadOk(repo, admin, build + ".pom", pom);
+    this.uploadOk(repo, admin, build + ".pom.asc", sign(pom));
+    this.uploadOk(repo, admin, build + ".jar", jar);
+    this.uploadOk(repo, admin, build + ".jar.asc", sign(jar));
+    assertThat(this.signedByVersion(repo)).isEqualTo(Map.of("1.0-SNAPSHOT", true));
+    // A second build whose jar has no signature: the newest build is the one that counts.
+    final var build2 = dir + "lib-1.0-20260921.101010-2";
+    this.uploadOk(repo, admin, build2 + ".pom", pom);
+    this.uploadOk(repo, admin, build2 + ".pom.asc", sign(pom));
+    this.uploadOk(repo, admin, build2 + ".jar", jar);
+    assertThat(this.signedByVersion(repo)).isEqualTo(Map.of("1.0-SNAPSHOT", true));
+
+    this.putVerifyAll(repo, admin, true);
+
+    this.awaitSigned(repo, Map.of("1.0-SNAPSHOT", false));
+
+    // The jar of the newest build gets its signature while every signature is verified.
+    this.uploadOk(repo, admin, build2 + ".jar.asc", sign(jar));
+    assertThat(this.signedByVersion(repo)).isEqualTo(Map.of("1.0-SNAPSHOT", true));
+
+    // A snapshot signed before RPS-1188 has no signature row (V0023 backfilled releases only).
+    this.jdbcTemplate.update(
+        """
+        delete from maven_version_signature where artifact_version_id in
+          (select v.id from maven_artifact_version v join maven_artifact a on a.id = v.artifact_id
+            where a.repo_id = ?)""",
+        repo.getId());
+    this.jdbcTemplate.update(
+        """
+        update maven_artifact_version set signed = false where artifact_id in
+          (select id from maven_artifact where repo_id = ?)""",
+        repo.getId());
+
+    this.putVerifyAll(repo, admin, false);
+
+    this.awaitSigned(repo, Map.of("1.0-SNAPSHOT", true));
+    assertThat(this.signedFileNames(repo, "1.0-SNAPSHOT"))
+        .containsExactlyInAnyOrder(
+            "lib-1.0-20260921.101010-1.pom", "lib-1.0-20260921.101010-2.pom");
+  }
+
+  @Test
+  @DisplayName("the setting read under the version's lock is the committed one, not a cached one")
+  void theSettingIsReadFromTheDatabaseUnderTheLock() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    this.uploadPom(repo, admin, "1.0");
+    final var versionId =
+        this.jdbcTemplate.queryForObject(
+            """
+            select v.id from maven_artifact_version v join maven_artifact a on a.id = v.artifact_id
+             where a.repo_id = ?""",
+            UUID.class,
+            repo.getId());
+
+    final var answers =
+        new TransactionTemplate(this.transactionManager)
+            .execute(
+                status -> {
+                  final var version =
+                      this.artifactVersionRepository.findById(versionId).orElseThrow();
+                  // The repo row is in the persistence context now, with the setting off.
+                  final var cached =
+                      version.getArtifact().getRepo().isPgpVerifyAllSignaturesEnabled();
+                  this.jdbcTemplate.update(
+                      "update repo set pgp_verify_all_signatures_enabled = true where id = ?",
+                      repo.getId());
+
+                  return List.of(
+                      cached,
+                      version.getArtifact().getRepo().isPgpVerifyAllSignaturesEnabled(),
+                      this.versionSignatureService.lockAndIsVerifyAll(version));
+                });
+
+    // The entity still says off (it is what a request that began before the toggle sees), the
+    // answer under the lock is the toggle's.
+    assertThat(answers).containsExactly(false, false, true);
+  }
+
+  /** The names of the files whose signature is recorded as verified, of one version. */
+  private List<String> signedFileNames(final Repo repo, final String version) {
+    return this.jdbcTemplate.queryForList(
+        """
+        select s.file_name from maven_version_signature s
+          join maven_artifact_version v on v.id = s.artifact_version_id
+          join maven_artifact a on a.id = v.artifact_id
+         where a.repo_id = ? and v.version_name = ?""",
+        String.class,
+        repo.getId(),
+        version);
   }
 
   @Test

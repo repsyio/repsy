@@ -24,20 +24,21 @@
  */
 import { expect, type Page } from '@playwright/test';
 
-import { LOGIN_USERNAME_TEXT, PASSWORD_TEXT } from '../credential-messages.js';
+import { LOGIN_PASSWORD_TEXT, LOGIN_USERNAME_TEXT } from '../credential-messages.js';
 import { type LoginField, LoginPage, type LoginValidator } from '../pages/login.js';
 
 /**
  * The visible text of every inline message, as `login.component.html` renders it. The sentences are the
- * shared credential ones (RPS-1265): the backend's LoginForm holds the password to the same rule as a new
- * one, so the login form has the create-user password rule and messages.
+ * shared credential ones (RPS-1265). The password has only the `required` and `maxlength` ones
+ * (RPS-1308): the complexity rule is for a password that is set, and login holds an existing one to
+ * its shape only, so a weak password is submitted and answered by the server (401).
  */
-export const LOGIN_ERROR_TEXT: Record<LoginField, Record<LoginValidator, string>> = {
+export const LOGIN_ERROR_TEXT: Record<LoginField, Partial<Record<LoginValidator, string>>> = {
   username: LOGIN_USERNAME_TEXT,
-  password: PASSWORD_TEXT,
+  password: LOGIN_PASSWORD_TEXT,
 };
 
-const VALIDATORS = Object.keys(LOGIN_ERROR_TEXT.username) as LoginValidator[];
+const VALIDATORS: LoginValidator[] = ['required', 'pattern', 'minlength', 'maxlength'];
 
 export class LoginValidation {
   constructor(private readonly login: LoginPage) {}
@@ -60,12 +61,17 @@ export class LoginValidation {
 
   /**
    * The field shows exactly the message of `validator` (with its text) and no other: the form
-   * shows one message at a time, in a fixed order (required, pattern, minlength, maxlength).
+   * shows one message at a time, in a fixed order (required, pattern, minlength, maxlength; the
+   * password has only required and maxlength).
    */
   async expectOnlyError(field: LoginField, validator: LoginValidator): Promise<void> {
     const shown = this.login.error(field, validator);
     await expect(shown).toBeVisible();
-    await expect(shown).toContainText(LOGIN_ERROR_TEXT[field][validator]);
+    const text = LOGIN_ERROR_TEXT[field][validator];
+    if (text === undefined) {
+      throw new Error(`The login ${field} has no ${validator} message`);
+    }
+    await expect(shown).toContainText(text);
     for (const other of VALIDATORS.filter((v) => v !== validator)) {
       await expect(this.login.error(field, other)).toHaveCount(0);
     }
