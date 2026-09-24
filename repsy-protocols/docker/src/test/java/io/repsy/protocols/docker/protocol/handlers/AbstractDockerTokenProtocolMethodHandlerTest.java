@@ -22,6 +22,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
@@ -42,6 +43,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
@@ -204,6 +207,52 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
         .startsWith("Basic realm=");
     assertThat(result.getBody()).isNull();
     verify(this.authService, never()).createAnonymousUser();
+  }
+
+  private MockHttpServletRequest anonymousRequestForScope(final String scope) {
+    final var request = new MockHttpServletRequest("GET", "/v2/token");
+    request.setParameter("scope", scope);
+
+    return request;
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "repository:repo/app:delete",
+        "repository:repo/app:pull,delete",
+        "repository:repo/app:pull repository:repo/other:delete",
+        "repository:repo/app:DELETE"
+      })
+  @DisplayName("a delete scope is never anonymous, even for a public repo (RPS-1216)")
+  void deleteScopeNeedsCredentials(final String scope) throws Exception {
+    final var result =
+        this.handler.handle(
+            new ProtocolContext(),
+            this.anonymousRequestForScope(scope),
+            new MockHttpServletResponse());
+
+    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    assertThat(result.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE))
+        .startsWith("Basic realm=");
+    verify(this.authService, never()).createAnonymousUser();
+    verifyNoInteractions(this.scopeParser);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"repository:repo/delete-me:pull", "repository:repo/undelete:pull"})
+  @DisplayName("an image merely named like the action is still a public pull")
+  void imageNamedDeleteIsStillAPublicPull(final String scope) throws Exception {
+    doReturn(Optional.of(repo(false))).when(this.scopeParser).getRepoInfoByScope(scope);
+    when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
+
+    final var result =
+        this.handler.handle(
+            new ProtocolContext(),
+            this.anonymousRequestForScope(scope),
+            new MockHttpServletResponse());
+
+    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
   }
 
   // -----------------------------------------------------------------------------------------

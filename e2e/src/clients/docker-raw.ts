@@ -199,6 +199,12 @@ export function pullScope(repoName: string, image: string): string {
   return `repository:${repoName}/${image}:pull`;
 }
 
+/** The scope a client asks for to delete: `crane delete`, `skopeo delete` and `regctl` request the
+ *  `delete` action on its own (RPS-1216). */
+export function deleteScope(repoName: string, image: string): string {
+  return `repository:${repoName}/${image}:delete`;
+}
+
 export interface TokenResult {
   status: number;
   token?: string;
@@ -340,6 +346,26 @@ export async function rawHeadManifest(
     body: res.body,
     hop: res.hop,
     digestHeader: res.headers.get('docker-content-digest') ?? undefined,
+  };
+}
+
+/** `DELETE /v2/<repo>/<image>/manifests/<ref>` (RPS-1216): a digest of either algorithm deletes the
+ *  manifest and every tag that pointed at it, a tag deletes the tag only; `202` either way. Needs
+ *  MANAGE, so it goes through the two-hop `dockerRequest` for `deleteScope`. */
+export async function rawDeleteManifest(
+  repoName: string,
+  credential: MaterializedCredential,
+  image: string,
+  ref: string,
+): Promise<RawResponse & { hop: 'token' | 'request'; wwwAuthenticate?: string }> {
+  const res = await dockerRequest(credential, deleteScope(repoName, image), (headers) =>
+    rawFetch(v2Url(`/${repoName}/${image}/manifests/${ref}`), { method: 'DELETE', headers }),
+  );
+  return {
+    status: res.status,
+    body: res.body,
+    hop: res.hop,
+    wwwAuthenticate: res.headers.get('www-authenticate') ?? undefined,
   };
 }
 

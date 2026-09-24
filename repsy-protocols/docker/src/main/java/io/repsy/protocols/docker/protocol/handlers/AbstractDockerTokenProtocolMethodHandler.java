@@ -37,11 +37,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
@@ -200,7 +202,29 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
 
   private boolean requiresAuthentication(final String scope) {
     final var lowerScope = scope.toLowerCase(Locale.getDefault());
-    return lowerScope.contains("push") || lowerScope.contains(",*") || lowerScope.endsWith(":*");
+    return lowerScope.contains("push")
+        || lowerScope.contains(",*")
+        || lowerScope.endsWith(":*")
+        || requestsDelete(lowerScope);
+  }
+
+  /**
+   * Tells whether any of the space separated scopes asks for the {@code delete} action (RPS-1216),
+   * which is never anonymous. Only the actions after the last colon are read, so an image that is
+   * merely named {@code delete-me} does not need credentials to be pulled.
+   */
+  private static boolean requestsDelete(final String lowerScope) {
+    for (final var single : StringUtils.split(lowerScope, ' ')) {
+      final var actionsStart = single.lastIndexOf(':');
+
+      if (actionsStart >= 0
+          && Arrays.asList(StringUtils.split(single.substring(actionsStart + 1), ','))
+              .contains("delete")) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private ResponseEntity<Object> buildUnauthorizedResponse() {

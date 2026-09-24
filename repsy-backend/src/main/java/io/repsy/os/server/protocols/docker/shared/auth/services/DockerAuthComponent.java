@@ -164,6 +164,23 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
   }
 
   /**
+   * A deploy token reads and writes, and never manages: a Docker request that needs {@link
+   * Permission#MANAGE} (deleting a manifest, RPS-1216) is refused for it, whether or not the token
+   * is read-only, so a CI's credential cannot delete what it pushed. The panel offers the same
+   * operations to users who manage the repo only.
+   */
+  @Override
+  public void authorizeTokenRequestTokenId(
+      final UUID repoId, final UUID tokenId, final Permission permission) {
+
+    if (permission == Permission.MANAGE) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    super.authorizeTokenRequestTokenId(repoId, tokenId, permission);
+  }
+
+  /**
    * A scanner token is repo-scoped and carries no user; only Docker issues it, for its
    * vulnerability scanner to re-pull the image it just scanned.
    */
