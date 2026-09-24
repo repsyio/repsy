@@ -2834,6 +2834,13 @@ Facts the tests rely on (probed, RPS-1256):
   `pypi.spec.ts` (long description, home page) publish their own rich package with the raw builders.
 - "Version 'x' not found" exists on the Go detail page only; nothing asserts it here.
 
+### Permissions requested once (RPS-1305)
+
+`tests/ui/packages/permissions-once.spec.ts` (PKG-perm-01, one test per protocol over `DESCRIPTORS`): a cold
+load of the list page of a repository with one seeded package sends exactly one request to
+`/api/repos/{name}/permissions`. The protocol shell components used to subscribe to the replaying
+`currentRepo$` and also load by hand, which sent it twice.
+
 ### Package tests: Cargo, NuGet, Helm, Go, Ruby (RPS-1257)
 
 `tests/ui/packages/{cargo,nuget,helm,golang,ruby}.spec.ts`: each is one `registerPackageScenarios(...)`
@@ -2902,7 +2909,7 @@ this story added (`package.json`, `pnpm-lock.yaml`), so the `ui` runner image mu
 | `nav/breadcrumbs`  | NAV-01    | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                         |
 | `nav/mobile`       | NAV-02    | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); the burger opens the mobile sidebar, its links, the X, the backdrop and Escape close it (admin, and a USER without Users/Security); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`                                                             |
 | `nav/mobile`       | NAV-03    | the mobile menu closes when the viewport widens past `md` and stays closed when it narrows again; `document.body.style.overflow` is `hidden` (and the wheel does not scroll the page) while it is open, `''` after every way of closing it                                                                                                                             |
-| `errors/not-found` | ERR-04    | `/not-found` in the panel layout: an anonymous visitor (phone and desktop) gets no sidebar, no burger and no `/api/profile` request; an admin and a USER at phone width open the mobile sidebar from it; at desktop the sidebar shows and the burger does not                                                                                                          |
+| `errors/not-found` | ERR-04    | `/not-found` in the panel layout: an anonymous visitor (phone and desktop, and on a deep unknown path `/a/b/c`) gets no sidebar, no burger, no avatar menu, a `header-login` link and no `/api/profile` request; an admin and a USER at phone width open the mobile sidebar from it; at desktop the sidebar shows and the burger does not                              |
 | `a11y/a11y`        | A11Y-01   | axe on login, dashboard, repository list, repository settings, users (admin); report-only                                                                                                                                                                                                                                                                              |
 
 Things a later author must know:
