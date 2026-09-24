@@ -66,7 +66,7 @@ test.describe('USR-01 create a user', () => {
     await usersPage.search(username);
     await expect(usersPage.row(username)).toBeVisible();
     await expect(usersPage.role(username)).toHaveText('USER');
-    const stored = (await panelApi.listUsers({ search: username })).find(
+    const stored = (await panelApi.listUsers({ q: username })).find(
       (user) => user.username === username,
     );
     expect(stored?.role).toBe(UserRole.USER);
@@ -105,7 +105,7 @@ test.describe('USR-01 create a user', () => {
 
     await usersPage.search(username);
     await expect(usersPage.role(username)).toHaveText('ADMIN');
-    const stored = (await panelApi.listUsers({ search: username })).find(
+    const stored = (await panelApi.listUsers({ q: username })).find(
       (user) => user.username === username,
     );
     expect(stored?.role).toBe(UserRole.ADMIN);
@@ -139,7 +139,7 @@ test.describe('USR-01 create a user', () => {
     await expect(usersPage.createModal.password).toHaveValue('');
     await expect(usersPage.createModal.confirmPassword).toHaveValue('');
 
-    expect(await panelApi.listUsers({ search: username })).toHaveLength(0);
+    expect(await panelApi.listUsers({ q: username })).toHaveLength(0);
   });
 });
 
@@ -358,7 +358,7 @@ test.describe('USR-02 create validation', () => {
     await usersPage.shell.toasts.expectError(/in use/i);
     await expect(usersPage.createModal.root).toBeVisible();
     // Still exactly one user of that name.
-    const matches = await panelApi.listUsers({ search: seededUser.username });
+    const matches = await panelApi.listUsers({ q: seededUser.username });
     expect(matches.filter((user) => user.username === seededUser.username)).toHaveLength(1);
   });
 });

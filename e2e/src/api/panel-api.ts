@@ -135,19 +135,23 @@ export class PanelApi {
     await this.client.userController.deleteUser({ userId });
   }
 
+  /**
+   * One page of `GET /api/users` (RPS-1269): `q` filters by username on the server, `size` is 1-100
+   * (server default 10) and `sort` defaults to `createdAt,desc`. Use `listAllUsers` to read everything.
+   */
   async listUsers(
-    params: { search?: string; page?: number; size?: number } = {},
+    params: { q?: string; page?: number; size?: number; sort?: string[] } = {},
   ): Promise<UserResponse[]> {
     const res = await this.client.userController.listUsers(params);
     return unwrap(res.data, 'listUsers').content ?? [];
   }
 
   /**
-   * Every user matching `search`, read page by page (100 a page) until the last page. A user created
+   * Every user matching `q`, read page by page (100 a page) until the last page. A user created
    * or deleted mid-read can still move a row across a page boundary, so an id is kept once. Collect
    * first, then act: deleting while reading pages skips the rows that move up into the page just read.
    */
-  async listAllUsers(filter: { search?: string } = {}): Promise<UserResponse[]> {
+  async listAllUsers(filter: { q?: string } = {}): Promise<UserResponse[]> {
     const byId = new Map<string, UserResponse>();
 
     for (let page = 0; ; page += 1) {
@@ -237,46 +241,26 @@ export class PanelApi {
   }
 
   /**
-   * One page of a repo's deploy tokens, newest first. The generated client's `listDeployTokens`
-   * serialises its `pageable` query param as `pageable[page]=..&pageable[size]=..`, which Spring's
-   * `Pageable` resolver does not bind (it always falls back to the server's default page), so this
-   * calls the endpoint directly with `page`/`size`/`sort` as plain query parameters instead — the
-   * form Spring actually binds.
+   * One page of a repo's deploy tokens, newest first (`repo_deploy_token.id` is a UUIDv7, so DESC on
+   * it is DESC on creation time): a token this harness just created is always on page 0, and sorting
+   * explicitly keeps that true even if the server's own default ever changes.
    */
   async listDeployTokensPage(
     repoName: string,
     page: number,
     size: number,
   ): Promise<DeployTokenPage> {
-    const url = new URL(`${this.baseUrl}/api/repos/${encodeURIComponent(repoName)}/deploy-tokens`);
-    url.searchParams.set('page', String(page));
-    url.searchParams.set('size', String(size));
-    // Newest first (repo_deploy_token.id is a UUIDv7, so DESC on it is DESC on creation time too):
-    // a token this harness just created is always on page 0, but sorting explicitly rather than
-    // relying on the server's own default keeps that true even if the default ever changes.
-    url.searchParams.set('sort', 'id,desc');
+    const res = await this.client.protocolDeployTokenController.listDeployTokens({
+      repoName,
+      page,
+      size,
+      sort: ['id,desc'],
+    });
+    const result = unwrap(res.data, 'listDeployTokensPage');
 
-    const res = await fetch(url, { headers: { Authorization: this.authorization() } });
-    if (!res.ok) {
-      throw new ApiError(
-        { method: 'GET', url: url.toString() },
-        {
-          status: res.status,
-          statusText: res.statusText,
-          url: url.toString(),
-          ok: false,
-          body: null,
-        },
-        `listDeployTokensPage failed with status ${res.status}`,
-      );
-    }
-
-    const body = (await res.json()) as {
-      data?: { content?: DeployTokenInfoListItem[]; page?: { totalPages?: number } };
-    };
     return {
-      content: body.data?.content ?? [],
-      totalPages: body.data?.page?.totalPages ?? 0,
+      content: result.content ?? [],
+      totalPages: result.page?.totalPages ?? 0,
     };
   }
 
@@ -323,45 +307,23 @@ export class PanelApi {
     return unwrap(res.data, 'registerPgpPublicKey');
   }
 
-  /**
-   * One page of a Maven repo's registered PGP public keys. Like {@link listDeployTokensPage}, the
-   * generated client's `listMavenPgpPublicKeys` serialises its `pageable` query param as
-   * `pageable[page]=..&pageable[size]=..`, which Spring's `Pageable` resolver does not bind, so
-   * this calls the endpoint directly with `page`/`size`/`sort` as plain query parameters instead.
-   */
+  /** One page of a Maven repo's registered PGP public keys, newest first. */
   async listPgpPublicKeysPage(
     repoName: string,
     page: number,
     size: number,
   ): Promise<PgpPublicKeyPage> {
-    const url = new URL(
-      `${this.baseUrl}/api/mvn/key-stores/${encodeURIComponent(repoName)}/public-keys`,
-    );
-    url.searchParams.set('page', String(page));
-    url.searchParams.set('size', String(size));
-    url.searchParams.set('sort', 'id,desc');
+    const res = await this.client.keyStoreController.listMavenPgpPublicKeys({
+      repoName,
+      page,
+      size,
+      sort: ['id,desc'],
+    });
+    const result = unwrap(res.data, 'listPgpPublicKeysPage');
 
-    const res = await fetch(url, { headers: { Authorization: this.authorization() } });
-    if (!res.ok) {
-      throw new ApiError(
-        { method: 'GET', url: url.toString() },
-        {
-          status: res.status,
-          statusText: res.statusText,
-          url: url.toString(),
-          ok: false,
-          body: null,
-        },
-        `listPgpPublicKeysPage failed with status ${res.status}`,
-      );
-    }
-
-    const body = (await res.json()) as {
-      data?: { content?: PgpPublicKeyItem[]; page?: { totalPages?: number } };
-    };
     return {
-      content: body.data?.content ?? [],
-      totalPages: body.data?.page?.totalPages ?? 0,
+      content: result.content ?? [],
+      totalPages: result.page?.totalPages ?? 0,
     };
   }
 

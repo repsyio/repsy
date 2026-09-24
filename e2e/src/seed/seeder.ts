@@ -122,7 +122,7 @@ export class Seeder {
 
   /** Looks a user up by exact username through the panel API, adopts it and returns its id. */
   async adoptUserByUsername(username: string): Promise<string> {
-    const matches = await this.api.listUsers({ search: username });
+    const matches = await this.api.listUsers({ q: username });
     const user = matches.find((candidate) => candidate.username === username);
     if (!user) {
       throw new Error(`Seeder.adoptUserByUsername: no user named "${username}" to adopt`);

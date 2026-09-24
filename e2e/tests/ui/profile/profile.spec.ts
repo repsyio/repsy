@@ -272,7 +272,7 @@ test.describe('PRO-03 delete account', () => {
       await profile.requestAccountDeletion();
       await profile.shell.dangerModal.cancel();
       await profile.shell.dangerModal.expectClosed();
-      expect(await panelApi.listUsers({ search: seededUser.username })).toHaveLength(1);
+      expect(await panelApi.listUsers({ q: seededUser.username })).toHaveLength(1);
 
       await profile.requestAccountDeletion();
       await profile.shell.dangerModal.confirm();
@@ -283,7 +283,7 @@ test.describe('PRO-03 delete account', () => {
       await expect(new LoginPage(userPage).submit).toBeVisible();
       expect(await currentUsername(userPage)).toBeNull();
 
-      expect(await panelApi.listUsers({ search: seededUser.username })).toHaveLength(0);
+      expect(await panelApi.listUsers({ q: seededUser.username })).toHaveLength(0);
       await expectLoginRefused(openUiPage, seededUser.username, seededUser.password);
     },
   );
@@ -354,7 +354,7 @@ test.describe('PRO-05 a refused update raises exactly one error toast (RPS-1309)
     // Still signed in, still on the page, the account still exists.
     await expect(userPage).toHaveURL(/\/profile$/);
     expect(await currentUsername(userPage)).toBe(seededUser.username);
-    expect(await panelApi.listUsers({ search: seededUser.username })).toHaveLength(1);
+    expect(await panelApi.listUsers({ q: seededUser.username })).toHaveLength(1);
   });
 });
 

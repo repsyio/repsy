@@ -99,7 +99,7 @@ export async function sweep(opts: SweepOptions): Promise<SweepResult> {
 
   // Same rule for users: read every page first, then delete. Deleting while paging shifts the
   // following users into the page already read (more than 100 e2e users is a normal leftover).
-  const staleUsers = (await api.listAllUsers({ search: `${RUN_PREFIX}-` })).filter(
+  const staleUsers = (await api.listAllUsers({ q: `${RUN_PREFIX}-` })).filter(
     (user) =>
       user.username !== env.adminUsername &&
       isRunPrefixed(user.username) &&
