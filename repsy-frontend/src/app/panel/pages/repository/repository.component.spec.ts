@@ -13,6 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 ///
+import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
 import { ProtocolRepoControllerService, RepoSecuritySummary } from '../../../../generated/api';
@@ -257,5 +259,311 @@ describe('RepositoryComponent load outcome', () => {
     const component = create();
 
     expect(component.isAdmin).toBeFalse();
+  });
+});
+
+describe('RepositoryComponent search and paging', () => {
+  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
+  let component: RepositoryComponent;
+
+  const names = (repos: { name: string }[]): string[] => repos.map((r) => r.name);
+
+  beforeEach(() => {
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['getInfo']);
+    repoApi.getInfo.and.callFake(((type: string) =>
+      of({
+        data:
+          type === 'MAVEN'
+            ? Array.from({ length: 12 }, (_, i) => ({
+                name: `lib-${i + 1}`,
+                createdAt: new Date(2026, 0, i + 1).toISOString(),
+              }))
+            : type === 'NPM'
+              ? [{ name: 'web-app', createdAt: '2026-02-01T00:00:00Z' }]
+              : [],
+      })) as never);
+    const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchSecuritySummary']);
+    securityService.watchSecuritySummary.and.returnValue(new Subject());
+    component = new RepositoryComponent(
+      repoApi,
+      securityService,
+      { get: () => of({ role: 'ADMIN' }) } as unknown as ProfileService,
+      jasmine.createSpyObj<ToastService>('ToastService', ['show']),
+      new DangerModalService(),
+    );
+  });
+
+  afterEach(() => component.ngOnDestroy());
+
+  it('lists the newest ten first and the rest on page two', () => {
+    expect(component.getTotalPages()).toBe(2);
+    expect(component.paginatedRepos.length).toBe(10);
+
+    component.pageNum = 1;
+    component.loadPage(1);
+
+    expect(names(component.paginatedRepos)).toEqual(['lib-3', 'lib-2', 'lib-1']);
+  });
+
+  it('starts a new search on the first page, so page one is shown and marked as current', () => {
+    component.pageNum = 1;
+    component.loadPage(1);
+
+    component.search('lib-1');
+
+    expect(component.pageNum).toBe(0);
+    expect(component.searchQuery).toBe('lib-1');
+    expect(names(component.paginatedRepos)).toEqual(['lib-12', 'lib-11', 'lib-10', 'lib-1']);
+  });
+
+  it('starts on the first page again when the search is widened after being narrowed on page two', () => {
+    component.pageNum = 1;
+    component.loadPage(1);
+    component.search('lib-1');
+
+    component.search('lib');
+
+    expect(component.pageNum).toBe(0);
+    expect(component.paginatedRepos.length).toBe(10);
+  });
+
+  it('empties the search on refresh, and the list is the unfiltered one', () => {
+    component.search('web');
+    expect(names(component.filteredRepos)).toEqual(['web-app']);
+
+    component.refreshPage();
+
+    expect(component.searchQuery).toBe('');
+    expect(component.filteredRepos.length).toBe(13);
+  });
+
+  it('empties the search and goes back to the first page when the type changes', () => {
+    component.search('lib');
+    component.pageNum = 1;
+    component.loadPage(1);
+
+    component.filterRepos(RepoType.NPM);
+
+    expect(component.searchQuery).toBe('');
+    expect(component.pageNum).toBe(0);
+    expect(names(component.paginatedRepos)).toEqual(['web-app']);
+  });
+
+  it('goes back to the first page on refresh', () => {
+    component.pageNum = 1;
+    component.loadPage(1);
+
+    component.refreshPage();
+
+    expect(component.pageNum).toBe(0);
+    expect(component.paginatedRepos.length).toBe(10);
+  });
+});
+
+describe('RepositoryComponent overlapping loads', () => {
+  interface Call {
+    type: string;
+    load: number;
+    answer: Subject<unknown>;
+  }
+
+  let calls: Call[];
+  let load: number;
+  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
+  let securityService: jasmine.SpyObj<SecurityService>;
+  let component: RepositoryComponent;
+
+  /** The answers of the requests the `n`th load started (the constructor's is the first). */
+  const answersOf = (n: number): Call[] => calls.filter((call) => call.load === n);
+  const answerOf = (n: number, type: string): Subject<unknown> =>
+    answersOf(n).find((call) => call.type === type)!.answer;
+  const rows = (...names: string[]) => ({ data: names.map((name) => ({ name, createdAt: '2026-01-01T00:00:00Z' })) });
+  const names = (repos: { name: string }[]): string[] => repos.map((r) => r.name);
+
+  beforeEach(() => {
+    calls = [];
+    load = 1;
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['getInfo']);
+    repoApi.getInfo.and.callFake(((type: string) => {
+      const answer = new Subject<unknown>();
+      calls.push({ type, load, answer });
+      return answer;
+    }) as never);
+    securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchSecuritySummary']);
+    securityService.watchSecuritySummary.and.returnValue(new Subject());
+    component = new RepositoryComponent(
+      repoApi,
+      securityService,
+      { get: () => of({ role: 'ADMIN' }) } as unknown as ProfileService,
+      jasmine.createSpyObj<ToastService>('ToastService', ['show']),
+      new DangerModalService(),
+    );
+  });
+
+  afterEach(() => component.ngOnDestroy());
+
+  function reload(): void {
+    load++;
+    component.refreshPage();
+  }
+
+  it('cancels the requests of the previous load when a new one starts', () => {
+    expect(answersOf(1).length).toBe(9);
+    expect(answersOf(1).every((call) => call.answer.observed)).toBeTrue();
+
+    reload();
+
+    expect(answersOf(1).some((call) => call.answer.observed)).toBeFalse();
+    expect(answersOf(2).every((call) => call.answer.observed)).toBeTrue();
+  });
+
+  it('never lists a row of the old load, and does not list the rows of the new load twice', () => {
+    reload(); // the create modal's (created) handler refreshes while a load is still running
+    answerOf(1, 'MAVEN').next(rows('old-maven'));
+    answerOf(1, 'MAVEN').complete();
+    answerOf(2, 'MAVEN').next(rows('new-maven'));
+    answerOf(2, 'MAVEN').complete();
+
+    expect(names(component.repositories)).toEqual(['new-maven']);
+    expect(names(component.filteredRepos)).toEqual(['new-maven']);
+    expect(names(component.paginatedRepos)).toEqual(['new-maven']);
+  });
+
+  it('keeps the spinner of the new load while the old load winds down, and never leaves it stuck', () => {
+    reload();
+    answersOf(2)
+      .slice(0, -1)
+      .forEach((call) => call.answer.next({ data: [] }));
+    answersOf(2)
+      .slice(0, -1)
+      .forEach((call) => call.answer.complete());
+
+    expect(component.loading).toBeTrue();
+
+    answersOf(2).at(-1)!.answer.next(rows('new-maven'));
+    answersOf(2).at(-1)!.answer.complete();
+
+    expect(component.loading).toBeFalse();
+    expect(names(component.paginatedRepos)).toEqual(['new-maven']);
+  });
+
+  it('does not let the cancelled requests count towards the pending requests of the new load', () => {
+    reload();
+
+    // If the old requests had been counted, the new load would already be "finished" after four answers.
+    answersOf(2)
+      .slice(0, 4)
+      .forEach((call) => call.answer.error(new Error('boom')));
+
+    expect(component.loading).toBeTrue();
+    expect(component.error).toBe('');
+    expect(component.warning).toBe('');
+
+    answersOf(2)
+      .slice(4)
+      .forEach((call) => call.answer.error(new Error('boom')));
+
+    expect(component.loading).toBeFalse();
+    expect(component.error).not.toBe('');
+  });
+
+  it('never shows the failures of the old load in the error or warning state of the new one', () => {
+    answerOf(1, 'NPM').error(new Error('boom'));
+    reload();
+    answersOf(2).forEach((call) => {
+      call.answer.next(call.type === 'MAVEN' ? rows('new-maven') : { data: [] });
+      call.answer.complete();
+    });
+
+    expect(component.error).toBe('');
+    expect(component.warning).toBe('');
+    expect(component.loading).toBeFalse();
+  });
+
+  it('drops the error of the old load when the refresh that follows it succeeds', () => {
+    answersOf(1).forEach((call) => call.answer.error(new Error('boom')));
+    expect(component.error).not.toBe('');
+
+    reload();
+    answersOf(2).forEach((call) => {
+      call.answer.next({ data: [] });
+      call.answer.complete();
+    });
+
+    expect(component.error).toBe('');
+  });
+
+  it('lets a type change supersede a running load of all types', () => {
+    load++;
+    component.filterRepos(RepoType.NPM);
+    answerOf(1, 'MAVEN').next(rows('old-maven'));
+    answerOf(2, 'NPM').next(rows('web-app'));
+    answerOf(2, 'NPM').complete();
+
+    expect(answersOf(2).length).toBe(1);
+    expect(names(component.paginatedRepos)).toEqual(['web-app']);
+    expect(component.loading).toBeFalse();
+  });
+
+  it('watches the security summary of the last load only', () => {
+    reload();
+    answersOf(1).forEach((call) => call.answer.complete());
+    expect(securityService.watchSecuritySummary).not.toHaveBeenCalled();
+
+    answersOf(2).forEach((call) => {
+      call.answer.next(call.type === 'MAVEN' ? rows('new-maven') : { data: [] });
+      call.answer.complete();
+    });
+
+    expect(securityService.watchSecuritySummary).toHaveBeenCalledOnceWith(['new-maven']);
+  });
+
+  it('cancels a running load when the component is destroyed, without starting the summary watch', () => {
+    component.ngOnDestroy();
+
+    expect(answersOf(1).some((call) => call.answer.observed)).toBeFalse();
+    expect(securityService.watchSecuritySummary).not.toHaveBeenCalled();
+  });
+});
+
+describe('RepositoryComponent search box', () => {
+  it('is emptied by the refresh button and by a type change, together with the query', () => {
+    const repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['getInfo']);
+    repoApi.getInfo.and.callFake(((type: string) =>
+      of({ data: [{ name: `${type.toLowerCase()}-repo`, createdAt: '2026-01-01T00:00:00Z' }] })) as never);
+    const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchSecuritySummary']);
+    securityService.watchSecuritySummary.and.returnValue(new Subject());
+    TestBed.configureTestingModule({
+      imports: [RepositoryComponent],
+      providers: [
+        provideRouter([]),
+        { provide: ProtocolRepoControllerService, useValue: repoApi },
+        { provide: SecurityService, useValue: securityService },
+        { provide: ProfileService, useValue: { get: () => of({ role: 'ADMIN' }) } },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+      ],
+    });
+    const fixture = TestBed.createComponent(RepositoryComponent);
+    fixture.detectChanges();
+    const box = (): HTMLInputElement => fixture.nativeElement.querySelector('[data-testid="repo-search"] input');
+    const type = (text: string) => {
+      box().value = text;
+      box().dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    };
+
+    type('maven');
+    expect(box().value).toBe('maven');
+
+    fixture.nativeElement.querySelector('[data-testid="repo-refresh"]').click();
+    fixture.detectChanges();
+    expect(box().value).toBe('');
+
+    type('maven');
+    fixture.componentInstance.filterRepos(RepoType.NPM);
+    fixture.detectChanges();
+    expect(box().value).toBe('');
+
+    fixture.destroy();
   });
 });

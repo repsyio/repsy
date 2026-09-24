@@ -174,7 +174,7 @@ export class UsersPage extends UiPage {
   }
 
   /** Resolves with the next `GET /api/users` answered for this exact search text (`''` = no search). */
-  private listResponse(search: string, pageIndex?: number) {
+  listResponse(search: string, pageIndex?: number) {
     return this.page.waitForResponse((response) => {
       const url = new URL(response.url());
       return (
@@ -193,7 +193,7 @@ export class UsersPage extends UiPage {
     await response;
   }
 
-  /** The reload button: page 0 with no search (the search box text itself is not cleared by the panel). */
+  /** The reload button: page 0 with no search, and the search box is emptied too. */
   async refresh(): Promise<void> {
     const response = this.listResponse('', 0);
     await this.refreshButton.click();

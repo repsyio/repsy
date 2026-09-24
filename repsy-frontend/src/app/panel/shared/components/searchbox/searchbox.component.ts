@@ -25,6 +25,8 @@ export class SearchboxComponent {
   @Input() public placeholder: string;
   /** Accessible name of the input; falls back to the placeholder. */
   @Input() public ariaLabel: string;
+  /** The text shown in the input; a parent that resets its query sets this to empty to clear the box. */
+  @Input() public value = '';
   @Output() public filter = new EventEmitter<string>();
 
   onSearch(event: Event) {

@@ -42,8 +42,10 @@ export async function rowNames(rows: Locator): Promise<string[]> {
  * The repository list (`/repositories`).
  *
  * How the page loads, which every wait here is built on: it fires one `GET /api/repos/<TYPE>/info`
- * per type (nine for "All", one for a type), shows the spinner until the FIRST answer, and then
- * renders rows as each further answer arrives. Search, type filter and pagination are all
+ * per type (nine for "All", one for a type), shows the spinner until an answer has rows (or every
+ * one is in, so a load that fails never flashes the empty state), and then renders rows as each
+ * further answer arrives. A new load (refresh, type change, a created repository) cancels the
+ * requests of the running one and ignores their answers. Search, type filter and pagination are all
  * client-side over what has arrived, so a query typed before the last answer would be lost: every
  * navigating method resolves only once all of its `info` answers are in, plus `settle()`.
  * Several parallel tests share the stack, so the unfiltered list is only ever asserted by size or
