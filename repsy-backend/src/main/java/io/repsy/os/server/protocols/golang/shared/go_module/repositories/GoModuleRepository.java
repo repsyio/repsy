@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.golang.shared.go_module.repositories;
 
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem;
 import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,6 +25,7 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -33,6 +35,32 @@ import org.springframework.stereotype.Repository;
 public interface GoModuleRepository extends JpaRepository<GoModule, UUID> {
 
   Optional<GoModule> findByRepoIdAndModulePath(UUID repoId, String modulePath);
+
+  /**
+   * The module row, locked for update until the transaction ends. The deletes of a version and of a
+   * module take it, so a delete and a publish of the same module take turns (RPS-1288). A module
+   * row that is deleted while this waits for it is not returned.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+      select m from GoModule m
+      where m.repo.id = :repoId and m.modulePath = :modulePath
+      """)
+  Optional<GoModule> findLockedByRepoIdAndModulePath(UUID repoId, String modulePath);
+
+  /**
+   * The module row, share-locked until the transaction ends: publishes of one module share it, and
+   * a delete, which locks for update, waits for them (and they for it). A module row that is
+   * deleted while this waits for it is not returned.
+   */
+  @Lock(LockModeType.PESSIMISTIC_READ)
+  @Query(
+      """
+      select m from GoModule m
+      where m.repo.id = :repoId and m.modulePath = :modulePath
+      """)
+  Optional<GoModule> findSharedByRepoIdAndModulePath(UUID repoId, String modulePath);
 
   /**
    * Inserts the module unless one with the same (repo, path) already exists. It does not raise the

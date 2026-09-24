@@ -40,9 +40,19 @@ public interface GoStorageService<ID> {
 
   List<StorageItemInfo> listDirectory(StoragePath storagePath);
 
-  void deleteDirectory(StoragePath storagePath);
+  /**
+   * Removes the file or directory at the path.
+   *
+   * @return the bytes it held, which the caller gives back to the repo's disk usage
+   */
+  long deleteDirectory(StoragePath storagePath);
 
-  void deleteVersionFiles(StoragePath atVVersionBasePath, String repoName);
+  /**
+   * Removes the {@code .mod}, {@code .zip} and {@code .info} files of one version, best effort.
+   *
+   * @return the bytes of the files that were removed
+   */
+  long deleteVersionFiles(StoragePath atVVersionBasePath, String repoName);
 
   void deleteRepo(UUID repoUuid);
 

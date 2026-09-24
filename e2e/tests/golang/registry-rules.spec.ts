@@ -525,6 +525,56 @@ test.describe('golang registry rules (raw HTTP)', () => {
   );
 
   test(
+    'deleting the last version removes the module, the wire still answers an empty list and a 404 ' +
+      'latest, and a republish brings the module back (RPS-1288)',
+    { tag: ['@negative'] },
+    async ({ seeder, panelApi }) => {
+      const layout = await newRepo(seeder, 'lastversion');
+      const admin = adminCredential();
+      const list = listRelPath(layout.modulePath);
+      const latest = latestRelPath(layout.modulePath);
+
+      for (const version of ['v0.0.1', 'v0.0.2']) {
+        const built = await buildModuleZip({ modulePath: layout.modulePath, version });
+        expectMsgId(await rawUpload(layout.repoName, admin, built), 200, undefined);
+      }
+
+      // A version is left: the module stays, and serves what is left.
+      await panelApi.deleteGolangModuleVersion(layout.repoName, layout.modulePath, 'v0.0.1');
+      const oneLeft = await rawGet(layout.repoName, admin, list);
+      expect(oneLeft.status).toBe(200);
+      expect(parseVersionList(oneLeft.body)).toEqual(['v0.0.2']);
+      const stillLatest = await rawGet(layout.repoName, admin, latestRelPath(layout.modulePath));
+      expect(stillLatest.status).toBe(200);
+      expect(parseInfo(stillLatest.body).Version).toBe('v0.0.2');
+
+      // The last one goes: the module goes with it. The wire answers as it does for a module that
+      // never existed: an empty list (200, not a 404) and no latest version.
+      await panelApi.deleteGolangModuleVersion(layout.repoName, layout.modulePath, 'v0.0.2');
+      const emptyList = await rawGet(layout.repoName, admin, list);
+      expect(emptyList.status, 'an empty @v/list stays 200').toBe(200);
+      expect(emptyList.body, 'with an empty body').toHaveLength(0);
+      expect((await rawGet(layout.repoName, admin, latest)).status).toBe(404);
+      expect(
+        (await rawGet(layout.repoName, admin, infoRelPath(layout.modulePath, 'v0.0.2'))).status,
+      ).toBe(404);
+      await expect(
+        panelApi.deleteGolangModuleVersion(layout.repoName, layout.modulePath, 'v0.0.2'),
+        'the module is gone, so a second delete finds nothing',
+      ).rejects.toMatchObject({ status: 404 });
+
+      // Publishing again creates the module again.
+      const again = await buildModuleZip({ modulePath: layout.modulePath, version: 'v0.0.2' });
+      expectMsgId(await rawUpload(layout.repoName, admin, again), 200, undefined);
+      const republished = await rawGet(layout.repoName, admin, list);
+      expect(parseVersionList(republished.body)).toEqual(['v0.0.2']);
+      const latestAgain = await rawGet(layout.repoName, admin, latest);
+      expect(latestAgain.status).toBe(200);
+      expect(parseInfo(latestAgain.body).Version).toBe('v0.0.2');
+    },
+  );
+
+  test(
     'HEAD on any path (existing or not) is 404 -- no handler supports it (R15/H17)',
     {
       tag: ['@negative'],
