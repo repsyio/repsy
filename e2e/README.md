@@ -2514,7 +2514,42 @@ _Not implemented yet._
 
 ### Repositories and dashboard (RPS-1252)
 
-_Not implemented yet._
+The dashboard (`/`), the repository list (`/repositories`) and the create-repository modal, which both
+pages open. Files: `src/ui/pages/{dashboard,repositories,repo-create-modal}.ts`, `src/ui/repo-types.ts`
+(the nine-row type table; a new protocol needs one row) and `tests/ui/{dashboard,repositories}/*.spec.ts`.
+`./run.sh test --protocol ui --grep "DASH-|REPO-"` runs it; the P0 cases (DASH-01, REPO-01 for maven,
+npm and docker, REPO-06, REPO-10) are also `@smoke`.
+
+| Spec                           | Scenarios                                                                                                                                            |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dashboard/dashboard.spec.ts`  | DASH-01 cards and counts against the API, DASH-02 Recent Activity, DASH-03 count row -> filtered list, DASH-04 USER                                  |
+| `repositories/create.spec.ts`  | REPO-01 (one case per row of `UI_REPO_TYPES`, plus public+description, default type, from the dashboard), REPO-02 validation, REPO-03 duplicate name |
+| `repositories/list.spec.ts`    | REPO-04 search, type selector and refresh, REPO-05 pagination, REPO-08 empty state, REPO-09 USER                                                     |
+| `repositories/delete.spec.ts`  | REPO-06 delete, REPO-07 cancel                                                                                                                       |
+| `repositories/routing.spec.ts` | REPO-10 `/<unknown>` is the 404 page, `/<repo>` opens the repository                                                                                 |
+
+Things a test here relies on, which a change to the page can break:
+
+- **The list loads nine `getInfo` calls, not one.** It shows the spinner after the FIRST answer and renders
+  rows as the others arrive; search, type filter and pagination run client-side over what has arrived. So
+  `RepositoriesPage.afterInfoResponses()` (used by `goto`, `selectType`, `refresh`, `confirmDelete`) waits
+  for every answer of the reload, then `settle()`s (two animation frames, so a negative assertion does not
+  run on the view before the last answer). Type into the search box only after that.
+- **Other tests' repositories are in the same list.** The list holds the nine defaults and everything the
+  parallel workers created, ten per page, newest first. A test narrows the list with a string only its own
+  repositories contain (`e2e-<runid>-`, `seeder.runId`) before it looks at rows, and asserts an unfiltered
+  list by size only. Dashboard counts are compared with `panelApi.listRepos()` reads taken before AND after
+  the page loaded, retried until nothing moved; Recent Activity (the six newest repositories) is reloaded
+  until the seeded repository is in it.
+- **UI-created repositories** are named with `seeder.reserveRepoName(type)` and adopted with
+  `seeder.adoptRepo(name)` BEFORE the submit, so a failure half way still deletes them.
+- **The visibility toggle** is toggled by clicking its label text: the `toggle-input` checkbox is `sr-only`
+  under a covering span, so Playwright refuses to click it (read `isChecked()` from it, though).
+- **Known defects, pinned as `test.fail`** (a `✘` line in the list reporter with a passing summary is the
+  expectation): the description textarea's `maxlength="500"` hides the ">500" error (RPS-1265), a USER's
+  Recent Activity is empty because `/api/repos/{name}/usage` refuses a USER and one failing call drops a
+  whole type (RPS-1276), the search box keeps its text and the page index stays stale after a refresh or a
+  new search. Drop the `test.fail` when the fix lands.
 
 ### Users and profile (RPS-1253)
 
