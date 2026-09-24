@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.docker.shared.tag.dtos;
 
+import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.List;
 import lombok.Builder;
 import lombok.Data;
@@ -23,10 +24,10 @@ import lombok.Data;
 @Builder
 public class TagForm {
   private static final String MULTIPLATFORM = "Multiplatform";
-  private static final String MULTI_PLATFORM_MANIFEST_PREFIX = "sha256:";
 
   private String imageName;
   private String manifestDigest;
+  private String manifestDigestSha512;
   private String tag;
   private String mediaType;
   private ManifestInfo manifestInfo;
@@ -44,6 +45,7 @@ public class TagForm {
         .imageName(imageName)
         .tag(form.getTagName())
         .manifestDigest(form.getDigest())
+        .manifestDigestSha512(form.getDigestSha512())
         .mediaType(form.getContentType())
         .manifestInfo(manifestInfo)
         .manifestJson(form.getManifestJson())
@@ -61,6 +63,7 @@ public class TagForm {
         .imageName(imageName)
         .tag(form.getTagName())
         .manifestDigest(form.getDigest())
+        .manifestDigestSha512(form.getDigestSha512())
         .mediaType(form.getContentType())
         .manifestList(manifestList)
         .manifestJson(form.getManifestJson())
@@ -85,12 +88,14 @@ public class TagForm {
     return isMultiPlatform ? this.getManifestListMediaType() : this.getMediaType();
   }
 
-  // Multiplatform manifest name starts with sha256 (name = digest)
-  // Create only manifest for a platform. Manifest list will be created later
-  // Should not create tag for a manifest list
-  public boolean isSinglePlatformByTagName() {
+  /**
+   * Tells whether the manifest was pushed under a tag. A manifest pushed by a digest reference
+   * ({@code sha256:} or {@code sha512:}) is stored without a tag: it is pullable by its digest, and
+   * an index or a later tag can point at it.
+   */
+  public boolean isTagReference() {
 
-    return !this.tag.startsWith(MULTI_PLATFORM_MANIFEST_PREFIX);
+    return !BlobDigests.startsWithDigestPrefix(this.tag);
   }
 
   public boolean isMultiPlatformByName() {

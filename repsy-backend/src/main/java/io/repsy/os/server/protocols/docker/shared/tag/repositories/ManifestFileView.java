@@ -13,18 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.docker.shared.layer.dtos;
+package io.repsy.os.server.protocols.docker.shared.tag.repositories;
 
-import java.time.LocalDateTime;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
-public interface ManifestListItem {
-  String getName();
+/** The digest of a manifest and the legacy reference its file name was generated from, if any. */
+@NullMarked
+public interface ManifestFileView {
 
   String getDigest();
 
-  String getConfigDigest();
-
-  String getPlatform();
-
-  LocalDateTime getCreatedAt();
+  @Nullable String getStorageName();
 }

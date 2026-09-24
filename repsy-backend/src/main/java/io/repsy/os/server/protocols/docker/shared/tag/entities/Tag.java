@@ -18,27 +18,21 @@ package io.repsy.os.server.protocols.docker.shared.tag.entities;
 import io.repsy.core.uuidv7.UuidV7;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import io.repsy.protocols.docker.shared.utils.DockerConstants;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.Fetch;
-import org.hibernate.annotations.FetchMode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -48,7 +42,7 @@ import org.jspecify.annotations.NonNull;
 @Entity
 @Table(name = "docker_tag")
 @NoArgsConstructor
-@ToString(exclude = {"image", "tagPlatforms"})
+@ToString(exclude = {"image", "manifest"})
 public class Tag {
 
   @Id
@@ -80,9 +74,15 @@ public class Tag {
   @UpdateTimestamp
   private Instant lastUpdatedAt;
 
-  @OneToMany(mappedBy = "tag", cascade = CascadeType.ALL, orphanRemoval = true)
-  @Fetch(FetchMode.SELECT)
-  private @NonNull Set<TagPlatform> tagPlatforms = new HashSet<>();
+  /**
+   * The manifest the tag points at. A tag is only a movable pointer: moving it leaves the manifest
+   * it pointed at before in place, pullable by its digest. {@code digest}, {@code mediaType} and
+   * {@code platform} are copies of the target's, rewritten whenever the pointer moves.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "manifest_id", nullable = false)
+  @OnDelete(action = OnDeleteAction.CASCADE)
+  private Manifest manifest;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "image_id", nullable = false)

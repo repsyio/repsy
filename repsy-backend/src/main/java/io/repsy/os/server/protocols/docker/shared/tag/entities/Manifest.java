@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.docker.shared.tag.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import io.repsy.os.server.protocols.docker.shared.layer.entities.Layer;
 import io.repsy.protocols.docker.shared.utils.DockerConstants;
 import jakarta.persistence.Column;
@@ -48,7 +49,7 @@ import org.jspecify.annotations.NonNull;
 @Table(name = "docker_manifest")
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"layers", "tagPlatform"})
+@ToString(exclude = {"layers", "image"})
 public class Manifest {
 
   @Id
@@ -60,14 +61,28 @@ public class Manifest {
   @Column(nullable = false)
   private Integer version;
 
-  @Column(name = "name", nullable = false, length = DockerConstants.MAX_REFERENCE_LENGTH)
-  private String name;
-
   @Column(name = "platform", nullable = false, length = DockerConstants.MAX_PLATFORM_LENGTH)
   private String platform;
 
+  /** The canonical {@code sha256:} digest, always calculated by this registry from the bytes. */
   @Column(name = "digest", nullable = false)
   private String digest;
+
+  /**
+   * The {@code sha512:} digest of the same bytes, so a client that names the manifest by that
+   * algorithm finds it too. Rows written before RPS-1216 have none until {@code
+   * DockerManifestLayoutRepairService} fills it from the stored file.
+   */
+  @Column(name = "digest_sha512")
+  private String digestSha512;
+
+  /**
+   * The reference the file name of a manifest stored by an earlier version was generated from (see
+   * {@code ManifestNameGenerator}); {@code null} once the file lives at {@code manifests/<digest>}.
+   * The repair service renames the file and clears it.
+   */
+  @Column(name = "storage_name", length = DockerConstants.MAX_REFERENCE_LENGTH)
+  private String storageName;
 
   @Column(name = "media_type", nullable = false, length = DockerConstants.MAX_MEDIA_TYPE_LENGTH)
   private String mediaType;
@@ -100,9 +115,9 @@ public class Manifest {
   private @NonNull Set<Layer> layers = new HashSet<>();
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "tag_platform_id")
+  @JoinColumn(name = "image_id", nullable = false)
   @OnDelete(action = OnDeleteAction.CASCADE)
-  private TagPlatform tagPlatform;
+  private Image image;
 
   /**
    * Identifier-based equality: two manifests are equal when they are the same instance or carry the

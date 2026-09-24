@@ -22,7 +22,7 @@ import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.libs.protocol.router.ProtocolProvider;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
-import io.repsy.protocols.docker.shared.utils.DockerConstants;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -114,6 +114,6 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
   }
 
   private static boolean isDigestReference(final @Nullable String artifactVersion) {
-    return artifactVersion != null && artifactVersion.startsWith(DockerConstants.SHA256_PREFIX);
+    return artifactVersion != null && BlobDigests.startsWithDigestPrefix(artifactVersion);
   }
 }

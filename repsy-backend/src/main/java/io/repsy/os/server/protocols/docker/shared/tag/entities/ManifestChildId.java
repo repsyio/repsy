@@ -13,23 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.docker.shared.tag.dtos;
+package io.repsy.os.server.protocols.docker.shared.tag.entities;
 
-import java.time.Instant;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import java.io.Serializable;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-@Data
-@AllArgsConstructor
+/** The composite key of {@link ManifestChild}: the index and the manifest it references. */
+@Getter
+@Setter
+@Embeddable
 @NoArgsConstructor
-public class BaseManifestDetail<ID> {
+@AllArgsConstructor
+@EqualsAndHashCode
+public class ManifestChildId implements Serializable {
 
-  private ID id;
-  private long configSize;
-  private String digest;
-  private String storageName;
-  private String mediaType;
-  private Instant createdAt;
-  private Instant lastUpdatedAt;
+  @Column(name = "parent_id", columnDefinition = "uuid", nullable = false)
+  private UUID parentId;
+
+  @Column(name = "child_id", columnDefinition = "uuid", nullable = false)
+  private UUID childId;
 }

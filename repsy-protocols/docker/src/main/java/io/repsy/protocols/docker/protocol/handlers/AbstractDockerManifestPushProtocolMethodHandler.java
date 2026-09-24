@@ -35,7 +35,6 @@ import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
 import io.repsy.protocols.docker.shared.utils.DockerManifestValidator;
 import io.repsy.protocols.docker.shared.utils.DockerPushGuards;
-import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -140,12 +139,12 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
 
     final var imageInfo = this.findOrCreateImage(repoInfo.getId(), imageName, 1);
 
-    final var fileName =
-        ManifestNameGenerator.generate(repoInfo.getStorageKey(), imageName, reference);
-    final var parsedManifestPath = this.parseForManifest(request.getServletPath(), fileName);
-
     final var manifestBytes = manifestJson.getBytes(StandardCharsets.UTF_8);
     final var digest = DockerDigestCalculator.calculateDigest(manifestBytes);
+
+    // A manifest is stored once per digest, whatever it was pushed under, so an override or a
+    // second tag never rewrites the file of the manifest it replaces (RPS-1216).
+    final var parsedManifestPath = this.parseForManifest(request.getServletPath(), digest);
 
     final var form =
         ManifestForm.builder()
@@ -155,6 +154,7 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
             .relativePath(parsedManifestPath.getRelativePath())
             .servletPath(request.getServletPath())
             .digest(digest)
+            .digestSha512(DockerDigestCalculator.calculateSha512Digest(manifestBytes))
             .manifestBytes(manifestBytes)
             .build();
 
