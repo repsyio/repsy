@@ -14,13 +14,21 @@
 /// limitations under the License.
 ///
 
-import { TestBed } from '@angular/core/testing';
+import { Component } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 
-import { PagedModelVulnerabilityScanInfo } from '../../../../generated/api';
+import {
+  PagedModelVulnerabilityScanInfo,
+  RepoType,
+  ScanStatus,
+  VulnerabilityScanInfo,
+} from '../../../../generated/api';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { SecurityScanSupportService } from '../../shared/service/security-scan-support.service';
+import { legacyNavigationUrl } from '../../shared/util/security-detail-route.testing';
+import { buildArtifactDetailRoute } from '../../shared/util/security-detail-route.util';
 import { SecurityComponent } from './security.component';
 import { SecurityService } from './service/security.service';
 
@@ -123,5 +131,90 @@ describe('SecurityComponent search box', () => {
 
     expect(box.value).toBe('');
     expect(securityService.listScans.calls.mostRecent().args).not.toContain('my-repo');
+  });
+});
+
+describe('SecurityComponent scan rows', () => {
+  let router: Router;
+  let fixture: ComponentFixture<SecurityComponent>;
+
+  @Component({ template: '' })
+  class BlankPage {}
+
+  function scan(id: string, repoType: RepoType, artifactName: string, artifactVersion: string): VulnerabilityScanInfo {
+    return {
+      id,
+      repoName: 'repo',
+      repoType,
+      artifactName,
+      artifactVersion,
+      status: ScanStatus.Completed,
+    } as VulnerabilityScanInfo;
+  }
+
+  function render(scans: VulnerabilityScanInfo[]): HTMLElement {
+    const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['listScans', 'getScansSummary']);
+    securityService.listScans.and.returnValue(
+      of({ content: scans, page: { totalPages: 1 } } as PagedModelVulnerabilityScanInfo),
+    );
+    securityService.getScansSummary.and.returnValue(of({ totalCount: scans.length }));
+    TestBed.configureTestingModule({
+      imports: [SecurityComponent],
+      providers: [
+        provideRouter([{ path: '**', component: BlankPage }]),
+        { provide: SecurityService, useValue: securityService },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+        { provide: SecurityScanSupportService, useValue: { getSupportedRepoTypes: () => of(new Set(['MAVEN'])) } },
+      ],
+    });
+    router = TestBed.inject(Router);
+    fixture = TestBed.createComponent(SecurityComponent);
+    fixture.detectChanges();
+    return fixture.nativeElement;
+  }
+
+  const CASES: [RepoType, string, string, string][] = [
+    [RepoType.Maven, 'org.acme:lib', '1.0.0', '/repo/org.acme/lib/1.0.0#security'],
+    [RepoType.Npm, '@acme/ui', '1.0.0', '/repo/acme/ui/1.0.0#security'],
+    [RepoType.Npm, 'left-pad', '1.0.0', '/repo/~/left-pad/1.0.0#security'],
+    [RepoType.Cargo, 'my crate', '1.0.0', '/repo/my%20crate/1.0.0#security'],
+    [RepoType.Docker, 'library/nginx', '1.25', '/repo/library/nginx/1.25/detail#security'],
+    [
+      RepoType.Golang,
+      'github.com/acme/lib',
+      'v1.0.0',
+      '/repo/modules/version?modulePath=github.com%2Facme%2Flib&version=v1.0.0#security',
+    ],
+  ];
+
+  CASES.forEach(([repoType, name, version, expected]) => {
+    it(`links a ${repoType} row for ${name} to the exact URL the row navigated to before`, () => {
+      const page = render([scan('7', repoType, name, version)]);
+
+      const row = page.querySelector('[data-testid="security-scan-row-7"]');
+      const link = row?.querySelector<HTMLAnchorElement>('a.row-link');
+      expect(row?.getAttribute('role')).toBeNull();
+      expect(row?.classList).toContain('row-link-host');
+      expect(link?.getAttribute('href')).toBe(expected);
+      expect(link?.getAttribute('href')).toBe(
+        legacyNavigationUrl(router, buildArtifactDetailRoute(repoType, 'repo', name, version)!),
+      );
+    });
+  });
+
+  it('gives a row without a detail page no link at all', () => {
+    const page = render([scan('8', RepoType.Docker, 'nginx', 'sha256:abc')]);
+
+    expect(page.querySelector('[data-testid="security-scan-row-8"]')).not.toBeNull();
+    expect(page.querySelector('a.row-link')).toBeNull();
+  });
+
+  it('opens the version on its security tab on a click', async () => {
+    const page = render([scan('9', RepoType.Maven, 'org.acme:lib', '1.0.0')]);
+
+    page.querySelector<HTMLAnchorElement>('a.row-link')!.click();
+    await fixture.whenStable();
+
+    expect(router.url).toBe('/repo/org.acme/lib/1.0.0#security');
   });
 });

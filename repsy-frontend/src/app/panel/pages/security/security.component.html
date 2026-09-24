@@ -99,15 +99,22 @@
 } @else {
   <div data-testid="security-scan-list" class="flex flex-col gap-1">
     @for (scan of scans; track scan.id) {
+      @let link = scanLink(scan);
       <div
         [attr.data-testid]="'security-scan-row-' + scan.id"
-        role="button"
-        tabindex="0"
-        (click)="openScan(scan)"
-        (keydown.enter)="openScan(scan)"
-        [ngClass]="{ 'cursor-pointer hover:bg-[#1D1C1C]': isScanClickable(scan) }"
-        class="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#101112] p-[14px] text-[13px]"
+        [ngClass]="{ 'hover:bg-[#1D1C1C]': link }"
+        class="row-link-host flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#101112] p-[14px] text-[13px]"
       >
+        @if (link) {
+          <a
+            data-testid="row-scan-link"
+            class="row-link"
+            [routerLink]="link.path"
+            [queryParams]="link.queryParams"
+            fragment="security"
+            [attr.aria-label]="scan.repoName + ' / ' + scan.artifactName + ' ' + scan.artifactVersion"
+          ></a>
+        }
         <div class="flex flex-col gap-1">
           <span data-testid="row-artifact" class="font-medium text-white"
             >{{ scan.repoName }} / {{ scan.artifactName }}</span
