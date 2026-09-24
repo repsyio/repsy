@@ -271,6 +271,7 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     return new PackageDeletion(versions, remover.removePackage());
   }
 
+  @Override
   public List<String> getVersionNames(final UUID packageId) {
 
     return this.packageVersionRepository.findByNpmPackageId(packageId).stream()

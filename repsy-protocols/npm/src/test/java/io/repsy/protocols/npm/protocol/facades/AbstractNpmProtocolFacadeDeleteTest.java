@@ -22,13 +22,17 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.protocols.npm.shared.npm_package.dtos.BasePackageInfo;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService.PackageDeletion;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService.PackageRemover;
@@ -51,15 +55,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.util.Pair;
 
 /**
- * RPS-1280: unpublishing, deprecating and deleting through {@link AbstractNpmProtocolFacade} hand
- * the file changes to {@link NpmPackageService}, which writes the rows first, and report the usages
- * the files reported.
+ * RPS-1280 and RPS-1289: unpublishing, deprecating and deleting through {@link
+ * AbstractNpmProtocolFacade} hand the file changes to {@link NpmPackageService}, which writes the
+ * rows first, and report the usages the files reported.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractNpmProtocolFacade unpublish, deprecate and delete (RPS-1280)")
 class AbstractNpmProtocolFacadeDeleteTest {
 
   private static final UUID REPO_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+  private static final UUID PACKAGE_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
   private static final String REPO_NAME = "npm-repo";
   private static final String PACKAGE = "demo";
   private static final Path BASE_PATH = Path.of(PACKAGE);
@@ -161,19 +166,93 @@ class AbstractNpmProtocolFacadeDeleteTest {
   }
 
   @Test
-  @DisplayName("a payload that lacks no version unpublishes nothing")
-  void unpublishOfNothingTouchesNothing() throws Exception {
+  @DisplayName("a payload that lacks no version is a conflict and unpublishes nothing")
+  void unpublishOfNothingIsAConflict() throws Exception {
     this.basePath();
     when(this.storageService.getMetadata(any(StoragePath.class), eq(REPO_NAME)))
         .thenReturn(metadataWithVersions("1.0.0"));
 
-    final var unpublished =
-        this.facade.unPublishPackageVersion(
-            this.context, null, PACKAGE, metadataWithVersions("1.0.0"));
+    assertThatThrownBy(
+            () ->
+                this.facade.unPublishPackageVersion(
+                    this.context, null, PACKAGE, metadataWithVersions("1.0.0")))
+        .isInstanceOf(ItemAlreadyExistException.class)
+        .hasMessage("unpublishPayloadStale");
 
-    assertThat(unpublished).isEmpty();
     verify(this.packageService, never())
         .deletePackageVersion(any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("a payload that lacks a version published after it was read is a conflict")
+  void unpublishOfAStalePayloadIsAConflict() throws Exception {
+    this.basePath();
+    when(this.storageService.getMetadata(any(StoragePath.class), eq(REPO_NAME)))
+        .thenReturn(metadataWithVersions("1.0.0", "2.0.0"));
+
+    assertThatThrownBy(
+            () ->
+                this.facade.unPublishPackageVersion(
+                    this.context, null, PACKAGE, metadataWithVersions()))
+        .isInstanceOf(ItemAlreadyExistException.class)
+        .hasMessage("unpublishPayloadStale");
+
+    verify(this.packageService, never())
+        .deletePackageVersion(any(), any(), any(), any(), any(), any());
+  }
+
+  private BasePackageInfo<UUID> packageInfo() {
+    return BasePackageInfo.<UUID>builder().id(PACKAGE_ID).build();
+  }
+
+  @Test
+  @DisplayName("the tarball request after an unpublish finds the version gone and deletes nothing")
+  void tarballDeleteOfAnUnpublishedVersionIsANoOp() throws Exception {
+    when(this.packageService.getPackage(REPO_ID, null, PACKAGE)).thenReturn(this.packageInfo());
+    when(this.packageService.getVersionNames(PACKAGE_ID)).thenReturn(List.of("1.1.0"));
+
+    this.facade.deletePackageTarball(this.context, null, PACKAGE, "demo-1.0.0.tgz");
+
+    verify(this.packageService, never())
+        .deletePackageVersion(any(), any(), any(), any(), any(), any());
+    verify(this.packageService, never()).deletePackage(any(), any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
+  @DisplayName("the tarball request of a package that is gone is a no-op too")
+  void tarballDeleteOfAMissingPackageIsANoOp() {
+    when(this.packageService.getPackage(REPO_ID, null, PACKAGE))
+        .thenThrow(new ItemNotFoundException("packageNotFound"));
+
+    this.facade.deletePackageTarball(this.context, null, PACKAGE, "demo-1.0.0.tgz");
+
+    verify(this.packageService, never()).deletePackage(any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("the tarball request of a version that is still published is a conflict")
+  void tarballDeleteOfAPublishedVersionIsAConflict() throws Exception {
+    when(this.packageService.getPackage(REPO_ID, null, PACKAGE)).thenReturn(this.packageInfo());
+    when(this.packageService.getVersionNames(PACKAGE_ID)).thenReturn(List.of("1.0.0"));
+
+    assertThatThrownBy(
+            () -> this.facade.deletePackageTarball(this.context, null, PACKAGE, "demo-1.0.0.tgz"))
+        .isInstanceOf(ItemAlreadyExistException.class)
+        .hasMessage("npmVersionStillPublished");
+
+    verify(this.packageService, never())
+        .deletePackageVersion(any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("a tarball file name that is not the package's is a bad request")
+  void tarballDeleteOfAnotherFileIsABadRequest() {
+    assertThatThrownBy(
+            () -> this.facade.deletePackageTarball(this.context, null, PACKAGE, "other-1.0.0.tgz"))
+        .isInstanceOf(BadRequestException.class);
+
+    verifyNoInteractions(this.packageService);
   }
 
   @Test

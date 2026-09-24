@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -372,6 +373,80 @@ class PackageUtilsTest {
       metadata.put("versions", new HashMap<>(versions));
 
       return metadata;
+    }
+  }
+
+  @Nested
+  @DisplayName("findUnpublishedVersion (RPS-1289)")
+  class FindUnpublishedVersion {
+
+    private Map<String, Object> packument(final String... versions) {
+      final var all = new HashMap<String, Object>();
+
+      for (final var version : versions) {
+        all.put(version, new HashMap<String, Object>());
+      }
+
+      final var metadata = new HashMap<String, Object>();
+      metadata.put("versions", all);
+
+      return metadata;
+    }
+
+    @Test
+    @DisplayName("is the one stored version the payload lacks")
+    void theOneMissingVersion() {
+      assertThat(
+              PackageUtils.findUnpublishedVersion(
+                  this.packument("1.0.0", "1.1.0", "2.0.0"), this.packument("1.0.0", "2.0.0")))
+          .isEqualTo("1.1.0");
+    }
+
+    @Test
+    @DisplayName("ignores a version only the payload has")
+    void aVersionOnlyThePayloadHas() {
+      assertThat(
+              PackageUtils.findUnpublishedVersion(
+                  this.packument("1.0.0", "1.1.0"), this.packument("1.0.0", "0.9.0")))
+          .isEqualTo("1.1.0");
+    }
+
+    @Test
+    @DisplayName("is the only version when the payload has none left")
+    void theLastVersion() {
+      assertThat(PackageUtils.findUnpublishedVersion(this.packument("1.0.0"), this.packument()))
+          .isEqualTo("1.0.0");
+    }
+
+    @Test
+    @DisplayName("is a conflict when the payload lacks no version")
+    void nothingMissing() {
+      assertThatThrownBy(
+              () ->
+                  PackageUtils.findUnpublishedVersion(
+                      this.packument("1.0.0"), this.packument("1.0.0")))
+          .isInstanceOf(ItemAlreadyExistException.class)
+          .hasMessage("unpublishPayloadStale");
+    }
+
+    @Test
+    @DisplayName("is a conflict when a version was published after the client read the package")
+    void stalePayload() {
+      // The client removed 1.0.0 from what it read; 2.0.0 was published in between.
+      assertThatThrownBy(
+              () ->
+                  PackageUtils.findUnpublishedVersion(
+                      this.packument("1.0.0", "2.0.0"), this.packument()))
+          .isInstanceOf(ItemAlreadyExistException.class)
+          .hasMessage("unpublishPayloadStale");
+    }
+
+    @Test
+    @DisplayName("is a bad request when the payload has no versions object")
+    void payloadWithoutVersions() {
+      assertThatThrownBy(
+              () -> PackageUtils.findUnpublishedVersion(this.packument("1.0.0"), new HashMap<>()))
+          .isInstanceOf(BadRequestException.class);
     }
   }
 }
