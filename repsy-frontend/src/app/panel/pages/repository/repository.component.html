@@ -78,7 +78,7 @@
       <div class="text-body1">
         <!-- Table Headers (Desktop)-->
         <div
-          class="hidden grid-cols-[3fr_3fr_2fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[minmax(0,3fr)_3fr_2fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Repository</div>
@@ -105,13 +105,13 @@
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === paginatedRepos.length - 1 }"
-                class="group grid grid-cols-[3fr_3fr_2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="group grid grid-cols-[minmax(0,3fr)_3fr_2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
-                <div class="flex gap-2 text-[14px] text-[#9FA0A0]">
+                <div class="flex min-w-0 gap-2 text-[14px] text-[#9FA0A0]">
                   @switch (repo.repoType) {
                     @case ('npm') {
                       <svg
-                        class="group-hover:text-secondary-500 mt-[2px] h-[20px] w-[20px]"
+                        class="group-hover:text-secondary-500 mt-[2px] h-[20px] w-[20px] shrink-0"
                         width="141"
                         height="84"
                         viewBox="0 0 141 84"
@@ -127,7 +127,7 @@
                     }
                     @case ('maven') {
                       <svg
-                        class="group-hover:text-secondary-500 mt-[3px] h-[20px] w-[20px]"
+                        class="group-hover:text-secondary-500 mt-[3px] h-[20px] w-[20px] shrink-0"
                         width="37"
                         height="48"
                         viewBox="0 0 37 48"
@@ -186,7 +186,7 @@
                     }
                     @case ('pypi') {
                       <svg
-                        class="group-hover:text-secondary-500 h-[20px] w-[20px]"
+                        class="group-hover:text-secondary-500 h-[20px] w-[20px] shrink-0"
                         width="46"
                         height="46"
                         viewBox="0 0 46 46"
@@ -203,7 +203,7 @@
                     }
                     @case ('docker') {
                       <svg
-                        class="group-hover:text-secondary-500 h-[20px] w-[20px]"
+                        class="group-hover:text-secondary-500 h-[20px] w-[20px] shrink-0"
                         width="101"
                         height="87"
                         viewBox="0 0 101 87"
@@ -219,7 +219,7 @@
                     }
                     @case ('cargo') {
                       <svg
-                        class="group-hover:text-secondary-500 h-[20px] w-[20px]"
+                        class="group-hover:text-secondary-500 h-[20px] w-[20px] shrink-0"
                         viewBox="0 0 256 256"
                         fill="currentColor"
                         xmlns="http://www.w3.org/2000/svg"
@@ -233,7 +233,7 @@
                       <svg
                         viewBox="0 0 24 24"
                         fill="currentColor"
-                        class="group-hover:text-secondary-500 h-[20px] w-[20px]"
+                        class="group-hover:text-secondary-500 h-[20px] w-[20px] shrink-0"
                       >
                         <path
                           d="M1.998.342a1.997 1.997 0 1 0 0 3.995 1.997 1.997 0 0 0 0-3.995zm9.18 4.34a6.156 6.156 0 0 0-6.153 6.155v6.667c0 3.4 2.756 6.154 6.154 6.154h6.667c3.4 0 6.154-2.755 6.154-6.154v-6.667a6.154 6.154 0 0 0-6.154-6.155zm-1.477 2.8a2.496 2.496 0 1 1 0 4.993 2.496 2.496 0 0 1 0-4.993zm7.968 6.16a3.996 3.996 0 1 1-.002 7.992 3.996 3.996 0 0 1 .002-7.992z"
@@ -242,7 +242,7 @@
                     }
                     @case ('golang') {
                       <svg
-                        class="group-hover:text-secondary-500 h-[20px] w-[20px]"
+                        class="group-hover:text-secondary-500 h-[20px] w-[20px] shrink-0"
                         viewBox="0 0 587 301"
                         fill="currentColor"
                         xmlns="http://www.w3.org/2000/svg"
@@ -254,7 +254,7 @@
                     }
                     @case ('helm') {
                       <svg
-                        class="group-hover:text-secondary-500 h-[20px] w-[20px]"
+                        class="group-hover:text-secondary-500 h-[20px] w-[20px] shrink-0"
                         viewBox="0 0 16 16"
                         fill="currentColor"
                         xmlns="http://www.w3.org/2000/svg"
@@ -266,7 +266,7 @@
                     }
                     @case ('ruby') {
                       <svg
-                        class="group-hover:text-secondary-500 h-[20px] w-[20px]"
+                        class="group-hover:text-secondary-500 h-[20px] w-[20px] shrink-0"
                         viewBox="0 0 32 32"
                         fill="currentColor"
                         xmlns="http://www.w3.org/2000/svg"
@@ -279,9 +279,10 @@
                   }
 
                   <app-tooltip
+                    truncate
                     data-testid="row-name"
                     class="text-[14px] text-[#FDFDFD]"
-                    [text]="repo.name | ellipsis"
+                    [text]="repo.name"
                     [textHover]="repo.name"
                   />
                   <app-repo-security-badge

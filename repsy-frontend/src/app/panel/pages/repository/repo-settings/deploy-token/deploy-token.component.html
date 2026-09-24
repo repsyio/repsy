@@ -30,7 +30,7 @@
         <div class="text-body1 overflo-y-auto mb-16">
           <!-- Package Headers (Desktop)-->
           <div
-            class="hidden grid-cols-[1fr_1fr_1fr_1fr_1fr_100px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+            class="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1fr_1fr_1fr_100px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
             animate.enter="fade-in-up"
           >
             <div>Name</div>
@@ -52,21 +52,23 @@
               <div
                 [attr.data-testid]="'token-row-' + deployToken.name"
                 [ngClass]="{ 'rounded-b-[12px]': i === deployTokens?.length - 1 }"
-                class="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_100px] items-center gap-4 p-4"
+                class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1fr_1fr_1fr_100px] items-center gap-4 p-4"
               >
                 <!-- Name -->
                 <app-tooltip
+                  truncate
                   data-testid="row-name"
                   class="text-secondary-500 group-hover:underline"
-                  [text]="deployToken.name | ellipsis"
+                  [text]="deployToken.name"
                   [textHover]="deployToken.name"
                 />
 
                 <!-- Username -->
                 <app-tooltip
+                  truncate
                   data-testid="row-username"
                   class="text-secondary-500 group-hover:underline"
-                  [text]="deployToken.username | ellipsis"
+                  [text]="deployToken.username"
                   [textHover]="deployToken.username"
                 />
 
@@ -295,17 +297,8 @@
         </div>
       } @else {
         <!-- Empty Deploy Token-->
-        <img
-          class="mx-auto"
-          ngSrc="/assets/images/hippo-empty.svg"
-          priority
-          alt="hippo-empty"
-          height="150"
-          width="300"
-        />
-        <div data-testid="token-empty" class="mx-auto mt-4 text-center">
-          <p class="text-[14px] text-[#9FA0A0]">Your list is empty,</p>
-          <p class="mt-2 text-[14px] text-[#9FA0A0]">just like this hippo's to-do list!</p>
+        <div data-testid="token-empty">
+          <app-empty-list message="No deploy tokens yet." />
         </div>
       }
     } @else {

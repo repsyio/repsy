@@ -327,12 +327,12 @@ describe('DeployTokenComponent', () => {
 });
 
 describe('DeployTokenComponent template', () => {
-  async function render(canManage: boolean): Promise<HTMLElement> {
+  async function render(canManage: boolean, tokens: DeployTokenInfo[] = [token('a')]): Promise<HTMLElement> {
     const tokenService = jasmine.createSpyObj<ProtocolDeployTokenControllerService>(
       'ProtocolDeployTokenControllerService',
       ['listDeployTokens'],
     );
-    tokenService.listDeployTokens.and.returnValue(of(listing([token('a')])) as never);
+    tokenService.listDeployTokens.and.returnValue(of(listing(tokens)) as never);
     const repoService = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
       'getUsage',
     ]);
@@ -362,5 +362,27 @@ describe('DeployTokenComponent template', () => {
 
     expect(el.querySelector('[data-testid="token-create"]')).toBeNull();
     expect(el.querySelector('[data-testid="token-table"]')).toBeNull();
+  });
+
+  it('shows the shared empty state with its own message when the repository has no tokens', async () => {
+    const el = await render(true, []);
+
+    expect(el.querySelector('[data-testid="token-table"]')).toBeNull();
+    expect(el.querySelector('[data-testid="token-empty"] [data-testid="empty-list"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="empty-list-message"]')?.textContent).toBe('No deploy tokens yet.');
+  });
+
+  it('renders a long name and username in full and lets the CSS clip them (RPS-1267)', async () => {
+    const name = 'deploy-token-for-the-production-cluster-eu-west-1-blue';
+    const username = 'a-very-long-deploy-username-that-would-not-fit-in-a-column';
+    const el = await render(true, [token(name, username)]);
+
+    const row = el.querySelector(`[data-testid="token-row-${name}"]`) as HTMLElement;
+    const cell = (id: string) => row.querySelector(`[data-testid="${id}"] [data-testid="tooltip-text"]`) as HTMLElement;
+
+    expect(cell('row-name').textContent).toBe(name);
+    expect(cell('row-username').textContent).toBe(username);
+    expect(cell('row-name').classList).toContain('truncate');
+    expect(cell('row-username').classList).toContain('truncate');
   });
 });

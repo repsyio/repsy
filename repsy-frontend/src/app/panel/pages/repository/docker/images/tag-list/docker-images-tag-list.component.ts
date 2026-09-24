@@ -27,7 +27,6 @@ import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
-import { EllipsisPipe } from '../../../../../shared/components/ellipsis/ellipsis.pipe';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { PaginationComponent } from '../../../../../shared/components/pagination/pagination.component';
@@ -57,7 +56,6 @@ import { DockerService } from '../../service/docker.service';
     SearchboxComponent,
     SortSelectorComponent,
     TooltipComponent,
-    EllipsisPipe,
     DropdownComponent,
     PaginationComponent,
     NgOptimizedImage,

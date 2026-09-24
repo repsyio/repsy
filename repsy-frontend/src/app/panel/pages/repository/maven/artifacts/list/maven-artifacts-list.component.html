@@ -82,7 +82,7 @@
         <div>
           <!-- Table Headers -->
           <div
-            class="hidden grid-cols-[3fr_1fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-neutral-400 bg-neutral-500 p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+            class="hidden grid-cols-[minmax(0,3fr)_1fr_minmax(0,1fr)_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-neutral-400 bg-neutral-500 p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
             animate.enter="fade-in-up"
           >
             <div>Artifact</div>
@@ -117,11 +117,11 @@
                 <div
                   animate.enter="fade-in-down"
                   [ngClass]="{ 'rounded-b-[12px]': i === artifacts.length - 1 }"
-                  class="grid grid-cols-[3fr_1fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                  class="grid grid-cols-[minmax(0,3fr)_1fr_minmax(0,1fr)_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
                 >
                   <a
                     data-testid="row-artifact-link"
-                    class="group text-secondary-500 flex w-max gap-2"
+                    class="group text-secondary-500 flex w-max max-w-full min-w-0 gap-2"
                     [routerLink]="'/' + activeRepo.repoName + '/' + artifact.groupName + '/' + artifact.artifactName"
                   >
                     @if (imageContain(artifact.packaging)) {
@@ -131,19 +131,27 @@
                         width="18"
                         priority
                         [alt]="artifact.packaging"
+                        class="shrink-0"
                       />
                     } @else {
-                      <img ngSrc="/assets/icons/repo/archive.svg" alt="archive" height="18" width="18" />
+                      <img
+                        ngSrc="/assets/icons/repo/archive.svg"
+                        alt="archive"
+                        height="18"
+                        width="18"
+                        class="shrink-0"
+                      />
                     }
 
                     <app-tooltip
+                      truncate
                       class="group-hover:underline"
-                      [text]="artifact.artifactName | ellipsis: 25"
+                      [text]="artifact.artifactName"
                       [textHover]="artifact.artifactName"
                     />
 
                     <svg
-                      class="mt-[2px] h-[14px] w-[14px] text-neutral-200 group-hover:text-white"
+                      class="mt-[2px] h-[14px] w-[14px] shrink-0 text-neutral-200 group-hover:text-white"
                       viewBox="0 0 14 14"
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"
@@ -176,7 +184,7 @@
 
                   <a
                     data-testid="row-latest-link"
-                    class="group text-secondary-500 flex w-max gap-2"
+                    class="group text-secondary-500 flex w-max max-w-full min-w-0 gap-2"
                     [routerLink]="
                       '/' +
                       activeRepo.repoName +
@@ -189,12 +197,13 @@
                     "
                   >
                     <app-tooltip
+                      truncate
                       class="group-hover:underline"
-                      [text]="artifact.latest | ellipsis: 25"
+                      [text]="artifact.latest"
                       [textHover]="artifact.latest"
                     />
                     <svg
-                      class="mt-[2px] h-[14px] w-[14px] text-neutral-200 group-hover:text-white"
+                      class="mt-[2px] h-[14px] w-[14px] shrink-0 text-neutral-200 group-hover:text-white"
                       viewBox="0 0 14 14"
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"

@@ -60,9 +60,8 @@ export class DeleteAccountComponent {
           this.authService.logOut();
           this.router.navigateByUrl('/login');
         },
-        error: (err: string) => {
-          this.toastService.show(err, 'error');
-        },
+        // The error interceptor already toasted the server's message; a second toast would repeat it.
+        error: () => undefined,
       });
   }
 }

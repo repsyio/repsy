@@ -14,6 +14,7 @@
 /// limitations under the License.
 ///
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder } from '@angular/forms';
 import { of, Subject, throwError } from 'rxjs';
 
@@ -204,14 +205,16 @@ describe('AccountInfoComponent', () => {
       expect(component.loading).toBeFalse();
     });
 
-    it('shows the error and unlocks the form when the request fails', () => {
+    it('leaves the toast to the error interceptor and unlocks the form when the request fails', () => {
       setPasswords('Passw0rd', 'Passw0rd');
-      profileService.updatePassword.and.returnValue(throwError(() => 'Password is too common'));
+      profileService.updatePassword.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 400, error: { text: 'Password is too common' } })),
+      );
 
       component.updatePassword();
       dangerModalService.call();
 
-      expect(toastService.show).toHaveBeenCalledOnceWith('Password is too common', 'error');
+      expect(toastService.show).not.toHaveBeenCalled();
       expect(component.passwordForm.enabled).toBeTrue();
       expect(component.loading).toBeFalse();
     });
@@ -243,14 +246,16 @@ describe('AccountInfoComponent', () => {
       expect(component.usernameForm.disabled).toBeTrue();
     });
 
-    it('shows the error and unlocks the form when the request fails', () => {
+    it('leaves the toast to the error interceptor and unlocks the form when the request fails', () => {
       component.usernameForm.get('username').setValue('alice2');
-      profileService.updateUsername.and.returnValue(throwError(() => 'Username is taken'));
+      profileService.updateUsername.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 409, error: { text: 'Username is taken' } })),
+      );
 
       component.updateUsername();
       dangerModalService.call();
 
-      expect(toastService.show).toHaveBeenCalledOnceWith('Username is taken', 'error');
+      expect(toastService.show).not.toHaveBeenCalled();
       expect(component.usernameForm.enabled).toBeTrue();
       expect(component.loading).toBeFalse();
     });

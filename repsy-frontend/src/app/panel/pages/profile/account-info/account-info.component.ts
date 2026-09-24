@@ -121,9 +121,8 @@ export class AccountInfoComponent implements OnInit {
           next: () => {
             this.toastService.show('Your password updated successfully', 'success');
           },
-          error: (err: string) => {
-            this.toastService.show(err, 'error');
-          },
+          // The error interceptor already toasted the server's message; a second toast would repeat it.
+          error: () => undefined,
         });
     });
   }
@@ -155,9 +154,8 @@ export class AccountInfoComponent implements OnInit {
             this.toastService.show('Your username changed successfully', 'success');
             location.reload();
           },
-          error: (err: string) => {
-            this.toastService.show(err, 'error');
-          },
+          // The error interceptor already toasted the server's message; a second toast would repeat it.
+          error: () => undefined,
         });
     });
   }

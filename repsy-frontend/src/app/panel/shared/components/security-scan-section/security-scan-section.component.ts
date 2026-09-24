@@ -33,7 +33,6 @@ import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.
 import { SecurityScanSupportService } from '../../service/security-scan-support.service';
 import { pollUntilTerminal } from '../../util/poll-until-terminal.util';
 import { scanStatusLabel } from '../../util/scan-status-label.util';
-import { EllipsisPipe } from '../ellipsis/ellipsis.pipe';
 import { PaginationComponent } from '../pagination/pagination.component';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
@@ -59,7 +58,6 @@ const SCROLL_RETRY_DELAYS_MS = [0, 300, 800];
     PaginationComponent,
     SeverityBadgeComponent,
     TooltipComponent,
-    EllipsisPipe,
     StatusPollingIndicatorComponent,
     RescanNoteComponent,
   ],

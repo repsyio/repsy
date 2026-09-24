@@ -14,23 +14,59 @@
 /// limitations under the License.
 ///
 
-import { Component, HostListener, Input } from '@angular/core';
+import { booleanAttribute, Component, ElementRef, HostListener, Input, ViewChild } from '@angular/core';
 
+/**
+ * A short text with the full value in a popup on hover.
+ *
+ * Two modes. By default the caller passes an already shortened `text` (usually through the `ellipsis`
+ * pipe) and the full value in `textHover`; the popup opens when `text` is longer than `maxLength`.
+ * With the `truncate` attribute the caller passes the FULL value as `text`: the host fills its grid
+ * cell or flex slot, the browser clips the text with a CSS ellipsis at the cell width, and the popup
+ * (`textHover`, or `text` when it is not set) opens only when the text really is clipped. The full
+ * value always stays in the DOM, so similar long names remain distinguishable to assistive
+ * technology and to tests.
+ */
 @Component({
   selector: 'app-tooltip',
   templateUrl: './tooltip.component.html',
   imports: [],
   standalone: true,
+  host: {
+    '[class.block]': 'truncate',
+    '[class.min-w-0]': 'truncate',
+  },
 })
 export class TooltipComponent {
   @Input() text: string;
   @Input() textHover: string;
   @Input() maxLength = 10;
   @Input() always = false;
+  @Input({ transform: booleanAttribute }) truncate = false;
+
+  @ViewChild('label') private label?: ElementRef<HTMLElement>;
 
   isVisible = false;
+  /** True while the text is wider than its slot; measured when the pointer enters. */
+  isClipped = false;
+
+  get showPopup(): boolean {
+    if (!this.isVisible) {
+      return false;
+    }
+    if (this.always) {
+      return true;
+    }
+    return this.truncate ? this.isClipped : (this.text?.length ?? 0) > this.maxLength;
+  }
+
+  get popupText(): string {
+    return this.truncate ? (this.textHover ?? this.text) : this.textHover;
+  }
 
   @HostListener('mouseenter') onMouseEnter() {
+    const label = this.label?.nativeElement;
+    this.isClipped = !!label && label.scrollWidth > label.clientWidth;
     this.isVisible = true;
   }
 

@@ -2707,9 +2707,9 @@ How the tests are written, and what they had to work around:
 - **The token "show" eye is clicked by event.** Its icon is a Font Awesome glyph from a CDN that the
   UI suite blocks (`src/ui/defaults.ts`), so the button has no size; `toggleTokenVisibility()`
   dispatches the click and the test asserts `aria-pressed` and the input's `type`.
-- **Long names are truncated** to 10 characters plus `...` in the token list (the full text is in the
-  tooltip popup on hover): `expectCellText()` hovers first; rows are keyed by the raw name through
-  `token-row-<name>`.
+- **Long names** are in the row in full and clipped by CSS (`truncate`, RPS-1267; the popup on hover
+  shows the whole name only while it is clipped): `expectCellText()` reads the cell's
+  `tooltip-text`; rows are keyed by the raw name through `token-row-<name>`.
 - **Expiry colours.** The UI can only create a token between tomorrow and a year out, so TOK-02 makes
   the "within 7 days" token in the UI (today + 3 days, UTC, the form's zone) and seeds the already
   expired one and a far-off one through the API (`seeder.createToken`, which accepts a past date).

@@ -251,7 +251,9 @@ test.describe('PRO-02 change username', () => {
       await profile.submitUsernameChange(other.username);
       await profile.shell.dangerModal.confirm();
 
+      // One toast, the server's message: the handler used to add an "[object Object]" one (RPS-1309).
       await profile.shell.toasts.expectError(/in use/i);
+      await expect(profile.shell.toasts.error()).toHaveCount(1);
       expect(await currentUsername(userPage)).toBe(seededUser.username);
       await expect(userPage).toHaveURL(/\/profile$/);
     },
@@ -285,6 +287,75 @@ test.describe('PRO-03 delete account', () => {
       await expectLoginRefused(openUiPage, seededUser.username, seededUser.password);
     },
   );
+});
+
+test.describe('PRO-05 a refused update raises exactly one error toast (RPS-1309)', () => {
+  const REFUSAL = 'Stubbed refusal from the server';
+
+  /** Answers `method` on `url` with a 400 carrying `REFUSAL`; every other request passes through. */
+  async function refuse(page: Page, url: RegExp, method: string): Promise<void> {
+    await page.route(url, async (route) => {
+      if (route.request().method() !== method) {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ text: REFUSAL }),
+      });
+    });
+  }
+
+  /** The interceptor's toast, and nothing else: no second toast with an object printed in it. */
+  async function expectOnlyTheServersMessage(profile: ProfilePage): Promise<void> {
+    await profile.shell.toasts.expectError(REFUSAL);
+    await expect(profile.shell.toasts.error()).toHaveCount(1);
+    await expect(profile.shell.toasts.error(/object Object/)).toHaveCount(0);
+    await expect(profile.shell.toasts.success()).toHaveCount(0);
+  }
+
+  test('a refused password change', CREDENTIALS, async ({ userPage, seededUser, seeder }) => {
+    await refuse(userPage, /\/api\/profile\/password$/, 'PUT');
+    const profile = new ProfilePage(userPage);
+    await profile.goto();
+
+    await profile.changePassword(`E2e-${seeder.runId}-New1`);
+
+    await expectOnlyTheServersMessage(profile);
+    // The form is usable again and the session untouched.
+    await expect(profile.newPassword).toBeEnabled();
+    expect(await currentUsername(userPage)).toBe(seededUser.username);
+  });
+
+  test('a refused username change', CREDENTIALS, async ({ userPage, seededUser, seeder }) => {
+    await refuse(userPage, /\/api\/profile\/username$/, 'PUT');
+    const profile = new ProfilePage(userPage);
+    await profile.goto();
+
+    await profile.submitUsernameChange(seeder.reserveUsername());
+    await profile.shell.dangerModal.confirm();
+
+    await expectOnlyTheServersMessage(profile);
+    await expect(profile.username).toBeEnabled();
+    expect(await currentUsername(userPage)).toBe(seededUser.username);
+    await expect(userPage).toHaveURL(/\/profile$/);
+  });
+
+  test('a refused account deletion', CREDENTIALS, async ({ userPage, seededUser, panelApi }) => {
+    await refuse(userPage, /\/api\/profile$/, 'DELETE');
+    const profile = new ProfilePage(userPage);
+    await profile.goto();
+
+    await profile.requestAccountDeletion();
+    await profile.shell.dangerModal.confirm();
+
+    await expectOnlyTheServersMessage(profile);
+    // Still signed in, still on the page, the account still exists.
+    await expect(userPage).toHaveURL(/\/profile$/);
+    expect(await currentUsername(userPage)).toBe(seededUser.username);
+    expect(await panelApi.listUsers({ search: seededUser.username })).toHaveLength(1);
+  });
 });
 
 test.describe('PRO-04 header Profile link (RPS-1264)', () => {
