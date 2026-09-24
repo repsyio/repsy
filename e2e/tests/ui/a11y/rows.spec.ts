@@ -28,7 +28,7 @@
 import type { Locator, Page } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
-import type { PackageProtocol } from '../../../src/seed/packages.js';
+import type { PackageProtocol, PackageRef } from '../../../src/seed/packages.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import {
@@ -115,6 +115,30 @@ async function tabTo(page: Page, start: Locator, target: Locator, max = 40): Pro
 }
 
 const pathOf = (url: string): string => new URL(url, 'http://x').pathname;
+
+/** The desktop row of `pkg`, or its mobile card. */
+function rowOrCard(list: ProtocolListPage, pkg: PackageRef, device: 'desktop' | 'mobile'): Locator {
+  return device === 'desktop' ? list.row(pkg) : list.card(pkg);
+}
+
+/** The target of the row's stretched link. */
+async function hrefOf(row: Locator): Promise<string> {
+  return row.locator('a.row-link').evaluate((link) => link.getAttribute('href') ?? '');
+}
+
+/**
+ * Clicks the exact centre of `row` with the mouse: one move, then press and release at once, like a
+ * fast user. (`locator.click()` waits for the point to be actionable, which hides an element that
+ * covers it for a moment, such as a popup that is still fading in under the arriving pointer.)
+ */
+async function clickCentre(page: Page, row: Locator): Promise<void> {
+  await row.scrollIntoViewIfNeeded();
+  const box = await row.boundingBox();
+  if (box === null) {
+    throw new Error('the row has no box');
+  }
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+}
 
 test.describe('List rows are links', { tag: '@a11y' }, () => {
   test('A11Y-08: a repository row is a container with one link, reachable by Tab and opened by Enter', async ({
@@ -259,6 +283,36 @@ test.describe('List rows are links', { tag: '@a11y' }, () => {
         await adminPage.keyboard.press('Enter');
         await expect(adminPage).toHaveURL((url) => url.pathname === pathOf(href));
       });
+
+      // RPS-1324: the centre of a row is the point a user (and the page object) clicks. It must open
+      // the row's link target, whatever cell sits there and whatever pops up when the pointer arrives
+      // (the Docker digest cell's hover popup used to swallow that click).
+      for (const [device, viewport] of [
+        ['desktop', { width: 1440, height: 900 }],
+        ['mobile', { width: 390, height: 844 }],
+      ] as const) {
+        if (device === 'mobile' && !descriptor.levels[level]?.mobileCards) {
+          continue;
+        }
+
+        test(`A11Y-11: a click on the centre of a ${protocol} ${level} ${device === 'desktop' ? 'row' : 'card'} opens it`, async ({
+          adminPage,
+          seeder,
+          seedPackage,
+        }) => {
+          await adminPage.setViewportSize(viewport);
+          const repo = await seeder.createRepo(repoType);
+          const pkg = await seedPackage(repo);
+          const listPage = pageOf(adminPage, descriptor, level, repo.name, pkg) as ProtocolListPage;
+          await listPage.goto();
+          const row = rowOrCard(listPage, pkg, device);
+          await expect(row).toBeVisible();
+          await expect(row.locator('a.row-link')).toHaveAttribute('href', /^\//);
+          const href = await hrefOf(row);
+          await clickCentre(adminPage, row);
+          await expect(adminPage).toHaveURL((url) => url.pathname === pathOf(href));
+        });
+      }
     }
   }
 
