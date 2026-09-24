@@ -15,8 +15,10 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
-import { Router, RouterLink, RouterModule } from '@angular/router';
+import { Component, EventEmitter, HostListener, Input, OnInit, Output } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterModule } from '@angular/router';
+import { filter } from 'rxjs';
 
 import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { ProfileService } from '../../../pages/profile/service/profile.service';
@@ -39,7 +41,15 @@ export class SidebarComponent implements OnInit {
     private readonly authService: AuthService,
     private readonly profileFacadeService: ProfileService,
     private readonly router: Router,
-  ) {}
+  ) {
+    // Any navigation (a link, the browser's back button) leaves the mobile menu closed.
+    this.router.events
+      .pipe(
+        filter((event) => event instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => this.closeIfOpen());
+  }
 
   public ngOnInit(): void {
     this.username = localStorage.getItem('username');
@@ -61,6 +71,13 @@ export class SidebarComponent implements OnInit {
   public logOut(): void {
     this.authService.logOut();
     this.router.navigateByUrl('login');
+  }
+
+  @HostListener('document:keydown.escape')
+  closeIfOpen(): void {
+    if (this.isMobileMenuOpen) {
+      this.closeMobileMenu();
+    }
   }
 
   closeMobileMenu(): void {

@@ -15,7 +15,7 @@
 ///
 
 import { NgOptimizedImage, ViewportScroller } from '@angular/common';
-import { Component, EventEmitter, HostListener, Output } from '@angular/core';
+import { Component, EventEmitter, HostListener, Input, Output } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../../../auth/pages/service/auth.service';
@@ -32,7 +32,8 @@ import { DividerComponent } from '../divider/divider.component';
 export class PanelHeaderComponent {
   public username: string;
   public email: string;
-  public isMobileMenuOpen = false;
+  // Owned by the layout: the burger only asks for a state, it never keeps one of its own.
+  @Input() public isMobileMenuOpen = false;
 
   @Output() mobileMenuToggle = new EventEmitter<boolean>();
 
@@ -55,9 +56,8 @@ export class PanelHeaderComponent {
   docDropdown = false;
   profileDropdown = false;
 
-  openMobileMenu() {
-    this.isMobileMenuOpen = true;
-    this.mobileMenuToggle.emit(this.isMobileMenuOpen);
+  toggleMobileMenu() {
+    this.mobileMenuToggle.emit(!this.isMobileMenuOpen);
   }
 
   toggleProfileDropdown(event: Event) {

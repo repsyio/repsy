@@ -125,7 +125,6 @@
       data-testid="mobile-sidebar-backdrop"
       class="fixed inset-0 z-4 bg-black/50"
       (click)="closeMobileMenu()"
-      (keydown)="closeMobileMenu()"
       role="button"
       tabindex="0"
     ></div>
@@ -138,7 +137,7 @@
       <div class="pb-6">
         <div class="flex items-center justify-between">
           <!-- Logo -->
-          <a [routerLink]="['/']" class="inline-block">
+          <a [routerLink]="['/']" class="inline-block" (click)="closeMobileMenu()">
             <img
               ngSrc="/assets/icons/repsy/repsy-brand.svg"
               priority
@@ -178,6 +177,7 @@
 
         <a
           data-testid="mobile-sidebar-link-dashboard"
+          (click)="closeMobileMenu()"
           routerLink="/"
           class="flex h-[44px] items-center gap-2 rounded-lg px-4 hover:bg-[#404141]"
           [routerLinkActiveOptions]="{ exact: true }"
@@ -189,6 +189,7 @@
 
         <a
           data-testid="mobile-sidebar-link-repositories"
+          (click)="closeMobileMenu()"
           routerLink="/repositories"
           class="flex h-[44px] items-center gap-2 rounded-lg px-4 hover:bg-[#404141]"
           [ngClass]="{ 'bg-[#333333]': isActive() }"
@@ -201,6 +202,7 @@
         @if (isAdmin) {
           <a
             data-testid="mobile-sidebar-link-users"
+            (click)="closeMobileMenu()"
             routerLink="/users"
             class="flex h-[44px] items-center gap-2 rounded-lg px-4 hover:bg-[#404141]"
             routerLinkActive="bg-[#333333]"
@@ -246,6 +248,7 @@
         @if (isAdmin) {
           <a
             data-testid="mobile-sidebar-link-security"
+            (click)="closeMobileMenu()"
             routerLink="/security"
             class="flex h-[44px] items-center gap-2 rounded-lg px-4 hover:bg-[#404141]"
             routerLinkActive="bg-[#333333]"
