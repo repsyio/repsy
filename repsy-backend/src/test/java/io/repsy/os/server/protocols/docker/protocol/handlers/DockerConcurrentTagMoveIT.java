@@ -228,6 +228,63 @@ class DockerConcurrentTagMoveIT extends AbstractIntegrationTest {
     assertThat(this.manifestRows(repo)).as("the two new manifests and the seed").isEqualTo(3);
   }
 
+  /**
+   * RPS-1325: a tag that keeps losing its version race (a heavily contended one) exhausts the three
+   * runs of the handler, and the {@code ObjectOptimisticLockingFailureException} used to reach the
+   * client as a 500. Every read of the tag is followed by another writer bumping the row's version,
+   * so no run can commit. The loser now gets a 503 with {@code Retry-After} in the registry error
+   * format, since Docker clients retry a 5xx and give up on a 409, and nothing of the losing push
+   * stays behind. Once the contention is over the same push succeeds.
+   */
+  @Test
+  @DisplayName(
+      "a push that loses the version race on every run is answered 503, and stores nothing")
+  void exhaustedRetriesAnswerARetryableRegistryError() throws Exception {
+    final var repo = this.dockerRepo();
+    this.wire.pushBlobsOf(repo, IMAGE, "layer-seed");
+    final var seed = imageManifest("layer-seed");
+    assertThat(this.wire.putImage(repo, IMAGE, TAG, seed).getStatus()).isEqualTo(201);
+    this.wire.pushBlobsOf(repo, IMAGE, "layer-one");
+    final var one = imageManifest("layer-one");
+    final var tagReads = new AtomicInteger();
+
+    AFTER_TAG_READ.set(
+        () -> {
+          tagReads.incrementAndGet();
+          this.jdbcTemplate.update(
+              """
+              update docker_tag set version = version + 1
+              where name = ? and image_id in (select id from docker_image where repo_id = ?)
+              """,
+              TAG,
+              repo.getId());
+        });
+
+    final var response = this.wire.putImage(repo, IMAGE, TAG, one);
+
+    assertThat(response.getStatus())
+        .as("answered %s", response.getContentAsString())
+        .isEqualTo(503);
+    assertThat(response.getHeader("Retry-After")).isEqualTo("1");
+    assertThat(response.getContentType()).startsWith("application/json");
+    assertThat(response.getContentAsString())
+        .as("the registry error format, not the panel envelope")
+        .contains("\"errors\"", "\"code\":\"UNKNOWN\"", "concurrentModification")
+        .doesNotContain("\"msgId\"");
+    assertThat(tagReads).as("the handler ran the whole save three times").hasValue(3);
+    assertThat(this.tagDigests(repo))
+        .as("the tag still points at the manifest it had")
+        .containsExactly(sha256(bytes(seed)));
+    assertThat(this.manifestRows(repo)).as("the losing push stored no manifest").isEqualTo(1);
+
+    AFTER_TAG_READ.set(null);
+
+    assertThat(this.wire.putImage(repo, IMAGE, TAG, one).getStatus())
+        .as("the same push repeated without contention")
+        .isEqualTo(201);
+    assertThat(this.tagDigests(repo)).containsExactly(sha256(bytes(one)));
+  }
+
   private List<String> tagDigests(final Repo repo) {
     return this.jdbcTemplate.queryForList(
         """

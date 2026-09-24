@@ -33,6 +33,7 @@ import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.os.shared.error_handling.exceptions.InvalidPagingParameterException;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
+import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -46,6 +47,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.convert.ConversionFailedException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -97,6 +99,10 @@ public class ErrorHandler {
   private static final @NonNull String ERR_MISSING_REQUEST_HEADER = "missingRequestHeader";
   private static final @NonNull String ERR_SCAN_EXECUTOR_SATURATED = "scanExecutorSaturated";
   private static final @NonNull String ERR_TOO_MANY_REQUESTS = "tooManyRequests";
+  private static final @NonNull String ERR_CONCURRENT_MODIFICATION = "concurrentModification";
+
+  /** Seconds an OCI client is told to wait before it repeats a push that lost a version race. */
+  private static final @NonNull String CONCURRENT_MODIFICATION_RETRY_AFTER = "1";
 
   private final @NonNull RestResponseFactory resp;
 
@@ -796,6 +802,50 @@ public class ErrorHandler {
     return ResponseEntity.status(status)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(msgId));
+  }
+
+  /**
+   * Handles a write that lost an optimistic-lock race: another request changed the same row (an
+   * entity with a {@code @Version}) between this request's read and its commit, so the version
+   * check matched no row. It covers {@code ObjectOptimisticLockingFailureException}, which is what
+   * Spring translates that failure to. Nothing of the losing request was written (its transaction
+   * rolled back) and the same request repeated normally succeeds, so it is not a server error
+   * (RPS-1325). Both answers carry the same {@code concurrentModification} message id.
+   *
+   * <p>A panel or other protocol request gets 409: the client re-reads and repeats. A request on
+   * the OCI {@code /v2/} endpoints gets 503 with a {@code Retry-After} instead. Registry clients
+   * retry a 5xx (and 429) but treat a 409 as a final refusal, and the distribution specification
+   * maps a 409 to {@code DENIED}, which tells the user they lack access. The push handler already
+   * repeats the save a few times, so this answer means a heavily contended tag, which is exactly
+   * what a later retry resolves. The body stays in the distribution format through {@link
+   * OciErrorBodyAdvice}. 429 was not chosen because nothing here is rate limiting.
+   *
+   * @param ex Thrown exception
+   * @return REST response
+   */
+  @ExceptionHandler(OptimisticLockingFailureException.class)
+  @Nullable ResponseEntity<RestResponse<String>> handleException(
+      final @NonNull OptimisticLockingFailureException ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Optimistic lock failure", ex);
+      return null;
+    }
+
+    log.warn("Optimistic lock failure: {}", exceptionToString(ex, request));
+
+    if (OciErrors.isOciRequest(request)) {
+      return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+          .contentType(MediaType.APPLICATION_JSON)
+          .header(HttpHeaders.RETRY_AFTER, CONCURRENT_MODIFICATION_RETRY_AFTER)
+          .body(this.resp.error(ERR_CONCURRENT_MODIFICATION));
+    }
+
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(this.resp.error(ERR_CONCURRENT_MODIFICATION));
   }
 
   @ExceptionHandler(RetryableException.class)
