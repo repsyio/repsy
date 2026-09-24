@@ -2615,7 +2615,70 @@ Rules these specs follow (and a later spec on these pages should too):
 
 ### Repository settings and deploy tokens (RPS-1254)
 
-_Not implemented yet._
+`/:repo/settings` and the deploy-token modals: SET-01..09 and TOK-01..05 of RPS-1254 (34 tests,
+because the section-per-repo-type check and the toggle check run once per type). Run them with
+`./run.sh test --protocol ui --grep @settings`; the P0 four (SET-01, SET-02, SET-06, TOK-01) are also
+`@smoke`.
+
+| File                                           | What it is                                                                                                                                |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/ui/pages/repo-settings/page.ts`           | `RepoSettingsPage(page, repoName)`: `goto()`, `reload()`, `shell`, and one member per section                                             |
+| `src/ui/pages/repo-settings/toggles.ts`        | `VisibilitySection`, `PackageOverrideSection` (`flip()`, `expectChecked()`), `VersionAllowanceSection` (`choose()`, `options()`)          |
+| `src/ui/pages/repo-settings/deploy-tokens.ts`  | `DeployTokensSection`: `row(name)`, `cell()`, `rotateButton()/revokeButton()`, `rowNames()`, pagination, `createModal`, `infoModal`       |
+| `src/ui/pages/deploy-token-modals.ts`          | `TokenCreateModal` (`create()`, field and per-validator error locators) and `TokenInfoModal` (`values()`, copy buttons)                   |
+| `src/ui/pages/repo-settings/pgp.ts`            | `PgpSection`: selector, add, per-host rows and delete, built-in servers                                                                   |
+| `src/ui/pages/repo-settings/repo-info.ts`      | `RepoInfoSection`: rename input/submit/errors, description save/reset                                                                     |
+| `src/ui/pages/repo-settings/danger-zone.ts`    | `StorageSection`, `OrphanLayersSection`, `DeleteRepoSection`                                                                              |
+| `src/ui/pages/repo-settings/readback.ts`       | `RepoSettingsReadback` (permissions/description, disk usage, key stores, allowed key servers) and `repoRootStatus()`, the repo-PORT probe |
+| `tests/ui/settings/access-and-toggles.spec.ts` | SET-01 (access), SET-02 (visibility), SET-03 (override, sections per repo type), SET-04 (version allowance)                               |
+| `tests/ui/settings/repo-management.spec.ts`    | SET-05 (rename, description), SET-06 (delete), SET-07 (orphan layers), SET-09 (storage)                                                   |
+| `tests/ui/settings/pgp.spec.ts`                | SET-08 (Maven PGP key stores)                                                                                                             |
+| `tests/ui/settings/deploy-tokens.spec.ts`      | TOK-01..05                                                                                                                                |
+
+How the tests are written, and what they had to work around:
+
+- **Persistence is asserted through the API.** The toggles and the selector PUT immediately and ask
+  for no confirmation, so each test reads the setting back (`panelApi.getSettings`, tokens through
+  `listDeployTokens`, description/usage/key stores through `RepoSettingsReadback`, which uses the
+  test's `adminSession` bearer token because `PanelApi` does not wrap those reads) and again after a
+  reload. Nothing sleeps: `expect.poll` on the API, `expect(...)` on the page.
+- **Visibility is proven on the repo port too.** SET-02 checks `GET /<repo>/` on the PROTOCOL port
+  (`REPSY_REPO_BASE_URL`, not the SPA port): 401 while private, 200 anonymous once public.
+  TOK-03/TOK-04 do the same with a token (`repoRootStatus`, raw `fetch` and Basic auth, no package
+  manager): a UI-created token gives 200, a revoked or rotated-away one 401.
+- **Scope every locator to a section or modal.** `#name`, `#username` and `#description` exist twice
+  on the page (the rename/description form and the create-token modal); only the `token-create-*`
+  and `settings-*` ids are used, never a label or `#id`.
+- **Toggles are flipped through their label** (`toggle-label`): the `role="switch"` checkbox is
+  `sr-only` and covered by the drawn switch, so Playwright refuses to click it as "intercepted".
+- **A forced click for Orphan Layers.** Every settings section is `mt-[-100px] pt-[100px]` (an anchor
+  offset), so the Delete Repository section's transparent padding overlaps the lower part of the
+  Orphan Layers button and Playwright's hit-target check never clicks it. `OrphanLayersSection.delete()`
+  uses `click({ force: true })`, which lands on the button's own label like a real mouse.
+- **The token "show" eye is clicked by event.** Its icon is a Font Awesome glyph from a CDN that the
+  UI suite blocks (`src/ui/defaults.ts`), so the button has no size; `toggleTokenVisibility()`
+  dispatches the click and the test asserts `aria-pressed` and the input's `type`.
+- **Long names are truncated** to 10 characters plus `...` in the token list (the full text is in the
+  tooltip popup on hover): `expectCellText()` hovers first; rows are keyed by the raw name through
+  `token-row-<name>`.
+- **Expiry colours.** The UI can only create a token between tomorrow and a year out, so TOK-02 makes
+  the "within 7 days" token in the UI (today + 3 days, UTC, the form's zone) and seeds the already
+  expired one and a far-off one through the API (`seeder.createToken`, which accepts a past date).
+- **Clipboard.** TOK-01 grants `clipboard-read`/`clipboard-write` to the context and compares
+  `navigator.clipboard.readText()` with the token and username, and asserts the button's
+  `data-copied`.
+- **Sections per repo type** (SET-03) is a table (`SECTIONS_BY_TYPE`) checked once for each of the
+  nine types with `toHaveCount`, so an absent section and a hidden one are told apart.
+
+Known product bugs are pinned with `test.fail('... RPS-nnnn')`, so the test turns red the day the
+bug is fixed and the marker has to go: the Visibility and Package Override help texts describe the
+opposite of the toggle (RPS-1261, two tests), and `#name`/`#description` are duplicated between the
+rename form and the create-token modal (RPS-1266). A third pin has no ticket yet: revoking the only token on page 2
+fires two list requests and the empty page-2 answer can land last, leaving "Your list is empty" over three tokens (the test
+slows that answer to make the order certain). Not covered here: the Vulnerability Scanning toggle
+(hidden without a scanner, RPS-1259), the per-protocol "configure" modal behind a token row, the
+`reservedName` rename error (it has no test id), the expiration-date range messages (no test id) and
+the token-name `minLength` branch, which is unreachable (`required` already covers an empty name, RPS-1265).
 
 ### Package seeding and protocol page objects (RPS-1255)
 
