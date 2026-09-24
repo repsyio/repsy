@@ -22,8 +22,8 @@
  * server's `text`. Each test removes its own route in a `finally` (`withRoute`), and a route lives on
  * the test's own page anyway, so nothing leaks into another test or worker.
  *
- * Two facts the tests are built around. A toast lives 3 s, so it is asserted right after the request
- * that raises it (the assertion is started BEFORE the navigation that triggers it, then awaited).
+ * Two facts the tests are built around. A toast is short-lived (an error toast 7 s, a success toast
+ * 3 s), so it is asserted right after the request that raises it (the assertion is started BEFORE the navigation that triggers it, then awaited).
  * And the repository list fires nine parallel `GET /api/repos/<TYPE>/info` calls, one per type, and
  * renders whatever arrives: stubbing all nine and stubbing only one are different scenarios.
  */
@@ -66,7 +66,7 @@ const respondWith =
 
 const abort: Handler = (route) => route.abort('failed');
 
-/** Starts asserting a toast now and hands back the promise, so a 3 s toast cannot be missed. */
+/** Starts asserting a toast now and hands back the promise, so a short-lived toast cannot be missed. */
 function expectToastLater(toasts: Toasts, text: string): Promise<void> {
   const raised = toasts.expectError(text);
   raised.catch(() => undefined); // awaited later; if the test fails first, do not report it twice
