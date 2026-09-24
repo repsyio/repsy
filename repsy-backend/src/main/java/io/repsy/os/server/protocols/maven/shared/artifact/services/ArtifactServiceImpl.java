@@ -352,16 +352,27 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
     // Locked first: a signature request that recorded this file's signature holds the lock until it
     // commits, so the record is either visible from here on or comes after the recomputation below
-    // (RPS-1320).
-    this.versionSignatureService.lock(version);
+    // (RPS-1320). The setting is read after the lock and not taken from repoInfo, which is from the
+    // start of the request: a toggle that committed since has its recomputation waiting for this
+    // lock, and what is written here must be by the setting it will find (RPS-1323).
+    final var verifyAll = this.versionSignatureService.lockAndIsVerifyAll(version);
 
-    if (!recorded
-        && !this.stillVerifies(repoInfo, version, PendingSignatureService.pathOf(storagePath))) {
-      this.versionSignatureService.forget(version, relativePath.getFileName());
+    if (verifyAll && !recorded) {
+      this.forgetUnlessStillVerifies(repoInfo, version, storagePath);
     }
 
     this.versionSignatureService.refreshSigned(
-        repoInfo.getStorageKey(), version, versionPathOf(storagePath));
+        repoInfo.getStorageKey(), version, versionPathOf(storagePath), verifyAll);
+  }
+
+  private void forgetUnlessStillVerifies(
+      final BaseRepoInfo<UUID> repoInfo,
+      final ArtifactVersion version,
+      final StoragePath storagePath) {
+
+    if (!this.stillVerifies(repoInfo, version, PendingSignatureService.pathOf(storagePath))) {
+      this.versionSignatureService.forget(version, storagePath.getRelativePath().getFileName());
+    }
   }
 
   /**
@@ -805,17 +816,19 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
           repoInfo.getStorageKey(), PendingSignatureService.pathOf(signedStoragePath));
     }
 
+    // The version's lock is taken before its signature is recorded, and the setting is read after
+    // it: repoInfo is from the start of the request, and a toggle may have committed since. The
+    // recomputation that toggle started waits for this lock, so it comes after what is written here
+    // (RPS-1323). The lock comes after the claim above, as it always did, so the two locks are
+    // taken in the same order as by the checks of parked signatures.
+    final var verifyAll = this.versionSignatureService.lockAndIsVerifyAll(artifactVersion);
+
     this.versionSignatureService.recordVerified(
         artifactVersion, signedStoragePath.getRelativePath().getFileName());
 
-    if (repoInfo.isPgpVerifyAllSignaturesEnabled()) {
-      this.versionSignatureService.refreshSigned(
-          repoInfo.getStorageKey(), artifactVersion, versionPathOf(signedStoragePath));
-    } else {
-      artifactVersion.setSigned(true);
-
-      this.artifactVersionRepository.save(artifactVersion);
-    }
+    // The rule of the setting it is now: every file has a verified signature, or the POM's has.
+    this.versionSignatureService.refreshSigned(
+        repoInfo.getStorageKey(), artifactVersion, versionPathOf(signedStoragePath), verifyAll);
   }
 
   /**
