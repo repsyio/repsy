@@ -50,10 +50,10 @@
  *    pin `409` in `catalog.ts`) -> only then the THREE storage writes (`.mod`, `.zip` verbatim, then a
  *    generated `.info` -- `{"Version":"<version>","Time":"<ISO-8601>"}`). The duplicate check running
  *    BEFORE any storage write means a refused duplicate cannot corrupt storage (confirmed live/H9: the
- *    original `.mod`/`.zip` bytes are unchanged after a refused re-PUT) -- the INVERSE of cargo's
- *    RPS-1124 storage-before-DB bug; here the DB row commits before the storage writes instead (G4,
- *    not independently observable over the wire, noted for the coordinator to consider commenting on
- *    the existing RPS-1124 storage/DB-ordering audit story, whose title already names Go).
+ *    original `.mod`/`.zip` bytes are unchanged after a refused re-PUT). RPS-1124 (fixed, #511):
+ *    the version row is now flushed first and stays uncommitted while the files are written, so a
+ *    failed file write rolls the row back and removes the partly written files (G4 is resolved:
+ *    no committed row without its files).
  *  - Deleting a version (`DELETE /api/go/modules/<repo>/versions?modulePath=&version=`, panel API,
  *    MANAGE) removes BOTH the DB row and the three storage files outright; a re-upload of the exact
  *    same version afterwards succeeds with a fresh `200`, never a `410` (confirmed live/G8: the

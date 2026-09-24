@@ -39,9 +39,10 @@
  *    version RE-EXTRACTED from the filename instead of the filename itself, so a mismatched form
  *    `version` made an existing file overwritable even under `allowOverride: false`. `isPackageFileExist`
  *    is now decided by the filename alone.
- *  - **P4**: storage-before-DB (the RPS-1124 family already open for cargo/nuget; commented there, not
- *    a new ticket): `writePackageArchive` runs before `ReleaseVersion.of(form.version)` can still
- *    throw `badVersionString`, leaving an orphaned, downloadable archive+sidecar with no DB row.
+ *  - **P4** (fixed, RPS-1124/#508): `writePackageArchive` used to run before
+ *    `ReleaseVersion.of(form.version)` could still throw `badVersionString`, leaving an orphaned,
+ *    downloadable archive+sidecar with no DB row. The version is now validated first, so a refused
+ *    upload stores nothing.
  *  - **RPS-1224/RPS-1225** (fixed): the `.sha256` sidecar used to be the client-sent `sha256_digest`
  *    VERBATIM, never recomputed or verified -- a missing digest used to be an unhandled `500`
  *    (RPS-1224), a wrong one used to be silently served to every consumer (RPS-1225). The facade now
@@ -311,8 +312,8 @@ test.describe('pypi registry rules (raw HTTP)', () => {
   );
 
   test(
-    'a badVersionString form version is refused with 400, but ONLY after the archive and its ' +
-      '.sha256 sidecar are already written to storage and downloadable (P4 / RPS-1124)',
+    'a badVersionString form version is refused with 400 and nothing is written to storage: ' +
+      'the archive is not downloadable afterwards (P4, fixed by RPS-1124/#508)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'badversion');
@@ -336,14 +337,8 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       const bytes = Buffer.from(await res.arrayBuffer());
       expectMsgId({ status: res.status, body: bytes }, 400, 'badVersionString');
 
-      // P4 (RPS-1124 family, confirmed live): the orphaned file is downloadable directly even
-      // though the upload was refused and no DB row/project-page entry exists for it.
-      test.fail(
-        true,
-        'P4 (RPS-1124 family): writePackageArchive runs BEFORE ReleaseVersion.of(form.version) can ' +
-          'throw badVersionString, so a validation failure after the storage write leaves an ' +
-          'orphaned, downloadable archive with no DB row at all',
-      );
+      // P4 (fixed, RPS-1124/#508): the form version is validated BEFORE the archive is written, so
+      // the refused upload leaves nothing behind -- no orphaned, downloadable file (nor a DB row).
       const dl = await rawDownload(layout.repoName, admin, layout.packageName, built.filename);
       expect(dl.status, 'the rejected upload left nothing downloadable').toBe(404);
     },

@@ -766,36 +766,29 @@ version, and the same Java-`Integer` overflow reasoning, as npm's correction #3;
 `coordinates.ts`'s `boundedSemverVersion` is shared between the two adapters), and `config.json`'s
 own `dl`/`api`/`auth-required` shape.
 
-### H1, confirmed live: a refused duplicate publish still corrupts storage (RPS-1124)
+### H1 (RPS-1124, fixed): a refused duplicate publish used to corrupt storage
 
-`AbstractCargoProtocolFacade.publish` writes the `.crate` bytes to storage (`FileSystemStorageStrategy
-.write`, `TRUNCATE_EXISTING` — overwrites whatever was already there) and appends an index line to a
-storage-only index FILE (never served — the sparse-index HTTP handler reads the DB instead) **BEFORE**
-calling `CargoCrateServiceImpl.publish`, where the duplicate-version check
-(`checkExistsVersion`) actually lives. When that check throws, the (Postgres) transaction the DB
-writes were inside rolls back — but the storage write already happened and is not, and cannot be,
-rolled back with it. Live evidence (`tests/cargo/registry-rules.spec.ts`):
+`AbstractCargoProtocolFacade.publish` used to write the `.crate` bytes to storage
+(`FileSystemStorageStrategy.write`, `TRUNCATE_EXISTING` — overwrites whatever was already there) and
+append an index line to a storage-only index FILE **BEFORE** calling `CargoCrateServiceImpl.publish`,
+where the duplicate-version check (`checkExistsVersion`) lives. When that check threw, the DB
+transaction rolled back but the storage write had already happened. Live evidence at the time
+(`tests/cargo/registry-rules.spec.ts`):
 
 ```
 seed publish (bytesA)                              -> 200
 download after seed                                 -> 200, equals bytesA
 duplicate publish (bytesB, allowOverride: false)    -> 400 "this crate version already exists in this registry"
 served (DB-backed) sparse index after the duplicate -> unchanged (still bytesA's cksum)
-download after the duplicate                        -> 200, equals bytesB, NOT bytesA
+download after the duplicate                        -> 200, equals bytesB, NOT bytesA   (before the fix)
 ```
 
-The served index still names bytesA's checksum, but a download now serves bytesB's bytes — a real
-consumer's own sha256 check (`cargo fetch` verifies the downloaded `.crate` against the index
-`cksum`) would then fail for a version that was never touched by any _accepted_ publish. This is why
-`clients/cargo.ts` declares `ProtocolAdapter.knownPublishSideEffect` (a new hook this step added to
-`scenarios/adapter.ts`/`scenarios/loop.ts`, the publish-side analogue of npm's
-`knownConsumeFailure`): it routes only the loop's `expectNothingStored` comparison for `no-override`/
-`override` (the only catalog scenarios that redeploy an existing version with a credential that
-passes auth) through `test.fail()`, never the outcome or client-exit-code assertions, which are
-asserted for real like every other scenario. Tracked by **RPS-1124** ("Audit the Cargo, Helm, PyPI,
-npm and Go publish paths for storage-before-DB ordering"), an already-open story this live evidence
-was added to as a comment rather than a new ticket, since it already scoped exactly this class of fix
-for Cargo by name.
+**Fixed** by RPS-1124 (#507: the version rows are written first, in one transaction, and the crate
+file only afterwards). The download after a refused duplicate is now bytesA again, and
+`registry-rules.spec.ts`'s override test and the catalog loop's `no-override`/`override` scenarios
+(`adapter.expectNothingStored`) assert that for real. `cargoAdapter` no longer sets
+`knownPublishSideEffect`; the hook itself stays in `scenarios/adapter.ts`/`scenarios/loop.ts`
+(the publish-side analogue of npm's old `knownConsumeFailure`) for the next such bug.
 
 ### H2, confirmed live: the sparse index serves a crate under its normalised name (RPS-1212)
 
@@ -1773,8 +1766,8 @@ download` in the catalog loop succeeds against pages carrying it.
   H21 test).
 - **H15** (a version/filename mismatch bypasses `allowOverride: false`): confirmed live — see
   RPS-1223.
-- **H16** (`badVersionString` leaves an orphaned, downloadable file+sidecar): confirmed live — see
-  P4/RPS-1124.
+- **H16** (`badVersionString` used to leave an orphaned, downloadable file+sidecar): confirmed live,
+  then fixed by RPS-1124/#508 — see P4.
 - **H17** (a missing `sha256_digest` is a 500; a wrong one is served as-is): confirmed live — see
   RPS-1224/RPS-1225.
 - **H18** (`HEAD` of a never-published path was 200): confirmed live, then fixed — see RPS-1226.
@@ -1826,12 +1819,12 @@ install`/`download` never fetch the root page, only `/simple/<project>/` — but
   an existing file overwritable even under `allowOverride: false`, bypassing the rule entirely.
   Confirmed live: `registry-rules.spec.ts`'s override test (same filename, mismatched declared
   version, `allowOverride: false`, `200` instead of the expected `403`).
-- **P4** (storage-before-DB — the RPS-1124 family already open for cargo/nuget; comment there, not a
-  new ticket) — `AbstractPypiStorageService.writePackageArchive` (the archive file AND its `.sha256`
-  sidecar) runs BEFORE `PypiPackageServiceImpl.addOrUpdateRelease`, where `ReleaseVersion.of(form
-.version)` can still throw `badVersionString`. A validation failure after the storage write leaves an
-  orphaned, directly-downloadable archive+sidecar with no DB row and no project-page entry at all.
-  Confirmed live: `registry-rules.spec.ts`'s badVersionString test.
+- **P4** (fixed, RPS-1124/#508): `AbstractPypiStorageService.writePackageArchive` (the archive file
+  AND its `.sha256` sidecar) used to run BEFORE `PypiPackageServiceImpl.addOrUpdateRelease`, where
+  `ReleaseVersion.of(form.version)` can still throw `badVersionString`, so a validation failure
+  after the storage write left an orphaned, directly-downloadable archive+sidecar with no DB row.
+  The release rows are now written first, in one transaction, and the archive only afterwards:
+  `registry-rules.spec.ts`'s badVersionString test asserts the refused upload is `404` for real.
 - **RPS-1224 / RPS-1225** — The `.sha256` sidecar is the client-sent `sha256_digest` form field stored
   VERBATIM, never recomputed or verified against the actual uploaded bytes
   (`uploadForm.getSha256_digest().getBytes()`). A MISSING digest crashes with an unhandled NPE
@@ -2044,12 +2037,11 @@ BEFORE any adapter code was written — H1-H4 and H12 gated the whole design.
   all, and the `go` command never reads Repsy's own stored hash, only computes its own from the
   downloaded bytes — noted here from source for the coordinator's own report, not asserted by any
   test in this harness.
-- **G4** (observation only, not independently wire-forced, no test; commented on
-  [RPS-1124](https://zyfera.atlassian.net/browse/RPS-1124) rather than filed as its own ticket, since
-  that story's own title already names Go) — the DB row commits BEFORE the three storage writes in
-  `AbstractGoProtocolFacade.upload` (`goModuleService.publishModule` runs first, then
-  `writeModFile`/`writeInputStreamToPath`/`writeInfoFile`) — the inverse of cargo's own RPS-1124
-  storage-before-DB ordering.
+- **G4** (fixed, RPS-1124/#511; was an observation only, no test) — the DB row used to commit BEFORE
+  the three storage writes in `AbstractGoProtocolFacade.upload` (`goModuleService.publishModule`
+  ran first, then `writeModFile`/`writeInputStreamToPath`/`writeInfoFile`), so a failed file write
+  left a committed row without its files. The row is now flushed first and stays uncommitted while
+  the files are written; a failed write rolls it back and removes the partly written files.
 - **G5** (architectural observation from source, not independently forced live; mentioned in the same
   [RPS-1124](https://zyfera.atlassian.net/browse/RPS-1124) comment as G4, same root cause) —
   `@v/list` and `@latest` read DIFFERENT sources of truth: `handleVersionList` lists the STORAGE
@@ -2578,7 +2570,7 @@ npm and docker, REPO-06, REPO-10) are also `@smoke`.
 
 Things a test here relies on, which a change to the page can break:
 
-- **The list loads nine `getInfo` calls, not one.** It shows the spinner after the FIRST answer and renders
+- **The list loads nine `getInfo` calls, not one.** It shows the spinner until an answer has rows (or the last one is in) and renders
   rows as the others arrive; search, type filter and pagination run client-side over what has arrived. So
   `RepositoriesPage.afterInfoResponses()` (used by `goto`, `selectType`, `refresh`, `confirmDelete`) waits
   for every answer of the reload, then `settle()`s (two animation frames, so a negative assertion does not
@@ -2709,7 +2701,7 @@ How the tests are written, and what they had to work around:
 Known product bugs are pinned with `test.fail('... RPS-nnnn')`, so the test turns red the day the
 bug is fixed and the marker has to go: the Visibility and Package Override help texts describe the
 opposite of the toggle (RPS-1261, two tests), and `#name`/`#description` are duplicated between the
-rename form and the create-token modal (RPS-1266). A third pin has no ticket yet: revoking the only token on page 2
+rename form and the create-token modal (RPS-1266). A third pin is RPS-1285: revoking the only token on page 2
 fires two list requests and the empty page-2 answer can land last, leaving "Your list is empty" over three tokens (the test
 slows that answer to make the order certain). Not covered here: the Vulnerability Scanning toggle
 (hidden without a scanner, RPS-1259), the per-protocol "configure" modal behind a token row, the
@@ -2794,7 +2786,53 @@ _Not implemented yet._
 
 ### Errors, navigation, mobile and accessibility (RPS-1258)
 
-_Not implemented yet._
+`tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..03, NAV-01..02, A11Y-01) plus `src/ui/a11y.ts` (the axe
+helper) and `tests/ui/nav/breadcrumb.ts` (the breadcrumb page object). Run them with
+`./run.sh test --protocol ui --grep "ERR-|NAV-|A11Y-"`. `@axe-core/playwright` is the only dependency
+this story added (`package.json`, `pnpm-lock.yaml`), so the `ui` runner image must be rebuilt once
+(`./run.sh test --protocol ui -b`).
+
+| Spec              | Scenarios | What is pinned                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `errors/errors`   | ERR-01    | all nine `.../{TYPE}/info` calls answered 500: exactly `Server error` (never the body's text), no rows, page alive; ONE type (NPM) failing: the toast plus the `repo-warning`, others still list; all types failing: `repo-error`, not `empty-list`, and the refresh button retries; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast |
+| `errors/errors`   | ERR-02    | an aborted request (status 0): `Connection error`, on the repository list and on the users page                                                                                                                                                                                                                                                                        |
+| `errors/errors`   | ERR-03    | 403 on `GET /api/users`: `Access denied` (no body) or the server's own `text`; 403 on `/security`: `Access denied` plus `You do not have permission to view this page`, and the redirect to the dashboard                                                                                                                                                              |
+| `nav/breadcrumbs` | NAV-01    | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                         |
+| `nav/mobile`      | NAV-02    | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`; `test.fail`: the burger never opens the mobile sidebar (x2: admin flow, USER flow)                                                                                                             |
+| `a11y/a11y`       | A11Y-01   | axe on login, dashboard, repository list, repository settings, users (admin); report-only                                                                                                                                                                                                                                                                              |
+
+Things a later author must know:
+
+- **Routes are stubs, everything else is real.** ERR tests answer one URL with `page.route`, remove it
+  again in a `finally` (`withRoute`), and start asserting the toast BEFORE the navigation that raises it
+  (`expectToastLater`): a toast lives 3 s. The interceptor's mapping is status 0 -> `Connection error`,
+  403 -> the server's `text` or `Access denied`, >= 500 -> `Server error`, other 4xx -> the server's `text`.
+- **The repository list renders whatever arrives** of its nine parallel `info` calls, so one failing type
+  loses only its own rows and the page shows `repo-warning`; only when EVERY request failed does it show
+  `repo-error` (never the empty state), and the refresh button retries.
+- **The mobile sidebar cannot be opened.** `PanelLayoutComponent` renders `<app-panel-header />` without a
+  `(mobileMenuToggle)` handler, so `isMobileMenuOpen` stays false. The two `test.fail` NAV-02 tests are
+  written from the templates (open, link, X, backdrop, USER without Users/Security, logout); the steps after
+  the burger have not run against a working sidebar and may need adjusting when it is fixed.
+- **axe, report-only by default.** `scanPage()` (`src/ui/a11y.ts`) runs the WCAG 2.0/2.1 A and AA rules,
+  attaches `axe-<page>.json` (summary + every violation with its nodes) and `axe-<page>.txt` to the report,
+  writes the JSON to `test-results/<test>/axe-<page>.json` and prints one `AXE <page> [report]: ...` line, and
+  never fails. `DEFAULT_A11Y_MODE` in `src/ui/a11y.ts` is the one flag that makes it fail on
+  serious/critical violations (RPS-1266 flips it once the baseline is clean); for a single run use
+  `REPSY_UI_OPT_IN=a11y-enforce` (or `a11y-report`), because `docker-compose.runners.yml` forwards that
+  variable already. Font Awesome (a blocked CDN in this harness) icons render as empty boxes; each summary
+  counts them as `faNodes` per rule so they stay separable. Axe cannot judge a modal or dropdown that is not
+  open: the five scans are of the pages at rest.
+
+Baseline on `main` (RPS-1266 tracks fixing it; serious/critical only, WCAG A/AA):
+
+| Page                | Violations                                                                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| login               | `button-name` (critical, 1): the password eye toggle                                                                                         |
+| dashboard           | none                                                                                                                                         |
+| repository list     | `button-name` (critical, 1): the refresh button; `nested-interactive` (serious, 1): a `role="button"` row containing a link and the row menu |
+| repository settings | `button-name` (critical, 1): the PGP add button; `color-contrast` (serious, 2): the disabled keyserver rows                                  |
+| users (admin)       | `color-contrast` (serious, 1): the `USER` role badge                                                                                         |
 
 ### Security scanning UI (RPS-1259)
 
@@ -2933,19 +2971,14 @@ golang --grep token-expired` failed as expected (`Error: expected "ok", got "una
 curl/go exit 22; curl ... -u <token>:*** -T module.zip ...)`), then reverted, `git diff` confirmed
 clean). `./run.sh sweep --dry-run` lists any `e2e-*` leftovers without deleting them.
 
-The npm suite's `'ok'`-expected scenarios currently report as an _expected_ failure
-(`test.fail`, RPS-1205 — see "npm runner" above), not a plain pass: Playwright's list reporter still
-prints a `✘` for each (something inside the test body did throw, which is exactly what `test.fail`
-is watching for), but the run's own summary line and exit code both say "passed"/`0` — treat those
-two as authoritative over the per-line glyphs. Likewise for the cargo suite's `no-override`/
-`override` scenarios (`knownPublishSideEffect`, "H1" above) and its two dedicated hyphen tests ("H2"
-above), the docker suite's three remaining `test.fail`-routed registry-rules tests (R5/B4, R7/B2,
-R12/B5 — "H9"/"H13" above; R8/B1 is fixed by RPS-1215 and no longer routed this way), the helm
-suite's four remaining `test.fail`-routed tests (HL2/B-H3, HL4/B-H1, HL5/B-H2, R8/B-H3 — "Helm
-runner" above; HL1/B-H4 is fixed by RPS-1220 and no longer routed this way), the pypi suite's six `test.fail`-routed
-registry-rules tests (RPS-1221/1222/1223/1224/1225, P4/RPS-1124 — "PyPI runner" above), and the golang
-suite's three `test.fail`-routed registry-rules tests (candidates G1/G2/G10 — "Go runner" above): all
-counted as "passed", not a plain pass line.
+The protocol suites carry exactly one `test.fail` pin left (checked on a stack built from `main` at
+RPS-1287): docker's R7/B2 (RPS-1216, overriding a tag makes the previous manifest unpullable by
+digest, still open), so a docker run prints one `✘` line next to an overall "passed"/exit `0` —
+treat those two as authoritative over the per-line glyph. Every other suite (maven, npm, cargo,
+nuget, helm, pypi, golang, ruby) has none: the pins for RPS-1205/1212/1215/1220/1221-1225 and the
+RPS-1124 storage-order family (cargo, pypi, ...) were flipped into plain assertions as their fixes
+landed, and a `test.fail` whose bug is fixed makes the runner exit `1` with "Expected to fail, but
+passed", so it has to be flipped as part of the fix.
 
 ### H2 profile verification (this step)
 

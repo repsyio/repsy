@@ -44,15 +44,13 @@
  *         the version RE-EXTRACTED from the filename via `ReleaseVersion.of`) AND the storage path
  *         already exists -- so a form `version` that does not match the filename's own version makes
  *         an existing file overwritable even with `allowOverride: false` (P3, confirmed live).
- *      4. `writePackageArchive` (storage: the file, THEN a `.sha256` sidecar containing
- *         `uploadForm.getSha256_digest()` VERBATIM, never recomputed/verified -- a missing digest is
- *         a `500` NPE, a wrong one is silently served, P5, both confirmed live) runs BEFORE
- *         `PypiPackageServiceImpl.addOrUpdateRelease`, where `ReleaseVersion.of(form.version)` can
- *         still throw `400 badVersionString` for an invalid (non-canonical, non-PEP-440) version
- *         string -- so a validation failure AFTER the storage write leaves an orphaned, downloadable
- *         file+sidecar with no DB row at all (P4, confirmed live; RPS-1124 already tracks this
- *         "storage before DB" family for PyPI, see `catalog.ts`'s file header for the cargo/nuget
- *         analogues -- comment there, do not file a new ticket).
+ *      4. (RPS-1124/#508, fixed) the release rows are written FIRST, in one transaction, where
+ *         `ReleaseVersion.of(form.version)` can still throw `400 badVersionString`; only then does
+ *         `writePackageArchive` store the file and a `.sha256` sidecar. A refused upload therefore
+ *         leaves nothing in storage (P4; used to leave an orphaned, downloadable file+sidecar with
+ *         no DB row). The sidecar holds the SERVER-computed digest of the uploaded bytes (RPS-1224/
+ *         RPS-1225, fixed: a missing digest is `400 sha256DigestMissing`, a wrong one `400
+ *         sha256DigestMismatch`, both before any storage write).
  *    Success: **`200`, empty body** (`ResponseEntity.ok().build()`), the only protocol in this
  *    harness whose accepted publish is not `201`.
  *  - Project page (PEP 503 HTML): `GET /<repoName>/simple/<name>/`, `permission: READ`. A `307`

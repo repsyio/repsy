@@ -38,10 +38,11 @@
  * checks, only marks the remaining consume-side assertions as an expected failure via
  * `test.fail(true, ...)` when the adapter names one. Maven has no such hook.
  *
- * `adapter.knownPublishSideEffect` (step 3b, cargo's storage-before-DB-check routing-around hook)
- * runs right before `adapter.expectNothingStored`, the symmetric case on the PUBLISH side: the
- * outcome and client-exit-code assertions for the publish still ran and were asserted for real, only
- * the "nothing changed" comparison becomes an expected failure when the adapter names one.
+ * `adapter.knownPublishSideEffect` (a hook step 3b added for cargo's storage-before-DB bug, RPS-1124,
+ * since fixed; no adapter uses it now) runs right before `adapter.expectNothingStored`, the symmetric
+ * case on the PUBLISH side: the outcome and client-exit-code assertions for the publish still ran
+ * and were asserted for real, only the "nothing changed" comparison becomes an expected failure when
+ * the adapter names one.
  *
  * Remote hardening (plan section "Execution targets", "Remote specifics"): on a `remote` target,
  * `@local-only` scenarios are skipped, and `@negative` scenarios run serially, each reserving a slot

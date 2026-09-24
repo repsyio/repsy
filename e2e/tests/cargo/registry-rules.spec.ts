@@ -23,13 +23,10 @@
  *
  *  - A duplicate-version publish is refused unconditionally (400, `{"errors":[{"detail":"this crate
  *    version already exists in this registry"}]}`) -- `allowOverride` is never read by the
- *    protocol at all. Confirmed live (RPS-1124): the refused attempt has ALREADY
- *    overwritten the stored `.crate` bytes with its own (rejected) content before the duplicate check
- *    runs (`AbstractCargoProtocolFacade.publish` writes to storage, then `CargoCrateServiceImpl
- *    .publish` throws and rolls the DB transaction back) -- the served, DB-backed index entry still
- *    names the ORIGINAL checksum, but a download now serves the REJECTED attempt's bytes. A
- *    subsequent `cargo fetch` of that version would then fail its own sha256 check against the
- *    (unchanged) index `cksum`.
+ *    protocol at all. RPS-1124 (fixed, #507): the refused attempt used to overwrite the stored `.crate`
+ *    bytes with its own (rejected) content before the duplicate check ran, so a download served the
+ *    REJECTED attempt's bytes while the index still named the original checksum. The check now runs
+ *    first: a refused duplicate leaves the stored `.crate` (and so the index `cksum`) untouched.
  *  - A malformed or int-overflowing version string is refused with 400 and a `"not a valid semver
  *    format"` detail (`CrateUtils.validateVersion`, semver4j 3.1.0), storing nothing.
  *  - `config.json` is served unauthenticated on both a private and a public repo (`skipPreProcessor:
@@ -112,8 +109,8 @@ function expectPut(res: RawResponse, status: number, detailContains: string | un
 
 test.describe('cargo registry rules (raw HTTP)', () => {
   test(
-    're-publishing an existing version is refused whatever allowOverride says, and already ' +
-      'corrupts the stored bytes (RPS-1124)',
+    're-publishing an existing version is refused whatever allowOverride says, and leaves the ' +
+      'stored bytes untouched (RPS-1124, fixed)',
     { tag: ['@settings', '@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'override');
@@ -142,7 +139,7 @@ test.describe('cargo registry rules (raw HTTP)', () => {
       expect(sha256Hex(dlBefore.body), 'the seeded version is bytesA').toBe(sha256Hex(bytesA));
 
       // Re-publishing the SAME version, even with different bytes and allowOverride: false, is
-      // refused -- but see below, this is where the candidate bug shows up.
+      // refused -- and (RPS-1124, fixed) the refusal must not touch storage either.
       const bytesB = fakeCrate(layout.packageName, v1, 'v1-again');
       expectPut(
         await rawPublish(
@@ -159,15 +156,9 @@ test.describe('cargo registry rules (raw HTTP)', () => {
         indexBefore.body.toString('utf8'),
       );
 
-      // RPS-1124 (confirmed live): the refused duplicate has already overwritten the
-      // stored .crate bytes, even though the index above still names bytesA's checksum.
+      // RPS-1124 (fixed, #507): the duplicate check now runs BEFORE the .crate is written, so the
+      // refused duplicate no longer overwrites the stored bytes.
       const dlAfter = await rawDownload(layout.repoName, admin, layout.packageName, v1);
-      test.fail(
-        true,
-        'RPS-1124: AbstractCargoProtocolFacade.publish writes the .crate to storage ' +
-          'BEFORE CargoCrateServiceImpl.publish runs the duplicate-version check, so a refused ' +
-          'duplicate publish still overwrites the stored bytes with its own (rejected) content',
-      );
       expect(sha256Hex(dlAfter.body), 'the stored .crate is unchanged (bytesA)').toBe(
         sha256Hex(bytesA),
       );
