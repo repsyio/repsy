@@ -37,6 +37,8 @@
  *    artifact-level `g/a/maven-metadata.xml` (a `<versions>` list, no `<version>` of its own); a
  *    release deploy writes the artifact-level file only.
  */
+import { zipSync } from 'fflate';
+
 import { env } from '../env.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import {
@@ -188,6 +190,29 @@ export function minimalPom(groupId: string, artifactId: string, version: string)
     `  <version>${version}</version>\n` +
     '  <packaging>jar</packaging>\n' +
     '</project>\n'
+  );
+}
+
+/**
+ * A tiny but real jar (a zip with `META-INF/MANIFEST.MF` and a marker file), hand-built with
+ * `fflate` so a raw seed never needs a JDK or `mvn` (the UI runner image has neither). The server
+ * never opens a jar; the bytes only need to be stable and distinct per coordinate.
+ */
+export function buildJar(opts: { groupId: string; artifactId: string; version: string }): Buffer {
+  const manifest =
+    'Manifest-Version: 1.0\n' +
+    `Implementation-Title: ${opts.artifactId}\n` +
+    `Implementation-Version: ${opts.version}\n` +
+    'Created-By: repsy-e2e\n';
+  const marker = `e2e ${opts.groupId}:${opts.artifactId}@${opts.version}\n`;
+  return Buffer.from(
+    zipSync(
+      {
+        'META-INF/MANIFEST.MF': new TextEncoder().encode(manifest),
+        'e2e-marker.txt': new TextEncoder().encode(marker),
+      },
+      { level: 0 },
+    ),
   );
 }
 

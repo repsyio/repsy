@@ -121,18 +121,20 @@ export function buildTar(entries: { name: string; data: Buffer }[]): Buffer {
   return Buffer.concat(blocks);
 }
 
+/** Everything `buildImage` returns except where it wrote the layout. */
+export type ImageContent = Omit<BuiltImage, 'dir'>;
+
 /**
- * Builds a fresh OCI image layout under `opts.dir` (created if missing) and returns every byte/digest
- * a caller needs, both to hand to `crane push` (the directory alone) and to build raw-HTTP probes with
- * the exact same bytes (`docker-raw.ts`'s `rawPutManifest`/`rawUploadBlob`).
+ * The in-memory half of `buildImage`: the layer, config and manifest bytes and digests, with no
+ * file system involved. A raw-HTTP seed (`rawUploadBlob` + `rawPutManifest`) needs nothing else, and
+ * `buildImage` below writes exactly these bytes into an OCI layout for `crane push`.
  */
-export async function buildImage(opts: {
-  dir: string;
+export function buildImageContent(opts: {
   marker: string;
   family?: MediaTypeFamily;
   os?: string;
   arch?: string;
-}): Promise<BuiltImage> {
+}): ImageContent {
   const types = opts.family === 'oci' ? OCI_MEDIA_TYPES : DOCKER_MEDIA_TYPES;
   const os = opts.os ?? 'linux';
   const arch = opts.arch ?? 'amd64';
@@ -161,31 +163,7 @@ export async function buildImage(opts: {
   const manifestBytes = Buffer.from(JSON.stringify(manifestObj), 'utf8');
   const manifestDigest = sha256(manifestBytes);
 
-  const blobsDir = path.join(opts.dir, 'blobs', 'sha256');
-  await fs.mkdir(blobsDir, { recursive: true });
-  await fs.writeFile(path.join(blobsDir, configDigest.slice('sha256:'.length)), configBytes);
-  await fs.writeFile(path.join(blobsDir, layerDigest.slice('sha256:'.length)), layerBytes);
-  await fs.writeFile(path.join(blobsDir, manifestDigest.slice('sha256:'.length)), manifestBytes);
-
-  await fs.writeFile(
-    path.join(opts.dir, 'oci-layout'),
-    JSON.stringify({ imageLayoutVersion: '1.0.0' }),
-    'utf8',
-  );
-  await fs.writeFile(
-    path.join(opts.dir, 'index.json'),
-    JSON.stringify({
-      schemaVersion: 2,
-      mediaType: 'application/vnd.oci.image.index.v1+json',
-      manifests: [
-        { mediaType: types.manifest, digest: manifestDigest, size: manifestBytes.length },
-      ],
-    }),
-    'utf8',
-  );
-
   return {
-    dir: opts.dir,
     manifestBytes,
     manifestDigest,
     manifestMediaType: types.manifest,
@@ -198,4 +176,57 @@ export async function buildImage(opts: {
     layerDiffId,
     marker: opts.marker,
   };
+}
+
+/**
+ * Builds a fresh OCI image layout under `opts.dir` (created if missing) and returns every byte/digest
+ * a caller needs, both to hand to `crane push` (the directory alone) and to build raw-HTTP probes with
+ * the exact same bytes (`docker-raw.ts`'s `rawPutManifest`/`rawUploadBlob`).
+ */
+export async function buildImage(opts: {
+  dir: string;
+  marker: string;
+  family?: MediaTypeFamily;
+  os?: string;
+  arch?: string;
+}): Promise<BuiltImage> {
+  const content = buildImageContent(opts);
+
+  const blobsDir = path.join(opts.dir, 'blobs', 'sha256');
+  await fs.mkdir(blobsDir, { recursive: true });
+  await fs.writeFile(
+    path.join(blobsDir, content.configDigest.slice('sha256:'.length)),
+    content.configBytes,
+  );
+  await fs.writeFile(
+    path.join(blobsDir, content.layerDigest.slice('sha256:'.length)),
+    content.layerBytes,
+  );
+  await fs.writeFile(
+    path.join(blobsDir, content.manifestDigest.slice('sha256:'.length)),
+    content.manifestBytes,
+  );
+
+  await fs.writeFile(
+    path.join(opts.dir, 'oci-layout'),
+    JSON.stringify({ imageLayoutVersion: '1.0.0' }),
+    'utf8',
+  );
+  await fs.writeFile(
+    path.join(opts.dir, 'index.json'),
+    JSON.stringify({
+      schemaVersion: 2,
+      mediaType: 'application/vnd.oci.image.index.v1+json',
+      manifests: [
+        {
+          mediaType: content.manifestMediaType,
+          digest: content.manifestDigest,
+          size: content.manifestBytes.length,
+        },
+      ],
+    }),
+    'utf8',
+  );
+
+  return { dir: opts.dir, ...content };
 }

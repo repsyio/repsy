@@ -50,9 +50,11 @@
  * `400 invalidPackageVersion` before anything is stored.
  */
 import { createHash } from 'node:crypto';
+import zlib from 'node:zlib';
 
 import { env } from '../env.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
+import { buildTar } from './docker-image.js';
 import {
   adminCredential,
   msgIdOf,
@@ -112,6 +114,27 @@ function repoUrl(repoName: string): string {
 
 function packagePutGetUrl(repoName: string, packageName: string): string {
   return `${repoUrl(repoName)}${encodePackageNameForUrl(packageName)}`;
+}
+
+/**
+ * A real (if tiny) `npm pack`-shaped tarball: a gzipped ustar with `package/package.json` and a
+ * marker file, built in code (`docker-image.ts`'s `buildTar` + `zlib`) so a raw seed never needs
+ * `npm`. Feed the result to `buildPublishDocument` as `tarballBytes`.
+ */
+export function buildTarball(opts: { packageName: string; version: string }): Buffer {
+  const manifest = JSON.stringify(
+    { name: opts.packageName, version: opts.version, main: 'index.js' },
+    null,
+    2,
+  );
+  const tar = buildTar([
+    { name: 'package/package.json', data: Buffer.from(manifest, 'utf8') },
+    {
+      name: 'package/index.js',
+      data: Buffer.from(`module.exports = ${JSON.stringify(opts.packageName)};\n`, 'utf8'),
+    },
+  ]);
+  return zlib.gzipSync(tar, { level: 6 });
 }
 
 /**
