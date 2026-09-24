@@ -23,7 +23,10 @@ import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +59,10 @@ import org.springframework.stereotype.Component;
  *       AdminUserInitializer}. Nothing else carries it.
  * </ol>
  *
+ * <p>A marker that fails (typically one that cannot be deleted because the volume is read-only) is
+ * logged at {@code ERROR} once, not on every poll: the scanner remembers the files that already
+ * failed and logs a file again only after it has disappeared and come back.
+ *
  * <p>The file content is never read, symlinks and directories are ignored (a symlink is never
  * followed), and a file whose name is not a valid username is removed with a warning. Nothing is
  * reachable over the network: it takes write access to the directory, the same trust level that can
@@ -76,6 +83,9 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
   private final @NonNull PasswordResetMarkerProperties properties;
   private final @NonNull UserRepository userRepository;
   private final @NonNull UserTxService userTxService;
+
+  /** The markers that already failed and are still in the directory: logged once, not per poll. */
+  private final Set<Path> failedMarkers = ConcurrentHashMap.newKeySet();
 
   @Override
   public void run(final @NonNull ApplicationArguments args) {
@@ -105,7 +115,10 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
 
   /** Applies every marker file in {@code dir}; a directory that does not exist has none. */
   public void scan(final @NonNull Path dir) {
-    for (final var entry : this.list(dir)) {
+    final var entries = this.list(dir);
+    // A marker that is gone (removed by hand, or applied after all) may fail and be logged again.
+    this.failedMarkers.retainAll(new HashSet<>(entries));
+    for (final var entry : entries) {
       this.process(entry);
     }
   }
@@ -144,10 +157,18 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
         this.reset(username, entry);
       }
     } catch (final IOException | RuntimeException e) {
+      this.logFailure(entry, e);
+    }
+  }
+
+  private void logFailure(final @NonNull Path entry, final @NonNull Exception e) {
+    if (this.failedMarkers.add(entry)) {
       log.error(
           "Could not apply the password reset marker {}, create it again to retry: {}",
           entry,
           e.toString());
+    } else {
+      log.debug("The password reset marker {} failed again: {}", entry, e.toString());
     }
   }
 
