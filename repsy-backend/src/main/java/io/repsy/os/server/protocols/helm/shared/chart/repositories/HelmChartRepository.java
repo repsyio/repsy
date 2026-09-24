@@ -16,11 +16,13 @@
 package io.repsy.os.server.protocols.helm.shared.chart.repositories;
 
 import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChart;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -30,6 +32,13 @@ import org.springframework.stereotype.Repository;
 public interface HelmChartRepository extends JpaRepository<HelmChart, UUID> {
 
   Optional<HelmChart> findByRepoIdAndName(UUID repoId, String name);
+
+  /**
+   * Finds the chart and locks its row until the transaction ends, so a concurrent upload of the
+   * same chart waits here for the one that holds the lock, and then sees what it committed.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  Optional<HelmChart> findWithLockByRepoIdAndName(UUID repoId, String name);
 
   /**
    * Inserts the chart unless a row for the (repo, name) pair exists, without failing the
