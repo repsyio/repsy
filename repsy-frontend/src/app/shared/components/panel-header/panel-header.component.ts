@@ -49,6 +49,11 @@ export class PanelHeaderComponent {
     viewportScroller.setOffset(() => [0, document.querySelector('header')?.getBoundingClientRect().height ?? 0]);
   }
 
+  /** Read on every check, so the header follows a login or a logout without being told. */
+  public get isAuthenticated(): boolean {
+    return this.authService.isAuthenticated();
+  }
+
   docDropdown = false;
   profileDropdown = false;
 

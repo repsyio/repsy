@@ -50,10 +50,14 @@ export class Shell {
     logout: Locator;
   };
 
-  /** The header; `menu` and its items only exist while the avatar menu is open (`openAvatarMenu`). */
+  /**
+   * The header; `menu` and its items only exist while the avatar menu is open (`openAvatarMenu`). Without a
+   * session (RPS-1306) there is no `avatar` and no menu: the header shows the `login` link instead.
+   */
   readonly header: {
     root: Locator;
     burger: Locator;
+    login: Locator;
     avatar: Locator;
     menu: Locator;
     profile: Locator;
@@ -81,6 +85,7 @@ export class Shell {
     this.header = {
       root: page.getByTestId('header'),
       burger: page.getByTestId('header-burger'),
+      login: page.getByTestId('header-login'),
       avatar: page.getByTestId('header-avatar'),
       menu: page.getByTestId('header-menu'),
       profile: page.getByTestId('header-menu-profile'),

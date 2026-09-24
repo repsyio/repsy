@@ -30,6 +30,11 @@ export class UserService {
     return this.userControllerService.listUsers(search, page, size).pipe(map((r) => r.data!));
   }
 
+  /** The number of admins on the server, whatever page or search the list shows. */
+  public countAdmins(): Observable<number> {
+    return this.userControllerService.countAdmins().pipe(map((r) => r.data!));
+  }
+
   public createUser(form: UserCreateForm): Observable<UserResponse> {
     return this.userControllerService.createUser(form).pipe(map((r) => r.data!));
   }

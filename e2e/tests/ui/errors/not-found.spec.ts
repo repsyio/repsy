@@ -17,8 +17,9 @@
 /**
  * ERR-04: the not-found page (`/not-found`, where an unknown path ends up) in the panel layout, as an
  * anonymous visitor and as a signed-in admin and USER, at phone width (390x844) and at desktop width.
- * Without a session the layout has no sidebar, so it also has no burger and asks for no profile;
- * with one, the burger opens the mobile sidebar here just as on every other page.
+ * Without a session the layout has no sidebar, so it also has no burger and asks for no profile, and the
+ * header offers a Log in link instead of the avatar menu (RPS-1306); with one, the burger opens the mobile
+ * sidebar here just as on every other page. A deep unknown path (`/a/b/c`) ends up on the same page.
  */
 import type { Page } from '@playwright/test';
 
@@ -62,6 +63,11 @@ test.describe('Not-found page', () => {
       await expect(shell.sidebar.root).toHaveCount(0);
       await expect(shell.mobileSidebar.root).toHaveCount(0);
 
+      // RPS-1306: no avatar, no Profile / Log out menu, a Log in link that leads to the login form.
+      await expect(shell.header.avatar).toHaveCount(0);
+      await expect(shell.header.menu).toHaveCount(0);
+      await expect(shell.header.login).toBeVisible();
+
       // The sidebar asks for the profile as it renders, i.e. before the 404 above is on screen.
       await page.waitForLoadState('load');
       expect(profileRequests).toEqual([]);
@@ -69,8 +75,43 @@ test.describe('Not-found page', () => {
       // Nothing to do with a session is offered: "Go to Home" leads to the login form.
       await page.getByTestId('not-found-home').click();
       await expect(page.getByTestId('login-form')).toBeVisible();
+
+      await page.goto('/not-found');
+      await shell.header.login.click();
+      await expect(page.getByTestId('login-form')).toBeVisible();
     });
   }
+
+  test('ERR-04: an anonymous visitor on a deep unknown path sees the 404 in the layout with the Log in link', async ({
+    openUiPage,
+  }) => {
+    const page = await openUiPage({ viewport: DESKTOP });
+    const shell = new Shell(page);
+
+    await page.goto('/a/b/c');
+
+    await expect(page).toHaveURL(/\/not-found(\?|$)/);
+    await expect(page.getByTestId('not-found-code')).toHaveText('404');
+    await expect(shell.header.root).toBeVisible();
+    await expect(shell.header.login).toBeVisible();
+    await expect(shell.header.avatar).toHaveCount(0);
+    await expect(shell.sidebar.root).toHaveCount(0);
+  });
+
+  test('ERR-04: a signed-in admin keeps the avatar menu and gets no Log in link on the 404 page', async ({
+    adminPage,
+  }) => {
+    const shell = new Shell(adminPage);
+
+    await adminPage.goto('/not-found');
+
+    await expect(adminPage.getByTestId('not-found')).toBeVisible();
+    await expect(shell.header.avatar).toBeVisible();
+    await expect(shell.header.login).toHaveCount(0);
+    await shell.openAvatarMenu();
+    await expect(shell.header.profile).toBeVisible();
+    await expect(shell.header.logout).toBeVisible();
+  });
 
   test('ERR-04: an admin at phone width opens the mobile sidebar on the 404 page and leaves through it', async ({
     openUiPage,

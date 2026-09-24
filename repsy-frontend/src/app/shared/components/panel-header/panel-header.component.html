@@ -53,86 +53,91 @@
         />
       </a>
 
-      <!-- Profile Dropdown -->
-      <div class="relative">
-        <button
-          data-testid="header-avatar"
-          class="group flex items-center justify-center gap-2 text-[#9FA0A0]"
-          (click)="toggleProfileDropdown($event)"
-        >
-          <app-profile-avatar [email]="email" [size]="45" [fallbackChar]="username?.[0]?.toUpperCase() ?? '?'" />
-          <svg
-            class="group-hover:text-secondary-500"
-            [class.rotate-180]="profileDropdown"
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            stroke="currentColor"
-            xmlns="http://www.w3.org/2000/svg"
+      @if (isAuthenticated) {
+        <!-- Profile Dropdown -->
+        <div class="relative">
+          <button
+            data-testid="header-avatar"
+            class="group flex items-center justify-center gap-2 text-[#9FA0A0]"
+            (click)="toggleProfileDropdown($event)"
           >
-            <path d="M4 6L8 10L12 6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
-
-        @if (profileDropdown) {
-          <div
-            data-testid="header-menu"
-            animate.enter="fade-in-down"
-            class="absolute top-[44px] right-0 z-2 w-[150px] overflow-hidden rounded-lg border border-[#404141] bg-[#101112] shadow-lg"
-          >
-            <!-- Profile -->
-            <a
-              data-testid="header-menu-profile"
-              routerLink="/profile"
-              (click)="profileDropdown = false"
-              class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-white hover:bg-[#2D2C2C]"
+            <app-profile-avatar [email]="email" [size]="45" [fallbackChar]="username?.[0]?.toUpperCase() ?? '?'" />
+            <svg
+              class="group-hover:text-secondary-500"
+              [class.rotate-180]="profileDropdown"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              stroke="currentColor"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              <img
-                class="h-4 w-4 sm:h-5 sm:w-5"
-                ngSrc="/assets/icons/header/profile.svg"
-                height="18"
-                width="18"
-                alt="Repsy"
-              />
-              Profile
-            </a>
+              <path d="M4 6L8 10L12 6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
 
-            <!-- Docs -->
-            <a
-              data-testid="header-menu-docs"
-              href="https://docs.repsy.io/"
-              target="_blank"
-              rel="noopener"
-              class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-white hover:bg-[#2D2C2C]"
+          @if (profileDropdown) {
+            <div
+              data-testid="header-menu"
+              animate.enter="fade-in-down"
+              class="absolute top-[44px] right-0 z-2 w-[150px] overflow-hidden rounded-lg border border-[#404141] bg-[#101112] shadow-lg"
             >
-              <img
-                class="h-4 w-4 sm:h-5 sm:w-5"
-                ngSrc="/assets/icons/header/doc.svg"
-                height="18"
-                width="18"
-                alt="Repsy"
-              />
-              Docs
-            </a>
+              <!-- Profile -->
+              <a
+                data-testid="header-menu-profile"
+                routerLink="/profile"
+                (click)="profileDropdown = false"
+                class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-white hover:bg-[#2D2C2C]"
+              >
+                <img
+                  class="h-4 w-4 sm:h-5 sm:w-5"
+                  ngSrc="/assets/icons/header/profile.svg"
+                  height="18"
+                  width="18"
+                  alt="Repsy"
+                />
+                Profile
+              </a>
 
-            <!-- Logout -->
-            <button
-              data-testid="header-menu-logout"
-              (click)="logOut()"
-              class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-white hover:bg-[#2D2C2C]"
-            >
-              <img
-                class="h-4 w-4 sm:h-5 sm:w-5"
-                ngSrc="/assets/icons/header/logout2.svg"
-                height="16"
-                width="16"
-                alt="Repsy"
-              />
-              Log out
-            </button>
-          </div>
-        }
-      </div>
+              <!-- Docs -->
+              <a
+                data-testid="header-menu-docs"
+                href="https://docs.repsy.io/"
+                target="_blank"
+                rel="noopener"
+                class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-white hover:bg-[#2D2C2C]"
+              >
+                <img
+                  class="h-4 w-4 sm:h-5 sm:w-5"
+                  ngSrc="/assets/icons/header/doc.svg"
+                  height="18"
+                  width="18"
+                  alt="Repsy"
+                />
+                Docs
+              </a>
+
+              <!-- Logout -->
+              <button
+                data-testid="header-menu-logout"
+                (click)="logOut()"
+                class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-white hover:bg-[#2D2C2C]"
+              >
+                <img
+                  class="h-4 w-4 sm:h-5 sm:w-5"
+                  ngSrc="/assets/icons/header/logout2.svg"
+                  height="16"
+                  width="16"
+                  alt="Repsy"
+                />
+                Log out
+              </button>
+            </div>
+          }
+        </div>
+      } @else {
+        <!-- Without a session there is no profile and nothing to log out of: the way in is the login page at "/" -->
+        <a data-testid="header-login" routerLink="/" class="repsy-btn-ghost">Log in</a>
+      }
     </div>
   </div>
 

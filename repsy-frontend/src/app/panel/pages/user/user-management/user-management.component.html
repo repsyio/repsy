@@ -58,7 +58,7 @@
     <div class="text-body1">
       <!-- User Headers (Desktop) -->
       <div
-        class="hidden grid-cols-[1fr_1fr_1fr_1fr_80px] gap-4 rounded-t-[12px] border-t border-r border-l border-neutral-400 bg-neutral-500 p-4 text-[13px] whitespace-nowrap text-neutral-200 lg:grid"
+        class="hidden grid-cols-[1fr_1fr_1fr_1fr_200px] gap-4 rounded-t-[12px] border-t border-r border-l border-neutral-400 bg-neutral-500 p-4 text-[13px] whitespace-nowrap text-neutral-200 lg:grid"
         animate.enter="fade-in-up"
       >
         <div>Username</div>
@@ -79,7 +79,7 @@
             <div
               animate.enter="fade-in-down"
               [ngClass]="{ 'rounded-b-[12px]': i === users.length - 1 }"
-              class="grid grid-cols-[1fr_1fr_1fr_1fr_80px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+              class="grid grid-cols-[1fr_1fr_1fr_1fr_200px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
             >
               <!-- Username -->
               <app-tooltip
@@ -123,8 +123,9 @@
                   data-testid="row-reset-password"
                   (click)="resetPassword(user)"
                   [disabled]="operationLock"
-                  class="hover:text-warning-500 text-neutral-200"
-                  title="Reset password"
+                  class="hover:text-warning-500 flex items-center gap-1 text-neutral-200"
+                  aria-label="Reset password"
+                  title="Reset password (a new password is shown once)"
                 >
                   <svg
                     width="20"
@@ -142,6 +143,7 @@
                     <!-- Refresh arrow -->
                     <path d="M12 15v4m0 0l-2-2m2 2l2-2" stroke-linecap="round" stroke-linejoin="round" />
                   </svg>
+                  <span class="text-[13px]">Reset password</span>
                 </button>
 
                 <!-- Dropdown Menu (Edit & Delete) -->
@@ -209,8 +211,9 @@
                   data-testid="row-reset-password"
                   (click)="resetPassword(user)"
                   [disabled]="operationLock"
-                  class="hover:text-warning-500 text-neutral-200"
-                  title="Reset password"
+                  class="hover:text-warning-500 flex items-center gap-1 text-neutral-200"
+                  aria-label="Reset password"
+                  title="Reset password (a new password is shown once)"
                 >
                   <svg
                     width="20"
@@ -228,6 +231,7 @@
                     <!-- Refresh arrow -->
                     <path d="M12 15v4m0 0l-2-2m2 2l2-2" stroke-linecap="round" stroke-linejoin="round" />
                   </svg>
+                  <span class="text-[13px]">Reset password</span>
                 </button>
 
                 <!-- Dropdown Menu -->
