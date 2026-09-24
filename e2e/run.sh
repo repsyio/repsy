@@ -22,6 +22,8 @@ cd "$SCRIPT_DIR"
 
 STACK_FILE="docker-compose.stack.yml"
 STACK_FILE_H2="docker-compose.stack-h2.yml"
+# Overlay for either stack file: adds the stub scanner and points Repsy at it (README.md "Scanner stack").
+STACK_FILE_SCANNER="docker-compose.stack-scanner.yml"
 RUNNERS_FILE="docker-compose.runners.yml"
 
 if [ -f .env ]; then
@@ -48,7 +50,7 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  run.sh local up|down [--h2]
+  run.sh local up|down [--h2] [--scanner]
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
@@ -65,17 +67,61 @@ except "local down".
 instead -- same ports/image, no postgres service, a fresh H2 database on every "up". "run.sh test"
 needs no flag either way: both profiles serve the same REPSY_API_BASE_URL/REPSY_REPO_BASE_URL, so
 every runner is unchanged.
+
+Pass --scanner, or set REPSY_E2E_SCANNER=1, to add the opt-in stub scanner (docker-compose.stack-scanner.yml,
+combinable with --h2): Repsy starts with SECURITY_SCANNER=enabled pointed at a deterministic stand-in for
+repsy-scanner-trivy, which the @scanner UI specs need (REPSY_UI_OPT_IN=scanner; with REPSY_E2E_SCANNER=1
+"run.sh test" adds that opt-in itself). The default stack never starts a scanner. Give "down" the same
+flags as "up". See README.md "Scanner stack".
 EOF
 }
 
-# Resolves the stack compose file for "local up|down": --h2 (checked by the caller) or
-# REPSY_E2E_STACK=h2 selects docker-compose.stack-h2.yml; anything else keeps the postgres profile.
-stack_file() {
-  local use_h2="$1"
-  if [ "$use_h2" = "true" ] || [ "${REPSY_E2E_STACK:-}" = "h2" ]; then
-    printf '%s' "$STACK_FILE_H2"
+# True when an env switch such as REPSY_E2E_SCANNER is set to something other than off.
+env_switch_on() {
+  case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+    '' | 0 | false | no | off) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+# Parses the flags of "local up|down" into USE_H2 and USE_SCANNER ("true"/"false"). Both can also be
+# switched on from the environment: REPSY_E2E_STACK=h2 and REPSY_E2E_SCANNER=1.
+USE_H2="false"
+USE_SCANNER="false"
+parse_stack_flags() {
+  local sub="$1"
+  shift
+  USE_H2="false"
+  USE_SCANNER="false"
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --h2) USE_H2="true" ;;
+      --scanner) USE_SCANNER="true" ;;
+      *)
+        echo "Unknown option for 'local $sub': $arg" >&2
+        usage
+        exit 1
+        ;;
+    esac
+  done
+  [ "${REPSY_E2E_STACK:-}" = "h2" ] && USE_H2="true"
+  env_switch_on "${REPSY_E2E_SCANNER:-}" && USE_SCANNER="true"
+  return 0
+}
+
+# The "-f" arguments of the stack for the parsed flags: --h2 (or REPSY_E2E_STACK=h2) selects
+# docker-compose.stack-h2.yml, anything else keeps the postgres profile; --scanner adds the overlay.
+# Fills STACK_ARGS.
+STACK_ARGS=()
+stack_args() {
+  if [ "$USE_H2" = "true" ]; then
+    STACK_ARGS=(-f "$STACK_FILE_H2")
   else
-    printf '%s' "$STACK_FILE"
+    STACK_ARGS=(-f "$STACK_FILE")
+  fi
+  if [ "$USE_SCANNER" = "true" ]; then
+    STACK_ARGS+=(-f "$STACK_FILE_SCANNER")
   fi
 }
 
@@ -109,23 +155,12 @@ ensure_runner_dirs() {
 }
 
 cmd_local_up() {
-  local use_h2="false"
-  case "${1:-}" in
-    --h2)
-      use_h2="true"
-      ;;
-    '') ;;
-    *)
-      echo "Unknown option for 'local up': $1" >&2
-      usage
-      exit 1
-      ;;
-  esac
+  parse_stack_flags up "$@"
   require_admin_password
-  local file db_label
-  file="$(stack_file "$use_h2")"
-  db_label="postgres"
-  [ "$use_h2" = "true" ] || [ "${REPSY_E2E_STACK:-}" = "h2" ] && db_label="h2"
+  stack_args
+  local db_label="postgres" scanner_label=""
+  [ "$USE_H2" = "true" ] && db_label="h2"
+  [ "$USE_SCANNER" = "true" ] && scanner_label=", stub scanner"
   # `up` alone builds the Repsy image only when repsy-os-e2e:local does not exist yet, so a stale one
   # from an earlier checkout was reused and the runners tested old code (RPS-1321). Build every time
   # instead: Docker's layer cache makes it a near no-op when nothing under the build context
@@ -133,31 +168,22 @@ cmd_local_up() {
   # or a core submodule bump). Not with REPSY_IMAGE: that names a published image to test as it is,
   # and `--build` would replace it with a local build under the same tag.
   if [ -n "${REPSY_IMAGE:-}" ]; then
-    docker compose -f "$file" up -d --wait
+    docker compose "${STACK_ARGS[@]}" up -d --wait
   else
-    docker compose -f "$file" up -d --wait --build
+    docker compose "${STACK_ARGS[@]}" up -d --wait --build
   fi
-  echo "Repsy is up ($db_label): panel API on http://localhost:8080, repo protocols on http://localhost:9090"
+  echo "Repsy is up ($db_label$scanner_label): panel API on http://localhost:8080, repo protocols on http://localhost:9090"
+  if [ "$USE_SCANNER" = "true" ]; then
+    echo "Scanner enabled: run the @scanner specs with REPSY_UI_OPT_IN=scanner (or REPSY_E2E_SCANNER=1) ./run.sh test --protocol ui --grep @scanner"
+  fi
 }
 
 cmd_local_down() {
-  local use_h2="false"
-  case "${1:-}" in
-    --h2)
-      use_h2="true"
-      ;;
-    '') ;;
-    *)
-      echo "Unknown option for 'local down': $1" >&2
-      usage
-      exit 1
-      ;;
-  esac
-  local file
-  file="$(stack_file "$use_h2")"
+  parse_stack_flags down "$@"
+  stack_args
   # Compose interpolates the whole file for every command, "down" included, and the stack file
   # requires REPSY_ADMIN_PASSWORD. Tearing down does not use it, so any value will do.
-  REPSY_ADMIN_PASSWORD="${REPSY_ADMIN_PASSWORD:-unused}" docker compose -f "$file" down
+  REPSY_ADMIN_PASSWORD="${REPSY_ADMIN_PASSWORD:-unused}" docker compose "${STACK_ARGS[@]}" down
 }
 
 cmd_test() {
@@ -203,6 +229,12 @@ cmd_test() {
       ;;
   esac
   export REPSY_TARGET="$target"
+
+  # A stack started with the scanner overlay (REPSY_E2E_SCANNER=1) also opts the UI suite into its
+  # @scanner specs, which skip themselves otherwise (src/ui/session.ts optedIn()).
+  if env_switch_on "${REPSY_E2E_SCANNER:-}"; then
+    export REPSY_UI_OPT_IN="${REPSY_UI_OPT_IN:+$REPSY_UI_OPT_IN,}scanner"
+  fi
 
   if [ -z "${REPSY_E2E_RUN_ID:-}" ]; then
     REPSY_E2E_RUN_ID="$(random_run_id)"
@@ -269,11 +301,11 @@ main() {
       case "${1:-}" in
         up)
           shift || true
-          cmd_local_up "${1:-}"
+          cmd_local_up "$@"
           ;;
         down)
           shift || true
-          cmd_local_down "${1:-}"
+          cmd_local_down "$@"
           ;;
         *)
           usage
