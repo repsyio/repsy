@@ -65,13 +65,6 @@ test.describe('Mobile viewport', () => {
     openUiPage,
     adminSession,
   }) => {
-    test.fail(
-      true,
-      'The burger never opens the sidebar: PanelLayoutComponent renders <app-panel-header /> without ' +
-        'a (mobileMenuToggle) handler, so its isMobileMenuOpen stays false and there is no navigation ' +
-        'at phone width (RPS-1291). The steps after the ' +
-        'burger are written from the templates and could not be run until it is fixed.',
-    );
     const page = await openUiPage({ session: adminSession, viewport: PHONE });
     const shell = new Shell(page);
     const dashboard = new DashboardPage(page);
@@ -86,6 +79,16 @@ test.describe('Mobile viewport', () => {
       await shell.mobileSidebar.link('repositories').click();
       await expect(page).toHaveURL(/\/repositories$/);
       await expect(repos.title).toBeVisible();
+      await expect(shell.mobileSidebar.root).toHaveCount(0);
+      await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    await test.step('a link between two pages of the same layout closes it too', async () => {
+      await shell.header.burger.click();
+      await shell.mobileSidebar.link('users').click();
+      await expect(page).toHaveURL(/\/users$/);
+      await expect(users.title).toBeVisible();
+      await expect(shell.mobileSidebar.root).toHaveCount(0);
     });
 
     await test.step('open again (fresh load) and follow the Users link (admin)', async () => {
@@ -102,6 +105,17 @@ test.describe('Mobile viewport', () => {
       await expect(shell.mobileSidebar.root).toBeVisible();
       await shell.mobileSidebar.close.click();
       await expect(shell.mobileSidebar.root).toHaveCount(0);
+      await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    await test.step('Escape closes it, other keys (Tab) do not', async () => {
+      await shell.header.burger.click();
+      await expect(shell.mobileSidebar.root).toBeVisible();
+      await page.keyboard.press('Tab');
+      await expect(shell.mobileSidebar.root).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(shell.mobileSidebar.root).toHaveCount(0);
+      await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'false');
     });
 
     await test.step('the backdrop (right of the 240 px panel) closes it', async () => {
@@ -116,7 +130,6 @@ test.describe('Mobile viewport', () => {
     openUiPage,
     seededUser,
   }) => {
-    test.fail(true, 'The burger never opens the sidebar (RPS-1291, see the previous test).');
     const session = await loginSession(seededUser.username, seededUser.password);
     const page = await openUiPage({ session, viewport: PHONE });
     const shell = new Shell(page);
