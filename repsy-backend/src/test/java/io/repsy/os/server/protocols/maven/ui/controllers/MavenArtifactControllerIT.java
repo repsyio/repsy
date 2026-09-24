@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
@@ -232,6 +233,31 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
           .andExpect(jsonPath("$.data.content[0].artifactName").value(ARTIFACT));
     }
 
+    /**
+     * RPS-1296: the detail of a version that is not the artifact's latest must describe that
+     * version. {@code artifactVersionName} feeds the dependency snippets and the detail page's
+     * Delete button, so the latest version's name there deleted the wrong version.
+     */
+    @Test
+    void detailOfAnOlderVersionNamesThatVersionNotTheLatest() throws Exception {
+      MavenArtifactControllerIT.this
+          .mockMvc
+          .perform(
+              get(
+                      "/api/mvn/artifacts/{repo}/{group}/{artifact}/versions/{version}",
+                      MavenArtifactControllerIT.this.repoName,
+                      GROUP,
+                      ARTIFACT,
+                      "1.0.0")
+                  .with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("artifactVersionFetched"))
+          .andExpect(jsonPath("$.data.artifactName").value(ARTIFACT))
+          .andExpect(jsonPath("$.data.artifactGroupName").value(GROUP))
+          .andExpect(jsonPath("$.data.artifactVersionName").value("1.0.0"))
+          .andExpect(jsonPath("$.data.versionName").value("1.0.0"));
+    }
+
     @Test
     void returnsLatestVersionAndPagedVersionList() throws Exception {
       MavenArtifactControllerIT.this
@@ -297,6 +323,56 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
           .andExpect(jsonPath("$.errorCode").value(nullValue()))
           .andExpect(jsonPath("$.text").value("Artifact version has been deleted."))
           .andExpect(jsonPath("$.data", notNullValue()));
+
+      MavenArtifactControllerIT.this
+          .mockMvc
+          .perform(
+              get(
+                      "/api/mvn/artifacts/{repo}/{group}/{artifact}/versions",
+                      MavenArtifactControllerIT.this.repoName,
+                      GROUP,
+                      ARTIFACT)
+                  .with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(1)))
+          .andExpect(jsonPath("$.data.content[0].versionName").value("1.1.0-SNAPSHOT"));
+    }
+
+    /**
+     * RPS-1296: the detail page deletes the version whose name the detail response carries in
+     * {@code artifactVersionName}. Replay that flow for the older of two versions and check that
+     * the latest one survives.
+     */
+    @Test
+    void deleteFromTheDetailOfAnOlderVersionRemovesExactlyThatVersion() throws Exception {
+      final var detail =
+          MavenArtifactControllerIT.this
+              .mockMvc
+              .perform(
+                  get(
+                          "/api/mvn/artifacts/{repo}/{group}/{artifact}/versions/{version}",
+                          MavenArtifactControllerIT.this.repoName,
+                          GROUP,
+                          ARTIFACT,
+                          "1.0.0")
+                      .with(apiPort()))
+              .andExpect(status().isOk())
+              .andReturn();
+      final String shownVersion =
+          JsonPath.read(detail.getResponse().getContentAsString(), "$.data.artifactVersionName");
+
+      MavenArtifactControllerIT.this
+          .mockMvc
+          .perform(
+              delete(
+                      "/api/mvn/artifacts/{repo}/{group}/{artifact}/versions/{version}",
+                      MavenArtifactControllerIT.this.repoName,
+                      GROUP,
+                      ARTIFACT,
+                      shownVersion)
+                  .header(AUTHORIZATION, MavenArtifactControllerIT.this.bearerToken())
+                  .with(apiPort()))
+          .andExpect(status().isOk());
 
       MavenArtifactControllerIT.this
           .mockMvc

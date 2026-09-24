@@ -32,15 +32,7 @@ import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 
 const maven = DESCRIPTORS.maven;
 
-// RPS-1296: the version detail of a version that is not the artifact's latest shows
-// the LATEST version's coordinates (the API's `artifactVersionName` is mapped from `artifact.latest`,
-// `ArtifactConverter.toArtifactVersionInfo`), and its Delete button deletes the latest version, not
-// the one on screen. So deleting 1.0.0 from its detail page while 2.0.0 exists removes 2.0.0.
-registerPackageScenarios(maven, {
-  knownFailures: {
-    '04-detail': 'RPS-1296: the detail of an older version deletes the LATEST version',
-  },
-});
+registerPackageScenarios(maven);
 
 /** `io.repsy.e2e.abc.g1:pkg-1` at `1.0.0` -> the directories a browser walks: io, repsy, e2e, abc, g1, pkg-1, 1.0.0. */
 function directories(name: string, version: string): string[] {
@@ -318,19 +310,26 @@ test.describe('Maven version detail', { tag: '@packages' }, () => {
       ['bazel', 'Bazel', `artifact = "${group}:${artifact}:${version}"`],
     ] as const;
 
-  // RPS-1296 (see the top of this file): the same defect as the pinned PKG-maven-04 detail delete, seen
-  // as content: every snippet of an older version's detail names the latest version.
-  test.fail(
-    'PKG-maven-07 the detail of an older version shows that version, not the latest (RPS-1296)',
-    async ({ adminPage, seeder, seedVersions }) => {
-      const repo = await seeder.createRepo(RepoType.MAVEN);
-      const [older] = await seedVersions(repo, ['1.0.0', '2.0.0']);
-      const detail = protocolPages(adminPage, maven, repo.name).detail(older);
-      await detail.goto();
-      await expect(detail.byId('pkg-detail-meta-artifact')).toContainText('(1.0.0)');
-      await expect(detail.installText).toContainText('<version>1.0.0</version>');
-    },
-  );
+  // RPS-1296: the API's `artifactVersionName` used to be the artifact's latest version, so every
+  // snippet (and the Delete button) of an older version's detail named the latest one.
+  test('PKG-maven-07 the detail of an older version shows that version, not the latest', async ({
+    adminPage,
+    seeder,
+    seedVersions,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    const [older] = await seedVersions(repo, ['1.0.0', '2.0.0']);
+    const detail = protocolPages(adminPage, maven, repo.name).detail(older);
+    await detail.goto();
+    await expect(detail.byId('pkg-detail-meta-artifact')).toContainText('(1.0.0)');
+    await expect(detail.installText).toContainText('<version>1.0.0</version>');
+    const [group, artifact] = older.name.split(':');
+    await expect(detail.snippet('gradle-kotlin')).toContainText(
+      `implementation("${group}:${artifact}:1.0.0")`,
+    );
+    await expect(detail.snippet('purl')).toContainText(`pkg:maven/${group}/${artifact}@1.0.0`);
+    await expect(detail.snippet('purl')).not.toContainText('2.0.0');
+  });
 
   test('PKG-maven-07 the version detail shows the ten build-tool snippets', async ({
     adminPage,
