@@ -71,6 +71,9 @@ services:
       # Read by clients/maven.ts: Maven's shared, third-party-only "local repository tail" (see that
       # file's header comment) -- never this harness's own test artifacts.
       MAVEN_SHARED_REPO_DIR: /app/.maven-shared-m2
+      # Read by clients/gradle.ts: a Gradle user home primed once and copied into each Gradle run's
+      # own home (see that file's SHARED_GRADLE_HOME_DIR comment) -- never a dependency of a test.
+      GRADLE_SHARED_HOME_DIR: /app/.gradle-shared
     volumes:
       - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
       - ./src:/app/src
@@ -78,6 +81,7 @@ services:
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
       - maven_m2_shared:/app/.maven-shared-m2
+      - gradle_home_shared:/app/.gradle-shared
 
   npm:
     <<: *runner-common
@@ -300,3 +304,6 @@ volumes:
   # Named (not bind-mounted): holds only downloaded third-party Maven plugins/dependencies, so it
   # persists across `run.sh test` invocations without leaving anything in the working tree.
   maven_m2_shared: {}
+  # Named for the same reason: the primed Gradle user home of clients/gradle.ts (native libraries,
+  # generated Gradle API / Kotlin DSL jars, plugin accessors), never a resolved dependency.
+  gradle_home_shared: {}

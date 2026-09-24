@@ -1,0 +1,29 @@
+// Rendered by clients/gradle.ts (mustache) into a per-test work directory (the Groovy DSL). A
+// consumer that declares only the Repsy repository (no mavenCentral(), so nothing can be resolved
+// from anywhere else) and the dependency line the panel shows for a Maven version. fetchDependencies
+// copies what was resolved into build/resolved, so the test can hash the very jar Gradle downloaded.
+plugins {
+  id 'java-library'
+}
+
+repositories {
+  maven {
+    url = uri('{{{repoUrl}}}')
+    allowInsecureProtocol = true
+    {{#hasCredential}}
+    credentials {
+      username = findProperty('repsyUsername')
+      password = findProperty('repsyPassword')
+    }
+    {{/hasCredential}}
+  }
+}
+
+dependencies {
+  implementation '{{{coordinates}}}'
+}
+
+tasks.register('fetchDependencies', Copy) {
+  from configurations.runtimeClasspath
+  into layout.buildDirectory.dir('resolved')
+}

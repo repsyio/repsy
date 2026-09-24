@@ -31,7 +31,7 @@ import type { Scenario } from '../scenarios/types.js';
 let versionSeq = 0;
 
 /** A version unique to this test process, in `versionType`'s form. Not a coordinate by itself. */
-function uniqueVersion(versionType: 'release' | 'snapshot'): string {
+export function uniqueVersion(versionType: 'release' | 'snapshot'): string {
   versionSeq += 1;
   const base = `0.0.${Date.now()}${versionSeq}`;
   return versionType === 'snapshot' ? `${base}-SNAPSHOT` : base;

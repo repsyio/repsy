@@ -34,6 +34,7 @@ import {
   parseListing,
   parseVersionMetadata,
   rawGet,
+  sha256Hex,
   repoTree,
   type RepoTree,
   splitPackageName,
@@ -83,6 +84,15 @@ export async function expectNothingStored(w: World, before: RepoTree): Promise<v
   }
 }
 
+export interface SnapshotCheckOptions {
+  /** The file extensions a deploy lists in the version-level metadata: `jar` and `pom` for Maven
+   *  (the default), plus `module` for a Gradle publish (its module metadata). */
+  extensions?: readonly string[];
+  /** The resolver names a resolved SNAPSHOT file `a-1.0-SNAPSHOT.jar` (Gradle) instead of by its
+   *  timestamp (Maven, the default): the check then compares the file's bytes, not its name. */
+  resolvedFileKeepsSnapshotName?: boolean;
+}
+
 /**
  * A SNAPSHOT that was deployed (once, or twice for a redeploy scenario) and resolved: the
  * version-level metadata names the latest build, the consumer resolved exactly that timestamped
@@ -93,7 +103,9 @@ export async function expectSnapshotFollowedThroughMetadata(
   w: World,
   scenario: Scenario,
   resolved: AdapterResult,
+  options: SnapshotCheckOptions = {},
 ): Promise<void> {
+  const { extensions = ['jar', 'pom'], resolvedFileKeepsSnapshotName = false } = options;
   const [groupId, artifactId] = splitPackageName(w.consumeTarget.packageName);
   const version = w.consumeTarget.version;
   const dir = versionDir(groupId, artifactId, version);
@@ -107,10 +119,24 @@ export async function expectSnapshotFollowedThroughMetadata(
   expect(metadata.buildNumber, 'the buildNumber counts the deploys of this SNAPSHOT').toBe(deploys);
 
   const latest = `${baseVersion(version)}-${metadata.timestamp}-${metadata.buildNumber}`;
-  expect(metadata.snapshotVersions).toEqual({ pom: latest, jar: latest });
-  expect(resolved.resolvedFile, 'the consumer resolves the latest timestamped jar').toBe(
-    `${artifactId}-${latest}.jar`,
-  );
+  expect(
+    metadata.snapshotVersions,
+    `every file of the latest build (${extensions.join(', ')}) is listed under its timestamp`,
+  ).toEqual(Object.fromEntries(extensions.map((extension) => [extension, latest])));
+  if (resolvedFileKeepsSnapshotName) {
+    // Gradle keeps the `-SNAPSHOT` name of a resolved file, so the file name says nothing about which
+    // build it is: the bytes do. Every deploy's jar is unique, so the resolved jar has to be the
+    // latest timestamped one stored.
+    const latestJar = await rawGet(w.repoName, admin, `${dir}/${artifactId}-${latest}.jar`);
+    expect(latestJar.status, `GET ${dir}/${artifactId}-${latest}.jar`).toBe(200);
+    expect(resolved.contentSha256, 'the consumer resolves the latest timestamped jar').toBe(
+      sha256Hex(latestJar.body),
+    );
+  } else {
+    expect(resolved.resolvedFile, 'the consumer resolves the latest timestamped jar').toBe(
+      `${artifactId}-${latest}.jar`,
+    );
+  }
 
   const listing = await rawGet(w.repoName, admin, `${dir}/`);
   const buildNumbers = parseListing(listing.body.toString('utf8'))

@@ -51,6 +51,9 @@ const ADMIN_CREDENTIAL: MaterializedCredential = {
 /** Lower-case runner/service name -> the RepoType its repos are created as. */
 const REPO_TYPE_BY_PROTOCOL: Record<string, RepoType> = {
   maven: RepoType.MAVEN,
+  // The Gradle client (RPS-133), one adapter per build file language: an ordinary Maven repo.
+  'gradle-groovy': RepoType.MAVEN,
+  'gradle-kotlin': RepoType.MAVEN,
   npm: RepoType.NPM,
   pypi: RepoType.PYPI,
   docker: RepoType.DOCKER,

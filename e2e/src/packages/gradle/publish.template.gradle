@@ -1,0 +1,38 @@
+// Rendered by clients/gradle.ts (mustache) into a per-test work directory, next to settings.gradle
+// (the Groovy DSL). A tiny, source-free library: the java-library plugin builds a jar from the
+// marker resource clients/gradle.ts writes, and maven-publish uploads it with its sources jar, POM
+// and Gradle module metadata, the way a real project publishes to a Maven repository. The Repsy
+// credential comes from the repsyUsername/repsyPassword project properties (an
+// ORG_GRADLE_PROJECT_* environment variable, or the run's own gradle.properties); the anonymous
+// credential renders no credentials block at all, so the client sends no Authorization header.
+plugins {
+  id 'java-library'
+  id 'maven-publish'
+}
+
+group = '{{{groupId}}}'
+version = '{{{version}}}'
+
+java {
+  withSourcesJar()
+}
+
+publishing {
+  publications {
+    mavenJava(MavenPublication) {
+      from components.java
+    }
+  }
+  repositories {
+    maven {
+      url = uri('{{{repoUrl}}}')
+      allowInsecureProtocol = true
+      {{#hasCredential}}
+      credentials {
+        username = findProperty('repsyUsername')
+        password = findProperty('repsyPassword')
+      }
+      {{/hasCredential}}
+    }
+  }
+}
