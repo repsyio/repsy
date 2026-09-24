@@ -2836,7 +2836,62 @@ Baseline on `main` (RPS-1266 tracks fixing it; serious/critical only, WCAG A/AA)
 
 ### Security scanning UI (RPS-1259)
 
-_Not implemented yet._
+Every piece of scanner UI (the badges on the repository, package and version lists, the scan section of
+a version page, the Vulnerability Scanning toggle of the settings, the content of `/security`) is gated
+by `GET /api/security/supported-repo-types`, which is `[]` in the e2e stack (`SECURITY_SCANNER=disabled`).
+These specs therefore **stub the scanner-facing calls with `page.route`** and let everything else
+(login, repositories, packages, settings) hit the real backend. They are tagged `@mocked`
+(`./run.sh test --protocol ui --grep @mocked`; SEC-02a..e, 51 tests, no scanner, no extra
+stack); one is also `@smoke`. The real-scanner half (a Trivy or stub scanner in the stack, SEC-01) is
+RPS-1270.
+
+| File                                           | What it is                                                                                                                                                                                                                                                                                                                                |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/ui/security-stubs.ts`                     | typed stubs: `stubSupportedRepoTypes`, `stubRepoSecuritySummary`, `stubArtifactSecuritySummary`, `stubVersionSecuritySummary`, `stubRepoSecurityDetail`, `stubArtifactSecurityDetail`, `stubVersionScans` (+ `ScanScript`), `stubSecurityScans`, `stubSecurityScansSummary`, builders `finding`, `findings`, `scanInfo`, `severityCounts` |
+| `src/ui/security-fixtures.ts`                  | `test` = `package-fixtures` + an automatic teardown that `unrouteAll`s the page                                                                                                                                                                                                                                                           |
+| `src/ui/pages/security.ts`                     | `SecurityPage` (`/security`), `ScanSection`, `SecurityModal`, `VulnerabilityScanningSection`, `SelectorControl`, `securityBadgeIn`, `badgeText`, `severityBadge`                                                                                                                                                                          |
+| `tests/ui/security/cases.ts`                   | the four seedable protocols (maven, npm, pypi, docker) and where each shows its package badge                                                                                                                                                                                                                                             |
+| `tests/ui/security/badges.spec.ts`             | SEC-02a: repo, package and version badges and their modals                                                                                                                                                                                                                                                                                |
+| `tests/ui/security/scan-section.spec.ts`       | SEC-02b: the scan section, "See Security Details", Pending to Completed by polling, rescan, history, findings paging and sort                                                                                                                                                                                                             |
+| `tests/ui/security/settings-toggle.spec.ts`    | SEC-02c: the settings toggle per repo type, the PUT body, persistence                                                                                                                                                                                                                                                                     |
+| `tests/ui/security/security-page.spec.ts`      | SEC-02d: `/security` (distribution, filters, empty states, paging, row navigation)                                                                                                                                                                                                                                                        |
+| `tests/ui/security/dashboard-overview.spec.ts` | SEC-02e: the dashboard's Security Overview                                                                                                                                                                                                                                                                                                |
+
+How the stubs are typed, and the rules they follow:
+
+- **Typed from the spec.** Every body is a `RestResponse*` model of `src/api/generated` (built from
+  `openapi-spec.yaml` by `pnpm gen:api`) and every helper takes the generated models as parameters, so
+  a renamed or retyped field breaks `tsc` instead of rendering nothing. Enums (`Severity`, `ScanStatus`,
+  `RepoType`) come from the same models.
+- **Register before navigating.** `SecurityScanSupportService` reads `supported-repo-types` once per SPA
+  load; a list asks for its summary as soon as it renders. To flip an answer, stub again and `reload()`
+  (the newest route for a URL wins). Stubs are idempotent (the answer depends on the request and on the
+  state object the test passed in, never on a call count); a handle counts calls only for assertions.
+- **The scanner is a script the test drives.** `ScanScript` holds one version's scans (newest first);
+  `setStatus()` moves the newest one Pending, Queued, Running, Completed or Failed, `rescan()` adds one
+  (what `POST .../scan` does). The scan section polls `GET /api/repos/{repo}/scans/{id}` every 3 s while a
+  scan is unfinished, so a test flips a status and then waits, bounded (15 s), for the panel to show it:
+  web-first assertions and `expect.poll`, never a fixed sleep. The overview's counters are the newest
+  COMPLETED scan's, the scan's `status` is the newest scan's, and a scan reports findings only once it is
+  COMPLETED (the contract in `openapi-spec.yaml`).
+- **Two things are the stub's own assumptions**, not the backend's: `stubSecurityScans` filters
+  `repoName` as a case-insensitive substring and orders newest first, and findings sort by severity rank
+  (Critical first for `ASC`). What a test asserts about them is the request the panel sent
+  (`handle.last().searchParams`) and the rows it drew.
+- **What is real.** The repositories and packages (raw-HTTP seeded), the routes the rows navigate to (a
+  `/security` row and a modal's recent-scan row must land on the page the protocol descriptor names, at
+  `#security`), and, for SEC-02c, the settings: the PUT goes to the backend and the test reads the stored
+  value back.
+- **The sidebar Security link does not need a scanner**: it shows for every admin (`isAdmin` only), and
+  `/security` then shows its empty states with a type filter that offers only `ALL`.
+
+Known product defects, pinned with `test.fail` so the test turns red the day it is fixed and the marker
+has to go (a `✘` in the list reporter with a passing summary is the expectation): the `/security`
+Refresh button clears the query but not the search box (RPS-1283 is the same defect on the repository
+list), and three security-modal defects (RPS-1295): the X of a repository or package modal
+also opens the row it sits in (the modal is rendered inside the clickable row and only the backdrop and
+the links stop the click), and with a chart the dialog is tall enough that the page header covers its
+title and X at 1440x900.
 
 ## Running
 
