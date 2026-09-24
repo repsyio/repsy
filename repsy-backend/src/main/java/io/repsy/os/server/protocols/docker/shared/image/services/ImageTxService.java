@@ -21,6 +21,8 @@ import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import io.repsy.os.server.protocols.docker.shared.image.mappers.ImageConverter;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
+import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
+import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
@@ -29,6 +31,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -44,6 +47,7 @@ public class ImageTxService implements ImageService<UUID> {
   private final ImageRepository imageRepository;
   private final RepoRepository repoRepository;
   private final LayerRepository layerRepository;
+  private final TagRepository tagRepository;
 
   @Override
   @Transactional
@@ -71,10 +75,37 @@ public class ImageTxService implements ImageService<UUID> {
   @Transactional
   public void updateImageSize(final UUID repoId, final UUID imageId, final String manifestDigest) {
 
+    this.storeSizeAndDigest(repoId, imageId, manifestDigest);
+  }
+
+  /**
+   * Recomputes the size and the digest the panel lists the image with, after a tag or a manifest
+   * was deleted: the size is the one a push stores (see {@link #updateImageSize}), the digest is
+   * the one of the manifest the most recently moved tag points at, and none once no tag is left.
+   * Runs in the caller's transaction, so the numbers never disagree with the rows that changed.
+   */
+  @Transactional
+  public void refreshImageSize(final UUID repoId, final UUID imageId) {
+
+    final var digest =
+        this.tagRepository
+            .findFirstByImageIdOrderByLastUpdatedAtDescIdDesc(imageId)
+            .map(Tag::getDigest)
+            .orElse(null);
+
+    this.storeSizeAndDigest(repoId, imageId, digest);
+  }
+
+  private void storeSizeAndDigest(
+      final UUID repoId, final UUID imageId, final @Nullable String digest) {
+
+    // Flushed first: the size is summed by a query that must see the deletes of this transaction.
+    this.imageRepository.flush();
+
     final var totalSize = this.layerRepository.sumDistinctSizeByImageId(repoId, imageId);
 
     this.imageRepository.updateImageSizeAndDigest(
-        repoId, imageId, manifestDigest, totalSize, Instant.now());
+        repoId, imageId, digest, totalSize, Instant.now());
   }
 
   @Override

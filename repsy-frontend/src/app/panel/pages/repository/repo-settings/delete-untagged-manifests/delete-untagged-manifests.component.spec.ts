@@ -13,6 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
 import {
@@ -66,7 +68,7 @@ describe('DeleteUntaggedManifestsComponent', () => {
 
     dangerModalService.call();
 
-    expect(dockerService.deleteUntaggedManifests).toHaveBeenCalledOnceWith('docker-repo');
+    expect(dockerService.deleteUntaggedManifests).toHaveBeenCalledOnceWith('docker-repo', undefined);
     expect(toastService.show).toHaveBeenCalledOnceWith(
       'Deleted 3 untagged manifests and 2 unused layers (4 K freed)',
       'success',
@@ -133,5 +135,70 @@ describe('DeleteUntaggedManifestsComponent', () => {
 
     expect(toastService.show).not.toHaveBeenCalled();
     expect(component.deleting).toBeFalse();
+  });
+  describe('for one image', () => {
+    beforeEach(() => {
+      component.imageName = 'nginx';
+    });
+
+    it('names the image in the confirmation and deletes nothing before it is confirmed', () => {
+      component.deleteUntaggedManifests();
+
+      expect(dangerModalService.modal.message).toContain('the image nginx');
+      expect(dangerModalService.modal.message).toContain('no tag points to');
+      expect(dockerService.deleteUntaggedManifests).not.toHaveBeenCalled();
+    });
+
+    it('limits the deletion to the image once confirmed, then toasts the counts', () => {
+      component.deleteUntaggedManifests();
+      dangerModalService.call();
+
+      expect(dockerService.deleteUntaggedManifests).toHaveBeenCalledOnceWith('docker-repo', 'nginx');
+      expect(toastService.show).toHaveBeenCalledOnceWith(
+        'Deleted 3 untagged manifests and 2 unused layers (4 K freed)',
+        'success',
+      );
+    });
+  });
+
+  describe('template', () => {
+    function render(imageName?: string): HTMLElement {
+      TestBed.configureTestingModule({
+        imports: [DeleteUntaggedManifestsComponent],
+        providers: [
+          provideRouter([]),
+          { provide: DockerImageControllerService, useValue: dockerService },
+          { provide: ToastService, useValue: toastService },
+          { provide: DangerModalService, useValue: dangerModalService },
+        ],
+      });
+      const fixture = TestBed.createComponent(DeleteUntaggedManifestsComponent);
+      fixture.componentRef.setInput('activeRepository', permission('docker-repo', { canManage: true }));
+      fixture.componentRef.setInput('imageName', imageName);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('is the settings section without an image', () => {
+      const element = render();
+
+      expect(element.querySelector('[data-testid="settings-untagged-manifests"]')).not.toBeNull();
+      expect(element.querySelector('[data-testid="settings-untagged-manifests-delete"]')).not.toBeNull();
+      expect(element.querySelector('[data-testid="pkg-delete-untagged"]')).toBeNull();
+    });
+
+    it('is only a button for an image, and the button asks for confirmation', () => {
+      const element = render('nginx');
+
+      expect(element.querySelector('[data-testid="settings-untagged-manifests"]')).toBeNull();
+      const button = element.querySelector<HTMLButtonElement>('[data-testid="pkg-delete-untagged"]');
+      expect(button?.textContent?.trim()).toBe('Delete Untagged Manifests');
+
+      button.click();
+
+      expect(dangerModalService.modal.title).toBe('Delete Untagged Manifests');
+      expect(dangerModalService.modal.message).toContain('the image nginx');
+      expect(dockerService.deleteUntaggedManifests).not.toHaveBeenCalled();
+    });
   });
 });
