@@ -90,12 +90,21 @@ export class RepositoryComponent implements OnDestroy {
   /** Set when only some of the requested types failed: the loaded ones are listed, and this says which are missing. */
   public warning = '';
   public isAdmin = false;
+  /** The text of the search box: it is emptied whenever the list is loaded again, so box and list agree. */
+  public searchQuery = '';
   public securitySummary: Record<string, RepoSecuritySummary> = {};
 
   private pendingRepoFetches = 0;
   private requestedRepoFetches = 0;
   private failedRepoTypes: RepoType[] = [];
   private securitySummarySubscription?: Subscription;
+  /**
+   * Identifies the current load. A load supersedes the previous one: its requests are cancelled and,
+   * because an unsubscribe still runs `finalize`, every callback also checks that its own load is
+   * still the current one before it touches the list or the counters.
+   */
+  private loadGeneration = 0;
+  private loadSubscription?: Subscription;
 
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
@@ -115,6 +124,8 @@ export class RepositoryComponent implements OnDestroy {
   }
 
   public ngOnDestroy(): void {
+    this.loadGeneration++;
+    this.loadSubscription?.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
@@ -128,8 +139,10 @@ export class RepositoryComponent implements OnDestroy {
   }
 
   public search(repoName: string) {
+    this.searchQuery = repoName;
     this.filteredRepos = this.repositories.filter((repo) => repo.name.toLowerCase().includes(repoName.toLowerCase()));
 
+    this.pageNum = 0;
     this.loadPage(0);
   }
 
@@ -146,6 +159,9 @@ export class RepositoryComponent implements OnDestroy {
   }
 
   public filterRepos(option: string) {
+    // The list is unfiltered again and starts on its first page: the search box and the page index follow.
+    this.searchQuery = '';
+    this.pageNum = 0;
     this.loading = true;
     this.error = '';
     this.warning = '';
@@ -155,6 +171,11 @@ export class RepositoryComponent implements OnDestroy {
     this.paginatedRepos = [];
     this.securitySummary = {};
     this.securitySummarySubscription?.unsubscribe();
+    // The generation moves first: unsubscribing runs the old requests' `finalize`, which must see that
+    // its load is no longer the current one.
+    this.loadGeneration++;
+    this.loadSubscription?.unsubscribe();
+    this.loadSubscription = new Subscription();
 
     this.loadAllRepos(option);
   }
@@ -213,14 +234,18 @@ export class RepositoryComponent implements OnDestroy {
   private fetchRepositoryTypes(repoTypes: RepoType[]): void {
     this.requestedRepoFetches = repoTypes.length;
     this.pendingRepoFetches = repoTypes.length;
-    repoTypes.forEach((repoType) => this.fetchRepositories(repoType));
+    const generation = this.loadGeneration;
+    repoTypes.forEach((repoType) => this.fetchRepositories(repoType, generation));
   }
 
-  private fetchRepositories(repoType: RepoType): void {
-    this.protocolRepoControllerService
+  private fetchRepositories(repoType: RepoType, generation: number): void {
+    const subscription = this.protocolRepoControllerService
       .getInfo(repoType.toUpperCase() as ApiRepoType)
       .pipe(
         finalize(() => {
+          if (generation !== this.loadGeneration) {
+            return;
+          }
           this.pendingRepoFetches--;
           if (this.pendingRepoFetches === 0) {
             this.loading = false;
@@ -236,6 +261,9 @@ export class RepositoryComponent implements OnDestroy {
       )
       .subscribe({
         next: (repos: RepoListItem[]) => {
+          if (generation !== this.loadGeneration) {
+            return;
+          }
           const temp = (repos ?? []).map((repo: RepoListItem) => {
             repo.repoType = repoType;
             return repo;
@@ -247,9 +275,13 @@ export class RepositoryComponent implements OnDestroy {
         },
         // The HTTP error interceptor already shows the toast; the failure is kept for the page.
         error: () => {
+          if (generation !== this.loadGeneration) {
+            return;
+          }
           this.failedRepoTypes.push(repoType);
         },
       });
+    this.loadSubscription?.add(subscription);
   }
 
   private reportFailedFetches(): void {

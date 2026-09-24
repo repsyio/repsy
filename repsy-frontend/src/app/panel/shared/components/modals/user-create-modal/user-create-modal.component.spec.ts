@@ -134,6 +134,26 @@ describe('UserCreateModalComponent', () => {
       expect(component.form.invalid).toBeTrue();
     });
 
+    it('reports an empty confirmation as required, not as a mismatch, once a password is typed', () => {
+      fill({ confirmPassword: '' });
+
+      const confirmation = component.form.get('confirmPassword');
+      expect(confirmation.hasError('required')).toBeTrue();
+      expect(confirmation.hasError('passwordMismatch')).toBeFalse();
+      expect(component.form.errors).toBeNull();
+      expect(component.form.invalid).toBeTrue();
+    });
+
+    it('goes from a mismatch back to required when the confirmation is emptied', () => {
+      fill({ confirmPassword: 'Passw0rd2' });
+      expect(component.form.get('confirmPassword').hasError('passwordMismatch')).toBeTrue();
+
+      component.form.patchValue({ confirmPassword: '' });
+
+      expect(component.form.get('confirmPassword').hasError('required')).toBeTrue();
+      expect(component.form.get('confirmPassword').hasError('passwordMismatch')).toBeFalse();
+    });
+
     it('clears the mismatch once the confirmation is corrected', () => {
       fill({ confirmPassword: 'Passw0rd2' });
       component.form.patchValue({ confirmPassword: 'Passw0rd' });

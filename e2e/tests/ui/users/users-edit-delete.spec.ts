@@ -60,6 +60,29 @@ test.describe('USR-03 edit a user', () => {
     await expect(usersPage.role(renamed)).toHaveText('USER');
   });
 
+  test('after an edit the list reloads without the old search, so the renamed user does not vanish', async ({
+    usersPage,
+    seededUser,
+    seeder,
+  }) => {
+    const renamed = seeder.reserveUsername();
+
+    await usersPage.goto();
+    await usersPage.search(seededUser.username);
+    await usersPage.openEdit(seededUser.username);
+    await usersPage.editModal.username.fill(renamed);
+    const reload = usersPage.listResponse('', 0);
+    await usersPage.editModal.submit.click();
+
+    await usersPage.shell.toasts.expectSuccess('User updated successfully');
+    // The old name no longer matches anything: with the search still applied the list would be
+    // empty ("No users found, create your first user"). It reloads without it, and the box agrees.
+    await reload;
+    await expect(usersPage.searchInput).toHaveValue('');
+    await expect(usersPage.empty).toHaveCount(0);
+    await expect(usersPage.rows().first()).toBeVisible();
+  });
+
   test('promoting a user to admin changes the role badge', async ({
     usersPage,
     seededUser,
@@ -76,6 +99,8 @@ test.describe('USR-03 edit a user', () => {
     await usersPage.editModal.submit.click();
 
     await usersPage.shell.toasts.expectSuccess('User updated successfully');
+    // The list reloads without the search (see the rename test): look the user up again.
+    await usersPage.search(seededUser.username);
     await expect(usersPage.role(seededUser.username)).toHaveText('ADMIN');
     const stored = (await panelApi.listUsers({ search: seededUser.username })).find(
       (user) => user.id === seededUser.id,
@@ -105,6 +130,7 @@ test.describe('USR-03 edit a user', () => {
     await usersPage.editModal.submit.click();
 
     await usersPage.shell.toasts.expectSuccess('User updated successfully');
+    await usersPage.search(seeder.runId);
     await expect(usersPage.role(first.username)).toHaveText('USER');
     await expect(usersPage.role(second.username)).toHaveText('ADMIN');
     const stored = (await panelApi.listUsers({ search: first.username })).find(
@@ -113,7 +139,7 @@ test.describe('USR-03 edit a user', () => {
     expect(stored?.role).toBe(UserRole.USER);
   });
 
-  test('a single admin in the view cannot be demoted: warning, and the submit is refused', async ({
+  test('a single admin in the view cannot be demoted: warning, and the role switch is locked', async ({
     usersPage,
     seeder,
     panelApi,
@@ -127,17 +153,16 @@ test.describe('USR-03 edit a user', () => {
     await expect(usersPage.editModal.lastAdminWarning).toBeVisible();
     await expect(usersPage.editModal.lastAdminWarning).toContainText('This is the only admin user');
     await expect(usersPage.editModal.roleSwitch).toBeChecked();
+    await expect(usersPage.editModal.roleSwitch).toBeDisabled();
 
-    // The warning says the role cannot change, but the switch itself is not locked (the modal
-    // disables the form control, and the toggle component ignores that): the guard is the submit.
-    await usersPage.editModal.roleToggle.click();
-    await expect(usersPage.editModal.roleLabel).toHaveText('User');
-    await usersPage.editModal.submit.click();
+    // The switch is locked: a click on it (dispatched, since Playwright would rather wait than click a
+    // disabled control) changes nothing, and the form still says Admin.
+    await usersPage.editModal.roleToggle.dispatchEvent('click');
+    await expect(usersPage.editModal.roleLabel).toHaveText('Admin');
+    await expect(usersPage.editModal.roleSwitch).toBeChecked();
+    await usersPage.editModal.cancel.click();
+    await expect(usersPage.editModal.root).toBeHidden();
 
-    await usersPage.shell.toasts.expectError(
-      'Cannot remove admin role from the last admin. Create another admin first.',
-    );
-    await expect(usersPage.editModal.root).toBeVisible();
     const stored = (await panelApi.listUsers({ search: admin.username })).find(
       (user) => user.id === admin.id,
     );
@@ -239,10 +264,17 @@ test.describe('USR-05 delete a user', () => {
     await expect(usersPage.row(seededUser.username)).toBeVisible();
     expect(await panelApi.listUsers({ search: seededUser.username })).toHaveLength(1);
 
+    const reload = usersPage.listResponse('', 0);
     await usersPage.deleteUser(seededUser.username);
     await usersPage.shell.toasts.expectSuccess('User deleted successfully');
     await expect(usersPage.row(seededUser.username)).toHaveCount(0);
     expect(await panelApi.listUsers({ search: seededUser.username })).toHaveLength(0);
+
+    // The list reloads without the search that led to the user, and the box agrees: it does not
+    // show the empty state for a search nobody typed any more.
+    await reload;
+    await expect(usersPage.searchInput).toHaveValue('');
+    await expect(usersPage.empty).toHaveCount(0);
   });
 
   test('a single admin in the view cannot be deleted: the client raises an error toast', async ({

@@ -79,10 +79,9 @@
             <app-toggle-component
               data-testid="user-edit-role"
               id="isAdmin"
-              [checked]="form.get('isAdmin').value"
+              formControlName="isAdmin"
               checkedLabel="Admin"
               uncheckedLabel="User"
-              (checkedChange)="form.get('isAdmin').setValue($event)"
             />
             <p class="mt-2 text-xs text-[#9FA0A0]">Admin have full access to all features including user management</p>
             @if (isLastAdmin && form.get('isAdmin').value) {

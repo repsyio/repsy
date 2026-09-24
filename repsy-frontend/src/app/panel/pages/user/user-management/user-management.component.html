@@ -10,6 +10,7 @@
         <app-searchbox
           data-testid="user-search"
           placeholder="Search username"
+          [value]="searchQuery"
           (filter)="search($event)"
           class="w-full sm:max-w-[320px]"
         />
@@ -339,7 +340,7 @@
   [(open)]="showEditUserModal"
   [user]="selectedUser"
   [isLastAdmin]="selectedUser?.role === 'ADMIN' && isLastAdmin()"
-  (updated)="fetchUsers()"
+  (updated)="userUpdated()"
 />
 
 <app-user-reset-password-modal

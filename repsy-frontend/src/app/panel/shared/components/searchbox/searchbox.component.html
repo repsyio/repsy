@@ -14,6 +14,7 @@
     data-testid="search-input"
     type="text"
     [placeholder]="placeholder"
+    [value]="value"
     [attr.aria-label]="ariaLabel || placeholder || 'Search'"
     (input)="onSearch($event)"
     class="w-full bg-transparent text-[14px] text-white outline-none placeholder:text-[#9FA0A0]"

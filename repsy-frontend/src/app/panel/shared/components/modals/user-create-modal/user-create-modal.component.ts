@@ -82,7 +82,9 @@ export class UserCreateModalComponent {
       return null;
     }
 
-    if (password.value !== confirmPassword.value) {
+    // An empty confirmation is "required", which the field's own validator already reports: the match
+    // check must not replace that error with "Passwords do not match".
+    if (confirmPassword.value && password.value !== confirmPassword.value) {
       confirmPassword.setErrors({ passwordMismatch: true });
       return { passwordMismatch: true };
     }
