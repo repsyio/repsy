@@ -50,4 +50,7 @@ public interface TagRepository extends JpaRepository<Tag, UUID> {
 
   @Query("select t.name from Tag t where t.image.id = :imageId and t.digest = :digest")
   List<String> findNamesByImageIdAndDigest(UUID imageId, String digest);
+
+  /** The tags that point at a manifest, which go with it when it is deleted. */
+  List<Tag> findAllByManifestId(UUID manifestId);
 }

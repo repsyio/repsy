@@ -100,6 +100,12 @@ class AbstractDockerProtocolTxFacadeTest {
           .relativePath(new RelativePath("manifests/" + fileName))
           .build();
     }
+
+    @Override
+    public void deleteManifest(
+        final ProtocolContext context, final String imageName, final String reference) {
+      throw new UnsupportedOperationException();
+    }
   }
 
   private static final String UPLOAD_STORAGE_PATH = REPO_ID + "/blobs/upload-id";

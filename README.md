@@ -551,13 +551,29 @@ instance per team.
   Deleting a tag in the web UI removes the pointer only, in the same way.
 - **Untagged manifests accumulate.** Nothing deletes a manifest automatically, so every override
   and every deleted tag leaves the previous manifest, and the layers only it used, on disk and in
-  the repository's usage. Deleting a whole image removes its manifests (a manifest file that
-  another image of the repository shares is kept until the last image that has it is gone).
-  Removing untagged manifests without deleting the image is not offered yet; it is tracked as
+  the repository's usage, until the manifest is deleted by its digest (`DELETE
+  /v2/<name>/manifests/<digest>`, below) or its image is deleted. Deleting a whole image removes
+  its manifests (a manifest file that another image of the repository shares is kept until the last
+  manifest that has it is gone). A cleanup of all untagged manifests at once is tracked as
   follow-up work.
 - **"Delete orphan layers"** in the repository settings deletes the layer blobs that no manifest
   uses (for example, left by a refused push). It does not touch manifests.
-- There is no `tags/list`, referrers API or protocol-level `DELETE` yet.
+- **`DELETE /v2/<name>/manifests/<reference>` needs the MANAGE permission** (an admin user, the
+  same as the operations of the repository settings page). A client that deletes manifests, such as
+  `crane delete`, works with the credentials it was logged in with; a deploy token, which only reads
+  and writes, is refused with `401`, and so is a user without the admin role.
+  - By **digest** (`sha256:` or `sha512:`) it deletes the manifest and every tag that points at it,
+    so neither the digest nor those tags can be pulled afterwards, as the distribution specification
+    describes. It answers `202 Accepted`; a digest the image does not have is `404 MANIFEST_UNKNOWN`
+    (a malformed one is `400 DIGEST_INVALID`). The manifests an index lists are not deleted with
+    it: another index may still list them, so they stay, untagged, until they are deleted by their
+    own digest. The manifest file is deleted (and its bytes released from the repository's usage)
+    unless another image of the repository has the same manifest.
+  - By **tag** it deletes that tag only, like deleting a tag in the web UI: the manifest stays
+    pullable by its digest. It answers `202 Accepted`; an unknown tag is `404 MANIFEST_UNKNOWN`.
+  - The layers a deleted manifest used are not deleted with it; "Delete orphan layers" removes the
+    ones no manifest uses any more.
+- There is no `tags/list` or referrers API yet.
 
 ### Signed Maven Deploys
 
