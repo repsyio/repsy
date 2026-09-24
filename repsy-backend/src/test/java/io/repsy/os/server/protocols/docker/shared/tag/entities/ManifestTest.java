@@ -29,7 +29,7 @@ class ManifestTest extends AbstractEntityIdentityTest<Manifest> {
   protected Manifest newEntity(final UUID id) {
     final var manifest = new Manifest();
     manifest.setId(id);
-    manifest.setName("latest");
+    manifest.setPlatform("linux/amd64");
     manifest.setDigest("sha256:aaaa");
     return manifest;
   }
@@ -37,7 +37,7 @@ class ManifestTest extends AbstractEntityIdentityTest<Manifest> {
   @Override
   protected void changeState(final Manifest manifest) {
     manifest.setVersion(7);
-    manifest.setName("renamed");
+    manifest.setStorageName("renamed");
     manifest.setDigest("sha256:bbbb");
     manifest.setConfigDigest("sha256:cccc");
     manifest.setConfigSize(42);
@@ -60,12 +60,12 @@ class ManifestTest extends AbstractEntityIdentityTest<Manifest> {
   }
 
   @Test
-  @DisplayName("Hashing and printing a manifest never touch its layers or tag platform")
+  @DisplayName("Hashing and printing a manifest never touch its layers or image")
   void hashCodeAndToStringSkipAssociations() {
     final var manifest = this.newEntity(UUID.randomUUID());
     manifest.setLayers(new UntouchableSet<>());
 
     assertThat(manifest.hashCode()).isEqualTo(Manifest.class.hashCode());
-    assertThat(manifest.toString()).doesNotContain("layers=", "tagPlatform=");
+    assertThat(manifest.toString()).doesNotContain("layers=", "image=");
   }
 }

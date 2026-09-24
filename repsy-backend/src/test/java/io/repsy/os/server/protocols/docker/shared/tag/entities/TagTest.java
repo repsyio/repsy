@@ -59,12 +59,11 @@ class TagTest extends AbstractEntityIdentityTest<Tag> {
   }
 
   @Test
-  @DisplayName("Hashing and printing a tag never touch its tag platforms or image")
+  @DisplayName("Hashing and printing a tag never touch its manifest or image")
   void hashCodeAndToStringSkipAssociations() {
     final var tag = this.newEntity(UUID.randomUUID());
-    tag.setTagPlatforms(new UntouchableSet<>());
 
     assertThat(tag.hashCode()).isEqualTo(Tag.class.hashCode());
-    assertThat(tag.toString()).doesNotContain("tagPlatforms=", "image=");
+    assertThat(tag.toString()).doesNotContain("manifest=", "image=");
   }
 }

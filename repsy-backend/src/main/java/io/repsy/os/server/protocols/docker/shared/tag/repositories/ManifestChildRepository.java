@@ -15,22 +15,19 @@
  */
 package io.repsy.os.server.protocols.docker.shared.tag.repositories;
 
-import io.repsy.os.server.protocols.docker.shared.tag.entities.TagPlatform;
+import io.repsy.os.server.protocols.docker.shared.tag.entities.ManifestChild;
+import io.repsy.os.server.protocols.docker.shared.tag.entities.ManifestChildId;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
 @NullMarked
-public interface TagPlatformRepository extends JpaRepository<TagPlatform, UUID> {
+public interface ManifestChildRepository extends JpaRepository<ManifestChild, ManifestChildId> {
 
-  Optional<TagPlatform> findByTagImageRepoIdAndTagImageIdAndTagIdAndPlatform(
-      UUID repoId, UUID imageId, UUID tagId, String platform);
-
-  List<TagPlatform> findAllByTagId(UUID id);
-
-  List<TagPlatform> findAllByTagImageId(UUID id);
+  @Query("select c from ManifestChild c join fetch c.child where c.parent.id = :parentId")
+  List<ManifestChild> findAllByParentId(UUID parentId);
 }

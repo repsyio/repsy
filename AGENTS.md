@@ -125,6 +125,12 @@ panel API. Edit that file for any API change; there is no other copy. Both sides
   scripts under `postgresql/`), named `V{version}__{description}.sql`. Add a new migration rather
   than editing an existing one.
 - Use `postgres:18` in any Dockerfile, compose file, README snippet or test you add.
+- A Docker manifest (`docker_manifest`) is content-addressed: one row per image and `sha256` digest,
+  its file at `<repoUuid>/manifests/<digest>` (shared by the images of a repo, deleted only when no row
+  of the repo has the digest), and a tag (`docker_tag`) is a pointer to it. A migration that changes
+  populated data is tested on legacy data at the previous version: see `DockerManifestMigrationScenario`
+  (`V0024DockerContentAddressedManifestsTest` on H2, `DockerManifestMigrationIT` on PostgreSQL, which
+  owns its container instead of extending `AbstractIntegrationTest`).
 - Hibernate does not validate the entity mappings (`ddl-auto: none`), so
   `EntitySchemaAnnotationIT` and `H2EntitySchemaAnnotationIT` compare every entity of the
   metamodel with `information_schema` (`EntityColumnSchemaChecks`). A new entity or column is

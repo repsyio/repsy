@@ -27,18 +27,16 @@ import io.repsy.os.server.protocols.docker.shared.layer.services.LayerTxService;
 import io.repsy.os.server.protocols.docker.shared.layer.services.OrphanLayerCleanupService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
+import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestFileService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
 import io.repsy.os.server.protocols.docker.ui.utils.RepoUtils;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
-import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +60,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
   private final @NonNull ImageTxService imageTxService;
   private final @NonNull LayerTxService layerTxService;
   private final @NonNull ManifestTxService manifestService;
+  private final @NonNull ManifestFileService manifestFileService;
   private final @NonNull DockerStorageService dockerStorageService;
   private final @NonNull OrphanLayerCleanupService orphanLayerCleanupService;
   private final @NonNull ApplicationEventPublisher eventPublisher;
@@ -74,7 +73,6 @@ public class DockerApiFacade implements ProtocolApiFacade {
     final var images = this.imageTxService.findAllByRepoId(repoInfo.getStorageKey());
 
     for (final var image : images) {
-      this.manifestService.deleteTagsByImageInfo(repoInfo.getStorageKey(), image.getId());
       this.imageTxService.deleteImage(repoInfo.getStorageKey(), image.getName());
     }
 
@@ -97,12 +95,18 @@ public class DockerApiFacade implements ProtocolApiFacade {
 
     final var tags = this.manifestService.findAllTags(repoInfo.getStorageKey(), imageInfo.getId());
 
-    final var manifestsToDeleteFileNames =
-        this.findManifestsToDeleteFileNames(repoInfo, imageInfo.getId(), imageName, tags);
+    // Taken before the rows go: the files a manifest keeps are found through its row.
+    final var manifestRefs = this.manifestFileService.findRefsOfImage(imageInfo.getId());
 
     this.imageTxService.deleteImage(repoInfo.getStorageKey(), imageInfo.getName());
 
     this.publishVersionsDeleted(repoInfo, imageInfo.getName(), tags);
+
+    // A manifest file is shared by every image of the repo that has the manifest: only the files no
+    // remaining row needs are deleted.
+    final var manifestsToDeleteFileNames =
+        this.manifestFileService.findUnreferencedFileNames(
+            repoInfo.getStorageKey(), imageInfo.getId(), imageInfo.getName(), manifestRefs);
 
     final var usage =
         this.dockerStorageService.deleteManifests(repoInfo, manifestsToDeleteFileNames);
@@ -156,15 +160,24 @@ public class DockerApiFacade implements ProtocolApiFacade {
     return configResource.getContentAsString(StandardCharsets.UTF_8);
   }
 
+  /**
+   * Reads the manifest from the first of the file names that exists (see {@link
+   * ManifestTxService#findManifestFileNamesByReference}).
+   */
   public @NonNull String getManifest(
-      final @NonNull RepoInfo repoInfo, final @NonNull String fileName) throws IOException {
+      final @NonNull RepoInfo repoInfo, final @NonNull List<String> fileNames) throws IOException {
 
-    final var storagePath =
-        StoragePath.of(repoInfo.getStorageKey(), Paths.get(MANIFESTS_PATH, fileName).toString());
+    for (final var fileName : fileNames) {
+      final var storagePath =
+          StoragePath.of(repoInfo.getStorageKey(), Paths.get(MANIFESTS_PATH, fileName).toString());
 
-    final var manifestResource = this.getResource(repoInfo, storagePath.getRelativePath());
+      if (this.dockerStorageService.existsResource(storagePath, repoInfo.getName())) {
+        return this.getResource(repoInfo, storagePath.getRelativePath())
+            .getContentAsString(StandardCharsets.UTF_8);
+      }
+    }
 
-    return manifestResource.getContentAsString(StandardCharsets.UTF_8);
+    throw new ItemNotFoundException("manifestNotFound");
   }
 
   @Transactional(readOnly = true)
@@ -192,30 +205,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
     final var tag =
         this.manifestService.findTag(repoInfo.getStorageKey(), imageInfo.getId(), tagName);
 
-    return this.manifestService.findManifestsByTagIdContainsName(tag.getId(), name, pageable);
-  }
-
-  private @NonNull Set<String> findManifestsToDeleteFileNames(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull UUID imageId,
-      final @NonNull String imageName,
-      final @NonNull List<Tag> tags) {
-
-    final var manifestsToDeleteFileNames = new HashSet<String>();
-
-    for (final Tag tag : tags) {
-      final var manifestsToDelete =
-          this.manifestService.findManifests(repoInfo.getStorageKey(), imageId, tag.getId());
-
-      for (final var manifest : manifestsToDelete) {
-        final var manifestName =
-            ManifestNameGenerator.generate(repoInfo.getStorageKey(), imageName, manifest.getName());
-
-        manifestsToDeleteFileNames.add(manifestName);
-      }
-    }
-
-    return manifestsToDeleteFileNames;
+    return this.manifestService.findManifestsByTagContainsName(tag, name, pageable);
   }
 
   private @NonNull Resource getResource(

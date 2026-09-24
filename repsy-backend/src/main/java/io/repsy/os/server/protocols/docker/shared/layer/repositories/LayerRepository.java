@@ -57,15 +57,24 @@ public interface LayerRepository extends JpaRepository<Layer, UUID> {
     """)
   List<Layer> findOrphansByRepoId(UUID repoId);
 
+  /**
+   * The size of the distinct layers of the manifests the image's tags reach: the manifests a tag
+   * points at and the manifests of the indexes among them. A manifest no tag reaches any more (the
+   * one a tag was moved away from) stays on disk but is not part of what the image shows.
+   */
   @Query(
       """
     select coalesce(sum(l.size), 0) from Layer l
       where l.id in (
         select distinct l2.id from Layer l2
           join l2.manifests m
-          join m.tagPlatform tp
-          join tp.tag t
-        where t.image.id = :imageId and l2.repo.id = :repoId
+        where m.image.id = :imageId and l2.repo.id = :repoId
+          and (
+            exists (select 1 from Tag t where t.manifest.id = m.id)
+            or exists (
+              select 1 from ManifestChild c, Tag t
+              where c.child.id = m.id and t.manifest.id = c.parent.id)
+          )
       )
   """)
   long sumDistinctSizeByImageId(UUID repoId, UUID imageId);

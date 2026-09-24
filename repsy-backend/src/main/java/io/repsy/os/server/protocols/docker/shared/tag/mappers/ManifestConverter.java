@@ -40,10 +40,6 @@ public interface ManifestConverter {
   io.repsy.os.generated.model.ImageTagListItem toTagDto(
       io.repsy.os.server.protocols.docker.shared.tag.dtos.ImageTagListItem source);
 
-  @Mapping(target = "createdAt", source = "createdAt")
-  io.repsy.os.generated.model.ManifestListItem toManifestDto(
-      io.repsy.os.server.protocols.docker.shared.layer.dtos.ManifestListItem source);
-
   @Mapping(target = "configDigest", ignore = true)
   @Mapping(target = "imageName", source = "image.name")
   io.repsy.os.generated.model.TagDetail toTagDetailBase(Tag tag);
@@ -53,13 +49,7 @@ public interface ManifestConverter {
     final var tagDetail = this.toTagDetailBase(tag);
 
     if (!io.repsy.protocols.docker.shared.utils.MediaTypes.isIndex(tag.getMediaType())) {
-      final var platformIterator = tag.getTagPlatforms().iterator();
-      if (platformIterator.hasNext()) {
-        final var manifestIterator = platformIterator.next().getManifests().iterator();
-        if (manifestIterator.hasNext()) {
-          tagDetail.setConfigDigest(manifestIterator.next().getConfigDigest());
-        }
-      }
+      tagDetail.setConfigDigest(tag.getManifest().getConfigDigest());
     }
 
     return tagDetail;

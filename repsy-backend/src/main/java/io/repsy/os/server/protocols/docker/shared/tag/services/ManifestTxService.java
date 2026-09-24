@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.docker.shared.tag.services;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.os.generated.model.ManifestListItem;
 import io.repsy.os.server.protocols.docker.shared.image.dtos.ImageInfo;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
@@ -24,40 +25,51 @@ import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerReposi
 import io.repsy.os.server.protocols.docker.shared.tag.dtos.TagDetail;
 import io.repsy.os.server.protocols.docker.shared.tag.dtos.manifest.ManifestDetail;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Manifest;
+import io.repsy.os.server.protocols.docker.shared.tag.entities.ManifestChild;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
-import io.repsy.os.server.protocols.docker.shared.tag.entities.TagPlatform;
 import io.repsy.os.server.protocols.docker.shared.tag.mappers.ManifestConverter;
+import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestChildRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
-import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagPlatformRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
-import io.repsy.protocols.docker.shared.tag.dtos.ManifestListManifestInfo;
+import io.repsy.protocols.docker.shared.tag.dtos.ManifestListManifest;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
 import io.repsy.protocols.docker.shared.utils.DockerConstants;
+import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
+import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import io.repsy.protocols.docker.shared.utils.MediaTypes;
-import jakarta.persistence.OptimisticLockException;
-import java.time.Instant;
+import io.repsy.protocols.shared.utils.BlobDigests;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * The manifests and tags of a Docker repo (RPS-1216). A manifest is content-addressed: one row per
+ * image and {@code sha256} digest, created by the first push of its bytes and kept when a tag moves
+ * away from it, so it stays pullable by its digest. A tag is a pointer to a manifest; an index
+ * references the manifests it lists through {@link ManifestChild} edges.
+ */
 @Slf4j
 @Service
 @Transactional(readOnly = true)
@@ -66,40 +78,50 @@ import org.springframework.transaction.annotation.Transactional;
 public class ManifestTxService implements ManifestService<UUID> {
 
   private static final String MULTIPLATFORM = "Multiplatform";
-  private static final int RETRY_COUNT = 3;
-  private static final long WAIT_RETRY = 100;
+
+  private static final Comparator<ManifestRow> BY_ID = Comparator.comparing(ManifestRow::id);
+
+  private static final Comparator<ManifestRow> BY_NAME =
+      Comparator.comparing(row -> row.item().getName());
+
+  private static final Comparator<ManifestRow> BY_CREATED_AT =
+      Comparator.comparing(
+          row -> row.item().getCreatedAt(), Comparator.nullsFirst(Comparator.naturalOrder()));
+
+  private static final Map<String, Comparator<ManifestRow>> SORTS =
+      Map.of("id", BY_ID, "name", BY_NAME, "createdAt", BY_CREATED_AT);
 
   private final ManifestConverter manifestConverter;
   private final ImageRepository imageRepository;
   private final LayerRepository layerRepository;
   private final ManifestRepository manifestRepository;
+  private final ManifestChildRepository manifestChildRepository;
   private final TagRepository tagRepository;
-  private final TagPlatformRepository tagPlatformRepository;
+
+  /** A row of the panel's list of a tag's manifests: the item, and the id its sort key uses. */
+  private record ManifestRow(UUID id, ManifestListItem item) {}
+
+  @Override
+  public void verifyManifestsExist(
+      final UUID repoId, final UUID imageId, final List<String> digests) {
+
+    for (final var digest : digests) {
+      this.findManifest(imageId, digest);
+    }
+  }
 
   @Override
   @Retryable(
       retryFor = ObjectOptimisticLockingFailureException.class,
       backoff = @Backoff(delay = 50))
   @Transactional
-  public void createManifestList(
-      final UUID repoId,
-      final UUID imageId,
-      final TagForm tagForm,
-      final List<ManifestListManifestInfo> manifestInfo) {
+  public void createManifestList(final UUID repoId, final UUID imageId, final TagForm tagForm) {
 
     final var image = this.findImageById(imageId);
-    final var tag = this.findOrCreateTag(repoId, image, tagForm, 1);
+    final var manifest = this.findOrCreateIndex(image, tagForm);
 
-    final var tagPlatform =
-        this.findOrCreateTagPlatform(repoId, imageId, tag, tagForm.getPlatform(), 1);
-
-    final var platformManifests =
-        this.manifestRepository.findByRepoIdAndImageIdAndDigest(
-            repoId, imageId, tagForm.getManifestDigests());
-
-    this.deleteOldManifests(repoId, imageId, tag, platformManifests);
-    this.createManifestList(repoId, imageId, tagForm, tagPlatform);
-    this.createManifestsAndTagPlatforms(repoId, imageId, tag, manifestInfo);
+    this.replaceChildren(manifest, image, tagForm.getManifestList().getManifests());
+    this.pointTag(image, tagForm, manifest);
   }
 
   @Override
@@ -112,82 +134,39 @@ public class ManifestTxService implements ManifestService<UUID> {
 
     final var imageInfo = (ImageInfo) baseImageInfo;
 
+    final var image = this.findImageById(imageInfo.getId());
     final var layers = this.findLayersByRepoIdAndForm(tagForm, repoId);
     final var configLayer = this.findConfigLayerByRepoIdAndDigest(tagForm, repoId);
 
-    this.createManifest(repoId, imageInfo, tagForm, layers, configLayer);
+    final var manifest = this.findOrCreateManifest(image, tagForm, layers, configLayer);
+
+    this.pointTag(image, tagForm, manifest);
   }
 
   @Override
   public Optional<BaseTagDetail<UUID>> findActiveTagByNameAndRepoAndImage(
       final UUID repoId, final String imageName, final String tag) {
 
-    final var tagOpt =
-        this.tagRepository.findByImageRepoIdAndImageNameAndName(repoId, imageName, tag);
-
-    return tagOpt.map(this::mapToTagDetailWithConfigDigest);
+    return this.tagRepository
+        .findByImageRepoIdAndImageNameAndName(repoId, imageName, tag)
+        .map(this::mapToTagDetailWithConfigDigest);
   }
 
   @Override
   public ManifestDetail findManifestByRepoIdAndImageNameAndDigest(
       final UUID repoId, final BaseImageInfo<UUID> imageInfo, final String digest) {
 
-    final var manifests =
-        this.manifestRepository.findByRepoIdAndImageIdAndDigestList(
-            repoId, imageInfo.getId(), digest);
-
-    if (manifests.isEmpty()) {
-      throw new ItemNotFoundException("manifestNotFound");
-    }
-
-    return this.manifestConverter.toManifestDetail(manifests.getFirst());
+    return this.manifestConverter.toManifestDetail(this.findManifest(imageInfo.getId(), digest));
   }
 
-  @Override
-  public List<ManifestDetail> findManifests(
-      final UUID repoId, final UUID imageId, final UUID tagId) {
-
-    final var manifests =
-        this.manifestRepository.findAllByRepoIdAndImageIdAndTagId(repoId, imageId, tagId);
-
-    return manifests.stream().map(this.manifestConverter::toManifestDetail).toList();
-  }
-
-  @Override
-  public boolean findByDigestAndImageIdAndRepoId(
-      final String digest, final UUID imageId, final UUID repoId) {
-
-    return this.manifestRepository
-        .findAllNonBindingManifestsByDigest(repoId, imageId, digest)
-        .stream()
-        .findFirst()
-        .isPresent();
-  }
-
+  /**
+   * Removes the tag and nothing else: the manifest it pointed at stays stored, untagged and
+   * pullable by its digest, until it is deleted explicitly.
+   */
   @Transactional
   public void deleteTag(final Tag tag) {
 
-    final var tagPlatforms = this.tagPlatformRepository.findAllByTagId(tag.getId());
-
-    final var manifests = tagPlatforms.stream().flatMap(tp -> tp.getManifests().stream()).toList();
-
-    for (final var manifest : manifests) {
-      manifest.getLayers().clear();
-    }
-
     this.tagRepository.delete(tag);
-  }
-
-  @Transactional
-  @SuppressWarnings("all")
-  public void deleteTagsByImageInfo(final UUID repoId, final UUID imageId) {
-
-    final var tags = this.tagRepository.findAllByImageRepoIdAndImageId(repoId, imageId);
-
-    // Do not change this with delete all because it uses aspectj
-    for (final var tag : tags) {
-      this.tagRepository.delete(tag);
-    }
   }
 
   public List<Tag> findAllTags(final UUID repoId, final UUID imageId) {
@@ -197,88 +176,57 @@ public class ManifestTxService implements ManifestService<UUID> {
 
   public boolean existsByImageIdAndConfigDigest(final UUID imageId, final String configDigest) {
 
-    return this.manifestRepository.existsByTagPlatformTagImageIdAndConfigDigest(
-        imageId, configDigest);
-  }
-
-  private void deleteOldManifests(
-      final UUID repoId, final UUID imageId, final Tag tag, final List<Manifest> newManifests) {
-
-    final var oldManifests =
-        this.manifestRepository.findAllBindingManifestsAndNonMultiplatform(
-            repoId, imageId, tag.getId());
-
-    if (oldManifests.isEmpty()) {
-      return;
-    }
-
-    final var newDigestSet =
-        newManifests.stream().map(Manifest::getDigest).collect(Collectors.toSet());
-
-    final var manifestsToDelete =
-        oldManifests.stream()
-            .filter(oldManifest -> !newDigestSet.contains(oldManifest.getDigest()))
-            .toList();
-
-    for (final var manifest : manifestsToDelete) {
-      try {
-        manifest.getLayers().clear();
-        manifest.setLayers(new HashSet<>());
-        this.manifestRepository.delete(manifest);
-      } catch (final OptimisticLockException _) {
-        log.debug("Manifest already deleted by another thread: {}", manifest.getId());
-      }
-    }
+    return this.manifestRepository.existsByImageIdAndConfigDigest(imageId, configDigest);
   }
 
   /**
-   * Resolves a tag name or a {@code sha256:} digest to the name its manifest file is stored under.
-   * A digest is matched against the tag rows first and then against the stored manifests, so the
-   * per-platform children of a multi-platform tag, which have no tag row of their own, resolve too.
+   * Resolves a tag name or a digest (of either algorithm) to the names the manifest file may have,
+   * in the order to try them: the legacy name an earlier version stored it under while the repair
+   * service has not renamed it yet, then its digest.
    */
-  public String findManifestNameByReference(
+  public List<String> findManifestFileNamesByReference(
       final UUID repoId, final String imageName, final String reference) {
 
-    final var name =
-        reference.startsWith(DockerConstants.SHA256_PREFIX)
-            ? this.findTagNameByDigest(repoId, imageName, reference)
-                .or(() -> this.findManifestNameByDigest(repoId, imageName, reference))
+    final var manifest =
+        BlobDigests.startsWithDigestPrefix(reference)
+            ? this.imageRepository
+                .findByRepoIdAndName(repoId, imageName)
+                .flatMap(
+                    image ->
+                        this.manifestRepository.findByImageIdAndAnyDigest(
+                            image.getId(), DockerDigestCalculator.normalize(reference)))
             : this.tagRepository
                 .findByImageRepoIdAndImageNameAndName(repoId, imageName, reference)
-                .map(Tag::getName);
+                .map(Tag::getManifest);
 
-    return name.orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
+    return manifest
+        .map(found -> this.fileNamesOf(repoId, imageName, found))
+        .orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
   }
 
-  private Optional<String> findTagNameByDigest(
-      final UUID repoId, final String imageName, final String digest) {
+  /**
+   * The manifests a tag shows in the panel: the manifest it points at, named after the tag, and,
+   * for an index, the manifests the index references, named after their digests.
+   */
+  public Page<ManifestListItem> findManifestsByTagContainsName(
+      final Tag tag, final String name, final Pageable pageable) {
 
-    return this.tagRepository
-        .findDistinctFirstByImageRepoIdAndImageNameAndDigestOrderByCreatedAtDesc(
-            repoId, imageName, digest)
-        .map(Tag::getName);
-  }
+    final var root = tag.getManifest();
+    final var rows = new ArrayList<ManifestRow>();
+    rows.add(this.toRow(root, tag.getName(), root.getPlatform()));
 
-  private Optional<String> findManifestNameByDigest(
-      final UUID repoId, final String imageName, final String digest) {
+    for (final var edge : this.manifestChildRepository.findAllByParentId(root.getId())) {
+      rows.add(this.toRow(edge.getChild(), edge.getChild().getDigest(), edge.getPlatform()));
+    }
 
-    return this.imageRepository
-        .findByRepoIdAndName(repoId, imageName)
-        .flatMap(
-            image ->
-                this.manifestRepository
-                    .findByRepoIdAndImageIdAndDigestList(repoId, image.getId(), digest)
-                    .stream()
-                    .findFirst())
-        .map(Manifest::getName);
-  }
+    final var matching =
+        rows.stream()
+            .filter(row -> row.item().getName().contains(name))
+            .sorted(this.comparatorOf(pageable.getSort()))
+            .map(ManifestRow::item)
+            .toList();
 
-  public Page<io.repsy.os.generated.model.ManifestListItem> findManifestsByTagIdContainsName(
-      final UUID tagId, final String name, final Pageable pageable) {
-
-    return this.manifestRepository
-        .findByTagIdAndNameContainsName(tagId, name, pageable)
-        .map(this.manifestConverter::toManifestDto);
+    return this.pageOf(matching, pageable);
   }
 
   public Tag findTag(final UUID repoId, final UUID imageId, final String tagName) {
@@ -302,252 +250,144 @@ public class ManifestTxService implements ManifestService<UUID> {
     return this.manifestConverter.toTagDetail(this.findTag(repoId, imageId, tagName));
   }
 
-  private void createManifest(
-      final UUID repoId,
-      final ImageInfo imageInfo,
-      final TagForm tagForm,
-      final Set<Layer> layers,
-      final Layer configLayer) {
+  private List<String> fileNamesOf(
+      final UUID repoId, final String imageName, final Manifest manifest) {
 
-    final var image = this.findImageById(imageInfo.getId());
-    final var tag = this.findOrCreateTag(repoId, image, tagForm, 1);
+    final var names = new ArrayList<String>();
 
-    final var tagPlatform =
-        this.findOrCreateTagPlatform(repoId, imageInfo.getId(), tag, tag.getPlatform(), 1);
-
-    final var manifest =
-        this.findOrCreateManifest(repoId, imageInfo.getId(), tag.getId(), tagForm, 1);
-
-    this.updateManifestProperties(manifest, layers, configLayer, tagForm, tagPlatform);
-  }
-
-  private void createManifestsAndTagPlatforms(
-      final UUID repoId,
-      final UUID imageId,
-      final Tag tag,
-      final List<ManifestListManifestInfo> manifestInfo) {
-
-    for (final var newManifest : manifestInfo) {
-      this.findOrCreateManifestForMultiplatformRetry(repoId, imageId, tag, newManifest, 1);
+    if (manifest.getStorageName() != null) {
+      names.add(ManifestNameGenerator.generate(repoId, imageName, manifest.getStorageName()));
     }
+
+    names.add(manifest.getDigest());
+
+    return names;
   }
 
-  @SneakyThrows
-  private void findOrCreateManifestForMultiplatformRetry(
-      final UUID repoId,
-      final UUID imageId,
-      final Tag tag,
-      final ManifestListManifestInfo newManifest,
-      final int counter) {
+  private ManifestRow toRow(final Manifest manifest, final String name, final String platform) {
 
-    try {
-      this.findOrCreateManifestForMultiPlatform(repoId, imageId, tag, newManifest);
-    } catch (final DataIntegrityViolationException e) {
-      if (counter == RETRY_COUNT) {
-        throw e;
-      }
+    final var item =
+        new ManifestListItem()
+            .name(name)
+            .digest(manifest.getDigest())
+            .createdAt(manifest.getCreatedAt())
+            .platform(platform)
+            .configDigest(manifest.getConfigDigest());
 
-      Thread.sleep(WAIT_RETRY * counter);
-      this.findOrCreateManifestForMultiplatformRetry(
-          repoId, imageId, tag, newManifest, counter + 1);
+    return new ManifestRow(manifest.getId(), item);
+  }
+
+  private Comparator<ManifestRow> comparatorOf(final Sort sort) {
+
+    return sort.stream().map(this::comparatorOf).reduce(Comparator::thenComparing).orElse(BY_ID);
+  }
+
+  private Comparator<ManifestRow> comparatorOf(final Sort.Order order) {
+
+    final var comparator = SORTS.get(order.getProperty());
+
+    if (comparator == null) {
+      throw new IllegalArgumentException("Unsupported sort property " + order.getProperty());
     }
+
+    return order.isAscending() ? comparator : comparator.reversed();
   }
 
-  private void findOrCreateManifestForMultiPlatform(
-      final UUID repoId,
-      final UUID imageId,
-      final Tag tag,
-      final ManifestListManifestInfo newManifest) {
+  private <T> Page<T> pageOf(final List<T> all, final Pageable pageable) {
 
-    final var manifestOpt =
-        this.manifestRepository.findByRepoIdAndImageIdAndTagIdAndDigest(
-            repoId, imageId, tag.getId(), newManifest.getDigest());
+    if (pageable.isUnpaged()) {
+      return new PageImpl<>(all, pageable, all.size());
+    }
 
-    if (manifestOpt.isPresent()) {
+    final var from = (int) Math.min(pageable.getOffset(), all.size());
+    final var to = Math.min(from + pageable.getPageSize(), all.size());
+
+    return new PageImpl<>(all.subList(from, to), pageable, all.size());
+  }
+
+  private Manifest findManifest(final UUID imageId, final String digest) {
+
+    return this.manifestRepository
+        .findByImageIdAndAnyDigest(imageId, DockerDigestCalculator.normalize(digest))
+        .orElseThrow(() -> new ItemNotFoundException("manifestNotFound"));
+  }
+
+  /**
+   * Makes the index reference exactly the manifests it lists now. The manifests themselves are
+   * never touched: the ones an earlier push of the tag referenced and this one does not stay
+   * stored, untagged.
+   */
+  private void replaceChildren(
+      final Manifest parent, final Image image, final List<ManifestListManifest> entries) {
+
+    final var wanted = new LinkedHashMap<UUID, ManifestChild>();
+
+    for (final var entry : entries) {
+      final var child = this.findManifest(image.getId(), entry.getDigest());
+
+      wanted.putIfAbsent(child.getId(), new ManifestChild(parent, child, platformOf(entry)));
+    }
+
+    final var existing = this.manifestChildRepository.findAllByParentId(parent.getId());
+
+    this.manifestChildRepository.deleteAll(
+        existing.stream().filter(edge -> !wanted.containsKey(edge.getChild().getId())).toList());
+
+    final var kept =
+        existing.stream().map(edge -> edge.getChild().getId()).collect(Collectors.toSet());
+
+    wanted.entrySet().stream()
+        .filter(entry -> !kept.contains(entry.getKey()))
+        .forEach(entry -> this.manifestChildRepository.save(entry.getValue()));
+  }
+
+  /**
+   * An index entry without a platform is legitimate (RPS-1117: an index grouping an artifact and
+   * its referrers, not per-platform images).
+   */
+  private static String platformOf(final ManifestListManifest entry) {
+
+    return entry.getPlatform() != null
+        ? entry.getPlatform().toString()
+        : DockerConstants.UNKNOWN_PLATFORM;
+  }
+
+  /**
+   * Creates the tag, or moves it to the manifest. Only the pointer moves: the manifest the tag
+   * pointed at before is left as it is.
+   */
+  private void pointTag(final Image image, final TagForm tagForm, final Manifest manifest) {
+
+    if (!tagForm.isTagReference()) {
       return;
     }
 
-    this.createManifestForMultiPlatform(repoId, imageId, tag, newManifest);
+    final var tag =
+        this.tagRepository
+            .findByImageIdAndName(image.getId(), tagForm.getTag())
+            .orElseGet(() -> this.newTag(image, tagForm));
+
+    tag.setManifest(manifest);
+    tag.setDigest(manifest.getDigest());
+    tag.setMediaType(tagForm.getCalculatedMediaType());
+    tag.setPlatform(tagForm.getPlatform());
+
+    this.tagRepository.save(tag);
   }
 
-  private void createManifestForMultiPlatform(
-      final UUID repoId,
-      final UUID imageId,
-      final Tag tag,
-      final ManifestListManifestInfo newManifest) {
-
-    final var tp = this.findOrCreateTagPlatform(repoId, imageId, tag, newManifest.getPlatform(), 1);
-
-    final var manifest = new Manifest();
-
-    final var layers =
-        this.layerRepository.findAllByRepoIdAndDigestIn(repoId, newManifest.getLayerDigests());
-
-    final var configLayer =
-        this.layerRepository
-            .findByRepoIdAndDigest(repoId, newManifest.getConfigDigest())
-            .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
-
-    manifest.setDigest(newManifest.getDigest());
-    manifest.setName(newManifest.getDigest());
-    manifest.setMediaType(newManifest.getMediaType());
-    manifest.setConfigMediaType(newManifest.getConfig().getMediaType());
-    manifest.setConfigDigest(newManifest.getConfigDigest());
-    manifest.setSchemaVersion(Math.toIntExact(newManifest.getSchemaVersion()));
-    manifest.setLayers(layers);
-    manifest.setPlatform(newManifest.getPlatform());
-    manifest.setConfigSize(configLayer.getSize());
-    manifest.setTagPlatform(tp);
-
-    this.manifestRepository.save(manifest);
-  }
-
-  @SneakyThrows
-  private Tag findOrCreateTag(
-      final UUID repoId, final Image image, final TagForm tagForm, final int counter) {
-
-    try {
-      return this.findOrCreateTag(repoId, image, tagForm);
-    } catch (final DataIntegrityViolationException e) {
-      if (counter == RETRY_COUNT) {
-        throw e;
-      }
-
-      Thread.sleep(WAIT_RETRY * counter);
-      return this.findOrCreateTag(repoId, image, tagForm, counter + 1);
-    }
-  }
-
-  @SneakyThrows
-  private TagPlatform findOrCreateTagPlatform(
-      final UUID repoId,
-      final UUID imageId,
-      final Tag tag,
-      final String platform,
-      final int counter) {
-
-    try {
-      return this.findOrCreateTagPlatform(repoId, imageId, tag, platform);
-    } catch (final DataIntegrityViolationException e) {
-      if (counter == RETRY_COUNT) {
-        throw e;
-      }
-
-      Thread.sleep(WAIT_RETRY * counter);
-      return this.findOrCreateTagPlatform(repoId, imageId, tag, platform, counter + 1);
-    }
-  }
-
-  @SneakyThrows
-  private Manifest findOrCreateManifest(
-      final UUID repoId,
-      final UUID imageId,
-      final UUID tagId,
-      final TagForm form,
-      final int counter) {
-
-    try {
-      return this.findOrCreateManifest(repoId, imageId, tagId, form);
-    } catch (final DataIntegrityViolationException e) {
-      if (counter == RETRY_COUNT) {
-        throw e;
-      }
-
-      Thread.sleep(WAIT_RETRY * counter);
-      return this.findOrCreateManifest(repoId, imageId, tagId, form, counter + 1);
-    }
-  }
-
-  private Tag findOrCreateTag(final UUID repoId, final Image image, final TagForm tagForm) {
-
-    final var tagOpt =
-        this.tagRepository.findByImageRepoIdAndImageIdAndName(
-            repoId, image.getId(), tagForm.getTag());
-
-    if (tagOpt.isEmpty()) {
-      return this.createTag(tagForm, image);
-    }
-
-    final var existingTag = tagOpt.get();
-    existingTag.setDigest(tagForm.getManifestDigest());
-    existingTag.setMediaType(tagForm.getCalculatedMediaType());
-    existingTag.setPlatform(tagForm.getPlatform());
-
-    return this.tagRepository.save(existingTag);
-  }
-
-  private Tag createTag(final TagForm tagForm, final Image image) {
+  private Tag newTag(final Image image, final TagForm tagForm) {
 
     final var tag = new Tag();
     tag.setName(tagForm.getTag());
-    tag.setPlatform(tagForm.getPlatform());
     tag.setImage(image);
-    tag.setDigest(tagForm.getManifestDigest());
-    tag.setMediaType(tagForm.getCalculatedMediaType());
 
-    return this.tagRepository.save(tag);
-  }
-
-  private TagPlatform findOrCreateTagPlatform(
-      final UUID repoId, final UUID imageId, final Tag tag, final String platform) {
-
-    final var tagPlatformOpt =
-        this.tagPlatformRepository.findByTagImageRepoIdAndTagImageIdAndTagIdAndPlatform(
-            repoId, imageId, tag.getId(), platform);
-
-    return tagPlatformOpt.orElseGet(() -> this.createTagPlatform(tag, platform));
-  }
-
-  private TagPlatform createTagPlatform(final Tag tag, final String platform) {
-
-    final var tagPlatform = new TagPlatform();
-    tagPlatform.setTag(tag);
-    tagPlatform.setPlatform(platform);
-
-    return this.tagPlatformRepository.save(tagPlatform);
-  }
-
-  private Manifest findOrCreateManifest(
-      final UUID repoId, final UUID imageId, final UUID tagId, final TagForm form) {
-
-    final var manifestOpt =
-        this.manifestRepository.findByRepoIdAndImageIdAndTagId(repoId, imageId, tagId);
-
-    if (manifestOpt.isPresent()) {
-      return manifestOpt.get();
-    }
-
-    final var manifestOptByDigest =
-        this.manifestRepository.findByRepoIdAndImageIdAndDigestList(
-            repoId, imageId, form.getManifestDigest());
-
-    if (!manifestOptByDigest.isEmpty()) {
-      return manifestOptByDigest.getFirst();
-    }
-
-    return this.createManifestByTagForm(form);
+    return tag;
   }
 
   private TagDetail mapToTagDetailWithConfigDigest(final Tag tag) {
 
-    String configDigest = null;
-
-    if (!MediaTypes.isIndex(tag.getMediaType())) {
-      // Single platform manifest. Must have only one platform and one manifest
-      final var platformIterator = tag.getTagPlatforms().iterator();
-
-      if (platformIterator.hasNext()) {
-        final var tagPlatform = platformIterator.next();
-
-        final var manifestIterator = tagPlatform.getManifests().iterator();
-
-        if (manifestIterator.hasNext()) {
-          final var manifest = manifestIterator.next();
-
-          configDigest = manifest.getConfigDigest();
-        }
-      }
-    }
+    final var configDigest =
+        MediaTypes.isIndex(tag.getMediaType()) ? null : tag.getManifest().getConfigDigest();
 
     return TagDetail.of(tag, configDigest);
   }
@@ -575,80 +415,70 @@ public class ManifestTxService implements ManifestService<UUID> {
         .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
   }
 
-  private Manifest createManifestByTagForm(final TagForm form) {
+  private Manifest findOrCreateManifest(
+      final Image image, final TagForm form, final Set<Layer> layers, final Layer configLayer) {
+
+    return this.manifestRepository
+        .findByImageIdAndDigest(image.getId(), form.getManifestDigest())
+        .map(existing -> this.completeDigests(existing, form))
+        .orElseGet(() -> this.createManifest(image, form, layers, configLayer));
+  }
+
+  private Manifest createManifest(
+      final Image image, final TagForm form, final Set<Layer> layers, final Layer configLayer) {
 
     final var manifestInfo = form.getManifestInfo();
+    final var allLayers = new HashSet<>(layers);
+    allLayers.add(configLayer);
 
-    final var manifest = new Manifest();
-
-    manifest.setDigest(form.getManifestDigest());
-    manifest.setName(form.getTag());
+    final var manifest = this.newManifest(image, form);
     manifest.setMediaType(manifestInfo.getMediaType());
     manifest.setConfigMediaType(manifestInfo.getConfig().getMediaType());
     manifest.setConfigDigest(manifestInfo.getConfig().getDigest());
+    manifest.setConfigSize(configLayer.getSize());
     manifest.setSchemaVersion(Math.toIntExact(manifestInfo.getSchemaVersion()));
-    manifest.setLayers(new HashSet<>());
+    manifest.setLayers(allLayers);
     manifest.setPlatform(form.getPlatform());
 
     return this.manifestRepository.save(manifest);
   }
 
-  private void createManifestList(
-      final UUID repoId,
-      final UUID imageId,
-      final TagForm tagForm,
-      final TagPlatform manifestListTagPlatform) {
+  private Manifest findOrCreateIndex(final Image image, final TagForm form) {
 
-    final var manifestListOpt =
-        this.manifestRepository.findByRepoIdAndImageIdAndTagIdAndPlatform(
-            repoId, imageId, tagForm.getTag(), MULTIPLATFORM);
+    return this.manifestRepository
+        .findByImageIdAndDigest(image.getId(), form.getManifestDigest())
+        .map(existing -> this.completeDigests(existing, form))
+        .orElseGet(() -> this.createIndex(image, form));
+  }
 
-    if (manifestListOpt.isPresent()) {
-      this.manifestRepository.delete(manifestListOpt.get());
-      this.manifestRepository.flush();
+  private Manifest createIndex(final Image image, final TagForm form) {
+
+    final var manifest = this.newManifest(image, form);
+    manifest.setMediaType(form.getManifestList().getMediaType());
+    manifest.setSchemaVersion(form.getManifestList().getSchemaVersion());
+    manifest.setLayers(new HashSet<>());
+    manifest.setPlatform(MULTIPLATFORM);
+
+    return this.manifestRepository.save(manifest);
+  }
+
+  private Manifest newManifest(final Image image, final TagForm form) {
+
+    final var manifest = new Manifest();
+    manifest.setImage(image);
+    manifest.setDigest(form.getManifestDigest());
+    manifest.setDigestSha512(form.getManifestDigestSha512());
+
+    return manifest;
+  }
+
+  /** A row written before RPS-1216 has no {@code sha512} digest; the push brings the bytes. */
+  private Manifest completeDigests(final Manifest manifest, final TagForm form) {
+
+    if (manifest.getDigestSha512() == null) {
+      manifest.setDigestSha512(form.getManifestDigestSha512());
     }
 
-    this.createManifestListByTagForm(tagForm, manifestListTagPlatform);
-  }
-
-  private void createManifestListByTagForm(
-      final TagForm tagForm, final TagPlatform manifestListTagPlatform) {
-
-    final var manifestList = new Manifest();
-
-    manifestList.setName(tagForm.getTag());
-    manifestList.setLayers(new HashSet<>());
-    manifestList.setPlatform(tagForm.getPlatform());
-    manifestList.setDigest(tagForm.getManifestDigest());
-    manifestList.setMediaType(tagForm.getManifestList().getMediaType());
-    manifestList.setSchemaVersion(tagForm.getManifestList().getSchemaVersion());
-    manifestList.setLastUpdatedAt(Instant.now());
-    manifestList.setTagPlatform(manifestListTagPlatform);
-
-    this.manifestRepository.save(manifestList);
-  }
-
-  private void updateManifestProperties(
-      final Manifest manifest,
-      final Set<Layer> layers,
-      final Layer configLayer,
-      final TagForm tagForm,
-      final TagPlatform tagPlatform) {
-
-    final var allLayers = new HashSet<>(layers);
-    allLayers.add(configLayer);
-
-    manifest.getLayers().clear();
-    manifest.getLayers().addAll(allLayers);
-    manifest.setLastUpdatedAt(Instant.now());
-    manifest.setDigest(tagForm.getManifestDigest());
-    manifest.setMediaType(tagForm.getManifestInfo().getMediaType());
-    manifest.setPlatform(tagForm.getPlatform());
-    manifest.setConfigSize(configLayer.getSize());
-    manifest.setConfigDigest(tagForm.getManifestInfo().getConfig().getDigest());
-    manifest.setConfigMediaType(tagForm.getManifestInfo().getConfig().getMediaType());
-    manifest.setTagPlatform(tagPlatform);
-
-    this.manifestRepository.save(manifest);
+    return manifest;
   }
 }

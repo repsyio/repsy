@@ -412,10 +412,9 @@ class DockerManifestPushIT extends AbstractIntegrationTest {
     final var image = this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE).orElseThrow();
     final var manifestDigest = sha256(manifest.getBytes(StandardCharsets.UTF_8));
     final var stored =
-        this.manifestRepository.findByRepoIdAndImageIdAndDigestList(
-            repo.getId(), image.getId(), manifestDigest);
-    assertThat(stored).isNotEmpty();
-    assertThat(stored.getFirst().getPlatform()).isEqualTo(DockerConstants.UNKNOWN_PLATFORM);
+        this.manifestRepository.findByImageIdAndDigest(image.getId(), manifestDigest);
+    assertThat(stored).isPresent();
+    assertThat(stored.get().getPlatform()).isEqualTo(DockerConstants.UNKNOWN_PLATFORM);
   }
 
   @Test

@@ -20,7 +20,8 @@ import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageReposi
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.os.server.security.shared.ArtifactStorageResolver;
-import io.repsy.protocols.docker.shared.utils.DockerConstants;
+import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -53,7 +54,7 @@ public class DockerArtifactStorageResolver implements ArtifactStorageResolver {
       final @NonNull String artifactVersion) {
 
     final var exists =
-        artifactVersion.startsWith(DockerConstants.SHA256_PREFIX)
+        BlobDigests.startsWithDigestPrefix(artifactVersion)
             ? this.digestExists(repoId, artifactName, artifactVersion)
             : this.tagRepository
                 .findByImageRepoIdAndImageNameAndName(repoId, artifactName, artifactVersion)
@@ -67,20 +68,15 @@ public class DockerArtifactStorageResolver implements ArtifactStorageResolver {
 
     return this.imageRepository
         .findByRepoIdAndName(repoId, imageName)
-        .map(image -> this.imageHasDigest(repoId, image, digest))
+        .map(image -> this.imageHasDigest(image, digest))
         .orElse(false);
   }
 
-  private boolean imageHasDigest(
-      final @NonNull UUID repoId, final @NonNull Image image, final @NonNull String digest) {
+  private boolean imageHasDigest(final @NonNull Image image, final @NonNull String digest) {
 
-    return this.tagRepository
-            .findDistinctFirstByImageRepoIdAndImageNameAndDigestOrderByCreatedAtDesc(
-                repoId, image.getName(), digest)
-            .isPresent()
-        || !this.manifestRepository
-            .findByRepoIdAndImageIdAndDigestList(repoId, image.getId(), digest)
-            .isEmpty();
+    return this.manifestRepository
+        .findByImageIdAndAnyDigest(image.getId(), DockerDigestCalculator.normalize(digest))
+        .isPresent();
   }
 
   @Override
