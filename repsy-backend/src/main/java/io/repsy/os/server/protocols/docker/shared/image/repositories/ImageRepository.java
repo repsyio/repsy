@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -66,5 +67,6 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
         where i.id = :imageId
           and i.repo.id = :repoId
       """)
-  void updateImageSizeAndDigest(UUID repoId, UUID imageId, String digest, long size, Instant now);
+  void updateImageSizeAndDigest(
+      UUID repoId, UUID imageId, @Nullable String digest, long size, Instant now);
 }

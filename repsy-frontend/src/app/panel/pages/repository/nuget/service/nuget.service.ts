@@ -117,11 +117,9 @@ export class NugetService {
     pageSize: number,
   ): Promise<PagedData<NuGetPackageListItem>> {
     const response = await firstValueFrom(
-      this.nugetPackageControllerService.searchNugetPackages(
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        query || undefined,
-      ),
+      this.nugetPackageControllerService.searchNugetPackages(this.repoName, query || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ]),
     );
     return this.toPagedData(response.data);
   }
@@ -141,9 +139,11 @@ export class NugetService {
     const response = await firstValueFrom(
       this.nugetPackageControllerService.listNugetVersions(
         packageId,
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
         this.repoName,
         query || undefined,
+        pageIndex,
+        pageSize,
+        [`${sortOption.column},${sortOption.type}`],
       ),
     );
     return this.toPagedData(response.data);
@@ -172,7 +172,7 @@ export class NugetService {
 
   public async getDeployTokens(pageNumber: number, pageSize: number): Promise<PagedData<DeployTokenInfoListItem>> {
     const response = await firstValueFrom(
-      this.protocolDeployTokenControllerService.listDeployTokens({ page: pageNumber, size: pageSize }, this.repoName),
+      this.protocolDeployTokenControllerService.listDeployTokens(this.repoName, pageNumber, pageSize),
     );
     return this.toPagedData(response.data);
   }

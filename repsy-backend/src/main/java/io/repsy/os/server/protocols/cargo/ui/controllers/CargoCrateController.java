@@ -37,6 +37,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -80,8 +81,8 @@ public class CargoCrateController {
   @RepoOperation
   public RestResponse<PagedModel<CrateListItem>> search(
       final RepoInfo repoInfo,
-      @RequestParam(defaultValue = "") final String query,
-      final Pageable pageable) {
+      @RequestParam(name = "q", defaultValue = "") final String query,
+      @PageableDefault final Pageable pageable) {
 
     final var crates =
         this.cargoApiFacade.search(
@@ -117,8 +118,8 @@ public class CargoCrateController {
   public RestResponse<PagedModel<CrateVersionListItem>> listVersions(
       final RepoInfo repoInfo,
       @PathVariable final String crateName,
-      @RequestParam(defaultValue = "") final String query,
-      final Pageable pageable) {
+      @RequestParam(name = "q", defaultValue = "") final String query,
+      @PageableDefault final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 

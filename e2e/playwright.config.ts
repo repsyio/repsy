@@ -94,6 +94,13 @@ export default defineConfig({
       testMatch: 'ruby/**/*.spec.ts',
     },
     {
+      // Cases that `docker exec` into the Repsy container itself (the password reset marker file in
+      // the image, README.md "Stack runner"). Runs in the "stack" runner, the only one with the
+      // host's Docker socket; specs under tests/stack/ skip themselves on a remote target.
+      name: 'stack',
+      testMatch: 'stack/**/*.spec.ts',
+    },
+    {
       // The panel UI, driven in headless Chromium (README.md "UI suite"). Runs in the "ui" runner,
       // which is the only one with a browser installed; specs live under tests/ui/.
       name: 'ui',

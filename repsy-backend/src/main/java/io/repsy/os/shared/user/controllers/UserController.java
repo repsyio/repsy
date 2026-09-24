@@ -27,15 +27,15 @@ import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.user.services.ReservedUsernameService;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
-import io.repsy.os.shared.utils.PagingOffsetValidator;
+import io.repsy.os.shared.utils.SortValidator;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -54,7 +54,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 final class UserController {
 
-  private static final int MAX_PAGE_SIZE = 100;
+  private static final Set<String> USER_SORT_PROPERTIES = Set.of("createdAt", "username");
 
   private final @NonNull PanelAuthHelper panelAuthHelper;
   private final @NonNull UserTxService userTxService;
@@ -64,14 +64,14 @@ final class UserController {
   @GetMapping
   public @NonNull RestResponse<PagedModel<UserResponse>> list(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @RequestParam(required = false, defaultValue = "") final @NonNull String search,
-      @RequestParam(defaultValue = "0") @Min(0) final int page,
-      @RequestParam(defaultValue = "10") @Min(1) @Max(MAX_PAGE_SIZE) final int size) {
+      @RequestParam(name = "q", required = false, defaultValue = "") final @NonNull String search,
+      @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
+          final @NonNull Pageable pageable) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
-    PagingOffsetValidator.requireNoOffsetOverflow(page, size);
-    final var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+    SortValidator.requireSortableBy(pageable, USER_SORT_PROPERTIES);
+
     final var usersPage = this.userTxService.getAllUsers(search, pageable);
 
     return this.resp.success("usersFetched", new PagedModel<>(usersPage));

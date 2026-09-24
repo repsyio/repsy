@@ -104,11 +104,11 @@ public class PypiPackageController {
     return this.restResponseFactory.success("packagesFetched", new PagedModel<>(packageList));
   }
 
-  @GetMapping(value = "/{repoName}", params = "name")
+  @GetMapping(value = "/{repoName}", params = "q")
   @RepoOperation
   public RestResponse<PagedModel<PypiPackageListItem>> listLikeName(
       final RepoInfo repoInfo,
-      @RequestParam(required = false, defaultValue = "") final String name,
+      @RequestParam(name = "q", required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, PACKAGE_SORT_PROPERTIES);
@@ -134,12 +134,12 @@ public class PypiPackageController {
     return this.restResponseFactory.success("releasesFetched", new PagedModel<>(releases));
   }
 
-  @GetMapping(value = "/{repoName}/{packageName}/releases", params = "version")
+  @GetMapping(value = "/{repoName}/{packageName}/releases", params = "q")
   @RepoOperation
   public RestResponse<PagedModel<ReleaseListItem>> listReleasesLikeVersion(
       final RepoInfo repoInfo,
       @PathVariable final String packageName,
-      @RequestParam(required = false, defaultValue = "") final String version,
+      @RequestParam(name = "q", required = false, defaultValue = "") final String version,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, RELEASE_SORT_PROPERTIES);

@@ -151,13 +151,13 @@ public class MavenArtifactController {
         "artifactVersionsFetched", new PagedModel<>(artifactVersions));
   }
 
-  @GetMapping(value = "/{repoName}/{groupName}/{artifactName}/versions", params = "version")
+  @GetMapping(value = "/{repoName}/{groupName}/{artifactName}/versions", params = "q")
   @RepoOperation
   public RestResponse<PagedModel<ArtifactVersionListItem>> listVersionsLikeVersion(
       final RepoInfo repoInfo,
       @PathVariable final String groupName,
       @PathVariable final String artifactName,
-      @RequestParam(required = false, defaultValue = "") final String version,
+      @RequestParam(name = "q", required = false, defaultValue = "") final String version,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
@@ -174,7 +174,7 @@ public class MavenArtifactController {
   @RepoOperation
   public RestResponse<PagedModel<ArtifactListItem>> listContainsGroupName(
       final RepoInfo repoInfo,
-      @RequestParam(required = false, defaultValue = "") final String groupName,
+      @RequestParam(name = "q", required = false, defaultValue = "") final String groupName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, ARTIFACT_SORT_PROPERTIES);
@@ -191,7 +191,7 @@ public class MavenArtifactController {
   public RestResponse<PagedModel<ArtifactListItem>> listContainsArtifactName(
       final RepoInfo repoInfo,
       @PathVariable final String groupName,
-      @RequestParam(required = false, defaultValue = "") final String artifactName,
+      @RequestParam(name = "q", required = false, defaultValue = "") final String artifactName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, ARTIFACT_SORT_PROPERTIES);

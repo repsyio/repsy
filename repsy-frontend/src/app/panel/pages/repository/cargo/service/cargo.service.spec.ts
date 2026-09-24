@@ -21,9 +21,9 @@ import {
   describeCalls,
   describePagedCalls,
   describeRepoSelection,
+  PAGE_ARGS,
   PAGE_INDEX,
   PAGE_SIZE,
-  PAGEABLE,
   PagedCase,
   REPO,
   restResponse,
@@ -76,13 +76,13 @@ describe('CargoService', () => {
         name: 'searchCrates',
         invoke: (s, search) => s.searchCrates(search, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => cargoApi.searchCargoCrates,
-        args: (search) => [PAGEABLE, REPO, search],
+        args: (search) => [REPO, search, ...PAGE_ARGS],
       },
       {
         name: 'fetchCrateVersions',
         invoke: (s, search) => s.fetchCrateVersions(CRATE, search, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => cargoApi.listCargoCrateVersions,
-        args: (search) => [CRATE, PAGEABLE, REPO, search],
+        args: (search) => [CRATE, REPO, search, ...PAGE_ARGS],
       },
     ];
     describePagedCalls(() => service, paged);

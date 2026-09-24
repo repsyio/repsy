@@ -57,6 +57,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -184,7 +185,7 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       NpmPackageApiControllerIT.this
           .perform(
               get("/api/npm/scopes/{repo}/{scope}/packages", repoName, "tools")
-                  .param("name", "scoped"))
+                  .param("q", "scoped"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content", hasSize(1)))
           .andExpect(jsonPath("$.data.content[0].scope").value("tools"));
@@ -228,7 +229,7 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       NpmPackageApiControllerIT.this
           .perform(
               get("/api/npm/scopes/{repo}/{scope}/packages", repoName, "tools")
-                  .param("name", "@tools/scoped-package"))
+                  .param("q", "@tools/scoped-package"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content", hasSize(1)));
       NpmPackageApiControllerIT.this
@@ -302,7 +303,7 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
           .andExpect(jsonPath("$.data.content[0].scope").value("scope"))
           .andExpect(jsonPath("$.data.content[0].name").value("foo"));
       NpmPackageApiControllerIT.this
-          .perform(get("/api/npm/scopes/{repo}/packages", repoName).param("name", "scope"))
+          .perform(get("/api/npm/scopes/{repo}/packages", repoName).param("q", "scope"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content", hasSize(1)))
           .andExpect(jsonPath("$.data.content[0].name").value("scope"))
@@ -402,7 +403,7 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       NpmPackageApiControllerIT.this
           .perform(
               get("/api/npm/packages/{repo}/package/{package}/versions", repoName, "plain-package")
-                  .param("version", "2.0"))
+                  .param("q", "2.0"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.msgId").value("packageVersionsFetched"))
           .andExpect(jsonPath("$.data.content", hasSize(1)))
@@ -762,6 +763,21 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       this.list(VERSIONS, "sort", "version,desc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].version").value("2.0.0-next.1"));
+    }
+
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource({
+      UNSCOPED + ",name",
+      SCOPED + ",name",
+      VERSIONS + ",version",
+      SCOPED_VERSIONS + ",version"
+    })
+    @DisplayName("filters by q only: the old name of the filter is an unknown parameter")
+    void filtersByQOnly(final String path, final String oldName) throws Exception {
+      PagingAssertions.expectFilterIsQ(
+          this.list(path, "page", "0"),
+          this.list(path, oldName, PagingAssertions.NO_MATCH),
+          this.list(path, "q", PagingAssertions.NO_MATCH));
     }
 
     @ParameterizedTest(name = "{0}")

@@ -342,7 +342,7 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var body =
           expectSuccess(
               UserControllerIT.this.perform(
-                  get("/api/users").header(AUTHORIZATION, token).param("search", tag)),
+                  get("/api/users").header(AUTHORIZATION, token).param("q", tag)),
               "usersFetched");
 
       final Map<String, Object> data = JsonPath.read(body, "$.data");
@@ -407,9 +407,7 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var byTag =
           expectSuccess(
               UserControllerIT.this.perform(
-                  get("/api/users")
-                      .header(AUTHORIZATION, token)
-                      .param("search", tag.toUpperCase())),
+                  get("/api/users").header(AUTHORIZATION, token).param("q", tag.toUpperCase())),
               "usersFetched");
       assertThat(usernames(byTag)).containsExactly(tag + "-beta", tag + "-Alpha");
 
@@ -418,7 +416,7 @@ class UserControllerIT extends AbstractIntegrationTest {
               UserControllerIT.this.perform(
                   get("/api/users")
                       .header(AUTHORIZATION, token)
-                      .param("search", (tag + "-ALPHA").toLowerCase())),
+                      .param("q", (tag + "-ALPHA").toLowerCase())),
               "usersFetched");
       assertThat(usernames(byFullName)).containsExactly(tag + "-Alpha");
     }
@@ -433,7 +431,7 @@ class UserControllerIT extends AbstractIntegrationTest {
               UserControllerIT.this.perform(
                   get("/api/users")
                       .header(AUTHORIZATION, token)
-                      .param("search", "nomatch" + randomTag())),
+                      .param("q", "nomatch" + randomTag())),
               "usersFetched");
 
       final Map<String, Object> data = JsonPath.read(body, "$.data");
@@ -472,7 +470,7 @@ class UserControllerIT extends AbstractIntegrationTest {
                 UserControllerIT.this.perform(
                     get("/api/users")
                         .header(AUTHORIZATION, token)
-                        .param("search", tag)
+                        .param("q", tag)
                         .param("page", String.valueOf(entry.getKey()))
                         .param("size", "2")),
                 "usersFetched");
@@ -519,6 +517,90 @@ class UserControllerIT extends AbstractIntegrationTest {
           "validationError",
           param,
           VALIDATION_TEXT);
+    }
+
+    @Test
+    @DisplayName("sorts by createdAt and by username, in both directions")
+    void sortsByCreatedAtAndUsername() throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+      final var tag = randomTag();
+      // The oldest user has the name that sorts last, so the two orders differ.
+      UserControllerIT.this.createUserCreatedAt(tag + "-c", UserRole.USER, BASE_TIME);
+      UserControllerIT.this.createUserCreatedAt(
+          tag + "-a", UserRole.USER, BASE_TIME.plusSeconds(60));
+      UserControllerIT.this.createUserCreatedAt(
+          tag + "-b", UserRole.USER, BASE_TIME.plusSeconds(120));
+
+      final var expected =
+          Map.of(
+              "createdAt,asc", List.of(tag + "-c", tag + "-a", tag + "-b"),
+              "createdAt,desc", List.of(tag + "-b", tag + "-a", tag + "-c"),
+              "username,asc", List.of(tag + "-a", tag + "-b", tag + "-c"),
+              "username,desc", List.of(tag + "-c", tag + "-b", tag + "-a"));
+
+      for (final var entry : expected.entrySet()) {
+        final var body =
+            expectSuccess(
+                UserControllerIT.this.perform(
+                    get("/api/users")
+                        .header(AUTHORIZATION, token)
+                        .param("q", tag)
+                        .param("sort", entry.getKey())),
+                "usersFetched");
+
+        assertThat(usernames(body))
+            .as("sort=%s", entry.getKey())
+            .containsExactlyElementsOf(entry.getValue());
+      }
+    }
+
+    @Test
+    @DisplayName("returns 400 validationError naming sort for a property it cannot sort by")
+    void unknownSortIs400() throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+
+      for (final var property : List.of("bogus,asc", "role,asc", "hash,desc")) {
+        expectError(
+            UserControllerIT.this.perform(
+                get("/api/users").header(AUTHORIZATION, token).param("sort", property)),
+            HttpStatus.BAD_REQUEST,
+            "validationError",
+            "sort",
+            VALIDATION_TEXT);
+      }
+    }
+
+    @Test
+    @DisplayName("filters by q only: search, its old name, is an unknown parameter")
+    void oldSearchNameIsIgnored() throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+      final var tag = randomTag();
+      UserControllerIT.this.createUser(tag + "-one", UserRole.USER);
+      UserControllerIT.this.createUser(tag + "-two", UserRole.USER);
+      final var nobody = "nomatch" + randomTag();
+
+      final var ignored =
+          expectSuccess(
+              UserControllerIT.this.perform(
+                  get("/api/users")
+                      .header(AUTHORIZATION, token)
+                      .param("search", nobody)
+                      .param("size", "100")),
+              "usersFetched");
+      final var everyone =
+          expectSuccess(
+              UserControllerIT.this.perform(
+                  get("/api/users").header(AUTHORIZATION, token).param("size", "100")),
+              "usersFetched");
+      final var filtered =
+          expectSuccess(
+              UserControllerIT.this.perform(
+                  get("/api/users").header(AUTHORIZATION, token).param("q", nobody)),
+              "usersFetched");
+
+      assertThat(usernames(ignored)).containsExactlyInAnyOrderElementsOf(usernames(everyone));
+      assertThat(usernames(ignored)).contains(tag + "-one", tag + "-two");
+      assertThat(usernames(filtered)).isEmpty();
     }
 
     static Stream<Arguments> outOfRangePagingParams() {

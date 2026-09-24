@@ -25,9 +25,9 @@ import {
   describeCalls,
   describePagedCalls,
   describeRepoSelection,
+  PAGE_ARGS,
   PAGE_INDEX,
   PAGE_SIZE,
-  PAGEABLE,
   PagedCase,
   REPO,
   restResponse,
@@ -88,19 +88,19 @@ describe('MavenService', () => {
         name: 'searchGroups',
         invoke: (s, group) => s.searchGroups(group, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => mavenApi.listContainsGroupName,
-        args: (group) => [PAGEABLE, REPO, group],
+        args: (group) => [REPO, group, ...PAGE_ARGS],
       },
       {
         name: 'searchArtifacts',
         invoke: (s, artifact) => s.searchArtifacts(GROUP, artifact, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => mavenApi.listContainsArtifactName,
-        args: (artifact) => [GROUP, PAGEABLE, REPO, artifact],
+        args: (artifact) => [GROUP, REPO, artifact, ...PAGE_ARGS],
       },
       {
         name: 'searchArtifactVersions',
         invoke: (s, version) => s.searchArtifactVersions(GROUP, ARTIFACT, version, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => mavenApi.listMavenArtifactVersions,
-        args: (version) => [GROUP, ARTIFACT, PAGEABLE, REPO, version],
+        args: (version) => [GROUP, ARTIFACT, REPO, version, ...PAGE_ARGS],
       },
     ];
     describePagedCalls(() => service, paged);

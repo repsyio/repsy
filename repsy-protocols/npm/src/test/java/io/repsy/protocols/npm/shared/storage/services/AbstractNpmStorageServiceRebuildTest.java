@@ -28,6 +28,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -51,13 +55,17 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.FieldSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -66,6 +74,9 @@ import tools.jackson.databind.ObjectMapper;
  * RPS-1300: a package whose metadata file is gone from storage is rebuilt from its rows before a
  * change is made to it, served from them when read, and the file is taken away again when the
  * change fails, as it was not there before.
+ *
+ * <p>RPS-1310: a file that is there but corrupt is treated the same, with a warning, and so is the
+ * merge of a version being published.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractNpmStorageService rebuilds lost metadata (RPS-1300)")
@@ -77,7 +88,8 @@ class AbstractNpmStorageServiceRebuildTest {
   private static final String PACKAGE = "demo";
   private static final Path BASE_PATH = Path.of(PACKAGE);
   private static final String METADATA_FILE = "demo/package.json";
-  private static final String STORED = "{\"name\":\"demo\",\"versions\":{}}";
+  private static final String STORED =
+      "{\"name\":\"demo\",\"versions\":{},\"dist-tags\":{},\"time\":{}}";
 
   private static final NpmPackageSnapshot SNAPSHOT =
       new NpmPackageSnapshot(
@@ -544,6 +556,283 @@ class AbstractNpmStorageServiceRebuildTest {
 
     assertThat(metadata).containsEntry("name", "demo");
     assertThat(this.snapshotReads).hasValue(0);
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // A file that is there but corrupt (RPS-1310)
+  // -------------------------------------------------------------------------------------------
+
+  private static final List<String> CORRUPT_FILES =
+      List.of(
+          "{\"name\":\"demo\",\"versions\":{\"1.0.0\":",
+          "",
+          "not json at all",
+          "null",
+          "[]",
+          "{}",
+          "{\"name\":\"demo\",\"versions\":{},\"dist-tags\":{}}",
+          "{\"name\":\"demo\",\"versions\":[],\"dist-tags\":{},\"time\":{}}");
+
+  private Logger metadataLogger;
+  private ListAppender<ILoggingEvent> warnings;
+
+  @BeforeEach
+  void captureWarnings() {
+    this.metadataLogger = (Logger) LoggerFactory.getLogger(AbstractNpmStorageService.class);
+    this.warnings = new ListAppender<>();
+    this.warnings.start();
+    this.metadataLogger.addAppender(this.warnings);
+  }
+
+  @AfterEach
+  void releaseWarnings() {
+    this.metadataLogger.detachAppender(this.warnings);
+  }
+
+  private void metadataIs(final String content) {
+    when(this.storageStrategy.get(at(METADATA_FILE), anyString()))
+        .thenReturn(Optional.of(new ByteArrayResource(content.getBytes(StandardCharsets.UTF_8))));
+  }
+
+  private List<String> warningTexts() {
+    return this.warnings.list.stream()
+        .filter(event -> event.getLevel() == Level.WARN)
+        .map(ILoggingEvent::getFormattedMessage)
+        .toList();
+  }
+
+  @ParameterizedTest
+  @FieldSource("CORRUPT_FILES")
+  @DisplayName("reading serves the rows when the file is corrupt, and says so")
+  void readsTheRowsWhenTheFileIsCorrupt(final String corrupt) throws Exception {
+    this.metadataIs(corrupt);
+
+    final var metadata =
+        this.service.readMetadataOrRebuild(REPO_ID, REPO_NAME, BASE_PATH, this.rows);
+
+    assertThat(((Map<String, Object>) metadata.get("versions")).keySet())
+        .containsExactly("1.0.0", "2.0.0");
+    assertThat(this.snapshotReads).hasValue(1);
+    verify(this.storageStrategy, never()).write(any(), any(), any());
+    assertThat(this.warningTexts())
+        .singleElement()
+        .asString()
+        .contains("package.json", "demo", REPO_NAME);
+  }
+
+  @Test
+  @DisplayName("a file that is gone is no fault worth a warning")
+  void aMissingFileIsNotWarnedAbout() throws Exception {
+    this.metadataIsGone();
+
+    this.service.readMetadataOrRebuild(REPO_ID, REPO_NAME, BASE_PATH, this.rows);
+
+    assertThat(this.warningTexts()).isEmpty();
+  }
+
+  @ParameterizedTest
+  @FieldSource("CORRUPT_FILES")
+  @DisplayName("a change to a corrupt file rebuilds it from the rows first, over the corrupt one")
+  void rebuildsACorruptFileFirst(final String corrupt) throws Exception {
+    this.metadataIs(corrupt);
+    when(this.storageStrategy.write(eq(REPO_NAME), at(METADATA_FILE), any()))
+        .thenReturn(BaseUsages.ofDisk(500L));
+
+    final var growth =
+        this.service.changeMetadata(REPO_ID, REPO_NAME, BASE_PATH, this.rows, () -> -20L);
+
+    assertThat(growth).isEqualTo(480L);
+    assertThat(((Map<String, Object>) this.writtenMetadata().getFirst().get("versions")).keySet())
+        .containsExactly("1.0.0", "2.0.0");
+    assertThat(this.warningTexts()).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("a change that fails puts the corrupt bytes back, as the file was")
+  void aFailedChangeRestoresTheCorruptBytes() throws Exception {
+    final var corrupt = "{\"name\":\"demo\",\"versions\":{\"1.0.0\":";
+    this.metadataIs(corrupt);
+    when(this.storageStrategy.write(eq(REPO_NAME), at(METADATA_FILE), any()))
+        .thenReturn(BaseUsages.ofDisk(500L));
+    final var failure = new IllegalStateException("storage refused");
+    final var streams = ArgumentCaptor.forClass(InputStream.class);
+
+    assertThatThrownBy(
+            () ->
+                this.service.changeMetadata(
+                    REPO_ID,
+                    REPO_NAME,
+                    BASE_PATH,
+                    this.rows,
+                    () -> {
+                      throw failure;
+                    }))
+        .isSameAs(failure);
+
+    verify(this.storageStrategy, times(2))
+        .write(eq(REPO_NAME), at(METADATA_FILE), streams.capture());
+    assertThat(streams.getAllValues().getLast().readAllBytes())
+        .isEqualTo(corrupt.getBytes(StandardCharsets.UTF_8));
+    verify(this.storageStrategy, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName("the packument read serves the rows of a package whose file is corrupt")
+  void packumentReadServesTheRowsOfACorruptFile() throws Exception {
+    this.metadataIs("{oops");
+
+    final var full = this.service.getMetadata(REPO_ID, REPO_NAME, null, PACKAGE, false, this.rows);
+    final var abbreviated =
+        this.service.getMetadata(REPO_ID, REPO_NAME, null, PACKAGE, true, this.rows);
+
+    assertThat(((Map<String, Object>) full.get("versions")).keySet())
+        .containsExactly("1.0.0", "2.0.0");
+    assertThat(((Map<String, Object>) abbreviated.get("versions")).keySet())
+        .containsExactly("1.0.0", "2.0.0");
+    verify(this.storageStrategy, never()).write(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("a corrupt file of a package the rows do not know is a not-found, as a missing one")
+  void aCorruptFileOfAnUnknownPackageIsNotFound() {
+    this.metadataIs("{oops");
+
+    assertThatThrownBy(
+            () ->
+                this.service.getMetadata(
+                    REPO_ID,
+                    REPO_NAME,
+                    null,
+                    PACKAGE,
+                    false,
+                    () -> {
+                      throw new ItemNotFoundException("packageNotFound");
+                    }))
+        .isInstanceOf(ItemNotFoundException.class);
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Publishing a version (RPS-1310)
+  // -------------------------------------------------------------------------------------------
+
+  /** What npm sends to publish 3.0.0 (as the latest, or under another tag). */
+  private static Map<String, Object> payloadOf(final String tag) {
+    final var version = new java.util.LinkedHashMap<String, Object>();
+    version.put("name", PACKAGE);
+    version.put("version", "3.0.0");
+    version.put("description", "the published one");
+    version.put(
+        "dist",
+        new java.util.LinkedHashMap<>(
+            Map.of("tarball", "http://h/npm-repo/demo/-/demo-3.0.0.tgz")));
+
+    return new java.util.LinkedHashMap<>(
+        Map.of(
+            "name",
+            PACKAGE,
+            "dist-tags",
+            new java.util.LinkedHashMap<>(Map.of(tag, "3.0.0")),
+            "versions",
+            new java.util.LinkedHashMap<>(Map.of("3.0.0", version)),
+            "_attachments",
+            Map.of("demo-3.0.0.tgz", Map.of("data", "AAAA"))));
+  }
+
+  /** The rows as the publish has written them: the new version and its tag are already in. */
+  private static final NpmPackageSnapshot ROWS_OF_A_PUBLISH =
+      new NpmPackageSnapshot(
+          null,
+          PACKAGE,
+          "3.0.0",
+          Instant.parse("2026-01-01T00:00:00Z"),
+          List.of(version("1.0.0"), version("2.0.0"), version("3.0.0")),
+          Map.of("latest", "3.0.0", "beta", "2.0.0"));
+
+  private Map<String, Object> mergePublished(final String tag) throws Exception {
+    return this.service
+        .processVersionPayload(
+            payloadOf(tag), BASE_PATH, REPO_ID, REPO_NAME, () -> ROWS_OF_A_PUBLISH)
+        .getSecond();
+  }
+
+  @Test
+  @DisplayName("publishing a version merges it into the stored file, and does not ask for the rows")
+  void publishMergesIntoTheStoredFile() throws Exception {
+    this.metadataIs(
+        "{\"name\":\"demo\",\"dist-tags\":{\"latest\":\"2.0.0\"},\"time\":{\"2.0.0\":\"t\"},"
+            + "\"versions\":{\"2.0.0\":{\"name\":\"demo\",\"version\":\"2.0.0\",\"readme\":\"kept\"}}}");
+
+    final var merged = this.mergePublished("latest");
+
+    final var versions = (Map<String, Map<String, Object>>) merged.get("versions");
+    assertThat(versions.keySet()).containsExactlyInAnyOrder("2.0.0", "3.0.0");
+    assertThat(versions.get("2.0.0")).containsEntry("readme", "kept");
+  }
+
+  @Test
+  @DisplayName("publishing the latest version of a package whose file is gone rebuilds the rest")
+  void publishLatestRebuildsAMissingFile() throws Exception {
+    this.metadataIsGone();
+
+    final var merged = this.mergePublished("latest");
+
+    final var versions = (Map<String, Map<String, Object>>) merged.get("versions");
+    assertThat(versions.keySet()).containsExactlyInAnyOrder("1.0.0", "2.0.0", "3.0.0");
+    // The new version is the payload's own entry, not the row-only one of the rebuild.
+    assertThat(versions.get("3.0.0")).containsEntry("description", "the published one");
+    assertThat(versions.get("1.0.0")).containsEntry("description", "version 1.0.0");
+    assertThat(merged.get("dist-tags")).isEqualTo(Map.of("latest", "3.0.0", "beta", "2.0.0"));
+    assertThat(((Map<String, Object>) merged.get("time")).keySet())
+        .contains("created", "modified", "1.0.0", "2.0.0", "3.0.0");
+    assertThat(merged)
+        .containsKey("_attachments")
+        .containsEntry("description", "the published one");
+    assertThat(this.warningTexts()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("publishing under another tag of a package whose file is gone rebuilds the rest")
+  void publishUnderATagRebuildsAMissingFile() throws Exception {
+    this.metadataIsGone();
+
+    final var merged = this.mergePublished("next");
+
+    final var versions = (Map<String, Map<String, Object>>) merged.get("versions");
+    assertThat(versions.keySet()).containsExactlyInAnyOrder("1.0.0", "2.0.0", "3.0.0");
+    assertThat(versions.get("3.0.0")).containsEntry("description", "the published one");
+    assertThat((Map<String, String>) merged.get("dist-tags")).containsEntry("next", "3.0.0");
+    assertThat(merged).containsKey("_attachments");
+  }
+
+  @ParameterizedTest
+  @FieldSource("CORRUPT_FILES")
+  @DisplayName("publishing a version of a package whose file is corrupt rebuilds the rest")
+  void publishRebuildsACorruptFile(final String corrupt) throws Exception {
+    this.metadataIs(corrupt);
+
+    final var merged = this.mergePublished("latest");
+
+    assertThat(((Map<String, Object>) merged.get("versions")).keySet())
+        .containsExactlyInAnyOrder("1.0.0", "2.0.0", "3.0.0");
+    assertThat(this.warningTexts()).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("publishing to a package neither the file nor the rows know is a not-found")
+  void publishToAnUnknownPackage() {
+    this.metadataIsGone();
+
+    assertThatThrownBy(
+            () ->
+                this.service.processVersionPayload(
+                    payloadOf("latest"),
+                    BASE_PATH,
+                    REPO_ID,
+                    REPO_NAME,
+                    () -> {
+                      throw new ItemNotFoundException("packageNotFound");
+                    }))
+        .isInstanceOf(ItemNotFoundException.class);
   }
 
   // -------------------------------------------------------------------------------------------

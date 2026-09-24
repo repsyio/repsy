@@ -38,6 +38,7 @@ import { VersionSecurityBadgeComponent } from '../../../../../shared/components/
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { SecurityService } from '../../../../security/service/security.service';
+import { DeleteUntaggedManifestsComponent } from '../../../repo-settings/delete-untagged-manifests/delete-untagged-manifests.component';
 import { DockerConfigComponent } from '../../config/docker-config.component';
 import { getRepoDomain } from '../../docker-repo-util';
 import { TagListItem } from '../../dto/tag-list-item';
@@ -60,6 +61,7 @@ import { DockerService } from '../../service/docker.service';
     SpinnerComponent,
     CopyClipboardComponent,
     VersionSecurityBadgeComponent,
+    DeleteUntaggedManifestsComponent,
   ],
   templateUrl: './docker-images-tag-list.component.html',
 })

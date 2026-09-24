@@ -75,7 +75,7 @@ public class HelmChartController {
   @RepoOperation
   public RestResponse<PagedModel<HelmChartListItem>> searchHelmCharts(
       final RepoInfo repoInfo,
-      @RequestParam(defaultValue = "") final String query,
+      @RequestParam(name = "q", defaultValue = "") final String query,
       @PageableDefault(sort = "lastUpdatedAt", direction = Sort.Direction.DESC)
           final Pageable pageable) {
 

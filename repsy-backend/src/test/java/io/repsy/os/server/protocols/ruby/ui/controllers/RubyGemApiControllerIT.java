@@ -41,6 +41,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
@@ -100,7 +101,7 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(
               get("/api/ruby/gems/{repo}", repo.getName())
-                  .param("name", "fixture")
+                  .param("q", "fixture")
                   .param("size", "10")
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
@@ -123,7 +124,7 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(
               get("/api/ruby/gems/{repo}/{gem}/versions", repo.getName(), "fixture-gem")
-                  .param("version", "1.1")
+                  .param("q", "1.1")
                   .param("size", "10")
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
@@ -235,7 +236,7 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(
               get("/api/ruby/gems/{repo}", repo.getName())
-                  .param("name", "beta")
+                  .param("q", "beta")
                   .param("page", "0")
                   .param("size", "1")
                   .with(apiPort())
@@ -264,7 +265,7 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(
               get("/api/ruby/gems/{repo}", repo.getName())
-                  .param("name", "does-not-match")
+                  .param("q", "does-not-match")
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
@@ -573,6 +574,18 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
       this.list(seed, VERSIONS, "sort", "version,desc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].version").value("1.1.0"));
+    }
+
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource({"/api/ruby/gems/{repo},name", "/api/ruby/gems/{repo}/fixture-gem/versions,version"})
+    @DisplayName("filters by q only: the old name of the filter is an unknown parameter")
+    void filtersByQOnly(final String path, final String oldName) throws Exception {
+      final var seed = this.seed();
+
+      PagingAssertions.expectFilterIsQ(
+          this.list(seed, path, "page", "0"),
+          this.list(seed, path, oldName, PagingAssertions.NO_MATCH),
+          this.list(seed, path, "q", PagingAssertions.NO_MATCH));
     }
 
     @ParameterizedTest(name = "{0}")

@@ -51,6 +51,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -422,7 +423,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           DockerImageControllerIT.this.expectSuccess(
               DockerImageControllerIT.this.perform(
                   get("/api/docker/images/%s/app/tags".formatted(repo.getName()))
-                      .param("name", "latest")
+                      .param("q", "latest")
                       .param("page", "0")
                       .param("size", "1")
                       .header(AUTHORIZATION, token)),
@@ -802,6 +803,18 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
       this.list(repo, TAGS, "sort", "name,desc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].name").value("stable"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {IMAGES, TAGS, MANIFESTS})
+    @DisplayName("filters by q only: name, the old name of the filter, is an unknown parameter")
+    void filtersByQOnly(final String path) throws Exception {
+      final var repo = this.seededRepo();
+
+      PagingAssertions.expectFilterIsQ(
+          this.list(repo, path, "page", "0"),
+          this.list(repo, path, "name", PagingAssertions.NO_MATCH),
+          this.list(repo, path, "q", PagingAssertions.NO_MATCH));
     }
 
     @ParameterizedTest(name = "{0}")

@@ -60,17 +60,30 @@ public interface NpmStorageService {
       String versionName)
       throws IOException, URISyntaxException;
 
+  /**
+   * Merges the version being published into the metadata of the package. The metadata is rebuilt
+   * from {@code snapshot} when its file is gone or corrupt (RPS-1310): see {@link
+   * #readMetadataOrRebuild}.
+   *
+   * @param snapshot the rows of the package as they are now, with the published version already in
+   *     them; asked for only when the file cannot be used
+   */
   Pair<Pair<Long, Long>, Map<String, Object>> processVersionPayload(
-      Map<String, Object> payload, Path packageBasePath, UUID repoId, String repoName)
+      Map<String, Object> payload,
+      Path packageBasePath,
+      UUID repoId,
+      String repoName,
+      Supplier<NpmPackageSnapshot> snapshot)
       throws IOException, URISyntaxException;
 
   /**
    * Reads the stored package metadata as it is, so a publish that fails can put it back.
    *
-   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package has no
-   *     metadata
+   * @return the bytes of the file, whatever they hold, or {@code null} when the package has no
+   *     metadata file
    */
-  byte[] readMetadataBytes(UUID repoId, String repoName, Path packageBasePath) throws IOException;
+  byte @Nullable [] readMetadataBytes(UUID repoId, String repoName, Path packageBasePath)
+      throws IOException;
 
   /**
    * Puts the package metadata back to {@code metadata}, as {@link #readMetadataBytes} returned it,
@@ -92,15 +105,16 @@ public interface NpmStorageService {
    * Runs {@code change} on the package metadata file and puts the file back as it was when the
    * change fails, so the file never keeps what the rolled-back rows do not have.
    *
-   * <p>A package whose metadata file is gone from storage has its rows as the only record of what
-   * it holds (RPS-1300), so the file is rebuilt from them first, from {@code snapshot}, and the
-   * change is made to that. Being put back then means being removed again, as the file was not
-   * there before. The rebuild is a write like any other and counts in the growth that is returned.
+   * <p>A package whose metadata file is gone from storage, or is corrupt (RPS-1310), has its rows
+   * as the only record of what it holds (RPS-1300), so the file is rebuilt from them first, from
+   * {@code snapshot}, and the change is made to that. Being put back then means the file is as it
+   * was: a missing one is removed again, and a corrupt one gets its bytes back. The rebuild is a
+   * write like any other and counts in the growth that is returned.
    *
    * <p>The caller holds the package row locked, so no other write can change the file in between.
    *
    * @param snapshot the rows of the package as they are now, with the change the caller is making
-   *     already in them; asked for only when the file is missing
+   *     already in them; asked for only when the file cannot be used
    * @return the growth of the file: what {@code change} reports, plus the size of a rebuilt file
    */
   long changeMetadata(
@@ -112,11 +126,12 @@ public interface NpmStorageService {
       throws IOException;
 
   /**
-   * The package metadata as stored or, when the file is gone, as the rows {@code snapshot} gives
-   * would have it written. Nothing is written.
+   * The package metadata as stored or, when the file is gone or corrupt (it is not a JSON object,
+   * or lacks the versions, dist-tags or time every change relies on; a warning tells of it), as the
+   * rows {@code snapshot} gives would have it written. Nothing is written.
    *
-   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the file is gone and
-   *     {@code snapshot} finds no package either
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the file cannot be
+   *     used and {@code snapshot} finds no package either
    */
   Map<String, Object> readMetadataOrRebuild(
       UUID repoId, String repoName, Path packageBasePath, Supplier<NpmPackageSnapshot> snapshot)
@@ -213,6 +228,11 @@ public interface NpmStorageService {
 
   Path getPackageBasePath(@Nullable String scopeName, String packageName);
 
+  /**
+   * The readme of the version in the metadata file, or {@code null} when there is none to show: the
+   * file has no entry or readme for the version (RPS-1143), or is gone or corrupt (RPS-1310). The
+   * caller has found the version in the database. Nothing is rebuilt: the rows keep no readme.
+   */
   @Nullable String getReadmeContent(
       UUID repoId, String repoName, Path packageBasePath, String versionName) throws IOException;
 

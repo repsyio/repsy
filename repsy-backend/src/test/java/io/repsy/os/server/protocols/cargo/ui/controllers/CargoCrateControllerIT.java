@@ -248,7 +248,7 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
       final var response =
           CargoCrateControllerIT.this
               .request(
-                  "GET", "/api/cargo/crates/" + repo.getName() + "?query=hello&page=0&size=1", null)
+                  "GET", "/api/cargo/crates/" + repo.getName() + "?q=hello&page=0&size=1", null)
               .andExpect(status().isOk())
               .andReturn()
               .getResponse()
@@ -332,9 +332,7 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
       final var versions =
           CargoCrateControllerIT.this
               .request(
-                  "GET",
-                  "/api/cargo/crates/" + repo.getName() + "/demo_crate/versions?query=2",
-                  null)
+                  "GET", "/api/cargo/crates/" + repo.getName() + "/demo_crate/versions?q=2", null)
               .andExpect(status().isOk())
               .andReturn()
               .getResponse()
@@ -429,9 +427,7 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
               CargoCrateControllerIT.this
                   .request(
                       "GET",
-                      "/api/cargo/crates/"
-                          + repo.getName()
-                          + "/paged/versions?query=0.0&page=1&size=1",
+                      "/api/cargo/crates/" + repo.getName() + "/paged/versions?q=0.0&page=1&size=1",
                       null)
                   .andExpect(status().isOk()));
       assertThat(JsonPath.<List<?>>read(response, "$.data.content")).hasSize(1);
@@ -793,6 +789,18 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].name").value("paged"))
           .andExpect(jsonPath("$.data.content[0].downloads").value(1));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {CRATES, VERSIONS})
+    @DisplayName("filters by q only: query, the old name of the filter, is an unknown parameter")
+    void filtersByQOnly(final String path) throws Exception {
+      final var repo = this.seededRepo();
+
+      PagingAssertions.expectFilterIsQ(
+          this.list(repo, path, "page", "0"),
+          this.list(repo, path, "query", PagingAssertions.NO_MATCH),
+          this.list(repo, path, "q", PagingAssertions.NO_MATCH));
     }
 
     @ParameterizedTest(name = "{0}")

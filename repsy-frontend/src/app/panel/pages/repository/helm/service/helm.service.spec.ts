@@ -21,9 +21,9 @@ import {
   describeCalls,
   describePagedCalls,
   describeRepoSelection,
+  PAGE_ARGS,
   PAGE_INDEX,
   PAGE_SIZE,
-  PAGEABLE,
   PagedCase,
   REPO,
   restResponse,
@@ -76,7 +76,7 @@ describe('HelmService', () => {
         name: 'searchCharts',
         invoke: (s, query) => s.searchCharts(query, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => helmApi.searchHelmCharts,
-        args: (query) => [PAGEABLE, REPO, query],
+        args: (query) => [REPO, query, ...PAGE_ARGS],
       },
     ];
     describePagedCalls(() => service, paged);

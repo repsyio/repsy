@@ -526,18 +526,16 @@ export class ScanScript {
   }
 }
 
-/** Reads `page`/`size`/`sort` however the SPA serialises its `pageable` object. */
-export function pageableOf(url: URL): {
+/** Reads the flat `page`, `size` and `sort` query parameters every paged panel list takes (RPS-1269). */
+export function pagingOf(url: URL): {
   page: number;
   size: number;
   sortDirection: 'ASC' | 'DESC';
 } {
-  const nested = url.searchParams.get('pageable');
-  const source = nested ? new URLSearchParams(nested.replace(/[{}"]/g, '')) : url.searchParams;
-  const sort = url.searchParams.get('sort') ?? source.get('sort') ?? '';
+  const sort = url.searchParams.get('sort') ?? '';
   return {
-    page: Number(url.searchParams.get('page') ?? source.get('page') ?? 0),
-    size: Number(url.searchParams.get('size') ?? source.get('size') ?? 10),
+    page: Number(url.searchParams.get('page') ?? 0),
+    size: Number(url.searchParams.get('size') ?? 10),
     sortDirection: /,\s*desc/i.test(sort) ? 'DESC' : 'ASC',
   };
 }
@@ -587,7 +585,7 @@ export async function stubVersionScans(
         return route.fallback();
       }
       script.calls.list++;
-      const { page: pageNumber, size } = pageableOf(url);
+      const { page: pageNumber, size } = pagingOf(url);
       const rows = script.scans.map((scan) => script.info(scan, repo, artifact, version, repoType));
       return json(
         route,
@@ -627,7 +625,7 @@ export async function stubVersionScans(
       return route.fallback();
     }
     script.calls.findings++;
-    const { page: pageNumber, size, sortDirection } = pageableOf(url);
+    const { page: pageNumber, size, sortDirection } = pagingOf(url);
     const ordered = [...script.reportedFindings(scan)].sort(
       (a, b) =>
         (SEVERITY_RANK[a.severity!] - SEVERITY_RANK[b.severity!]) *

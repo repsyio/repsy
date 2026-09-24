@@ -143,7 +143,7 @@ describe('SignatureComponent', () => {
     it('loads the first page of key stores and the allowed keyservers', () => {
       component.ngOnInit();
 
-      expect(keyStoreService.listMavenKeyStores).toHaveBeenCalledOnceWith({ page: 0, size: 5 }, REPO);
+      expect(keyStoreService.listMavenKeyStores).toHaveBeenCalledOnceWith(REPO, 0, 5);
       expect(component.keyStores.map((k) => k.id)).toEqual(['k1']);
       expect(component.pageNum).toBe(1);
     });
@@ -187,7 +187,7 @@ describe('SignatureComponent', () => {
       component.createKeyStore();
 
       expect(keyStoreService.createMavenKeyStore).toHaveBeenCalledOnceWith(REPO, { allowedKeyserverId: 'ks-2' });
-      expect(keyStoreService.listMavenKeyStores).toHaveBeenCalledOnceWith({ page: 0, size: 5 }, REPO);
+      expect(keyStoreService.listMavenKeyStores).toHaveBeenCalledOnceWith(REPO, 0, 5);
       expect(toastService.show).toHaveBeenCalledOnceWith('Key Store added', 'success');
       expect(component.isSubmitting).toBeFalse();
     });
@@ -236,7 +236,7 @@ describe('SignatureComponent', () => {
 
       component.loadMoreKeyStores();
 
-      expect(keyStoreService.listMavenKeyStores).toHaveBeenCalledWith({ page: 1, size: 5 }, REPO);
+      expect(keyStoreService.listMavenKeyStores).toHaveBeenCalledWith(REPO, 1, 5);
       expect(component.keyStores.map((k) => k.id)).toEqual(['k1', 'k2']);
       expect(component.pageNum).toBe(2);
     });
@@ -285,7 +285,7 @@ describe('SignatureComponent', () => {
       dangerModalService.call();
 
       expect(keyStoreService.deleteMavenKeyStore).toHaveBeenCalledOnceWith('k1', REPO);
-      expect(keyStoreService.listMavenKeyStores).toHaveBeenCalledOnceWith({ page: 0, size: 5 }, REPO);
+      expect(keyStoreService.listMavenKeyStores).toHaveBeenCalledOnceWith(REPO, 0, 5);
       expect(component.pageNum).toBe(1);
       expect(toastService.show).toHaveBeenCalledOnceWith('Key Store deleted', 'success');
     });

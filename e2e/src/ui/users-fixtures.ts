@@ -44,7 +44,7 @@ export const test = uiTest.extend<UsersFixtures>({
       names.push(username);
     });
     for (const username of names) {
-      const matches = await panelApi.listUsers({ search: username, size: 50 });
+      const matches = await panelApi.listUsers({ q: username, size: 50 });
       const user = matches.find((candidate) => candidate.username === username);
       if (user) {
         seeder.adoptUser(user.id);

@@ -98,6 +98,9 @@ public class ManifestDeletionComponent {
     this.manifestRepository.delete(manifest);
     this.manifestRepository.flush();
 
+    // In this transaction: the image is listed with the size and the digest of what its tags reach.
+    this.imageService.refreshImageSize(repoInfo.getStorageKey(), imageInfo.getId());
+
     this.publishVersionsDeleted(repoInfo, imageInfo.getName(), tagNames);
 
     // Another image of the repo may have the same manifest, and its file is shared: the file goes

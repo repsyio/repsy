@@ -446,7 +446,13 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
               payload,
               kind ->
                   this.storeVersion(
-                      repoInfo, packageBasePath, packageName, versionName, payload, kind));
+                      repoInfo,
+                      scopeName,
+                      packageBasePath,
+                      packageName,
+                      versionName,
+                      payload,
+                      kind));
 
       context.addProperty(ARTIFACT_NAME, this.buildArtifactName(scopeName, packageName));
       context.addProperty(ARTIFACT_VERSION, versionName);
@@ -469,6 +475,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
    */
   private BaseUsages storeVersion(
       final BaseRepoInfo<ID> repoInfo,
+      final @Nullable String scopeName,
       final Path packageBasePath,
       final String packageName,
       final String versionName,
@@ -489,7 +496,8 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             : null;
 
     try {
-      return this.writeFiles(repoInfo, packageBasePath, packageName, versionName, payload, kind);
+      return this.writeFiles(
+          repoInfo, scopeName, packageBasePath, packageName, versionName, payload, kind);
     } catch (final IOException | URISyntaxException | RuntimeException e) {
       // The rows are rolled back with this failure. A version being replaced keeps its row, so
       // its files are left alone.
@@ -529,6 +537,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
 
   private BaseUsages writeFiles(
       final BaseRepoInfo<ID> repoInfo,
+      final @Nullable String scopeName,
       final Path packageBasePath,
       final String packageName,
       final String versionName,
@@ -541,7 +550,11 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             ? this.processNewPackage(repoInfo, payload)
             : this.npmStorageService
                 .processVersionPayload(
-                    payload, packageBasePath, repoInfo.getStorageKey(), repoInfo.getName())
+                    payload,
+                    packageBasePath,
+                    repoInfo.getStorageKey(),
+                    repoInfo.getName(),
+                    this.snapshotOf(repoInfo, scopeName, packageName))
                 .getSecond();
 
     return this.npmStorageService.writeTarballAndMetadata(

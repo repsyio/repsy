@@ -32,7 +32,7 @@ import {
   Severity,
   finding,
   findings,
-  pageableOf,
+  pagingOf,
   stubSupportedRepoTypes,
   stubVersionScans,
 } from '../../../src/ui/security-stubs.js';
@@ -385,13 +385,13 @@ test.describe('SEC-02b scan section', { tag: MOCKED }, () => {
 
     const twoButton = section.findingsPagination.page(2);
     await twoButton.click();
-    await expect.poll(() => pageableOf(stubs.findings.last()!).page).toBe(1);
+    await expect.poll(() => pagingOf(stubs.findings.last()!).page).toBe(1);
     await expect(section.findingRows()).toHaveCount(2);
 
     // Sorting again reverses the order and starts over at page 1.
     await section.sortBySeverity.click();
     await expect
-      .poll(() => pageableOf(stubs.findings.last()!))
+      .poll(() => pagingOf(stubs.findings.last()!))
       .toMatchObject({
         page: 0,
         sortDirection: 'DESC',
