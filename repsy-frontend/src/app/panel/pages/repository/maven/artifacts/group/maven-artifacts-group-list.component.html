@@ -99,26 +99,26 @@
           class="hidden rounded-b-[12px] border border-neutral-400 bg-neutral-500 lg:block"
         >
           @for (artifact of artifacts; track artifact.artifactName; let i = $index) {
-            <div
-              [attr.data-testid]="'pkg-list-row-' + artifact.groupName + ':' + artifact.artifactName"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="
-                '/' +
-                activeRepo.repoName +
-                '/' +
-                artifact.groupName +
-                '/' +
-                artifact.artifactName +
-                '/' +
-                artifact.latest
-              "
-            >
+            <div [attr.data-testid]="'pkg-list-row-' + artifact.groupName + ':' + artifact.artifactName">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === artifacts.length - 1 }"
-                class="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="row-link-host grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="
+                    '/' +
+                    activeRepo.repoName +
+                    '/' +
+                    artifact.groupName +
+                    '/' +
+                    artifact.artifactName +
+                    '/' +
+                    artifact.latest
+                  "
+                  [attr.aria-label]="artifact.groupName + ':' + artifact.artifactName"
+                ></a>
                 <a
                   data-testid="row-group-link"
                   class="group text-secondary-500 flex w-max max-w-full min-w-0 gap-2"
@@ -250,21 +250,23 @@
           @for (artifact of artifacts; track artifact.artifactName; let i = $index) {
             <div animate.enter="fade-in-down" class="lg:hidden">
               <div
-                class="hover:border-secondary-500 relative flex flex-col gap-2 rounded-[12px] border border-neutral-400 bg-neutral-500 p-4 hover:bg-[#1D1C1C]"
+                class="row-link-host hover:border-secondary-500 relative flex flex-col gap-2 rounded-[12px] border border-neutral-400 bg-neutral-500 p-4 hover:bg-[#1D1C1C]"
                 [attr.data-testid]="'pkg-list-card-' + artifact.groupName + ':' + artifact.artifactName"
-                role="button"
-                appKeyboardActivate
-                [routerLink]="
-                  '/' +
-                  activeRepo.repoName +
-                  '/' +
-                  artifact.groupName +
-                  '/' +
-                  artifact.artifactName +
-                  '/' +
-                  artifact.latest
-                "
               >
+                <a
+                  class="row-link"
+                  [routerLink]="
+                    '/' +
+                    activeRepo.repoName +
+                    '/' +
+                    artifact.groupName +
+                    '/' +
+                    artifact.artifactName +
+                    '/' +
+                    artifact.latest
+                  "
+                  [attr.aria-label]="artifact.groupName + ':' + artifact.artifactName"
+                ></a>
                 @if (activeRepo.canManage) {
                   <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
                     <button

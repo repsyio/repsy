@@ -307,7 +307,7 @@
                     @if (user.lastLoginAt) {
                       {{ user.lastLoginAt | date: 'medium' }} {{ '(' + timeAgo(user.lastLoginAt) + ')' }}
                     } @else {
-                      <span class="text-neutral-400 italic">Never logged in</span>
+                      <span class="text-[#9FA0A0] italic">Never logged in</span>
                     }
                   </span>
                 </div>

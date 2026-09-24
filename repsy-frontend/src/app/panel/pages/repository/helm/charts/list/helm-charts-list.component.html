@@ -73,17 +73,17 @@
           class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
         >
           @for (chart of charts; track chart.name; let i = $index) {
-            <div
-              [attr.data-testid]="'pkg-list-row-' + chart.name"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="'/' + activeRepo.repoName + '/' + chart.name"
-            >
+            <div [attr.data-testid]="'pkg-list-row-' + chart.name">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === charts.length - 1 }"
-                class="grid grid-cols-[minmax(0,2fr)_1fr_minmax(0,1fr)_minmax(0,2fr)_1fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="row-link-host grid grid-cols-[minmax(0,2fr)_1fr_minmax(0,1fr)_minmax(0,2fr)_1fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="'/' + activeRepo.repoName + '/' + chart.name"
+                  [attr.aria-label]="chart.name"
+                ></a>
                 <div class="flex min-w-0 items-center gap-2">
                   <img class="h-[18px] w-[18px] shrink-0" src="/assets/icons/helm/helm.svg" alt="Helm" />
                   <app-tooltip
@@ -179,11 +179,13 @@
             <div animate.enter="fade-in-down" class="lg:hidden">
               <div
                 [attr.data-testid]="'pkg-list-card-' + chart.name"
-                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
-                role="button"
-                appKeyboardActivate
-                [routerLink]="'/' + activeRepo.repoName + '/' + chart.name"
+                class="row-link-host relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="'/' + activeRepo.repoName + '/' + chart.name"
+                  [attr.aria-label]="chart.name"
+                ></a>
                 @if (activeRepo.canManage) {
                   <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
                     <button

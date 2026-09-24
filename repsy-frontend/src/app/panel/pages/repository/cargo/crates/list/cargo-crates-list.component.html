@@ -72,17 +72,17 @@
           class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
         >
           @for (crate of crates; track crate.name; let i = $index) {
-            <div
-              [attr.data-testid]="'pkg-list-row-' + crate.name"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="'/' + activeRepo.repoName + '/' + crate.name"
-            >
+            <div [attr.data-testid]="'pkg-list-row-' + crate.name">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === crates.length - 1 }"
-                class="grid grid-cols-[minmax(0,2fr)_1fr_minmax(0,2fr)_2fr_1fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="row-link-host grid grid-cols-[minmax(0,2fr)_1fr_minmax(0,2fr)_2fr_1fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="'/' + activeRepo.repoName + '/' + crate.name"
+                  [attr.aria-label]="crate.name"
+                ></a>
                 <div class="flex min-w-0 items-center gap-2">
                   <img
                     src="/assets/icons/repo/cargo.svg"
@@ -157,11 +157,13 @@
             <div animate.enter="fade-in-down" class="lg:hidden">
               <div
                 [attr.data-testid]="'pkg-list-card-' + crate.name"
-                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
-                role="button"
-                appKeyboardActivate
-                [routerLink]="'/' + activeRepo.repoName + '/' + crate.name"
+                class="row-link-host relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="'/' + activeRepo.repoName + '/' + crate.name"
+                  [attr.aria-label]="crate.name"
+                ></a>
                 @if (activeRepo.canManage) {
                   <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
                     <button

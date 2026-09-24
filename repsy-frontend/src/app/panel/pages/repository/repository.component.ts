@@ -34,7 +34,6 @@ import { SearchboxComponent } from '../../shared/components/searchbox/searchbox.
 import { SelectorComponent } from '../../shared/components/selector/selector.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../shared/components/tooltip/tooltip.component';
-import { KeyboardActivateDirective } from '../../shared/directives/keyboard-activate.directive';
 import { RepoListItem } from '../../shared/dto/repo/repo-list-item';
 import { RepoType } from '../../shared/dto/repo/repo-type';
 import { ByteFormatter } from '../../shared/util/byte-formatter';
@@ -45,7 +44,6 @@ import { SecurityService } from '../security/service/security.service';
   selector: 'app-repository',
   standalone: true,
   imports: [
-    KeyboardActivateDirective,
     CommonModule,
     NgOptimizedImage,
     EmptyListComponent,

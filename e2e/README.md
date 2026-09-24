@@ -2907,22 +2907,23 @@ mobile-Delete `canWrite` bug of RPS-1262 (1) never existed in these five protoco
 
 ### Errors, navigation, mobile and accessibility (RPS-1258)
 
-`tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..04, NAV-01..03, A11Y-01..04) plus `src/ui/a11y.ts` (the axe
+`tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..04, NAV-01..03, A11Y-01..10) plus `src/ui/a11y.ts` (the axe
 helper) and `tests/ui/nav/breadcrumb.ts` (the breadcrumb page object). Run them with
 `./run.sh test --protocol ui --grep "ERR-|NAV-|A11Y-"`. `@axe-core/playwright` is the only dependency
 this story added (`package.json`, `pnpm-lock.yaml`), so the `ui` runner image must be rebuilt once
 (`./run.sh test --protocol ui -b`).
 
-| Spec               | Scenarios | What is pinned                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `errors/errors`    | ERR-01    | all nine `.../{TYPE}/info` calls answered 500: exactly `Server error` (never the body's text), no rows, page alive; ONE type (NPM) failing: the toast plus the `repo-warning`, others still list; all types failing: `repo-error`, not `empty-list`, and the refresh button retries; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast |
-| `errors/errors`    | ERR-02    | an aborted request (status 0): `Connection error`, on the repository list and on the users page                                                                                                                                                                                                                                                                        |
-| `errors/errors`    | ERR-03    | 403 on `GET /api/users`: `Access denied` (no body) or the server's own `text`; 403 on `/security`: `Access denied` plus `You do not have permission to view this page`, and the redirect to the dashboard                                                                                                                                                              |
-| `nav/breadcrumbs`  | NAV-01    | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                         |
-| `nav/mobile`       | NAV-02    | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); the burger opens the mobile sidebar, its links, the X, the backdrop and Escape close it (admin, and a USER without Users/Security); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`                                                             |
-| `nav/mobile`       | NAV-03    | the mobile menu closes when the viewport widens past `md` and stays closed when it narrows again; `document.body.style.overflow` is `hidden` (and the wheel does not scroll the page) while it is open, `''` after every way of closing it                                                                                                                             |
-| `errors/not-found` | ERR-04    | `/not-found` in the panel layout: an anonymous visitor (phone and desktop, and on a deep unknown path `/a/b/c`) gets no sidebar, no burger, no avatar menu, a `header-login` link and no `/api/profile` request; an admin and a USER at phone width open the mobile sidebar from it; at desktop the sidebar shows and the burger does not                              |
-| `a11y/a11y`        | A11Y-01   | axe on login, dashboard, repository list, repository settings, users (admin); report-only                                                                                                                                                                                                                                                                              |
+| Spec               | Scenarios   | What is pinned                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `errors/errors`    | ERR-01      | all nine `.../{TYPE}/info` calls answered 500: exactly `Server error` (never the body's text), no rows, page alive; ONE type (NPM) failing: the toast plus the `repo-warning`, others still list; all types failing: `repo-error`, not `empty-list`, and the refresh button retries; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast |
+| `errors/errors`    | ERR-02      | an aborted request (status 0): `Connection error`, on the repository list and on the users page                                                                                                                                                                                                                                                                        |
+| `errors/errors`    | ERR-03      | 403 on `GET /api/users`: `Access denied` (no body) or the server's own `text`; 403 on `/security`: `Access denied` plus `You do not have permission to view this page`, and the redirect to the dashboard                                                                                                                                                              |
+| `nav/breadcrumbs`  | NAV-01      | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                         |
+| `nav/mobile`       | NAV-02      | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); the burger opens the mobile sidebar, its links, the X, the backdrop and Escape close it (admin, and a USER without Users/Security); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`                                                             |
+| `nav/mobile`       | NAV-03      | the mobile menu closes when the viewport widens past `md` and stays closed when it narrows again; `document.body.style.overflow` is `hidden` (and the wheel does not scroll the page) while it is open, `''` after every way of closing it                                                                                                                             |
+| `errors/not-found` | ERR-04      | `/not-found` in the panel layout: an anonymous visitor (phone and desktop, and on a deep unknown path `/a/b/c`) gets no sidebar, no burger, no avatar menu, a `header-login` link and no `/api/profile` request; an admin and a USER at phone width open the mobile sidebar from it; at desktop the sidebar shows and the burger does not                              |
+| `a11y/a11y`        | A11Y-01     | axe on login, dashboard, repository list, repository settings, users (admin), the open modals and, for every protocol, its list, sublist, versions, manifests and detail pages (40 scans); enforced: a serious/critical violation fails the test                                                                                                                       |
+| `a11y/rows`        | A11Y-08..10 | list rows are links (RPS-1266 part 4): one stretched `a.row-link` per row, named after the row, nothing interactive inside another, Tab + Enter, a modified click left to the browser, the row menu on top of the next row; the dashboard count rows and the Maven browser use real buttons, no `javascript:` anchors                                                  |
 
 Things a later author must know:
 
@@ -2958,29 +2959,53 @@ Things a later author must know:
   control), by the accessible names of the icon-only buttons (refresh, PGP add, token rotate/configure/revoke,
   modal X) and by the password eyes, whose name and `aria-pressed` follow the state (they are still clicked with
   `dispatchEvent`: the blocked Font Awesome CDN leaves them without a box).
-- **axe, report-only by default.** `scanPage()` (`src/ui/a11y.ts`) runs the WCAG 2.0/2.1 A and AA rules,
+- **List rows are links (A11Y-08..10, `a11y/rows.spec.ts`, RPS-1266 part 4).** A row used to be
+  `<div role="button" [routerLink]>` holding links and the row menu (axe `nested-interactive`). Now it is a plain
+  container (`.row-link-host`, `position: relative`) whose first child is ONE real `<a class="row-link"
+[routerLink] [attr.aria-label]="identifier">`, stretched over the row (`position: absolute; inset: 0`,
+  `styles.css`), so the whole row still takes a mouse click, a ctrl/middle click opens a new tab and Tab + Enter
+  work like on any link. Everything else interactive in the row (secondary links, the security badge, the row menu,
+  the hover tooltips) is a sibling, lifted above the link by `position: relative` (a positioned element later in the
+  tree paints over the earlier positioned link, so there is no z-index and the open menu, `z-1`, still paints over
+  the next rows); `TooltipComponent` forwards a click on its text to the row link. `expectRowIsLink()` asserts, for
+  the repository list, the dashboard's recent activity and every clickable level of all nine protocols: the row
+  is no `role=button` and no tab stop, exactly one `a.row-link` named after the row key that covers the row to the
+  pixel, and no interactive element inside another. The ctrl-click test asserts the click is NOT default-prevented
+  (the browser opens the tab): the `page` event of a background tab is missing about every second time in headless
+  Chromium, so it is not awaited. The `javascript:void(0)` anchors (dashboard count rows, the Maven browser's
+  breadcrumbs and "files" link) are `<button type="button">`, the Maven browser's file icon too.
+- **axe, enforced by default.** `scanPage()` (`src/ui/a11y.ts`) runs the WCAG 2.0/2.1 A and AA rules,
   attaches `axe-<page>.json` (summary + every violation with its nodes) and `axe-<page>.txt` to the report,
-  writes the JSON to `test-results/<test>/axe-<page>.json` and prints one `AXE <page> [report]: ...` line, and
-  never fails. `DEFAULT_A11Y_MODE` in `src/ui/a11y.ts` is the one flag that makes it fail on
-  serious/critical violations (RPS-1266 flips it once the baseline is clean); for a single run use
-  `REPSY_UI_OPT_IN=a11y-enforce` (or `a11y-report`), because `docker-compose.runners.yml` forwards that
-  variable already. Font Awesome (a blocked CDN in this harness) icons render as empty boxes; each summary
-  counts them as `faNodes` per rule so they stay separable. The five page scans are of the pages at rest;
+  writes the JSON to `test-results/<test>/axe-<page>.json`, prints one `AXE <page> [enforce]: ...` line and
+  fails the test on a serious or critical violation (RPS-1266 part 4 flipped `DEFAULT_A11Y_MODE`, the one flag,
+  from `report` to `enforce`). For a single run that only reports, use `REPSY_UI_OPT_IN=a11y-report` (or
+  `a11y-enforce` to force the failing mode if the default is changed back), because `docker-compose.runners.yml`
+  forwards that variable already. Font Awesome (a blocked CDN in this harness) icons render as empty boxes; each
+  summary counts them as `faNodes` per rule so they stay separable. The five page scans are of the pages at rest;
   A11Y-01 also scans the open create-repository, create-token, create-user, confirmation and one-time-password
-  modals (`scanPage(page, testInfo, label, selector)` scopes a scan to one element).
+  modals (`scanPage(page, testInfo, label, selector)` scopes a scan to one element) and, for every protocol, the
+  pages of the seeded package.
 
-Baseline (RPS-1266 tracks fixing it; serious/critical only, WCAG A/AA). `main` before parts 2 and 3, then after:
+Baseline (RPS-1266; serious/critical only, WCAG A/AA). `main` before parts 2 and 3, after them, and after part 4
+(the default is now `enforce`; every scan below is clean):
 
-| Page                | Before                                                                                                                                       | After parts 2 and 3                                                 |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| login               | `button-name` (critical, 1): the password eye toggle                                                                                         | none                                                                |
-| dashboard           | none                                                                                                                                         | none                                                                |
-| repository list     | `button-name` (critical, 1): the refresh button; `nested-interactive` (serious, 1): a `role="button"` row containing a link and the row menu | `nested-interactive` (serious, 1): the row (part 4, rows as links)  |
-| repository settings | `button-name` (critical, 1): the PGP add button; `color-contrast` (serious, 3): the disabled keyserver rows and the description counter      | `color-contrast` (serious, 2): the disabled built-in keyserver rows |
-| users (admin)       | `color-contrast` (serious, 1): the `USER` role badge                                                                                         | none                                                                |
+| Page                | Before                                                                                                                                       | After parts 2 and 3                                                 | After part 4 |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------ |
+| login               | `button-name` (critical, 1): the password eye toggle                                                                                         | none                                                                | none         |
+| dashboard           | none                                                                                                                                         | none                                                                | none         |
+| repository list     | `button-name` (critical, 1): the refresh button; `nested-interactive` (serious, 1): a `role="button"` row containing a link and the row menu | `nested-interactive` (serious, 1): the row (part 4, rows as links)  | none         |
+| repository settings | `button-name` (critical, 1): the PGP add button; `color-contrast` (serious, 3): the disabled keyserver rows and the description counter      | `color-contrast` (serious, 2): the disabled built-in keyserver rows | none         |
+| users (admin)       | `color-contrast` (serious, 1): the `USER` role badge                                                                                         | none                                                                | none         |
+| open modals (5)     | not scanned                                                                                                                                  | none                                                                | none         |
 
-The package lists and version lists show the same `nested-interactive` row (part 4); the Docker manifest page has
-`color-contrast` (13 highlight.js tokens) and `scrollable-region-focusable` (its code block), not scanned by the suite yet.
+The package pages were first scanned in part 4, on `main` after part 3: `nested-interactive` (serious, 1) on all 20
+list, sublist and versions pages of the nine protocols; `color-contrast` (serious) on the detail pages of Maven (28
+nodes), Docker (13), Cargo (6), Helm (5), NuGet (3) and Ruby (2), and `scrollable-region-focusable` (serious) on the
+Docker (1) and NuGet (2) detail pages: the highlight.js theme's pink keys/keywords (#f92672, 4.1:1) and grey comments
+(#75715e, 2.9:1), and the `overflow: auto` code block that could not be reached with the keyboard. Part 4 lightens
+those two theme colours (`styles.css`), gives every highlighted `<code>` `tabindex="0"`, turns the row into a link,
+and lightens the "Never logged in" text, the `@` in the security modal titles and the built-in keyserver rows (plain
+text, not disabled controls: they carried `opacity-40`), so all 40 scans are clean.
 
 ### Security scanning UI (RPS-1259)
 
