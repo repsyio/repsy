@@ -81,7 +81,7 @@ describe('NugetPackagesVersionListComponent', () => {
       component,
       repoChanges,
       load: nugetService.fetchPackageVersions,
-      args: { sort: 1, page: 2 },
+      args: { search: 1, sort: 2, page: 3 },
       respond: (content, totalPages) =>
         nugetService.fetchPackageVersions.and.resolveTo(pageOf(content, totalPages) as never),
       fail: () =>
@@ -96,6 +96,7 @@ describe('NugetPackagesVersionListComponent', () => {
     describeRepoListBehavior(build, {
       security: true,
       sortResetsPage: true,
+      search: { typed: '1.0', loaded: '1.0' },
       failureMessage: 'Package not found',
     }));
 
@@ -108,7 +109,7 @@ describe('NugetPackagesVersionListComponent', () => {
 
       expect(component.packageId).toBe('Acme.Lib');
       expect(nugetService.fetchPackage).toHaveBeenCalledOnceWith('Acme.Lib');
-      expect(nugetService.fetchPackageVersions).toHaveBeenCalledOnceWith('Acme.Lib', component.sortOption, 0, 10);
+      expect(nugetService.fetchPackageVersions).toHaveBeenCalledOnceWith('Acme.Lib', '', component.sortOption, 0, 10);
       expect(component.pkg).toBe(PACKAGE);
       expect(component.versions).toEqual([VERSION]);
       expect(component.error).toBeNull();
@@ -218,6 +219,14 @@ describe('NugetPackagesVersionListComponent template', () => {
     expect(card?.querySelector('[data-testid="row-published"]')).not.toBeNull();
     expect(card?.closest('[data-testid="pkg-versions-cards"]')).not.toBeNull();
     expect(card?.parentElement?.classList).toContain('lg:hidden');
+  });
+
+  it('renders the version search box in the toolbar', async () => {
+    const el = await render(true);
+
+    const box = el.querySelector('[data-testid="pkg-toolbar"] [data-testid="pkg-search"]');
+    expect(box).not.toBeNull();
+    expect(box?.querySelector('[data-testid="search-input"]')?.getAttribute('placeholder')).toBe('version');
   });
 
   it('offers the row menu on a card to a manager only', async () => {

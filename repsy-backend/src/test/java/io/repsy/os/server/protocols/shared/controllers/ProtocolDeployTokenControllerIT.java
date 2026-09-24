@@ -50,6 +50,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -1047,6 +1048,108 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
                   get(tokensUrl(repo)).header(AUTHORIZATION, token).param("sort", "name,desc")),
               "TokenFetched");
       assertThat(namesOf(descending)).containsExactly("charlie", "bravo", "alpha");
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @ValueSource(
+        strings = {
+          "id",
+          "name",
+          "username",
+          "description",
+          "readOnly",
+          "expirationDate",
+          "createdAt"
+        })
+    @DisplayName("accepts every listed property as a sort, in both directions")
+    void acceptsEverySortProperty(final String property) throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      final var token = it.adminBearerToken();
+      it.seedToken(repo, "first", true, BASE_TIME.plus(10, ChronoUnit.DAYS));
+      it.seedToken(repo, "second", false, null);
+
+      for (final var direction : List.of("asc", "desc")) {
+        final var body =
+            expectSuccess(
+                it.perform(
+                    get(tokensUrl(repo))
+                        .header(AUTHORIZATION, token)
+                        .param("sort", property + "," + direction)),
+                "TokenFetched");
+
+        assertThat(namesOf(body)).as("%s,%s", property, direction).hasSize(2);
+        assertPage(body, 10, 0, 2, 1);
+      }
+    }
+
+    @Test
+    @DisplayName("sorts by expirationDate in the requested direction")
+    void sortsByExpirationDate() throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      final var token = it.adminBearerToken();
+      it.seedToken(repo, "late", false, BASE_TIME.plus(300, ChronoUnit.DAYS));
+      it.seedToken(repo, "early", false, BASE_TIME.plus(100, ChronoUnit.DAYS));
+      it.seedToken(repo, "middle", false, BASE_TIME.plus(200, ChronoUnit.DAYS));
+
+      final var ascending =
+          expectSuccess(
+              it.perform(
+                  get(tokensUrl(repo))
+                      .header(AUTHORIZATION, token)
+                      .param("sort", "expirationDate,asc")),
+              "TokenFetched");
+      assertThat(namesOf(ascending)).containsExactly("early", "middle", "late");
+
+      final var descending =
+          expectSuccess(
+              it.perform(
+                  get(tokensUrl(repo))
+                      .header(AUTHORIZATION, token)
+                      .param("sort", "expirationDate,desc")),
+              "TokenFetched");
+      assertThat(namesOf(descending)).containsExactly("late", "middle", "early");
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @ValueSource(
+        strings = {
+          "bogus,asc",
+          "token,asc",
+          "lastUsedAt,desc",
+          "tokenDurationDay,asc",
+          "repo.name,asc",
+          "created_at,desc"
+        })
+    @DisplayName("returns 400 validationError naming sort for a property the list cannot sort by")
+    void unsupportedSortIs400(final String sort) throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      it.seedToken(repo, "only");
+
+      expectValidationError(
+          it.perform(
+              get(tokensUrl(repo))
+                  .header(AUTHORIZATION, it.adminBearerToken())
+                  .param("sort", sort)),
+          "sort");
+    }
+
+    @Test
+    @DisplayName("rejects the request when only one of several sort properties is unsupported")
+    void oneUnsupportedOfSeveralSortsIs400() throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      it.seedToken(repo, "only");
+
+      expectValidationError(
+          it.perform(
+              get(tokensUrl(repo))
+                  .header(AUTHORIZATION, it.adminBearerToken())
+                  .param("sort", "name,asc")
+                  .param("sort", "bogus,desc")),
+          "sort");
     }
 
     @ParameterizedTest(name = "{0}={1}")

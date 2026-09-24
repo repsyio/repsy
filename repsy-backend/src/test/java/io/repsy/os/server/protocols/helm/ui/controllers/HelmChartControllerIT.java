@@ -34,6 +34,7 @@ import com.jayway.jsonpath.JsonPath;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
+import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
 import io.repsy.os.server.protocols.helm.shared.oci.services.HelmOciBlobService;
 import io.repsy.os.server.protocols.helm.shared.oci.services.HelmOciManifestNameRepairService;
@@ -54,6 +55,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -136,6 +138,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
   @MockitoBean private UsageUpdateService usageUpdateService;
   @Autowired private HelmChartService helmChartService;
+  @Autowired private HelmChartVersionRepository helmChartVersionRepository;
   @Autowired private HelmChartRepository helmChartRepository;
   @Autowired private HelmOciManifestService helmOciManifestService;
   @Autowired private HelmOciBlobService helmOciBlobService;
@@ -837,6 +840,46 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
       assertThat(content(body)).hasSize(1);
       assertThat(content(body).getFirst()).containsEntry("latestVersion", "1.5.0");
+    }
+
+    @Test
+    @DisplayName("lists a chart once when two of its versions were created in the same instant")
+    void tiedCreatedAtListsChartOnce() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+      it.upload(repo, ChartSpec.of("payments", "1.1.0"), token);
+      it.upload(repo, ChartSpec.of("orders", "0.1.0"), token);
+      it.upload(repo, ChartSpec.of("orders", "0.2.0"), token);
+      it.upload(repo, ChartSpec.of("inventory", "3.0.0"), token);
+      it.entityManager.flush();
+      // Both versions of "payments" and of "orders" now share one createdAt.
+      it.jdbcTemplate.update(
+          "update helm_chart_version set created_at = ? where chart_id in"
+              + " (select id from helm_chart where repo_id = ?)",
+          Timestamp.from(Instant.parse("2026-01-01T00:00:00Z")),
+          repo.getId());
+      it.entityManager.clear();
+
+      final var body = it.search(repo, token);
+
+      assertPage(body, 10, 0, 3, 1);
+      assertThat(namesOf(body)).containsExactlyInAnyOrder("inventory", "orders", "payments");
+      // The tie goes to the version the version list puts first: the greater id.
+      for (final var name : List.of("orders", "payments")) {
+        final var chart =
+            it.helmChartRepository.findByRepoIdAndName(repo.getId(), name).orElseThrow();
+        final var newest =
+            it.helmChartVersionRepository
+                .findAllByChartOrderByCreatedAtDescIdDesc(chart)
+                .getFirst();
+        assertThat(content(body))
+            .filteredOn(item -> name.equals(item.get("name")))
+            .singleElement()
+            .satisfies(
+                item -> assertThat(item).containsEntry("latestVersion", newest.getVersion()));
+      }
     }
 
     @Test

@@ -63,7 +63,19 @@ public interface NuGetPackageVersionRepository extends JpaRepository<NuGetPackag
   List<NuGetPackageVersion> findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(
       UUID packageId);
 
-  Page<NuGetPackageVersion> findByNugetPackageId(UUID packageId, Pageable pageable);
+  /**
+   * The versions of the package whose version matches {@code pattern}, a lower-cased {@code LIKE}
+   * pattern that escapes its wildcards with a backslash. The match runs before paging, so it spans
+   * every page.
+   */
+  @Query(
+      """
+      select v from NuGetPackageVersion v
+      where v.nugetPackage.id = :packageId
+        and lower(v.version) like :pattern escape '\\'
+      """)
+  Page<NuGetPackageVersion> searchByNugetPackageId(
+      @Param("packageId") UUID packageId, @Param("pattern") String pattern, Pageable pageable);
 
   boolean existsByNugetPackageId(UUID packageId);
 }

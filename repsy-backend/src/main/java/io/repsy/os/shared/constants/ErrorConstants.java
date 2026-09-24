@@ -25,6 +25,7 @@ public final class ErrorConstants {
   public static final String REPO_NOT_FOUND = "repoNotFound";
   public static final String UN_AUTHORIZED = "unAuthorized";
   public static final String ACCESS_NOT_ALLOWED = "accessNotAllowed";
+  public static final String SESSION_EXPIRED = "sessionExpired";
   public static final String PACKAGE_NOT_FOUND = "packageNotFound";
   public static final String PACKAGE_VERSION_NOT_FOUND = "packageVersionNotFound";
 }

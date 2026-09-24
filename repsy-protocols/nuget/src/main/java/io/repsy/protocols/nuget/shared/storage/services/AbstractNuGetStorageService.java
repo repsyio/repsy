@@ -15,8 +15,6 @@
  */
 package io.repsy.protocols.nuget.shared.storage.services;
 
-import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.hasBuildMetadata;
-import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.legacyNuGetVersion;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.normalizeNuGetVersion;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
@@ -94,7 +92,8 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
   @Override
   public String getNupkgRelativePath(final String packageId, final String version) {
 
-    return filePath(packageId.toLowerCase(Locale.ROOT), storedVersion(version), NUPKG_EXTENSION);
+    return filePath(
+        packageId.toLowerCase(Locale.ROOT), normalizeNuGetVersion(version), NUPKG_EXTENSION);
   }
 
   @Override
@@ -102,12 +101,12 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
       final UUID repoId, final String packageId, final String version) throws IOException {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
-    final var source = storedVersion(version);
-    final var target = normalizeNuGetVersion(version);
-
-    if (source.equals(target)) {
+    if (!hasBuildMetadata(version)) {
       return false;
     }
+
+    final var source = buildMetadataDirectory(version);
+    final var target = normalizeNuGetVersion(version);
 
     final var nupkgCopied = this.copyFile(repoId, normalizedId, source, target, NUPKG_EXTENSION);
     this.copyFile(repoId, normalizedId, source, target, NUSPEC_EXTENSION);
@@ -144,7 +143,27 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
 
-    final var versionPath = PACKAGES_PATH + "/" + normalizedId + "/" + storedVersion(version);
+    return this.deleteVersionDirectory(repoId, normalizedId, normalizeNuGetVersion(version));
+  }
+
+  @Override
+  public long deleteBuildMetadataVersion(
+      final UUID repoId, final String packageId, final String version) throws IOException {
+
+    // A version without build metadata has no directory of its own apart from the canonical one,
+    // which must not be removed here.
+    if (!hasBuildMetadata(version)) {
+      return 0;
+    }
+
+    return this.deleteVersionDirectory(
+        repoId, packageId.toLowerCase(Locale.ROOT), buildMetadataDirectory(version));
+  }
+
+  private long deleteVersionDirectory(
+      final UUID repoId, final String normalizedId, final String versionDirectory) {
+
+    final var versionPath = PACKAGES_PATH + "/" + normalizedId + "/" + versionDirectory;
     final var versionStoragePath = StoragePath.of(repoId, versionPath);
 
     final var usage = this.storageStrategy.calculatePathUsage(versionStoragePath);
@@ -172,23 +191,10 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
     this.storageStrategy.delete(storagePath);
   }
 
-  /**
-   * Reads a package file. A version with build metadata is looked up where it was stored before the
-   * metadata was dropped from the canonical form, and then under the canonical version, which is
-   * where a package pushed with that metadata now lives.
-   */
   private Optional<Resource> getPackageFile(
       final UUID repoId, final String packageId, final String version, final String extension) {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
-    final var stored =
-        this.storageStrategy.get(
-            StoragePath.of(repoId, filePath(normalizedId, storedVersion(version), extension)),
-            repoId.toString());
-
-    if (stored.isPresent() || !hasBuildMetadata(version)) {
-      return stored;
-    }
 
     return this.storageStrategy.get(
         StoragePath.of(repoId, filePath(normalizedId, normalizeNuGetVersion(version), extension)),
@@ -196,11 +202,16 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
   }
 
   /**
-   * The version directory of an already stored version. A version with build metadata can only be
-   * one stored before the metadata was dropped, so it keeps the directory it was written to.
+   * The version directory of a version stored with build metadata, which is the version as it was
+   * stored: only {@link #copyToCanonicalVersion} and {@link #deleteBuildMetadataVersion}, the
+   * migration of those versions (RPS-1059), read or remove it.
    */
-  private static String storedVersion(final String version) {
-    return hasBuildMetadata(version) ? legacyNuGetVersion(version) : normalizeNuGetVersion(version);
+  private static boolean hasBuildMetadata(final String version) {
+    return version.indexOf('+') >= 0;
+  }
+
+  private static String buildMetadataDirectory(final String version) {
+    return version.strip().toLowerCase(Locale.ROOT);
   }
 
   private static String filePath(

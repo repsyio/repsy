@@ -331,7 +331,9 @@ logged again.
 
 **Resetting other users:** a non-admin account left with the reset marker cannot log in until an
 admin resets its password, either from the users page in the web UI or directly with
-`POST /api/users/{userId}/actions/reset-password`.
+`POST /api/users/{userId}/actions/reset-password`. If no admin can sign in either, a
+[password reset marker file](#forgot-admin-password) resets the password of any account, not only
+an admin's, from inside the container.
 
 ## Configuration
 
@@ -357,10 +359,13 @@ admin resets its password, either from the users page in the web UI or directly 
 | `BASIC_AUTH_CACHE_ENABLED` | Remember successful HTTP Basic password checks, so a client that sends its username and password on every request pays for one password verification instead of one per request. See [Authenticating from CI](#authenticating-from-ci). | `true` |
 | `BASIC_AUTH_CACHE_TTL_SECONDS` | How long a remembered password check stays valid | `300` |
 | `BASIC_AUTH_CACHE_MAX_ENTRIES` | How many remembered password checks are kept | `10000` |
-| `AUTH_THROTTLE_ENABLED` | Limit the failed password checks of one client (HTTP Basic and web UI login), so a flood of wrong credentials cannot keep the CPU busy with password verification. A client over the limit is answered with `429 Too Many Requests`. See [Authenticating from CI](#authenticating-from-ci). | `true` |
+| `AUTH_THROTTLE_ENABLED` | Limit the failed password checks of one client (HTTP Basic, unrecognised Bearer tokens and web UI login), so a flood of wrong credentials cannot keep the CPU busy with password verification. A client over the limit is answered with `429 Too Many Requests`. See [Authenticating from CI](#authenticating-from-ci). | `true` |
 | `AUTH_THROTTLE_MAX_FAILURES` | How many failed password checks one client may make per window before its next password check is refused | `20` |
 | `AUTH_THROTTLE_WINDOW_SECONDS` | Length of the window in seconds. When it ends, the client starts again with a clean count | `60` |
 | `AUTH_THROTTLE_MAX_CLIENTS` | How many clients are tracked at once | `10000` |
+| `PASSWORD_RESET_MARKER_ENABLED` | Reset a user's password when a file named after the user is created in `PASSWORD_RESET_MARKER_DIR`. Nothing is reachable over the network: it takes write access to that directory. See [Forgot admin password?](#forgot-admin-password). Set it to `false` to switch the feature off | `true` |
+| `PASSWORD_RESET_MARKER_DIR` | Directory watched for password reset marker files. The Docker image sets it to `/app/data/password-reset`, on the persisted volume, whatever `STORAGE_BASE_PATH` is | `<STORAGE_BASE_PATH>/password-reset` (`/app/data/password-reset` in the image) |
+| `PASSWORD_RESET_MARKER_POLL_INTERVAL` | How often a running instance looks into the directory (ISO-8601 duration, at least `PT1S`). A marker created while the application is stopped is applied once at startup | `PT5S` |
 | `ABANDONED_UPLOAD_CLEANUP_ENABLED` | Periodically delete Docker and Helm OCI blob uploads that were started and never finished (aborted pushes), and release the disk usage they were charged for | `true` |
 | `ABANDONED_UPLOAD_TTL` | How long an upload can go without receiving data before it counts as abandoned (ISO-8601 duration) | `PT24H` |
 | `ABANDONED_UPLOAD_CLEANUP_INTERVAL` | How often the cleanup runs (ISO-8601 duration) | `PT1H` |
@@ -529,13 +534,26 @@ a BCrypt verification, until the window ends. That caps what a flood of wrong cr
 about a second of CPU per client and minute. Set `AUTH_THROTTLE_ENABLED` to `false` to turn the
 limit off.
 
-- **What counts:** only a failed password verification: a wrong password, or a username that does
-  not exist. Both count the same and are refused the same way, so the limit never reveals which
-  usernames exist, and it is keyed on the client, never on the username. A request that succeeds,
-  a deploy token, a bearer token and a request that carries no username do not count, and a success
-  does not reset the count: only the end of the window does.
+- **What counts:** a failed password verification (a wrong password, or a username that does not
+  exist) and a credential sent as a `Bearer` value that Repsy does not recognise: a deploy token
+  that was revoked, rotated or belongs to another repository, or a forged token (npm's
+  `_authToken`, a NuGet API key, a Cargo or Ruby token). A validly signed token that has merely
+  expired is recognised and does not count (it is answered `sessionExpired`), so a long `docker
+  push` whose token runs out does not spend the budget of everyone behind the same address.
+  All of them count the same and are refused the same way (`401 unAuthorized`), so the limit never
+  reveals which usernames exist, and it is keyed on the client, never on the username. A request
+  that succeeds, a valid deploy token, a valid bearer token, a recognised token that is refused
+  (revoked or read-only for a write, or without the admin role for a management call) and a
+  request that carries no username do not count, and a success does not reset the count: only the
+  end of the window does.
+- **A stale token in CI:** a job that keeps sending a rotated or revoked token (an old
+  `NPM_TOKEN`, an outdated `--api-key`) spends the same budget as a wrong password. `npm install`
+  sends many requests at once, so one stale token can use up the 20 failures within a second and
+  block the address for the rest of the window, until the token is fixed. Valid tokens keep
+  working while an address is blocked. Rotate the secret in the job as soon as you revoke it in
+  Repsy.
 - **Shared addresses:** many users behind one address (a company NAT, shared CI egress) share one
-  count. A password Repsy remembers (see above) and a deploy token cost no verification and keep
+  count. A password Repsy remembers (see above), a valid deploy token and a valid bearer token cost no verification and keep
   working for a client that is over the limit, so a CI job is not locked out by a neighbour that
   sends wrong passwords. A client that keeps sending guesses after it was blocked (ten times the
   limit) loses that as well until its window ends. Raise `AUTH_THROTTLE_MAX_FAILURES` if a shared
@@ -583,8 +601,53 @@ docker exec repsy env | grep ADMIN
 
 **Can't login:**
 - Verify `ADMIN_INITIAL_PASSWORD` was set before the first startup
-- **Forgot admin password?** Reset it by setting the hash to an empty string in the database
-  (`hash` is `NOT NULL`, so `NULL` is rejected):
+- <a id="forgot-admin-password"></a>**Forgot admin password?** Create an empty file named after the user in the password reset
+  directory, from inside the container. No database access is needed, and it works for any user, not
+  only for an admin. In the Docker image the directory is `/app/data/password-reset`:
+  ```bash
+  # Docker
+  docker exec repsy touch /app/data/password-reset/admin
+  docker logs repsy 2>&1 | grep "New password"
+
+  # Kubernetes
+  kubectl exec deploy/repsy -- touch /app/data/password-reset/admin
+  kubectl logs deploy/repsy | grep "New password"
+  ```
+  Within a few seconds (`PASSWORD_RESET_MARKER_POLL_INTERVAL`) Repsy removes the file, generates a
+  new random password for that user, revokes every session and refresh token of the account, and
+  logs one line at `WARN`:
+  ```
+  Password of user admin has been reset by the marker file /app/data/password-reset/admin. New password: <password>
+  ```
+  Copy the password from the log, sign in and change it under Profile: the log may be shipped
+  elsewhere. The file is removed before the password is changed, so a marker is applied only once.
+  The file name must be a valid username (lower-case letters, digits, `_` and `-`, 3 to 25
+  characters), and its content is never read. A marker for a user that does not exist is removed
+  with a warning. Symlinks and directories are ignored. Outside the image, or with a different
+  `PASSWORD_RESET_MARKER_DIR`, use the directory you configured (`<STORAGE_BASE_PATH>/password-reset`
+  by default).
+
+  **While Repsy is stopped** (for example, with the embedded H2 database, whose file only one process
+  can open), put the marker on the data volume and start Repsy: the directory is read once at
+  startup.
+  ```bash
+  docker stop repsy
+  docker run --rm -v repsy-data:/app/data alpine touch /app/data/password-reset/admin
+  docker start repsy
+  docker logs repsy 2>&1 | grep "New password"
+  ```
+  If the log shows more than one `New password` line for the same user (a marker and an emptied
+  hash, see below, applied at the same startup), use the last one.
+
+  **If the marker does nothing:** check that `PASSWORD_RESET_MARKER_ENABLED` is not `false`, and that
+  the directory is writable by the user Repsy runs as (`appuser` in the image; a bind-mounted
+  `/app/data` owned by root makes Repsy log `Could not create the password reset marker directory`
+  at startup). Anyone who can write to that directory can lock an account out (the account then has
+  a password only the log holds), which is why it is a directory of its own, outside the protocol
+  storage tree in the Docker image. Set `PASSWORD_RESET_MARKER_ENABLED=false` if you do not want it.
+
+  **Alternative, without the marker directory (older images):** reset the password by setting the
+  hash to an empty string in the database (`hash` is `NOT NULL`, so `NULL` is rejected):
   ```sql
   -- Connect to PostgreSQL
   docker exec -it repsy-postgres psql -U repsy -d repsy

@@ -45,7 +45,15 @@ public interface NuGetStorageService {
    */
   boolean copyToCanonicalVersion(UUID repoId, String packageId, String version) throws IOException;
 
+  /** Deletes the files of a version, which are kept under its canonical version. */
   long deletePackageVersion(UUID repoId, String packageId, String version) throws IOException;
+
+  /**
+   * Deletes the directory a version stored with build metadata was written to (RPS-1059), once its
+   * files are in the directory of the canonical version. It does nothing for a version without
+   * build metadata, so it can never remove the canonical directory.
+   */
+  long deleteBuildMetadataVersion(UUID repoId, String packageId, String version) throws IOException;
 
   long deletePackage(UUID repoId, String packageId) throws IOException;
 

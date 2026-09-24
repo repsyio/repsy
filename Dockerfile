@@ -161,7 +161,7 @@ FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
-    mkdir -p /app/data /app/certs && \
+    mkdir -p /app/data/password-reset /app/certs && \
     chown -R appuser:appgroup /app/data /app/certs
 
 COPY entrypoint.sh /app/entrypoint.sh
@@ -180,6 +180,10 @@ COPY --chown=appuser:appgroup --from=frontend-build /app/dist/panel-frontend/bro
 # spring-boot:run) keeps application.yml's own PostgreSQL default instead -- this ENV only affects
 # the image. Any DB_URL passed at "docker run" time overrides this. See RPS-1173.
 ENV DB_URL="jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
+
+# Where an operator drops a marker file to reset a user's password (README "Forgot admin password?").
+# It lives on the persisted volume whatever STORAGE_BASE_PATH is. See RPS-1107.
+ENV PASSWORD_RESET_MARKER_DIR="/app/data/password-reset"
 
 VOLUME /app/data
 

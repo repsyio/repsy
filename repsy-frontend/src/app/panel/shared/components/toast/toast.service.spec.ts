@@ -136,4 +136,66 @@ describe('ToastService', () => {
 
     tick(3000);
   }));
+
+  describe('error toasts (RPS-1266)', () => {
+    it('lasts 7 seconds by default, longer than a success toast', fakeAsync(() => {
+      service.show('Boom', 'error');
+
+      tick(3000);
+      expect(service.toasts.length).toBe(1);
+      tick(3999);
+      expect(service.toasts.length).toBe(1);
+      tick(1);
+      expect(service.toasts.length).toBe(0);
+    }));
+
+    it('still honours an explicit duration', fakeAsync(() => {
+      service.show('Boom', 'error', 500);
+
+      tick(500);
+      expect(service.toasts.length).toBe(0);
+    }));
+
+    it('stays while paused and only counts down the time it had left after resume', fakeAsync(() => {
+      service.show('Boom', 'error');
+      const id = service.toasts[0].id;
+
+      tick(5000);
+      service.pause(id);
+      tick(60000);
+      expect(service.toasts.length).toBe(1);
+
+      service.resume(id);
+      tick(1999);
+      expect(service.toasts.length).toBe(1);
+      tick(1);
+      expect(service.toasts.length).toBe(0);
+    }));
+
+    it('ignores pause and resume of an unknown toast, and a second pause or resume', fakeAsync(() => {
+      service.show('Boom', 'error');
+      const id = service.toasts[0].id;
+
+      service.pause(9999);
+      service.resume(9999);
+      service.pause(id);
+      service.pause(id);
+      service.resume(id);
+      service.resume(id);
+
+      tick(7000);
+      expect(service.toasts.length).toBe(0);
+    }));
+
+    it('does not resurrect the timer of a toast removed while paused', fakeAsync(() => {
+      service.show('Boom', 'error');
+      const id = service.toasts[0].id;
+      service.pause(id);
+      service.remove(id);
+      service.resume(id);
+
+      tick(10000);
+      expect(service.toasts).toEqual([]);
+    }));
+  });
 });

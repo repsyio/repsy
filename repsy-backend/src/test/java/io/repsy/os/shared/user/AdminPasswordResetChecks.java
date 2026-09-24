@@ -26,7 +26,8 @@ import org.springframework.boot.test.system.CapturedOutput;
  * H2) share: the statements of the README's "Forgot admin password?" recovery and the way to read
  * the new password the initializer logs. Both databases must accept the same statements and give
  * the same result, and running the same assertions against each is what proves it (RPS-1026,
- * RPS-1099).
+ * RPS-1099). {@link PasswordResetMarkerScannerIT} and {@link H2PasswordResetMarkerIT} read the
+ * password the marker file recovery logs the same way (RPS-1107).
  */
 final class AdminPasswordResetChecks {
 
@@ -49,12 +50,36 @@ final class AdminPasswordResetChecks {
             "Admin password has been reset for user "
                 + Pattern.quote(admin.getUsername())
                 + "\\. New password: (\\S+)");
+
+    return lastMatch(pattern, admin.getUsername(), output);
+  }
+
+  /**
+   * The password the marker file recovery logged for {@code username} (the last one, as the README
+   * tells operators), which fails if it logged none.
+   */
+  static String loggedMarkerPasswordOf(final String username, final CapturedOutput output) {
+    final var pattern =
+        Pattern.compile(
+            "Password of user "
+                + Pattern.quote(username)
+                + " has been reset by the marker file \\S+\\. New password: (\\S+)");
+
+    return lastMatch(pattern, username, output);
+  }
+
+  private static String lastMatch(
+      final Pattern pattern, final String username, final CapturedOutput output) {
     final var matcher = pattern.matcher(output.getAll());
+    String password = null;
+    while (matcher.find()) {
+      password = matcher.group(1);
+    }
 
-    assertThat(matcher.find())
-        .as("the reset of %s is logged with its new password", admin.getUsername())
-        .isTrue();
+    assertThat(password)
+        .as("the reset of %s is logged with its new password", username)
+        .isNotNull();
 
-    return matcher.group(1);
+    return password;
   }
 }

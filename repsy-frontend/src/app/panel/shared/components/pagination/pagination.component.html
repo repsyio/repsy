@@ -1,17 +1,27 @@
-<div data-testid="pagination" class="flex items-center justify-end gap-1 py-2" [ngClass]="{ hidden: totalPages <= 1 }">
+<nav
+  data-testid="pagination"
+  aria-label="Pagination"
+  class="flex items-center justify-end gap-1 py-2"
+  [ngClass]="{ hidden: totalPages <= 1 }"
+>
   <button
     data-testid="pagination-prev"
+    type="button"
+    aria-label="Previous page"
     (click)="previousPage()"
     class="text-secondary-500 flex h-8 w-7 items-center justify-center rounded-[8px] bg-neutral-400 p-[6px] text-sm font-medium hover:bg-neutral-300 disabled:opacity-50"
     [disabled]="pageNum === 0"
   >
-    <img ngSrc="/assets/icons/cursor/arrow-left.svg" class="h-[12px] w-[12px]" height="8" width="4" alt="page-left" />
+    <img ngSrc="/assets/icons/cursor/arrow-left.svg" class="h-[12px] w-[12px]" height="8" width="4" alt="" />
   </button>
   <div class="flex items-center gap-1">
     @for (page of pages; track page) {
       @if (isNumber(page)) {
         <button
           [attr.data-testid]="'pagination-page-' + (page + 1)"
+          type="button"
+          [attr.aria-label]="'Page ' + (page + 1)"
+          [attr.aria-current]="page === pageNum ? 'page' : null"
           (click)="goToPage(page)"
           [disabled]="page === pageNum"
           [ngClass]="{
@@ -33,10 +43,12 @@
   </div>
   <button
     data-testid="pagination-next"
+    type="button"
+    aria-label="Next page"
     (click)="nextPage()"
     class="text-secondary-500 flex h-8 w-7 items-center justify-center rounded-[8px] bg-neutral-400 p-[6px] text-sm font-medium hover:bg-neutral-300 disabled:opacity-50"
     [disabled]="pageNum + 1 >= totalPages"
   >
-    <img ngSrc="/assets/icons/cursor/arrow-right.svg" class="h-[12px] w-[12px]" height="8" width="5" alt="page-right" />
+    <img ngSrc="/assets/icons/cursor/arrow-right.svg" class="h-[12px] w-[12px]" height="8" width="5" alt="" />
   </button>
-</div>
+</nav>
