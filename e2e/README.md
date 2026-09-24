@@ -2469,9 +2469,11 @@ so `panelApi` and `seeder` (per-test run id, cleanup) work unchanged, and adds:
   starting or stopping on the host adds a veth link, a wifi interface refreshes its IPv6 lifetimes). The
   SPA bundle (`main-*.js`, `polyfills-*.js`, chunks) is lost with it, the panel never boots, and the test
   times out on `pkg-toolbar`, `settings-page` or `user-title` of a blank page. `healHostNetworkChange`
-  (`defaults.ts`) reloads the page (up to 5 times) when a same-origin GET fails with exactly that
-  error; `harness.spec.ts` proves it. A write is never replayed and a `page.goto()` that itself is refused
-  still throws, so a run that hits either shows the error text in its trace, not a timeout.
+  (`defaults.ts`) reloads the page (up to 5 times, again when the reload is hit too) when a same-origin
+  script, stylesheet or API read (GET) fails with exactly that error; `harness.spec.ts` proves it. Images
+  and fonts are left alone (a reload would throw away what the test is doing), a write is never replayed
+  and a `page.goto()` that itself is refused still throws, so a run that hits one of those shows the error
+  text in its trace, not a timeout. Each reload is logged as `[ui] host network changed (...)`.
 - **Guards redirect to `/`, not `/login`.** `AuthGuard` sends an anonymous visitor of a protected route
   to `/?returnUrl=<the route>`, and `/` renders the login form _in place_ (`AuthRedirectComponent`
   follows the session: the login form, then the dashboard as soon as a login stores one), so the path

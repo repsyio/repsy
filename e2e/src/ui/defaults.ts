@@ -90,6 +90,18 @@ export async function applyUiDefaults(
 /** What Chromium reports for a request it aborted because the HOST's network configuration changed. */
 export const HOST_NETWORK_CHANGED = /ERR_NETWORK_CHANGED/;
 
+/**
+ * The requests whose loss leaves a page unbooted or empty. An image, a font or a beacon lost to the
+ * same event costs the panel nothing, and a reload for it would throw away what a test is in the
+ * middle of (AUTH-09 lost its "Session expired" toast to a reload caused by two icons).
+ */
+const HEALED_RESOURCE_TYPES: ReadonlySet<string> = new Set([
+  'script',
+  'stylesheet',
+  'xhr',
+  'fetch',
+]);
+
 /** How many reloads `healHostNetworkChange` gives one page before the failure is left to the test. */
 export const MAX_NETWORK_CHANGE_RELOADS = 5;
 
@@ -104,8 +116,8 @@ export const MAX_NETWORK_CHANGE_RELOADS = 5;
  * `pkg-toolbar` / `settings-page` / `user-title` of a blank page. Nothing in the panel or the test is
  * wrong: a reload gets the page.
  *
- * So a same-origin GET (the SPA's scripts and styles, or a panel-API read that the view renders from)
- * that fails with exactly that error reloads its page, and reloads again when that load is hit too, up
+ * So a same-origin GET (the SPA's scripts and styles, or a panel-API read that the view renders from,
+ * `HEALED_RESOURCE_TYPES`; never an icon or an image) that fails with exactly that error reloads its page, and reloads again when that load is hit too, up
  * to `MAX_NETWORK_CHANGE_RELOADS` times (a failure of a request issued after the reload started is the
  * reload's own). A write (POST/PUT/DELETE) is never replayed: its outcome is unknown. Top-level
  * navigations are left alone, since a `page.goto()` that is refused reports the error to its caller
@@ -159,6 +171,7 @@ export function healHostNetworkChange(
     if (
       request.method() !== 'GET' ||
       request.isNavigationRequest() ||
+      !HEALED_RESOURCE_TYPES.has(request.resourceType()) ||
       !matches.test(request.failure()?.errorText ?? '') ||
       !allowedOrigins.has(new URL(request.url()).origin)
     ) {
