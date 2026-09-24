@@ -1,0 +1,42 @@
+// Rendered by clients/maven-signing.ts (mustache). The publisher's real Gradle setup for a signed
+// release: maven-publish uploads the jar, the sources jar, the POM and the Gradle module metadata,
+// and the signing plugin, driven by the gpg binary (useGpgCmd), signs every one of them. The gpg
+// key, its home and its passphrase come from the run's own GRADLE_USER_HOME/gradle.properties
+// (signing.gnupg.*); the Repsy credential from ORG_GRADLE_PROJECT_repsyUsername/repsyPassword.
+plugins {
+  id 'java-library'
+  id 'maven-publish'
+  id 'signing'
+}
+
+group = '{{{groupId}}}'
+version = '{{{version}}}'
+
+java {
+  withSourcesJar()
+}
+
+publishing {
+  publications {
+    mavenJava(MavenPublication) {
+      from components.java
+    }
+  }
+  repositories {
+    maven {
+      url = uri('{{{repoUrl}}}')
+      allowInsecureProtocol = true
+      credentials {
+        username = findProperty('repsyUsername')
+        password = findProperty('repsyPassword')
+      }
+    }
+  }
+}
+
+signing {
+  {{#signed}}
+  useGpgCmd()
+  sign publishing.publications.mavenJava
+  {{/signed}}
+}
