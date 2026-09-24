@@ -115,9 +115,10 @@ export interface DetailLevel {
   /**
    * The Delete button (managers only). Where the browser lands after a confirmed delete is ONE
    * convention for every protocol (RPS-1288): the package's versions page, or the package list of the
-   * repo when it was the package's LAST version. A protocol that has not adopted it yet records its
-   * own landing here (`landsOn` for a version that has siblings, `landsOnLast` for the last one, which
-   * defaults to `landsOn`); a protocol that follows the convention sets neither.
+   * repo when it was the package's LAST version. A protocol that follows it sets neither field; one that
+   * deviates records its own landing (`landsOn` for a version that has siblings, `landsOnLast` for the
+   * last one, which defaults to `landsOn`): Docker's image stays with `No tags` after its last tag, so it
+   * lands on the image's tag list.
    */
   delete:
     | (DeleteAffordance & {
@@ -165,10 +166,13 @@ export interface ProtocolDescriptor {
   toolbar: { browseFiles: boolean };
   /**
    * Whether deleting a package's LAST version removes the package from the list (true for maven, npm,
-   * pypi, nuget). Docker keeps the image listed (probed: an image with no tags stays, digest empty,
-   * size 0 B). `unverified` = read from the code only.
+   * pypi, nuget). Docker keeps the image listed BY DESIGN (RPS-1288 item 5): deleting a tag removes
+   * only the tag, the manifest stays pullable by digest, and the image goes with its last manifest.
+   * `unverified` = read from the code only.
    */
   lastVersionRemovesPackage: boolean | 'unverified';
+  /** What a package kept after its last version was deleted says in its list row (Docker: "No tags"). */
+  lastVersionKeptRowText?: string;
   /** Routes that are not a level (maven's `/:repo/browser`). */
   extraPaths: Readonly<Record<string, (repo: string) => string>>;
   /** The Configure modal's texts (RPS-1256); absent = the template's default. */

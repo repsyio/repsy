@@ -464,6 +464,60 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
         .andExpect(jsonPath("$.type").value("ERROR"));
   }
 
+  @Test
+  @DisplayName("deleting the last version removes the module; the wire keeps its old answers")
+  void lastVersionDeleteRemovesTheModule() throws Exception {
+    final var user = this.createUser(uniqueUsername("gomod"), UserRole.ADMIN);
+    final var token = this.bearerTokenFor(user);
+    final var repo = this.createRepo(unique("go"), false);
+    this.upload(repo, "v1.0.0", this.protocolBearerTokenFor(user));
+    this.upload(repo, "v1.2.0", this.protocolBearerTokenFor(user));
+
+    for (final var version : new String[] {"v1.0.0", "v1.2.0"}) {
+      this.mockMvc
+          .perform(
+              delete("/api/go/modules/{repo}/versions", repo)
+                  .param("modulePath", MODULE)
+                  .param("version", version)
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk());
+
+      final var moduleListed = version.equals("v1.0.0") ? 1 : 0;
+      this.mockMvc
+          .perform(get("/api/go/modules/{repo}", repo).with(apiPort()).header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(moduleListed)))
+          .andExpect(jsonPath("$.data.page.totalElements").value(moduleListed));
+    }
+
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}/versions", repo)
+                .param("modulePath", MODULE)
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.msgId").value("moduleNotFound"));
+
+    // The proxy answers as it does for a module that was never published: an empty list, no latest.
+    this.mockMvc
+        .perform(get("/{repo}/{module}/@v/list", repo, MODULE).with(protocolPort()))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(""));
+    this.mockMvc
+        .perform(get("/{repo}/{module}/@latest", repo, MODULE).with(protocolPort()))
+        .andExpect(status().isNotFound());
+
+    // Publishing again creates the module again.
+    this.upload(repo, "v1.0.0", this.protocolBearerTokenFor(user));
+    this.mockMvc
+        .perform(get("/api/go/modules/{repo}", repo).with(apiPort()).header(AUTHORIZATION, token))
+        .andExpect(jsonPath("$.data.content", hasSize(1)))
+        .andExpect(jsonPath("$.data.content[0].modulePath").value(MODULE));
+  }
+
   @Nested
   @DisplayName("paging and sorting of the list endpoints")
   class PagingAndSorting {

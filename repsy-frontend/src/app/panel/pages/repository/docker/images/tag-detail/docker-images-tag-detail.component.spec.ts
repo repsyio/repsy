@@ -184,14 +184,14 @@ describe('DockerImagesTagDetailComponent', () => {
       expect(dockerService.deleteTag).not.toHaveBeenCalled();
     });
 
-    it('deletes the tag, then goes to the repository and toasts', async () => {
+    it("deletes the tag, then goes to the image's tag list and toasts", async () => {
       component.deleteTag();
 
       dangerModalService.call();
       await Promise.resolve();
 
       expect(dockerService.deleteTag).toHaveBeenCalledOnceWith('nginx', 'latest');
-      expect(router.navigateByUrl).toHaveBeenCalledOnceWith(`/${REPO}`);
+      expect(router.navigateByUrl).toHaveBeenCalledOnceWith(`/${REPO}/nginx`);
       expect(toastService.show).toHaveBeenCalledOnceWith('Tag deleted successfully', 'success');
     });
 

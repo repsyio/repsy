@@ -13,9 +13,16 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { HttpContext } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
+import { firstValueFrom, of } from 'rxjs';
 
-import { DockerImageControllerService, ProtocolRepoControllerService } from '../../../../../../generated/api';
+import {
+  DockerImageControllerService,
+  ImageListItem,
+  ProtocolRepoControllerService,
+} from '../../../../../../generated/api';
+import { SILENT_ERROR } from '../../../../../shared/interceptor/error-handler.interceptor';
 import {
   CallCase,
   describeCalls,
@@ -50,6 +57,7 @@ describe('DockerService', () => {
       'listDockerImageTags',
       'listTagManifests',
       'deleteDockerImage',
+      'getDockerImageSummary',
       'getDockerImageTag',
       'deleteTag',
       'getManifest',
@@ -146,5 +154,32 @@ describe('DockerService', () => {
       },
     ];
     describeCalls(() => service, calls);
+
+    describe('fetchImageSummary', () => {
+      const summary: ImageListItem = { name: IMAGE, tagCount: 0, untaggedManifestCount: 2, untaggedSize: 2048 };
+
+      it('reads the image of the active repository and unwraps the answer', async () => {
+        dockerApi.getDockerImageSummary.and.returnValue(of(restResponse(summary)) as never);
+
+        const result = await firstValueFrom(service.fetchImageSummary(IMAGE));
+
+        expect(result).toEqual(summary);
+        expect(dockerApi.getDockerImageSummary).toHaveBeenCalledTimes(1);
+        const args = dockerApi.getDockerImageSummary.calls.mostRecent().args as unknown[];
+        expect(args.slice(0, 4)).toEqual([IMAGE, REPO, 'body', false]);
+        expect(args[4]).toEqual({ context: jasmine.any(HttpContext) });
+      });
+
+      it('does not toast a 404, because the page leaves when the image is gone', () => {
+        dockerApi.getDockerImageSummary.and.returnValue(of(restResponse(summary)) as never);
+
+        service.fetchImageSummary(IMAGE).subscribe();
+
+        const options = dockerApi.getDockerImageSummary.calls.mostRecent().args[4] as unknown as {
+          context: HttpContext;
+        };
+        expect(options.context.get(SILENT_ERROR)).toBeTrue();
+      });
+    });
   });
 });

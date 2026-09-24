@@ -120,6 +120,8 @@ export class ProtocolListPage extends UiPage {
   readonly spinner: Spinner;
   readonly error: Locator;
   readonly errorMessage: Locator;
+  /** Docker's tag list of an image with no tag left: what it still stores, and the actions (RPS-1288). */
+  readonly noTags: Locator;
   readonly toasts: Toasts;
   readonly dangerModal: DangerModal;
 
@@ -150,6 +152,7 @@ export class ProtocolListPage extends UiPage {
     this.spinner = new Spinner(page);
     this.error = this.tid('pkg-error');
     this.errorMessage = this.tid('pkg-error-message');
+    this.noTags = this.tid('pkg-no-tags');
     this.toasts = new Toasts(page);
     this.dangerModal = new DangerModal(page);
   }
@@ -176,6 +179,7 @@ export class ProtocolListPage extends UiPage {
       this.desktop.container
         .or(this.cards)
         .or(this.emptyList.root)
+        .or(this.noTags)
         .or(this.error)
         .filter({ visible: true })
         .first(),

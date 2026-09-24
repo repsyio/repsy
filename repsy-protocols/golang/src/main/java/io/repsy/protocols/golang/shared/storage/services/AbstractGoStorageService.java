@@ -86,30 +86,34 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
   }
 
   @Override
-  public void deleteDirectory(final StoragePath storagePath) {
+  public long deleteDirectory(final StoragePath storagePath) {
+    final var freedBytes = this.storageStrategy.calculatePathUsage(storagePath);
     this.storageStrategy.delete(storagePath);
+
+    return freedBytes;
   }
 
   @Override
-  public void deleteVersionFiles(final StoragePath atVVersionBasePath, final String repoName) {
+  public long deleteVersionFiles(final StoragePath atVVersionBasePath, final String repoName) {
 
     final var storageKey = atVVersionBasePath.getStorageKey();
     if (storageKey == null) {
-      return;
+      return 0L;
     }
     final var relativePath = atVVersionBasePath.getRelativePath().getPath();
     final var lastSlash = relativePath.lastIndexOf('/');
     if (lastSlash < 0) {
-      return;
+      return 0L;
     }
     final var versionPrefix = relativePath.substring(lastSlash + 1);
     final var atVDirPath = relativePath.substring(0, lastSlash + 1);
     final var atVStoragePath = StoragePath.of(storageKey, atVDirPath);
 
+    long freedBytes = 0L;
     try {
       final var items = this.storageStrategy.listDirectoryContents(atVStoragePath);
       for (final var item : items) {
-        this.tryDeleteVersionFile(item, versionPrefix, atVDirPath, storageKey);
+        freedBytes += this.tryDeleteVersionFile(item, versionPrefix, atVDirPath, storageKey);
       }
     } catch (final ItemNotFoundException _) {
       // No @v directory means there are no files left to remove.
@@ -118,15 +122,18 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
       // Cleanup is best effort: the caller still removes the version's database row.
       log.warn("Could not list {} while deleting version files", atVStoragePath, e);
     }
+
+    return freedBytes;
   }
 
-  private void tryDeleteVersionFile(
+  /** Returns the bytes of the file when it was removed, and 0 when it was not one to remove. */
+  private long tryDeleteVersionFile(
       final StorageItemInfo item,
       final String versionPrefix,
       final String atVDirPath,
       final UUID storageKey) {
     if (item.isDirectory() || !item.getName().startsWith(versionPrefix + ".")) {
-      return;
+      return 0L;
     }
     final var filePath = StoragePath.of(storageKey, atVDirPath + item.getName());
     try {
@@ -134,7 +141,10 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
     } catch (final Exception e) {
       // Best effort: one file that cannot be removed must not stop the others from being removed.
       log.warn("Could not delete version file {}", filePath, e);
+      return 0L;
     }
+
+    return item.getSize() == null ? 0L : item.getSize();
   }
 
   @Override

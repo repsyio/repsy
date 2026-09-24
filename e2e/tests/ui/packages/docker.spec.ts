@@ -22,6 +22,7 @@
 import { RepoType } from '../../../src/api/panel-api.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { rawGetManifest } from '../../../src/clients/docker-raw.js';
+import { scanPage } from '../../../src/ui/a11y.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { asDetailPage, registerPackageScenarios } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
@@ -174,10 +175,13 @@ test.describe('Docker image, tags, manifests and tag detail', { tag: '@packages'
     await opened.expectLoaded();
     await opened.delete();
 
-    // It lands on the image list (recorded: RPS-1288 (7) asks for one convention), and the image is still there.
-    await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
+    // It lands on the image's tag list (RPS-1288 item 7), which no longer has that tag.
+    await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}/${one.name}$`));
+    await tags.expectLoaded();
+    await tags.expectNoRow(one);
+    await tags.expectRow(two);
     const images = pages.list();
-    await images.expectLoaded();
+    await images.goto();
     await images.expectRow(one);
 
     await tags.goto();
@@ -185,5 +189,179 @@ test.describe('Docker image, tags, manifests and tag detail', { tag: '@packages'
     await tags.expectRow(two);
     expect((await rawGetManifest(repo.name, admin, one.name, one.version)).status).toBe(404);
     expect((await rawGetManifest(repo.name, admin, two.name, two.version)).status).toBe(200);
+  });
+
+  // RPS-1288 item 5: an image stays while it stores any manifest. Deleting its last TAG removes the tag
+  // only (OCI: the manifest stays pullable by digest), so the image is listed as "No tags" with what it
+  // keeps, its page stays and explains, and it goes with its last manifest.
+  test.describe('an image whose last tag was deleted (RPS-1288)', () => {
+    const untaggedText = /1 untagged manifest is still stored/;
+
+    test('PKG-docker-08 stays listed as "No tags" with its untagged manifest and size, and its page explains', async ({
+      adminPage,
+      seeder,
+      seedPackage,
+    }, testInfo) => {
+      const repo = await seeder.createRepo(RepoType.DOCKER);
+      const image = await seedPackage(repo);
+      const pages = protocolPages(adminPage, docker, repo.name);
+      const admin = adminCredential();
+
+      const tags = pages.versions(image);
+      await tags.goto();
+      await tags.deleteRow(image);
+
+      // The page stays (it does not leave for the list) and says what is left, with both actions.
+      await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}/${image.name}$`));
+      await expect(tags.noTags).toBeVisible();
+      await expect(tags.noTags).toContainText('This image has no tags');
+      await expect(tags.noTags).toContainText(untaggedText);
+      await expect(tags.emptyList.root).toBeHidden();
+      await expect(adminPage.getByTestId('pkg-delete-untagged')).toBeVisible();
+      await expect(adminPage.getByTestId('pkg-no-tags-delete-image')).toBeVisible();
+      await scanPage(adminPage, testInfo, 'docker-no-tags-page');
+
+      // The manifest is still pullable by digest, and the panel counts it.
+      expect(
+        (await rawGetManifest(repo.name, admin, image.name, image.extra['digest'])).status,
+      ).toBe(200);
+      expect((await rawGetManifest(repo.name, admin, image.name, image.version)).status).toBe(404);
+
+      // The list keeps the row: "No tags", how many untagged manifests, and the untagged size (not 0 B).
+      const images = pages.list();
+      await images.goto();
+      await images.expectRow(image);
+      await expect(images.inRow(image, 'row-no-tags')).toHaveText('No tags');
+      await expect(images.inRow(image, 'row-untagged')).toHaveText('1 untagged manifest');
+      await expect(images.inRow(image, 'row-size')).toContainText('untagged');
+      await expect(images.inRow(image, 'row-size')).not.toContainText(/^\s*0 B/);
+      await scanPage(adminPage, testInfo, 'docker-no-tags-list');
+
+      // The row still opens the image page with the explanation, through its one link.
+      await images.openRow(image);
+      await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}/${image.name}$`));
+      await expect(tags.noTags).toBeVisible();
+    });
+
+    test('PKG-docker-08 two images without tags are two rows, on the desktop list and on the mobile cards', async ({
+      openUiPage,
+      adminSession,
+      panelApi,
+      seeder,
+      seedPackage,
+    }) => {
+      const repo = await seeder.createRepo(RepoType.DOCKER);
+      const first = await seedPackage(repo, { index: 1 });
+      const second = await seedPackage(repo, { index: 2 });
+      await panelApi.deleteDockerTag(repo.name, first.name, first.version);
+      await panelApi.deleteDockerTag(repo.name, second.name, second.version);
+
+      // Rows used to be tracked by their last update, which an image without tags does not have.
+      const desktop = protocolPages(
+        await openUiPage({ session: adminSession }),
+        docker,
+        repo.name,
+      ).list();
+      await desktop.goto();
+      await desktop.expectRow(first);
+      await desktop.expectRow(second);
+      await expect(desktop.rows()).toHaveCount(2);
+      await expect(desktop.inRow(first, 'row-no-tags')).toBeVisible();
+      await expect(desktop.inRow(second, 'row-no-tags')).toBeVisible();
+
+      const mobilePage = await openUiPage({
+        session: adminSession,
+        viewport: { width: 390, height: 844 },
+      });
+      const mobile = protocolPages(mobilePage, docker, repo.name).list();
+      await mobile.goto();
+      await expect(mobile.card(first)).toContainText('No tags');
+      await expect(mobile.card(first)).toContainText('1 untagged manifest');
+      await expect(mobile.card(second)).toContainText('No tags');
+      await expect(mobile.card(second)).toContainText('untagged');
+    });
+
+    test('PKG-docker-08 "Delete Untagged Manifests" on its page removes the manifests and the image', async ({
+      adminPage,
+      panelApi,
+      seeder,
+      seedPackage,
+    }) => {
+      const repo = await seeder.createRepo(RepoType.DOCKER);
+      const emptied = await seedPackage(repo, { index: 1 });
+      const kept = await seedPackage(repo, { index: 2 });
+      const pages = protocolPages(adminPage, docker, repo.name);
+      const admin = adminCredential();
+      await panelApi.deleteDockerTag(repo.name, emptied.name, emptied.version);
+      expect((await panelApi.getDockerImageSummary(repo.name, emptied.name)).tagCount).toBe(0);
+
+      const tags = pages.versions(emptied);
+      await tags.goto();
+      await expect(tags.noTags).toBeVisible();
+      await adminPage.getByTestId('pkg-delete-untagged').click();
+      await tags.dangerModal.expectOpen('Delete Untagged Manifests');
+      await tags.dangerModal.confirm();
+      await tags.toasts.expectSuccess(/Deleted 1 untagged manifest/);
+
+      // The image went with its last manifest, so the page leaves for the image list.
+      await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
+      const images = pages.list();
+      await images.expectLoaded();
+      await images.expectNoRow(emptied);
+      await images.expectRow(kept);
+      expect(
+        (await rawGetManifest(repo.name, admin, emptied.name, emptied.extra['digest'])).status,
+      ).toBe(404);
+      await expect(panelApi.getDockerImageSummary(repo.name, emptied.name)).rejects.toMatchObject({
+        status: 404,
+      });
+      expect((await rawGetManifest(repo.name, admin, kept.name, kept.version)).status).toBe(200);
+    });
+
+    test('PKG-docker-08 "Delete Image" on its page removes the image and goes to the list', async ({
+      adminPage,
+      panelApi,
+      seeder,
+      seedPackage,
+    }) => {
+      const repo = await seeder.createRepo(RepoType.DOCKER);
+      const emptied = await seedPackage(repo, { index: 1 });
+      const pages = protocolPages(adminPage, docker, repo.name);
+      await panelApi.deleteDockerTag(repo.name, emptied.name, emptied.version);
+
+      const tags = pages.versions(emptied);
+      await tags.goto();
+      await adminPage.getByTestId('pkg-no-tags-delete-image').click();
+      await tags.dangerModal.expectOpen('Delete Image');
+      await tags.dangerModal.confirm();
+      await tags.toasts.expectSuccess('Image deleted successfully');
+
+      await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
+      const images = pages.list();
+      await images.expectLoaded();
+      await images.expectNoRow(emptied);
+    });
+
+    test('PKG-docker-08 an image with one manifest and another tag left is not "No tags"', async ({
+      adminPage,
+      panelApi,
+      seeder,
+      seedVersions,
+    }) => {
+      const repo = await seeder.createRepo(RepoType.DOCKER);
+      const [one, two] = await seedVersions(repo, ['1.0.0', '2.0.0']);
+      const pages = protocolPages(adminPage, docker, repo.name);
+      await panelApi.deleteDockerTag(repo.name, one.name, one.version);
+
+      const images = pages.list();
+      await images.goto();
+      await images.expectRow(one);
+      await expect(images.inRow(one, 'row-no-tags')).toHaveCount(0);
+      await expect(images.inRow(one, 'row-digest')).toContainText(two.extra['digest'].slice(0, 15));
+      const tags = pages.versions(one);
+      await tags.goto();
+      await tags.expectRow(two);
+      await expect(tags.noTags).toBeHidden();
+    });
   });
 });

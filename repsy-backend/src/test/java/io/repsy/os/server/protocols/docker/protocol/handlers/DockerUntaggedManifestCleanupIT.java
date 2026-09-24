@@ -194,6 +194,11 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
         .isEqualTo(layerBytes);
   }
 
+  private List<String> imageNames(final Repo repo) {
+    return this.jdbcTemplate.queryForList(
+        "select name from docker_image where repo_id = ?", String.class, repo.getId());
+  }
+
   private int manifestRows(final Repo repo) {
     return this.count(
         "select count(*) from docker_manifest m join docker_image i on i.id = m.image_id"
@@ -342,6 +347,73 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
 
     assertThat(this.status(repo, "b", oldB)).isEqualTo(404);
     this.awaitBlobsDeleted(repo, "layer-a1", "layer-b1");
+  }
+
+  @Test
+  @DisplayName(
+      "the repo-wide cleanup removes an image whose manifests are all gone, and only that one")
+  void theRepoWideCleanupRemovesTheImagesItEmptied() throws Exception {
+    final var repo = this.dockerRepo();
+    // "emptied": its only tag was deleted, so it stores one untagged manifest and nothing else.
+    this.push(repo, "emptied", "latest", "layer-e1");
+    this.deleteTag(repo, "emptied", "latest");
+    // "mixed": one tag and one untagged manifest, the image stays with the tagged one.
+    this.push(repo, "mixed", "latest", "layer-m1");
+    final var mixedOld = this.push(repo, "mixed", "latest", "layer-m2");
+    // "tagged": nothing to delete.
+    this.push(repo, "tagged", "latest", "layer-t1");
+    assertThat(this.imageNames(repo)).containsExactlyInAnyOrder("emptied", "mixed", "tagged");
+
+    this.cleanup(repo);
+
+    assertThat(this.imageNames(repo))
+        .as("the image with no manifest left is deleted, the others stay")
+        .containsExactlyInAnyOrder("mixed", "tagged");
+    assertThat(this.status(repo, "mixed", mixedOld)).isEqualTo(200);
+    assertThat(this.wire.getManifest(repo, "emptied", "latest").getStatus()).isEqualTo(404);
+
+    // The next push of the deleted name creates it again.
+    this.push(repo, "emptied", "latest", "layer-e2");
+    assertThat(this.imageNames(repo)).contains("emptied");
+  }
+
+  @Test
+  @DisplayName("the per-image cleanup removes the image it emptied")
+  void thePerImageCleanupRemovesTheImageItEmptied() throws Exception {
+    final var repo = this.dockerRepo();
+    this.push(repo, "a", "latest", "layer-a1");
+    this.deleteTag(repo, "a", "latest");
+    this.push(repo, "b", "latest", "layer-b1");
+    this.deleteTag(repo, "b", "latest");
+
+    this.cleanup(repo, "?image=a");
+
+    assertThat(this.imageNames(repo)).containsExactly("b");
+    this.expectError(
+        this.perform(
+            delete("/api/docker/images/manifests/%s/untagged?image=a".formatted(repo.getName()))
+                .header(AUTHORIZATION, this.panelToken)),
+        HttpStatus.NOT_FOUND,
+        "imageNotFound",
+        "imageNotFound",
+        "Image not found.");
+  }
+
+  @Test
+  @DisplayName("an image with a manifest that a tagged index lists is kept by the cleanup")
+  void anImageWhoseManifestsAreReachedByATaggedIndexStays() throws Exception {
+    final var repo = this.dockerRepo();
+    final var child = this.pushByDigest(repo, IMAGE, "layer-child");
+    assertThat(
+            this.wire
+                .putManifest(repo, IMAGE, "multi", DockerWire.OCI_INDEX, index(child))
+                .getStatus())
+        .isEqualTo(201);
+
+    this.cleanup(repo);
+
+    assertThat(this.imageNames(repo)).containsExactly(IMAGE);
+    assertThat(this.status(repo, IMAGE, child)).isEqualTo(200);
   }
 
   @Test

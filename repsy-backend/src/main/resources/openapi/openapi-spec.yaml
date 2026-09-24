@@ -2790,6 +2790,44 @@ paths:
         required: true
         schema:
           type: string
+  "/api/docker/images/{repoName}/{imageName}/summary":
+    get:
+      tags:
+        - docker-image-controller
+      operationId: getDockerImageSummary
+      description: >-
+        The image as the list shows it, including how many tags and untagged manifests it has and
+        the size of the untagged ones. An image with no tag is still there while it stores a
+        manifest.
+      parameters:
+        - name: imageName
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseImageListItem"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a Docker image with its tag and untagged manifest counts
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
   "/api/docker/images/{repoName}/{imageName}/tags":
     get:
       tags:
@@ -4330,7 +4368,9 @@ components:
     Conflict:
       description: >-
         The request collides with something that exists (`itemAlreadyExists`, `repoExists`,
-        `keyStoreAlreadyExists`, `pgpPublicKeyAlreadyExists`, `scanAlreadyRunning`).
+        `keyStoreAlreadyExists`, `pgpPublicKeyAlreadyExists`, `scanAlreadyRunning`), or with another
+        request that changed the same item at the same moment (`concurrentModification`): read the
+        item again and repeat the request.
       content:
         application/json:
           schema:
@@ -6096,17 +6136,53 @@ components:
           type: string
     ImageListItem:
       type: object
+      description: >-
+        An image of a Docker repo. An image is kept while it stores any manifest, so it may have no
+        tags: then tagCount is 0, digest is null and size is 0 (both describe what the tags reach),
+        and the untagged fields say what it still stores.
       properties:
         name:
           type: string
         size:
           type: integer
           format: int64
+          description: Size of the distinct layers the tagged manifests reach.
         digest:
           type: string
+          description: Digest of the manifest the most recently moved tag points at; null without tags.
         updatedAt:
           type: string
           format: date-time
+          description: Latest tag creation; the last change of the image when it has no tag.
+        tagCount:
+          type: integer
+          format: int32
+          description: Number of tags of the image.
+        untaggedManifestCount:
+          type: integer
+          format: int32
+          description: >-
+            Manifests that no tag points at and no tagged index lists: what "Delete untagged
+            manifests" removes.
+        untaggedSize:
+          type: integer
+          format: int64
+          description: >-
+            Size of the distinct layers (config blobs included) that untagged manifests link to and
+            no tagged manifest of the image links to. For an image without tags, all it stores.
+    RestResponseImageListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/ImageListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
     PagedModelImageListItem:
       type: object
       properties:

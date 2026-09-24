@@ -127,6 +127,16 @@ describe('DeleteUntaggedManifestsComponent', () => {
     expect(component.deleting).toBeFalse();
   });
 
+  it('tells the page around it once the deletion succeeded, so it can reload', () => {
+    const cleaned = jasmine.createSpy('cleaned');
+    component.cleaned.subscribe(cleaned);
+    component.deleteUntaggedManifests();
+
+    dangerModalService.call();
+
+    expect(cleaned).toHaveBeenCalledTimes(1);
+  });
+
   it('does not toast, and stops showing it as running, when the deletion fails', () => {
     dockerService.deleteUntaggedManifests.and.returnValue(throwError(() => new Error('boom')));
     component.deleteUntaggedManifests();
@@ -135,6 +145,17 @@ describe('DeleteUntaggedManifestsComponent', () => {
 
     expect(toastService.show).not.toHaveBeenCalled();
     expect(component.deleting).toBeFalse();
+  });
+
+  it('does not tell the page anything when the deletion fails', () => {
+    const cleaned = jasmine.createSpy('cleaned');
+    component.cleaned.subscribe(cleaned);
+    dockerService.deleteUntaggedManifests.and.returnValue(throwError(() => new Error('boom')));
+    component.deleteUntaggedManifests();
+
+    dangerModalService.call();
+
+    expect(cleaned).not.toHaveBeenCalled();
   });
   describe('for one image', () => {
     beforeEach(() => {

@@ -508,9 +508,7 @@ export function registerPackageScenarios(
       test(
         title(
           '04',
-          detailDelete.landsOn
-            ? 'deleting a version from its detail page toasts and lands where the descriptor records (not yet the shared convention)'
-            : 'deleting a version from its detail page toasts and lands on the versions page',
+          'deleting a version from its detail page toasts and lands on the versions page',
           '04-detail',
         ),
         async ({ adminPage, seeder, seedVersions }) => {
@@ -582,8 +580,11 @@ export function registerPackageScenarios(
             await expect(list.emptyList.root).toBeVisible();
             await list.expectNoRow(pkg);
           } else if (descriptor.lastVersionRemovesPackage === false) {
-            // Recorded (RPS-1288): the package stays listed with nothing in it.
+            // By design (RPS-1288 item 5): the package stays listed, and its row says why.
             await list.expectRow(pkg);
+            if (descriptor.lastVersionKeptRowText) {
+              await expect(list.row(pkg)).toContainText(descriptor.lastVersionKeptRowText);
+            }
           } else {
             test.skip(
               true,
