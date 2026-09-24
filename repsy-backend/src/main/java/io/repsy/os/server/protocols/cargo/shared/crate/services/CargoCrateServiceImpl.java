@@ -414,6 +414,16 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
     this.crateMetaRepository.save(meta);
   }
 
+  /**
+   * The values in a fixed order, without duplicates. Two publishes that share several new values
+   * then insert them in the same order, so neither can hold a value the other waits for while
+   * waiting for one the other holds.
+   */
+  private static List<String> insertOrder(final List<String> values) {
+
+    return values.stream().distinct().sorted().toList();
+  }
+
   private void syncAuthors(final CargoCrate crate, final @Nullable List<String> authorStrings) {
 
     if (authorStrings == null) {
@@ -422,37 +432,24 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
 
     crate.getAuthors().clear();
 
-    for (final var authorStr : authorStrings) {
-      final var author =
-          this.authorRepository
-              .findByAuthor(authorStr)
-              .orElseGet(() -> this.createAuthor(authorStr));
-
-      crate.getAuthors().add(author);
+    for (final var authorStr : insertOrder(authorStrings)) {
+      crate.getAuthors().add(this.findOrInsertAuthor(authorStr));
     }
   }
 
-  private CargoAuthor createAuthor(final String authorStr) {
+  /**
+   * The global author rows are shared by every publish, so two concurrent publishes can introduce
+   * the same new author. The insert skips a row that exists (or is being inserted by a publish that
+   * has not committed yet, which it waits for) instead of failing on the unique index and aborting
+   * the transaction (RPS-1271), and the row is read back.
+   */
+  private CargoAuthor findOrInsertAuthor(final String authorStr) {
 
-    final var newAuthor = new CargoAuthor();
-    newAuthor.setAuthor(authorStr);
-    return this.authorRepository.save(newAuthor);
-  }
+    this.authorRepository.insertIfAbsent(UuidCreator.getTimeOrderedEpoch(), authorStr);
 
-  private CargoKeyword createKeyword(final String keywordStr) {
-
-    final var newKeyword = new CargoKeyword();
-    newKeyword.setKeyword(keywordStr);
-
-    return this.keywordRepository.save(newKeyword);
-  }
-
-  private CargoCategory crateCategory(final String categoryStr) {
-
-    final var newCategory = new CargoCategory();
-    newCategory.setCategory(categoryStr);
-
-    return this.categoryRepository.save(newCategory);
+    return this.authorRepository
+        .findByAuthor(authorStr)
+        .orElseThrow(() -> new IllegalStateException("cargo author missing after insert"));
   }
 
   private void syncKeywords(final CargoCrate crate, final @Nullable List<String> keywordStrings) {
@@ -463,14 +460,19 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
 
     crate.getKeywords().clear();
 
-    for (final var keywordStr : keywordStrings) {
-      final var keyword =
-          this.keywordRepository
-              .findByKeyword(keywordStr)
-              .orElseGet(() -> this.createKeyword(keywordStr));
-
-      crate.getKeywords().add(keyword);
+    for (final var keywordStr : insertOrder(keywordStrings)) {
+      crate.getKeywords().add(this.findOrInsertKeyword(keywordStr));
     }
+  }
+
+  /** Same race and remedy as {@link #findOrInsertAuthor}, for the global keyword rows. */
+  private CargoKeyword findOrInsertKeyword(final String keywordStr) {
+
+    this.keywordRepository.insertIfAbsent(UuidCreator.getTimeOrderedEpoch(), keywordStr);
+
+    return this.keywordRepository
+        .findByKeyword(keywordStr)
+        .orElseThrow(() -> new IllegalStateException("cargo keyword missing after insert"));
   }
 
   private void syncCategories(
@@ -482,14 +484,19 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
 
     crate.getCategories().clear();
 
-    for (final var categoryStr : categoryStrings) {
-      final var category =
-          this.categoryRepository
-              .findByCategory(categoryStr)
-              .orElseGet(() -> this.crateCategory(categoryStr));
-
-      crate.getCategories().add(category);
+    for (final var categoryStr : insertOrder(categoryStrings)) {
+      crate.getCategories().add(this.findOrInsertCategory(categoryStr));
     }
+  }
+
+  /** Same race and remedy as {@link #findOrInsertAuthor}, for the global category rows. */
+  private CargoCategory findOrInsertCategory(final String categoryStr) {
+
+    this.categoryRepository.insertIfAbsent(UuidCreator.getTimeOrderedEpoch(), categoryStr);
+
+    return this.categoryRepository
+        .findByCategory(categoryStr)
+        .orElseThrow(() -> new IllegalStateException("cargo category missing after insert"));
   }
 
   private void updateCrateMaxVersion(final CargoCrate crate, final String newVers) {
