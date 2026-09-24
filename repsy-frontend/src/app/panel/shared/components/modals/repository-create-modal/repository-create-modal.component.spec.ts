@@ -17,8 +17,10 @@
 import { TestBed } from '@angular/core/testing';
 import { FormBuilder } from '@angular/forms';
 import { Router } from '@angular/router';
+import { of, throwError } from 'rxjs';
 
-import { ProtocolRepoControllerService } from '../../../../../../generated/api';
+import { RepoCollectionControllerService, RepoType as ApiRepoType } from '../../../../../../generated/api';
+import { RepoType } from '../../../dto/repo/repo-type';
 import { ToastService } from '../../toast/toast.service';
 import { RepositoryCreateModalComponent } from './repository-create-modal.component';
 
@@ -27,7 +29,7 @@ describe('RepositoryCreateModalComponent name validation', () => {
 
   beforeEach(() => {
     component = new RepositoryCreateModalComponent(
-      {} as ProtocolRepoControllerService,
+      {} as RepoCollectionControllerService,
       new FormBuilder(),
       {} as Router,
       {} as ToastService,
@@ -82,7 +84,7 @@ describe('RepositoryCreateModalComponent buttons', () => {
     TestBed.configureTestingModule({
       imports: [RepositoryCreateModalComponent],
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: {} },
+        { provide: RepoCollectionControllerService, useValue: {} },
         { provide: Router, useValue: {} },
         { provide: ToastService, useValue: {} },
       ],
@@ -128,4 +130,82 @@ describe('RepositoryCreateModalComponent buttons', () => {
     name.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     expect(create).toHaveBeenCalledTimes(1);
   });
+});
+
+describe('RepositoryCreateModalComponent create', () => {
+  let api: jasmine.SpyObj<RepoCollectionControllerService>;
+  let router: jasmine.SpyObj<Router>;
+  let toast: jasmine.SpyObj<ToastService>;
+  let component: RepositoryCreateModalComponent;
+  let created: unknown[];
+  let closed: boolean[];
+
+  beforeEach(() => {
+    api = jasmine.createSpyObj<RepoCollectionControllerService>('RepoCollectionControllerService', [
+      'createRepository',
+    ]);
+    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
+    router.navigate.and.returnValue(Promise.resolve(true));
+    toast = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
+    component = new RepositoryCreateModalComponent(api, new FormBuilder(), router, toast);
+    created = [];
+    closed = [];
+    component.created.subscribe((repo) => created.push(repo));
+    component.openChange.subscribe((open) => closed.push(open));
+    component.selectedOption = RepoType.NPM;
+    component.ngOnInit();
+    component.form.patchValue({ name: 'my-repo', privateRepo: false, description: 'a description' });
+  });
+
+  it('posts ONE request with the upper-case type in the body, next to the form fields', () => {
+    api.createRepository.and.returnValue(of({ data: { name: 'my-repo' } }) as never);
+
+    component.createRepo();
+
+    expect(api.createRepository).toHaveBeenCalledOnceWith({
+      name: 'my-repo',
+      privateRepo: false,
+      description: 'a description',
+      type: ApiRepoType.Npm,
+    });
+  });
+
+  it('sends the type the user picked in the selector', () => {
+    api.createRepository.and.returnValue(of({ data: { name: 'my-repo' } }) as never);
+    component.selectOption(RepoType.GOLANG);
+
+    component.createRepo();
+
+    expect(api.createRepository.calls.mostRecent().args[0].type).toBe(ApiRepoType.Golang);
+  });
+
+  it('emits the created repository the server returned, closes the modal and toasts', async () => {
+    const item = { name: 'my-repo', type: ApiRepoType.Npm };
+    api.createRepository.and.returnValue(of({ data: item }) as never);
+
+    component.createRepo();
+    await Promise.resolve();
+
+    expect(created).toEqual([item]);
+    expect(closed).toEqual([false]);
+    expect(router.navigate).toHaveBeenCalledOnceWith(['/repositories']);
+    expect(toast.show).toHaveBeenCalledOnceWith('Repository created successfully', 'success');
+    expect(component.loading).toBeFalse();
+    expect(component.form.enabled).toBeTrue();
+  });
+
+  for (const status of [409, 400]) {
+    it(`emits nothing and stays open when the server answers ${status} (the interceptor shows the message)`, () => {
+      api.createRepository.and.returnValue(throwError(() => ({ status })));
+
+      component.createRepo();
+
+      expect(created).toEqual([]);
+      expect(closed).toEqual([]);
+      expect(toast.show).not.toHaveBeenCalled();
+      expect(component.loading).toBeFalse();
+      expect(component.form.enabled).toBeTrue();
+      expect(component.form.get('name')?.value).toBe('my-repo');
+    });
+  }
 });

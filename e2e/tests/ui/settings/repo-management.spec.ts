@@ -58,7 +58,9 @@ test.describe('Repository settings: rename and description', { tag: SETTINGS }, 
     await settings.shell.dangerModal.expectOpen('Rename Repository');
     await settings.shell.dangerModal.cancel();
     await settings.shell.dangerModal.expectClosed();
-    expect((await panelApi.listRepos(RepoType.NPM)).map((r) => r.name)).not.toContain(newName);
+    expect((await panelApi.listAllRepos({ type: RepoType.NPM })).map((r) => r.name)).not.toContain(
+      newName,
+    );
 
     await settings.info.renameSubmit.click();
     await settings.shell.dangerModal.expectOpen('Rename Repository');
@@ -71,7 +73,7 @@ test.describe('Repository settings: rename and description', { tag: SETTINGS }, 
     await expect(renamed.info.renameInput).toHaveValue(newName);
     await expect(adminPage.getByTestId('breadcrumb-item-1')).toContainText(newName);
 
-    const names = (await panelApi.listRepos(RepoType.NPM)).map((r) => r.name);
+    const names = (await panelApi.listAllRepos({ type: RepoType.NPM })).map((r) => r.name);
     expect(names).toContain(newName);
     expect(names).not.toContain(repo.name);
     expect((await panelApi.getSettings(newName)).privateRepo).toBe(true);
@@ -174,7 +176,8 @@ test.describe('Repository settings: delete', { tag: SETTINGS }, () => {
       const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
       const settings = new RepoSettingsPage(adminPage, repo.name);
       await settings.goto();
-      const repoNames = async () => (await panelApi.listRepos(RepoType.NPM)).map((r) => r.name);
+      const repoNames = async () =>
+        (await panelApi.listAllRepos({ type: RepoType.NPM })).map((r) => r.name);
 
       // Cancel: the modal closes, the repo and the page stay.
       await settings.deleteRepo.deleteButton.click();

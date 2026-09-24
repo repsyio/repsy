@@ -55,7 +55,7 @@ test(
     const usersBefore = await panelApi.listUsers({ size: 100 });
     expect(usersBefore.some((u) => u.id === user.id)).toBe(true);
 
-    const reposBefore = await panelApi.listRepos(RepoType.MAVEN);
+    const reposBefore = await panelApi.listAllRepos({ type: RepoType.MAVEN });
     expect(reposBefore.some((r) => r.name === repo.name)).toBe(true);
 
     const tokensBefore = await panelApi.listDeployTokens(repo.name);
@@ -69,7 +69,7 @@ test(
     const usersAfter = await panelApi.listUsers({ size: 100 });
     expect(usersAfter.some((u) => u.id === user.id)).toBe(false);
 
-    const reposAfter = await panelApi.listRepos(RepoType.MAVEN);
+    const reposAfter = await panelApi.listAllRepos({ type: RepoType.MAVEN });
     expect(reposAfter.some((r) => r.name === repo.name)).toBe(false);
   },
 );

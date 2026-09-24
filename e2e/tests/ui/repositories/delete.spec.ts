@@ -45,7 +45,9 @@ test.describe('Delete repository', () => {
       await repos.search(`e2e-${seeder.runId}-`);
       await expect(repos.row(kept.name)).toBeVisible();
       await expect(repos.row(doomed.name)).toHaveCount(0);
-      const remaining = (await panelApi.listRepos(RepoType.MAVEN)).map((repo) => repo.name);
+      const remaining = (await panelApi.listAllRepos({ type: RepoType.MAVEN })).map(
+        (repo) => repo.name,
+      );
       expect(remaining).not.toContain(doomed.name);
       expect(remaining).toContain(kept.name);
     },
@@ -67,13 +69,17 @@ test.describe('Delete repository', () => {
     await repos.dangerModal.expectClosed();
     await expect(repos.toasts.toast()).toHaveCount(0);
     await expect(repos.row(repo.name)).toBeVisible();
-    expect((await panelApi.listRepos(RepoType.MAVEN)).map((r) => r.name)).toContain(repo.name);
+    expect((await panelApi.listAllRepos({ type: RepoType.MAVEN })).map((r) => r.name)).toContain(
+      repo.name,
+    );
 
     // The modal's close (x) is a cancel as well.
     await repos.startDelete(repo.name);
     await repos.dangerModal.close();
     await repos.dangerModal.expectClosed();
     await expect(repos.row(repo.name)).toBeVisible();
-    expect((await panelApi.listRepos(RepoType.MAVEN)).map((r) => r.name)).toContain(repo.name);
+    expect((await panelApi.listAllRepos({ type: RepoType.MAVEN })).map((r) => r.name)).toContain(
+      repo.name,
+    );
   });
 });

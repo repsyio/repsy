@@ -257,7 +257,7 @@ test.describe('Dialogs: semantics, focus and keyboard', { tag: '@a11y' }, () => 
     // The name field has the focus already: type and press Enter.
     await expect(modal.nameInput).toBeFocused();
     await modal.nameInput.fill(name);
-    await repos.afterInfoResponses(() => adminPage.keyboard.press('Enter'));
+    await repos.afterListResponse(() => adminPage.keyboard.press('Enter'));
 
     await repos.toasts.expectSuccess('Repository created successfully');
     await expect(modal.root).toHaveCount(0);

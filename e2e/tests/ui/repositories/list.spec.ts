@@ -15,9 +15,10 @@
 ///
 
 /**
- * REPO-04, REPO-05, REPO-08, REPO-09: the repository list. It filters and pages CLIENT-SIDE over
- * every repository of the stack (other tests' repositories and the nine defaults included), so a
- * test narrows the list with a search string that only its own repositories contain
+ * REPO-04, REPO-05, REPO-08, REPO-09: the repository list. Type filter, search and paging are all
+ * SERVER-side (RPS-1268: `GET /api/repos?type=&q=&page=&size=10&sort=createdAt,desc`, one request
+ * per action) over every repository of the stack (other tests' repositories and the nine defaults
+ * included), so a test narrows the list with a search string that only its own repositories contain
  * (`e2e-<runid>-`) before it looks at rows, and asserts anything about the unfiltered list by size.
  */
 import { RepoType } from '../../../src/api/panel-api.js';
@@ -39,7 +40,15 @@ test.describe('Repository list', () => {
     await repos.goto();
 
     // Substring search, case-insensitive: all three, then just the npm one by its type word.
-    await repos.search(mine);
+    const searched = await repos.search(mine);
+    const params = new URL(searched.url()).searchParams;
+    expect([params.get('q'), params.get('page'), params.get('size'), params.get('sort')]).toEqual([
+      mine,
+      '0',
+      String(REPO_PAGE_SIZE),
+      'createdAt,desc',
+    ]);
+    expect(params.get('type')).toBeNull();
     await expect(repos.rows()).toHaveCount(3);
     for (const repo of [maven, npmRepo, pypi]) {
       await expect(repos.row(repo.name)).toBeVisible();
@@ -48,8 +57,11 @@ test.describe('Repository list', () => {
     await expect(repos.rows()).toHaveCount(1);
     await expect(repos.row(npmRepo.name)).toBeVisible();
 
-    // The type selector fetches only that type; the search box is not part of that filter.
-    await repos.selectType(npm);
+    // The type selector asks the server for that type (`type=NPM`, upper-case); the search box is
+    // emptied with it, so the request carries no `q`.
+    const typed = await repos.selectType(npm);
+    expect(new URL(typed.url()).searchParams.get('type')).toBe('NPM');
+    expect(new URL(typed.url()).searchParams.get('q')).toBeNull();
     await expect(repos.typeFilterText()).toHaveText(npm.label);
     await repos.search(mine);
     await expect(repos.row(npmRepo.name)).toBeVisible();
@@ -94,42 +106,79 @@ test.describe('Repository list', () => {
     expect(await repos.rows().count()).toBeGreaterThan(1);
   });
 
-  test('REPO-04: a refresh during a load supersedes it, so its late answer never joins the list', async ({
+  test('REPO-04: a newer search supersedes a running one, so its late answer never replaces the list', async ({
     adminPage,
     seeder,
   }) => {
     const repos = new RepositoriesPage(adminPage);
     const maven = await seeder.createRepo(RepoType.MAVEN);
     const mine = `e2e-${seeder.runId}-`;
+    const held = `${mine}held`;
+    await repos.goto();
 
-    // Hold the answer of the FIRST maven request: the other eight types answer with rows and end the
-    // spinner, so the toolbar works while maven is still outstanding (RPS-1293).
-    let releaseFirst!: () => void;
-    const firstMavenHeld = new Promise<void>((resolve) => {
-      releaseFirst = resolve;
+    // Hold the answer of the search for `held` (it matches nothing) until the newer search is done.
+    let releaseHeld!: () => void;
+    const heldAnswer = new Promise<void>((resolve) => {
+      releaseHeld = resolve;
     });
-    let mavenRequests = 0;
-    await adminPage.route(/\/api\/repos\/MAVEN\/info$/, async (route) => {
-      mavenRequests++;
-      if (mavenRequests === 1) {
-        await firstMavenHeld;
+    const heldRequested = adminPage.waitForRequest((request) =>
+      request.url().includes(`q=${held}`),
+    );
+    await adminPage.route(/\/api\/repos\?/, async (route) => {
+      if (route.request().url().includes(`q=${held}`)) {
+        await heldAnswer;
+        // The panel cancels the held request when the newer search starts: continuing it may fail.
+        await route.continue().catch(() => undefined);
+        return;
       }
-      // The held request is cancelled by the panel when the refresh starts: continuing it may fail.
-      await route.continue().catch(() => undefined);
+      await route.fallback();
     });
 
-    await adminPage.goto('/repositories');
-    await expect(repos.rows().first()).toBeVisible();
-    await expect.poll(() => mavenRequests).toBe(1);
-
-    await repos.refresh();
-    releaseFirst();
-    await repos.settle();
-
+    await repos.searchInput.fill(held);
+    await heldRequested;
     await repos.search(mine);
     await expect(repos.rows()).toHaveCount(1);
     await expect(repos.row(maven.name)).toHaveCount(1);
+
+    releaseHeld();
+    await repos.settle();
+
+    // The stale answer would have emptied the list (nothing matches `held`).
+    await expect(repos.rows()).toHaveCount(1);
+    await expect(repos.emptyList.root).toHaveCount(0);
     await expect(repos.spinner.root).toBeHidden();
+  });
+
+  test('REPO-04: every action is ONE list request, and typing sends one request after a pause', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repos = new RepositoriesPage(adminPage);
+    const npm = uiRepoType(RepoType.NPM);
+    await seeder.createRepo(RepoType.MAVEN);
+    const mine = `e2e-${seeder.runId}-`;
+    const requests: string[] = [];
+    adminPage.on('request', (request) => {
+      if (request.method() === 'GET' && /\/api\/repos(\?|$)/.test(request.url())) {
+        requests.push(request.url());
+      }
+    });
+
+    await repos.goto();
+    expect(requests).toHaveLength(1);
+
+    await repos.selectType(npm);
+    expect(requests).toHaveLength(2);
+
+    await repos.refresh(npm);
+    expect(requests).toHaveLength(3);
+
+    // Typing key by key inside the pause sends ONE request, for the whole text.
+    await repos.afterListResponse(() => repos.searchInput.pressSequentially(mine, { delay: 15 }), {
+      q: mine,
+    });
+    expect(requests.length).toBeLessThanOrEqual(5);
+    expect(new URL(requests[requests.length - 1]).searchParams.get('q')).toBe(mine);
   });
 
   test('REPO-05: eleven repositories paginate by ten, with prev/next disabled at the ends', async ({
@@ -153,8 +202,9 @@ test.describe('Repository list', () => {
     await expect(repos.pagination.page(2)).toBeEnabled();
     const firstPage = await rowNames(repos.rows());
 
-    // Page 2: the eleventh, no next page.
-    await repos.pagination.next.click();
+    // Page 2: the eleventh, no next page. The server is asked for it (`page=1`), same search.
+    const second = await repos.afterListResponse(() => repos.pagination.next.click(), { page: 1 });
+    expect(new URL(second.url()).searchParams.get('q')).toBe(`e2e-${seeder.runId}-`);
     await expect(repos.rows()).toHaveCount(1);
     await expect(repos.pagination.next).toBeDisabled();
     await expect(repos.pagination.prev).toBeEnabled();
@@ -163,11 +213,11 @@ test.describe('Repository list', () => {
     expect([...firstPage, ...secondPage].sort()).toEqual([...names].sort());
 
     // A page number button goes to that page, "previous" goes back to page 1.
-    await repos.pagination.root.getByTestId('pagination-page-1').click();
+    await repos.goToPage(1);
     await expect(repos.rows()).toHaveCount(REPO_PAGE_SIZE);
-    await repos.pagination.root.getByTestId('pagination-page-2').click();
+    await repos.goToPage(2);
     await expect(repos.rows()).toHaveCount(1);
-    await repos.pagination.prev.click();
+    await repos.afterListResponse(() => repos.pagination.prev.click(), { page: 0 });
     await expect(repos.rows()).toHaveCount(REPO_PAGE_SIZE);
     await expect(repos.pagination.prev).toBeDisabled();
   });
@@ -181,10 +231,11 @@ test.describe('Repository list', () => {
     await repos.goto();
     await repos.search(mine);
     await expect(repos.rows()).toHaveCount(REPO_PAGE_SIZE);
-    await repos.pagination.next.click();
+    await repos.goToPage(2);
     await expect(repos.rows()).toHaveCount(1);
 
-    // Three of the eleven end in "maven-1" (1, 10, 11): a single page. Then back to all eleven.
+    // Three of the eleven end in "maven-1" (1, 10, 11): a single page. `search` only resolves for a
+    // request that asks for `page=0`, so a search that kept page 2 would time out here.
     await repos.search(`${mine}maven-1`);
     await expect(repos.rows()).toHaveCount(3);
     await repos.search(mine);
@@ -210,6 +261,7 @@ test.describe('Repository list', () => {
 
     await expect(repos.emptyList.root).toBeVisible();
     await expect(repos.rows()).toHaveCount(0);
+    await expect(repos.error).toHaveCount(0);
     // Clearing the search brings the rows back.
     await repos.search('');
     await expect(repos.rows().first()).toBeVisible();

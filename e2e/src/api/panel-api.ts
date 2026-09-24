@@ -28,6 +28,7 @@ import type { ArtifactVersionInfo } from './generated/models/ArtifactVersionInfo
 import type { DeployTokenForm } from './generated/models/DeployTokenForm.js';
 import type { DeployTokenInfoListItem } from './generated/models/DeployTokenInfoListItem.js';
 import type { LoginInfo } from './generated/models/LoginInfo.js';
+import type { PagedModelRepoListInfo } from './generated/models/PagedModelRepoListInfo.js';
 import type { PgpPublicKeyItem } from './generated/models/PgpPublicKeyItem.js';
 import type { RepoCreateForm } from './generated/models/RepoCreateForm.js';
 import type { RepoListInfo } from './generated/models/RepoListInfo.js';
@@ -43,6 +44,7 @@ export type {
   DeployTokenForm,
   DeployTokenInfoListItem,
   LoginInfo,
+  PagedModelRepoListInfo,
   PgpPublicKeyItem,
   RepoCreateForm,
   RepoListInfo,
@@ -81,6 +83,15 @@ export interface DeployTokenPage {
 export interface PgpPublicKeyPage {
   content: PgpPublicKeyItem[];
   totalPages: number;
+}
+
+/** The query of `GET /api/repos`; every field is optional. */
+export interface RepoListParams {
+  type?: RepoType;
+  q?: string;
+  page?: number;
+  size?: number;
+  sort?: string[];
 }
 
 export class PanelApi {
@@ -129,17 +140,51 @@ export class PanelApi {
     return unwrap(res.data, 'listUsers').content ?? [];
   }
 
-  async createRepo(repoType: RepoType, form: RepoCreateForm): Promise<void> {
-    await this.client.protocolRepoController.createRepo({ repoType, requestBody: form });
+  /** `POST /api/repos`: the repository type travels in the body; the answer is the created repository. */
+  async createRepo(repoType: RepoType, form: RepoCreateForm): Promise<RepoListInfo> {
+    const res = await this.client.repoCollectionController.createRepository({
+      requestBody: { ...form, type: repoType },
+    });
+    return unwrap(res.data, 'createRepo');
   }
 
   async deleteRepo(repoName: string): Promise<void> {
     await this.client.protocolRepoController.deleteRepo({ repoName });
   }
 
-  async listRepos(repoType: RepoType): Promise<RepoListInfo[]> {
-    const res = await this.client.protocolRepoController.getInfo({ repoType });
+  /**
+   * One page of `GET /api/repos` (RPS-1268): `type` and `q` filter on the server, `size` is 1-100
+   * (server default 10) and `sort` defaults to `createdAt,desc`. Use `listAllRepos` to read everything.
+   */
+  async listRepos(params: RepoListParams = {}): Promise<PagedModelRepoListInfo> {
+    const res = await this.client.repoCollectionController.listRepos(params);
     return unwrap(res.data, 'listRepos');
+  }
+
+  /**
+   * Every repository matching `type` and `q`, read page by page (100 a page), sorted by name so the
+   * pages do not shift when a parallel test creates a repository. A repository created or deleted
+   * mid-read can still move a row across a page boundary, so a name is kept once. Collect first, then
+   * act: deleting while reading pages skips the rows that move up into the page just read.
+   */
+  async listAllRepos(filter: { type?: RepoType; q?: string } = {}): Promise<RepoListInfo[]> {
+    const byName = new Map<string, RepoListInfo>();
+
+    for (let page = 0; ; page += 1) {
+      const result = await this.listRepos({ ...filter, page, size: 100, sort: ['name,asc'] });
+      for (const repo of result.content ?? []) {
+        byName.set(repo.name, repo);
+      }
+      if (page + 1 >= (result.page?.totalPages ?? 0)) {
+        return [...byName.values()];
+      }
+    }
+  }
+
+  /** `GET /api/repos/counts`: how many repositories there are of each type (every type is a key). */
+  async repoCounts(): Promise<Record<string, number>> {
+    const res = await this.client.repoCollectionController.getRepoCounts();
+    return unwrap(res.data, 'repoCounts');
   }
 
   async getSettings(repoName: string): Promise<RepoSettingsInfo> {

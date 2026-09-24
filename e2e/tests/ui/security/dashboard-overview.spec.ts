@@ -40,7 +40,7 @@ test.describe('SEC-02e Security Overview', { tag: MOCKED }, () => {
     // The premise: nothing in the stack has ever been scanned.
     expect(Object.values(real).filter((entry) => entry.severity)).toEqual([]);
 
-    await dashboard.open({ admin: true });
+    await dashboard.open();
 
     await expect(dashboard.securityCard).toContainText('Security Overview');
     await expect(dashboard.securityCriticalHigh).toHaveText('0');
@@ -62,7 +62,7 @@ test.describe('SEC-02e Security Overview', { tag: MOCKED }, () => {
     });
     const dashboard = new DashboardPage(adminPage);
 
-    await dashboard.open({ admin: true });
+    await dashboard.open();
 
     await expect(dashboard.securityCriticalHigh).toHaveText('3');
     await expect(dashboard.securityTotal).toHaveText('8');
@@ -76,7 +76,7 @@ test.describe('SEC-02e Security Overview', { tag: MOCKED }, () => {
     });
     const dashboard = new DashboardPage(adminPage);
 
-    await dashboard.open({ admin: true });
+    await dashboard.open();
 
     await expect(dashboard.securityCriticalHigh).toHaveText('0');
     await expect(dashboard.securityTotal).toHaveText('2');

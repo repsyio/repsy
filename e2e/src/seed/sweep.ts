@@ -24,9 +24,9 @@
  * default repos, none of them prefixed). Run with `pnpm sweep -- [--hours N] [--all] [--dry-run]`
  * or `./run.sh sweep`.
  */
-import { PanelApi, RepoType } from '../api/panel-api.js';
+import { PanelApi } from '../api/panel-api.js';
 import { env } from '../env.js';
-import { isRunPrefixed } from './run-id.js';
+import { isRunPrefixed, RUN_PREFIX } from './run-id.js';
 
 const DEFAULT_SWEEP_HOURS = 24;
 const USER_PAGE_SIZE = 100;
@@ -79,26 +79,21 @@ export async function sweep(opts: SweepOptions): Promise<SweepResult> {
 
   let deletedRepos = 0;
 
-  for (const repoType of Object.values(RepoType)) {
-    const repos = await api.listRepos(repoType);
+  // Every candidate is collected BEFORE the first delete: the list is paged, and deleting while
+  // reading it would shift the following rows into the page already read and skip them.
+  const candidates = (await api.listAllRepos({ q: `${RUN_PREFIX}-` })).filter(
+    (repo) => isRunPrefixed(repo.name) && (opts.all || isOlderThan(repo.createdAt, opts.hours)),
+  );
 
-    for (const repo of repos) {
-      if (!isRunPrefixed(repo.name)) {
-        continue;
-      }
-      if (!opts.all && !isOlderThan(repo.createdAt, opts.hours)) {
-        continue;
-      }
-
-      if (opts.dryRun) {
-        console.log(`[dry-run] would delete repo ${repo.name}`);
-        continue;
-      }
-
-      await api.deleteRepo(repo.name);
-      deletedRepos += 1;
-      console.log(`deleted repo ${repo.name}`);
+  for (const repo of candidates) {
+    if (opts.dryRun) {
+      console.log(`[dry-run] would delete repo ${repo.name}`);
+      continue;
     }
+
+    await api.deleteRepo(repo.name);
+    deletedRepos += 1;
+    console.log(`deleted repo ${repo.name}`);
   }
 
   let deletedUsers = 0;

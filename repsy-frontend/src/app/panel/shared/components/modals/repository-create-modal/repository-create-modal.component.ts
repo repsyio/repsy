@@ -20,11 +20,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import {
-  ProtocolRepoControllerService,
-  RepoCreateForm,
-  RepoType as ApiRepoType,
-} from '../../../../../../generated/api';
+import { RepoCollectionControllerService, RepoCreateRequest, RepoListInfo } from '../../../../../../generated/api';
 import { idFactory } from '../../../../../shared/util/unique-id';
 import {
   DESCRIPTION_MAX_LENGTH,
@@ -33,6 +29,7 @@ import {
 } from '../../../../../shared/validators/description.validators';
 import { DialogDirective } from '../../../directives/dialog.directive';
 import { RepoType } from '../../../dto/repo/repo-type';
+import { toApiRepoType } from '../../../util/repo-api-type';
 import { reservedRepoNameValidator } from '../../../util/reserved-repo-names';
 import { SelectorComponent } from '../../selector/selector.component';
 import { ToastService } from '../../toast/toast.service';
@@ -50,7 +47,8 @@ export class RepositoryCreateModalComponent implements OnInit {
   public readonly id = idFactory('repo-create');
 
   @Output() openChange = new EventEmitter<boolean>();
-  @Output() created = new EventEmitter<void>();
+  /** The repository the server created, as the list shows it. */
+  @Output() created = new EventEmitter<RepoListInfo | undefined>();
   @Input() public open: boolean;
   @Input() selectedOption: RepoType;
 
@@ -72,7 +70,7 @@ export class RepositoryCreateModalComponent implements OnInit {
   public readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
 
   constructor(
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly repoCollectionControllerService: RepoCollectionControllerService,
     private readonly fb: FormBuilder,
     private readonly router: Router,
     private readonly toastService: ToastService,
@@ -112,11 +110,11 @@ export class RepositoryCreateModalComponent implements OnInit {
     this.loading = true;
     this.form.disable();
 
-    const form = this.form.getRawValue() as RepoCreateForm;
-    const apiRepoType = this.selectedOption.toUpperCase() as ApiRepoType;
+    const type = toApiRepoType(this.selectedOption);
+    const body: RepoCreateRequest = { ...this.form.getRawValue(), type };
 
-    this.protocolRepoControllerService
-      .createRepo(apiRepoType, form)
+    this.repoCollectionControllerService
+      .createRepository(body)
       .pipe(
         finalize(() => {
           this.form.enable();
@@ -124,12 +122,12 @@ export class RepositoryCreateModalComponent implements OnInit {
         }),
       )
       .subscribe({
-        next: () => {
+        next: (response) => {
           this.router.navigate(['/repositories']).then(() => {
             this.toastService.show('Repository created successfully', 'success');
           });
 
-          this.created.emit();
+          this.created.emit(response.data);
           this.closeModal();
         },
         error: () => {},

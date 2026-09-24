@@ -15,7 +15,7 @@
 ///
 
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { finalize } from 'rxjs';
 
 import { Severity } from '../../../../../generated/api';
@@ -33,12 +33,24 @@ export class SecurityOverviewCardComponent implements OnInit {
   public totalRepoCount = 0;
   public criticalOrHighCount = 0;
 
-  constructor(private readonly securityService: SecurityService) {}
+  constructor(
+    private readonly securityService: SecurityService,
+    private readonly cdRef: ChangeDetectorRef,
+  ) {}
 
   public ngOnInit(): void {
     this.securityService
       .getSecuritySummary()
-      .pipe(finalize(() => (this.loading = false)))
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+          // The dashboard is rendered inside an OnPush component (AuthRedirectComponent): this view is
+          // only checked again when it is marked. Until RPS-1268 a later answer of the dashboard's many
+          // other requests did that by chance; with two requests left this card would stay on
+          // "Loading..." whenever its answer is the last one.
+          this.cdRef.markForCheck();
+        }),
+      )
       .subscribe({
         next: (summary) => {
           const repoSummaries = Object.values(summary);

@@ -59,8 +59,6 @@ describe('NugetService', () => {
   beforeEach(() => {
     repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
       'getPermission',
-      'createRepo',
-      'getInfo',
       'getUsage',
       'getSettings',
       'updateSettings',
@@ -207,10 +205,8 @@ describe('NugetService', () => {
   });
 
   describe('repository calls', () => {
-    const repoForm = { name: 'new-repo', private: false, description: 'd' };
     const settingsForm = { description: 'settings' } as never;
     const descriptionForm = { description: 'new description' };
-    const repos = [{ name: REPO }];
     const usage = { usedStorage: 1 };
     const settings = { name: REPO };
     const tokenForm = { name: 'ci' } as never;
@@ -218,30 +214,6 @@ describe('NugetService', () => {
     const tokenInfo = { token: 'secret' };
 
     const calls: CallCase<NugetService>[] = [
-      {
-        name: 'createRepository',
-        invoke: (s) => from(s.createRepository(repoForm as never)),
-        api: () => repoApi.createRepo,
-        args: ['NUGET', repoForm],
-        response: restResponse(undefined),
-        expected: undefined,
-      },
-      {
-        name: 'fetchRepositories',
-        invoke: (s) => from(s.fetchRepositories()),
-        api: () => repoApi.getInfo,
-        args: ['NUGET'],
-        response: restResponse(repos),
-        expected: repos,
-      },
-      {
-        name: 'fetchRepositories without data',
-        invoke: (s) => from(s.fetchRepositories()),
-        api: () => repoApi.getInfo,
-        args: ['NUGET'],
-        response: restResponse(undefined),
-        expected: [],
-      },
       {
         name: 'fetchRepositoryUsage',
         invoke: (s) => from(s.fetchRepositoryUsage()),

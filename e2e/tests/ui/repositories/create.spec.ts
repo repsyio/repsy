@@ -45,9 +45,9 @@ test.describe('Create repository modal', () => {
         const modal = await repos.openCreateModal();
         await modal.selectType(repoType);
         await modal.fillName(name);
-        // Creating reloads the list (all nine types); the success toast lives 3 s, so it is asserted
+        // Creating reloads the list (one request); the success toast lives 3 s, so it is asserted
         // straight after.
-        await repos.afterInfoResponses(() => modal.submitButton.click());
+        await repos.afterListResponse(() => modal.submitButton.click(), { page: 0 });
 
         await repos.toasts.expectSuccess('Repository created successfully');
         await modal.expectClosed();
@@ -58,7 +58,7 @@ test.describe('Create repository modal', () => {
         await expect(repos.list.inRow(name, 'row-name')).toHaveText(name);
         await expect(repos.list.inRow(name, 'row-created')).toContainText('ago');
         await expect(repos.list.inRow(name, 'row-size')).toHaveText('0 B');
-        const created = (await panelApi.listRepos(repoType.type)).find(
+        const created = (await panelApi.listAllRepos({ type: repoType.type, q: name })).find(
           (repo) => repo.name === name,
         );
         expect(created?.privateRepo).toBe(true);
@@ -123,10 +123,11 @@ test.describe('Create repository modal', () => {
     const maven = uiRepoType(RepoType.MAVEN);
     const name = seeder.reserveRepoName(maven.type);
     seeder.adoptRepo(name);
-    const creates: string[] = [];
+    const creates: Array<{ url: string; body: unknown }> = [];
     adminPage.on('request', (request) => {
-      if (request.method() === 'POST' && /\/api\/repos\/[A-Za-z]+$/.test(request.url())) {
-        creates.push(request.url());
+      // `POST /api/repos`: the type travels in the body (RPS-1268), not in the path.
+      if (request.method() === 'POST' && /\/api\/repos$/.test(request.url())) {
+        creates.push({ url: request.url(), body: request.postDataJSON() });
       }
     });
     await repos.goto();
@@ -144,10 +145,11 @@ test.describe('Create repository modal', () => {
     await expect(modal.nameInput).toHaveValue('');
     await modal.selectType(maven);
     await modal.fillName(name);
-    await repos.afterInfoResponses(() => modal.nameInput.press('Enter'));
+    await repos.afterListResponse(() => modal.nameInput.press('Enter'), { page: 0 });
     await repos.toasts.expectSuccess('Repository created successfully');
     await modal.expectClosed();
     expect(creates).toHaveLength(1);
+    expect(creates[0].body).toMatchObject({ name, type: 'MAVEN', privateRepo: true });
   });
 
   test('REPO-01: creating from the dashboard works too and lands on the list', async ({
@@ -159,12 +161,12 @@ test.describe('Create repository modal', () => {
     const maven = uiRepoType(RepoType.MAVEN);
     const name = seeder.reserveRepoName(maven.type);
     seeder.adoptRepo(name);
-    await dashboard.open({ admin: true });
+    await dashboard.open();
 
     const modal = await dashboard.openCreateModal();
     await modal.selectType(maven);
     await modal.fillName(name);
-    await repos.afterInfoResponses(() => modal.submitButton.click());
+    await repos.afterListResponse(() => modal.submitButton.click(), { page: 0 });
 
     await repos.toasts.expectSuccess('Repository created successfully');
     await expect(adminPage).toHaveURL('/repositories');
@@ -302,7 +304,7 @@ test.describe('Create repository modal', () => {
     await expect(modal.nameInput).toHaveValue(existing.name);
     // The form is usable again (it is disabled while the request runs).
     await expect(modal.submitButton).toBeEnabled();
-    const same = (await panelApi.listRepos(RepoType.MAVEN)).filter(
+    const same = (await panelApi.listAllRepos({ type: RepoType.MAVEN })).filter(
       (repo) => repo.name === existing.name,
     );
     expect(same).toHaveLength(1);

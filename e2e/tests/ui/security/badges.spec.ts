@@ -22,7 +22,7 @@
  */
 import { RepoType } from '../../../src/api/panel-api.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
-import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
+import { REPO_PAGE_SIZE, RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import {
   ScanSection,
   SecurityModal,
@@ -110,11 +110,17 @@ test.describe('SEC-02a repository list badges', { tag: MOCKED }, () => {
     await expect(badge(never.name)).toHaveCount(0);
     await expect(badge(unsupported.name)).toHaveCount(0);
 
-    // The panel asked for exactly the repositories it lists, in one call.
-    const asked = summary.calls.flatMap(
-      (url) => url.searchParams.get('repoNames')?.split(',') ?? [],
-    );
-    expect(asked).toEqual(expect.arrayContaining([high.name, never.name, unsupported.name]));
+    // After the search the panel asks about exactly the repositories of the page it lists, in one
+    // call (RPS-1268: it used to send every repository of the stack).
+    const askedOf = (url: URL) => url.searchParams.get('repoNames')?.split(',') ?? [];
+    await expect
+      .poll(() => askedOf(summary.calls[summary.calls.length - 1]).sort())
+      .toEqual(
+        [high, clean, scanning, failed, rescanning, never, unsupported].map((r) => r.name).sort(),
+      );
+    for (const call of summary.calls) {
+      expect(askedOf(call).length).toBeLessThanOrEqual(REPO_PAGE_SIZE);
+    }
   });
 
   test('the same repository has no badge once its type has no scanner', async ({
