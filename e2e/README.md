@@ -2746,9 +2746,8 @@ test('lists a seeded package', async ({ adminPage, seeder, seedPackage }) => {
   `version` default `1.0.0`, `index` for the default name, npm `scoped: false`, helm `variant`);
   `seedPackages(repo, n)` publishes `n` distinct packages (pagination needs more than 10);
   `seedVersions(repo, [...])` publishes versions of one package in order. The protocol is the repo's own
-  type. A seeder throws if the server refuses. RPS-1257 replaces the five `notImplemented(...)` entries
-  (cargo, nuget, helm, golang, ruby) with `src/seed/packages/<proto>.ts` modules; until then they throw
-  "not implemented yet (RPS-1257 ...)".
+  type. A seeder throws if the server refuses. All nine protocols have a seeder
+  (`src/seed/packages/<proto>.ts`; the last five arrived with RPS-1257).
 - **Identity.** `PackageRef.name` is the raw row key: maven `group:artifact` (default: one group per
   `index`, so deleting a group never takes a sibling), npm `@scope/name` or `name`, docker the image
   (`version` = the tag), golang the module path.
@@ -2773,8 +2772,8 @@ test('lists a seeded package', async ({ adminPage, seeder, seedPackage }) => {
   and its last-tag delete leaves the image listed. Playwright's own click is refused by every detail
   page's Delete button (the page host is reported above it), so `VersionDetailPage` clicks it with
   `force`.
-- **Not covered here.** cargo, nuget, helm, golang and ruby seeders and their scenarios (RPS-1257); the
-  scenario template itself (RPS-1256).
+- **Not covered here.** The scenario templates live in RPS-1256 (maven, npm, docker, pypi) and RPS-1257
+  (cargo, nuget, helm, golang, ruby).
 
 ### Package tests: Maven, npm, Docker, PyPI (RPS-1256)
 
@@ -2870,15 +2869,15 @@ now: absent = same body, only the title differs), Ruby's title is the same in bo
 
 Pinned with `test.fail` / `knownFailures` (each still fails for the stated reason, checked un-pinned):
 
-| Where                                                  | Bug                                                                                                                                                                                                                                          |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| cargo `05-mobile-versions`, nuget `05-mobile-versions` | RPS-1262 (2): the version list has no `lg:hidden` cards, a phone shows nothing                                                                                                                                                               |
-| nuget `02-versions-search`                             | RPS-1262 (3): no search box on the version list                                                                                                                                                                                              |
-| helm-07 twelve versions                                | RPS-1262 (3): no pager on the version list, all twelve render                                                                                                                                                                                |
-| golang-07 empty versions page                          | RPS-1262 (3): `<app-pagination>` renders under the empty state of an unknown module, printing "1 NaN"                                                                                                                                        |
-| cargo-07 row menu real click                           | RPS-1299: the menu of a non-last row paints under the next row, Playwright's click is refused ("subtree intercepts pointer events")                                                                                                          |
-| cargo-07 Newest by publish time                        | unfiled: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort and pager have distinct keys (RPS-1298), and cargo-07 asserts the sorts by version |
-| helm-07 deleting the last version                      | unfiled: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                                                                                            |
+| Where                                                  | Bug                                                                                                                                                                                                                                           |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| cargo `05-mobile-versions`, nuget `05-mobile-versions` | RPS-1262 (2): the version list has no `lg:hidden` cards, a phone shows nothing                                                                                                                                                                |
+| nuget `02-versions-search`                             | RPS-1262 (3): no search box on the version list                                                                                                                                                                                               |
+| helm-07 twelve versions                                | RPS-1262 (3): no pager on the version list, all twelve render                                                                                                                                                                                 |
+| golang-07 empty versions page                          | RPS-1262 (3): `<app-pagination>` renders under the empty state of an unknown module, printing "1 NaN"                                                                                                                                         |
+| cargo-07 row menu real click                           | RPS-1299: the menu of a non-last row paints under the next row, Playwright's click is refused ("subtree intercepts pointer events")                                                                                                           |
+| cargo-07 Newest by publish time                        | RPS-1301: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort and pager have distinct keys (RPS-1298), and cargo-07 asserts the sorts by version |
+| helm-07 deleting the last version                      | RPS-1302: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                                                                                            |
 
 `seed-proof.spec.ts` (RPS-1255) now covers all nine protocols; its generic search/sort/delete walk stays on
 the first four (the other five have the protocol-aware version of it in PKG-<proto>-02 and -04).
@@ -3214,7 +3213,7 @@ Selector priority: `getByTestId` first, then `getByRole`/`getByLabel`, never CSS
 | `selector`       | `selector`, `selector-toggle`, `selector-menu`, `selector-option-<raw value>`                                                                                                                                                                       |
 | `sort-selector`  | `sort-selector`, `sort-selector-toggle`, `sort-selector-menu`, `sort-option-<name>`                                                                                                                                                                 |
 | `dropdown`       | `dropdown`, `dropdown-toggle`, `dropdown-menu`                                                                                                                                                                                                      |
-| `toggle`         | `toggle`, `toggle-input` (click it, assert `toBeChecked()`), `toggle-label`                                                                                                                                                                         |
+| `toggle`         | `toggle`, `toggle-input` (assert `toBeChecked()`; CLICK the `toggle` label, the slider intercepts the input), `toggle-label`                                                                                                                        |
 | `radio-group`    | `radio-group`, `radio-option-<value>`                                                                                                                                                                                                               |
 | `copy-clipboard` | `copy-button` (+ `data-copied`)                                                                                                                                                                                                                     |
 | `tooltip`        | `tooltip-text`, `tooltip-popup`                                                                                                                                                                                                                     |

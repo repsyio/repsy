@@ -129,11 +129,11 @@ test.describe('Helm charts: OCI and classic', { tag: '@packages' }, () => {
     },
   );
 
-  // Not filed yet (see the PR): after the LAST version is deleted the panel navigates to the chart's
+  // RPS-1302: after the LAST version is deleted the panel navigates to the chart's
   // versions page, which no longer exists, and that load shows an error toast, "Chart not found.
   // [object Object]", next to the success toast.
   test.fail(
-    'PKG-helm-07 deleting the last version shows no error toast (unfiled: "Chart not found. [object Object]")',
+    'PKG-helm-07 deleting the last version shows no error toast (RPS-1302: "Chart not found. [object Object]")',
     async ({ adminPage, seeder, seedPackage }) => {
       const repo = await seeder.createRepo(RepoType.HELM);
       const chart = await seedPackage(repo);

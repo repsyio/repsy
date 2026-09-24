@@ -177,10 +177,10 @@ test.describe('Cargo crate pages', { tag: '@packages' }, () => {
     }
   });
 
-  // Not filed yet (see the PR): the crate list's Newest/Oldest order by `max_version`, a text column,
+  // RPS-1301: the crate list's Newest/Oldest order by `max_version`, a text column,
   // not by when a crate was published, so a crate published later at a lower version is not "newest".
   test.fail(
-    'PKG-cargo-07 Newest puts the crate published last on top (unfiled: it sorts by max_version)',
+    'PKG-cargo-07 Newest puts the crate published last on top (RPS-1301: it sorts by max_version)',
     async ({ adminPage, seeder }) => {
       const repo = await seeder.createRepo(RepoType.CARGO);
       const older = await publishCrate(repo.name, `e2e_${seeder.runId}_older`, '3.0.0');

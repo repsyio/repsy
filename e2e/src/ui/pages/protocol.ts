@@ -400,7 +400,7 @@ export class VersionDetailPage extends UiPage {
     // Playwright's own hit-target check refuses this button on every detail page ("<app-...-version-
     // detail> intercepts pointer events": the page's custom-element host is reported above it by
     // `elementsFromPoint`), although a real mouse click at the same point works. `force` skips that
-    // check only; the click is still a real mouse click on the button's centre. (Finding, not fixed here.)
+    // check only; the click is still a real mouse click on the button's centre. (RPS-1288 item 1, not fixed here.)
     await this.deleteButton.click({ force: true });
     await this.dangerModal.expectOpen(affordance.dialogTitle);
     return this.dangerModal;
