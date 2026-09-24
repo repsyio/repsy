@@ -58,9 +58,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -111,9 +108,6 @@ public class ManifestTxService implements ManifestService<UUID> {
   }
 
   @Override
-  @Retryable(
-      retryFor = ObjectOptimisticLockingFailureException.class,
-      backoff = @Backoff(delay = 50))
   @Transactional
   public void createManifestList(final UUID repoId, final UUID imageId, final TagForm tagForm) {
 
@@ -125,9 +119,6 @@ public class ManifestTxService implements ManifestService<UUID> {
   }
 
   @Override
-  @Retryable(
-      retryFor = ObjectOptimisticLockingFailureException.class,
-      backoff = @Backoff(delay = 50))
   @Transactional
   public void createSinglePlatformManifest(
       final UUID repoId, final BaseImageInfo<UUID> baseImageInfo, final TagForm tagForm) {
