@@ -26,6 +26,12 @@
  */
 import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
+import {
+  MISMATCH_TEXT,
+  PASSWORD_TEXT,
+  USERNAME_TEXT,
+  bulleted,
+} from '../../../src/ui/credential-messages.js';
 import { documentIsMarked, markDocument } from '../../../src/ui/document-marker.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
@@ -115,21 +121,43 @@ test.describe('PRO-01 change password', () => {
 
     await profile.newPassword.fill('Ab1de');
     await profile.newPassword.blur();
-    await expect(profile.passwordError('new-password', 'minlength')).toBeVisible();
+    await expect(profile.passwordError('new-password', 'minlength')).toHaveText(
+      bulleted(PASSWORD_TEXT.minlength),
+    );
 
     await profile.newPassword.fill('alllowercase1');
-    await expect(profile.passwordError('new-password', 'pattern')).toBeVisible();
+    await expect(profile.passwordError('new-password', 'pattern')).toHaveText(
+      bulleted(PASSWORD_TEXT.pattern),
+    );
 
     await profile.newPassword.fill('');
-    await expect(profile.passwordError('new-password', 'required')).toBeVisible();
+    await expect(profile.passwordError('new-password', 'required')).toHaveText(
+      bulleted(PASSWORD_TEXT.required),
+    );
 
     await profile.newPassword.fill(`Aa1${'x'.repeat(48)}`);
-    await expect(profile.passwordError('new-password', 'maxlength')).toBeVisible();
+    await expect(profile.passwordError('new-password', 'maxlength')).toHaveText(
+      bulleted(PASSWORD_TEXT.maxlength),
+    );
     await expect(profile.passwordSubmit).toBeDisabled();
 
     await profile.passwordConfirmation.fill('');
     await profile.passwordConfirmation.blur();
-    await expect(profile.passwordError('password-confirmation', 'required')).toBeVisible();
+    await expect(profile.passwordError('password-confirmation', 'required')).toHaveText(
+      bulleted(PASSWORD_TEXT.required),
+    );
+
+    // The confirmation has no length or alphabet rule of its own (RPS-1265): it only has to be filled
+    // and to equal the new password, so a short one is a mismatch and nothing else.
+    await profile.newPassword.fill('Passw0rd');
+    await profile.passwordConfirmation.fill('abc');
+    await profile.passwordConfirmation.blur();
+    await expect(profile.passwordError('password-confirmation', 'mismatch')).toHaveText(
+      bulleted(MISMATCH_TEXT),
+    );
+    for (const validator of ['minlength', 'maxlength', 'pattern'] as const) {
+      await expect(profile.passwordError('password-confirmation', validator)).toHaveCount(0);
+    }
 
     // The eye buttons reveal what was typed.
     await expect(profile.newPassword).toHaveAttribute('type', 'password');
@@ -198,17 +226,17 @@ test.describe('PRO-02 change username', () => {
 
     await profile.username.fill('Bad Name');
     await profile.username.blur();
-    await expect(profile.usernameError('pattern')).toBeVisible();
+    await expect(profile.usernameError('pattern')).toHaveText(bulleted(USERNAME_TEXT.pattern));
     await expect(profile.usernameSubmit).toBeDisabled();
 
     await profile.username.fill('ab');
-    await expect(profile.usernameError('minlength')).toBeVisible();
+    await expect(profile.usernameError('minlength')).toHaveText(bulleted(USERNAME_TEXT.minlength));
 
     await profile.username.fill('a'.repeat(26));
-    await expect(profile.usernameError('maxlength')).toBeVisible();
+    await expect(profile.usernameError('maxlength')).toHaveText(bulleted(USERNAME_TEXT.maxlength));
 
     await profile.username.fill('');
-    await expect(profile.usernameError('required')).toBeVisible();
+    await expect(profile.usernameError('required')).toHaveText(bulleted(USERNAME_TEXT.required));
     await expect(profile.usernameSubmit).toBeDisabled();
   });
 

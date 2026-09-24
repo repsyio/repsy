@@ -29,6 +29,7 @@
  * A search is also what keeps every view deterministic on a stack other tests are writing to.
  */
 import { UserRole } from '../../../src/api/panel-api.js';
+import { USERNAME_TEXT, bulleted } from '../../../src/ui/credential-messages.js';
 import { expect, test } from '../../../src/ui/users-fixtures.js';
 
 test.describe('USR-03 edit a user', () => {
@@ -192,19 +193,25 @@ test.describe('USR-03 edit a user', () => {
 
     await usersPage.editModal.username.fill('Bad Name');
     await usersPage.editModal.username.blur();
-    await expect(usersPage.editModal.error('pattern')).toBeVisible();
+    await expect(usersPage.editModal.error('pattern')).toHaveText(bulleted(USERNAME_TEXT.pattern));
     await expect(usersPage.editModal.submit).toBeDisabled();
 
     await usersPage.editModal.username.fill('ab');
-    await expect(usersPage.editModal.error('minlength')).toBeVisible();
+    await expect(usersPage.editModal.error('minlength')).toHaveText(
+      bulleted(USERNAME_TEXT.minlength),
+    );
     await expect(usersPage.editModal.submit).toBeDisabled();
 
     await usersPage.editModal.username.fill('');
-    await expect(usersPage.editModal.error('required')).toBeVisible();
+    await expect(usersPage.editModal.error('required')).toHaveText(
+      bulleted(USERNAME_TEXT.required),
+    );
     await expect(usersPage.editModal.submit).toBeDisabled();
 
     await usersPage.editModal.username.fill('a'.repeat(26));
-    await expect(usersPage.editModal.error('maxlength')).toBeVisible();
+    await expect(usersPage.editModal.error('maxlength')).toHaveText(
+      bulleted(USERNAME_TEXT.maxlength),
+    );
     await expect(usersPage.editModal.submit).toBeDisabled();
   });
 

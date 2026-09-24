@@ -100,17 +100,25 @@
           data-testid="repo-create-description"
           id="description"
           formControlName="description"
-          maxlength="500"
           placeholder="Enter description about repository"
           class="input-text-secondary w-full"
           rows="5"
         ></textarea>
-        <div class="text-body2 text-error min-h-7 pt-1">
-          @if (form.get('description').errors?.['maxlength'] && form.get('description').touched) {
-            <p data-testid="repo-create-description-error-maxlength" animate.enter="fade-in-up">
-              • Should be maximum 500 characters
-            </p>
-          }
+        <div class="text-body2 flex min-h-7 items-start justify-between gap-2 pt-1">
+          <div class="text-error">
+            @if (form.get('description').errors?.['maxlength'] && form.get('description').touched) {
+              <p data-testid="repo-create-description-error-maxlength" animate.enter="fade-in-up">
+                • {{ descriptionMaxMessage }}
+              </p>
+            }
+          </div>
+          <p
+            data-testid="repo-create-description-counter"
+            class="shrink-0 text-neutral-400"
+            [class.text-error]="(form.get('description').value?.length ?? 0) > descriptionMaxLength"
+          >
+            {{ form.get('description').value?.length ?? 0 }}/{{ descriptionMaxLength }}
+          </p>
         </div>
       </div>
 

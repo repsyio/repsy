@@ -76,9 +76,9 @@ export async function publishCrate(
 
 /**
  * The default version is `1.0.0` for the first crate and `1.<index - 1>.0` for the next ones: the
- * crate list sorts by `max_version` (a text column) and pages on it with no tie-breaker (RPS-1298), so
- * crates that all sit at one version have no stable order and a pager can repeat or drop a row.
- * Distinct versions per index make the order well defined (and equal to publish order).
+ * crate list sorts by `max_version` (a text column, RPS-1301), so crates that all sit at one version
+ * tie on it and are ordered by their id only (RPS-1298). Distinct versions per index make the order
+ * well defined (and equal to publish order).
  */
 export const seedCargo: PackageSeeder = async (repoName, ctx, opts) => {
   const index = opts.index ?? 1;

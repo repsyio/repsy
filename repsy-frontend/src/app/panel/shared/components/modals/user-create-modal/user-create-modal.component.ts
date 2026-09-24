@@ -21,6 +21,13 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 
 import { UserCreateForm } from '../../../../../../generated/api';
+import {
+  PASSWORD_MESSAGES,
+  PASSWORD_MISMATCH_MESSAGE,
+  passwordValidators,
+  USERNAME_MESSAGES,
+  usernameValidators,
+} from '../../../../../shared/validators/credentials.validators';
 import { UserService } from '../../../../pages/user/service/user.service';
 import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';
@@ -39,6 +46,9 @@ export class UserCreateModalComponent {
 
   public loading = false;
   public form: FormGroup;
+  public readonly usernameMessages = USERNAME_MESSAGES;
+  public readonly passwordMessages = PASSWORD_MESSAGES;
+  public readonly mismatchMessage = PASSWORD_MISMATCH_MESSAGE;
   public showPassword = false;
   public showConfirmPassword = false;
 
@@ -49,24 +59,8 @@ export class UserCreateModalComponent {
   ) {
     this.form = this.fb.group(
       {
-        username: [
-          '',
-          [
-            Validators.required,
-            Validators.minLength(3),
-            Validators.maxLength(25),
-            Validators.pattern(/^[a-z0-9_\-]+$/),
-          ],
-        ],
-        password: [
-          '',
-          [
-            Validators.required,
-            Validators.minLength(6),
-            Validators.maxLength(50),
-            Validators.pattern(/^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=\S+$).+$/),
-          ],
-        ],
+        username: ['', usernameValidators()],
+        password: ['', passwordValidators()],
         confirmPassword: ['', [Validators.required]],
         isAdmin: [false],
       },

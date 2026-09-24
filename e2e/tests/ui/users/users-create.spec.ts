@@ -27,7 +27,14 @@ import { password as runPassword } from '../../../src/seed/run-id.js';
 import { UserRole } from '../../../src/api/panel-api.js';
 import { expect, test } from '../../../src/ui/users-fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
+import {
+  MISMATCH_TEXT,
+  PASSWORD_TEXT,
+  USERNAME_TEXT,
+  bulleted,
+} from '../../../src/ui/credential-messages.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
+import { ProfilePage, type ProfileUsernameValidator } from '../../../src/ui/pages/profile.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
 import type {
   ConfirmValidator,
@@ -224,54 +231,107 @@ test.describe('USR-02 create validation', () => {
     await expect(modal.error('confirm-password', 'mismatch')).toHaveCount(0);
   });
 
-  test('the messages carry their text', async ({ usersPage }) => {
+  test('the messages carry the shared credential texts', async ({ usersPage }) => {
     await usersPage.goto();
     await usersPage.openCreateModal();
     const modal = usersPage.createModal;
 
-    await modal.username.fill('ab');
+    await modal.username.fill('');
     await modal.username.blur();
-    await expect(modal.error('username', 'minlength')).toContainText(
-      'Should be minimum 3 characters',
+    await expect(modal.error('username', 'required')).toHaveText(bulleted(USERNAME_TEXT.required));
+    await modal.username.fill('ab');
+    await expect(modal.error('username', 'minlength')).toHaveText(
+      bulleted(USERNAME_TEXT.minlength),
+    );
+    await modal.username.fill('a'.repeat(26));
+    await expect(modal.error('username', 'maxlength')).toHaveText(
+      bulleted(USERNAME_TEXT.maxlength),
     );
     await modal.username.fill('Bad Name');
-    await expect(modal.error('username', 'pattern')).toContainText(
-      'Can contain only lowercase letters, digits, underscores and hyphens',
+    await expect(modal.error('username', 'pattern')).toHaveText(bulleted(USERNAME_TEXT.pattern));
+
+    await modal.password.fill('');
+    await modal.password.blur();
+    await expect(modal.error('password', 'required')).toHaveText(bulleted(PASSWORD_TEXT.required));
+    await modal.password.fill('Ab1de');
+    await expect(modal.error('password', 'minlength')).toHaveText(
+      bulleted(PASSWORD_TEXT.minlength),
+    );
+    await modal.password.fill(`Aa1${'x'.repeat(48)}`);
+    await expect(modal.error('password', 'maxlength')).toHaveText(
+      bulleted(PASSWORD_TEXT.maxlength),
     );
     await modal.password.fill('NoDigitsHere');
-    await modal.password.blur();
-    await expect(modal.error('password', 'pattern')).toContainText(
-      'Should contain at least 1 lowercase, 1 uppercase letter and 1 digit',
-    );
+    await expect(modal.error('password', 'pattern')).toHaveText(bulleted(PASSWORD_TEXT.pattern));
+
     await modal.confirmPassword.fill('different');
     await modal.confirmPassword.blur();
-    await expect(modal.error('confirm-password', 'mismatch')).toContainText(
-      'Passwords do not match',
-    );
+    await expect(modal.error('confirm-password', 'mismatch')).toHaveText(bulleted(MISMATCH_TEXT));
   });
 
-  // RPS-1261: the modal's template was saved double-encoded, so its bullet rendered as the three
-  // characters "â€¢".
-  test('the messages start with a bullet, not mojibake RPS-1261', async ({ usersPage }) => {
+  // RPS-1265: the create-user modal, the profile and the deploy token modal used to word the same rule
+  // three ways ("Should be...", "Username must be...", "Can contain..."). Same input, same text.
+  test('the create-user modal and the profile show the same message for the same bad input', async ({
+    usersPage,
+  }) => {
+    const badUsernames = {
+      minlength: 'ab',
+      maxlength: 'a'.repeat(26),
+      pattern: 'Bad Name',
+    } as const;
+    const badPasswords = {
+      minlength: 'Ab1de',
+      maxlength: `Aa1${'x'.repeat(48)}`,
+      pattern: 'NoDigitsHere',
+    } as const;
     await usersPage.goto();
     await usersPage.openCreateModal();
     const modal = usersPage.createModal;
 
-    await modal.username.fill('ab');
-    await modal.username.blur();
-    await expect(modal.error('username', 'minlength')).toHaveText(
-      '• Should be minimum 3 characters',
-    );
-    await modal.password.fill('Ab1de');
-    await modal.password.blur();
-    await expect(modal.error('password', 'minlength')).toHaveText(
-      '• Should be minimum 6 characters',
-    );
-    await modal.confirmPassword.fill('x');
+    const fromModal: Record<string, string> = {};
+    for (const [validator, value] of Object.entries(badUsernames)) {
+      await modal.username.fill(value);
+      await modal.username.blur();
+      fromModal[`username-${validator}`] =
+        (await modal.error('username', validator as UsernameValidator).textContent()) ?? '';
+    }
+    for (const [validator, value] of Object.entries(badPasswords)) {
+      await modal.password.fill(value);
+      await modal.password.blur();
+      fromModal[`password-${validator}`] =
+        (await modal.error('password', validator as PasswordValidator).textContent()) ?? '';
+    }
+    await modal.confirmPassword.fill('different');
     await modal.confirmPassword.blur();
-    await expect(modal.error('confirm-password', 'mismatch')).toHaveText(
-      '• Passwords do not match',
-    );
+    fromModal['mismatch'] = (await modal.error('confirm-password', 'mismatch').textContent()) ?? '';
+
+    // The harness admin only types into the profile fields here; nothing is submitted.
+    const profile = new ProfilePage(usersPage.page);
+    await profile.goto();
+    const fromProfile: Record<string, string> = {};
+    for (const [validator, value] of Object.entries(badUsernames)) {
+      await profile.username.fill(value);
+      await profile.username.blur();
+      fromProfile[`username-${validator}`] =
+        (await profile.usernameError(validator as ProfileUsernameValidator).textContent()) ?? '';
+    }
+    for (const [validator, value] of Object.entries(badPasswords)) {
+      await profile.newPassword.fill(value);
+      await profile.newPassword.blur();
+      fromProfile[`password-${validator}`] =
+        (await profile
+          .passwordError('new-password', validator as PasswordValidator)
+          .textContent()) ?? '';
+    }
+    await profile.newPassword.fill('Passw0rd');
+    await profile.passwordConfirmation.fill('different');
+    await profile.passwordConfirmation.blur();
+    fromProfile['mismatch'] =
+      (await profile.passwordError('password-confirmation', 'mismatch').textContent()) ?? '';
+
+    expect(fromProfile).toEqual(fromModal);
+    expect(fromProfile['username-pattern']?.trim()).toBe(bulleted(USERNAME_TEXT.pattern));
+    expect(fromProfile['password-pattern']?.trim()).toBe(bulleted(PASSWORD_TEXT.pattern));
   });
 
   test('a valid form enables the submit button', async ({ usersPage, seeder }) => {

@@ -20,7 +20,6 @@ import { of, Subject, throwError } from 'rxjs';
 import { LoginInfo } from '../../../../../generated/api';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
-import { renderComponent } from '../../repository/testing/render-spec-helpers';
 import { ProfileService } from '../service/profile.service';
 import { AccountInfoComponent } from './account-info.component';
 
@@ -255,32 +254,5 @@ describe('AccountInfoComponent', () => {
       expect(component.usernameForm.enabled).toBeTrue();
       expect(component.loading).toBeFalse();
     });
-  });
-});
-
-describe('AccountInfoComponent template', () => {
-  it('spells "characters" in the password confirmation length message (RPS-1261)', async () => {
-    const { fixture, el } = await renderComponent(
-      AccountInfoComponent,
-      [
-        {
-          provide: ProfileService,
-          useValue: jasmine.createSpyObj<ProfileService>('ProfileService', ['updatePassword']),
-        },
-        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
-        {
-          provide: DangerModalService,
-          useValue: jasmine.createSpyObj<DangerModalService>('DangerModalService', ['show']),
-        },
-      ],
-      { username: 'alice' },
-    );
-    const confirmation = fixture.componentInstance.passwordForm.get('passwordConfirmation');
-    confirmation.setValue('abc');
-    confirmation.markAsTouched();
-    fixture.detectChanges();
-
-    const message = el.querySelector('[data-testid="profile-password-confirmation-error-minlength"]');
-    expect(message?.textContent?.trim()).toBe('• Password confirmation should be minimum 6 characters');
   });
 });

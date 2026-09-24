@@ -24,22 +24,17 @@
  */
 import { expect, type Page } from '@playwright/test';
 
+import { LOGIN_USERNAME_TEXT, PASSWORD_TEXT } from '../credential-messages.js';
 import { type LoginField, LoginPage, type LoginValidator } from '../pages/login.js';
 
-/** The visible text of every inline message, as `login.component.html` renders it today. */
+/**
+ * The visible text of every inline message, as `login.component.html` renders it. The sentences are the
+ * shared credential ones (RPS-1265): the backend's LoginForm holds the password to the same rule as a new
+ * one, so the login form has the create-user password rule and messages.
+ */
 export const LOGIN_ERROR_TEXT: Record<LoginField, Record<LoginValidator, string>> = {
-  username: {
-    required: 'Should not be empty',
-    pattern: 'Should not contain invalid characters',
-    minlength: 'Should be minimum 3 characters',
-    maxlength: 'Should be maximum 150 characters',
-  },
-  password: {
-    required: 'Should not be empty',
-    pattern: 'Should be at least 1 lowercase, uppercase letter and 1 digit',
-    minlength: 'Should be minimum 6 characters',
-    maxlength: 'Should be maximum 50 characters',
-  },
+  username: LOGIN_USERNAME_TEXT,
+  password: PASSWORD_TEXT,
 };
 
 const VALIDATORS = Object.keys(LOGIN_ERROR_TEXT.username) as LoginValidator[];

@@ -56,18 +56,20 @@
             />
             <div class="text-body2 text-error min-h-7 pt-1">
               @if (form.get('username').errors?.['required'] && form.get('username').touched) {
-                <p data-testid="user-edit-username-error-required" animate.enter="fade-in-up">• Should not be empty</p>
+                <p data-testid="user-edit-username-error-required" animate.enter="fade-in-up">
+                  • {{ usernameMessages.required }}
+                </p>
               } @else if (form.get('username').errors?.['minlength'] && form.get('username').touched) {
                 <p data-testid="user-edit-username-error-minlength" animate.enter="fade-in-up">
-                  • Should be minimum 3 characters
+                  • {{ usernameMessages.minlength }}
                 </p>
               } @else if (form.get('username').errors?.['maxlength'] && form.get('username').touched) {
                 <p data-testid="user-edit-username-error-maxlength" animate.enter="fade-in-up">
-                  • Should be maximum 25 characters
+                  • {{ usernameMessages.maxlength }}
                 </p>
               } @else if (form.get('username').errors?.['pattern'] && form.get('username').touched) {
                 <p data-testid="user-edit-username-error-pattern" animate.enter="fade-in-up">
-                  Can contain only lowercase letters, digits, underscores and hyphens
+                  • {{ usernameMessages.pattern }}
                 </p>
               }
             </div>
