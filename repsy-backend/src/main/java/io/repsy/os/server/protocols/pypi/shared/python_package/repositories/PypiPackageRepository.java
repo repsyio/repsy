@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -99,13 +98,4 @@ public interface PypiPackageRepository extends JpaRepository<PypiPackage, UUID> 
           join p.repo re
           where re.id = :repoId and p.latestVersion = r.version and p.name like %:name%""")
   Page<PackageListItem> findAllByRepoIdContainsName(UUID repoId, String name, Pageable pageable);
-
-  @Query(
-      """
-          update PypiPackage p
-          set p.latestVersion = :latestVersion, p.stableVersion = :stableVersion
-          where p.id = :packageId""")
-  @Modifying
-  void updatePackageLatestVersionAndStableVersion(
-      UUID packageId, String latestVersion, @Nullable String stableVersion);
 }

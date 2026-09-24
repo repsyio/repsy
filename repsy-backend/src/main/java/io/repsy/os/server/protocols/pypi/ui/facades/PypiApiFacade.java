@@ -22,9 +22,7 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPack
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseVersionRequiresPython;
 import io.repsy.protocols.pypi.shared.utils.PackageUtils;
-import io.repsy.protocols.pypi.shared.utils.ReleaseVersion;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -49,70 +47,38 @@ public class PypiApiFacade implements ProtocolApiFacade {
     this.pypiStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
+  /**
+   * Deletes the package. The rows and the archives go in one transaction under the package's row
+   * lock, see {@link PypiPackageServiceImpl#deletePackage}. The events follow the commit, so a
+   * delete that rolled back reports nothing.
+   */
   public @NonNull BaseUsages deletePackage(
       final @NonNull RepoInfo repoInfo, final @NonNull String packageName) {
 
-    final var packageInfo =
-        this.pypiPackageService.getPackage(
-            repoInfo.getStorageKey(), PackageUtils.normalizePackageName(packageName));
+    final var normalizedName = PackageUtils.normalizePackageName(packageName);
 
-    final var releaseVersions =
-        this.pypiPackageService.getReleaseIndexListItemInfos(packageInfo.getId());
+    final var deletion =
+        this.pypiPackageService.deletePackage(repoInfo.getStorageKey(), normalizedName);
 
-    this.pypiPackageService.deletePackage(
-        repoInfo.getStorageKey(), packageInfo.getNormalizedName());
+    this.publishVersionsDeleted(repoInfo, normalizedName, deletion.versions());
 
-    final var usage =
-        this.pypiStorageService.deletePackage(
-            repoInfo.getStorageKey(), packageInfo.getNormalizedName());
-
-    this.publishVersionsDeleted(repoInfo, packageInfo.getNormalizedName(), releaseVersions);
-
-    return BaseUsages.builder().diskUsage(-1L * usage).build();
+    return BaseUsages.builder().diskUsage(-1L * deletion.freedBytes()).build();
   }
 
+  /** Deletes the release, and the package with it when it was the last one, like the above. */
   public @NonNull BaseUsages deleteRelease(
       final @NonNull RepoInfo repoInfo,
       final @NonNull String packageName,
       final @NonNull String version) {
 
-    final var packageInfo =
-        this.pypiPackageService.getPackage(
-            repoInfo.getStorageKey(), PackageUtils.normalizePackageName(packageName));
+    final var normalizedName = PackageUtils.normalizePackageName(packageName);
 
-    final var releaseVersion = ReleaseVersion.of(version);
+    final var deletion =
+        this.pypiPackageService.deleteRelease(repoInfo.getStorageKey(), normalizedName, version);
 
-    this.pypiPackageService.deleteRelease(packageInfo.getId(), releaseVersion.getVersion());
+    this.publishVersionsDeleted(repoInfo, normalizedName, deletion.versions());
 
-    this.publishVersionDeleted(
-        repoInfo, packageInfo.getNormalizedName(), releaseVersion.getVersion());
-
-    final var isHasNoReleases = this.pypiPackageService.isPackageHasNoReleases(packageInfo.getId());
-
-    final var usage = BaseUsages.builder().build();
-
-    if (isHasNoReleases) {
-      this.pypiPackageService.deletePackage(
-          repoInfo.getStorageKey(), packageInfo.getNormalizedName());
-
-      usage.setDiskUsage(
-          -1L
-              * this.pypiStorageService.deletePackage(
-                  repoInfo.getStorageKey(), packageInfo.getNormalizedName()));
-
-    } else {
-      usage.setDiskUsage(
-          -1L
-              * this.pypiStorageService.deleteRelease(
-                  repoInfo.getStorageKey(),
-                  packageInfo.getNormalizedName(),
-                  releaseVersion.getVersion()));
-
-      this.pypiPackageService.updatePackageReleaseVersionsIfNecessary(
-          packageInfo, releaseVersion.getVersion());
-    }
-
-    return usage;
+    return BaseUsages.builder().diskUsage(-1L * deletion.freedBytes()).build();
   }
 
   private void publishVersionDeleted(
@@ -132,10 +98,10 @@ public class PypiApiFacade implements ProtocolApiFacade {
   private void publishVersionsDeleted(
       final @NonNull RepoInfo repoInfo,
       final @NonNull String normalizedPackageName,
-      final @NonNull List<ReleaseVersionRequiresPython> releaseVersions) {
+      final @NonNull List<String> versions) {
 
-    for (final var releaseVersion : releaseVersions) {
-      this.publishVersionDeleted(repoInfo, normalizedPackageName, releaseVersion.getVersion());
+    for (final var version : versions) {
+      this.publishVersionDeleted(repoInfo, normalizedPackageName, version);
     }
   }
 
