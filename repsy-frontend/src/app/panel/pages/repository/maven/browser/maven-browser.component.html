@@ -2,20 +2,28 @@
 
 <!-- Navigation and Path -->
 <div
+  data-testid="pkg-toolbar"
   class="mb-7 flex flex-col flex-col-reverse items-start justify-between gap-4 md:items-start lg:flex-row lg:items-center"
 >
   <!-- Back/Forward Buttons -->
   <div class="flex w-full flex-row items-center gap-4 sm:w-auto sm:gap-0">
-    <app-searchbox class="w-full sm:mr-4 sm:max-w-[192px]" placeholder="File name" (filter)="search($event)" />
+    <app-searchbox
+      data-testid="pkg-search"
+      class="w-full sm:mr-4 sm:max-w-[192px]"
+      placeholder="File name"
+      (filter)="search($event)"
+    />
 
     <div class="flex items-center">
       <button
+        data-testid="maven-browser-back"
         (click)="prev()"
         class="flex h-[40px] w-[40px] items-center justify-center rounded-l-md border border-[#404141] bg-[#101112] text-[#9FA0A0] hover:border hover:border-[#FDFDFD] hover:text-[#FDFDFD]"
       >
         <img class="h-[12px]" ngSrc="/assets/icons/cursor/arrow-left.svg" alt="page-left" height="8" width="4" />
       </button>
       <button
+        data-testid="maven-browser-forward"
         (click)="next()"
         class="flex h-[40px] w-[40px] items-center justify-center rounded-r-md border border-[#404141] bg-[#101112] text-[#9FA0A0] hover:border-[#FDFDFD] hover:text-[#FDFDFD]"
       >
@@ -25,11 +33,12 @@
   </div>
 
   <div class="flex w-full items-center justify-end gap-2 sm:w-auto">
-    <button (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
+    <button data-testid="pkg-configure" (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
       <img ngSrc="/assets/icons/input/configure.svg" alt="configure" height="16" width="16" />
       Configure
     </button>
     <button
+      data-testid="pkg-settings"
       [disabled]="!activeRepo.canManage"
       [routerLink]="'/' + activeRepo.repoName + '/settings'"
       class="repsy-btn-ghost w-full sm:w-auto"
@@ -44,6 +53,7 @@
   • Browse the
   <a
     href="javascript:void(0)"
+    data-testid="maven-browser-open-native"
     (click)="goToBrowser('/')"
     class="text-body1 hover:text-brand-500 focus:text-brand-500 inline-block text-neutral-200 underline focus:underline"
   >
@@ -52,12 +62,16 @@
   on your browser.
 </p>
 
-<div class="mb-4 text-[14px] text-neutral-200">
-  <a class="hover:text-secondary-500" href="javascript:void(0)" (click)="goToDir({ name: '/', path: '/', prev: null })"
+<div data-testid="maven-browser-path" class="mb-4 text-[14px] text-neutral-200">
+  <a
+    data-testid="maven-browser-path-root"
+    class="hover:text-secondary-500"
+    href="javascript:void(0)"
+    (click)="goToDir({ name: '/', path: '/', prev: null })"
     >{{ activeRepo.repoName }}:</a
   >
   @for (dir of directoryStack; track dir.name; let index = $index) {
-    <a href="javascript:void(0)" (click)="goToDir(dir)">
+    <a [attr.data-testid]="'maven-browser-path-' + dir.name" href="javascript:void(0)" (click)="goToDir(dir)">
       <span
         class="hover:text-secondary-500"
         [ngClass]="{ 'text-secondary-500': directoryStack.length - 1 === index }"
@@ -71,14 +85,19 @@
   <app-spinner />
 } @else {
   @if (filteredFsItems && filteredFsItems.length > 0) {
-    <div class="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+    <div
+      data-testid="maven-browser-grid"
+      class="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4"
+    >
       @for (file of filteredFsItems; track file.name) {
         <div
           animate.enter="fade-in-up"
+          [attr.data-testid]="'maven-browser-item-' + file.name"
           class="relative rounded-lg border border-[#404141] bg-[#14161A] hover:border-[#FDFDFD]"
         >
-          <app-dropdown class="absolute top-0 right-0 z-1 px-2 py-4">
+          <app-dropdown data-testid="row-menu" class="absolute top-0 right-0 z-1 px-2 py-4">
             <button
+              data-testid="row-browse-file"
               (click)="goToBrowser(directoryStack[directoryStack.length - 1]?.path + file.name)"
               class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FDFDFD] hover:bg-[#2D2C2C]"
             >
@@ -92,6 +111,7 @@
 
             <!-- File Icon -->
             <div
+              data-testid="row-open"
               (click)="go(file)"
               (keydown.enter)="go(file); $event.preventDefault()"
               (keydown.space)="go(file); $event.preventDefault()"
@@ -113,7 +133,7 @@
             </div>
 
             <!-- File Name -->
-            <div class="mb-1 text-start text-[15px] font-medium break-all text-neutral-200">
+            <div data-testid="row-name" class="mb-1 text-start text-[15px] font-medium break-all text-neutral-200">
               {{ file.name }}
             </div>
 
@@ -135,7 +155,7 @@
     </div>
   } @else {
     @if (!filteredFsItems) {
-      <div animate.enter="fade-in-up" class="p-8 text-center">
+      <div data-testid="maven-browser-not-found" animate.enter="fade-in-up" class="p-8 text-center">
         <img
           class="mx-auto mb-[70px]"
           ngSrc="/assets/images/hippo-empty.svg"

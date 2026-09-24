@@ -7,13 +7,20 @@
 
 <div
   [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading || this.error }"
+  data-testid="pkg-toolbar"
   class="mb-7 flex flex-col flex-col-reverse items-start justify-between gap-4 md:items-start lg:flex-row lg:items-center"
 >
   <div class="flex w-full flex-col items-start gap-4 sm:w-auto sm:flex-row sm:items-center">
-    <app-searchbox class="w-full sm:max-w-[192px]" placeholder="version" (filter)="search($event)" />
+    <app-searchbox
+      data-testid="pkg-search"
+      class="w-full sm:max-w-[192px]"
+      placeholder="version"
+      (filter)="search($event)"
+    />
 
     <div class="flex w-full gap-2 sm:w-auto">
       <app-sort-selector
+        data-testid="pkg-sort"
         [(selectedOption)]="sortOption"
         [options]="sortOptions"
         (choose)="sort($event)"
@@ -21,6 +28,7 @@
       />
 
       <button
+        data-testid="pkg-refresh"
         (click)="refreshPage()"
         class="flex h-[40px] w-[40px] items-center justify-center hover:brightness-0 hover:invert"
       >
@@ -30,12 +38,13 @@
   </div>
 
   <div class="flex w-full items-center justify-end gap-2 sm:w-auto">
-    <button (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
+    <button data-testid="pkg-configure" (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
       <img ngSrc="/assets/icons/input/configure.svg" alt="configure" height="16" width="16" />
       Configure
     </button>
     @if (canManage) {
       <button
+        data-testid="pkg-settings"
         [disabled]="!activeRepo.canManage"
         [routerLink]="'/' + activeRepo.repoName + '/settings'"
         class="repsy-btn-ghost w-full sm:w-auto"
@@ -65,9 +74,14 @@
         </div>
 
         <!-- Version Table (Desktop) -->
-        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
+        <div
+          data-testid="pkg-versions-table"
+          animate.enter="fade-in-down"
+          class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
+        >
           @for (version of versions; track version.version; let i = $index) {
             <div
+              [attr.data-testid]="'pkg-versions-row-' + version.version"
               role="button"
               appKeyboardActivate
               [routerLink]="'/' + activeRepo.repoName + '/' + packageName + '/' + version.version"
@@ -81,12 +95,14 @@
                   <img class="mb-1" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
                   <app-tooltip
                     class="group-hover:underline"
+                    data-testid="row-name"
                     [text]="version.version | ellipsis: 20"
                     [textHover]="version.version"
                   />
                 </div>
 
                 <app-version-security-badge
+                  data-testid="row-security"
                   [repoName]="activeRepo.repoName"
                   repoType="pypi"
                   [artifactName]="packageName"
@@ -98,14 +114,16 @@
 
                 <app-tooltip
                   class="text-secondary-500 group-hover:underline"
+                  data-testid="row-updated"
                   [text]="timeAgo(version.createdAt)"
                   [textHover]="version.createdAt | date: 'medium'"
                   [always]="true"
                 />
 
                 @if (activeRepo.canManage) {
-                  <app-dropdown>
+                  <app-dropdown data-testid="row-menu">
                     <button
+                      data-testid="row-delete"
                       (click)="deleteVersion(version)"
                       [disabled]="loading"
                       class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
@@ -124,62 +142,66 @@
         </div>
 
         <!-- Version List (Mobile) -->
-        @for (version of versions; track version.version; let i = $index) {
-          <div animate.enter="fade-in-down" class="lg:hidden">
-            <div
-              class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="'/' + activeRepo.repoName + '/' + packageName + '/' + version.version"
-            >
-              @if (activeRepo.canWrite) {
-                <app-dropdown class="relative left-4 ml-auto">
-                  <button
-                    (click)="deleteVersion(version)"
-                    [disabled]="loading"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
-                  >
-                    <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
-                    Delete
-                  </button>
-                </app-dropdown>
+        <div data-testid="pkg-versions-cards">
+          @for (version of versions; track version.version; let i = $index) {
+            <div animate.enter="fade-in-down" class="lg:hidden">
+              <div
+                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+                [attr.data-testid]="'pkg-versions-card-' + version.version"
+                role="button"
+                appKeyboardActivate
+                [routerLink]="'/' + activeRepo.repoName + '/' + packageName + '/' + version.version"
+              >
+                @if (activeRepo.canWrite) {
+                  <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
+                    <button
+                      data-testid="row-delete"
+                      (click)="deleteVersion(version)"
+                      [disabled]="loading"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                    >
+                      <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                      Delete
+                    </button>
+                  </app-dropdown>
+                }
+
+                <div class="group text-secondary-500 flex items-start gap-2 text-[14px]">
+                  <img class="mt-[2px]" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
+
+                  <span data-testid="row-name" class="text-right break-all text-[#FDFDFD]">{{ version.version }}</span>
+                </div>
+
+                <div class="space-y-2">
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Security: </span>
+                    <app-version-security-badge
+                      data-testid="row-security"
+                      [repoName]="activeRepo.repoName"
+                      repoType="pypi"
+                      [artifactName]="packageName"
+                      [versionName]="version.version"
+                      [severity]="securitySummary[version.version]?.severity ?? null"
+                      [scanStatus]="securitySummary[version.version]?.latestScanStatus ?? null"
+                      [scanned]="securitySummary[version.version]?.scanned ?? false"
+                    />
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Upladed: </span>
+                    <span data-testid="row-updated" class="text-secondary-500 text-right break-all">
+                      {{ version.createdAt | date: 'medium' }} {{ '(' + timeAgo(version.createdAt) + ')' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              @if (i !== versions.length - 1) {
+                <div class="px-2 py-4">
+                  <div class="h-[1px] bg-[#404141]"></div>
+                </div>
               }
-
-              <div class="group text-secondary-500 flex items-start gap-2 text-[14px]">
-                <img class="mt-[2px]" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
-
-                <span class="text-right break-all text-[#FDFDFD]">{{ version.version }}</span>
-              </div>
-
-              <div class="space-y-2">
-                <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Security: </span>
-                  <app-version-security-badge
-                    [repoName]="activeRepo.repoName"
-                    repoType="pypi"
-                    [artifactName]="packageName"
-                    [versionName]="version.version"
-                    [severity]="securitySummary[version.version]?.severity ?? null"
-                    [scanStatus]="securitySummary[version.version]?.latestScanStatus ?? null"
-                    [scanned]="securitySummary[version.version]?.scanned ?? false"
-                  />
-                </div>
-                <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Upladed: </span>
-                  <span class="text-secondary-500 text-right break-all">
-                    {{ version.createdAt | date: 'medium' }} {{ '(' + timeAgo(version.createdAt) + ')' }}
-                  </span>
-                </div>
-              </div>
             </div>
-            @if (i !== versions.length - 1) {
-              <div class="px-2 py-4">
-                <div class="h-[1px] bg-[#404141]"></div>
-              </div>
-            }
-          </div>
-        }
-
+          }
+        </div>
         <!-- Pagination -->
         <app-pagination
           (pageNumChange)="loadPage($event)"
@@ -191,7 +213,7 @@
       <app-empty-list />
     }
   } @else {
-    <div animate.enter="fade-in-up" class="p-8 text-center">
+    <div data-testid="pkg-error" animate.enter="fade-in-up" class="p-8 text-center">
       <img
         class="mx-auto mb-[70px]"
         ngSrc="/assets/images/hippo-empty.svg"
@@ -199,7 +221,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p data-testid="pkg-error-message" class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
     </div>
   }
 }

@@ -2,23 +2,31 @@
 
 <div
   [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading || this.error }"
+  data-testid="pkg-install-snippet"
   class="mb-8 inline-flex items-start gap-2 rounded-lg bg-[#101112] p-[14px]"
 >
   <img class="mt-[2px]" ngSrc="/assets/icons/docker/docker.svg" alt="docker-light" height="18" width="18" />
-  <span class="text-[13px] break-all text-[#9C9C9D]">{{ installText }}</span>
+  <span data-testid="pkg-install-snippet-text" class="text-[13px] break-all text-[#9C9C9D]">{{ installText }}</span>
 
   <app-copy-clipboard [text]="installText" />
 </div>
 
 <div
   [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading || this.error }"
+  data-testid="pkg-toolbar"
   class="mb-7 flex flex-col flex-col-reverse items-start justify-between gap-4 md:items-start lg:flex-row lg:items-center"
 >
   <div class="flex w-full flex-col items-start gap-4 sm:w-auto sm:flex-row sm:items-center">
-    <app-searchbox class="w-full sm:max-w-[192px]" placeholder="tag" (filter)="search($event)" />
+    <app-searchbox
+      data-testid="pkg-search"
+      class="w-full sm:max-w-[192px]"
+      placeholder="tag"
+      (filter)="search($event)"
+    />
 
     <div class="flex w-full gap-2 sm:w-auto">
       <app-sort-selector
+        data-testid="pkg-sort"
         [(selectedOption)]="sortOption"
         [options]="sortOptions"
         (choose)="sort($event)"
@@ -26,6 +34,7 @@
       />
 
       <button
+        data-testid="pkg-refresh"
         (click)="refreshPage()"
         class="hover:text-secondary-500 flex h-[40px] w-[40px] items-center justify-center text-neutral-200"
       >
@@ -48,12 +57,13 @@
   </div>
 
   <div class="flex w-full items-center justify-end gap-2 sm:w-auto">
-    <button (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
+    <button data-testid="pkg-configure" (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
       <img ngSrc="/assets/icons/input/configure.svg" alt="configure" height="16" width="16" />
       Configure
     </button>
     @if (canManage) {
       <button
+        data-testid="pkg-settings"
         [disabled]="!activeRepo.canManage"
         [routerLink]="'/' + activeRepo.repoName + '/settings'"
         class="repsy-btn-ghost w-full sm:w-auto"
@@ -84,9 +94,14 @@
         </div>
 
         <!-- Tag Table (Desktop) -->
-        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
+        <div
+          data-testid="pkg-versions-table"
+          animate.enter="fade-in-down"
+          class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
+        >
           @for (tag of tags; track tag.name; let i = $index) {
             <div
+              [attr.data-testid]="'pkg-versions-row-' + tag.name"
               role="button"
               appKeyboardActivate
               [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name + '/detail'"
@@ -98,6 +113,7 @@
               >
                 <div class="flex w-max items-center gap-2">
                   <a
+                    data-testid="row-manifests-link"
                     class="group text-secondary-500 flex w-max gap-2"
                     [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name"
                   >
@@ -105,6 +121,7 @@
 
                     <app-tooltip
                       class="group-hover:underline"
+                      data-testid="row-name"
                       [text]="tag.name | ellipsis: 30"
                       [textHover]="tag.name"
                     />
@@ -127,6 +144,7 @@
                 </div>
 
                 <app-version-security-badge
+                  data-testid="row-security"
                   [repoName]="activeRepo.repoName"
                   repoType="docker"
                   [artifactName]="imageName"
@@ -138,20 +156,23 @@
 
                 <app-tooltip
                   class="text-[14px] text-[#FDFDFD]"
+                  data-testid="row-platform"
                   [text]="tag.platform | ellipsis: 30"
                   [textHover]="tag.platform"
                 />
 
                 <app-tooltip
                   class="text-[14px] text-[#FDFDFD]"
+                  data-testid="row-updated"
                   [text]="timeAgo(tag.lastUpdatedAt)"
                   [textHover]="tag.lastUpdatedAt | date: 'medium'"
                   [always]="true"
                 />
 
                 @if (activeRepo.canManage) {
-                  <app-dropdown>
+                  <app-dropdown data-testid="row-menu">
                     <button
+                      data-testid="row-delete"
                       (click)="deleteTag(tag)"
                       [disabled]="loading"
                       class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
@@ -171,84 +192,93 @@
         </div>
 
         <!-- Tag List (Mobile)-->
-        @for (tag of tags; track tag.name; let i = $index) {
-          <div animate.enter="fade-in-down" class="lg:hidden">
-            <div
-              class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name + '/detail'"
-            >
-              @if (activeRepo.canManage) {
-                <app-dropdown class="relative left-4 ml-auto">
-                  <button
-                    (click)="deleteTag(tag)"
-                    [disabled]="loading"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
-                  >
-                    <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
-                    Delete
-                  </button>
-                </app-dropdown>
-              }
+        <div data-testid="pkg-versions-cards">
+          @for (tag of tags; track tag.name; let i = $index) {
+            <div animate.enter="fade-in-down" class="lg:hidden">
+              <div
+                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+                [attr.data-testid]="'pkg-versions-card-' + tag.name"
+                role="button"
+                appKeyboardActivate
+                [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name + '/detail'"
+              >
+                @if (activeRepo.canManage) {
+                  <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
+                    <button
+                      data-testid="row-delete"
+                      (click)="deleteTag(tag)"
+                      [disabled]="loading"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                    >
+                      <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                      Delete
+                    </button>
+                  </app-dropdown>
+                }
 
-              <div class="flex items-start gap-2">
-                <a
-                  class="group text-secondary-500 flex items-start gap-2"
-                  [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name"
-                >
-                  <img class="mt-[2px]" ngSrc="/assets/icons/repo/tag.svg" alt="tag" height="18" width="18" />
-                  <span class="text-right break-all group-hover:underline">{{ tag.name }}</span>
-                  <svg
-                    class="h-4 w-4 shrink-0 text-neutral-200 group-hover:text-white"
-                    viewBox="0 0 14 14"
-                    fill="currentColor"
-                    xmlns="http://www.w3.org/2000/svg"
+                <div class="flex items-start gap-2">
+                  <a
+                    data-testid="row-manifests-link"
+                    class="group text-secondary-500 flex items-start gap-2"
+                    [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name"
                   >
-                    <path
-                      d="M4.93386 4.13083L9.90503 4.13076M9.90503 4.13076L9.90503 9.03122M9.90503 4.13076L4.13032 9.90547"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
+                    <img class="mt-[2px]" ngSrc="/assets/icons/repo/tag.svg" alt="tag" height="18" width="18" />
+                    <span data-testid="row-name" class="text-right break-all group-hover:underline">{{
+                      tag.name
+                    }}</span>
+                    <svg
+                      class="h-4 w-4 shrink-0 text-neutral-200 group-hover:text-white"
+                      viewBox="0 0 14 14"
+                      fill="currentColor"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M4.93386 4.13083L9.90503 4.13076M9.90503 4.13076L9.90503 9.03122M9.90503 4.13076L4.13032 9.90547"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </a>
+                </div>
+
+                <div class="space-y-2">
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Security: </span>
+                    <app-version-security-badge
+                      data-testid="row-security"
+                      [repoName]="activeRepo.repoName"
+                      repoType="docker"
+                      [artifactName]="imageName"
+                      [versionName]="tag.name"
+                      [severity]="securitySummary[tag.name]?.severity ?? null"
+                      [scanStatus]="securitySummary[tag.name]?.latestScanStatus ?? null"
+                      [scanned]="securitySummary[tag.name]?.scanned ?? false"
                     />
-                  </svg>
-                </a>
-              </div>
-
-              <div class="space-y-2">
-                <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Security: </span>
-                  <app-version-security-badge
-                    [repoName]="activeRepo.repoName"
-                    repoType="docker"
-                    [artifactName]="imageName"
-                    [versionName]="tag.name"
-                    [severity]="securitySummary[tag.name]?.severity ?? null"
-                    [scanStatus]="securitySummary[tag.name]?.latestScanStatus ?? null"
-                    [scanned]="securitySummary[tag.name]?.scanned ?? false"
-                  />
-                </div>
-                <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Platform: </span>
-                  <span class="text-right text-sm break-all text-[#FDFDFD]">{{ tag.platform }}</span>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Last Updated: </span>
-                  <span class="text-right text-sm break-all text-[#FDFDFD]">
-                    {{ tag.lastUpdatedAt | date: 'medium' }} {{ '(' + timeAgo(tag.lastUpdatedAt) + ')' }}
-                  </span>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Platform: </span>
+                    <span data-testid="row-platform" class="text-right text-sm break-all text-[#FDFDFD]">{{
+                      tag.platform
+                    }}</span>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Last Updated: </span>
+                    <span data-testid="row-updated" class="text-right text-sm break-all text-[#FDFDFD]">
+                      {{ tag.lastUpdatedAt | date: 'medium' }} {{ '(' + timeAgo(tag.lastUpdatedAt) + ')' }}
+                    </span>
+                  </div>
                 </div>
               </div>
+              @if (i !== tags.length - 1) {
+                <div class="px-2 py-4">
+                  <div class="h-[1px] bg-[#404141]"></div>
+                </div>
+              }
             </div>
-            @if (i !== tags.length - 1) {
-              <div class="px-2 py-4">
-                <div class="h-[1px] bg-[#404141]"></div>
-              </div>
-            }
-          </div>
-        }
-
+          }
+        </div>
         <!-- Pagination -->
         <app-pagination
           (pageNumChange)="loadPage($event)"
@@ -260,7 +290,7 @@
       <app-empty-list />
     }
   } @else {
-    <div animate.enter="fade-in-up" class="p-8 text-center">
+    <div data-testid="pkg-error" animate.enter="fade-in-up" class="p-8 text-center">
       <img
         class="mx-auto mb-[70px]"
         ngSrc="/assets/images/hippo-empty.svg"
@@ -268,7 +298,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p data-testid="pkg-error-message" class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
     </div>
   }
 }

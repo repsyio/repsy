@@ -2,21 +2,26 @@
   <app-spinner />
 } @else {
   @if (!this.error) {
-    <div class="mb-4" animate.enter="fade-in-up">
-      <p class="font-courier mb-4 text-[12px] text-[#9C9C9D]">Version: v{{ versionInfo.versionName }}</p>
-      <p class="font-courier mb-8 text-[12px] text-[#9C9C9D]">
+    <div data-testid="pkg-detail" class="mb-4" animate.enter="fade-in-up">
+      <p data-testid="pkg-detail-version" class="font-courier mb-4 text-[12px] text-[#9C9C9D]">
+        Version: v{{ versionInfo.versionName }}
+      </p>
+      <p data-testid="pkg-detail-published" class="font-courier mb-8 text-[12px] text-[#9C9C9D]">
         Published at: {{ versionInfo.createdAt | date: 'medium' }}
       </p>
 
       <h3 class="mb-2 text-[13px] text-white">Installation:</h3>
-      <div class="mb-8 inline-flex items-center gap-2 overflow-x-auto rounded-lg bg-[#101112] p-[14px]">
+      <div
+        data-testid="pkg-detail-install"
+        class="mb-8 inline-flex items-center gap-2 overflow-x-auto rounded-lg bg-[#101112] p-[14px]"
+      >
         <img class="h-[15.6px] w-[24px]" ngSrc="/assets/icons/npm/npm.svg" alt="Npm Logo" height="84" width="141" />
 
-        <span class="text-[13px] text-[#9C9C9D]">{{ installation }}</span>
+        <span data-testid="pkg-detail-install-text" class="text-[13px] text-[#9C9C9D]">{{ installation }}</span>
         <app-copy-clipboard [text]="installation" />
       </div>
 
-      <div class="mb-8 flex flex-col gap-2 text-[14px]">
+      <div data-testid="pkg-detail-metadata" class="mb-8 flex flex-col gap-2 text-[14px]">
         <div class="inline-flex items-center gap-2 overflow-x-auto rounded-lg bg-[#101112] p-[14px]">
           <span class="text-white">Homepage URL: </span>
           <span class="text-error">{{ versionInfo.homepage ? versionInfo.homepage : 'No homepage URL found!' }}</span>
@@ -42,7 +47,7 @@
       </div>
 
       <div class="mb-8 overflow-x-auto rounded-lg bg-[#101112] p-[22px] text-[24px]">
-        <h3 class="text-neutral-200">{{ versionInfo.packageName }}</h3>
+        <h3 data-testid="pkg-detail-name" class="text-neutral-200">{{ versionInfo.packageName }}</h3>
       </div>
 
       <app-security-scan-section
@@ -61,7 +66,12 @@
       }
 
       @if (activeRegistry.canManage) {
-        <button (click)="deleteVersion()" [disabled]="loading" class="repsy-btn-danger group ml-auto w-full sm:w-auto">
+        <button
+          data-testid="pkg-detail-delete"
+          (click)="deleteVersion()"
+          [disabled]="loading"
+          class="repsy-btn-danger group ml-auto w-full sm:w-auto"
+        >
           <svg
             width="18"
             height="18"
@@ -80,7 +90,7 @@
       }
     </div>
   } @else {
-    <div animate.enter="fade-in-up" class="p-8 text-center">
+    <div data-testid="pkg-error" animate.enter="fade-in-up" class="p-8 text-center">
       <img
         class="mx-auto mb-[70px]"
         ngSrc="/assets/images/hippo-empty.svg"
@@ -88,7 +98,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p data-testid="pkg-error-message" class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
     </div>
   }
 }
