@@ -80,7 +80,7 @@ class NuGetBuildMetadataVersionMigrationServiceTest {
     assertThat(report.migrated()).isZero();
     assertThat(report.isEmpty()).isFalse();
     verify(this.versions, never()).saveAndFlush(any());
-    verify(this.storage, never()).deletePackageVersion(any(), anyString(), anyString());
+    verify(this.storage, never()).deleteBuildMetadataVersion(any(), anyString(), anyString());
   }
 
   @Test
@@ -94,7 +94,7 @@ class NuGetBuildMetadataVersionMigrationServiceTest {
 
     assertThat(report.failed()).isEqualTo(1);
     assertThat(report.migrated()).isZero();
-    verify(this.storage, never()).deletePackageVersion(any(), anyString(), anyString());
+    verify(this.storage, never()).deleteBuildMetadataVersion(any(), anyString(), anyString());
   }
 
   @Test
@@ -104,7 +104,7 @@ class NuGetBuildMetadataVersionMigrationServiceTest {
     when(this.versions.findById(this.legacy.id())).thenReturn(Optional.of(this.row()));
     doThrow(new IOException("read-only"))
         .when(this.storage)
-        .deletePackageVersion(eq(this.repoId), eq("some.package"), eq("1.0.0+build"));
+        .deleteBuildMetadataVersion(eq(this.repoId), eq("some.package"), eq("1.0.0+build"));
 
     final var report = this.service.migrate();
 
@@ -122,7 +122,7 @@ class NuGetBuildMetadataVersionMigrationServiceTest {
     final var report = this.service.migrate();
 
     assertThat(report.migrated()).isEqualTo(1);
-    verify(this.storage, never()).deletePackageVersion(any(), anyString(), anyString());
+    verify(this.storage, never()).deleteBuildMetadataVersion(any(), anyString(), anyString());
   }
 
   @Test

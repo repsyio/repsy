@@ -2474,8 +2474,8 @@ so `panelApi` and `seeder` (per-test run id, cleanup) work unchanged, and adds:
 - **Timing facts a test must respect.** A routed view renders after its own requests answer: never
   assert "navigation finished", wait for the element or response that drives the view
   (`Shell.waitForView`, `expect(...).toBeVisible()`); there are no fixed sleeps
-  (`eslint-plugin-playwright` errors on `waitForTimeout`). Toasts live 3 s and at most 3 are kept:
-  assert a toast right after the action. (`PanelLayoutComponent` used to hide the outlet for a fixed
+  (`eslint-plugin-playwright` errors on `waitForTimeout`). A success toast lives 3 s, an error toast 7 s
+  (held while hovered or focused, RPS-1266) and at most 3 are kept: assert a toast right after the action. (`PanelLayoutComponent` used to hide the outlet for a fixed
   500 ms and the header "Profile" link used to be a full reload, RPS-1264; both are fixed, PRO-04
   proves the link with `src/ui/document-marker.ts`.)
 - **Opt-in suites** (`@throttle`, `@scanner`, ...) skip themselves with
@@ -2888,7 +2888,7 @@ mobile-Delete `canWrite` bug of RPS-1262 (1) never existed in these five protoco
 
 ### Errors, navigation, mobile and accessibility (RPS-1258)
 
-`tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..04, NAV-01..03, A11Y-01) plus `src/ui/a11y.ts` (the axe
+`tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..04, NAV-01..03, A11Y-01..04) plus `src/ui/a11y.ts` (the axe
 helper) and `tests/ui/nav/breadcrumb.ts` (the breadcrumb page object). Run them with
 `./run.sh test --protocol ui --grep "ERR-|NAV-|A11Y-"`. `@axe-core/playwright` is the only dependency
 this story added (`package.json`, `pnpm-lock.yaml`), so the `ui` runner image must be rebuilt once
@@ -2909,7 +2909,7 @@ Things a later author must know:
 
 - **Routes are stubs, everything else is real.** ERR tests answer one URL with `page.route`, remove it
   again in a `finally` (`withRoute`), and start asserting the toast BEFORE the navigation that raises it
-  (`expectToastLater`): a toast lives 3 s. The interceptor's mapping is status 0 -> `Connection error`,
+  (`expectToastLater`): a toast is short-lived (3 s success, 7 s error). The interceptor's mapping is status 0 -> `Connection error`,
   403 -> the server's `text` or `Access denied`, >= 500 -> `Server error`, other 4xx -> the server's `text`.
 - **The repository list renders whatever arrives** of its nine parallel `info` calls, so one failing type
   loses only its own rows and the page shows `repo-warning`; only when EVERY request failed does it show
@@ -2920,6 +2920,14 @@ Things a later author must know:
   navigation), the layout closes it when the viewport reaches `md` and while it is open sets
   `document.body.style.overflow = 'hidden'` (the same style the splash screen uses, so NAV-03 checks that
   style rather than a class).
+- **Shared components (A11Y-02..04, `a11y/shared-components.spec.ts`, RPS-1266 part 1).** The ARIA
+  contract of the row `...` menu, the toast stack and pagination on the real pages, each with an axe scan
+  scoped to the component (the page-level scans cannot see an open menu or a toast): the menu toggle is
+  labelled and carries `aria-haspopup`/`aria-expanded`/`aria-controls`, the menu is `role=menu` with
+  `menuitem`s and closes on Escape (focus back on the toggle), on an outside click and after an item is
+  chosen; the stack is `role=status` + `aria-live=polite`, an error toast is `role=alert`, its close button
+  is named, it lasts 7 s and is held while hovered or focused (driven with `page.clock`, so no test sleeps);
+  pagination is a `nav` named `Pagination` with `aria-current=page` and named previous/next buttons.
 - **axe, report-only by default.** `scanPage()` (`src/ui/a11y.ts`) runs the WCAG 2.0/2.1 A and AA rules,
   attaches `axe-<page>.json` (summary + every violation with its nodes) and `axe-<page>.txt` to the report,
   writes the JSON to `test-results/<test>/axe-<page>.json` and prints one `AXE <page> [report]: ...` line, and

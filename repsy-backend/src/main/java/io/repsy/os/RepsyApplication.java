@@ -33,6 +33,7 @@ import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
 import io.repsy.os.shared.configs.AppCorsProperties;
 import io.repsy.os.shared.configs.ContentSecurityPolicyProperties;
+import io.repsy.os.shared.user.PasswordResetMarkerProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
@@ -60,6 +61,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   AuthThrottleProperties.class,
   AppCorsProperties.class,
   ContentSecurityPolicyProperties.class,
+  PasswordResetMarkerProperties.class,
 })
 @EnableAsync
 @EnableScheduling

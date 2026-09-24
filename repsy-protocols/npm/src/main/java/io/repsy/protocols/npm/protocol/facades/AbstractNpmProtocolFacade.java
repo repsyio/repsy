@@ -21,10 +21,12 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService.PublishKind;
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
+import io.repsy.protocols.npm.shared.storage.services.NpmStorageService.MetadataChange;
 import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import io.repsy.protocols.npm.shared.utils.NpmRevPath;
 import io.repsy.protocols.npm.shared.utils.PackageUtils;
@@ -35,6 +37,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -81,12 +84,15 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final Map<String, Object> payload)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
-    final var storagePath =
-        StoragePath.of(repoInfo.getStorageKey(), packageBasePath.resolve(PACKAGE_JSON).toString());
 
-    final var metadata = this.npmStorageService.getMetadata(storagePath, repoInfo.getName());
+    final var metadata =
+        this.npmStorageService.readMetadataOrRebuild(
+            repoInfo.getStorageKey(),
+            repoInfo.getName(),
+            packageBasePath,
+            this.snapshotOf(repoInfo, scopeName, packageName));
     final var unpublishedVersion = PackageUtils.findUnpublishedVersion(metadata, payload);
 
     this.deletePackageVersion(context, scopeName, packageName, unpublishedVersion);
@@ -152,11 +158,18 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final String acceptHeader)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var isAbbreviated = PackageUtils.isRequestedAbbreviatedMetadata(acceptHeader);
 
+    // A package the database has and storage lost is served from the rows (RPS-1300): it is what a
+    // client reads before it unpublishes, deprecates or tags the package.
     return this.npmStorageService.getMetadata(
-        repoInfo.getStorageKey(), repoInfo.getName(), scopeName, packageName, isAbbreviated);
+        repoInfo.getStorageKey(),
+        repoInfo.getName(),
+        scopeName,
+        packageName,
+        isAbbreviated,
+        this.snapshotOf(repoInfo, scopeName, packageName));
   }
 
   @Override
@@ -199,6 +212,8 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             () ->
                 this.rewriteMetadata(
                     repoInfo,
+                    scopeName,
+                    packageName,
                     packageBasePath,
                     () -> {
                       final var metadataAndUsage =
@@ -242,6 +257,8 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             () ->
                 this.rewriteMetadata(
                     repoInfo,
+                    scopeName,
+                    packageName,
                     packageBasePath,
                     () ->
                         this.npmStorageService.removeDistributionTag(
@@ -253,49 +270,35 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
     context.addProperty(USAGES, usages);
   }
 
-  /** A change to the package metadata file that reports how many bytes the file grew by. */
-  @FunctionalInterface
-  private interface MetadataChange {
-
-    long apply() throws IOException;
-  }
-
   /**
    * Runs {@code change} while {@link NpmPackageService} still holds the package row locked, and
    * puts the metadata back as it was when the change fails, so the metadata never keeps a tag the
-   * rolled-back rows do not have. The metadata is read under the lock, so no other write can have
-   * changed it in between.
+   * rolled-back rows do not have. A package whose metadata file is gone is rebuilt from its rows
+   * first (RPS-1300): see {@link AbstractNpmStorageService#changeMetadata}.
    */
   private BaseUsages rewriteMetadata(
-      final BaseRepoInfo<ID> repoInfo, final Path packageBasePath, final MetadataChange change)
+      final BaseRepoInfo<ID> repoInfo,
+      final @Nullable String scopeName,
+      final String packageName,
+      final Path packageBasePath,
+      final MetadataChange change)
       throws IOException {
 
-    final var previousMetadata =
-        this.npmStorageService.readMetadataBytes(
-            repoInfo.getStorageKey(), repoInfo.getName(), packageBasePath);
-
-    try {
-      return BaseUsages.ofDisk(change.apply());
-    } catch (final IOException | RuntimeException e) {
-      this.restoreMetadata(repoInfo, packageBasePath, previousMetadata, e);
-      throw e;
-    }
+    return BaseUsages.ofDisk(
+        this.npmStorageService.changeMetadata(
+            repoInfo.getStorageKey(),
+            repoInfo.getName(),
+            packageBasePath,
+            this.snapshotOf(repoInfo, scopeName, packageName),
+            change));
   }
 
-  private void restoreMetadata(
-      final BaseRepoInfo<ID> repoInfo,
-      final Path packageBasePath,
-      final byte[] previousMetadata,
-      final Exception cause) {
+  /** The rows of the package as the transaction that is open sees them, when asked for. */
+  private Supplier<NpmPackageSnapshot> snapshotOf(
+      final BaseRepoInfo<ID> repoInfo, final @Nullable String scopeName, final String packageName) {
 
-    try {
-      this.npmStorageService.restoreMetadataBytes(
-          repoInfo.getStorageKey(), repoInfo.getName(), packageBasePath, previousMetadata);
-    } catch (final IOException | RuntimeException e) {
-      // The change's own failure is the one to report; the leftover is noted on it.
-      log.warn("Could not put back the metadata of npm package at {}", packageBasePath, e);
-      cause.addSuppressed(e);
-    }
+    return () ->
+        this.npmPackageService.getSnapshot(repoInfo.getStorageKey(), scopeName, packageName);
   }
 
   @Override
@@ -362,7 +365,8 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
                         packageBasePath,
                         packageName,
                         versionName,
-                        newLatest)),
+                        newLatest,
+                        this.snapshotOf(repoInfo, scopeName, packageName))),
             () -> this.removePackageFiles(repoInfo, packageBasePath));
 
     context.addProperty(USAGES, deletion.usages());
@@ -377,10 +381,13 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
-    final var packageJsonPath = packageBasePath.resolve(PACKAGE_JSON);
 
-    final var storagePath = StoragePath.of(repoInfo.getStorageKey(), packageJsonPath.toString());
-    final var metadata = this.npmStorageService.getMetadata(storagePath, repoInfo.getName());
+    final var metadata =
+        this.npmStorageService.readMetadataOrRebuild(
+            repoInfo.getStorageKey(),
+            repoInfo.getName(),
+            packageBasePath,
+            this.snapshotOf(repoInfo, scopeName, packageName));
     final var deprecations = PackageUtils.findDeprecatedVersions(metadata, payload);
 
     // The deprecation rows are written first and the package metadata second, in one transaction
@@ -394,6 +401,8 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             () ->
                 this.rewriteMetadata(
                     repoInfo,
+                    scopeName,
+                    packageName,
                     packageBasePath,
                     () ->
                         this.npmStorageService.deprecateVersions(

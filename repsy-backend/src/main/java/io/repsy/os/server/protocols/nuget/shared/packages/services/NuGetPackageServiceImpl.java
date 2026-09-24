@@ -199,7 +199,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
     return this.packageRepository
         .findByRepoIdAndPackageIdIgnoreCase(repoInfo.getId(), packageId.toLowerCase(Locale.ROOT))
-        .flatMap(pkg -> this.findVersionWithBuildFallback(pkg, version))
+        .flatMap(pkg -> this.findVersion(pkg, version))
         .map(v -> this.converter.toVersionDetail(v, packageId));
   }
 
@@ -282,7 +282,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
     final var pkgVersion =
-        this.findVersionWithBuildFallback(pkg, version)
+        this.findVersion(pkg, version)
             .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
 
     this.packageVersionRepository.incrementDownloadCount(pkgVersion.getId());
@@ -296,7 +296,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
     final var pkgVersion =
-        this.findVersionWithBuildFallback(pkg, version)
+        this.findVersion(pkg, version)
             .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
 
     pkgVersion.setListed(false);
@@ -312,7 +312,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
     final var pkgVersion =
-        this.findVersionWithBuildFallback(pkg, version)
+        this.findVersion(pkg, version)
             .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
 
     pkgVersion.setListed(true);
@@ -359,8 +359,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
     final var pkgVersion =
-        this.packageVersionRepository
-            .findByNugetPackageIdAndVersionIgnoreCase(pkg.getId(), version)
+        this.findVersion(pkg, version)
             .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
 
     this.packageVersionRepository.delete(pkgVersion);
@@ -377,21 +376,10 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   }
 
   /**
-   * Finds a version by the string a client sent. A version with build metadata is first matched as
-   * stored, which is how versions published before the metadata was dropped from the canonical form
-   * are kept, and then by its canonical form, which is how a package pushed with that metadata is
-   * stored now.
+   * Finds a version by the string a client sent, matched by its canonical form: versions are stored
+   * without build metadata, so {@code 1.0.0+build} and {@code 1.0.0} are the same version.
    */
-  private Optional<NuGetPackageVersion> findVersionWithBuildFallback(
-      final NuGetPackage pkg, final String version) {
-
-    final var stored =
-        this.packageVersionRepository.findByNugetPackageIdAndVersionIgnoreCase(
-            pkg.getId(), version);
-
-    if (stored.isPresent() || !NuGetPackageUtils.hasBuildMetadata(version)) {
-      return stored;
-    }
+  private Optional<NuGetPackageVersion> findVersion(final NuGetPackage pkg, final String version) {
 
     return this.packageVersionRepository.findByNugetPackageIdAndVersionIgnoreCase(
         pkg.getId(), NuGetPackageUtils.normalizeNuGetVersion(version));

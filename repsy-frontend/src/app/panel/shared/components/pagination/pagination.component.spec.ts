@@ -13,6 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+
 import { PaginationComponent } from './pagination.component';
 
 describe('PaginationComponent', () => {
@@ -131,5 +133,70 @@ describe('PaginationComponent', () => {
       expect(component.isNumber(0)).toBeTrue();
       expect(component.isNumber('...')).toBeFalse();
     });
+  });
+});
+
+describe('PaginationComponent markup', () => {
+  let fixture: ComponentFixture<PaginationComponent>;
+
+  const q = (selector: string): HTMLElement => fixture.nativeElement.querySelector(selector);
+
+  function render(pageNum: number, totalPages: number) {
+    fixture.componentInstance.pageNum = pageNum;
+    fixture.componentInstance.totalPages = totalPages;
+    fixture.detectChanges();
+  }
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [PaginationComponent] });
+    fixture = TestBed.createComponent(PaginationComponent);
+  });
+
+  it('is a navigation landmark named Pagination that keeps its test id', () => {
+    render(0, 5);
+
+    const nav = q('[data-testid="pagination"]');
+    expect(nav.tagName).toBe('NAV');
+    expect(nav.getAttribute('aria-label')).toBe('Pagination');
+  });
+
+  it('marks only the current page with aria-current', () => {
+    render(2, 5);
+
+    const current = fixture.nativeElement.querySelectorAll('[aria-current]');
+    expect(current.length).toBe(1);
+    expect(current[0].getAttribute('data-testid')).toBe('pagination-page-3');
+    expect(current[0].getAttribute('aria-current')).toBe('page');
+    expect(q('[data-testid="pagination-page-2"]').hasAttribute('aria-current')).toBeFalse();
+  });
+
+  it('moves aria-current when the page changes', () => {
+    render(0, 5);
+    q('[data-testid="pagination-page-2"]').click();
+    fixture.detectChanges();
+
+    expect(q('[data-testid="pagination-page-2"]').getAttribute('aria-current')).toBe('page');
+    expect(q('[data-testid="pagination-page-1"]').hasAttribute('aria-current')).toBeFalse();
+  });
+
+  it('names the page buttons and the previous/next buttons, whose arrow images are decorative', () => {
+    render(1, 5);
+
+    expect(q('[data-testid="pagination-page-1"]').getAttribute('aria-label')).toBe('Page 1');
+    expect(q('[data-testid="pagination-prev"]').getAttribute('aria-label')).toBe('Previous page');
+    expect(q('[data-testid="pagination-next"]').getAttribute('aria-label')).toBe('Next page');
+    expect(q('[data-testid="pagination-prev"] img').getAttribute('alt')).toBe('');
+    expect(q('[data-testid="pagination-next"] img').getAttribute('alt')).toBe('');
+  });
+
+  it('keeps the previous and next buttons working', () => {
+    const emitted: number[] = [];
+    fixture.componentInstance.pageNumChange.subscribe((page) => emitted.push(page));
+    render(1, 5);
+
+    q('[data-testid="pagination-next"]').click();
+    q('[data-testid="pagination-prev"]').click();
+
+    expect(emitted).toEqual([2, 1]);
   });
 });
