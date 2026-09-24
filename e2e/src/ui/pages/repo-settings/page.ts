@@ -24,7 +24,12 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 import { UiPage } from '../base.js';
 import { Shell } from '../shell.js';
-import { DeleteRepoSection, OrphanLayersSection, StorageSection } from './danger-zone.js';
+import {
+  DeleteRepoSection,
+  OrphanLayersSection,
+  StorageSection,
+  UntaggedManifestsSection,
+} from './danger-zone.js';
 import { DeployTokensSection } from './deploy-tokens.js';
 import { PgpSection } from './pgp.js';
 import { RepoInfoSection } from './repo-info.js';
@@ -44,6 +49,7 @@ export class RepoSettingsPage extends UiPage {
   readonly tokens: DeployTokensSection;
   readonly storage: StorageSection;
   readonly info: RepoInfoSection;
+  readonly untaggedManifests: UntaggedManifestsSection;
   readonly orphanLayers: OrphanLayersSection;
   readonly deleteRepo: DeleteRepoSection;
 
@@ -64,6 +70,7 @@ export class RepoSettingsPage extends UiPage {
     this.tokens = new DeployTokensSection(page);
     this.storage = new StorageSection(page);
     this.info = new RepoInfoSection(page);
+    this.untaggedManifests = new UntaggedManifestsSection(page);
     this.orphanLayers = new OrphanLayersSection(page);
     this.deleteRepo = new DeleteRepoSection(page);
   }

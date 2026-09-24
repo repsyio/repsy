@@ -81,17 +81,17 @@
           class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
         >
           @for (version of versions; track version.version; let i = $index) {
-            <div
-              [attr.data-testid]="'pkg-versions-row-' + version.version"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="'/' + activeRepo.repoName + '/' + packageName + '/' + version.version"
-            >
+            <div [attr.data-testid]="'pkg-versions-row-' + version.version">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
-                class="grid grid-cols-[minmax(0,3fr)_1.2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="row-link-host grid grid-cols-[minmax(0,3fr)_1.2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="'/' + activeRepo.repoName + '/' + packageName + '/' + version.version"
+                  [attr.aria-label]="version.version"
+                ></a>
                 <div class="flex min-w-0 gap-2 text-[14px] text-white">
                   <img
                     class="mb-1 shrink-0"
@@ -154,12 +154,14 @@
           @for (version of versions; track version.version; let i = $index) {
             <div animate.enter="fade-in-down" class="lg:hidden">
               <div
-                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+                class="row-link-host relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
                 [attr.data-testid]="'pkg-versions-card-' + version.version"
-                role="button"
-                appKeyboardActivate
-                [routerLink]="'/' + activeRepo.repoName + '/' + packageName + '/' + version.version"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="'/' + activeRepo.repoName + '/' + packageName + '/' + version.version"
+                  [attr.aria-label]="version.version"
+                ></a>
                 @if (activeRepo.canManage) {
                   <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
                     <button

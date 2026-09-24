@@ -17,6 +17,7 @@ package io.repsy.protocols.docker.shared.utils;
 
 import static java.security.MessageDigest.getInstance;
 
+import io.repsy.protocols.shared.utils.BlobDigests;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Locale;
@@ -55,6 +56,23 @@ public class DockerDigestCalculator {
   public static String normalize(final String digest) {
 
     return digest.toLowerCase(Locale.ROOT);
+  }
+
+  /**
+   * The digest a response reports for a manifest: the reference itself when the client named the
+   * manifest by a digest (in the algorithm it used, hex lower-cased), otherwise, for a tag, the
+   * canonical {@code sha256} digest. A registry may report another algorithm than the requested
+   * one, but a client that verifies the response against the digest it asked for (containerd,
+   * skopeo) needs the same one back. The caller has already established that a digest reference
+   * names the manifest, by the push check or the lookup.
+   *
+   * @param reference the tag or digest of the request
+   * @param canonicalDigest the manifest's {@code sha256} digest
+   * @return the digest to send in {@code Docker-Content-Digest} and {@code Location}
+   */
+  public static String reportedDigest(final String reference, final String canonicalDigest) {
+
+    return BlobDigests.startsWithDigestPrefix(reference) ? normalize(reference) : canonicalDigest;
   }
 
   /**

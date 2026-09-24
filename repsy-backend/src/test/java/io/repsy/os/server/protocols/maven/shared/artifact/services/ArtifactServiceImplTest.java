@@ -44,6 +44,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersi
 import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactConverter;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
+import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSignatureRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionDeveloperRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLicenseRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
@@ -53,12 +54,14 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.apache.maven.artifact.repository.metadata.Versioning;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -143,6 +146,8 @@ class ArtifactServiceImplTest {
   @Mock ArtifactUpsertHelper artifactUpsertHelper;
   @Mock ArtifactVersionWriteService artifactVersionWriteService;
   @Mock VersionSignatureService versionSignatureService;
+  @Mock PendingSignatureService pendingSignatureService;
+  @Mock PendingSignatureRepository pendingSignatureRepository;
   @Mock StorageStrategy storageStrategy;
 
   @InjectMocks ArtifactServiceImpl artifactService;
@@ -812,8 +817,28 @@ class ArtifactServiceImplTest {
   }
 
   @Test
-  @DisplayName("refuses a jar signature whose version is not registered (a jar before its POM)")
-  void verifySignatureRefusesAJarSignatureBeforeThePomRegisteredTheVersion() {
+  @DisplayName("parks a jar signature whose version is not registered yet when verifying all")
+  void aJarSignatureBeforeThePomIsParkedWhenVerifyingAll() {
+    final var id = UUID.randomUUID();
+    when(this.storageStrategy.get(pathOf("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
+        .thenReturn(Optional.of(new ByteArrayResource(new byte[0])));
+    this.stubVersion(this.stubArtifact(id), "1.0", false);
+
+    final var outcome =
+        this.artifactService.verifySignature(
+            repoVerifyingAllSignatures(id),
+            StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.asc"),
+            new ByteArrayResource("sig".getBytes(UTF_8)));
+
+    assertThat(outcome).isEqualTo(SignatureOutcome.PARKED);
+    verify(this.pendingSignatureService)
+        .park(id, "com/acme/lib/1.0/lib-1.0.jar", "sig".getBytes(UTF_8));
+    verifyNoInteractions(this.pgpVerifierService, this.keyStoreService);
+  }
+
+  @Test
+  @DisplayName("without verify-all a jar signature before its POM is still refused")
+  void aJarSignatureBeforeThePomIsRefusedWhenNotVerifyingAll() {
     final var id = UUID.randomUUID();
     when(this.storageStrategy.get(pathOf("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
         .thenReturn(Optional.of(new ByteArrayResource(new byte[0])));
@@ -822,13 +847,236 @@ class ArtifactServiceImplTest {
     assertThatThrownBy(
             () ->
                 this.artifactService.verifySignature(
-                    repoVerifyingAllSignatures(id),
+                    repo(id, true, true, true),
                     StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.asc"),
                     new ByteArrayResource(new byte[0])))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("artifactVersionNotFound");
 
-    verifyNoInteractions(this.pgpVerifierService, this.keyStoreService);
+    verifyNoInteractions(
+        this.pgpVerifierService, this.keyStoreService, this.pendingSignatureService);
+  }
+
+  @Test
+  @DisplayName(
+      "parks a signature whose file is not stored yet when verifying all, refuses it if not")
+  void aSignatureBeforeItsFileIsParkedWhenVerifyingAllAndRefusedOtherwise() {
+    final var id = UUID.randomUUID();
+    when(this.storageStrategy.get(any(StoragePath.class), any(String.class)))
+        .thenReturn(Optional.empty());
+    final var path = StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.asc");
+    final var signature = new ByteArrayResource("sig".getBytes(UTF_8));
+
+    assertThat(
+            this.artifactService.verifySignature(repoVerifyingAllSignatures(id), path, signature))
+        .isEqualTo(SignatureOutcome.PARKED);
+    verify(this.pendingSignatureService)
+        .park(id, "com/acme/lib/1.0/lib-1.0.jar", "sig".getBytes(UTF_8));
+
+    assertThatThrownBy(
+            () -> this.artifactService.verifySignature(repo(id, true, true, true), path, signature))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("itemNotFound");
+    verify(this.pendingSignatureService, org.mockito.Mockito.times(1)).park(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("a parked signature is verified at once when the file and the version showed up")
+  void aParkedSignatureIsVerifiedWhenTheFileLandedMeanwhile() {
+    final var id = UUID.randomUUID();
+    final var jar = new ByteArrayResource("jar".getBytes(UTF_8));
+    when(this.storageStrategy.get(pathOf("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
+        .thenReturn(Optional.empty(), Optional.of(jar));
+    final var artifact = this.stubArtifact(id);
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(new ArtifactVersion()));
+    final var sources = PublicKeySources.none();
+    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(sources);
+    final var signature = new ByteArrayResource("sig".getBytes(UTF_8));
+
+    final var outcome =
+        this.artifactService.verifySignature(
+            repoVerifyingAllSignatures(id),
+            StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.asc"),
+            signature);
+
+    assertThat(outcome).isEqualTo(SignatureOutcome.VERIFIED);
+    verify(this.pendingSignatureService).park(any(), any(), any());
+    verify(this.pgpVerifierService).verify(jar, signature, sources);
+    verify(this.pendingSignatureService, never()).discard(any(), any());
+  }
+
+  @Test
+  @DisplayName("a parked signature that does not verify in that second look is dropped again")
+  void aParkedSignatureThatFailsTheSecondLookIsDiscarded() {
+    final var id = UUID.randomUUID();
+    final var jar = new ByteArrayResource("jar".getBytes(UTF_8));
+    when(this.storageStrategy.get(pathOf("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
+        .thenReturn(Optional.empty(), Optional.of(jar));
+    final var artifact = this.stubArtifact(id);
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(new ArtifactVersion()));
+    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(PublicKeySources.none());
+    doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
+        .when(this.pgpVerifierService)
+        .verify(any(), any(), any());
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.verifySignature(
+                    repoVerifyingAllSignatures(id),
+                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.asc"),
+                    new ByteArrayResource("sig".getBytes(UTF_8))))
+        .isInstanceOf(SignatureNotVerifiedException.class);
+
+    verify(this.pendingSignatureService).discard(id, "com/acme/lib/1.0/lib-1.0.jar");
+  }
+
+  @Test
+  @DisplayName("a signature that is stored takes its parked copy out of the way when verifying all")
+  void aStoredSignatureClaimsItsParkedCopy() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(new ArtifactVersion()));
+
+    this.artifactService.createOrUpdateArtifact(
+        repoVerifyingAllSignatures(id),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.asc"),
+        new ByteArrayResource(new byte[0]));
+
+    verify(this.pendingSignatureService).claim(id, "com/acme/lib/1.0/lib-1.0.jar");
+  }
+
+  @Test
+  @DisplayName("a stored file whose signature was recorded from the parked one keeps that record")
+  void aFileWithAReconciledSignatureIsNotForgotten() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    final var version = new ArtifactVersion();
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+    when(this.pendingSignatureService.reconcileFile(any(), eq("com/acme/lib/1.0/lib-1.0.jar")))
+        .thenReturn(true);
+
+    this.artifactService.createOrUpdateArtifact(
+        repoVerifyingAllSignatures(id),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
+        new ByteArrayResource(new byte[0]));
+
+    verify(this.versionSignatureService, never()).forget(any(), any());
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0");
+  }
+
+  @Test
+  @DisplayName("a bad parked signature fails the file's upload before anything else is recomputed")
+  void aBadParkedSignatureFailsTheFile() {
+    final var id = UUID.randomUUID();
+    when(this.pendingSignatureService.reconcileFile(any(), any()))
+        .thenThrow(new SignatureNotVerifiedException("pendingSignatureNotVerified"));
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.createOrUpdateArtifact(
+                    repoVerifyingAllSignatures(id),
+                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
+                    new ByteArrayResource(new byte[0])))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage("pendingSignatureNotVerified");
+
+    verifyNoInteractions(this.versionSignatureService);
+  }
+
+  @Test
+  @DisplayName(
+      "a POM is checked against the parked signatures before, and reconciled after, it registers")
+  void aPomChecksTheParkedSignaturesAroundItsRegistration() {
+    final var id = UUID.randomUUID();
+    this.stubRepo(id);
+    when(this.artifactUpsertHelper.insertArtifact(any(Artifact.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    final var repoInfo = repoVerifyingAllSignatures(id);
+    when(this.pendingSignatureService.reconcileDirectory(repoInfo, "com/acme/lib/1.0"))
+        .thenReturn(java.util.Set.of("com/acme/lib/1.0/lib-1.0.pom"));
+
+    this.artifactService.createOrUpdateArtifact(
+        repoInfo,
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom"),
+        new ByteArrayResource(POM_OF_GROUP.formatted("").getBytes(UTF_8)));
+
+    final var order =
+        org.mockito.Mockito.inOrder(this.pendingSignatureService, this.artifactUpsertHelper);
+    order.verify(this.pendingSignatureService).verifyDirectory(repoInfo, "com/acme/lib/1.0");
+    order.verify(this.artifactUpsertHelper).insertArtifactVersion(any(), any(), any());
+    order.verify(this.pendingSignatureService).reconcileDirectory(repoInfo, "com/acme/lib/1.0");
+    verify(this.versionSignatureService, never()).forget(any(), eq("lib-1.0.pom"));
+  }
+
+  @Test
+  @DisplayName("a bad parked signature stops the POM before it registers anything")
+  void aBadParkedSignatureStopsThePomBeforeItRegisters() {
+    final var id = UUID.randomUUID();
+    this.stubRepo(id);
+    final var repoInfo = repoVerifyingAllSignatures(id);
+    doThrow(new SignatureNotVerifiedException("pendingSignatureNotVerified"))
+        .when(this.pendingSignatureService)
+        .verifyDirectory(repoInfo, "com/acme/lib/1.0");
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.createOrUpdateArtifact(
+                    repoInfo,
+                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom"),
+                    new ByteArrayResource(POM_OF_GROUP.formatted("").getBytes(UTF_8))))
+        .isInstanceOf(SignatureNotVerifiedException.class);
+
+    verifyNoInteractions(this.artifactUpsertHelper);
+  }
+
+  @Test
+  @DisplayName("without verify-all nothing about parked signatures is looked at")
+  void withoutVerifyAllNoPendingSignatureIsLookedAt() {
+    final var id = UUID.randomUUID();
+    this.stubRepo(id);
+    when(this.artifactUpsertHelper.insertArtifact(any(Artifact.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom"),
+        new ByteArrayResource(POM_OF_GROUP.formatted("").getBytes(UTF_8)));
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
+        new ByteArrayResource(new byte[0]));
+
+    verifyNoInteractions(this.pendingSignatureService);
+  }
+
+  @Test
+  @DisplayName("deleting a version, an artifact or a group drops the signatures parked under it")
+  void deletingDropsTheParkedSignatures() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    artifact.setArtifactName("lib");
+    final var version = new ArtifactVersion();
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+    when(this.artifactRepository.findAllByRepoIdAndGroupName(id, "com.acme"))
+        .thenReturn(List.of(artifact));
+    final var repo = new Repo();
+    repo.setId(id);
+    when(this.repoRepository.findById(id)).thenReturn(Optional.of(repo));
+
+    this.artifactService.deleteArtifactVersion(
+        repo(id, true, true, true), "com.acme", "lib", "1.0", new Versioning());
+    this.artifactService.deleteArtifact(id, "com.acme", "lib");
+    this.artifactService.deleteGroup(id, "com.acme");
+
+    verify(this.pendingSignatureRepository)
+        .deleteByRepoIdAndSignedFilePathStartingWith(id, "com/acme/lib/1.0/");
+    verify(this.pendingSignatureRepository, org.mockito.Mockito.times(2))
+        .deleteByRepoIdAndSignedFilePathStartingWith(id, "com/acme/lib/");
   }
 
   @Test

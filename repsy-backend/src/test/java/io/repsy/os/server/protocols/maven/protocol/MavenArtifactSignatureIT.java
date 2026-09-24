@@ -288,6 +288,13 @@ class MavenArtifactSignatureIT extends AbstractIntegrationTest {
         repo.getId());
   }
 
+  private int pendingCount(final Repo repo) {
+    return this.jdbcTemplate.queryForObject(
+        "select count(*) from maven_pending_signature where repo_id = ?",
+        Integer.class,
+        repo.getId());
+  }
+
   private void allowOverride(final Repo repo) {
     final var managed = this.repoRepository.findByName(repo.getName()).orElseThrow();
     managed.setAllowOverride(true);
@@ -454,38 +461,45 @@ class MavenArtifactSignatureIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("a signature before the file it signs answers 404 itemNotFound, nothing stored")
-  void aSignatureBeforeItsFileIs404() throws Exception {
+  @DisplayName("a signature before the file it signs is parked, and verified when the file arrives")
+  void aSignatureBeforeItsFileIsParkedAndVerifiedWhenTheFileArrives() throws Exception {
     final var f = this.fixture(true);
+    final var jar = bytes("jar");
+    final var signature = sign(jar);
     this.uploadOk(f.repo(), f.admin(), POM, pom("1.0"));
 
-    expectError(
-        this.upload(f.repo(), f.admin(), JAR + ".asc", sign(bytes("jar"))),
-        HttpStatus.NOT_FOUND,
-        "itemNotFound",
-        "itemNotFound",
-        "The requested item is not found.");
+    this.uploadOk(f.repo(), f.admin(), JAR + ".asc", signature);
 
     assertThat(stored(f.repo(), JAR + ".asc")).doesNotExist();
+    assertThat(this.pendingCount(f.repo())).isEqualTo(1);
     assertThat(this.signatureRowCount(f.repo())).isZero();
+
+    this.uploadOk(f.repo(), f.admin(), JAR, jar);
+
+    assertThat(Files.readAllBytes(stored(f.repo(), JAR + ".asc"))).isEqualTo(signature);
+    assertThat(this.pendingCount(f.repo())).isZero();
+    assertThat(this.verifiedFiles(f.repo(), "1.0")).containsExactly("lib-1.0.jar");
   }
 
   @Test
-  @DisplayName("a jar signature before the POM registered the version answers 404, nothing stored")
-  void aJarSignatureBeforeThePomIs404() throws Exception {
+  @DisplayName("a jar signature before the POM is parked, and verified when the POM registers")
+  void aJarSignatureBeforeThePomIsParkedAndVerifiedWhenThePomRegisters() throws Exception {
     final var f = this.fixture(true);
     final var jar = bytes("jar");
+    final var pom = pom("1.0");
     this.uploadOk(f.repo(), f.admin(), JAR, jar);
 
-    expectError(
-        this.upload(f.repo(), f.admin(), JAR + ".asc", sign(jar)),
-        HttpStatus.NOT_FOUND,
-        "artifactVersionNotFound",
-        "artifactVersionNotFound",
-        "Artifact version is not found.");
+    this.uploadOk(f.repo(), f.admin(), JAR + ".asc", sign(jar));
 
     assertThat(stored(f.repo(), JAR + ".asc")).doesNotExist();
-    assertThat(this.signatureRowCount(f.repo())).isZero();
+    assertThat(this.pendingCount(f.repo())).isEqualTo(1);
+
+    this.uploadOk(f.repo(), f.admin(), POM, pom);
+    this.uploadOk(f.repo(), f.admin(), POM + ".asc", sign(pom));
+
+    assertThat(stored(f.repo(), JAR + ".asc")).exists();
+    assertThat(this.pendingCount(f.repo())).isZero();
+    assertThat(this.signedOf(f.repo(), "1.0")).containsExactly(true);
   }
 
   @Test

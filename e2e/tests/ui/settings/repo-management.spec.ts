@@ -16,16 +16,18 @@
 
 /**
  * The lower half of `/:repo/settings`: rename and description (SET-05), delete (SET-06), Docker
- * Orphan Layers (SET-07) and the Storage section (SET-09). Rename, delete and orphan layers all go
- * through the danger modal; the description saves without one.
+ * Orphan Layers (SET-07), Docker Untagged Manifests (SET-07b) and the Storage section (SET-09).
+ * Rename, delete, orphan layers and untagged manifests all go through the danger modal; the
+ * description saves without one.
  *
  * What a click PERSISTED is read back through the panel API, which is what a rename or a delete is
  * about: the old name stops resolving, the new one starts.
  */
 import { RepoType } from '../../../src/api/panel-api.js';
+import { rawGetManifest } from '../../../src/clients/docker-raw.js';
 import { adminCredential, minimalPom, rawPut, versionDir } from '../../../src/clients/maven-raw.js';
 import { DESCRIPTION_MAX_TEXT, bulleted } from '../../../src/ui/credential-messages.js';
-import { expect, test } from '../../../src/ui/fixtures.js';
+import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
 import { RepoSettingsReadback } from '../../../src/ui/pages/repo-settings/readback.js';
 
@@ -223,6 +225,71 @@ test.describe('Repository settings: orphan layers', { tag: SETTINGS }, () => {
     await expect(settings.orphanLayers.deleteButton).toBeEnabled();
   });
 
+  // RPS-1216: deleting or overriding a tag only moves the tag pointer; the previous manifest stays stored and
+  // pullable by its digest until this action removes it (the backend's manual cleanup, no automatic GC).
+  test('SET-07b the Docker Untagged Manifests action deletes the manifests no tag points to, and only those', async ({
+    adminPage,
+    seeder,
+    seedVersions,
+    panelApi,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.DOCKER, { privateRepo: true });
+    const [gone, kept] = await seedVersions(repo, ['1.0.0', '2.0.0']);
+    const admin = adminCredential();
+    const pull = async (image: typeof gone, ref: string) =>
+      (await rawGetManifest(repo.name, admin, image.name, ref)).status;
+
+    // Deleting a tag only removes the pointer: the manifest is still pullable by digest.
+    await panelApi.deleteDockerTag(repo.name, gone.name, gone.version);
+    expect(await pull(gone, gone.version)).toBe(404);
+    expect(await pull(gone, gone.extra['digest'])).toBe(200);
+
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    await settings.goto();
+    // The section says what it does and how it differs from Orphan Layers.
+    await expect(settings.untaggedManifests.root).toContainText('no tag points to');
+    await expect(settings.untaggedManifests.root).toContainText('pullable by digest');
+
+    // Cancelling the confirmation changes nothing.
+    await settings.untaggedManifests.delete();
+    await settings.shell.dangerModal.expectOpen('Delete Untagged Manifests');
+    await settings.shell.dangerModal.cancel();
+    await settings.shell.dangerModal.expectClosed();
+    expect(await pull(gone, gone.extra['digest'])).toBe(200);
+
+    await settings.untaggedManifests.delete();
+    await settings.shell.dangerModal.expectOpen('Delete Untagged Manifests');
+    const response = adminPage.waitForResponse(
+      (res) =>
+        res.request().method() === 'DELETE' &&
+        res.url().includes(`/api/docker/images/manifests/${repo.name}/untagged`),
+    );
+    await settings.shell.dangerModal.confirm();
+
+    const answer = await response;
+    expect(answer.ok()).toBe(true);
+    const result = (await answer.json()) as {
+      data: { deletedManifests: number; orphanLayersScheduled: number };
+    };
+    expect(result.data.deletedManifests).toBe(1);
+    // The layers only that manifest used (its config and layer blobs) are freed with it.
+    expect(result.data.orphanLayersScheduled).toBeGreaterThan(0);
+    await settings.shell.toasts.expectSuccess(
+      /^Deleted 1 untagged manifest and \d+ unused layers? \(/,
+    );
+    await expect(settings.untaggedManifests.deleteButton).toBeEnabled();
+
+    // The untagged manifest is gone for good; the tagged one is untouched.
+    expect(await pull(gone, gone.extra['digest'])).toBe(404);
+    expect(await pull(kept, kept.version)).toBe(200);
+    expect(await pull(kept, kept.extra['digest'])).toBe(200);
+
+    // A second run has nothing left to delete.
+    await settings.untaggedManifests.delete();
+    await settings.shell.dangerModal.confirm();
+    await settings.shell.toasts.expectSuccess('No untagged manifests to delete');
+  });
+
   // RPS-1286: every section used to carry an invisible 100 px top padding (an anchor offset done with a
   // negative margin) that covered the lower part of the section above, so the corners of a button near
   // a section's end hit the next section. The offset is `scroll-margin-top` now.
@@ -234,6 +301,7 @@ test.describe('Repository settings: orphan layers', { tag: SETTINGS }, () => {
     const settings = new RepoSettingsPage(adminPage, repo.name);
     await settings.goto();
     await expect(settings.orphanLayers.deleteButton).toBeVisible();
+    await expect(settings.untaggedManifests.deleteButton).toBeVisible();
 
     // Every visible button inside a section: each corner hits the button itself or its own section.
     const covered = await adminPage.evaluate(() => {

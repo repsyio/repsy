@@ -51,6 +51,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -213,6 +215,20 @@ class ArtifactScanListenerTest {
     verifyNoInteractions(this.dockerScanTokenIssuer);
   }
 
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"sha256", "sha512"})
+  @DisplayName("scans a Docker image named by a digest of either algorithm with @, not :")
+  void scansADigestReferenceWithAtSign(final String algorithm) {
+    final var digest = algorithm + ":" + "a".repeat("sha256".equals(algorithm) ? 64 : 128);
+    this.givenDockerScanIsQueued(digest);
+    this.givenDockerRepo(false);
+
+    this.listener.handleArtifactPushed(this.dockerEvent(digest));
+
+    assertThat(this.capturedScanRequest().dockerRegistryReference())
+        .isEqualTo("repo/image@" + digest);
+  }
+
   @Test
   @DisplayName("scans a private Docker repo with a read-only pull token")
   void scansPrivateDockerRepoWithPullToken() {
@@ -228,9 +244,13 @@ class ArtifactScanListenerTest {
   }
 
   private void givenDockerScanIsQueued() {
+    this.givenDockerScanIsQueued("1.0");
+  }
+
+  private void givenDockerScanIsQueued(final String version) {
     when(this.scanner.getName()).thenReturn("trivy");
     when(this.scannerRegistry.findScanner("DOCKER")).thenReturn(Optional.of(this.scanner));
-    when(this.scanTxService.createPendingScan(REPO_ID, "image", "1.0", "trivy"))
+    when(this.scanTxService.createPendingScan(REPO_ID, "image", version, "trivy"))
         .thenReturn(SCAN_ID);
     doAnswer(
             invocation -> {
@@ -254,8 +274,12 @@ class ArtifactScanListenerTest {
   }
 
   private ArtifactPushedEvent dockerEvent() {
+    return this.dockerEvent("1.0");
+  }
+
+  private ArtifactPushedEvent dockerEvent(final String version) {
     return new ArtifactPushedEvent(
-        REPO_ID, "DOCKER", "repo", "manifests/1.0", "image", "1.0", false, false);
+        REPO_ID, "DOCKER", "repo", "manifests/1.0", "image", version, false, false);
   }
 
   private ArtifactPushedEvent event() {

@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { booleanAttribute, Component, ElementRef, HostListener, Input, ViewChild } from '@angular/core';
+import { booleanAttribute, Component, ElementRef, HostListener, inject, Input, ViewChild } from '@angular/core';
 
 /**
  * A short text with the full value in a popup on hover.
@@ -26,6 +26,10 @@ import { booleanAttribute, Component, ElementRef, HostListener, Input, ViewChild
  * (`textHover`, or `text` when it is not set) opens only when the text really is clipped. The full
  * value always stays in the DOM, so similar long names remain distinguishable to assistive
  * technology and to tests.
+ *
+ * Inside a list row (`.row-link-host`) the tooltip sits above the row's stretched link so that its
+ * hover keeps working; a click on its text is then handed to that link, so the whole row still opens
+ * on a click.
  */
 @Component({
   selector: 'app-tooltip',
@@ -43,6 +47,8 @@ export class TooltipComponent {
   @Input() maxLength = 10;
   @Input() always = false;
   @Input({ transform: booleanAttribute }) truncate = false;
+
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   @ViewChild('label') private label?: ElementRef<HTMLElement>;
 
@@ -72,5 +78,26 @@ export class TooltipComponent {
 
   @HostListener('mouseleave') onMouseLeave() {
     this.isVisible = false;
+  }
+
+  /** Hands a click on the text to the stretched link of the row that hosts the tooltip, if any. */
+  @HostListener('click', ['$event'])
+  onClick(event: MouseEvent) {
+    const element = this.host.nativeElement;
+    if (event.defaultPrevented || element.closest('a, button')) {
+      return;
+    }
+    const link = element.closest('.row-link-host')?.querySelector<HTMLAnchorElement>(':scope > .row-link');
+    link?.dispatchEvent(
+      new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+        altKey: event.altKey,
+      }),
+    );
   }
 }

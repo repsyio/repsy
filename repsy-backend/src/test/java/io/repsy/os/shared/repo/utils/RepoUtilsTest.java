@@ -64,7 +64,9 @@ class RepoUtilsTest {
           "security",
           "not-found",
           "api",
-          "assets"
+          "assets",
+          "counts",
+          "security-summary"
         })
     @DisplayName("rejects every reserved name that is also a legal character set (RPS-1158)")
     void rejectsReservedNames(final String name) {
@@ -74,7 +76,17 @@ class RepoUtilsTest {
     }
 
     @ParameterizedTest(name = "\"{0}\"")
-    @ValueSource(strings = {"LOGIN", "Profile", "USERS", "Not-Found", "API", "ASSETS"})
+    @ValueSource(
+        strings = {
+          "LOGIN",
+          "Profile",
+          "USERS",
+          "Not-Found",
+          "API",
+          "ASSETS",
+          "Counts",
+          "SECURITY-SUMMARY"
+        })
     @DisplayName("compares reserved names case-insensitively")
     void rejectsReservedNamesRegardlessOfCase(final String name) {
       assertThatThrownBy(() -> RepoUtils.validateNewRepoName(name))

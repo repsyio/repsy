@@ -171,11 +171,14 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
       this.imageTxService.updateImageSize(repoInfo.getId(), imageInfo.getId(), manifestDigest);
     }
 
-    final var location = this.getServletURILocation(context, imageName, digest);
+    // A push by a digest reference is answered in that reference's algorithm (RPS-1244): the
+    // stored manifest is addressable by both, the client verifies against the one it named.
+    final var reportedDigest = DockerDigestCalculator.reportedDigest(reference, manifestDigest);
+    final var location = this.getServletURILocation(context, imageName, reportedDigest);
 
     return ResponseEntity.status(HttpStatus.CREATED)
         .header(LOCATION, location)
-        .header(DOCKER_CONTENT_DIGEST, manifestDigest)
+        .header(DOCKER_CONTENT_DIGEST, reportedDigest)
         .header(CONTENT_TYPE, contentType)
         .build();
   }

@@ -24,6 +24,7 @@ import io.repsy.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestLayer;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
@@ -106,7 +107,7 @@ public abstract class AbstractDockerLayerRenamer<ID> {
   private boolean checkLayerExistsInStorage(
       final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath, final LayerInfo layerInfo) {
 
-    final var idx = relativePath.getPath().indexOf("sha256:");
+    final var idx = BlobDigests.indexOfDigestPrefix(relativePath.getPath());
 
     final var mutatedPath =
         idx > 0

@@ -18,6 +18,7 @@ package io.repsy.protocols.maven.shared.artifact.services.contracts;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -63,17 +64,26 @@ public interface ArtifactService<ID> {
   StoragePath getNonSignedStoragePath(StoragePath storagePath);
 
   /**
-   * Verifies a detached signature of a file that is already stored. Nothing is written or deleted,
-   * so a refused signature leaves the repository exactly as it was.
+   * Verifies a detached signature of a file that is already stored, or, on a repo that verifies
+   * every signature, keeps it back until that file arrives (RPS-1188). Nothing is written or
+   * deleted in the repository, so a refused signature leaves it exactly as it was.
    *
    * <p>A {@code .pom.asc} is verified on every repo, any other artifact {@code .asc} ({@code
    * .jar.asc}, {@code -sources.jar.asc}, ...) only on a repo that verifies every signature
    * (RPS-1188); the signer's key is looked up on the key servers unless the repo switched that off
    * (RPS-1204).
    *
+   * <p>On a repo that verifies every signature, a signature whose file is not stored yet, or whose
+   * version the POM has not registered yet, is not refused: it is parked ({@link
+   * SignatureOutcome#PARKED}) and checked when the file or the POM arrives, which is what Maven's
+   * parallel upload needs. On any other repo it is refused with {@code itemNotFound} or {@code
+   * artifactVersionNotFound}, as before.
+   *
    * @param signedStoragePath the path of the signature, {@code <file>.asc}; the file it signs is
    *     read from storage at the same path without the {@code .asc}
    * @param signature the signature as the client sent it
+   * @return {@link SignatureOutcome#VERIFIED} when it verified against the stored file, {@link
+   *     SignatureOutcome#PARKED} when it was kept back: the caller stores nothing then
    * @throws io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException when the
    *     signature is malformed or does not match the stored file
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code itemNotFound} when
@@ -85,6 +95,6 @@ public interface ArtifactService<ID> {
    *     artifactSigningKeyNotRegistered} when the key is not registered and the repo switched the
    *     key-server lookup off (RPS-1204)
    */
-  void verifySignature(
+  SignatureOutcome verifySignature(
       BaseRepoInfo<ID> repoInfo, StoragePath signedStoragePath, Resource signature);
 }

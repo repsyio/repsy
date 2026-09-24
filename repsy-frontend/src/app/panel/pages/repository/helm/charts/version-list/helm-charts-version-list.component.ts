@@ -33,7 +33,6 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
-import { KeyboardActivateDirective } from '../../../../../shared/directives/keyboard-activate.directive';
 import { Sort } from '../../../../../shared/dto/sort';
 import { SecurityService } from '../../../../security/service/security.service';
 import { HelmConfigComponent } from '../../config/helm-config.component';
@@ -43,7 +42,6 @@ import { HelmService } from '../../service/helm.service';
   selector: 'app-helm-charts-version-list',
   standalone: true,
   imports: [
-    KeyboardActivateDirective,
     CommonModule,
     RouterLink,
     SpinnerComponent,

@@ -12,11 +12,9 @@
   @for (repo of repoListInfos; track repo.name) {
     <div
       [attr.data-testid]="'recent-activity-row-' + repo.name"
-      [routerLink]="repo.name"
-      role="button"
-      appKeyboardActivate
-      class="group grid grid-cols-1 gap-3 border-t border-[#404141] py-4 text-[12px] hover:bg-[#1D1C1C] lg:grid-cols-[2fr_1fr_1fr]"
+      class="row-link-host group grid grid-cols-1 gap-3 border-t border-[#404141] py-4 text-[12px] hover:bg-[#1D1C1C] lg:grid-cols-[2fr_1fr_1fr]"
     >
+      <a class="row-link" [routerLink]="repo.name" [attr.aria-label]="repo.name"></a>
       <!-- Repository Name with Icon -->
       <div class="flex items-center gap-2 text-neutral-200">
         @switch (repo.type) {

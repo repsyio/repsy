@@ -112,14 +112,6 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
           "/api/repos/ -> {repoName} | {repoType}",
           "RPS-1268 (PR-2c removes the {repoType} routes)");
 
-  /**
-   * Literal segments directly under {@code /api/repos/} that are not in {@code
-   * RepoUtils.RESERVED_REPO_NAMES}. A repo of that name is created without complaint, and is then
-   * shadowed by the literal route. RPS-1268 (PR-2a) reserves it.
-   */
-  private static final Map<String, String> KNOWN_UNRESERVED_LITERALS =
-      Map.of("security-summary", "RPS-1268 (PR-2a reserves it, together with counts)");
-
   @Autowired private RequestMappingHandlerMapping handlerMapping;
 
   // ---------------------------------------------------------------------------------------------
@@ -266,8 +258,7 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
         .as("the rule is only meaningful while {repoName} is what sits under /api/repos/")
         .anyMatch(template -> template.startsWith(REPOS_PREFIX + "{repoName}"));
 
-    assertNoNewFindings(
-        "unreserved literals under /api/repos/", findings, KNOWN_UNRESERVED_LITERALS);
+    assertNoNewFindings("unreserved literals under /api/repos/", findings, Map.of());
   }
 
   @Test

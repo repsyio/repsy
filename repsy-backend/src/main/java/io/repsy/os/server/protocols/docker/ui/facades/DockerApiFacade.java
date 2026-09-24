@@ -23,12 +23,14 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.generated.model.ManifestListItem;
 import io.repsy.os.generated.model.TagDetail;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
+import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
 import io.repsy.os.server.protocols.docker.shared.layer.services.LayerTxService;
 import io.repsy.os.server.protocols.docker.shared.layer.services.OrphanLayerCleanupService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestFileService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
+import io.repsy.os.server.protocols.docker.shared.tag.services.UntaggedManifestCleanupService;
 import io.repsy.os.server.protocols.docker.ui.utils.RepoUtils;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -41,6 +43,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
@@ -63,6 +66,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
   private final @NonNull ManifestFileService manifestFileService;
   private final @NonNull DockerStorageService dockerStorageService;
   private final @NonNull OrphanLayerCleanupService orphanLayerCleanupService;
+  private final @NonNull UntaggedManifestCleanupService untaggedManifestCleanupService;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
   @Override
@@ -218,7 +222,22 @@ public class DockerApiFacade implements ProtocolApiFacade {
         .orElseThrow(() -> new ItemNotFoundException("manifestNotFound"));
   }
 
-  public void deleteOrphanLayers(final @NonNull RepoInfo repoInfo) {
+  /**
+   * Deletes the untagged manifests of the repo, or of one image, with their files. The caller
+   * refunds the returned bytes and then sweeps the layers those manifests kept alive.
+   */
+  public UntaggedManifestCleanupService.Result deleteUntaggedManifests(
+      final @NonNull RepoInfo repoInfo, final @Nullable String imageName) {
+
+    return this.untaggedManifestCleanupService.deleteUntagged(repoInfo, imageName);
+  }
+
+  /**
+   * Deletes the layers no manifest uses and schedules their blobs for deletion.
+   *
+   * @return The layers whose rows are gone and whose blobs are being deleted in the background
+   */
+  public @NonNull List<OrphanLayerInfo> deleteOrphanLayers(final @NonNull RepoInfo repoInfo) {
 
     // The rows go first, in their own transaction, so a concurrent push cannot re-reference a row
     // whose blob is about to be deleted. The price: a blob whose delete fails stays on disk, still
@@ -228,6 +247,8 @@ public class DockerApiFacade implements ProtocolApiFacade {
     final var orphans = this.layerTxService.deleteOrphanLayers(repoInfo.getStorageKey());
 
     this.orphanLayerCleanupService.cleanupBlobs(repoInfo.getStorageKey(), orphans);
+
+    return orphans;
   }
 
   @Override

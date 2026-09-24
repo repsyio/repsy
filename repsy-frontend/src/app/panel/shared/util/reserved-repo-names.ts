@@ -20,7 +20,9 @@ import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
  * Repository names that would collide with a fixed top-level route declared ahead of the
  * `:repoName` route in `app.routes.ts` (`login`, `profile`, `repositories`, `users`, `security`,
  * `not-found`), plus the paths the API port forwards to the SPA before anything more specific can
- * claim them (`api`, `assets`, `favicon.ico`). Compared case-insensitively.
+ * claim them (`api`, `assets`, `favicon.ico`), plus the literal segments the API keeps directly
+ * under `/api/repos/` next to its `{repoName}` variable (`counts`, `security-summary`). Compared
+ * case-insensitively.
  *
  * Keep this in sync with `app.routes.ts` (which points back here) and with the backend's mirror,
  * `io.repsy.os.shared.repo.utils.RepoUtils.RESERVED_REPO_NAMES`.
@@ -35,6 +37,8 @@ export const RESERVED_REPO_NAMES: ReadonlySet<string> = new Set([
   'api',
   'assets',
   'favicon.ico',
+  'counts',
+  'security-summary',
 ]);
 
 export function isReservedRepoName(name: string | null | undefined): boolean {

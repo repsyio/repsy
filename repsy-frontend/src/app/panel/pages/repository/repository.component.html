@@ -97,17 +97,13 @@
         >
           <!-- Repo Items -->
           @for (repo of paginatedRepos; track repo.name; let i = $index) {
-            <div
-              [attr.data-testid]="'repo-row-' + repo.name"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="'/' + repo.name"
-            >
+            <div [attr.data-testid]="'repo-row-' + repo.name">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === paginatedRepos.length - 1 }"
-                class="group grid grid-cols-[minmax(0,3fr)_3fr_2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="row-link-host group grid grid-cols-[minmax(0,3fr)_3fr_2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
+                <a class="row-link" [routerLink]="'/' + repo.name" [attr.aria-label]="repo.name"></a>
                 <div class="flex min-w-0 gap-2 text-[14px] text-[#9FA0A0]">
                   @switch (repo.repoType) {
                     @case ('npm') {
@@ -379,12 +375,9 @@
           @for (repo of paginatedRepos; track repo.name; let i = $index) {
             <div [attr.data-testid]="'repo-card-' + repo.name" animate.enter="fade-in-down" class="lg:hidden">
               <div
-                class="group relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
-                role="button"
-                appKeyboardActivate
-                tabindex="0"
-                [routerLink]="'/' + repo.name"
+                class="row-link-host group relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
               >
+                <a class="row-link" [routerLink]="'/' + repo.name" [attr.aria-label]="repo.name"></a>
                 @if (isAdmin) {
                   <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
                     <button
