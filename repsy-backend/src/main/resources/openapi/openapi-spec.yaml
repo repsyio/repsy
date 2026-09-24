@@ -1,8 +1,27 @@
 ---
 openapi: 3.1.0
 info:
-  title: OpenAPI definition
-  version: v0
+  title: Repsy Panel API
+  version: 0.1.0
+  description: >-
+    The API the Repsy web panel talks to (the wire protocols of the package formats are not
+    described here).
+
+
+    **This API is in beta.** Breaking changes are allowed until 1.0, and the version above is
+    bumped for each one. It is independent of the Repsy release version.
+
+
+    Every response body, success or failure, is the same envelope: `msgId`, `type`, `text`,
+    `errorCode` and `data`. Failures are described by `ErrorResponse`.
+
+
+    Authenticate with the access token that `login` returns, as `Authorization: Bearer <token>`.
+    Operations that act on one repository (`/api/repos/{repoName}/...` and the per-format
+    `/api/{format}/...` routes) also accept HTTP Basic with a username and password, which is meant
+    for scripts. Public repositories can be read without credentials.
+security:
+  - bearerAuth: []
 paths:
   "/api/users/{userId}":
     put:
@@ -29,10 +48,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseUserResponse"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
         '401':
-          description: Missing or invalid token
+          "$ref": "#/components/responses/Unauthorized"
         '403':
-          description: Admin role required
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
       summary: Update a user
     delete:
       tags:
@@ -52,10 +75,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
         '401':
-          description: Missing or invalid token
+          "$ref": "#/components/responses/Unauthorized"
         '403':
-          description: Admin role required
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
       summary: Delete a user
   "/api/repos/{repoName}/settings":
     get:
@@ -69,6 +96,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoSettingsInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get settings for a repository
     put:
       tags:
@@ -87,6 +120,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Update repository settings
       description: >-
         Settings are updated field by field: a field that is omitted (or sent as null) keeps its
@@ -116,6 +157,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Regenerate a deploy token
     delete:
       tags:
@@ -135,6 +184,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a deploy token
     parameters:
       - name: repoName
@@ -160,6 +217,10 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseLoginInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
       summary: Update the current user's username
   "/api/profile/password":
     put:
@@ -179,6 +240,10 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseLoginInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
       summary: Update the current user's password
   "/api/users/admin-count":
     get:
@@ -193,9 +258,9 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponseLong"
         '401':
-          description: Missing or invalid token
+          "$ref": "#/components/responses/Unauthorized"
         '403':
-          description: Admin role required
+          "$ref": "#/components/responses/Forbidden"
       summary: Count the users that hold the admin role, regardless of any paging or search
   "/api/users":
     get:
@@ -234,11 +299,11 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelUserResponse"
         '400':
-          description: Invalid paging parameter (page below 0, size outside 1-100, or not a number)
+          "$ref": "#/components/responses/BadRequest"
         '401':
-          description: Missing or invalid token
+          "$ref": "#/components/responses/Unauthorized"
         '403':
-          description: Admin role required
+          "$ref": "#/components/responses/Forbidden"
       summary: List all users
     post:
       tags:
@@ -257,10 +322,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseUserResponse"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
         '401':
-          description: Missing or invalid token
+          "$ref": "#/components/responses/Unauthorized"
         '403':
-          description: Admin role required
+          "$ref": "#/components/responses/Forbidden"
       summary: Create a new user
   "/api/users/{userId}/actions/reset-password":
     post:
@@ -281,10 +348,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
         '401':
-          description: Missing or invalid token
+          "$ref": "#/components/responses/Unauthorized"
         '403':
-          description: Admin role required
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
       summary: Reset a user's password
   "/api/repos/{repoType}":
     post:
@@ -310,6 +381,16 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Create a new repository
   "/api/repos/{repoName}/deploy-tokens":
     get:
@@ -329,6 +410,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelDeployTokenInfoListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List deploy tokens for a repository
     post:
       tags:
@@ -347,6 +436,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseTokenInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Create a deploy token for a repository
     parameters:
       - name: repoName
@@ -367,7 +464,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponseListAllowedKeyserverItem"
         '401':
-          description: Missing or invalid token
+          "$ref": "#/components/responses/Unauthorized"
       summary: List allowed keyservers for the authenticated user
   "/api/mvn/key-stores/{repoName}":
     get:
@@ -387,6 +484,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelKeyStoreItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List key stores for a Maven repository
     post:
       tags:
@@ -405,6 +510,16 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseKeyStoreItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Add a key store to a Maven repository
     parameters:
       - name: repoName
@@ -430,6 +545,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPgpPublicKeyItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List the PGP public keys registered directly on a Maven repository's key store
       description: >-
         Registered keys are tried first when a .pom.asc is verified, then the repo's allowed
@@ -452,6 +575,16 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePgpPublicKeyItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Register an armored OpenPGP public key directly on a Maven repository's key store
       description: >-
         Registered keys are tried first when a .pom.asc is verified, then the repo's allowed
@@ -482,6 +615,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Remove a registered PGP public key from a Maven repository's key store
     parameters:
       - name: repoName
@@ -500,6 +641,7 @@ paths:
             schema:
               "$ref": "#/components/schemas/RefreshTokenForm"
         required: true
+      security: []
       responses:
         '200':
           description: OK
@@ -507,6 +649,10 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseLoginInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
       summary: Refresh access token using a refresh token
   "/api/auth/login":
     post:
@@ -519,6 +665,7 @@ paths:
             schema:
               "$ref": "#/components/schemas/LoginForm"
         required: true
+      security: []
       responses:
         '200':
           description: OK
@@ -526,18 +673,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseLoginInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
         '401':
-          description: Unknown username or wrong password (invalidCredentials)
+          "$ref": "#/components/responses/Unauthorized"
         '429':
-          description: >-
-            The client made too many failed password checks and is refused until its window ends
-            (tooManyRequests). The answer is the same whatever username or password was sent.
-          headers:
-            Retry-After:
-              description: Seconds until the client may try again
-              schema:
-                type: integer
-                format: int64
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Authenticate user and return JWT tokens
   "/api/repos/{repoName}/name":
     patch:
@@ -557,6 +698,16 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Rename a repository
     parameters:
       - name: repoName
@@ -582,6 +733,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Update repository description
     parameters:
       - name: repoName
@@ -602,7 +761,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponseTotalUsageInfo"
         '401':
-          description: Missing or invalid token
+          "$ref": "#/components/responses/Unauthorized"
       summary: Get total usage statistics
   "/api/repos/{repoType}/info":
     get:
@@ -622,6 +781,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListRepoListInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get repository list info by type
   "/api/repos/{repoType}/count":
     get:
@@ -641,6 +806,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseLong"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get repository count by type
   "/api/repos/{repoName}/usage":
     get:
@@ -654,6 +825,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoUsageInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get storage usage for a repository
     parameters:
       - name: repoName
@@ -666,6 +843,9 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: getPermission
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -673,6 +853,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoPermissionInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get permissions for a repository
     parameters:
       - name: repoName
@@ -685,6 +871,9 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: getRepoType
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -692,6 +881,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get the format of a repository
     parameters:
       - name: repoName
@@ -710,6 +905,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -717,6 +915,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListStorageItemInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List contents of a repository
     parameters:
       - name: repoName
@@ -735,6 +941,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -742,6 +951,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Create a one-minute token that only authorizes downloading the given path of a repository
     parameters:
       - name: repoName
@@ -766,6 +983,9 @@ paths:
           schema:
             type: string
             default: ''
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -773,6 +993,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPypiPackageListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List PyPI packages in a repository
     parameters:
       - name: repoName
@@ -802,6 +1030,9 @@ paths:
           schema:
             type: string
             default: ''
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -809,6 +1040,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelReleaseListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List releases of a PyPI package
     parameters:
       - name: repoName
@@ -832,6 +1071,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -839,6 +1081,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseReleaseDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a specific PyPI package release
     delete:
       tags:
@@ -862,6 +1110,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a specific PyPI package release
     parameters:
       - name: repoName
@@ -880,6 +1134,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -887,6 +1144,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseReleaseDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a PyPI package
     delete:
       tags:
@@ -905,6 +1168,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a PyPI package
     parameters:
       - name: repoName
@@ -924,6 +1193,8 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseProfileInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
       summary: Get the current user's profile
     delete:
       tags:
@@ -936,6 +1207,8 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
       summary: Delete the current user's account
   "/api/npm/packages/{repoName}":
     get:
@@ -953,6 +1226,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -960,6 +1236,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List npm packages in a repository
     parameters:
       - name: repoName
@@ -983,6 +1267,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -990,6 +1277,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a specific npm package version
     delete:
       tags:
@@ -1013,6 +1306,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a specific npm package version
     parameters:
       - name: repoName
@@ -1041,6 +1340,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1048,6 +1350,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a specific scoped npm package version
     delete:
       tags:
@@ -1076,6 +1384,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a specific scoped npm package version
     parameters:
       - name: repoName
@@ -1094,6 +1408,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1101,6 +1418,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get an npm package
     delete:
       tags:
@@ -1119,6 +1442,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete an npm package
     parameters:
       - name: repoName
@@ -1142,6 +1471,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1149,6 +1481,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a scoped npm package
     delete:
       tags:
@@ -1172,6 +1510,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a scoped npm package
     parameters:
       - name: repoName
@@ -1196,6 +1540,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1203,6 +1550,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List the unscoped npm packages in a repository
     parameters:
       - name: repoName
@@ -1232,6 +1587,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1239,6 +1597,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List the npm packages in a scope
     parameters:
       - name: repoName
@@ -1268,6 +1634,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1275,6 +1644,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPackageVersionListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List versions of an npm package
     parameters:
       - name: repoName
@@ -1309,6 +1686,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1316,6 +1696,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPackageVersionListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List versions of a scoped npm package
     parameters:
       - name: repoName
@@ -1334,6 +1722,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1341,6 +1732,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListPackageDistributionTagMapListItem"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List dist-tags for an npm package
     parameters:
       - name: repoName
@@ -1364,6 +1761,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1371,6 +1771,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListPackageDistributionTagMapListItem"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List dist-tags for a scoped npm package
     parameters:
       - name: repoName
@@ -1395,6 +1801,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1402,6 +1811,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelNuGetPackageListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Search NuGet packages in a repository
     parameters:
       - name: repoName
@@ -1421,6 +1838,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1428,6 +1848,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseNuGetPackageInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a NuGet package
     delete:
       tags:
@@ -1446,6 +1872,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseNuGetDeletedItem"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a NuGet package
     parameters:
       - name: repoName
@@ -1476,6 +1908,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1483,6 +1918,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelNuGetVersionListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List versions of a NuGet package
     parameters:
       - name: repoName
@@ -1507,6 +1950,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1514,6 +1960,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseNuGetVersionInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a specific NuGet package version
     delete:
       tags:
@@ -1537,6 +1989,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseNuGetDeletedItem"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a specific NuGet package version
     parameters:
       - name: repoName
@@ -1561,6 +2019,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1568,6 +2029,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelArtifactListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List artifact groups in a Maven repository
     parameters:
       - name: repoName
@@ -1597,6 +2066,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1604,6 +2076,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelArtifactListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List artifacts in a Maven group
     delete:
       tags:
@@ -1622,6 +2102,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseDeletedItem"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a Maven artifact group
     parameters:
       - name: repoName
@@ -1656,6 +2142,9 @@ paths:
           schema:
             type: string
             default: ''
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1663,6 +2152,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelArtifactVersionListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List versions of a Maven artifact
     parameters:
       - name: repoName
@@ -1686,6 +2183,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1693,6 +2193,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseArtifactVersionInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a Maven artifact
     delete:
       tags:
@@ -1716,6 +2222,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseDeletedItem"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a Maven artifact
     parameters:
       - name: repoName
@@ -1744,6 +2256,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1751,6 +2266,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseArtifactVersionInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a specific version of a Maven artifact
     delete:
       tags:
@@ -1779,6 +2300,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseDeletedItem"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a specific Maven artifact version
     parameters:
       - name: repoName
@@ -1797,6 +2324,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1804,6 +2334,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelGoModuleListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List Go modules in a repository
     delete:
       tags:
@@ -1822,6 +2360,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a Go module
     parameters:
       - name: repoName
@@ -1851,6 +2397,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1858,6 +2407,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelGoModuleVersionListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List versions of a Go module
     delete:
       tags:
@@ -1881,6 +2438,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete Go module versions
     parameters:
       - name: repoName
@@ -1899,9 +2464,14 @@ paths:
           required: true
           schema:
             type: string
+      security: []
       responses:
         '200':
           description: OK
+        '404':
+          description: >-
+            Always. This proxy does not relay checksum database requests, so the Go toolchain
+            falls back to sum.golang.org (or GONOSUMDB). The body is empty.
       summary: Check if sum database is supported
   "/api/go/modules/{repoName}/search":
     get:
@@ -1920,6 +2490,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1927,6 +2500,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelGoModuleListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Search Go modules in a repository
     parameters:
       - name: repoName
@@ -1945,6 +2526,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1952,6 +2536,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseGoModuleInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get Go module info
     parameters:
       - name: repoName
@@ -1976,6 +2568,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -1983,6 +2578,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelImageListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List Docker images in a repository
     parameters:
       - name: repoName
@@ -2002,6 +2605,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete orphan layers for a Docker repository
     parameters:
       - name: repoName
@@ -2031,6 +2640,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2038,6 +2650,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelImageTagListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List tags of a Docker image
     parameters:
       - name: repoName
@@ -2072,6 +2692,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2079,6 +2702,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelManifestListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List manifests for a Docker image tag
     parameters:
       - name: repoName
@@ -2102,6 +2733,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2109,6 +2743,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a Docker image manifest
     parameters:
       - name: repoName
@@ -2127,6 +2767,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2134,6 +2777,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseTagDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a Docker image
     delete:
       tags:
@@ -2152,6 +2801,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a Docker image
     parameters:
       - name: repoName
@@ -2175,6 +2830,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2182,6 +2840,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseTagDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a specific Docker image tag
     delete:
       tags:
@@ -2205,6 +2869,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a Docker image tag
     parameters:
       - name: repoName
@@ -2228,6 +2898,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2235,6 +2908,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get Docker image config by digest
     parameters:
       - name: repoName
@@ -2259,6 +2938,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2266,6 +2948,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelCrateListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List crates in a Cargo repository
     parameters:
       - name: repoName
@@ -2284,6 +2974,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2291,6 +2984,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseBaseCrateInfoUUID"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a Cargo crate
     delete:
       tags:
@@ -2309,6 +3008,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a Cargo crate
     parameters:
       - name: repoName
@@ -2332,6 +3037,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2339,6 +3047,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseBaseCrateVersionInfoUUID"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a specific Cargo crate version
     delete:
       tags:
@@ -2362,6 +3076,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a specific Cargo crate version
     parameters:
       - name: repoName
@@ -2391,6 +3111,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2398,6 +3121,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelCrateVersionListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List versions of a Cargo crate
     parameters:
       - name: repoName
@@ -2422,6 +3153,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2429,6 +3163,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelGemListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List gems in a Ruby repository
     parameters:
       - name: repoName
@@ -2454,6 +3196,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a Ruby gem
     parameters:
       - name: repoName
@@ -2483,6 +3231,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2490,6 +3241,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelGemVersionListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List versions of a Ruby gem
     parameters:
       - name: repoName
@@ -2519,6 +3278,9 @@ paths:
           schema:
             type: string
             default: 'ruby'
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2526,6 +3288,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseGemVersionInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a specific Ruby gem version
     delete:
       tags:
@@ -2555,6 +3323,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a specific Ruby gem version
     parameters:
       - name: repoName
@@ -2579,6 +3353,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2586,6 +3363,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelHelmChartListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List and search charts in a Helm repository
     parameters:
       - name: repoName
@@ -2599,6 +3384,9 @@ paths:
         - helm-chart-controller
       operationId: getHelmChartVersions
       parameters: []
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2606,6 +3394,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListHelmChartVersionItem"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List all versions of a chart
     delete:
       tags:
@@ -2619,6 +3413,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete all versions of a chart
     parameters:
       - name: repoName
@@ -2637,6 +3437,9 @@ paths:
         - helm-chart-controller
       operationId: getHelmChartOciTags
       parameters: []
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2644,6 +3447,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListString"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List OCI tags for a chart
     parameters:
       - name: repoName
@@ -2662,6 +3471,9 @@ paths:
         - helm-chart-controller
       operationId: getHelmChartDetail
       parameters: []
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2669,6 +3481,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseHelmChartDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a specific chart version detail
     delete:
       tags:
@@ -2682,6 +3500,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a specific chart version
     parameters:
       - name: repoName
@@ -2711,6 +3535,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a repository
     parameters:
       - name: repoName
@@ -2737,6 +3567,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseKeyStoreItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Remove a key store from a Maven repository
     parameters:
       - name: repoName
@@ -2765,6 +3603,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2772,6 +3613,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelVulnerabilityScanInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: List the vulnerability scan history of an artifact version
     parameters:
       - name: repoName
@@ -2795,6 +3644,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2802,6 +3654,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseScanOverview"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get the severity breakdown of an artifact version
       description: >-
         The scanId, status and scannedAt describe the version's newest scan, whatever its status.
@@ -2837,6 +3695,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVulnerabilityScanInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Manually trigger a vulnerability re-scan for an artifact version
       description: >-
         Scans the version regardless of the repository's `securityScanEnabled` setting: that setting
@@ -2858,6 +3724,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2865,6 +3734,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVersionSecuritySummaryMap"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get every version's latest-scan severity and finding count for one artifact, in a single call
     parameters:
       - name: repoName
@@ -2877,6 +3752,9 @@ paths:
       tags:
         - vulnerability-scan-controller
       operationId: getArtifactSecuritySummary
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2884,6 +3762,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVersionSecuritySummaryMap"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get every artifact's aggregated latest-scan severity and finding count for a repo, in a single call
     parameters:
       - name: repoName
@@ -2903,6 +3787,9 @@ paths:
           schema:
             type: string
             format: uuid
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2910,6 +3797,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVulnerabilityScanDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a vulnerability scan's detail (metadata only — findings are paginated separately)
     parameters:
       - name: repoName
@@ -2934,6 +3829,9 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2941,6 +3839,14 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelVulnerabilityFindingInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get one page of a vulnerability scan's findings
     parameters:
       - name: repoName
@@ -2953,6 +3859,9 @@ paths:
       tags:
         - vulnerability-scan-controller
       operationId: getRepoSecurityDetail
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2960,6 +3869,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoSecurityDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get a repo-wide severity breakdown (each artifact-version's latest completed scan) plus its most recently scanned versions
     parameters:
       - name: repoName
@@ -2978,6 +3893,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
@@ -2985,6 +3903,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoSecurityDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
       summary: Get one artifact's severity breakdown (each version's latest completed scan) plus its most recently scanned versions
     parameters:
       - name: repoName
@@ -3014,6 +3938,8 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseSecuritySummary"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
       summary: Get the worst known severity per repo, across each artifact version's latest completed scan
   "/api/security/scans":
     get:
@@ -3061,11 +3987,11 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelVulnerabilityScanInfo"
         '400':
-          description: Invalid paging parameter (page below 0, size outside 1-100, or not a number)
+          "$ref": "#/components/responses/BadRequest"
         '401':
-          description: Missing or invalid token
+          "$ref": "#/components/responses/Unauthorized"
         '403':
-          description: Admin role required
+          "$ref": "#/components/responses/Forbidden"
       summary: List vulnerability scans across all repositories, filterable by severity/repoType/repoName
   "/api/security/scans/summary":
     get:
@@ -3090,16 +4016,19 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseSecurityScansSummary"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
         '401':
-          description: Missing or invalid token
+          "$ref": "#/components/responses/Unauthorized"
         '403':
-          description: Admin role required
+          "$ref": "#/components/responses/Forbidden"
       summary: Get the system-wide severity distribution (each artifact-version's latest completed scan), filterable by repoType/repoName, independent of the scans list's severity filter
   "/api/security/supported-repo-types":
     get:
       tags:
         - security-scan-controller
       operationId: getSupportedRepoTypes
+      security: []
       responses:
         '200':
           description: OK
@@ -3109,6 +4038,122 @@ paths:
                 "$ref": "#/components/schemas/RestResponseListString"
       summary: List repo types (e.g. MAVEN, NPM) that have a registered vulnerability scanner, single source of truth for gating scan-related UI/behavior
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        The access token returned by `login` or `refreshToken`. Every operation needs it unless it
+        says `security: []` (public), or lists an empty requirement next to `bearerAuth` (readable
+        anonymously when the repository is public, otherwise it needs the token).
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Zero-based page index.
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        default: 0
+    Size:
+      name: size
+      in: query
+      required: false
+      description: Page size.
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 100
+        default: 10
+    Sort:
+      name: sort
+      in: query
+      required: false
+      description: >-
+        Sort order as `property,direction` (`asc` or `desc`); repeat the parameter for more than one
+        property. The properties a paged operation accepts differ, and any other one is answered
+        with 400 `validationError`.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+  responses:
+    BadRequest:
+      description: >-
+        The request is malformed or fails validation: a body that cannot be read or breaks a
+        constraint, a missing or mistyped parameter, a page below 0, a size outside 1-100 or a
+        sort property that is not allowed (`validationError`, `data` names the offending parameter
+        where there is one), or a business rule (for example `usernameInUse` or
+        `cannotDeleteLastAdminUser`).
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: >-
+        The request is not authenticated (`unAuthorized`, `unauthorizedRequest`): the token or
+        credentials are missing, wrong, or expired (`sessionExpired`), or the account behind the
+        token no longer exists. The panel answers with a `WWW-Authenticate: Bearer` challenge.
+
+
+        Today this status is also the answer for a signed-in user who lacks the permission: an
+        operation that manages a repository answers a user who is not an admin with 401
+        `unAuthorized`, not 403 (RPS-1284 will change that). Only the operations that need the
+        admin role themselves answer 403.
+      headers:
+        WWW-Authenticate:
+          description: The `Bearer` challenge, sent by the panel operations.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: >-
+        The caller is signed in but is not allowed to do this: the admin role is required
+        (`accessDenied`).
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: >-
+        The thing the request names does not exist: a repository (`repoNotFound`), a repository
+        type, a user, a token or an item in the repository (`itemNotFound`). A caller who may not
+        read the repository is answered 401 instead, so this does not reveal that it exists.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: >-
+        The request collides with something that exists (`itemAlreadyExists`, `repoExists`,
+        `keyStoreAlreadyExists`, `pgpPublicKeyAlreadyExists`, `scanAlreadyRunning`).
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    TooManyRequests:
+      description: >-
+        The client made too many failed password checks and is refused until its window ends
+        (`tooManyRequests`). The answer is the same whatever username or password was sent.
+      headers:
+        Retry-After:
+          description: Seconds until the client may try again
+          schema:
+            type: integer
+            format: int64
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
   schemas:
     NuGetDependencyInfo:
       type: object
@@ -3436,6 +4481,23 @@ components:
           description: >-
             Whether newly pushed versions are scanned automatically. Manually triggered scans ignore
             this setting.
+        pgpVerifyAllSignaturesEnabled:
+          type: boolean
+          nullable: false
+          description: >-
+            Maven only; rejected with 400 pgpSettingsUnsupported for any other repo type. When true,
+            every artifact signature (.jar.asc, -sources.jar.asc, .module.asc, ...) is verified
+            against the file it signs before it is stored, exactly like the .pom.asc, and a version
+            is signed only when every file of it has a verified signature. When false (the default)
+            only the .pom.asc is verified.
+        pgpKeyServerLookupEnabled:
+          type: boolean
+          nullable: false
+          description: >-
+            Maven only; rejected with 400 pgpSettingsUnsupported for any other repo type. When
+            false, a signature made with a key that is not registered on the repository is refused
+            with 404 artifactSigningKeyNotRegistered, without asking any public key server (for
+            installs that cannot reach the internet). Defaults to true.
     RestResponseVoid:
       type: object
       properties:
@@ -3898,6 +4960,16 @@ components:
           description: >-
             Whether newly pushed versions are scanned automatically. Manually triggered scans ignore
             this setting.
+        pgpVerifyAllSignaturesEnabled:
+          type: boolean
+          description: >-
+            Maven only; omitted for any other repo type. Whether every artifact signature is
+            verified, not only the .pom.asc.
+        pgpKeyServerLookupEnabled:
+          type: boolean
+          description: >-
+            Maven only; omitted for any other repo type. Whether public key servers are asked for a
+            signer's key that is not registered on the repository.
       required:
         - privateRepo
         - allowOverride
@@ -4494,6 +5566,10 @@ components:
       properties:
         signed:
           type: boolean
+          description: >-
+            True when the POM signature was verified or, on a repository with
+            pgpVerifyAllSignaturesEnabled, when every file of the version has a verified signature
+            (for a snapshot, every file of its newest build).
         lastUpdatedAt:
           type: string
           format: date-time
@@ -4581,6 +5657,10 @@ components:
             "$ref": "#/components/schemas/VersionDeveloperInfo"
         signed:
           type: boolean
+          description: >-
+            True when the POM signature was verified or, on a repository with
+            pgpVerifyAllSignaturesEnabled, when every file of the version has a verified signature
+            (for a snapshot, every file of its newest build).
     RestResponseArtifactVersionInfo:
       type: object
       properties:
@@ -5058,6 +6138,27 @@ components:
         - ERROR
         - SUCCESS
         - WARNING
+    ErrorResponse:
+      type: object
+      description: >-
+        The envelope of every failed request. `type` is always `ERROR`. `msgId` is the stable key
+        of the failure and `text` its message. `errorCode` is a unique id of this failure, for a
+        bug report. `data` is a detail about the failure (for example the name of the offending
+        parameter), or null.
+      properties:
+        msgId:
+          type: string
+          example: validationError
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        text:
+          type: string
+        errorCode:
+          type: string
+          format: uuid
+        data:
+          type: string
+          description: A detail about the failure, or null when there is none.
     UserRole:
       type: string
       enum:

@@ -351,8 +351,7 @@ class AbstractMavenProtocolFacadeTest {
   }
 
   @Test
-  @DisplayName(
-      "pins the current behaviour: only a POM signature is verified, a jar signature is not")
+  @DisplayName("by default only a POM signature is verified, a jar signature is stored as sent")
   void doesNotVerifyAJarSignature() throws Exception {
     requestFor("com/example/lib/1.0/lib-1.0.jar.asc");
     deployIsAllowed();
@@ -364,6 +363,73 @@ class AbstractMavenProtocolFacadeTest {
 
     verify(this.artifactService, never()).verifySignature(any(), any(), any());
     assertThat(this.stored).singleElement().isEqualTo("sig".getBytes(UTF_8));
+  }
+
+  @Test
+  @DisplayName("verifies a jar signature before it stores it on a repo verifying every signature")
+  void verifiesAJarSignatureBeforeStoringItWhenVerifyingAll() throws Exception {
+    this.repoInfo.setPgpVerifyAllSignaturesEnabled(true);
+    final var signature = "-----BEGIN PGP SIGNATURE-----\nabc\n-----END PGP SIGNATURE-----\n";
+    requestFor("com/example/lib/1.0/lib-1.0-sources.jar.asc");
+    deployIsAllowed();
+    storageReportsUsage(signature.length());
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(signature.getBytes(UTF_8)));
+
+    upload(signature);
+
+    final var order = inOrder(this.storageService, this.artifactService);
+    order
+        .verify(this.artifactService)
+        .verifySignature(any(), any(StoragePath.class), any(Resource.class));
+    order
+        .verify(this.storageService)
+        .writeInputStreamToPath(any(StoragePath.class), any(), anyString());
+    order
+        .verify(this.artifactService)
+        .createOrUpdateArtifact(any(), any(StoragePath.class), any(Resource.class));
+    assertThat(this.stored).singleElement().isEqualTo(signature.getBytes(UTF_8));
+  }
+
+  @Test
+  @DisplayName("stores nothing for a refused jar signature on a repo verifying every signature")
+  void storesNothingWhenAJarSignatureIsRefusedWhenVerifyingAll() {
+    this.repoInfo.setPgpVerifyAllSignaturesEnabled(true);
+    requestFor("com/example/lib/1.0/lib-1.0.jar.asc");
+    deployIsAllowed();
+    doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
+        .when(this.artifactService)
+        .verifySignature(any(), any(StoragePath.class), any(Resource.class));
+
+    assertThatThrownBy(() -> upload("not a signature"))
+        .isInstanceOf(SignatureNotVerifiedException.class);
+
+    verifyNoInteractions(this.storageService);
+    verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
+  @DisplayName("never verifies a checksum, a metadata signature or a plain file of any repo")
+  void verifyAllStillLeavesChecksumsMetadataSignaturesAndFilesAlone() throws Exception {
+    this.repoInfo.setPgpVerifyAllSignaturesEnabled(true);
+
+    for (final var path :
+        new String[] {
+          "com/example/lib/1.0/lib-1.0.jar.asc.sha1",
+          "com/example/lib/maven-metadata.xml.asc",
+          "com/example/lib/1.0/lib-1.0.jar"
+        }) {
+      requestFor(path);
+      deployIsAllowed();
+      storageReportsUsage(3);
+      when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+          .thenReturn(new ByteArrayResource(new byte[0]));
+
+      upload("sig");
+    }
+
+    verify(this.artifactService, never()).verifySignature(any(), any(), any());
   }
 
   @Test
@@ -683,7 +749,7 @@ class AbstractMavenProtocolFacadeTest {
   @Test
   @DisplayName("verifies and stores a POM signature exactly at the size limit (RPS-1121)")
   void verifiesAndStoresAPomSignatureAtTheSizeLimit() throws Exception {
-    final var signature = filler(MavenUploadLimits.MAX_POM_SIGNATURE_BYTES);
+    final var signature = filler(MavenUploadLimits.MAX_SIGNATURE_BYTES);
     requestFor(POM_PATH + ".asc");
     deployIsAllowed();
     storageReportsUsage(signature.length());
@@ -702,7 +768,7 @@ class AbstractMavenProtocolFacadeTest {
       "refuses a POM signature one byte over the size limit before verifying or storing it"
           + " (RPS-1121)")
   void rejectsAPomSignatureOverTheSizeLimit() {
-    final var signature = filler(MavenUploadLimits.MAX_POM_SIGNATURE_BYTES + 1);
+    final var signature = filler(MavenUploadLimits.MAX_SIGNATURE_BYTES + 1);
     requestFor(POM_PATH + ".asc");
     deployIsAllowed();
 

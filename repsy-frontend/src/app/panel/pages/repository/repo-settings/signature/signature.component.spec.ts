@@ -16,10 +16,16 @@
 import { of, Subject, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
-import { AllowedKeyserverItem, KeyStoreControllerService, KeyStoreItem } from '../../../../../../generated/api';
+import {
+  AllowedKeyserverItem,
+  KeyStoreControllerService,
+  KeyStoreItem,
+  ProtocolRepoControllerService,
+} from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { permission } from '../../testing/protocol-service-spec-helpers';
+import { releaseAwareParentForm } from '../testing/repo-settings-spec-helpers';
 import { SignatureComponent } from './signature.component';
 
 const REPO = 'maven-repo';
@@ -35,6 +41,7 @@ function keyStore(id: string): KeyStoreItem {
 describe('SignatureComponent', () => {
   let component: SignatureComponent;
   let keyStoreService: jasmine.SpyObj<KeyStoreControllerService>;
+  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
 
@@ -49,16 +56,87 @@ describe('SignatureComponent', () => {
     keyStoreService.listMavenKeyStores.and.returnValue(of({ data: { content: [keyStore('k1')] } }) as never);
     keyStoreService.createMavenKeyStore.and.returnValue(of({}) as never);
     keyStoreService.deleteMavenKeyStore.and.returnValue(of({}) as never);
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['updateSettings']);
+    repoApi.updateSettings.and.returnValue(of({}) as never);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
-    component = new SignatureComponent(toastService, dangerModalService, keyStoreService);
+    component = new SignatureComponent(toastService, dangerModalService, keyStoreService, repoApi);
     component.activeRepository = permission(REPO, { canManage: true });
     component.repoType = 'MAVEN';
+    component.parentForm = releaseAwareParentForm();
   });
 
   it('links to the documentation of the configured site and knows the well-known keyservers', () => {
     expect(component.docsBaseUrl).toBe(environment.docsBase);
     expect(component.wellKnownServers.map((s) => s.host)).toEqual(['keyserver.ubuntu.com', 'keys.openpgp.org']);
+  });
+
+  describe('signature verification settings (RPS-1188, RPS-1204)', () => {
+    it('starts from the values the settings page loaded', () => {
+      component.parentForm = releaseAwareParentForm({
+        pgpVerifyAllSignaturesEnabled: true,
+        pgpKeyServerLookupEnabled: false,
+      });
+
+      component.ngOnInit();
+
+      expect(component.verifyAllSignaturesEnabled).toBeTrue();
+      expect(component.keyServerLookupEnabled).toBeFalse();
+    });
+
+    it('defaults to verifying the POM only and looking keys up', () => {
+      component.ngOnInit();
+
+      expect(component.verifyAllSignaturesEnabled).toBeFalse();
+      expect(component.keyServerLookupEnabled).toBeTrue();
+    });
+
+    it('sends only its own field when every signature verification is switched on, then reloads', () => {
+      const reloaded = jasmine.createSpy('reloaded');
+      component.fetch.subscribe(reloaded);
+      component.ngOnInit();
+      component.verifyAllSignaturesEnabled = true;
+
+      component.changeVerifyAllSignatures();
+
+      expect(repoApi.updateSettings).toHaveBeenCalledOnceWith(REPO, { pgpVerifyAllSignaturesEnabled: true });
+      expect(component.parentForm.get('pgpVerifyAllSignaturesEnabled').value).toBeTrue();
+      expect(toastService.show).toHaveBeenCalledOnceWith('Every signature is now verified', 'success');
+      expect(reloaded).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends only its own field when the key server lookup is switched off, then reloads', () => {
+      const reloaded = jasmine.createSpy('reloaded');
+      component.fetch.subscribe(reloaded);
+      component.ngOnInit();
+      component.keyServerLookupEnabled = false;
+
+      component.changeKeyServerLookup();
+
+      expect(repoApi.updateSettings).toHaveBeenCalledOnceWith(REPO, { pgpKeyServerLookupEnabled: false });
+      expect(component.parentForm.get('pgpKeyServerLookupEnabled').value).toBeFalse();
+      expect(toastService.show).toHaveBeenCalledOnceWith('Key server lookup is now disabled', 'success');
+      expect(reloaded).toHaveBeenCalledTimes(1);
+    });
+
+    it('puts a toggle back, and neither toasts nor reloads, when the update fails', () => {
+      const reloaded = jasmine.createSpy('reloaded');
+      component.fetch.subscribe(reloaded);
+      repoApi.updateSettings.and.returnValue(throwError(() => new Error('boom')));
+      component.ngOnInit();
+      component.verifyAllSignaturesEnabled = true;
+      component.keyServerLookupEnabled = false;
+
+      component.changeVerifyAllSignatures();
+      component.changeKeyServerLookup();
+
+      expect(component.verifyAllSignaturesEnabled).toBeFalse();
+      expect(component.keyServerLookupEnabled).toBeTrue();
+      expect(component.parentForm.get('pgpVerifyAllSignaturesEnabled').value).toBeFalse();
+      expect(component.parentForm.get('pgpKeyServerLookupEnabled').value).toBeTrue();
+      expect(toastService.show).not.toHaveBeenCalled();
+      expect(reloaded).not.toHaveBeenCalled();
+    });
   });
 
   describe('ngOnInit', () => {

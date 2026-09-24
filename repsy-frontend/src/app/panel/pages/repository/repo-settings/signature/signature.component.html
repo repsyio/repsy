@@ -11,6 +11,50 @@
   <div class="w-full rounded-b-[12px] border-r border-b border-l border-[#404141] bg-[#101112] p-[24px]">
     <p class="mb-6 text-[14px] text-[#9FA0A0]">Configure PGP Signature Key Store Server.</p>
 
+    <!-- Signature verification -->
+    <div class="mb-6 flex flex-col gap-4">
+      <div class="flex flex-col gap-4 sm:flex-row sm:gap-10">
+        <app-toggle-component
+          data-testid="settings-pgp-verify-all-toggle"
+          class="w-[115px]"
+          [(checked)]="verifyAllSignaturesEnabled"
+          checkedLabel="On"
+          uncheckedLabel="Off"
+          (checkedChange)="changeVerifyAllSignatures()"
+        />
+        <div class="text-[13px]">
+          <p class="text-[#FDFDFD]">Verify every signature</p>
+          <p class="text-[#9FA0A0]">
+            {{
+              verifyAllSignaturesEnabled
+                ? 'Every artifact signature (.jar.asc, -sources.jar.asc, ...) is verified before it is stored, and a version shows Signed only when every file of it has a verified signature.'
+                : 'Only the .pom.asc is verified. Other signatures are stored as they are sent.'
+            }}
+          </p>
+        </div>
+      </div>
+      <div class="flex flex-col gap-4 sm:flex-row sm:gap-10">
+        <app-toggle-component
+          data-testid="settings-pgp-keyserver-lookup-toggle"
+          class="w-[115px]"
+          [(checked)]="keyServerLookupEnabled"
+          checkedLabel="On"
+          uncheckedLabel="Off"
+          (checkedChange)="changeKeyServerLookup()"
+        />
+        <div class="text-[13px]">
+          <p class="text-[#FDFDFD]">Look up keys on key servers</p>
+          <p class="text-[#9FA0A0]">
+            {{
+              keyServerLookupEnabled
+                ? 'A signature made with a key that is not registered on this repository is checked against the key servers below.'
+                : 'Air-gapped: only the keys registered on this repository are used, and no key server is contacted.'
+            }}
+          </p>
+        </div>
+      </div>
+    </div>
+
     <!-- Add keyserver -->
     @if (serverLabels.length > 0) {
       <div class="mb-6 flex items-center gap-2">

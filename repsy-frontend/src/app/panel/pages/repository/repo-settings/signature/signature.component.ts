@@ -15,7 +15,8 @@
 ///
 
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { FormGroup } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
@@ -25,21 +26,28 @@ import {
   KeyStoreControllerService,
   KeyStoreForm,
   KeyStoreItem,
+  ProtocolRepoControllerService,
   RepoPermissionInfo,
+  RepoSettingsForm,
 } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SelectorComponent } from '../../../../shared/components/selector/selector.component';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
+import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 
 @Component({
   selector: 'app-signature',
   templateUrl: './signature.component.html',
   standalone: true,
-  imports: [CommonModule, SelectorComponent, RouterLink],
+  imports: [CommonModule, SelectorComponent, ToggleComponent, RouterLink],
 })
 export class SignatureComponent implements OnInit {
   @Input() public activeRepository: RepoPermissionInfo;
   @Input() public repoType: string;
+  @Input() public parentForm: FormGroup;
+  @Output() public fetch = new EventEmitter<void>();
+  public verifyAllSignaturesEnabled = false;
+  public keyServerLookupEnabled = true;
   public pageNum = 1;
   public pageSize = 5;
   public keyStores: KeyStoreItem[] = [];
@@ -59,13 +67,55 @@ export class SignatureComponent implements OnInit {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly keyStoreControllerService: KeyStoreControllerService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
   ) {
     this.docsBaseUrl = environment.docsBase;
   }
 
   ngOnInit(): void {
+    this.verifyAllSignaturesEnabled = this.parentForm?.get('pgpVerifyAllSignaturesEnabled')?.value ?? false;
+    this.keyServerLookupEnabled = this.parentForm?.get('pgpKeyServerLookupEnabled')?.value ?? true;
     this.fetchKeyStores();
     this.fetchAllowedKeyservers();
+  }
+
+  /** Each toggle sends only its own field, so it cannot change any other setting of the repository. */
+  public changeVerifyAllSignatures(): void {
+    const enabled = this.verifyAllSignaturesEnabled;
+
+    this.updateSetting(
+      { pgpVerifyAllSignaturesEnabled: enabled },
+      'pgpVerifyAllSignaturesEnabled',
+      `Every signature is ${enabled ? 'now' : 'no longer'} verified`,
+      () => (this.verifyAllSignaturesEnabled = !enabled),
+    );
+  }
+
+  public changeKeyServerLookup(): void {
+    const enabled = this.keyServerLookupEnabled;
+
+    this.updateSetting(
+      { pgpKeyServerLookupEnabled: enabled },
+      'pgpKeyServerLookupEnabled',
+      `Key server lookup is now ${enabled ? 'enabled' : 'disabled'}`,
+      () => (this.keyServerLookupEnabled = !enabled),
+    );
+  }
+
+  private updateSetting(
+    form: RepoSettingsForm,
+    controlName: 'pgpVerifyAllSignaturesEnabled' | 'pgpKeyServerLookupEnabled',
+    message: string,
+    revert: () => void,
+  ): void {
+    this.protocolRepoControllerService.updateSettings(this.activeRepository.repoName, form).subscribe({
+      next: () => {
+        this.parentForm?.get(controlName)?.setValue(form[controlName]);
+        this.toastService.show(message, 'success');
+        this.fetch.emit();
+      },
+      error: () => revert(),
+    });
   }
 
   private fetchAllowedKeyservers(): void {

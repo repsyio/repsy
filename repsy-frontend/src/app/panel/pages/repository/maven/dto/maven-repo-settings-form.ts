@@ -20,4 +20,8 @@ export class MavenRepoSettingsForm {
   public snapshots: boolean;
   public allowOverride: boolean;
   public securityScanEnabled = true;
+  /** Maven only. Left out of every other section's PUT, which must not touch it. */
+  public pgpVerifyAllSignaturesEnabled?: boolean;
+  /** Maven only. Left out of every other section's PUT, which must not touch it. */
+  public pgpKeyServerLookupEnabled?: boolean;
 }

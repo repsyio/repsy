@@ -90,6 +90,8 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
       snapshots: new FormControl(false, [Validators.required]),
       allowOverride: new FormControl(true, [Validators.required]),
       securityScanEnabled: new FormControl(true, [Validators.required]),
+      pgpVerifyAllSignaturesEnabled: new FormControl(false),
+      pgpKeyServerLookupEnabled: new FormControl(true),
     });
   }
 
