@@ -20,7 +20,11 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.utils.NpmConstants;
+import io.repsy.protocols.npm.shared.utils.NpmPackumentBuilder;
+import io.repsy.protocols.npm.shared.utils.NpmTarballFacts;
+import io.repsy.protocols.npm.shared.utils.NpmTarballInspector;
 import io.repsy.protocols.npm.shared.utils.PackageUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -28,12 +32,15 @@ import java.net.URISyntaxException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.binary.Base64;
 import org.jspecify.annotations.NullMarked;
@@ -262,26 +269,175 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
   public byte[] readMetadataBytes(
       final UUID repoId, final String repoName, final Path packageBasePath) throws IOException {
 
+    final var metadata = this.readMetadataBytesIfPresent(repoId, repoName, packageBasePath);
+
+    if (metadata == null) {
+      throw new ItemNotFoundException("itemNotFound");
+    }
+
+    return metadata;
+  }
+
+  /** The stored package metadata as it is, or {@code null} when the file is gone. */
+  private byte @Nullable [] readMetadataBytesIfPresent(
+      final UUID repoId, final String repoName, final Path packageBasePath) throws IOException {
+
     final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
     final var resource =
-        this.getResource(StoragePath.of(repoId, metadataPath.toString()), repoName);
+        this.storageStrategy.get(StoragePath.of(repoId, metadataPath.toString()), repoName);
 
-    try (final var inputStream = resource.getInputStream()) {
+    if (resource.isEmpty()) {
+      return null;
+    }
+
+    try (final var inputStream = resource.get().getInputStream()) {
       return inputStream.readAllBytes();
     }
   }
 
   @Override
   public void restoreMetadataBytes(
-      final UUID repoId, final String repoName, final Path packageBasePath, final byte[] metadata)
+      final UUID repoId,
+      final String repoName,
+      final Path packageBasePath,
+      final byte @Nullable [] metadata)
+      throws IOException {
+
+    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
+    final var storagePath = StoragePath.of(repoId, metadataPath.toString());
+
+    if (metadata == null) {
+      this.deleteIfPresent(storagePath, repoName);
+      return;
+    }
+
+    try (final var inputStream = new ByteArrayInputStream(metadata)) {
+      this.storageStrategy.write(repoName, storagePath, inputStream);
+    }
+  }
+
+  @Override
+  public long changeMetadata(
+      final UUID repoId,
+      final String repoName,
+      final Path packageBasePath,
+      final Supplier<NpmPackageSnapshot> snapshot,
+      final MetadataChange change)
+      throws IOException {
+
+    final var previousMetadata = this.readMetadataBytesIfPresent(repoId, repoName, packageBasePath);
+    final var rebuiltSize =
+        previousMetadata == null
+            ? this.writeRebuiltMetadata(repoId, repoName, packageBasePath, snapshot.get())
+            : 0L;
+
+    try {
+      return rebuiltSize + change.apply();
+    } catch (final IOException | RuntimeException e) {
+      this.restoreAfterFailedChange(repoId, repoName, packageBasePath, previousMetadata, e);
+      throw e;
+    }
+  }
+
+  private long writeRebuiltMetadata(
+      final UUID repoId,
+      final String repoName,
+      final Path packageBasePath,
+      final NpmPackageSnapshot snapshot)
+      throws IOException {
+
+    final var metadata = this.rebuildMetadata(repoId, repoName, snapshot);
+    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
+
+    // The same atomic write as any other change of the file: nothing half-written is ever served.
+    return this.writeMetadataToFile(
+            repoName, metadata, StoragePath.of(repoId, metadataPath.toString()))
+        .getDiskUsage();
+  }
+
+  @Override
+  public Map<String, Object> readMetadataOrRebuild(
+      final UUID repoId,
+      final String repoName,
+      final Path packageBasePath,
+      final Supplier<NpmPackageSnapshot> snapshot)
       throws IOException {
 
     final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
 
-    try (final var inputStream = new ByteArrayInputStream(metadata)) {
-      this.storageStrategy.write(
-          repoName, StoragePath.of(repoId, metadataPath.toString()), inputStream);
+    try {
+      return this.getMetadata(StoragePath.of(repoId, metadataPath.toString()), repoName);
+    } catch (final ItemNotFoundException _) {
+      return this.rebuildMetadata(repoId, repoName, snapshot.get());
     }
+  }
+
+  /**
+   * Builds the metadata of the package from its rows, reading the tarball of each version for what
+   * the rows do not keep: see {@link NpmPackumentBuilder}. Writes nothing.
+   */
+  private Map<String, Object> rebuildMetadata(
+      final UUID repoId, final String repoName, final NpmPackageSnapshot snapshot)
+      throws IOException {
+
+    final var packageBasePath = this.getPackageBasePath(snapshot.scope(), snapshot.name());
+    final var tarballs = new HashMap<String, NpmTarballFacts>();
+
+    for (final var version : snapshot.versions()) {
+      this.inspectTarball(repoId, repoName, packageBasePath, snapshot.name(), version.version())
+          .ifPresent(facts -> tarballs.put(version.version(), facts));
+    }
+
+    return NpmPackumentBuilder.build(
+        snapshot, tarballs, this.packageUrl(repoName, snapshot), Instant.now());
+  }
+
+  private Optional<NpmTarballFacts> inspectTarball(
+      final UUID repoId,
+      final String repoName,
+      final Path packageBasePath,
+      final String packageName,
+      final String versionName)
+      throws IOException {
+
+    final var tarballPath =
+        packageBasePath.resolve(PackageUtils.getTarballFilename(packageName, versionName));
+    final var resource =
+        this.storageStrategy.get(StoragePath.of(repoId, tarballPath.toString()), repoName);
+
+    if (resource.isEmpty()) {
+      return Optional.empty();
+    }
+
+    try (final var inputStream = resource.get().getInputStream()) {
+      return Optional.of(NpmTarballInspector.inspect(inputStream));
+    }
+  }
+
+  private @Nullable String packageUrl(final String repoName, final NpmPackageSnapshot snapshot) {
+
+    final var base = this.registryBaseUrl();
+
+    if (base == null || base.isBlank()) {
+      return null;
+    }
+
+    return base.replaceAll("/+$", "")
+        + "/"
+        + repoName
+        + "/"
+        + PackageUtils.buildFullName(snapshot.scope(), snapshot.name());
+  }
+
+  /**
+   * The address clients reach the registry at (scheme, host and port, without the repo), from which
+   * the {@code dist.tarball} of a rebuilt version follows. The database does not keep it, and it
+   * depends on how a client got here, so it is up to the deployment: {@code null} (the default)
+   * leaves {@code dist.tarball} out of a rebuilt version.
+   */
+  protected @Nullable String registryBaseUrl() {
+
+    return null;
   }
 
   @Override
@@ -353,39 +509,54 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final Path packageBasePath,
       final String packageName,
       final String versionName,
-      final @Nullable String newLatest)
+      final @Nullable String newLatest,
+      final Supplier<NpmPackageSnapshot> snapshot)
       throws IOException {
 
-    // Read while the caller holds the package row locked, so no other write can have changed it.
-    final var previousMetadata = this.readMetadataBytes(repoId, repoName, packageBasePath);
-
-    try {
-      final var metadataGrowth =
-          this.removeVersionFromMetadata(repoId, repoName, packageBasePath, versionName, newLatest);
-
-      // The tarball goes last: a removed file cannot be put back, so nothing that can still fail
-      // runs after it. Whatever fails before it leaves the tarball, and the metadata is restored.
-      final var tarballSize =
-          this.removeTarball(repoId, repoName, packageBasePath, packageName, versionName);
-
-      return metadataGrowth - tarballSize;
-    } catch (final IOException | RuntimeException e) {
-      this.restoreAfterFailedRemoval(repoId, repoName, packageBasePath, previousMetadata, e);
-      throw e;
-    }
+    return this.changeMetadata(
+        repoId,
+        repoName,
+        packageBasePath,
+        snapshot,
+        () ->
+            this.removeVersionAndTarball(
+                repoId, repoName, packageBasePath, packageName, versionName, newLatest));
   }
 
-  private void restoreAfterFailedRemoval(
+  /**
+   * Rewrites the metadata and removes the tarball. The tarball goes last: a removed file cannot be
+   * put back, so nothing that can still fail runs after it. Whatever fails before it leaves the
+   * tarball, and {@link #changeMetadata} puts the metadata back.
+   */
+  private long removeVersionAndTarball(
       final UUID repoId,
       final String repoName,
       final Path packageBasePath,
-      final byte[] previousMetadata,
+      final String packageName,
+      final String versionName,
+      final @Nullable String newLatest)
+      throws IOException {
+
+    final var metadataGrowth =
+        this.removeVersionFromMetadata(repoId, repoName, packageBasePath, versionName, newLatest);
+
+    final var tarballSize =
+        this.removeTarball(repoId, repoName, packageBasePath, packageName, versionName);
+
+    return metadataGrowth - tarballSize;
+  }
+
+  private void restoreAfterFailedChange(
+      final UUID repoId,
+      final String repoName,
+      final Path packageBasePath,
+      final byte @Nullable [] previousMetadata,
       final Exception cause) {
 
     try {
       this.restoreMetadataBytes(repoId, repoName, packageBasePath, previousMetadata);
     } catch (final IOException | RuntimeException e) {
-      // The removal's own failure is the one to report; the leftover is noted on it.
+      // The change's own failure is the one to report; the leftover is noted on it.
       cause.addSuppressed(e);
     }
   }
@@ -521,6 +692,44 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
     } catch (final NoSuchFileException _) {
       throw new ItemNotFoundException("packageNotFound");
     }
+  }
+
+  @Override
+  public Map<String, Object> getMetadata(
+      final UUID repoId,
+      final String repoName,
+      final @Nullable String scopeName,
+      final String packageName,
+      final boolean isAbbreviated,
+      final Supplier<NpmPackageSnapshot> snapshot)
+      throws IOException {
+
+    try {
+      return this.getMetadata(repoId, repoName, scopeName, packageName, isAbbreviated);
+    } catch (final ItemNotFoundException missing) {
+      final var rebuilt = this.rebuildIfPackageExists(repoId, repoName, snapshot, missing);
+
+      return isAbbreviated ? this.createAbbreviatedMetadata(rebuilt) : rebuilt;
+    }
+  }
+
+  /** Rebuilds the metadata of a package the rows know, and otherwise fails as the read did. */
+  private Map<String, Object> rebuildIfPackageExists(
+      final UUID repoId,
+      final String repoName,
+      final Supplier<NpmPackageSnapshot> snapshot,
+      final ItemNotFoundException missing)
+      throws IOException {
+
+    final NpmPackageSnapshot rows;
+
+    try {
+      rows = snapshot.get();
+    } catch (final ItemNotFoundException _) {
+      throw missing;
+    }
+
+    return this.rebuildMetadata(repoId, repoName, rows);
   }
 
   @Override

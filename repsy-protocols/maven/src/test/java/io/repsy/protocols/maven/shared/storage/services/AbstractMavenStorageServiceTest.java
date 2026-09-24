@@ -95,17 +95,16 @@ class AbstractMavenStorageServiceTest {
   }
 
   @Test
-  @DisplayName("deleteArtifactVersion is a no-op when the version directory is already gone")
+  @DisplayName("deleteArtifactVersion frees nothing when the version directory is already gone")
   void deleteArtifactVersionIsIdempotentWhenDirectoryMissing() {
 
-    when(this.storageStrategy.listDirectoryContents(any()))
-        .thenThrow(new ItemNotFoundException("resourceNotFound"));
+    // The storage strategy's delete is idempotent, and a directory that is gone has no usage.
+    when(this.storageStrategy.calculatePathUsage(any())).thenReturn(0L);
 
     final var usage = this.storageService.deleteArtifactVersion(REPO_ID, GROUP, ARTIFACT, "1.0");
 
     assertThat(usage).isZero();
-    verify(this.storageStrategy, never()).delete(any());
-    verify(this.storageStrategy, never()).calculatePathUsage(any());
+    verify(this.storageStrategy).delete(argThat(pathEndingWith("com/example/demo/1.0")));
   }
 
   @Test
@@ -126,7 +125,6 @@ class AbstractMavenStorageServiceTest {
   @DisplayName("deleteArtifactVersion deletes the directory and returns its usage when present")
   void deleteArtifactVersionDeletesExistingDirectory() {
 
-    when(this.storageStrategy.listDirectoryContents(any())).thenReturn(List.of());
     when(this.storageStrategy.calculatePathUsage(any())).thenReturn(4096L);
 
     final var usage = this.storageService.deleteArtifactVersion(REPO_ID, GROUP, ARTIFACT, "1.0");

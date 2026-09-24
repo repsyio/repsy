@@ -16,18 +16,58 @@
 package io.repsy.os.server.protocols.npm.shared.storage.services;
 
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Service
 @NullMarked
 public class NpmStorageService extends AbstractNpmStorageService {
 
+  private final int repoPort;
+
   public NpmStorageService(
-      @Qualifier("osStorageStrategyNpm") final StorageStrategy storageStrategy) {
+      @Qualifier("osStorageStrategyNpm") final StorageStrategy storageStrategy,
+      @Value("${server.port:9090}") final int repoPort) {
 
     super(storageStrategy);
+
+    this.repoPort = repoPort;
+  }
+
+  @Override
+  protected @Nullable String registryBaseUrl() {
+
+    if (RequestContextHolder.getRequestAttributes()
+        instanceof final ServletRequestAttributes attributes) {
+      return registryBaseUrl(attributes.getRequest(), this.repoPort);
+    }
+
+    return null;
+  }
+
+  /**
+   * The address the registry answers at, for the {@code dist.tarball} of a rebuilt version. A
+   * request to the registry port already carries it. The panel is served on another port, so for a
+   * request there the registry port takes the panel's place, unless something in front of the
+   * server (a reverse proxy) rewrites the port: then what the client sees is all there is to go by.
+   */
+  static String registryBaseUrl(final HttpServletRequest request, final int repoPort) {
+
+    final var onPanelPort =
+        request.getLocalPort() != repoPort && request.getServerPort() == request.getLocalPort();
+
+    if (onPanelPort) {
+      return request.getScheme() + "://" + request.getServerName() + ":" + repoPort;
+    }
+
+    return RequestBaseUrlUtils.resolveBaseUrl(request);
   }
 }
