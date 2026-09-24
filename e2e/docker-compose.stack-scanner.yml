@@ -1,0 +1,60 @@
+# Copyright 2026 the original author or authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# OPT-IN overlay that turns the vulnerability scanner on in the e2e stack (RPS-1270): it adds a
+# deterministic stub of repsy-scanner-trivy (src/stubs/scanner/, contract and rules in its header and
+# in README.md "Scanner stack") and starts Repsy with SECURITY_SCANNER=enabled pointed at it, so the
+# real backend-to-scanner path (submit, poll, the scan states, findings) runs offline and fast, with no
+# Trivy and no vulnerability database download.
+#
+# It is never part of the default stack: it changes nothing unless it is passed as a second -f, which
+# `./run.sh local up --scanner` (or REPSY_E2E_SCANNER=1) does, on top of the postgres or the H2 stack:
+#
+#   docker compose -f docker-compose.stack.yml -f docker-compose.stack-scanner.yml up -d --wait --build
+#
+# The stub is published on loopback only (REPSY_E2E_SCANNER_PORT, default 8090): the ui runner (host
+# network) reaches its /control API there; Repsy reaches it as scanner-stub:8090 on the compose network.
+services:
+  scanner-stub:
+    image: ${REPSY_SCANNER_STUB_IMAGE:-repsy-e2e-scanner-stub:local}
+    build:
+      context: .
+      dockerfile: runners/scanner-stub.Dockerfile
+    ports:
+      - '127.0.0.1:${REPSY_E2E_SCANNER_PORT:-8090}:8090'
+    environment:
+      SCANNER_API_KEY: ${REPSY_SCANNER_API_KEY:-e2e-scanner-key}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:8090/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  repsy:
+    depends_on:
+      scanner-stub:
+        condition: service_healthy
+    environment:
+      SECURITY_SCANNER: enabled
+      TRIVY_SCANNER_BASE_URL: http://scanner-stub:8090
+      TRIVY_SCANNER_API_KEY: ${REPSY_SCANNER_API_KEY:-e2e-scanner-key}
+      # The backend polls an unfinished scan this often (default 3 s): a scan the stub finishes in two
+      # seconds then shows up promptly, and a state the stub holds for a few seconds is seen.
+      TRIVY_POLL_INTERVAL_MS: '1000'
