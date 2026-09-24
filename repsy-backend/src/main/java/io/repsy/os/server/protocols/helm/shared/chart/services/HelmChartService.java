@@ -55,7 +55,7 @@ public class HelmChartService implements ChartService<UUID> {
   @Override
   @Transactional
   public HelmChartInfo findOrCreate(final HelmChartForm form, final UUID repoId) {
-    final var chart = this.findOrCreateChart(repoId, form.getName());
+    final var chart = this.lockOrCreateChart(repoId, form.getName());
     final var version = this.findOrCreateVersion(chart, form);
     return this.toDetail(version);
   }
@@ -95,7 +95,7 @@ public class HelmChartService implements ChartService<UUID> {
     final HelmChartInfo published;
 
     try {
-      final var chart = this.findOrCreateChart(repoId, form.getName());
+      final var chart = this.lockOrCreateChart(repoId, form.getName());
       final var existing =
           this.helmChartVersionRepository.findByChartAndVersion(chart, form.getVersion());
 
@@ -204,15 +204,23 @@ public class HelmChartService implements ChartService<UUID> {
   }
 
   /**
-   * Returns the chart row, inserting it when this is the first version of a chart name.
+   * Returns the chart row, locked until the transaction ends, inserting it when this is the first
+   * version of a chart name.
+   *
+   * <p>The lock is what makes uploads of one chart take turns (RPS-1273): two overriding uploads of
+   * one version would otherwise both update the same version row, and the loser would fail on its
+   * optimistic {@code @Version} check with a 500. Serialised, the second upload starts once the
+   * first has committed, sees the version row it wrote, and overrides that, so the last upload to
+   * get the lock wins and its file is the one the row describes. The classic upload holds the lock
+   * while it writes the file, so two files are never written to the same path at once.
    *
    * <p>The insert skips a row that already exists instead of failing on the unique index: on
    * PostgreSQL a failed statement aborts the transaction, which also holds the version row and the
    * file write. When a concurrent first upload has inserted the chart but not committed yet, the
-   * statement waits for it, and then finds the committed row.
+   * statement waits for it, and the second lookup then finds the committed row.
    */
-  private HelmChart findOrCreateChart(final UUID repoId, final String name) {
-    final var existing = this.helmChartRepository.findByRepoIdAndName(repoId, name);
+  private HelmChart lockOrCreateChart(final UUID repoId, final String name) {
+    final var existing = this.helmChartRepository.findWithLockByRepoIdAndName(repoId, name);
 
     if (existing.isPresent()) {
       return existing.get();
@@ -222,7 +230,7 @@ public class HelmChartService implements ChartService<UUID> {
         UuidCreator.getTimeOrderedEpoch(), repoId, name, Instant.now());
 
     return this.helmChartRepository
-        .findByRepoIdAndName(repoId, name)
+        .findWithLockByRepoIdAndName(repoId, name)
         .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
   }
 
