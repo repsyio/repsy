@@ -32,6 +32,7 @@ import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestChild
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
+import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;
 import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestListManifest;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
@@ -111,7 +112,7 @@ public class ManifestTxService implements ManifestService<UUID> {
   @Transactional
   public void createManifestList(final UUID repoId, final UUID imageId, final TagForm tagForm) {
 
-    final var image = this.findImageById(imageId);
+    final var image = this.lockImageForPush(imageId);
     final var manifest = this.findOrCreateIndex(image, tagForm);
 
     this.replaceChildren(manifest, image, tagForm.getManifestList().getManifests());
@@ -125,7 +126,7 @@ public class ManifestTxService implements ManifestService<UUID> {
 
     final var imageInfo = (ImageInfo) baseImageInfo;
 
-    final var image = this.findImageById(imageInfo.getId());
+    final var image = this.lockImageForPush(imageInfo.getId());
     final var layers = this.findLayersByRepoIdAndForm(tagForm, repoId);
     final var configLayer = this.findConfigLayerByRepoIdAndDigest(tagForm, repoId);
 
@@ -383,11 +384,16 @@ public class ManifestTxService implements ManifestService<UUID> {
     return TagDetail.of(tag, configDigest);
   }
 
-  private Image findImageById(final UUID imageId) {
+  /**
+   * The image row, share-locked until the push's transaction ends: a delete of the image's last
+   * manifest waits for it, and an image that is gone already (it went with its last manifest after
+   * the push looked it up) is reported so the handler can create it again.
+   */
+  private Image lockImageForPush(final UUID imageId) {
 
     return this.imageRepository
-        .findById(imageId)
-        .orElseThrow(() -> new ItemNotFoundException("imageNotFound"));
+        .findByIdForShare(imageId)
+        .orElseThrow(() -> new ImageDeletedException(imageId));
   }
 
   private Set<Layer> findLayersByRepoIdAndForm(final TagForm tagForm, final UUID repoId) {

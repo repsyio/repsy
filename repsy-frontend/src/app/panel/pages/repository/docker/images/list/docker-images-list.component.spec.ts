@@ -102,6 +102,19 @@ describe('DockerImagesListComponent', () => {
       expect(component.packageRoute(ITEM_UNDER_TEST)).toBe(`/${REPO_NAME}/nginx`);
     }));
 
+    it('says an image has no tags only when the server counts none', () => {
+      expect(component.hasNoTags({ name: 'a', tagCount: 0 })).toBeTrue();
+      expect(component.hasNoTags({ name: 'a', tagCount: 2 })).toBeFalse();
+      expect(component.hasNoTags({ name: 'a' })).toBeFalse();
+    });
+
+    it('describes the untagged manifests of an image without tags', () => {
+      expect(component.untaggedLabel({ name: 'a', untaggedManifestCount: 1 })).toBe('1 untagged manifest');
+      expect(component.untaggedLabel({ name: 'a', untaggedManifestCount: 3 })).toBe('3 untagged manifests');
+      expect(component.untaggedLabel({ name: 'a', untaggedManifestCount: 0 })).toBe('no manifests');
+      expect(component.untaggedLabel({ name: 'a' })).toBe('no manifests');
+    });
+
     it('timeAgo renders a relative time', () => {
       expect(component.timeAgo(moment().subtract(3, 'days').toDate() as never)).toBe('3 days ago');
     });

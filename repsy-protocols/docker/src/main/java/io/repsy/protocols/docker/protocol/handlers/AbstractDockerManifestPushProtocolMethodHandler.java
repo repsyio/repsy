@@ -29,6 +29,7 @@ import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.protocol.parser.DockerPathParserManifest;
 import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
+import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
 import io.repsy.protocols.docker.shared.layer.services.AbstractDockerLayerRenamer;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
@@ -64,7 +65,13 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
   private static final Pattern MANIFEST_PUSH_PATTERN = Pattern.compile("^/([^/]+)/manifests/(.+)$");
 
   private static final int RETRY_COUNT = 3;
+  private static final int MAX_IMAGE_RECREATIONS = 20;
   private static final long WAIT_RETRY = 100;
+
+  /**
+   * The digest a save answered with, and the image it was saved into (a new one if it was deleted).
+   */
+  private record SavedManifest<ID>(String digest, BaseImageInfo<ID> image) {}
 
   private final PathParser basePathParser;
   private final DockerProtocolFacade<ID> dockerFacade;
@@ -159,7 +166,8 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
             .manifestBytes(manifestBytes)
             .build();
 
-    final var manifestDigest = this.saveManifest(context, imageInfo, form);
+    final var saved = this.saveManifest(context, repoInfo.getId(), imageInfo, form);
+    final var manifestDigest = saved.digest();
 
     if (!contentType.equals(OCI_IMAGE_INDEX) && !contentType.equals(DOCKER_MANIFEST_LIST)) {
       final var storagePathMap = this.layerRenamer.findLayersToRename(repoInfo, manifestJson);
@@ -172,7 +180,7 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
 
     // Every manifest push, single-platform or index (RPS-1314): the size and digest the panel
     // lists the image with are computed the same way a delete computes them.
-    this.imageTxService.refreshImageSize(repoInfo.getId(), imageInfo.getId());
+    this.imageTxService.refreshImageSize(repoInfo.getId(), saved.image().getId());
 
     // A push by a digest reference is answered in that reference's algorithm (RPS-1244): the
     // stored manifest is addressable by both, the client verifies against the one it named.
@@ -218,23 +226,42 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
    * {@code @Version}, and the loser fails the version check at commit (RPS-1322). The second run
    * sees what the winner committed, so the client gets its {@code 201} instead of an error.
    *
+   * <p>An image goes with its last manifest (RPS-1288), so the image this push looked up may be
+   * deleted before the transaction can write to it. The facade reports that with {@link
+   * ImageDeletedException} and this method creates the image again and saves once more, without
+   * counting it against the retries above: each such run means another request has just deleted the
+   * image's last manifest, and it can only happen a bounded number of times for that.
+   *
    * <p>This is the only place that retries: the facade is the {@code @Transactional} proxy, and a
    * retry inside its transaction (a retry annotation on the service, which nothing enabled anyway)
    * would reuse the failed persistence context and could never succeed.
    */
-  private String saveManifest(
-      final ProtocolContext context, final BaseImageInfo<ID> imageInfo, final ManifestForm form)
+  private SavedManifest<ID> saveManifest(
+      final ProtocolContext context,
+      final ID repoId,
+      final BaseImageInfo<ID> imageInfo,
+      final ManifestForm form)
       throws IOException {
 
-    for (var attempt = 1; ; attempt++) {
+    var currentImage = imageInfo;
+    var recreations = 0;
+
+    for (var attempt = 1; ; ) {
       try {
-        return this.dockerFacade.saveManifest(context, imageInfo, form);
+        return new SavedManifest<>(
+            this.dockerFacade.saveManifest(context, currentImage, form), currentImage);
+      } catch (final ImageDeletedException e) {
+        if (++recreations > MAX_IMAGE_RECREATIONS) {
+          throw e;
+        }
+
+        currentImage = this.findOrCreateImage(repoId, currentImage.getName(), 1);
       } catch (final DataIntegrityViolationException | OptimisticLockingFailureException e) {
         if (attempt >= RETRY_COUNT) {
           throw e;
         }
 
-        this.pauseBeforeRetry(WAIT_RETRY * attempt);
+        this.pauseBeforeRetry(WAIT_RETRY * attempt++);
       }
     }
   }

@@ -14,6 +14,7 @@
 /// limitations under the License.
 ///
 
+import { HttpContext } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
@@ -26,6 +27,7 @@ import {
   RepoPermissionInfo,
   TagDetail,
 } from '../../../../../../generated/api';
+import { SILENT_ERROR } from '../../../../../shared/interceptor/error-handler.interceptor';
 import { PagedData } from '../../../../shared/dto/paged-data';
 import { Sort } from '../../../../shared/dto/sort';
 import { TagListItem } from '../dto/tag-list-item';
@@ -110,6 +112,18 @@ export class DockerService {
       .pipe(
         map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ManifestListItem>),
       );
+  }
+
+  /**
+   * The image as the list shows it. A 404 (the image went with its last manifest) is left to the
+   * caller, which leaves the page instead of toasting an error.
+   */
+  public fetchImageSummary(imageName: string): Observable<ImageListItem> {
+    return this.dockerImageControllerService
+      .getDockerImageSummary(imageName, this.repoName, 'body', false, {
+        context: new HttpContext().set(SILENT_ERROR, true),
+      })
+      .pipe(map((r) => r.data!));
   }
 
   public deleteImage(imageName: string): Observable<void> {

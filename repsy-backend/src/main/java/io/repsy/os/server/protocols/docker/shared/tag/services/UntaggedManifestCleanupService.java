@@ -18,10 +18,12 @@ package io.repsy.os.server.protocols.docker.shared.tag.services;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
+import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestFileService.ManifestFileRef;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -36,7 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Not safe against a push in flight: a manifest pushed by digest whose tag or index has not
  * arrived yet counts as untagged and goes; the client's next push of that index fails with
- * "manifest not found" and pushes the manifest again.
+ * "manifest not found" and pushes the manifest again. An image whose manifests are all gone is
+ * deleted with them, as when the last manifest is deleted by its digest.
  */
 @Service
 @RequiredArgsConstructor
@@ -47,6 +50,7 @@ public class UntaggedManifestCleanupService {
   public record Result(int deletedManifests, long freedBytes) {}
 
   private final ImageRepository imageRepository;
+  private final ImageTxService imageService;
   private final ManifestRepository manifestRepository;
   private final ManifestFileService manifestFileService;
   private final UntaggedManifestFinder untaggedManifestFinder;
@@ -78,7 +82,10 @@ public class UntaggedManifestCleanupService {
   private List<Image> findImages(final RepoInfo repoInfo, final @Nullable String imageName) {
 
     if (imageName == null) {
-      return this.imageRepository.findAllByRepoId(repoInfo.getStorageKey());
+      // In one order, so two repo-wide cleanups lock the images in the same sequence.
+      return this.imageRepository.findAllByRepoId(repoInfo.getStorageKey()).stream()
+          .sorted(Comparator.comparing(Image::getId))
+          .toList();
     }
 
     return List.of(
@@ -89,9 +96,15 @@ public class UntaggedManifestCleanupService {
 
   private Result deleteUntaggedOfImage(final RepoInfo repoInfo, final Image image) {
 
+    // Locked before anything is read, so a push that is writing to the image is waited for.
+    this.imageService.lockImage(image.getId());
+
     final var untagged = this.untaggedManifestFinder.findUntagged(image.getId());
 
     if (untagged.isEmpty()) {
+      // An image with no manifest at all (a push that failed after it created the image) goes too.
+      this.imageService.deleteImageIfEmpty(repoInfo.getStorageKey(), image.getId());
+
       return new Result(0, 0L);
     }
 
@@ -107,6 +120,9 @@ public class UntaggedManifestCleanupService {
       this.manifestRepository.delete(manifest);
     }
     this.manifestRepository.flush();
+
+    // The image goes with its last manifest (RPS-1288), which this may have been.
+    this.imageService.deleteImageIfEmpty(repoInfo.getStorageKey(), image.getId());
 
     // A file is shared by every image of the repo that has the manifest: only the ones no
     // remaining row needs are deleted.

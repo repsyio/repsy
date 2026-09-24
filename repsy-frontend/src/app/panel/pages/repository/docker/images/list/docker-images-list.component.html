@@ -90,7 +90,7 @@
           animate.enter="fade-in-down"
           class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
         >
-          @for (image of images; track image.updatedAt; let i = $index) {
+          @for (image of images; track image.name; let i = $index) {
             <div [attr.data-testid]="'pkg-list-row-' + image.name">
               <div
                 animate.enter="fade-in-down"
@@ -127,12 +127,23 @@
                   [unscannedFailedCount]="securitySummary[image.name]?.unscannedFailedCount ?? 0"
                 />
 
-                <app-tooltip
-                  class="text-[14px] text-[#FDFDFD]"
-                  data-testid="row-digest"
-                  [text]="image.digest | ellipsis: 20"
-                  [textHover]="image.digest"
-                />
+                @if (hasNoTags(image)) {
+                  <div class="flex min-w-0 items-center gap-2 text-[14px]" data-testid="row-digest">
+                    <span
+                      data-testid="row-no-tags"
+                      class="shrink-0 rounded-md bg-[#2D2C2C] px-2 py-[2px] text-[13px] text-[#FDFDFD]"
+                      >No tags</span
+                    >
+                    <span data-testid="row-untagged" class="truncate text-[#9FA0A0]">{{ untaggedLabel(image) }}</span>
+                  </div>
+                } @else {
+                  <app-tooltip
+                    class="text-[14px] text-[#FDFDFD]"
+                    data-testid="row-digest"
+                    [text]="image.digest | ellipsis: 20"
+                    [textHover]="image.digest"
+                  />
+                }
 
                 <app-tooltip
                   class="text-[14px] text-[#FDFDFD]"
@@ -142,12 +153,19 @@
                   [always]="true"
                 />
 
-                <app-tooltip
-                  class="text-right text-[14px] text-[#FDFDFD]"
-                  data-testid="row-size"
-                  [text]="formatBytes(image.size) | ellipsis"
-                  [textHover]="formatBytes(image.size)"
-                />
+                @if (hasNoTags(image)) {
+                  <div class="text-right text-[14px] text-[#FDFDFD]" data-testid="row-size">
+                    {{ formatBytes(image.untaggedSize ?? 0) }}
+                    <span data-testid="row-size-untagged" class="text-[#9FA0A0]">untagged</span>
+                  </div>
+                } @else {
+                  <app-tooltip
+                    class="text-right text-[14px] text-[#FDFDFD]"
+                    data-testid="row-size"
+                    [text]="formatBytes(image.size) | ellipsis"
+                    [textHover]="formatBytes(image.size)"
+                  />
+                }
 
                 @if (activeRepo.canManage) {
                   <app-dropdown data-testid="row-menu">
@@ -172,7 +190,7 @@
 
         <!-- Image List (Mobile) -->
         <div data-testid="pkg-list-cards">
-          @for (image of images; track image.updatedAt; let i = $index) {
+          @for (image of images; track image.name; let i = $index) {
             <div animate.enter="fade-in-down" class="lg:hidden">
               <!-- Mobile Row -->
               <div
@@ -223,15 +241,29 @@
                   </div>
                   <div class="flex justify-between gap-2">
                     <span class="text-sm text-[#9FA0A0]">Digest: </span>
-                    <span data-testid="row-digest" class="text-right text-sm break-all text-[#FDFDFD]">
-                      {{ image.digest }}</span
-                    >
+                    @if (hasNoTags(image)) {
+                      <span data-testid="row-digest" class="text-right text-sm text-[#FDFDFD]">
+                        <span data-testid="row-no-tags" class="rounded-md bg-[#2D2C2C] px-2 py-[2px]">No tags</span>
+                        <span data-testid="row-untagged" class="text-[#9FA0A0]">{{ untaggedLabel(image) }}</span>
+                      </span>
+                    } @else {
+                      <span data-testid="row-digest" class="text-right text-sm break-all text-[#FDFDFD]">
+                        {{ image.digest }}</span
+                      >
+                    }
                   </div>
                   <div class="flex justify-between gap-2">
                     <span class="text-sm text-[#9FA0A0]">Size: </span>
-                    <span data-testid="row-size" class="text-right text-sm break-all text-[#FDFDFD]">
-                      {{ formatBytes(image.size) }}</span
-                    >
+                    @if (hasNoTags(image)) {
+                      <span data-testid="row-size" class="text-right text-sm text-[#FDFDFD]">
+                        {{ formatBytes(image.untaggedSize ?? 0) }}
+                        <span data-testid="row-size-untagged" class="text-[#9FA0A0]">untagged</span>
+                      </span>
+                    } @else {
+                      <span data-testid="row-size" class="text-right text-sm break-all text-[#FDFDFD]">
+                        {{ formatBytes(image.size) }}</span
+                      >
+                    }
                   </div>
                   <div class="flex justify-between gap-2">
                     <span class="text-sm text-[#9FA0A0]">Last Updated: </span>

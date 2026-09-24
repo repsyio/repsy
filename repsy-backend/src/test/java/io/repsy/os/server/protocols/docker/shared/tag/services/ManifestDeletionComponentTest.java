@@ -254,4 +254,51 @@ class ManifestDeletionComponentTest {
 
     verify(this.dockerStorageService).deleteManifests(this.repoInfo, Set.of("x"));
   }
+
+  @Test
+  @DisplayName("locks the image row before it reads or deletes anything of the image")
+  void locksTheImageFirst() {
+    this.imageExists();
+    when(this.manifestRepository.findByImageIdAndAnyDigest(IMAGE_ID, SHA256))
+        .thenReturn(Optional.of(this.manifest));
+    when(this.tagRepository.findAllByManifestId(this.manifest.getId())).thenReturn(List.of());
+    when(this.manifestFileService.findUnreferencedFileNames(any(), any(), any(), anyCollection()))
+        .thenReturn(Set.of());
+
+    this.component.delete(this.repoInfo, IMAGE, SHA256);
+
+    final var order = inOrder(this.imageService, this.manifestRepository);
+    order.verify(this.imageService).lockImage(IMAGE_ID);
+    order.verify(this.manifestRepository).findByImageIdAndAnyDigest(IMAGE_ID, SHA256);
+    order.verify(this.manifestRepository).delete(this.manifest);
+    order.verify(this.imageService).deleteImageIfEmpty(REPO_ID, IMAGE_ID);
+  }
+
+  @Test
+  @DisplayName("the image is refreshed while it still has manifests, and not once it is gone")
+  void refreshesTheImageOnlyWhileItStays() {
+    this.imageExists();
+    when(this.manifestRepository.findByImageIdAndAnyDigest(IMAGE_ID, SHA256))
+        .thenReturn(Optional.of(this.manifest));
+    when(this.tagRepository.findAllByManifestId(this.manifest.getId())).thenReturn(List.of());
+    when(this.manifestFileService.findUnreferencedFileNames(any(), any(), any(), anyCollection()))
+        .thenReturn(Set.of());
+    when(this.imageService.deleteImageIfEmpty(REPO_ID, IMAGE_ID)).thenReturn(false, true);
+
+    this.component.delete(this.repoInfo, IMAGE, SHA256);
+
+    verify(this.imageService).refreshImageSize(REPO_ID, IMAGE_ID);
+
+    this.component.delete(this.repoInfo, IMAGE, SHA256);
+
+    verify(this.imageService, times(1)).refreshImageSize(REPO_ID, IMAGE_ID);
+  }
+
+  @Test
+  @DisplayName("a tag reference never asks for the image to be deleted")
+  void aTagReferenceNeverDeletesTheImage() {
+    this.component.delete(this.repoInfo, IMAGE, "latest");
+
+    verify(this.imageService, never()).deleteImageIfEmpty(any(), any());
+  }
 }

@@ -48,6 +48,8 @@ public interface ManifestRepository extends JpaRepository<Manifest, UUID> {
 
   List<Manifest> findAllByImageId(UUID imageId);
 
+  long countByImageId(UUID imageId);
+
   /** Just what identifies the files of an image's manifests, without loading the entities. */
   List<ManifestFileView> findFileViewsByImageId(UUID imageId);
 

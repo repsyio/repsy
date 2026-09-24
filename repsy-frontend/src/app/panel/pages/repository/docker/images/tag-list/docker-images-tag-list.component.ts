@@ -15,6 +15,7 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
@@ -22,7 +23,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
+import { ImageListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
@@ -37,6 +38,7 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { ByteFormatter } from '../../../../../shared/util/byte-formatter';
 import { SecurityService } from '../../../../security/service/security.service';
 import { DeleteUntaggedManifestsComponent } from '../../../repo-settings/delete-untagged-manifests/delete-untagged-manifests.component';
 import { DockerConfigComponent } from '../../config/docker-config.component';
@@ -77,6 +79,9 @@ export class DockerImagesTagListComponent implements OnDestroy {
   public pagedData: PagedData<TagListItem>;
   public activeRepo: RepoPermissionInfo;
   public tags: TagListItem[];
+  /** What the image still stores; only loaded when it has no tag to list. */
+  public summary?: ImageListItem;
+  public loadingSummary = false;
   public securitySummary: Record<string, VersionSecuritySummary> = {};
 
   public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
@@ -147,6 +152,54 @@ export class DockerImagesTagListComponent implements OnDestroy {
     return moment(date).fromNow();
   }
 
+  public formatBytes(bytes: number): string {
+    return ByteFormatter.formatBytes(bytes);
+  }
+
+  /** True when the image has no tag at all (not just none that match the search). */
+  public get hasNoTags(): boolean {
+    return this.tags?.length === 0 && !this.searchText && this.summary?.tagCount === 0;
+  }
+
+  public get untaggedText(): string {
+    const count = this.summary?.untaggedManifestCount ?? 0;
+
+    if (count === 0) {
+      return 'It stores no manifests either.';
+    }
+
+    return (
+      `${count} untagged ${count === 1 ? 'manifest is' : 'manifests are'} still stored ` +
+      `(${this.formatBytes(this.summary?.untaggedSize ?? 0)}), and can be pulled by digest.`
+    );
+  }
+
+  /** Reloads after "Delete untagged manifests": the image itself may be gone with its last manifest. */
+  public onUntaggedCleaned(): void {
+    this.refreshPage();
+  }
+
+  public deleteImage(): void {
+    this.dangerModalService.show('Delete Image', 'Delete', () => {
+      this.loading = true;
+      this.dockerService
+        .deleteImage(this.imageName)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.router.navigate([`/${this.activeRepo.repoName}`]).then(() => {
+              this.toastService.show('Image deleted successfully', 'success');
+            });
+          },
+          error: () => {},
+        });
+    });
+  }
+
   private fetchTags(): void {
     this.loading = true;
     this.dockerService
@@ -160,9 +213,36 @@ export class DockerImagesTagListComponent implements OnDestroy {
         next: (pagedData: PagedData<TagListItem>) => {
           this.pagedData.page = pagedData.page;
           this.tags = pagedData.content;
+          this.summary = undefined;
+
+          if (this.tags.length === 0 && !this.searchText) {
+            this.fetchSummary();
+          }
         },
         error: () => {},
       });
+  }
+
+  /**
+   * An image with no tag is still there while it stores a manifest (RPS-1288), so its page stays and
+   * explains what is left. If it is gone (its last manifest was deleted, by this page or over the
+   * wire), there is nothing to show: back to the image list.
+   */
+  private fetchSummary(): void {
+    this.loadingSummary = true;
+    this.dockerService.fetchImageSummary(this.imageName).subscribe({
+      next: (summary: ImageListItem) => {
+        this.summary = summary;
+        this.loadingSummary = false;
+      },
+      error: (error: HttpErrorResponse) => {
+        this.loadingSummary = false;
+
+        if (error?.status === 404) {
+          this.router.navigate([`/${this.activeRepo.repoName}`]);
+        }
+      },
+    });
   }
 
   public deleteTag(tag: TagListItem) {
@@ -177,14 +257,10 @@ export class DockerImagesTagListComponent implements OnDestroy {
         )
         .subscribe({
           next: () => {
-            if (this.tags.length - 1 === 0) {
-              this.router.navigate([`/${this.activeRepo.repoName}`]).then(() => {
-                this.toastService.show('Tag deleted successfully', 'success');
-              });
-            } else {
-              this.refreshPage();
-              this.toastService.show('Tag deleted successfully', 'success');
-            }
+            // Also after the last tag: deleting a tag never deletes the image, its manifest stays
+            // pullable by digest, so the page stays and says what is left (RPS-1288).
+            this.refreshPage();
+            this.toastService.show('Tag deleted successfully', 'success');
           },
           error: () => {},
         });

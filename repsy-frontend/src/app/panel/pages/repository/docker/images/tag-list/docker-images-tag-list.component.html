@@ -63,7 +63,12 @@
       Configure
     </button>
     @if (canManage) {
-      <app-delete-untagged-manifests class="w-full sm:w-auto" [activeRepository]="activeRepo" [imageName]="imageName" />
+      <app-delete-untagged-manifests
+        class="w-full sm:w-auto"
+        [activeRepository]="activeRepo"
+        [imageName]="imageName"
+        (cleaned)="onUntaggedCleaned()"
+      />
       <button
         data-testid="pkg-settings"
         [disabled]="!activeRepo.canManage"
@@ -77,7 +82,7 @@
   </div>
 </div>
 
-@if (loading) {
+@if (loading || loadingSummary) {
   <app-spinner />
 } @else {
   @if (!this.error) {
@@ -291,6 +296,33 @@
           [(pageNum)]="pageNum"
           [totalPages]="pagedData.page.totalPages"
         />
+      </div>
+    } @else if (hasNoTags) {
+      <div
+        data-testid="pkg-no-tags"
+        animate.enter="fade-in-up"
+        class="mx-auto max-w-[640px] rounded-[12px] border border-[#404141] bg-[#101112] p-8 text-center"
+      >
+        <h2 data-testid="pkg-no-tags-title" class="text-[20px] font-medium text-[#FDFDFD]">This image has no tags</h2>
+        <p data-testid="pkg-no-tags-text" class="mt-4 text-[14px] text-[#9FA0A0]">
+          Deleting a tag only removes the tag: {{ untaggedText }}
+          @if (summary.untaggedManifestCount > 0) {
+            Delete the untagged manifests to free their space, or push a new tag. Once the last manifest is gone, the
+            image is removed too.
+          } @else {
+            Push a new tag, or delete the image.
+          }
+        </p>
+        @if (canManage) {
+          <button
+            data-testid="pkg-no-tags-delete-image"
+            class="repsy-btn-danger mt-6 w-full sm:w-auto"
+            (click)="deleteImage()"
+            [disabled]="loading"
+          >
+            Delete Image
+          </button>
+        }
       </div>
     } @else {
       <app-empty-list />

@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { Component, Input } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
@@ -38,6 +38,9 @@ export class DeleteUntaggedManifestsComponent {
   @Input() public activeRepository: RepoPermissionInfo;
   /** When set, only the untagged manifests of this image are deleted, and only a button is shown. */
   @Input() public imageName?: string;
+
+  /** Emits once a cleanup has succeeded, so the page around it can reload what it shows. */
+  @Output() public readonly cleaned = new EventEmitter<void>();
 
   public deleting = false;
 
@@ -64,7 +67,10 @@ export class DeleteUntaggedManifestsComponent {
             }),
           )
           .subscribe({
-            next: (response) => this.toastService.show(this.summary(response?.data), 'success'),
+            next: (response) => {
+              this.toastService.show(this.summary(response?.data), 'success');
+              this.cleaned.emit();
+            },
             error: () => {},
           });
       },

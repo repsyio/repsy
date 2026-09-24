@@ -44,6 +44,11 @@ public class TagDeletionComponent {
     final var imageInfo =
         this.imageService.findImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
 
+    // The image row is locked first, in the order every transaction that deletes rows of the image
+    // takes (see ImageTxService.lockImage). The image itself is never deleted here: the manifest
+    // the tag pointed at stays, so the image still has it (RPS-1288).
+    this.imageService.lockImage(imageInfo.getId());
+
     final var tag =
         this.manifestService.findTag(repoInfo.getStorageKey(), imageInfo.getId(), tagName);
 

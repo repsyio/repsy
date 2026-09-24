@@ -85,6 +85,8 @@ async function expectAfterLastVersionDelete(
   if (list.descriptor.lastVersionRemovesPackage === true) {
     await expect(list.emptyList.root).toBeVisible();
   } else {
+    // Still listed: by the list itself (a docker delete lands on the image's tag list, not the list).
+    await list.goto();
     await list.expectRow(pkg);
   }
 }
@@ -172,11 +174,12 @@ test.describe('package seeding proof', () => {
         await list.expectNoRow(second);
         await list.expectRow(first);
 
-        // Delete from the detail page: it lands where the descriptor says (the list, for these four).
+        // Delete from the detail page: it lands where the descriptor says (the list, except docker, whose
+        // image stays and whose tag list it lands on, RPS-1288).
         const detail = protocolPages(adminPage, DESCRIPTORS[protocol], repo.name).detail(first);
         await detail.goto();
         await detail.delete();
-        expect(detail.detail.delete?.landsOn).toBe('list');
+        expect(detail.detail.delete?.landsOn).toBe(protocol === 'docker' ? 'versions' : 'list');
         await expectAfterLastVersionDelete(list, first);
       });
     }
