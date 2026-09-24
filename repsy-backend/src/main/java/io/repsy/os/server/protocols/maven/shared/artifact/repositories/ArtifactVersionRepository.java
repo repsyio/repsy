@@ -24,6 +24,7 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -81,4 +82,17 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
 
   @NonNull Optional<ArtifactVersion> findByArtifactIdAndVersionName(
       @NonNull UUID artifactId, @NonNull String versionName);
+
+  /**
+   * Takes the row lock of a version without changing it: the statement is an update, so the lock is
+   * the one an update takes (it does not block the insert of a signature row that references the
+   * version) and it is held until the transaction ends (RPS-1188).
+   */
+  @Modifying(flushAutomatically = true)
+  @Query("update ArtifactVersion v set v.signed = v.signed where v.id = :versionId")
+  void lockForSignedUpdate(UUID versionId);
+
+  @Modifying(flushAutomatically = true)
+  @Query("update ArtifactVersion v set v.signed = :signed where v.id = :versionId")
+  void updateSigned(UUID versionId, boolean signed);
 }

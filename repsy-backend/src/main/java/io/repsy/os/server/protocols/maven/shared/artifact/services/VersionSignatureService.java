@@ -79,13 +79,20 @@ public class VersionSignatureService {
 
   /**
    * Sets {@code version.signed} from what the version directory holds now and what has a verified
-   * signature, saving the version only when the value changes.
+   * signature.
+   *
+   * <p>The version's row is locked first and the two are read after that, so requests that change
+   * them at the same time (a deploy uploads its files and signatures in parallel) are recomputed
+   * one after the other, and the last one sees what all the others recorded: two computed from a
+   * state that lacked each other's signature would both answer {@code false} (RPS-1188).
    *
    * @param storageKey the repo's storage key
    * @param versionPath the version directory, {@code <group>/<artifactId>/<version>}
    */
   public void refreshSigned(
       final UUID storageKey, final ArtifactVersion version, final String versionPath) {
+
+    this.artifactVersionRepository.lockForSignedUpdate(version.getId());
 
     final var items =
         this.storageStrategy.listStorageItems(StoragePath.of(storageKey, versionPath));
@@ -97,10 +104,8 @@ public class VersionSignatureService {
 
     final var signed = isSigned(toSign, verified);
 
-    if (version.isSigned() != signed) {
-      version.setSigned(signed);
-      this.artifactVersionRepository.save(version);
-    }
+    // A bulk update, so the entity is not marked dirty and flushed again with all its columns.
+    this.artifactVersionRepository.updateSigned(version.getId(), signed);
   }
 
   /** Whether there is something to sign and every file of it has a verified signature. */

@@ -37,6 +37,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.protocols.maven.shared.utils.MavenUploadLimits;
@@ -389,6 +390,65 @@ class AbstractMavenProtocolFacadeTest {
         .verify(this.artifactService)
         .createOrUpdateArtifact(any(), any(StoragePath.class), any(Resource.class));
     assertThat(this.stored).singleElement().isEqualTo(signature.getBytes(UTF_8));
+  }
+
+  @Test
+  @DisplayName("stores, registers and charges nothing for a signature that was parked (RPS-1188)")
+  void aParkedSignatureStoresNothing() throws Exception {
+    this.repoInfo.setPgpVerifyAllSignaturesEnabled(true);
+    requestFor("com/example/lib/1.0/lib-1.0-javadoc.jar.asc");
+    deployIsAllowed();
+    when(this.artifactService.verifySignature(any(), any(StoragePath.class), any(Resource.class)))
+        .thenReturn(SignatureOutcome.PARKED);
+
+    upload("-----BEGIN PGP SIGNATURE-----\nabc\n-----END PGP SIGNATURE-----\n");
+
+    verifyNoInteractions(this.storageService);
+    verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+    assertThat(this.context.<String>getProperty("artifactName")).isNull();
+  }
+
+  @Test
+  @DisplayName("takes a new jar back out of the repo when its parked signature fails it (RPS-1188)")
+  void takesBackANewJarWhoseParkedSignatureFails() {
+    this.repoInfo.setPgpVerifyAllSignaturesEnabled(true);
+    requestFor("com/example/lib/1.0/lib-1.0.jar");
+    deployIsAllowed();
+    storageReportsUsage(9);
+    when(this.storageService.exists(any(StoragePath.class), anyString())).thenReturn(false);
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(new byte[0]));
+    doThrow(new SignatureNotVerifiedException("pendingSignatureNotVerified"))
+        .when(this.artifactService)
+        .createOrUpdateArtifact(any(), any(), any());
+
+    assertThatThrownBy(() -> upload("jar bytes"))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage("pendingSignatureNotVerified");
+
+    verify(this.storageService).deleteFile(any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
+  @DisplayName("keeps a redeployed jar, and charges it, when its parked signature fails it")
+  void keepsARedeployedJarWhoseParkedSignatureFails() {
+    this.repoInfo.setPgpVerifyAllSignaturesEnabled(true);
+    requestFor("com/example/lib/1.0/lib-1.0.jar");
+    deployIsAllowed();
+    storageReportsUsage(9);
+    when(this.storageService.exists(any(StoragePath.class), anyString())).thenReturn(true);
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(new byte[0]));
+    doThrow(new SignatureNotVerifiedException("pendingSignatureNotVerified"))
+        .when(this.artifactService)
+        .createOrUpdateArtifact(any(), any(), any());
+
+    assertThatThrownBy(() -> upload("jar bytes")).isInstanceOf(SignatureNotVerifiedException.class);
+
+    verify(this.storageService, never()).deleteFile(any());
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(9);
   }
 
   @Test

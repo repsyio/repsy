@@ -251,6 +251,33 @@ class PGPVerifierServiceTest {
   }
 
   @Test
+  @DisplayName("reads the id of the key that made a signature without asking any server (RPS-1188)")
+  void readsTheSignerKeyId() {
+    final var signature = resource(keys.detachedSignature(POM));
+
+    assertThat(this.serviceWithTheKey().readSignerKeyId(signature))
+        .isEqualTo("%016X".formatted(keys.keyId()));
+    assertThat(this.asked).isEmpty();
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "not a signature at all",
+        "-----BEGIN PGP SIGNATURE-----\n\n-----END PGP SIGNATURE-----\n"
+      })
+  @DisplayName("refuses to read the key id of what is not a signature (RPS-1188)")
+  void refusesToReadTheKeyIdOfGarbage(final String garbage) {
+    final var service = this.serviceWithTheKey();
+    final var resource = resource(garbage);
+
+    assertThatThrownBy(() -> service.readSignerKeyId(resource))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+    assertThat(this.asked).isEmpty();
+  }
+
+  @Test
   @DisplayName("accepts the detached signature of the stored file")
   void verifiesADetachedSignatureOfTheStoredFile() {
     final var signature = resource(keys.detachedSignature(POM));

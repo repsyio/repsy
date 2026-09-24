@@ -21,6 +21,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
@@ -85,6 +86,13 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * unparsed and unverified, judged like a metadata checksum (RPS-1185). A POM, its signature and
    * its checksum are told by the file name, never by the directory (RPS-1196).
    *
+   * <p>On a repo that verifies every signature a signature may reach the repo before the file it
+   * signs, or before the POM that registers its version, which Maven's parallel upload makes
+   * routine. It is then kept back unverified ({@link SignatureOutcome#PARKED}): the request answers
+   * 200 and stores and charges nothing, and the signature is verified when the file arrives. That
+   * arrival fails (422 {@code pendingSignatureNotVerified}, the new file taken back) when it does
+   * not verify (RPS-1188).
+   *
    * <p>What is left to fail after the store is the registration itself (a repo or a signed version
    * deleted meanwhile, a database error). The usage is set on the context whether it succeeds or
    * not, and a POM or POM signature that was new is taken back out of the repo first when it fails
@@ -124,7 +132,13 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
             storagePath, repoInfo.isPgpVerifyAllSignaturesEnabled())) {
       // A signature is well below 1 KB, and it is read once here to be verified and then stored.
       content = readBoundedSignature(inputStream, contentLength);
-      this.artifactService.verifySignature(repoInfo, storagePath, new ByteArrayResource(content));
+
+      if (this.artifactService.verifySignature(
+              repoInfo, storagePath, new ByteArrayResource(content))
+          == SignatureOutcome.PARKED) {
+        // Kept back until the file it signs arrives (RPS-1188): nothing is stored or charged.
+        return;
+      }
     }
 
     final var isNewRegisteredFile = this.isNewRegisteredFile(repoInfo, storagePath);
@@ -147,13 +161,20 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * createOrUpdateArtifact}) can still fail once it is stored, and the only one that is worth
    * taking back: it is told here, before the store, whether the file is a new one. A file that is
    * already there is a redeploy, and storing over it cannot be undone.
+   *
+   * <p>On a repo that verifies every signature that is also true of any signable file: a signature
+   * that arrived before it and does not verify fails its upload (RPS-1188), and the new file is
+   * taken back like a POM whose registration failed.
    */
   private boolean isNewRegisteredFile(
       final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath) {
 
+    final var verifyAll = repoInfo.isPgpVerifyAllSignaturesEnabled();
+
     return (ArtifactUtils.isPomToParse(storagePath)
-            || ArtifactUtils.isSignatureToVerify(
-                storagePath, repoInfo.isPgpVerifyAllSignaturesEnabled()))
+            || ArtifactUtils.isSignatureToVerify(storagePath, verifyAll)
+            || (verifyAll
+                && ArtifactUtils.isSignableFile(storagePath.getRelativePath().getFileName())))
         && !this.mavenStorageService.exists(storagePath, repoInfo.getName());
   }
 

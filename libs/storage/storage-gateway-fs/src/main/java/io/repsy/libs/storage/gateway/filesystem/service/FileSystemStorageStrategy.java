@@ -193,23 +193,77 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     return itemInfos;
   }
 
+  /**
+   * Lists the entries under {@code storagePath}, or the entries of a whole tree for a path inside a
+   * repo. An entry that disappears while the tree is read is left out instead of failing the
+   * listing: a concurrent write puts its bytes in a hidden temporary file that it then moves over
+   * the target, so a listing that runs during a parallel deploy can meet a file that is gone a
+   * moment later, and {@code Files.walk} answers that with an {@code UncheckedIOException}.
+   */
   @SneakyThrows
   @Override
   public @NonNull List<StorageItemInfo> listStorageItems(final @NonNull StoragePath storagePath) {
     final Path path = this.toPhysicalPath(storagePath);
 
-    try (final Stream<Path> stream =
-        storagePath.getStorageKey() == null ? Files.list(path) : Files.walk(path)) {
-      return stream
-          .filter(entry -> !isTempFile(entry))
-          .map(this::toStorageItemInfo)
-          .filter(si -> !si.getPath().equals(this.trashPath.toString()))
-          .toList();
+    final List<Path> entries = new ArrayList<>();
+
+    if (storagePath.getStorageKey() == null) {
+      try (final Stream<Path> stream = Files.list(path)) {
+        stream.forEach(entries::add);
+      }
+    } else {
+      walkTolerantly(path, entries);
     }
+
+    return entries.stream()
+        .filter(entry -> !isTempFile(entry))
+        .map(this::toStorageItemInfoIfPresent)
+        .flatMap(Optional::stream)
+        .filter(si -> !si.getPath().equals(this.trashPath.toString()))
+        .toList();
+  }
+
+  private static void walkTolerantly(final Path root, final List<Path> entries) throws IOException {
+
+    Files.walkFileTree(
+        root,
+        new SimpleFileVisitor<>() {
+          @Override
+          public @NonNull FileVisitResult preVisitDirectory(
+              final @NonNull Path dir, final @NonNull BasicFileAttributes attrs) {
+            entries.add(dir);
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public @NonNull FileVisitResult visitFile(
+              final @NonNull Path file, final @NonNull BasicFileAttributes attrs) {
+            entries.add(file);
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public @NonNull FileVisitResult visitFileFailed(
+              final @NonNull Path file, final @NonNull IOException exc) throws IOException {
+            if (exc instanceof NoSuchFileException && !file.equals(root)) {
+              return FileVisitResult.CONTINUE;
+            }
+
+            throw exc;
+          }
+        });
   }
 
   @SneakyThrows
-  private StorageItemInfo toStorageItemInfo(final @NonNull Path path) {
+  private Optional<StorageItemInfo> toStorageItemInfoIfPresent(final @NonNull Path path) {
+    try {
+      return Optional.of(this.readStorageItemInfo(path));
+    } catch (final NoSuchFileException _) {
+      return Optional.empty();
+    }
+  }
+
+  private StorageItemInfo readStorageItemInfo(final @NonNull Path path) throws IOException {
     final File file = path.toFile();
 
     final var fileAttributes = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
