@@ -315,10 +315,16 @@ test.describe('USR-05 delete a user', () => {
     await usersPage.goto();
     await usersPage.search(seeder.runId);
     await expect(usersPage.row(second.username)).toBeVisible();
+    const reload = usersPage.listResponse('', 0);
     await usersPage.deleteUser(first.username);
 
     await usersPage.shell.toasts.expectSuccess('User deleted successfully');
     await expect(usersPage.row(first.username)).toHaveCount(0);
+    await reload;
+    // A delete reloads the list WITHOUT the search, and that list is the whole instance, newest first:
+    // ten users of parallel tests created in the meantime push `second` off page 1. Search again for
+    // this run's users before asserting it is still there (RPS-1303).
+    await usersPage.search(seeder.runId);
     await expect(usersPage.row(second.username)).toBeVisible();
     expect(await panelApi.listUsers({ search: first.username })).toHaveLength(0);
   });

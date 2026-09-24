@@ -23,7 +23,9 @@ import { test as plainTest, expect as plainExpect } from '@playwright/test';
 
 import { env } from '../../src/env.js';
 import { expect, test } from '../../src/ui/fixtures.js';
+import { healHostNetworkChange } from '../../src/ui/defaults.js';
 import { DashboardPage } from '../../src/ui/pages/dashboard.js';
+import { LoginPage } from '../../src/ui/pages/login.js';
 import { Shell } from '../../src/ui/pages/shell.js';
 import { assertAdminCredentialsUsableInUi, assertNotAdmin, optedIn } from '../../src/ui/session.js';
 
@@ -123,6 +125,41 @@ test.describe('UI harness fixtures', () => {
       };
     });
     expect(outcomes).toEqual({ sameOrigin: 'reached', gravatar: 'blocked', tagManager: 'blocked' });
+  });
+
+  // RPS-1303: Chromium aborts in-flight requests with net::ERR_NETWORK_CHANGED when the host's
+  // network changes, which leaves the SPA unbooted, and a container start on the host is a burst of
+  // such changes over several seconds, so the reload can be hit too. The fixtures' own handler matches
+  // only that exact error and a test cannot make Chromium report it, so ERR_FAILED (what
+  // `route.abort('failed')` produces) stands in through the same function.
+  test('a page whose SPA bundle was lost to a host network change is reloaded until it boots', async ({
+    page,
+    context,
+    baseURL,
+  }) => {
+    healHostNetworkChange(
+      context,
+      new Set([new URL(baseURL ?? env.apiBaseUrl).origin]),
+      /ERR_FAILED/,
+    );
+    let mainRequests = 0;
+    await page.route(/\/main-[^/]+\.js$/, async (route) => {
+      mainRequests += 1;
+      if (mainRequests === 1) {
+        await route.abort('failed');
+      } else if (mainRequests === 2) {
+        // The reload is hit too, later than the stragglers of the first load can arrive.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        await route.abort('failed');
+      } else {
+        await route.fallback();
+      }
+    });
+
+    await page.goto('/login');
+
+    await expect(new LoginPage(page).form).toBeVisible();
+    expect(mainRequests).toBe(3);
   });
 
   test('adminPage and userPage are two independent sessions', async ({
