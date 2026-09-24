@@ -128,10 +128,10 @@
       @for (server of wellKnownServers; track server.host) {
         <div
           [attr.data-testid]="'settings-pgp-builtin-' + server.host"
-          class="flex min-h-10 min-w-0 cursor-not-allowed justify-between gap-2 opacity-40"
+          class="flex min-h-10 min-w-0 justify-between gap-2"
         >
           <div class="flex w-full min-w-0 justify-between gap-2 rounded-lg border border-neutral-400 px-4 py-2">
-            <div class="text-body1 flex w-full items-start gap-2 text-white">
+            <div class="text-body1 flex w-full items-start gap-2 text-[#9FA0A0]">
               {{ server.displayName }} ({{ server.host }})
             </div>
           </div>

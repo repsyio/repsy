@@ -91,17 +91,17 @@
           class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
         >
           @for (image of images; track image.updatedAt; let i = $index) {
-            <div
-              [attr.data-testid]="'pkg-list-row-' + image.name"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="'/' + activeRepo.repoName + '/' + image.name"
-            >
+            <div [attr.data-testid]="'pkg-list-row-' + image.name">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === images.length - 1 }"
-                class="grid grid-cols-[minmax(0,3fr)_1fr_3fr_2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="row-link-host grid grid-cols-[minmax(0,3fr)_1fr_3fr_2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="'/' + activeRepo.repoName + '/' + image.name"
+                  [attr.aria-label]="image.name"
+                ></a>
                 <div class="flex min-w-0 gap-2">
                   <img ngSrc="/assets/icons/repo/monitor.svg" alt="monitor" height="18" width="18" class="shrink-0" />
                   <app-tooltip
@@ -177,12 +177,14 @@
               <!-- Mobile Row -->
               <div
                 animate.enter="fade-in-down"
-                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+                class="row-link-host relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
                 [attr.data-testid]="'pkg-list-card-' + image.name"
-                role="button"
-                appKeyboardActivate
-                [routerLink]="'/' + activeRepo.repoName + '/' + image.name"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="'/' + activeRepo.repoName + '/' + image.name"
+                  [attr.aria-label]="image.name"
+                ></a>
                 @if (activeRepo.canManage) {
                   <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
                     <button

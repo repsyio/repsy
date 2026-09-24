@@ -52,33 +52,34 @@
 
 <p class="mb-4 text-[14px] font-medium text-[#9FA0A0]">
   • Browse the
-  <a
-    href="javascript:void(0)"
+  <button
+    type="button"
     data-testid="maven-browser-open-native"
     (click)="goToBrowser('/')"
     class="text-body1 hover:text-brand-500 focus:text-brand-500 inline-block text-neutral-200 underline focus:underline"
   >
     files
-  </a>
+  </button>
   on your browser.
 </p>
 
 <div data-testid="maven-browser-path" class="mb-4 text-[14px] text-neutral-200">
-  <a
+  <button
+    type="button"
     data-testid="maven-browser-path-root"
     class="hover:text-secondary-500"
-    href="javascript:void(0)"
     (click)="goToDir({ name: '/', path: '/', prev: null })"
-    >{{ activeRepo.repoName }}:</a
   >
+    {{ activeRepo.repoName }}:
+  </button>
   @for (dir of directoryStack; track dir.name; let index = $index) {
-    <a [attr.data-testid]="'maven-browser-path-' + dir.name" href="javascript:void(0)" (click)="goToDir(dir)">
+    <button type="button" [attr.data-testid]="'maven-browser-path-' + dir.name" (click)="goToDir(dir)">
       <span
         class="hover:text-secondary-500"
         [ngClass]="{ 'text-secondary-500': directoryStack.length - 1 === index }"
         >{{ dir.name }}</span
       >
-    </a>
+    </button>
   }
 </div>
 
@@ -111,14 +112,11 @@
             <!-- More Options Button -->
 
             <!-- File Icon -->
-            <div
+            <button
+              type="button"
               data-testid="row-open"
               (click)="go(file)"
-              (keydown.enter)="go(file); $event.preventDefault()"
-              (keydown.space)="go(file); $event.preventDefault()"
-              class="mb-4 flex items-center justify-center"
-              tabindex="0"
-              role="button"
+              class="mb-4 flex w-full items-center justify-center"
               [attr.aria-label]="'Open ' + file.name"
             >
               <!-- Default File Icon -->
@@ -131,7 +129,7 @@
               } @else {
                 <img ngSrc="/assets/icons/browser/default-file.svg" alt="browser" height="101" width="102" />
               }
-            </div>
+            </button>
 
             <!-- File Name -->
             <div data-testid="row-name" class="mb-1 text-start text-[15px] font-medium break-all text-neutral-200">

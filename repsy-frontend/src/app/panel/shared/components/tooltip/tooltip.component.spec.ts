@@ -37,6 +37,18 @@ class HostComponent {
   text = 'a-very-long-package-name-that-does-not-fit-in-a-hundred-pixels';
 }
 
+@Component({
+  imports: [TooltipComponent],
+  template: `
+    <div class="row-link-host">
+      <a class="row-link" href="#row" aria-label="row"></a>
+      <app-tooltip data-testid="plain" [text]="'name'" [textHover]="'name'" />
+      <a data-testid="own-link" href="#own"><app-tooltip [text]="'own'" [textHover]="'own'" /></a>
+    </div>
+  `,
+})
+class RowHostComponent {}
+
 describe('TooltipComponent', () => {
   let fixture: ComponentFixture<HostComponent>;
 
@@ -108,6 +120,48 @@ describe('TooltipComponent', () => {
       hover();
 
       expect(popup()?.textContent?.trim()).toBe(fixture.componentInstance.text);
+    });
+  });
+
+  describe('inside a row with a stretched link', () => {
+    let clicks: MouseEvent[];
+    let rowHost: ComponentFixture<RowHostComponent>;
+
+    beforeEach(() => {
+      clicks = [];
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ imports: [RowHostComponent] });
+      const rowFixture = TestBed.createComponent(RowHostComponent);
+      rowFixture.detectChanges();
+      rowHost = rowFixture;
+      const link = rowFixture.nativeElement.querySelector('.row-link') as HTMLAnchorElement;
+      link.addEventListener('click', (event) => {
+        clicks.push(event);
+        event.preventDefault();
+      });
+    });
+
+    const click = (selector: string, init: MouseEventInit = {}) =>
+      (rowHost.nativeElement.querySelector(selector) as HTMLElement).dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, ...init }),
+      );
+
+    it('hands a click on the text to the row link', () => {
+      click('[data-testid="plain"] [data-testid="tooltip-text"]');
+
+      expect(clicks.length).toBe(1);
+    });
+
+    it('keeps the modifier keys, so a ctrl-click still opens a new tab', () => {
+      click('[data-testid="plain"] [data-testid="tooltip-text"]', { ctrlKey: true });
+
+      expect(clicks[0].ctrlKey).toBeTrue();
+    });
+
+    it('leaves a tooltip that sits in its own link alone', () => {
+      click('[data-testid="own-link"] [data-testid="tooltip-text"]');
+
+      expect(clicks.length).toBe(0);
     });
   });
 });

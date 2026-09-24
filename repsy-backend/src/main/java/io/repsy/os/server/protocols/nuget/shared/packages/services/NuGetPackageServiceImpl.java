@@ -25,6 +25,7 @@ import io.repsy.os.server.protocols.nuget.shared.packages.mappers.NuGetPackageCo
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
+import io.repsy.os.shared.utils.LikePatterns;
 import io.repsy.os.shared.utils.OffsetPageRequest;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
@@ -189,7 +190,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
                 pageable.getSort(), Sort.by(Sort.Direction.DESC, "publishedAt"), "version"));
 
     return this.packageVersionRepository
-        .searchByNugetPackageId(pkg.getId(), likePattern("%", query, "%"), sortedPageable)
+        .searchByNugetPackageId(pkg.getId(), LikePatterns.of("%", query, "%"), sortedPageable)
         .map(v -> this.converter.toVersionInfo(v, packageId));
   }
 
@@ -241,7 +242,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
     final var pkgPage =
         this.packageRepository.search(
-            repoInfo.getId(), likePattern("%", query, "%"), semVer2, sortedPageable);
+            repoInfo.getId(), LikePatterns.of("%", query, "%"), semVer2, sortedPageable);
 
     return pkgPage.map(pkg -> this.toSearchResult(pkg, prerelease, semVer2));
   }
@@ -266,7 +267,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
         PageRequest.of(
             0, Math.max(Math.addExact(skip, take), 1), Sort.by(Sort.Direction.ASC, "packageId"));
     return this.packageRepository
-        .search(repoInfo.getId(), likePattern("", query, "%"), semVer2, pageable)
+        .search(repoInfo.getId(), LikePatterns.of("", query, "%"), semVer2, pageable)
         .stream()
         .skip(skip)
         .limit(take)
@@ -466,19 +467,6 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     return sort.getOrderFor(tiebreaker) == null
         ? sort.and(Sort.by(Sort.Direction.ASC, tiebreaker))
         : sort;
-  }
-
-  /** The lower-cased {@code LIKE} pattern of {@code query} with its wildcards taken literally. */
-  private static String likePattern(final String prefix, final String query, final String suffix) {
-
-    final var escaped =
-        query
-            .toLowerCase(Locale.ROOT)
-            .replace("\\", "\\\\")
-            .replace("%", "\\%")
-            .replace("_", "\\_");
-
-    return prefix + escaped + suffix;
   }
 
   private NuGetPackageSearchResult toSearchResult(

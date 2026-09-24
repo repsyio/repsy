@@ -16,21 +16,24 @@
 
 /**
  * A11Y-01: an axe-core scan of the login page, the dashboard, the repository list, a repository's
- * settings page and the admin users page (`src/ui/a11y.ts`). REPORT-ONLY by default: each test attaches
- * its axe findings (`axe-<page>.json`, `axe-<page>.txt`) to the report, prints one summary line and
- * passes whatever axe finds, because the panel still carries the accessibility debt tracked in RPS-1266.
- * Once that lands, flip `DEFAULT_A11Y_MODE` in `src/ui/a11y.ts` to `enforce` (or run once with
- * `REPSY_UI_OPT_IN=a11y-enforce`) and the same tests fail on serious/critical violations.
+ * settings page and the admin users page, of the open modals and, for every protocol, of its package
+ * list, group/scope list, versions, manifests and detail pages (`src/ui/a11y.ts`). Each test attaches its
+ * axe findings (`axe-<page>.json`, `axe-<page>.txt`) to the report and prints one summary line. Since
+ * RPS-1266 part 4 the default mode is `enforce`: a serious or critical violation fails the test (run
+ * with `REPSY_UI_OPT_IN=a11y-report` to only report while looking at a page that is not clean yet).
  *
  * Every scan runs after the page's own ready element is on screen (the layout hides the router outlet
  * for 500 ms behind a splash), on the state a user sees: at least one repository of the test's own
  * exists, so the list and settings pages hold data.
  */
 import { RepoType } from '../../../src/api/panel-api.js';
+import type { PackageProtocol } from '../../../src/seed/packages.js';
 import { scanPage } from '../../../src/ui/a11y.js';
-import { expect, test } from '../../../src/ui/fixtures.js';
+import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
+import { DESCRIPTORS, pageOf, type ProtocolListPage } from '../../../src/ui/pages/protocol.js';
+import type { LevelName } from '../../../src/ui/pages/protocols/types.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
 import { UsersPage } from '../../../src/ui/pages/users.js';
@@ -135,4 +138,27 @@ test.describe('Accessibility (axe)', { tag: '@a11y' }, () => {
       '[data-testid="user-reset-password-modal"]',
     );
   });
+
+  // The package pages of every protocol, which carry the row markup of RPS-1266 part 4 and (detail
+  // pages) the highlighted code blocks. The seeded package gives every level one row.
+  const LEVELS: readonly LevelName[] = ['list', 'sublist', 'versions', 'manifests', 'detail'];
+  for (const protocol of Object.keys(DESCRIPTORS) as PackageProtocol[]) {
+    const descriptor = DESCRIPTORS[protocol];
+    const repoType = RepoType[protocol.toUpperCase() as keyof typeof RepoType];
+    for (const level of LEVELS.filter((name) => descriptor.levels[name])) {
+      test(`A11Y-01: ${protocol} ${level} page`, async ({
+        adminPage,
+        seeder,
+        seedPackage,
+      }, testInfo) => {
+        const repo = await seeder.createRepo(repoType);
+        const pkg = await seedPackage(repo);
+        const page = pageOf(adminPage, descriptor, level, repo.name, pkg);
+        await (page as ProtocolListPage).goto();
+        const label = `pkg-${protocol}-${level}`;
+        const summary = await scanPage(adminPage, testInfo, label);
+        expect(summary.label).toBe(label);
+      });
+    }
+  }
 });

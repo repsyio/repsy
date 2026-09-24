@@ -32,8 +32,10 @@ public class RepoUtils {
    * its {@code :repoName} route ({@code app.routes.ts}: {@code login}, {@code profile}, {@code
    * repositories}, {@code users}, {@code security}, {@code not-found}), plus the paths the API port
    * forwards to the SPA before anything more specific can claim them ({@code api}, {@code assets},
-   * {@code favicon.ico}). Compared case-insensitively. Keep this in sync with {@code
-   * app.routes.ts}, which points back here in a comment.
+   * {@code favicon.ico}), plus the literal segments the API keeps directly under {@code
+   * /api/repos/} next to its {@code {repoName}} variable ({@code counts}, {@code
+   * security-summary}). Compared case-insensitively. Keep this in sync with {@code app.routes.ts},
+   * which points back here in a comment.
    */
   private static final @NonNull Set<String> RESERVED_REPO_NAMES =
       Set.of(
@@ -45,7 +47,9 @@ public class RepoUtils {
           "not-found",
           "api",
           "assets",
-          "favicon.ico");
+          "favicon.ico",
+          "counts",
+          "security-summary");
 
   public void validateRepoName(final @NonNull String repoName) {
     if (!REPO_NAME_PATTERN.matcher(repoName).matches()) {

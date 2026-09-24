@@ -35,7 +35,6 @@ import { SearchboxComponent } from '../../../../../shared/components/searchbox/s
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
-import { KeyboardActivateDirective } from '../../../../../shared/directives/keyboard-activate.directive';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { ByteFormatter } from '../../../../../shared/util/byte-formatter';
@@ -47,7 +46,6 @@ import { DockerService } from '../../service/docker.service';
   selector: 'app-docker-image-list',
   standalone: true,
   imports: [
-    KeyboardActivateDirective,
     CommonModule,
     DockerConfigComponent,
     RouterLink,

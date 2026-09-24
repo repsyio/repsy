@@ -93,17 +93,17 @@
           class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
         >
           @for (pkg of packages; track pkg.name; let i = $index) {
-            <div
-              [attr.data-testid]="'pkg-sublist-row-' + pkg.name"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="'/' + activeRegistry.repoName + '/' + scopeName + '/' + pkg.name"
-            >
+            <div [attr.data-testid]="'pkg-sublist-row-' + pkg.name">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === packages.length - 1 }"
-                class="grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="row-link-host grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="'/' + activeRegistry.repoName + '/' + scopeName + '/' + pkg.name"
+                  [attr.aria-label]="pkg.name"
+                ></a>
                 <a
                   data-testid="row-package-link"
                   class="group text-secondary-500 flex w-max max-w-full min-w-0 gap-2 text-[14px]"
@@ -201,21 +201,23 @@
           @for (pkg of packages; track pkg.name; let i = $index) {
             <div animate.enter="fade-in-down" class="lg:hidden">
               <div
-                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+                class="row-link-host relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
                 [attr.data-testid]="'pkg-sublist-card-' + pkg.name"
-                role="button"
-                appKeyboardActivate
-                [routerLink]="
-                  '/' +
-                  activeRegistry.repoName +
-                  '/' +
-                  (pkg.scope ? pkg.scope : '~') +
-                  '/' +
-                  pkg.name +
-                  '/' +
-                  pkg.latestVersion
-                "
               >
+                <a
+                  class="row-link"
+                  [routerLink]="
+                    '/' +
+                    activeRegistry.repoName +
+                    '/' +
+                    (pkg.scope ? pkg.scope : '~') +
+                    '/' +
+                    pkg.name +
+                    '/' +
+                    pkg.latestVersion
+                  "
+                  [attr.aria-label]="pkg.name"
+                ></a>
                 @if (activeRegistry.canManage) {
                   <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
                     <button
