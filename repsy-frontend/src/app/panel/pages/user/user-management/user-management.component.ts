@@ -21,6 +21,7 @@ import moment from 'moment';
 import { finalize } from 'rxjs';
 
 import { PagedModelUserResponse, UserResponse } from '../../../../../generated/api';
+import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { DropdownComponent } from '../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../shared/components/ellipsis/ellipsis.pipe';
 import { EmptyListComponent } from '../../../shared/components/empty-list/empty-list.component';
@@ -66,11 +67,14 @@ export class UserManagementComponent implements OnInit {
   public selectedUser: UserResponse;
   public searchQuery = '';
   public newPassword: string;
+  /** Admins on the server (not only on the loaded page); null until the first answer arrives. */
+  public adminCount: number | null = null;
 
   constructor(
     private readonly userService: UserService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
+    private readonly authService: AuthService,
   ) {}
 
   public ngOnInit(): void {
@@ -81,6 +85,9 @@ export class UserManagementComponent implements OnInit {
     this.userService.listUsers(this.searchQuery || undefined, this.pageNum, this.pageSize).subscribe((pagedModel) => {
       this.pagedData = pagedModel;
       this.users = pagedModel.content ?? [];
+    });
+    this.userService.countAdmins().subscribe((count) => {
+      this.adminCount = count;
     });
   }
 
@@ -128,7 +135,7 @@ export class UserManagementComponent implements OnInit {
   }
 
   public resetPassword(user: UserResponse): void {
-    this.dangerModalService.show('Reset Password', 'Reset', () => {
+    this.dangerModalService.showWithMessage('Reset Password', 'Reset', this.resetPasswordMessage(user), () => {
       this.operationLock = true;
 
       this.userService
@@ -145,6 +152,19 @@ export class UserManagementComponent implements OnInit {
           this.toastService.show('Password reset successfully', 'success');
         });
     });
+  }
+
+  public resetPasswordMessage(user: UserResponse): string {
+    const message =
+      `A new random password for "${user.username}" is generated and shown to you once. ` +
+      'The current password stops working and every signed-in session and CLI login of that account is revoked.';
+    if (user.username !== this.authService.username) {
+      return message;
+    }
+    return (
+      `${message} This is your own account: you will be signed out and must sign in again with the new password. ` +
+      'To keep your session, change it under Profile instead.'
+    );
   }
 
   public deleteUser(user: UserResponse): void {
@@ -178,9 +198,13 @@ export class UserManagementComponent implements OnInit {
     });
   }
 
+  /**
+   * Whether the admin about to be deleted or demoted is the last one on the server (RPS-1246). The
+   * count comes from the server, so a search or a page holding a single admin does not matter. The
+   * server still refuses the change for the real last admin, so an unknown count (null) lets it through.
+   */
   protected isLastAdmin(): boolean {
-    const adminCount = this.users?.filter((u) => u.role === 'ADMIN').length || 0;
-    return adminCount === 1;
+    return this.adminCount !== null && this.adminCount <= 1;
   }
 
   public timeAgo(date: Date | string | null): string {

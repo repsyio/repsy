@@ -2547,7 +2547,10 @@ Things a later author must know:
   blocks, so the button has no size and Playwright calls it "not visible": use
   `LoginValidation.togglePasswordVisibility()` (a DOM click).
 - **Inline validation messages appear on blur** (`touched`), one at a time, in the order required,
-  pattern, minlength, maxlength; `LoginValidation.enter()` types and blurs.
+  pattern, minlength, maxlength; `LoginValidation.enter()` types and blurs. The texts are the shared credential
+  sentences of `src/ui/credential-messages.ts` (RPS-1265: one wording for a username, a password and a
+  description on every form); the login password rule is the create-user one because the backend's `LoginForm`
+  holds a login password to the same rule, so a weaker one is answered by the form, not the server.
 - **AUTH-11 (`@throttle`) is skipped by default.** It needs a stack whose `AUTH_THROTTLE_MAX_FAILURES` is
   below 30 (the harness stack raises it to 100000, see `docker-compose.stack.yml`) and, once it trips,
   the client stays refused for the window (`AUTH_THROTTLE_WINDOW_SECONDS`), so run it alone, on a
@@ -2591,9 +2594,9 @@ Things a test here relies on, which a change to the page can break:
   `seeder.adoptRepo(name)` BEFORE the submit, so a failure half way still deletes them.
 - **The visibility toggle** is toggled by clicking its label text: the `toggle-input` checkbox is `sr-only`
   under a covering span, so Playwright refuses to click it (read `isChecked()` from it, though).
-- **Known defects, pinned as `test.fail`** (a `✘` line in the list reporter with a passing summary is the
-  expectation): the description textarea's `maxlength="500"` hides the ">500" error (RPS-1265). Drop the
-  `test.fail` when the fix lands. (The search box and page index after a refresh or a new search were
+- **The description textarea has a counter and no `maxlength` attribute** (RPS-1265): text past 500
+  characters is kept, the "n/500" counter and the maxlength message show, and Create is disabled. Type it
+  with `pressSequentially` to prove a real keyboard is not cut. (The search box and page index after a refresh or a new search were
   pinned to RPS-1283 and are fixed; a refresh during a load, RPS-1293, is covered by a route that holds
   the first maven answer. A USER's Recent Activity was pinned to RPS-1276 until that
   fix; the row now shows, so DASH-04 asserts it plainly.)
@@ -2611,9 +2614,9 @@ user the UI is about to create so a failing test still cleans it up).
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | USR-01   | create a USER and an Admin, log in as each from a fresh context (an Admin sees Users, a USER does not), cancel resets the form       |
 | USR-02   | one test per validator of the create form, the message texts, a valid form, a duplicate username                                     |
-| USR-03   | rename, promote, demote next to another admin, the last-admin warning and locked switch, edit validation, taken name, cancel         |
+| USR-03   | rename, promote, demote next to another admin, no last-admin warning while another admin exists, edit validation, taken name, cancel |
 | USR-04   | reset password: one-time modal, the new password logs in, the old one is refused, cancel resets nothing                              |
-| USR-05   | delete (cancel, then confirm), delete next to another admin, the last-admin toast                                                    |
+| USR-05   | delete (cancel, then confirm), delete next to another admin, a lone admin in the view is still deletable                             |
 | USR-06   | 11 users: search (incl. case-insensitive, no match with its `No user matches` message), pagination both ways, refresh                |
 | PRO-01   | change password: mismatch, cancel, confirm, re-login with the new one, the old one refused; field validation                         |
 | PRO-02   | change username: reload as the new name, same account, repo protocol URL and repo page still work; validation; taken name            |
@@ -2629,12 +2632,13 @@ Rules these specs follow (and a later spec on these pages should too):
   The suite never edits, demotes or deletes the harness admin. Names a test creates or renames to come from
   `seeder.reserveUsername()`, so the `e2e-` prefix survives and sweep finds them; a renamed user is
   cleaned up by id.
-- **Last admin.** The panel decides "last admin" on the client from the admins in the page it shows
-  (RPS-1246); the server guards the real one, which the backend ITs cover. A shared stack always has the
-  harness admin, so the real last-admin state is unreachable here. What is reachable: search for a seeded
-  admin's exact username, and the view holds a single admin. Those tests pin what the panel does there
-  today, and two `test.fail(... RPS-1246)` tests assert what it should do. Two admins in one view (search
-  for `seeder.runId`, which is in both names) is the "not the last" case.
+- **Last admin.** The panel decides "last admin" from the server's admin count (`GET /api/users/admin-count`,
+  RPS-1246), not from the page it shows, and the server guards the real one, which the backend ITs cover.
+  A shared stack always has the harness admin, so the real last-admin state is unreachable here (the
+  component spec covers the panel's branch). What is reachable: search for a seeded admin's exact username,
+  and the view holds a single admin that must still be editable and deletable, which two tests assert.
+  `UsersPage.goto` waits for the admin-count response. Two admins in one view (search for `seeder.runId`,
+  which is in both names) is the "not the last" case.
 - **Search first.** The list is server-paged (10, newest first) and server-searched (case-insensitive
   substring), and other tests add users, so every list view is a search for a username or for
   `seeder.runId`, which is in exactly the names this test seeded (with 10 or more users, `-user-1` also
@@ -2646,8 +2650,9 @@ Rules these specs follow (and a later spec on these pages should too):
   Font Awesome CDN, so the buttons have no box: they are activated with `dispatchEvent('click')`.
 - **Timing.** The username change ends in `location.reload()` in the tick that raises its toast, so that
   toast is not observable: assert the reload (`ProfilePage.changeUsername`) and the outcome.
-- **Known bugs, pinned with `test.fail`**: RPS-1246 (last-admin check counts one page). The mojibake
-  `â€¢` of the create-user messages (RPS-1261) is fixed and asserted unpinned. The spec text of a `test.fail` states the key.
+- **Known bugs, pinned with `test.fail`**: none left in the users suite. The mojibake `â€¢` of the create-user
+  messages (RPS-1261) and the page-scoped last-admin check (RPS-1246) are fixed and asserted unpinned. The spec text
+  of a `test.fail` states the key.
 
 ### Repository settings and deploy tokens (RPS-1254)
 
@@ -2710,7 +2715,7 @@ with the page-2 answer delayed and asserts a single list request (the first page
 remaining rows. Not covered here: the Vulnerability Scanning toggle
 (hidden without a scanner, RPS-1259), the per-protocol "configure" modal behind a token row, the
 `reservedName` rename error (it has no test id), the expiration-date range messages (no test id) and
-the token-name `minLength` branch, which is unreachable (`required` already covers an empty name, RPS-1265).
+the token-name `minLength` branch, which was unreachable and is gone (`required` already covers an empty name, RPS-1265).
 
 ### Package seeding and protocol page objects (RPS-1255)
 
@@ -2827,6 +2832,13 @@ Facts the tests rely on (probed, RPS-1256):
   `pypi.spec.ts` (long description, home page) publish their own rich package with the raw builders.
 - "Version 'x' not found" exists on the Go detail page only; nothing asserts it here.
 
+### Permissions requested once (RPS-1305)
+
+`tests/ui/packages/permissions-once.spec.ts` (PKG-perm-01, one test per protocol over `DESCRIPTORS`): a cold
+load of the list page of a repository with one seeded package sends exactly one request to
+`/api/repos/{name}/permissions`. The protocol shell components used to subscribe to the replaying
+`currentRepo$` and also load by hand, which sent it twice.
+
 ### Package tests: Cargo, NuGet, Helm, Go, Ruby (RPS-1257)
 
 `tests/ui/packages/{cargo,nuget,helm,golang,ruby}.spec.ts`: each is one `registerPackageScenarios(...)`
@@ -2894,7 +2906,7 @@ this story added (`package.json`, `pnpm-lock.yaml`), so the `ui` runner image mu
 | `nav/breadcrumbs`  | NAV-01    | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                         |
 | `nav/mobile`       | NAV-02    | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); the burger opens the mobile sidebar, its links, the X, the backdrop and Escape close it (admin, and a USER without Users/Security); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`                                                             |
 | `nav/mobile`       | NAV-03    | the mobile menu closes when the viewport widens past `md` and stays closed when it narrows again; `document.body.style.overflow` is `hidden` (and the wheel does not scroll the page) while it is open, `''` after every way of closing it                                                                                                                             |
-| `errors/not-found` | ERR-04    | `/not-found` in the panel layout: an anonymous visitor (phone and desktop) gets no sidebar, no burger and no `/api/profile` request; an admin and a USER at phone width open the mobile sidebar from it; at desktop the sidebar shows and the burger does not                                                                                                          |
+| `errors/not-found` | ERR-04    | `/not-found` in the panel layout: an anonymous visitor (phone and desktop, and on a deep unknown path `/a/b/c`) gets no sidebar, no burger, no avatar menu, a `header-login` link and no `/api/profile` request; an admin and a USER at phone width open the mobile sidebar from it; at desktop the sidebar shows and the burger does not                              |
 | `a11y/a11y`        | A11Y-01   | axe on login, dashboard, repository list, repository settings, users (admin); report-only                                                                                                                                                                                                                                                                              |
 
 Things a later author must know:
@@ -3180,7 +3192,7 @@ Selector priority: `getByTestId` first, then `getByRole`/`getByLabel`, never CSS
    `@Input() testId`.
 6. Validation messages: `<form>-<field>-error-<validator>`, validator names as Angular reports them
    (`required`, `minlength`, `maxlength`, `pattern`; `mismatch` for confirm-password checks). Key by
-   validator, never by text.
+   validator, never by text (the sentences live once in `src/ui/credential-messages.ts`).
 7. Error branch: `<page>-error` on the wrapper, `<page>-error-message` on the message. Custom empty
    state: `<page>-empty`; `<app-empty-list>` is the shared `empty-list`.
 8. `data-testid="readme"` (cargo/npm/nuget version detail) predates the scheme and Karma specs assert

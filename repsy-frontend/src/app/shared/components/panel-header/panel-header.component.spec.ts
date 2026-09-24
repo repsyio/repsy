@@ -28,7 +28,10 @@ describe('PanelHeaderComponent burger', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [PanelHeaderComponent],
-      providers: [provideRouter([]), { provide: AuthService, useValue: { username: 'admin' } }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: { username: 'admin', isAuthenticated: () => true } },
+      ],
     });
     fixture = TestBed.createComponent(PanelHeaderComponent);
     emitted = [];
@@ -80,7 +83,7 @@ describe('PanelHeaderComponent profile link', () => {
       imports: [PanelHeaderComponent],
       providers: [
         provideRouter([{ path: 'profile', component: PanelHeaderComponent }]),
-        { provide: AuthService, useValue: { username: 'admin' } },
+        { provide: AuthService, useValue: { username: 'admin', isAuthenticated: () => true } },
       ],
     });
     router = TestBed.inject(Router);
@@ -108,16 +111,61 @@ describe('PanelHeaderComponent profile link', () => {
   });
 });
 
-// RPS-1294: the header also renders on the not-found page of an anonymous visitor, who has no username.
+// RPS-1294, RPS-1306: the header also renders on the not-found page of an anonymous visitor, who has no username
+// and no session: it shows the logo and a Log in link, not the avatar menu.
 describe('PanelHeaderComponent without a session', () => {
-  it('renders with a fallback avatar character instead of failing on the missing username', () => {
+  let fixture: ComponentFixture<PanelHeaderComponent>;
+
+  const query = (testId: string): HTMLElement | null =>
+    fixture.nativeElement.querySelector(`[data-testid="${testId}"]`);
+
+  beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [PanelHeaderComponent],
-      providers: [provideRouter([]), { provide: AuthService, useValue: { username: null } }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: { username: null, isAuthenticated: () => false } },
+      ],
+    });
+    fixture = TestBed.createComponent(PanelHeaderComponent);
+  });
+
+  it('renders without failing on the missing username', () => {
+    expect(() => fixture.detectChanges()).not.toThrow();
+  });
+
+  it('shows the logo, the docs link and a Log in link to the login page at /', () => {
+    fixture.detectChanges();
+
+    expect(query('header-logo')).not.toBeNull();
+    expect(query('header-docs')).not.toBeNull();
+    expect(query('header-login')!.textContent).toContain('Log in');
+    expect(query('header-login')!.getAttribute('href')).toBe('/');
+  });
+
+  it('shows no avatar, no profile menu and no way to log out', () => {
+    fixture.detectChanges();
+
+    expect(query('header-avatar')).toBeNull();
+    expect(query('header-menu')).toBeNull();
+    expect(query('header-menu-profile')).toBeNull();
+    expect(query('header-menu-logout')).toBeNull();
+  });
+});
+
+describe('PanelHeaderComponent with a session', () => {
+  it('shows the avatar and no Log in link', () => {
+    TestBed.configureTestingModule({
+      imports: [PanelHeaderComponent],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: { username: 'admin', isAuthenticated: () => true } },
+      ],
     });
     const fixture = TestBed.createComponent(PanelHeaderComponent);
+    fixture.detectChanges();
 
-    expect(() => fixture.detectChanges()).not.toThrow();
     expect(fixture.nativeElement.querySelector('[data-testid="header-avatar"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="header-login"]')).toBeNull();
   });
 });

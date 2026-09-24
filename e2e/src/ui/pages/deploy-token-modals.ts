@@ -82,6 +82,11 @@ export class TokenCreateModal {
     return this.root.getByTestId('token-create-description-error-maxlength');
   }
 
+  /** The "n/500" character counter under the description. */
+  descriptionCounter(): Locator {
+    return this.root.getByTestId('token-create-description-counter');
+  }
+
   /** Fills the given fields only; anything left out keeps the form's default. */
   async fill(values: TokenFormValues): Promise<void> {
     if (values.name !== undefined) {

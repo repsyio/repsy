@@ -69,6 +69,7 @@ class UserControllerIT extends AbstractIntegrationTest {
   private static final Map<String, String> SUCCESS_TEXTS =
       Map.of(
           "usersFetched", "Users fetched.",
+          "adminCountFetched", "Admin count fetched.",
           "userCreated", "User created.",
           "userUpdated", "User updated.",
           "userDeleted", "User deleted.",
@@ -186,6 +187,7 @@ class UserControllerIT extends AbstractIntegrationTest {
     static Stream<Endpoint> endpoints() {
       return Stream.of(
           new Endpoint("GET /api/users", _ -> get("/api/users")),
+          new Endpoint("GET /api/users/admin-count", _ -> get("/api/users/admin-count")),
           new Endpoint(
               "POST /api/users",
               _ ->
@@ -1305,6 +1307,63 @@ class UserControllerIT extends AbstractIntegrationTest {
           "validationError",
           "userId",
           VALIDATION_TEXT);
+    }
+  }
+
+  @Nested
+  @DisplayName("GET /api/users/admin-count")
+  class CountAdmins {
+
+    private long adminCount(final String token) throws Exception {
+      final var body =
+          expectSuccess(
+              UserControllerIT.this.perform(
+                  get("/api/users/admin-count").header(AUTHORIZATION, token)),
+              "adminCountFetched");
+      return number(JsonPath.read(body, "$.data"));
+    }
+
+    @Test
+    @DisplayName("counts every admin, however many there are and whatever the users list shows")
+    void countsAllAdmins() throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+      final var baseline = UserControllerIT.this.userRepository.countByRole(UserRole.ADMIN);
+      assertThat(baseline).isPositive();
+      final var tag = randomTag();
+      // More admins than one default page (10) holds, so a count taken from a page would be wrong.
+      for (var i = 0; i < 12; i++) {
+        UserControllerIT.this.createUser(tag + "-admin" + i, UserRole.ADMIN);
+      }
+      UserControllerIT.this.createUser(tag + "-user", UserRole.USER);
+
+      assertThat(this.adminCount(token)).isEqualTo(baseline + 12);
+    }
+
+    @Test
+    @DisplayName("drops when an admin is deleted or demoted, and ignores plain users")
+    void followsTheAdminSet() throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+      final var before = this.adminCount(token);
+      final var first =
+          UserControllerIT.this.createUser(uniqueUsername("cnt-admin-a"), UserRole.ADMIN);
+      final var second =
+          UserControllerIT.this.createUser(uniqueUsername("cnt-admin-b"), UserRole.ADMIN);
+      assertThat(this.adminCount(token)).isEqualTo(before + 2);
+
+      expectSuccess(
+          UserControllerIT.this.perform(
+              delete("/api/users/" + first.getId()).header(AUTHORIZATION, token)),
+          "userDeleted");
+      assertThat(this.adminCount(token)).isEqualTo(before + 1);
+
+      expectSuccess(
+          UserControllerIT.this.perform(
+              put("/api/users/" + second.getId())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(updateBody(second.getUsername(), "USER"))),
+          "userUpdated");
+      assertThat(this.adminCount(token)).isEqualTo(before);
     }
   }
 

@@ -25,6 +25,11 @@ import {
   RepoPermissionInfo,
   RepoRenameForm,
 } from '../../../../../../generated/api';
+import {
+  DESCRIPTION_MAX_LENGTH,
+  DESCRIPTION_MAX_MESSAGE,
+  descriptionValidators,
+} from '../../../../../shared/validators/description.validators';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { reservedRepoNameValidator } from '../../../../shared/util/reserved-repo-names';
@@ -43,6 +48,8 @@ export class RepoInfoComponent implements OnInit {
 
   public loading = false;
   public private = false;
+  public readonly descriptionMaxLength = DESCRIPTION_MAX_LENGTH;
+  public readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
 
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
@@ -60,7 +67,7 @@ export class RepoInfoComponent implements OnInit {
     });
 
     this.descriptionForm = new FormGroup({
-      description: new FormControl('', [Validators.maxLength(500)]),
+      description: new FormControl('', descriptionValidators()),
     });
   }
 

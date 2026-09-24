@@ -19,6 +19,7 @@ import { FormBuilder } from '@angular/forms';
 import { config, of, Subject, throwError } from 'rxjs';
 
 import { UserResponse } from '../../../../../../generated/api';
+import { PASSWORD_MESSAGES, USERNAME_MESSAGES } from '../../../../../shared/validators/credentials.validators';
 import { renderComponent } from '../../../../pages/repository/testing/render-spec-helpers';
 import { UserService } from '../../../../pages/user/service/user.service';
 import { ToastService } from '../../toast/toast.service';
@@ -319,7 +320,7 @@ describe('UserCreateModalComponent template', () => {
     touch('username', 'a'.repeat(26));
     expect(message('user-create-username-error-maxlength')).toBe('• Should be maximum 25 characters');
     touch('username', 'Bad Name');
-    expect(message('user-create-username-error-pattern')).toMatch(/^• Can contain only lowercase/);
+    expect(message('user-create-username-error-pattern')).toBe(`• ${USERNAME_MESSAGES.pattern}`);
 
     touch('password', '');
     expect(message('user-create-password-error-required')).toBe('• Should not be empty');
@@ -328,7 +329,7 @@ describe('UserCreateModalComponent template', () => {
     touch('password', 'A'.repeat(51));
     expect(message('user-create-password-error-maxlength')).toBe('• Should be maximum 50 characters');
     touch('password', 'abcdefgh');
-    expect(message('user-create-password-error-pattern')).toMatch(/^• Should contain at least 1 lowercase/);
+    expect(message('user-create-password-error-pattern')).toBe(`• ${PASSWORD_MESSAGES.pattern}`);
 
     form.get('password').setValue('');
     touch('confirmPassword', '');
