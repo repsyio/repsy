@@ -1,0 +1,253 @@
+///
+/// Copyright 2026 the original author or authors.
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+///      https://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+///
+
+/**
+ * The lower half of `/:repo/settings`: rename and description (SET-05), delete (SET-06), Docker
+ * Orphan Layers (SET-07) and the Storage section (SET-09). Rename, delete and orphan layers all go
+ * through the danger modal; the description saves without one.
+ *
+ * What a click PERSISTED is read back through the panel API, which is what a rename or a delete is
+ * about: the old name stops resolving, the new one starts.
+ */
+import { RepoType } from '../../../src/api/panel-api.js';
+import { adminCredential, minimalPom, rawPut, versionDir } from '../../../src/clients/maven-raw.js';
+import { expect, test } from '../../../src/ui/fixtures.js';
+import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
+import { RepoSettingsReadback } from '../../../src/ui/pages/repo-settings/readback.js';
+
+const SETTINGS = '@settings';
+
+test.describe('Repository settings: rename and description', { tag: SETTINGS }, () => {
+  test('SET-05 renaming a repo moves the URL and breadcrumb, and the old URL 404s', async ({
+    adminPage,
+    seeder,
+    panelApi,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
+    const newName = seeder.reserveRepoName(RepoType.NPM);
+    // Tracked so cleanup deletes it; the original name is gone by then (a 404 is tolerated).
+    seeder.adoptRepo(newName);
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    await settings.goto();
+
+    // The form starts on the current name and refuses to rename to it.
+    await expect(settings.info.renameInput).toHaveValue(repo.name);
+    await expect(settings.info.renameSubmit).toBeDisabled();
+
+    await settings.info.typeName(newName);
+    await expect(settings.info.renameSubmit).toBeEnabled();
+
+    // Cancelling the confirmation changes nothing.
+    await settings.info.renameSubmit.click();
+    await settings.shell.dangerModal.expectOpen('Rename Repository');
+    await settings.shell.dangerModal.cancel();
+    await settings.shell.dangerModal.expectClosed();
+    expect((await panelApi.listRepos(RepoType.NPM)).map((r) => r.name)).not.toContain(newName);
+
+    await settings.info.renameSubmit.click();
+    await settings.shell.dangerModal.expectOpen('Rename Repository');
+    await settings.shell.dangerModal.confirm();
+
+    await settings.shell.toasts.expectSuccess('Repository renamed successfully');
+    await expect(adminPage).toHaveURL(new RegExp(`/${newName}/settings$`));
+    const renamed = new RepoSettingsPage(adminPage, newName);
+    await renamed.expectLoaded();
+    await expect(renamed.info.renameInput).toHaveValue(newName);
+    await expect(adminPage.getByTestId('breadcrumb-item-1')).toContainText(newName);
+
+    const names = (await panelApi.listRepos(RepoType.NPM)).map((r) => r.name);
+    expect(names).toContain(newName);
+    expect(names).not.toContain(repo.name);
+    expect((await panelApi.getSettings(newName)).privateRepo).toBe(true);
+
+    // A fresh page load of the old address finds nothing (a same-session navigation could still
+    // hit the SPA's cached repo lookup, so this reloads on purpose).
+    await adminPage.goto(`/${repo.name}/settings`);
+    await expect(adminPage.getByTestId('not-found')).toBeVisible();
+    await expect(renamed.root).toHaveCount(0);
+  });
+
+  test('SET-05 the rename form validates the name', async ({ adminPage, seeder }) => {
+    const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    await settings.goto();
+    const { info } = settings;
+
+    await info.typeName('');
+    await expect(info.renameError('required')).toBeVisible();
+    await expect(info.renameSubmit).toBeDisabled();
+
+    // Anything outside [a-zA-Z0-9_-], or starting with "-", is a pattern error, and the message says
+    // what the rule is (the pattern and maxlength texts were once swapped; fixed on main, so this pins the right ones).
+    for (const bad of ['has space', '-leading-dash', 'dot.name', 'slash/name']) {
+      await info.typeName(bad);
+      await expect(info.renameError('pattern'), bad).toBeVisible();
+      await expect(info.renameError('pattern'), bad).toContainText('letters, numbers');
+      await expect(info.renameSubmit, bad).toBeDisabled();
+    }
+
+    // 26 characters is one over the limit; 25 is fine.
+    await info.typeName('a'.repeat(26));
+    await expect(info.renameError('maxlength')).toBeVisible();
+    await expect(info.renameError('maxlength')).toContainText('25 characters');
+    await expect(info.renameSubmit).toBeDisabled();
+
+    await info.typeName('a'.repeat(25));
+    await expect(info.renameError('maxlength')).toHaveCount(0);
+    await expect(info.renameError('pattern')).toHaveCount(0);
+    await expect(info.renameSubmit).toBeEnabled();
+  });
+
+  test('SET-05 the description saves, resets, and is validated', async ({
+    adminPage,
+    seeder,
+    adminSession,
+  }) => {
+    const readback = new RepoSettingsReadback(adminSession.token);
+    const repo = await seeder.createRepo(RepoType.NPM, {
+      privateRepo: true,
+      description: 'the seeded description',
+    });
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    await settings.goto();
+    const { info } = settings;
+
+    await expect(info.descriptionInput).toHaveValue('the seeded description');
+    // Nothing edited yet: nothing to save or reset.
+    await expect(info.descriptionSave).toBeDisabled();
+    await expect(info.descriptionReset).toBeDisabled();
+
+    // Reset throws an edit away and leaves the stored text alone.
+    await info.descriptionInput.fill('a draft nobody saves');
+    await expect(info.descriptionSave).toBeEnabled();
+    await info.descriptionReset.click();
+    await expect(info.descriptionInput).toHaveValue('the seeded description');
+    await expect(info.descriptionSave).toBeDisabled();
+    expect((await readback.permissions(repo.name)).description).toBe('the seeded description');
+
+    await info.descriptionInput.fill('a new description');
+    await info.descriptionSave.click();
+    await settings.shell.toasts.expectSuccess('Repository description updated successfully');
+    await expect(info.descriptionSave).toBeDisabled();
+    await expect
+      .poll(async () => (await readback.permissions(repo.name)).description)
+      .toBe('a new description');
+
+    await settings.reload();
+    await expect(info.descriptionInput).toHaveValue('a new description');
+
+    // More than 500 characters is refused before anything is sent.
+    await info.descriptionInput.fill('x'.repeat(501));
+    await info.descriptionInput.blur();
+    await expect(info.descriptionError).toBeVisible();
+    await expect(info.descriptionSave).toBeDisabled();
+    await info.descriptionInput.fill('x'.repeat(500));
+    await expect(info.descriptionError).toHaveCount(0);
+    await expect(info.descriptionSave).toBeEnabled();
+  });
+});
+
+test.describe('Repository settings: delete', { tag: SETTINGS }, () => {
+  test(
+    'SET-06 deleting a repo asks first, then lands on /repositories with a toast',
+    { tag: ['@smoke'] },
+    async ({ adminPage, seeder, panelApi }) => {
+      const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
+      const settings = new RepoSettingsPage(adminPage, repo.name);
+      await settings.goto();
+      const repoNames = async () => (await panelApi.listRepos(RepoType.NPM)).map((r) => r.name);
+
+      // Cancel: the modal closes, the repo and the page stay.
+      await settings.deleteRepo.deleteButton.click();
+      await settings.shell.dangerModal.expectOpen('Delete Repository');
+      await settings.shell.dangerModal.cancel();
+      await settings.shell.dangerModal.expectClosed();
+      await expect(settings.root).toBeVisible();
+      expect(await repoNames()).toContain(repo.name);
+
+      // Confirm.
+      await settings.deleteRepo.deleteButton.click();
+      await settings.shell.dangerModal.expectOpen('Delete Repository');
+      await settings.shell.dangerModal.confirm();
+
+      await settings.shell.toasts.expectSuccess('Repository deleted successfully');
+      await expect(adminPage).toHaveURL(/\/repositories$/);
+      await expect(settings.root).toHaveCount(0);
+      await expect.poll(repoNames).not.toContain(repo.name);
+    },
+  );
+});
+
+test.describe('Repository settings: orphan layers', { tag: SETTINGS }, () => {
+  test('SET-07 the Docker Orphan Layers action confirms, calls the API and toasts', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.DOCKER, { privateRepo: true });
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    await settings.goto();
+
+    await settings.orphanLayers.delete();
+    await settings.shell.dangerModal.expectOpen('Delete Orphan Layers');
+    await settings.shell.dangerModal.cancel();
+    await settings.shell.dangerModal.expectClosed();
+
+    await settings.orphanLayers.delete();
+    await settings.shell.dangerModal.expectOpen('Delete Orphan Layers');
+    const response = adminPage.waitForResponse(
+      (res) =>
+        res.request().method() === 'DELETE' &&
+        res.url().includes(`/api/docker/images/blobs/${repo.name}/orphan-layers`),
+    );
+    await settings.shell.dangerModal.confirm();
+
+    expect((await response).ok()).toBe(true);
+    await settings.shell.toasts.expectSuccess('Orphan layers deleted successfully');
+    await expect(settings.orphanLayers.deleteButton).toBeEnabled();
+  });
+});
+
+test.describe('Repository settings: storage', { tag: SETTINGS }, () => {
+  test('SET-09 Storage shows the disk used, more than 0 after a package is stored', async ({
+    adminPage,
+    seeder,
+    adminSession,
+  }) => {
+    const readback = new RepoSettingsReadback(adminSession.token);
+    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+
+    await settings.goto();
+    await expect(settings.storage.diskUsed).toHaveText('0 B');
+
+    // A real deploy over the repo port: a POM is a package file the repo now has to store.
+    const groupId = `io.repsy.e2e.${seeder.runId}`;
+    const pomPath = `${versionDir(groupId, 'storage', '1.0')}/storage-1.0.pom`;
+    const put = await rawPut(
+      repo.name,
+      adminCredential(),
+      pomPath,
+      minimalPom(groupId, 'storage', '1.0'),
+      'application/octet-stream',
+    );
+    expect(put.status, 'seed PUT of the POM').toBe(200);
+    await expect.poll(() => readback.diskUsedBytes(repo.name)).toBeGreaterThan(0);
+
+    await settings.reload();
+    await expect(settings.storage.diskUsed).not.toHaveText('0 B');
+    await expect(settings.storage.diskUsed).toHaveText(/^\d+(\.\d+)?\s*(B|KB|MB|GB)$/);
+  });
+});
