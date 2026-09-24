@@ -105,32 +105,6 @@ class NuGetPackageUtilsTest {
 
   @ParameterizedTest
   @CsvSource({
-    "1.0.0, 1.0.0",
-    "1.0-Alpha, 1.0.0-alpha",
-    "1.0+Build, 1.0.0+build",
-    "1.0.0.0+Build, 1.0.0+build",
-    "1.0-beta+Build, 1.0.0-beta+build",
-    "1.0.0+a-b, 1.0.0+a-b",
-  })
-  @DisplayName("keeps the build metadata in the legacy form versions were stored under")
-  void legacyVersionKeepsBuildMetadata(final String raw, final String expected) {
-    assertThat(NuGetPackageUtils.legacyNuGetVersion(raw)).isEqualTo(expected);
-  }
-
-  @ParameterizedTest
-  @CsvSource({
-    "1.0.0, false",
-    "1.0.0-beta.1, false",
-    "1.0.0+build, true",
-    "1.0.0-beta+build, true",
-  })
-  @DisplayName("tells whether a version carries build metadata")
-  void detectsBuildMetadata(final String version, final boolean expected) {
-    assertThat(NuGetPackageUtils.hasBuildMetadata(version)).isEqualTo(expected);
-  }
-
-  @ParameterizedTest
-  @CsvSource({
     "1.0.0, false",
     "1.2.3.4, false",
     "1.0.0-beta, false",

@@ -24,8 +24,10 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -70,6 +72,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -1496,96 +1500,173 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
   }
 
   /**
-   * Versions published before RPS-996 kept their build metadata: the row says {@code 1.0.0+legacy}
-   * and the files sit in a {@code 1.0.0+legacy} directory. They have to stay readable and
-   * deletable, and deleting one must not touch the canonical {@code 1.0.0} it now collides with.
+   * A version pushed with build metadata is stored, and found, by its canonical version (RPS-996):
+   * {@code 1.0.0+Build.5} and {@code 1.0.0} are one version, whichever of them a request spells.
+   * The read-side fallback for versions stored with the metadata is gone (RPS-1123); the startup
+   * migration (RPS-1059) is what moves those.
    */
   @Nested
-  @DisplayName("a version stored with build metadata before RPS-996")
-  class LegacyBuildMetadata {
+  @DisplayName("a version pushed with build metadata, addressed by either spelling")
+  class BuildMetadataSpellings {
 
-    private static final String LEGACY = "1.0.0+legacy";
+    private static final String PUSHED = "1.0.0+Build.5";
+    private static final List<String> SPELLINGS = List.of("1.0.0", "1.0.0+build.5", PUSHED);
 
-    private record Seeded(Repo repo, String id, byte[] legacyNupkg, byte[] canonicalNupkg) {}
+    private record Pushed(Repo repo, String id, byte[] nupkg) {
 
-    private Seeded seed() throws Exception {
-      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
-      final var id = uniquePackageId();
-      final var lowerId = id.toLowerCase();
-      final var canonical = new Pkg(id, "1.0.0").nupkg();
-      assertStatus(
-          NuGetPublishProtocolIT.this.pushAs(
-              repo, canonical, NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
-          201);
-
-      final var legacy = new Pkg(id, LEGACY).nupkg();
-      final var directory = java.nio.file.Path.of(packageDir(repo, id, LEGACY));
-      Files.createDirectories(directory);
-      Files.write(directory.resolve(lowerId + "." + LEGACY + ".nupkg"), legacy);
-      Files.writeString(
-          directory.resolve(lowerId + "." + LEGACY + ".nuspec"), new Pkg(id, LEGACY).nuspec());
-
-      NuGetPublishProtocolIT.this.nugetPackageService.publishVersion(
-          NuGetPublishProtocolIT.this.repoTxService.getRepoByName(repo.getName()),
-          id,
-          LEGACY,
-          new Pkg(id, LEGACY).nuspec(),
-          null,
-          replacesExisting -> BaseUsages.ofDisk(0));
-
-      return new Seeded(repo, id, legacy, canonical);
+      String lowerId() {
+        return this.id.toLowerCase(java.util.Locale.ROOT);
+      }
     }
 
-    private byte[] download(final Seeded seeded, final String version) throws Exception {
-      final var lowerId = seeded.id().toLowerCase();
+    private Pushed push() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), PUSHED);
+      final var nupkg = pkg.nupkg();
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, nupkg, NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
+          201);
+
+      return new Pushed(repo, pkg.id(), nupkg);
+    }
+
+    private byte[] read(final Pushed pushed, final String version, final String extension)
+        throws Exception {
 
       return NuGetPublishProtocolIT.this
           .protocol(
               get(
-                  "/{repo}/v3/package/{id}/{version}/{id}.{version}.nupkg",
-                  seeded.repo().getName(),
-                  lowerId,
+                  "/{repo}/v3/package/{id}/{version}/{id}.{version}.{extension}",
+                  pushed.repo().getName(),
+                  pushed.lowerId(),
                   version,
-                  lowerId,
-                  version))
+                  pushed.lowerId(),
+                  version,
+                  extension))
           .andExpect(status().isOk())
           .andReturn()
           .getResponse()
           .getContentAsByteArray();
     }
 
-    @Test
-    @DisplayName("is still served under its own version, next to the canonical one")
-    void servesLegacyVersion() throws Exception {
-      final var seeded = this.seed();
+    private ResultActions versionRequest(final AbstractMockHttpServletRequestBuilder<?> builder)
+        throws Exception {
 
-      assertThat(this.download(seeded, LEGACY)).isEqualTo(seeded.legacyNupkg());
-      assertThat(this.download(seeded, "1.0.0")).isEqualTo(seeded.canonicalNupkg());
+      return NuGetPublishProtocolIT.this.protocol(
+          builder.header(AUTHORIZATION, NuGetPublishProtocolIT.this.adminProtocolBearerToken()));
+    }
 
-      assertThat(NuGetPublishProtocolIT.this.storedVersions(seeded.repo(), seeded.id()))
-          .filteredOn(v -> LEGACY.equals(v.getVersion()))
-          .singleElement()
-          .satisfies(v -> assertThat(v.getDownloadCount()).isEqualTo(1));
+    private String versionUrl(final Pushed pushed, final String version) {
+      return "/%s/v3/package/%s/%s".formatted(pushed.repo().getName(), pushed.lowerId(), version);
     }
 
     @Test
-    @DisplayName("is deleted from its own directory and leaves the canonical version alone")
-    void deletesLegacyVersion() throws Exception {
-      final var seeded = this.seed();
-      final var repo = seeded.repo();
+    @DisplayName("is downloaded, and counted on its one row, by every spelling of the version")
+    void downloadsAndCountsBySpelling() throws Exception {
+      final var pushed = this.push();
+
+      for (final var version : SPELLINGS) {
+        assertThat(this.read(pushed, version, "nupkg"))
+            .as("nupkg of %s", version)
+            .isEqualTo(pushed.nupkg());
+        assertThat(this.read(pushed, version, "nuspec")).as("nuspec of %s", version).isNotEmpty();
+      }
+
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(pushed.repo(), pushed.id()))
+          .singleElement()
+          .satisfies(
+              v -> {
+                assertThat(v.getVersion()).isEqualTo("1.0.0");
+                assertThat(v.getDownloadCount()).isEqualTo(SPELLINGS.size());
+              });
+    }
+
+    @Test
+    @DisplayName("is in the registration, by every spelling of the version")
+    void registrationBySpelling() throws Exception {
+      final var pushed = this.push();
+
+      for (final var version : SPELLINGS) {
+        NuGetPublishProtocolIT.this
+            .protocol(
+                get(
+                    "/{repo}/v3/registration/{id}/{version}.json",
+                    pushed.repo().getName(),
+                    pushed.lowerId(),
+                    version))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.catalogEntry.version").value("1.0.0"));
+      }
+    }
+
+    @Test
+    @DisplayName("is unlisted and relisted by the spelling with build metadata")
+    void unlistsAndRelistsBySpelling() throws Exception {
+      final var pushed = this.push();
+      final var url = this.versionUrl(pushed, PUSHED);
+
+      this.versionRequest(delete(url)).andExpect(status().isNoContent());
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(pushed.repo(), pushed.id()))
+          .singleElement()
+          .satisfies(v -> assertThat(v.isListed()).isFalse());
+
+      this.versionRequest(post(url)).andExpect(status().isOk());
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(pushed.repo(), pushed.id()))
+          .singleElement()
+          .satisfies(v -> assertThat(v.isListed()).isTrue());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1.0.0", "1.0.0+build.5", PUSHED})
+    @DisplayName("is deleted, with its files, by every spelling of the version")
+    void deletesBySpelling(final String version) throws Exception {
+      final var pushed = this.push();
+      final var repo = pushed.repo();
 
       NuGetPublishProtocolIT.this.nugetApiFacade.deleteVersion(
           NuGetPublishProtocolIT.this.repoTxService.getRepoByName(repo.getName()),
-          seeded.id(),
-          LEGACY);
+          pushed.id(),
+          version);
 
-      assertThat(java.nio.file.Path.of(packageDir(repo, seeded.id(), LEGACY))).doesNotExist();
-      assertThat(java.nio.file.Path.of(packageDir(repo, seeded.id(), "1.0.0")))
-          .isDirectory()
-          .isNotEmptyDirectory();
-      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, seeded.id()))
-          .extracting(NuGetPackageVersion::getVersion)
-          .containsExactly("1.0.0");
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, pushed.id())).isEmpty();
+      assertThat(java.nio.file.Path.of(packageDir(repo, pushed.id(), "1.0.0"))).doesNotExist();
+    }
+
+    @Test
+    @DisplayName("does not find a version stored under build metadata in a directory of its own")
+    void leftoverLegacyVersionIsNotServed() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var lowerId = id.toLowerCase(java.util.Locale.ROOT);
+      final var legacy = "1.0.0+legacy";
+      final var nuspec = new Pkg(id, legacy).nuspec();
+
+      // What an installation that skipped the RPS-1059 migration still holds.
+      final var directory = java.nio.file.Path.of(packageDir(repo, id, legacy));
+      Files.createDirectories(directory);
+      Files.write(
+          directory.resolve(lowerId + "." + legacy + ".nupkg"), new Pkg(id, legacy).nupkg());
+      Files.writeString(directory.resolve(lowerId + "." + legacy + ".nuspec"), nuspec);
+      NuGetPublishProtocolIT.this.nugetPackageService.publishVersion(
+          NuGetPublishProtocolIT.this.repoTxService.getRepoByName(repo.getName()),
+          id,
+          legacy,
+          nuspec,
+          null,
+          replacesExisting -> BaseUsages.ofDisk(0));
+
+      NuGetPublishProtocolIT.this
+          .protocol(
+              get(
+                  "/{repo}/v3/package/{id}/{version}/{id}.{version}.nupkg",
+                  repo.getName(),
+                  lowerId,
+                  legacy,
+                  lowerId,
+                  legacy))
+          .andExpect(status().isNotFound());
     }
   }
 
