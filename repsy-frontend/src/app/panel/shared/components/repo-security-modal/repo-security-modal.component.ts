@@ -22,6 +22,7 @@ import { finalize } from 'rxjs/operators';
 import { RecentScannedVersion, RepoSecurityDetail, RepoType } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { SecurityService } from '../../../pages/security/service/security.service';
+import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
 import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
@@ -30,6 +31,7 @@ import { SeverityBreakdownComponent } from '../severity-breakdown/severity-break
 @Component({
   selector: 'app-repo-security-modal',
   standalone: true,
+  hostDirectives: [PortalToBodyDirective],
   imports: [CommonModule, SpinnerComponent, RescanNoteComponent, SeverityBadgeComponent, SeverityBreakdownComponent],
   templateUrl: './repo-security-modal.component.html',
 })

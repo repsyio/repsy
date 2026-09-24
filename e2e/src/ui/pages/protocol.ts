@@ -231,23 +231,31 @@ export class ProtocolListPage extends UiPage {
     await this.search(this.level.search.term(target));
   }
 
-  /**
-   * Picks a sort option by name (`Newest`, `Oldest`, `Name (A-Z)`, ...). The sort menu stays OPEN after
-   * a choice (it only closes on an outside click), so this opens it only when it is closed: calling it
-   * twice in a row must not toggle it shut.
-   */
-  async sortBy(option: string): Promise<void> {
+  /** The open sort menu (hidden while the menu is closed). */
+  get sortMenu(): Locator {
+    return this.tid('sort-selector-menu', this.sort);
+  }
+
+  /** Opens the sort menu and returns it. */
+  async openSortMenu(): Promise<Locator> {
     if (!this.level.sort) {
       throw new Error(`the ${this.descriptor.protocol} ${this.levelName} page has no sort`);
     }
-    const menu = this.tid('sort-selector-menu', this.sort);
-    if (!(await menu.isVisible())) {
-      await this.tid('sort-selector-toggle', this.sort).click();
-      await expect(menu).toBeVisible();
-    }
-    await this.tid(`sort-option-${option}`, this.sort).click();
+    await this.tid('sort-selector-toggle', this.sort).click();
+    await expect(this.sortMenu).toBeVisible();
+    return this.sortMenu;
+  }
+
+  /**
+   * Picks a sort option by name (`Newest`, `Oldest`, `Name (A-Z)`, ...): opens the menu, clicks the
+   * option and checks that the menu closes on its own (it closes on a choice, RPS-1288 item 3).
+   */
+  async sortBy(option: string): Promise<void> {
+    const menu = await this.openSortMenu();
+    await this.tid(`sort-option-${option}`, menu).click();
     // The toggle shows the chosen option's name.
     await expect(this.tid('sort-selector-toggle', this.sort)).toContainText(option);
+    await expect(menu).toBeHidden();
   }
 
   async refresh(): Promise<void> {
@@ -294,12 +302,7 @@ export class ProtocolListPage extends UiPage {
       throw new Error(`the ${this.descriptor.protocol} ${this.levelName} rows cannot be deleted`);
     }
     const menu = await this.openRowMenu(target);
-    // Not a mouse click: the menu opens over the NEXT row, and that row's grid (its `fade-in-down`
-    // class keeps `animation: ... forwards`, so it is a stacking context of its own) paints above the
-    // menu, so a real click on the middle of "Delete" lands on the next row (and Playwright refuses it:
-    // "<div class=grid ...> intercepts pointer events"). The button's own click handler is what the
-    // user's click would reach, so dispatch that. (RPS-1299, not fixed here.)
-    await this.tid('row-delete', menu).dispatchEvent('click');
+    await this.tid('row-delete', menu).click();
     await this.dangerModal.expectOpen(affordance.dialogTitle);
     return this.dangerModal;
   }
@@ -397,11 +400,7 @@ export class VersionDetailPage extends UiPage {
       throw new Error(`the ${this.descriptor.protocol} detail page cannot delete`);
     }
     await expect(this.deleteButton).toBeVisible();
-    // Playwright's own hit-target check refuses this button on every detail page ("<app-...-version-
-    // detail> intercepts pointer events": the page's custom-element host is reported above it by
-    // `elementsFromPoint`), although a real mouse click at the same point works. `force` skips that
-    // check only; the click is still a real mouse click on the button's centre. (RPS-1288 item 1, not fixed here.)
-    await this.deleteButton.click({ force: true });
+    await this.deleteButton.click();
     await this.dangerModal.expectOpen(affordance.dialogTitle);
     return this.dangerModal;
   }

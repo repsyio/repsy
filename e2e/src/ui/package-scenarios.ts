@@ -395,6 +395,11 @@ export function registerPackageScenarios(
             await list.sortBy(option);
             await expect.poll(() => rowKeys(list)).toEqual(order(option));
           }
+
+          // The menu closes by itself after a choice (`sortBy` asserts that) and on Escape.
+          const menu = await list.openSortMenu();
+          await adminPage.keyboard.press('Escape');
+          await expect(menu).toBeHidden();
         },
       );
     } else {

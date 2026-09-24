@@ -222,6 +222,17 @@ body {
   font-family: 'Comfortaa', sans-serif;
 }
 
+/*
+ * A routed page component is a custom element, which is `display: inline` unless styled. Every page
+ * wraps block-level content, and Chrome then reports the inline host (and its inline ancestors) as
+ * the element at the point of a button near the bottom of the page: Playwright refuses the click
+ * ("<app-...> intercepts pointer events") and the host takes the hit instead of the button. Routed
+ * components are always inserted right after their `<router-outlet>`, so make them block boxes.
+ */
+router-outlet + * {
+  display: block;
+}
+
 .repsy-btn-base {
   display: flex;
   justify-content: center;

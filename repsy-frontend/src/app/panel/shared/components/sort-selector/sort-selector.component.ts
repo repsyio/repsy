@@ -15,7 +15,7 @@
 ///
 
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Input, OnInit, Output } from '@angular/core';
 
 import { OutSideClickDirective } from '../../../../shared/components/outside-click-directive';
 import { Sort } from '../../dto/sort';
@@ -32,6 +32,8 @@ export class SortSelectorComponent implements OnInit {
   @Output() public choose = new EventEmitter<Sort>();
   public isOpen = false;
 
+  constructor(private readonly element: ElementRef<HTMLElement>) {}
+
   ngOnInit() {
     if (!this.selectedOption) {
       this.selectedOption = this.options[0];
@@ -43,7 +45,18 @@ export class SortSelectorComponent implements OnInit {
     this.isOpen = !this.isOpen;
   }
 
+  /** Escape closes the menu and hands the focus back to the toggle. */
+  @HostListener('document:keydown.escape')
+  onEscape() {
+    if (!this.isOpen) {
+      return;
+    }
+    this.isOpen = false;
+    this.element.nativeElement.querySelector<HTMLElement>('[data-testid="sort-selector-toggle"]')?.focus();
+  }
+
   selectOption(option: Sort) {
+    this.isOpen = false;
     this.selectedOption = option;
     this.selectedOptionChange.emit(option);
     this.choose.emit(option);

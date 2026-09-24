@@ -1,4 +1,9 @@
-/* FadeInDown enter */
+/*
+ * FadeInDown enter. No `forwards` fill: the keyframes already end on the element's natural state
+ * (no transform, opacity 1), and a kept transform would make every list row a stacking context of its
+ * own (a later row then paints over the dropdown menu of an earlier one, and a `fixed` child such as
+ * a modal is positioned against the row instead of the viewport).
+ */
 @keyframes fadeInDown {
   from {
     transform: translateY(-20px);
@@ -11,7 +16,7 @@
 }
 
 .fade-in-down {
-  animation: fadeInDown 400ms cubic-bezier(0.35, 0, 0.25, 1) forwards;
+  animation: fadeInDown 400ms cubic-bezier(0.35, 0, 0.25, 1);
 }
 
 @keyframes fadeInLeft {

@@ -316,18 +316,14 @@ for (const { protocol, type, packageLevel } of SECURITY_CASES) {
 }
 
 test.describe('SEC-02a closing a security modal', { tag: MOCKED }, () => {
-  // The modals are rendered INSIDE the clickable row or card that hosts the badge, and only their
-  // backdrop and their links stop the click from bubbling: the X (and any click inside the dialog)
-  // reaches the row, whose handler opens the repository or the package. A clean repository keeps the
-  // dialog short, so the X is reachable for these two tests (see the last one for a tall dialog).
+  // The modals used to be rendered INSIDE the clickable row or card that hosts the badge, so a click
+  // on the X reached the row and opened the repository or the package (RPS-1295); they are now moved
+  // to the end of the body. The first two tests use a clean repository (a short dialog), the last one
+  // a tall dialog with a chart.
   test('the X of the repository modal closes it and stays on the list', async ({
     adminPage,
     seeder,
   }) => {
-    test.fail(
-      true,
-      'the X of the security modal does not stop the click, so it also opens the row it sits in RPS-1295',
-    );
     const repo = await seeder.createRepo(RepoType.NPM);
     await stubSupportedRepoTypes(adminPage, [RepoType.NPM]);
     await stubRepoSecuritySummary(adminPage, {
@@ -353,10 +349,6 @@ test.describe('SEC-02a closing a security modal', { tag: MOCKED }, () => {
     seeder,
     seedPackage,
   }) => {
-    test.fail(
-      true,
-      'the X of the security modal does not stop the click, so it also opens the row it sits in RPS-1295',
-    );
     const repo = await seeder.createRepo(RepoType.NPM);
     const pkg = await seedPackage(repo);
     const list = protocolPages(adminPage, DESCRIPTORS.npm, repo.name).list();
@@ -384,10 +376,6 @@ test.describe('SEC-02a closing a security modal', { tag: MOCKED }, () => {
     adminPage,
     seeder,
   }) => {
-    test.fail(
-      true,
-      "the dialog's title and X are covered by the page header when the chart makes it tall, so a mouse cannot reach the X RPS-1295",
-    );
     const repo = await seeder.createRepo(RepoType.NPM);
     await stubSupportedRepoTypes(adminPage, [RepoType.NPM]);
     await stubRepoSecuritySummary(adminPage, {
