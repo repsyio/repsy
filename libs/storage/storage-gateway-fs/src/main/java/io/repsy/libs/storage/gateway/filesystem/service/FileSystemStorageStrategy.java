@@ -15,8 +15,12 @@
  */
 package io.repsy.libs.storage.gateway.filesystem.service;
 
+import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static java.nio.file.StandardOpenOption.APPEND;
 import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.CREATE_NEW;
+import static java.nio.file.StandardOpenOption.WRITE;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
@@ -32,6 +36,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.FileChannel;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -39,6 +44,7 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -50,6 +56,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -63,6 +70,22 @@ import org.springframework.scheduling.annotation.Async;
 public class FileSystemStorageStrategy implements StorageStrategy {
 
   private static final String PATH_DELIMITER = "/";
+
+  /**
+   * A {@link #write} streams into a hidden sibling named {@code .repsy-write-<uuid>.tmp} and moves
+   * it over the target once the stream was read to its end. A file with such a name is never
+   * listed, counted, served or accepted as a target.
+   */
+  private static final String TEMP_FILE_PREFIX = ".repsy-write-";
+
+  private static final String TEMP_FILE_SUFFIX = ".tmp";
+
+  /**
+   * How long a temporary write file may go without being modified before {@link #clearTrash()}
+   * treats it as left behind by a crashed JVM. A live write modifies its file all the time, so this
+   * only has to outlast the longest stall of a client that is still uploading.
+   */
+  private static final Duration ORPHANED_TEMP_FILE_AGE = Duration.ofDays(1);
 
   private final @NonNull Path basePath;
   private final @NonNull Path trashPath;
@@ -89,9 +112,10 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   public @NonNull Optional<Resource> get(
       final @NonNull StoragePath storagePath, final @NonNull String repoName)
       throws IsADirectoryException {
-    final UrlResource urlResource = new UrlResource(this.toPhysicalPath(storagePath).toUri());
+    final Path physicalPath = this.toPhysicalPath(storagePath);
+    final UrlResource urlResource = new UrlResource(physicalPath.toUri());
 
-    if (!urlResource.exists()) {
+    if (isTempFile(physicalPath) || !urlResource.exists()) {
       return Optional.empty();
     }
 
@@ -127,7 +151,9 @@ public class FileSystemStorageStrategy implements StorageStrategy {
         final long lastModified = file.lastModified();
         final long size = file.length();
 
-        if (file.isFile() && Instant.ofEpochMilli(lastModified).isBefore(notModifiedSince)) {
+        if (file.isFile()
+            && !isTempFileName(file.getName())
+            && Instant.ofEpochMilli(lastModified).isBefore(notModifiedSince)) {
           staleFiles.add(new StaleFile(file.getName(), size));
         }
       }
@@ -173,6 +199,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     try (final Stream<Path> stream =
         storagePath.getStorageKey() == null ? Files.list(path) : Files.walk(path)) {
       return stream
+          .filter(entry -> !isTempFile(entry))
           .map(this::toStorageItemInfo)
           .filter(si -> !si.getPath().equals(this.trashPath.toString()))
           .toList();
@@ -195,6 +222,23 @@ public class FileSystemStorageStrategy implements StorageStrategy {
         .build();
   }
 
+  /**
+   * Writes the stream to the object, replacing what is there. The bytes go to a temporary file next
+   * to the target first, and the file is moved over the target only after the stream was read to
+   * its end, so a failure part-way (a dropped connection, a full disk) leaves the previous content
+   * of the object byte-identical and removes the temporary file. A reader sees either the old or
+   * the new content, never a part of it.
+   *
+   * <p>The move is atomic ({@link java.nio.file.StandardCopyOption#ATOMIC_MOVE}). A file system
+   * that cannot do that gets a plain replacing move instead, which is not atomic but still only
+   * runs after the full content was written. The permissions of the file that is replaced are kept
+   * where the platform has them; a target that is a symbolic link is replaced by the new file
+   * instead of being written through.
+   *
+   * <p>A JVM that dies during a write leaves its temporary file behind; {@link #clearTrash()}
+   * removes such files once they are a day old. The usage change is the size of the new content
+   * minus the size of the content it replaces.
+   */
   @Override
   @SneakyThrows
   public @NonNull BaseUsages write(
@@ -210,21 +254,78 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     }
 
     final Path physicalPath = this.toPhysicalPath(storagePath);
+
+    if (isTempFile(physicalPath)) {
+      throw new InvalidStoragePathException("invalidStoragePath");
+    }
+
     final Path directory = physicalPath.getParent();
 
     if (!Files.exists(directory)) {
       Files.createDirectories(directory);
     }
 
+    final Path tempFile =
+        directory.resolve(TEMP_FILE_PREFIX + UUID.randomUUID() + TEMP_FILE_SUFFIX);
     final long bytesWritten;
-    try (final InputStream is = inputStream;
-        final OutputStream os =
-            Files.newOutputStream(physicalPath, CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 
-      bytesWritten = is.transferTo(os);
+    try {
+      try (final InputStream is = inputStream;
+          final OutputStream os = Files.newOutputStream(tempFile, CREATE_NEW, WRITE)) {
+
+        bytesWritten = is.transferTo(os);
+      }
+
+      keepPermissions(physicalPath, tempFile);
+      moveIntoPlace(tempFile, physicalPath);
+    } catch (final IOException | RuntimeException | Error e) {
+      deleteTempFile(tempFile, e);
+      throw e;
     }
 
     return BaseUsages.builder().diskUsage(bytesWritten - existingFileLength).build();
+  }
+
+  private static void moveIntoPlace(final Path tempFile, final Path target) throws IOException {
+    try {
+      Files.move(tempFile, target, ATOMIC_MOVE);
+    } catch (final AtomicMoveNotSupportedException e) {
+      Files.move(tempFile, target, REPLACE_EXISTING);
+    }
+  }
+
+  /**
+   * Gives the new file the permissions of the file it replaces, as an in-place write would have
+   * kept them. Best effort: a file system without POSIX permissions, or a target that vanished in
+   * the meantime, leaves the default permissions of a new file.
+   */
+  private static void keepPermissions(final Path target, final Path tempFile) {
+    if (!Files.exists(target)) {
+      return;
+    }
+
+    try {
+      Files.setPosixFilePermissions(tempFile, Files.getPosixFilePermissions(target));
+    } catch (final IOException | UnsupportedOperationException ignored) {
+      // keep the default permissions of a new file
+    }
+  }
+
+  private static void deleteTempFile(final Path tempFile, final Throwable cause) {
+    try {
+      Files.deleteIfExists(tempFile);
+    } catch (final IOException e) {
+      cause.addSuppressed(e);
+    }
+  }
+
+  private static boolean isTempFile(final Path path) {
+    final Path fileName = path.getFileName();
+    return fileName != null && isTempFileName(fileName.toString());
+  }
+
+  private static boolean isTempFileName(final String name) {
+    return name.startsWith(TEMP_FILE_PREFIX) && name.endsWith(TEMP_FILE_SUFFIX);
   }
 
   @Override
@@ -312,6 +413,10 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     }
 
     for (final @NonNull File subFile : files) {
+      if (isTempFileName(subFile.getName())) {
+        continue;
+      }
+
       final StoragePath storagePath =
           StoragePath.of(
               paths.getStorageKey(),
@@ -369,6 +474,8 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   @Async("maintenanceTaskExecutor")
   @Override
   public @NonNull CompletableFuture<TrashCleanupResult> clearTrash() {
+    this.deleteOrphanedTempFiles();
+
     if (!Files.exists(this.trashPath) || !Files.isDirectory(this.trashPath)) {
       return CompletableFuture.completedFuture(TrashCleanupResult.EMPTY);
     }
@@ -389,6 +496,50 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     }
 
     return CompletableFuture.completedFuture(result);
+  }
+
+  /**
+   * Deletes the temporary files of {@link #write} that a JVM died on: hidden write files under the
+   * base path that have not been modified for a day. Best effort and not part of the trash result:
+   * an entry that cannot be read or removed is skipped, and the trash directory is not entered.
+   */
+  @SneakyThrows
+  private void deleteOrphanedTempFiles() {
+    if (!Files.isDirectory(this.basePath)) {
+      return;
+    }
+
+    final FileTime threshold = FileTime.from(Instant.now().minus(ORPHANED_TEMP_FILE_AGE));
+
+    Files.walkFileTree(
+        this.basePath,
+        new SimpleFileVisitor<>() {
+          @Override
+          public @NonNull FileVisitResult preVisitDirectory(
+              final Path dir, final @NonNull BasicFileAttributes attrs) {
+            return dir.normalize().equals(FileSystemStorageStrategy.this.trashPath.normalize())
+                ? FileVisitResult.SKIP_SUBTREE
+                : FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public @NonNull FileVisitResult visitFile(
+              final Path file, final @NonNull BasicFileAttributes attrs) {
+            if (isTempFile(file) && attrs.lastModifiedTime().compareTo(threshold) < 0) {
+              try {
+                Files.deleteIfExists(file);
+              } catch (final IOException ignored) {
+                // left for the next pass
+              }
+            }
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public @NonNull FileVisitResult visitFileFailed(final Path file, final IOException exc) {
+            return FileVisitResult.CONTINUE;
+          }
+        });
   }
 
   /**
@@ -521,7 +672,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     for (final @NonNull File file : files) {
       final String fileName = file.getName();
 
-      if (file.getPath().equals(this.trashPath.toString())) {
+      if (isTempFileName(fileName) || file.getPath().equals(this.trashPath.toString())) {
         continue;
       }
 
