@@ -9,7 +9,7 @@
   </div>
 
   <!-- Activity Items -->
-  @for (repo of repoListInfos; track repo.createdAt) {
+  @for (repo of repoListInfos; track repo.name) {
     <div
       [attr.data-testid]="'recent-activity-row-' + repo.name"
       [routerLink]="repo.name"

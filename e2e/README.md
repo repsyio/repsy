@@ -2560,13 +2560,13 @@ pages open. Files: `src/ui/pages/{dashboard,repositories,repo-create-modal}.ts`,
 `./run.sh test --protocol ui --grep "DASH-|REPO-"` runs it; the P0 cases (DASH-01, REPO-01 for maven,
 npm and docker, REPO-06, REPO-10) are also `@smoke`.
 
-| Spec                           | Scenarios                                                                                                                                            |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dashboard/dashboard.spec.ts`  | DASH-01 cards and counts against the API, DASH-02 Recent Activity, DASH-03 count row -> filtered list, DASH-04 USER                                  |
-| `repositories/create.spec.ts`  | REPO-01 (one case per row of `UI_REPO_TYPES`, plus public+description, default type, from the dashboard), REPO-02 validation, REPO-03 duplicate name |
-| `repositories/list.spec.ts`    | REPO-04 search, type selector and refresh, REPO-05 pagination, REPO-08 empty state, REPO-09 USER                                                     |
-| `repositories/delete.spec.ts`  | REPO-06 delete, REPO-07 cancel                                                                                                                       |
-| `repositories/routing.spec.ts` | REPO-10 `/<unknown>` is the 404 page, `/<repo>` opens the repository                                                                                 |
+| Spec                           | Scenarios                                                                                                                                                                                            |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dashboard/dashboard.spec.ts`  | DASH-01 cards and counts against the API, DASH-02 Recent Activity, DASH-03 count row -> filtered list, DASH-04 USER                                                                                  |
+| `repositories/create.spec.ts`  | REPO-01 (one case per row of `UI_REPO_TYPES`, plus public+description, default type, from the dashboard, Cancel sends no request and Enter creates once), REPO-02 validation, REPO-03 duplicate name |
+| `repositories/list.spec.ts`    | REPO-04 search, type selector and refresh, REPO-05 pagination, REPO-08 empty state, REPO-09 USER                                                                                                     |
+| `repositories/delete.spec.ts`  | REPO-06 delete, REPO-07 cancel                                                                                                                                                                       |
+| `repositories/routing.spec.ts` | REPO-10 `/<unknown>` and a several-segment unknown path are the 404 page (inside the layout, at `/not-found`), `/<repo>` opens the repository                                                        |
 
 Things a test here relies on, which a change to the page can break:
 
@@ -2608,7 +2608,7 @@ user the UI is about to create so a failing test still cleans it up).
 | USR-03   | rename, promote, demote next to another admin, the last-admin warning and locked switch, edit validation, taken name, cancel   |
 | USR-04   | reset password: one-time modal, the new password logs in, the old one is refused, cancel resets nothing                        |
 | USR-05   | delete (cancel, then confirm), delete next to another admin, the last-admin toast                                              |
-| USR-06   | 11 users: search (incl. case-insensitive, no match), pagination both ways, refresh                                             |
+| USR-06   | 11 users: search (incl. case-insensitive, no match with its `No user matches` message), pagination both ways, refresh          |
 | PRO-01   | change password: mismatch, cancel, confirm, re-login with the new one, the old one refused; field validation                   |
 | PRO-02   | change username: reload as the new name, same account, repo protocol URL and repo page still work; validation; taken name      |
 | PRO-03   | delete account: cancel, confirm, logged out, login refused                                                                     |
@@ -2702,9 +2702,7 @@ How the tests are written, and what they had to work around:
 Known product bugs are pinned with `test.fail('... RPS-nnnn')`, so the test turns red the day the
 bug is fixed and the marker has to go: the Visibility and Package Override help texts describe the
 opposite of the toggle (RPS-1261, two tests), and `#name`/`#description` are duplicated between the
-rename form and the create-token modal (RPS-1266). A third pin is RPS-1285: revoking the only token on page 2
-fires two list requests and the empty page-2 answer can land last, leaving "Your list is empty" over three tokens (the test
-slows that answer to make the order certain). Not covered here: the Vulnerability Scanning toggle
+rename form and the create-token modal (RPS-1266). TOK-03 (RPS-1285, fixed) revokes the only token on page 2 with the page-2 answer delayed and asserts a single list request (the first page) and the three remaining rows. Not covered here: the Vulnerability Scanning toggle
 (hidden without a scanner, RPS-1259), the per-protocol "configure" modal behind a token row, the
 `reservedName` rename error (it has no test id), the expiration-date range messages (no test id) and
 the token-name `minLength` branch, which is unreachable (`required` already covers an empty name, RPS-1265).

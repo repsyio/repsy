@@ -22,11 +22,10 @@ import { filter } from 'rxjs';
 
 import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { ProfileService } from '../../../pages/profile/service/profile.service';
-import { SearchboxComponent } from '../searchbox/searchbox.component';
 
 @Component({
   selector: 'app-sidebar',
-  imports: [RouterModule, CommonModule, RouterLink, SearchboxComponent, NgOptimizedImage],
+  imports: [RouterModule, CommonModule, RouterLink, NgOptimizedImage],
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.css',
 })

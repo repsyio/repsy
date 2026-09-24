@@ -76,6 +76,8 @@ test.describe('Mobile viewport', () => {
       await shell.header.burger.click();
       await expect(shell.mobileSidebar.root).toBeVisible({ timeout: 3_000 });
       await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'true');
+      // RPS-1267: the "Search docs" box did nothing and is gone.
+      await expect(page.getByTestId('mobile-sidebar-search')).toHaveCount(0);
       await shell.mobileSidebar.link('repositories').click();
       await expect(page).toHaveURL(/\/repositories$/);
       await expect(repos.title).toBeVisible();

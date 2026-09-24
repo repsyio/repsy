@@ -105,9 +105,9 @@ export const routes: Routes = [
     ],
   },
 
+  // Anything no route above matches ends up on the 404 page inside the panel layout, like `/not-found`.
   {
     path: '**',
-    component: NotFoundComponent,
-    title: 'repsy | Not Found',
+    redirectTo: 'not-found',
   },
 ];

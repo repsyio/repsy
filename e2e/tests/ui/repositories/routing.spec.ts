@@ -48,6 +48,21 @@ test.describe('Repository routing', () => {
     },
   );
 
+  // RPS-1267: a path with several segments matches no repository route and used to render the 404
+  // page outside the panel layout (no sidebar, no header). It now lands on /not-found like the rest.
+  test('REPO-10: an unknown path with several segments is the 404 page inside the panel layout', async ({
+    adminPage,
+    seeder,
+  }) => {
+    await adminPage.goto(`/no/such/path/${seeder.runId}/at/all`);
+
+    await expect(adminPage.getByTestId('not-found')).toBeVisible();
+    await expect(adminPage).toHaveURL('/not-found');
+    await expect(adminPage).toHaveTitle('repsy | Not Found');
+    await expect(adminPage.getByTestId('header')).toBeVisible();
+    await expect(adminPage.getByTestId('sidebar')).toBeVisible();
+  });
+
   test("REPO-10: a repository of another type opens that type's page", async ({
     adminPage,
     seeder,
