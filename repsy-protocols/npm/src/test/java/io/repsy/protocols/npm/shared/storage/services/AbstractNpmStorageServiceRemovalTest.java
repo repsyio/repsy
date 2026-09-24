@@ -32,6 +32,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -39,6 +40,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -75,6 +77,18 @@ class AbstractNpmStorageServiceRemovalTest {
          "1.1.0":{"name":"demo","version":"1.1.0","description":"two","readme":"r2"},
          "1.2.0":{"name":"demo","version":"1.2.0","description":"three"}}}
       """;
+
+  /** For a package whose metadata is stored: the rows are never asked for. */
+  private static final Supplier<NpmPackageSnapshot> NO_ROWS =
+      () -> {
+        throw new AssertionError("the metadata is stored, so the rows are not needed");
+      };
+
+  /** For a package the database does not know either. */
+  private static final Supplier<NpmPackageSnapshot> NO_PACKAGE =
+      () -> {
+        throw new ItemNotFoundException("packageNotFound");
+      };
 
   @Mock private StorageStrategy storageStrategy;
 
@@ -123,7 +137,8 @@ class AbstractNpmStorageServiceRemovalTest {
         .thenReturn(BaseUsages.ofDisk(-100L));
 
     final var growth =
-        this.service.removeVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0");
+        this.service.removeVersion(
+            REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS);
 
     assertThat(growth).as("the metadata shrank by 100, the tarball freed 40").isEqualTo(-140L);
     final var written = this.written();
@@ -144,7 +159,7 @@ class AbstractNpmStorageServiceRemovalTest {
         .thenReturn(BaseUsages.ofDisk(-10L));
 
     final var growth =
-        this.service.removeVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.0.0", null);
+        this.service.removeVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.0.0", null, NO_ROWS);
 
     assertThat(growth).as("a tarball that is gone frees nothing").isEqualTo(-10L);
     final var written = this.written();
@@ -161,7 +176,7 @@ class AbstractNpmStorageServiceRemovalTest {
     when(this.storageStrategy.write(eq(REPO_NAME), at(METADATA_FILE), any()))
         .thenReturn(BaseUsages.ofDisk(0L));
 
-    this.service.removeVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0");
+    this.service.removeVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS);
 
     final var order = inOrder(this.storageStrategy);
     order.verify(this.storageStrategy).write(eq(REPO_NAME), at(METADATA_FILE), any());
@@ -181,7 +196,7 @@ class AbstractNpmStorageServiceRemovalTest {
     assertThatThrownBy(
             () ->
                 this.service.removeVersion(
-                    REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0"))
+                    REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
         .isSameAs(failure);
 
     final var restored = ArgumentCaptor.forClass(InputStream.class);
@@ -202,7 +217,7 @@ class AbstractNpmStorageServiceRemovalTest {
     assertThatThrownBy(
             () ->
                 this.service.removeVersion(
-                    REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0"))
+                    REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("disk full");
 
@@ -225,20 +240,20 @@ class AbstractNpmStorageServiceRemovalTest {
     assertThatThrownBy(
             () ->
                 this.service.removeVersion(
-                    REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0"))
+                    REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
         .isSameAs(failure)
         .hasSuppressedException(restoreFailure);
   }
 
   @Test
-  @DisplayName("a package without metadata is a not-found, before anything is removed")
+  @DisplayName("a package without metadata and without rows is a not-found, before anything goes")
   void aMissingMetadataFileIsNotFound() {
     when(this.storageStrategy.get(at(METADATA_FILE), anyString())).thenReturn(Optional.empty());
 
     assertThatThrownBy(
             () ->
                 this.service.removeVersion(
-                    REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0"))
+                    REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_PACKAGE))
         .isInstanceOf(ItemNotFoundException.class);
 
     verify(this.storageStrategy, never()).delete(any());

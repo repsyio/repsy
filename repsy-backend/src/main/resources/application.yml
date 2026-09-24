@@ -127,6 +127,13 @@ repsy:
       max-failures: ${AUTH_THROTTLE_MAX_FAILURES:20}
       window-seconds: ${AUTH_THROTTLE_WINDOW_SECONDS:60}
       max-clients: ${AUTH_THROTTLE_MAX_CLIENTS:10000}
+    # Resets a user's password when an operator creates a file named after the user in `dir`
+    # (README "Forgot admin password?"). The file is removed and the new password is logged once.
+    # The Docker image points `dir` at /app/data/password-reset, on the persisted volume.
+    password-reset:
+      enabled: ${PASSWORD_RESET_MARKER_ENABLED:true}
+      dir: ${PASSWORD_RESET_MARKER_DIR:${storage-gateway.fs.base-path}/password-reset}
+      poll-interval: ${PASSWORD_RESET_MARKER_POLL_INTERVAL:PT5S}
     scanner: ${SECURITY_SCANNER:disabled}
     trivy:
       scanner-base-url: ${TRIVY_SCANNER_BASE_URL:http://localhost:8090}

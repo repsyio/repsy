@@ -29,12 +29,17 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
+// Runs before PasswordResetMarkerScanner, so when both apply to a user the marker's password is
+// the last one logged.
+@Order(Ordered.LOWEST_PRECEDENCE - 1)
 public class AdminUserInitializer implements ApplicationRunner {
 
   private static final String ADMIN_USERNAME = "admin";

@@ -31,21 +31,24 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.npm.shared.npm_package.dtos.BasePackageInfo;
+import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService.PackageDeletion;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService.PackageRemover;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService.VersionRemover;
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
+import io.repsy.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -68,7 +71,8 @@ class AbstractNpmProtocolFacadeDeleteTest {
   private static final String REPO_NAME = "npm-repo";
   private static final String PACKAGE = "demo";
   private static final Path BASE_PATH = Path.of(PACKAGE);
-  private static final byte[] PREVIOUS_METADATA = "{\"name\":\"demo\"}".getBytes();
+  private static final NpmPackageSnapshot SNAPSHOT =
+      new NpmPackageSnapshot(null, PACKAGE, "1.0.0", Instant.EPOCH, List.of(), Map.of());
 
   @Mock private NpmPackageService<UUID> packageService;
   @Mock private AbstractNpmStorageService storageService;
@@ -124,10 +128,17 @@ class AbstractNpmProtocolFacadeDeleteTest {
   @DisplayName("unpublishing a version deletes it through the service and reports the freed bytes")
   void unpublishRemovesTheVersionFilesInsideTheService() throws Exception {
     this.basePath();
-    when(this.storageService.getMetadata(any(StoragePath.class), eq(REPO_NAME)))
+    when(this.storageService.readMetadataOrRebuild(
+            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0", "1.1.0"));
     when(this.storageService.removeVersion(
-            REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.1.0", "1.0.0"))
+            eq(REPO_ID),
+            eq(REPO_NAME),
+            eq(BASE_PATH),
+            eq(PACKAGE),
+            eq("1.1.0"),
+            eq("1.0.0"),
+            any()))
         .thenReturn(-150L);
     when(this.packageService.deletePackageVersion(
             any(), any(), eq(PACKAGE), eq("1.1.0"), any(), any()))
@@ -149,7 +160,8 @@ class AbstractNpmProtocolFacadeDeleteTest {
   @DisplayName("unpublishing the last version removes the package files instead")
   void unpublishOfTheLastVersionRemovesThePackage() throws Exception {
     this.basePath();
-    when(this.storageService.getMetadata(any(StoragePath.class), eq(REPO_NAME)))
+    when(this.storageService.readMetadataOrRebuild(
+            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0"));
     when(this.storageService.deletePackage(REPO_ID, BASE_PATH)).thenReturn(300L);
     when(this.packageService.deletePackageVersion(
@@ -161,7 +173,8 @@ class AbstractNpmProtocolFacadeDeleteTest {
 
     this.facade.unPublishPackageVersion(this.context, null, PACKAGE, metadataWithVersions());
 
-    verify(this.storageService, never()).removeVersion(any(), any(), any(), any(), any(), any());
+    verify(this.storageService, never())
+        .removeVersion(any(), any(), any(), any(), any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(-300L);
   }
 
@@ -169,7 +182,8 @@ class AbstractNpmProtocolFacadeDeleteTest {
   @DisplayName("a payload that lacks no version is a conflict and unpublishes nothing")
   void unpublishOfNothingIsAConflict() throws Exception {
     this.basePath();
-    when(this.storageService.getMetadata(any(StoragePath.class), eq(REPO_NAME)))
+    when(this.storageService.readMetadataOrRebuild(
+            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0"));
 
     assertThatThrownBy(
@@ -187,7 +201,8 @@ class AbstractNpmProtocolFacadeDeleteTest {
   @DisplayName("a payload that lacks a version published after it was read is a conflict")
   void unpublishOfAStalePayloadIsAConflict() throws Exception {
     this.basePath();
-    when(this.storageService.getMetadata(any(StoragePath.class), eq(REPO_NAME)))
+    when(this.storageService.readMetadataOrRebuild(
+            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0", "2.0.0"));
 
     assertThatThrownBy(
@@ -295,6 +310,14 @@ class AbstractNpmProtocolFacadeDeleteTest {
     return metadata;
   }
 
+  /** The storage service runs the change it is given, like the real one when the file is there. */
+  private void metadataChangesRun() throws IOException {
+    when(this.storageService.changeMetadata(
+            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any(), any()))
+        .thenAnswer(
+            invocation -> invocation.<NpmStorageService.MetadataChange>getArgument(4).apply());
+  }
+
   private void deprecationRuns() throws IOException {
     when(this.packageService.handleDeprecations(any(), any(), eq(PACKAGE), any(), any()))
         .thenAnswer(
@@ -306,10 +329,10 @@ class AbstractNpmProtocolFacadeDeleteTest {
   void deprecateChangesTheMetadataInsideTheService() throws Exception {
     this.basePath();
     this.deprecationRuns();
-    when(this.storageService.getMetadata(any(StoragePath.class), eq(REPO_NAME)))
+    this.metadataChangesRun();
+    when(this.storageService.readMetadataOrRebuild(
+            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0"));
-    when(this.storageService.readMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH))
-        .thenReturn(PREVIOUS_METADATA);
     when(this.storageService.deprecateVersions(eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
         .thenReturn(17L);
 
@@ -322,23 +345,44 @@ class AbstractNpmProtocolFacadeDeleteTest {
   }
 
   @Test
-  @DisplayName("a deprecation whose metadata write fails puts the metadata back")
-  void deprecateRestoresTheMetadataWhenTheWriteFails() throws Exception {
+  @DisplayName("a deprecation whose metadata write fails reports nothing")
+  void deprecateReportsNothingWhenTheWriteFails() throws Exception {
     final var failure = new IOException("disk full");
     this.basePath();
     this.deprecationRuns();
-    when(this.storageService.getMetadata(any(StoragePath.class), eq(REPO_NAME)))
+    this.metadataChangesRun();
+    when(this.storageService.readMetadataOrRebuild(
+            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0"));
-    when(this.storageService.readMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH))
-        .thenReturn(PREVIOUS_METADATA);
     doThrow(failure).when(this.storageService).deprecateVersions(any(), any(), any(), any());
 
     assertThatThrownBy(
             () -> this.facade.deprecate(this.context, null, PACKAGE, this.deprecatedPayload()))
         .isSameAs(failure);
 
-    verify(this.storageService)
-        .restoreMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH, PREVIOUS_METADATA);
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
+  @DisplayName("the rows are asked for only through the supplier the storage service is handed")
+  void deprecateGivesTheStorageServiceTheRows() throws Exception {
+    this.basePath();
+    this.deprecationRuns();
+    when(this.storageService.readMetadataOrRebuild(
+            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
+        .thenReturn(metadataWithVersions("1.0.0"));
+    when(this.storageService.changeMetadata(
+            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              final var rows = invocation.<Supplier<NpmPackageSnapshot>>getArgument(3).get();
+              assertThat(rows).isSameAs(SNAPSHOT);
+              return 0L;
+            });
+    when(this.packageService.getSnapshot(REPO_ID, null, PACKAGE)).thenReturn(SNAPSHOT);
+
+    this.facade.deprecate(this.context, null, PACKAGE, this.deprecatedPayload());
+
+    verify(this.packageService).getSnapshot(REPO_ID, null, PACKAGE);
   }
 }

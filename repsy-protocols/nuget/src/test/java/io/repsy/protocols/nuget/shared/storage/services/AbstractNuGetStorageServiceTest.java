@@ -111,17 +111,19 @@ class AbstractNuGetStorageServiceTest {
   }
 
   @Test
-  @DisplayName("reads a version with build metadata from the directory it was stored under")
-  void readsLegacyVersionFirst() {
-    final Resource legacy = new ByteArrayResource(new byte[] {1});
-    this.stubOnlyExisting(LEGACY_NUPKG, legacy);
+  @DisplayName("does not read the directory a version with build metadata used to be stored under")
+  void ignoresLegacyDirectory() {
+    this.stubOnlyExisting(LEGACY_NUPKG, new ByteArrayResource(new byte[] {1}));
 
-    assertThat(this.service.getNuPkg(REPO_ID, "Some.Package", "1.0.0+Build")).isSameAs(legacy);
+    assertThatThrownBy(() -> this.service.getNuPkg(REPO_ID, "Some.Package", "1.0.0+Build"))
+        .isInstanceOf(ItemNotFoundException.class);
+    assertThatThrownBy(() -> this.service.getNuspec(REPO_ID, "Some.Package", "1.0.0+Build"))
+        .isInstanceOf(ItemNotFoundException.class);
   }
 
   @Test
-  @DisplayName("reads a version with build metadata from the canonical directory when not legacy")
-  void fallsBackToCanonicalVersion() {
+  @DisplayName("reads a version with build metadata from its canonical directory")
+  void readsBuildMetadataFromCanonicalDirectory() {
     final Resource canonical = new ByteArrayResource(new byte[] {1});
     this.stubOnlyExisting(CANONICAL_NUPKG, canonical);
 
@@ -138,7 +140,7 @@ class AbstractNuGetStorageServiceTest {
   }
 
   @Test
-  @DisplayName("answers not found when neither directory holds the file")
+  @DisplayName("answers not found when the canonical directory holds no file")
   void notFound() {
     when(this.storageStrategy.get(any(StoragePath.class), anyString()))
         .thenReturn(Optional.empty());
@@ -150,28 +152,28 @@ class AbstractNuGetStorageServiceTest {
   }
 
   @Test
-  @DisplayName("does not look under a legacy directory for a version without build metadata")
-  void noSecondLookupWithoutBuildMetadata() {
+  @DisplayName("looks in one place only, whatever the build metadata of the version")
+  void singleLookup() {
     when(this.storageStrategy.get(any(StoragePath.class), anyString()))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> this.service.getNuPkg(REPO_ID, "Some.Package", "1.0.0"))
+    assertThatThrownBy(() -> this.service.getNuPkg(REPO_ID, "Some.Package", "1.0.0+Build"))
         .isInstanceOf(ItemNotFoundException.class);
 
     verify(this.storageStrategy).get(any(StoragePath.class), anyString());
   }
 
   @Test
-  @DisplayName("points the scanner at the legacy path of a stored version with build metadata")
-  void relativePathOfLegacyVersion() {
+  @DisplayName("points the scanner at the canonical path, also for a version with build metadata")
+  void relativePathIsCanonical() {
     assertThat(this.service.getNupkgRelativePath("Some.Package", "1.0.0+Build"))
-        .isEqualTo(LEGACY_NUPKG);
+        .isEqualTo(CANONICAL_NUPKG);
     assertThat(this.service.getNupkgRelativePath("Some.Package", "1.0")).isEqualTo(CANONICAL_NUPKG);
   }
 
   @Test
-  @DisplayName("deletes the legacy directory of a version with build metadata, not the canonical")
-  void deletesLegacyDirectory() throws IOException {
+  @DisplayName("deletes the canonical directory of a version with build metadata")
+  void deletesCanonicalDirectoryOfBuildMetadataVersion() throws IOException {
     when(this.storageStrategy.calculatePathUsage(any(StoragePath.class))).thenReturn(7L);
 
     assertThat(this.service.deletePackageVersion(REPO_ID, "Some.Package", "1.0.0+Build"))
@@ -179,7 +181,28 @@ class AbstractNuGetStorageServiceTest {
 
     final var deleted = ArgumentCaptor.forClass(StoragePath.class);
     verify(this.storageStrategy).delete(deleted.capture());
+    assertThat(relativePath(deleted.getValue())).isEqualTo("packages/some.package/1.0.0");
+  }
+
+  @Test
+  @DisplayName("deletes the directory a version with build metadata was stored under, only")
+  void deletesBuildMetadataDirectory() throws IOException {
+    when(this.storageStrategy.calculatePathUsage(any(StoragePath.class))).thenReturn(7L);
+
+    assertThat(this.service.deleteBuildMetadataVersion(REPO_ID, "Some.Package", "1.0.0+Build"))
+        .isEqualTo(7L);
+
+    final var deleted = ArgumentCaptor.forClass(StoragePath.class);
+    verify(this.storageStrategy).delete(deleted.capture());
     assertThat(relativePath(deleted.getValue())).isEqualTo("packages/some.package/1.0.0+build");
+  }
+
+  @Test
+  @DisplayName("never deletes the canonical directory as a directory with build metadata")
+  void keepsCanonicalDirectoryWhenThereIsNoBuildMetadata() throws IOException {
+    assertThat(this.service.deleteBuildMetadataVersion(REPO_ID, "Some.Package", "1.0")).isZero();
+
+    verifyNoInteractions(this.storageStrategy);
   }
 
   @Test
