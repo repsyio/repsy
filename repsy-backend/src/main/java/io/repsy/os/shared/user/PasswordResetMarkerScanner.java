@@ -63,6 +63,9 @@ import org.springframework.stereotype.Component;
  * logged at {@code ERROR} once, not on every poll: the scanner remembers the files that already
  * failed and logs a file again only after it has disappeared and come back.
  *
+ * <p>A marker directory that cannot be read is logged at {@code WARN} once as well, and again only
+ * after it has been readable in between (RPS-1321).
+ *
  * <p>The file content is never read, symlinks and directories are ignored (a symlink is never
  * followed), and a file whose name is not a valid username is removed with a warning. Nothing is
  * reachable over the network: it takes write access to the directory, the same trust level that can
@@ -86,6 +89,12 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
 
   /** The markers that already failed and are still in the directory: logged once, not per poll. */
   private final Set<Path> failedMarkers = ConcurrentHashMap.newKeySet();
+
+  /**
+   * The directories that could not be listed at the last scan: logged once, until listed again
+   * (RPS-1321).
+   */
+  private final Set<Path> unreadableDirectories = ConcurrentHashMap.newKeySet();
 
   @Override
   public void run(final @NonNull ApplicationArguments args) {
@@ -125,11 +134,19 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
 
   private @NonNull List<Path> list(final @NonNull Path dir) {
     try (Stream<Path> entries = Files.list(dir)) {
-      return entries.sorted().toList();
+      final var sorted = entries.sorted().toList();
+      this.unreadableDirectories.remove(dir);
+      return sorted;
     } catch (final NoSuchFileException e) {
+      this.unreadableDirectories.remove(dir);
       return List.of();
     } catch (final IOException e) {
-      log.warn("Could not read the password reset marker directory {}: {}", dir, e.toString());
+      if (this.unreadableDirectories.add(dir)) {
+        log.warn("Could not read the password reset marker directory {}: {}", dir, e.toString());
+      } else {
+        log.debug(
+            "The password reset marker directory {} is still unreadable: {}", dir, e.toString());
+      }
       return List.of();
     }
   }

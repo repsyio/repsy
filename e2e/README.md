@@ -3165,8 +3165,10 @@ How the stubs are typed, and the rules they follow:
 ## Running
 
 ```bash
-./run.sh local up            # starts postgres:18 + Repsy (built from the repo root Dockerfile;
-                              # set REPSY_IMAGE to test a published image instead)
+./run.sh local up            # starts postgres:18 + Repsy (built from the repo root Dockerfile on every
+                              # `up`, so a stale repsy-os-e2e:local is never reused; the layer cache
+                              # keeps an unchanged rebuild fast. Set REPSY_IMAGE to test a published
+                              # image instead: that one is not built)
 ./run.sh test                # runs the "skeleton" runner container against it
 ./run.sh test --protocol maven
 ./run.sh test --protocol npm
