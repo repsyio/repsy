@@ -163,19 +163,17 @@ export class SignatureComponent implements OnInit {
 
   public fetchKeyStores(): void {
     this.pageNum = 1;
-    this.keyStoreControllerService
-      .listMavenKeyStores({ page: 0, size: this.pageSize }, this.activeRepository.repoName)
-      .subscribe({
-        next: (r) => {
-          this.keyStores = r.data?.content ?? [];
-        },
-        error: () => {},
-      });
+    this.keyStoreControllerService.listMavenKeyStores(this.activeRepository.repoName, 0, this.pageSize).subscribe({
+      next: (r) => {
+        this.keyStores = r.data?.content ?? [];
+      },
+      error: () => {},
+    });
   }
 
   public loadMoreKeyStores(): void {
     this.keyStoreControllerService
-      .listMavenKeyStores({ page: this.pageNum, size: this.pageSize }, this.activeRepository.repoName)
+      .listMavenKeyStores(this.activeRepository.repoName, this.pageNum, this.pageSize)
       .subscribe({
         next: (r) => {
           const newItems = r.data?.content ?? [];

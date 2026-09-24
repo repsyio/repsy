@@ -78,7 +78,7 @@ public class DockerImageController {
   @RepoOperation
   public RestResponse<PagedModel<ImageListItem>> list(
       final RepoInfo repoInfo,
-      @RequestParam(required = false, defaultValue = "") final String name,
+      @RequestParam(name = "q", required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, IMAGE_SORT_PROPERTIES);
@@ -94,7 +94,7 @@ public class DockerImageController {
   public RestResponse<PagedModel<ImageTagListItem>> listTags(
       final RepoInfo repoInfo,
       @PathVariable final String imageName,
-      @RequestParam(required = false, defaultValue = "") final String name,
+      @RequestParam(name = "q", required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, TAG_SORT_PROPERTIES);
@@ -193,7 +193,7 @@ public class DockerImageController {
       final RepoInfo repoInfo,
       @PathVariable final String imageName,
       @PathVariable final String tagName,
-      @RequestParam(required = false, defaultValue = "") final String name,
+      @RequestParam(name = "q", required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, MANIFEST_SORT_PROPERTIES);

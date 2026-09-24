@@ -73,11 +73,9 @@ export class CargoService {
     pageSize: number,
   ): Observable<PagedData<CrateListItem>> {
     return this.cargoCrateControllerService
-      .searchCargoCrates(
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        search || undefined,
-      )
+      .searchCargoCrates(this.repoName, search || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<CrateListItem>),
       );
@@ -103,12 +101,9 @@ export class CargoService {
     pageSize: number,
   ): Observable<PagedData<CrateVersionListItem>> {
     return this.cargoCrateControllerService
-      .listCargoCrateVersions(
-        crateName,
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        search || undefined,
-      )
+      .listCargoCrateVersions(crateName, this.repoName, search || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map(
           (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<CrateVersionListItem>,

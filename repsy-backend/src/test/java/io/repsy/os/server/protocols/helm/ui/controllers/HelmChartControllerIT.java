@@ -892,18 +892,19 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       it.upload(repo, ChartSpec.of("payment-gateway", "1.0.0"), token);
       it.upload(repo, ChartSpec.of("orders", "1.0.0"), token);
 
-      assertThat(namesOf(it.searchWith(repo, token, "query", "payment")))
+      assertThat(namesOf(it.searchWith(repo, token, "q", "payment")))
           .containsExactlyInAnyOrder("payments", "payment-gateway");
-      assertThat(namesOf(it.searchWith(repo, token, "query", "PAYMENTS")))
-          .containsExactly("payments");
-      assertThat(namesOf(it.searchWith(repo, token, "query", "ent")))
+      assertThat(namesOf(it.searchWith(repo, token, "q", "PAYMENTS"))).containsExactly("payments");
+      assertThat(namesOf(it.searchWith(repo, token, "q", "ent")))
           .containsExactlyInAnyOrder("payments", "payment-gateway");
-      assertThat(namesOf(it.searchWith(repo, token, "query", "gateway")))
+      assertThat(namesOf(it.searchWith(repo, token, "q", "gateway")))
           .containsExactly("payment-gateway");
-      assertThat(namesOf(it.searchWith(repo, token, "query", ""))).hasSize(3);
+      assertThat(namesOf(it.searchWith(repo, token, "q", ""))).hasSize(3);
+      // The filter was called "query" before RPS-1269: that name is an unknown parameter now.
+      assertThat(namesOf(it.searchWith(repo, token, "query", "gateway"))).hasSize(3);
 
       // "chart" is in every description ("<name> chart") but in no name.
-      final var noMatch = it.searchWith(repo, token, "query", "chart");
+      final var noMatch = it.searchWith(repo, token, "q", "chart");
       assertThat(content(noMatch)).isEmpty();
       assertPage(noMatch, 10, 0, 0, 0);
     }

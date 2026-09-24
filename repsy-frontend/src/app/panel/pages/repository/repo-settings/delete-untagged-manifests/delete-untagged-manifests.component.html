@@ -1,25 +1,37 @@
-<section data-testid="settings-untagged-manifests" id="delete-untagged-manifests" class="scroll-mt-[100px]">
-  <h3
-    class="w-full rounded-t-[12px] border border-[#e8546a] border-b-[#404141] bg-[#101112] p-[24px] font-medium text-[#FDFDFD]"
+@if (imageName) {
+  <button
+    data-testid="pkg-delete-untagged"
+    class="repsy-btn-ghost w-full sm:w-auto"
+    (click)="deleteUntaggedManifests()"
+    [disabled]="deleting"
   >
-    <a [routerLink]="[]" fragment="delete-untagged-manifests"> Untagged Manifests </a>
-  </h3>
-  <div class="rounded-b-[12px] border-r border-b border-l border-[#e8546a] bg-[#101112] p-[24px]">
-    <p class="mb-[12px] text-[14px] text-[#FDFDFD]">
-      Deleting or overriding a tag leaves its previous manifest in the repository, still pullable by its digest. Delete
-      the manifests no tag points to: they stop being pullable by digest, then the layers only they used are freed.
-    </p>
-    <p class="mb-[24px] text-[14px] text-[#FDFDFD]">
-      Do not run this while an image is being pushed by digest. To delete only the layers no manifest uses, use Orphan
-      Layers below.
-    </p>
-    <button
-      data-testid="settings-untagged-manifests-delete"
-      class="repsy-btn-danger w-full sm:w-auto"
-      (click)="deleteUntaggedManifests()"
-      [disabled]="deleting"
+    {{ deleting ? 'Deleting...' : 'Delete Untagged Manifests' }}
+  </button>
+} @else {
+  <section data-testid="settings-untagged-manifests" id="delete-untagged-manifests" class="scroll-mt-[100px]">
+    <h3
+      class="w-full rounded-t-[12px] border border-[#e8546a] border-b-[#404141] bg-[#101112] p-[24px] font-medium text-[#FDFDFD]"
     >
-      {{ deleting ? 'Deleting...' : 'Delete Untagged Manifests' }}
-    </button>
-  </div>
-</section>
+      <a [routerLink]="[]" fragment="delete-untagged-manifests"> Untagged Manifests </a>
+    </h3>
+    <div class="rounded-b-[12px] border-r border-b border-l border-[#e8546a] bg-[#101112] p-[24px]">
+      <p class="mb-[12px] text-[14px] text-[#FDFDFD]">
+        Deleting or overriding a tag leaves its previous manifest in the repository, still pullable by its digest.
+        Delete the manifests no tag points to: they stop being pullable by digest, then the layers only they used are
+        freed.
+      </p>
+      <p class="mb-[24px] text-[14px] text-[#FDFDFD]">
+        Do not run this while an image is being pushed by digest. To delete only the layers no manifest uses, use Orphan
+        Layers below.
+      </p>
+      <button
+        data-testid="settings-untagged-manifests-delete"
+        class="repsy-btn-danger w-full sm:w-auto"
+        (click)="deleteUntaggedManifests()"
+        [disabled]="deleting"
+      >
+        {{ deleting ? 'Deleting...' : 'Delete Untagged Manifests' }}
+      </button>
+    </div>
+  </section>
+}

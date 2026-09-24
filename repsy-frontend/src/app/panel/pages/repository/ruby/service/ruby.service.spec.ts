@@ -21,9 +21,9 @@ import {
   describeCalls,
   describePagedCalls,
   describeRepoSelection,
+  PAGE_ARGS,
   PAGE_INDEX,
   PAGE_SIZE,
-  PAGEABLE,
   PagedCase,
   REPO,
   restResponse,
@@ -76,13 +76,13 @@ describe('RubyService', () => {
         name: 'searchGems',
         invoke: (s, search) => s.searchGems(search, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => rubyApi.listGems,
-        args: (search) => [PAGEABLE, REPO, search],
+        args: (search) => [REPO, search, ...PAGE_ARGS],
       },
       {
         name: 'fetchGemVersions',
         invoke: (s, search) => s.fetchGemVersions(GEM, search, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => rubyApi.listGemVersions,
-        args: (search) => [GEM, PAGEABLE, REPO, search],
+        args: (search) => [GEM, REPO, search, ...PAGE_ARGS],
       },
     ];
     describePagedCalls(() => service, paged);

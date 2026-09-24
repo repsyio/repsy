@@ -122,10 +122,10 @@ test.describe('USR-06 users list', () => {
     });
     const heldRequested = adminPage.waitForRequest((request) => {
       const url = new URL(request.url());
-      return url.pathname === '/api/users' && url.searchParams.get('search') === held;
+      return url.pathname === '/api/users' && url.searchParams.get('q') === held;
     });
     await adminPage.route(/\/api\/users\?/, async (route) => {
-      if (new URL(route.request().url()).searchParams.get('search') === held) {
+      if (new URL(route.request().url()).searchParams.get('q') === held) {
         await heldAnswer;
         // The panel cancels the held request when the newer search starts: handing it the answer fails then.
         const answer = await route.fetch().catch(() => undefined);
@@ -165,8 +165,8 @@ test.describe('USR-06 users list', () => {
     const searches: string[] = [];
     adminPage.on('request', (request) => {
       const url = new URL(request.url());
-      if (url.pathname === '/api/users' && url.searchParams.has('search')) {
-        searches.push(url.searchParams.get('search') ?? '');
+      if (url.pathname === '/api/users' && url.searchParams.has('q')) {
+        searches.push(url.searchParams.get('q') ?? '');
       }
     });
 

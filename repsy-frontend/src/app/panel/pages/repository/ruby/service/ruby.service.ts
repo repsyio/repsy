@@ -71,11 +71,7 @@ export class RubyService {
     pageSize: number,
   ): Observable<PagedData<GemListItem>> {
     return this.rubyGemApiControllerService
-      .listGems(
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        search || undefined,
-      )
+      .listGems(this.repoName, search || undefined, pageIndex, pageSize, [`${sortOption.column},${sortOption.type}`])
       .pipe(map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GemListItem>));
   }
 
@@ -87,12 +83,9 @@ export class RubyService {
     pageSize: number,
   ): Observable<PagedData<GemVersionListItem>> {
     return this.rubyGemApiControllerService
-      .listGemVersions(
-        gemName,
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        search || undefined,
-      )
+      .listGemVersions(gemName, this.repoName, search || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map(
           (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GemVersionListItem>,

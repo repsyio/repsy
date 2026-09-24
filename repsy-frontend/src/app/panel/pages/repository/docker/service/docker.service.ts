@@ -73,11 +73,9 @@ export class DockerService {
     pageSize: number,
   ): Observable<PagedData<ImageListItem>> {
     return this.dockerImageControllerService
-      .listDockerImages(
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        name || undefined,
-      )
+      .listDockerImages(this.repoName, name || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ImageListItem>),
       );
@@ -91,12 +89,9 @@ export class DockerService {
     pageSize: number,
   ): Observable<PagedData<TagListItem>> {
     return this.dockerImageControllerService
-      .listDockerImageTags(
-        imageName,
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        name || undefined,
-      )
+      .listDockerImageTags(imageName, this.repoName, name || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<TagListItem>));
   }
 
@@ -109,13 +104,9 @@ export class DockerService {
     pageSize: number,
   ): Observable<PagedData<ManifestListItem>> {
     return this.dockerImageControllerService
-      .listTagManifests(
-        imageName,
-        tagName,
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        name || undefined,
-      )
+      .listTagManifests(imageName, tagName, this.repoName, name || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ManifestListItem>),
       );

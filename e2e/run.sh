@@ -37,6 +37,14 @@ HOST_UID="$(id -u)"
 HOST_GID="$(id -g)"
 export HOST_UID HOST_GID
 
+# Read by docker-compose.runners.yml's "stack" runner (group_add), so its non-root uid can use the
+# host's Docker socket. Only that runner mounts the socket. A daemon reached some other way
+# (DOCKER_HOST, rootless Docker) is not supported by that runner.
+if [ -z "${DOCKER_GID:-}" ] && [ -S /var/run/docker.sock ]; then
+  DOCKER_GID="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || stat -f '%g' /var/run/docker.sock)"
+  export DOCKER_GID
+fi
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -45,7 +53,9 @@ Usage:
   run.sh sweep [--hours N] [--all] [--dry-run]
 
 --protocol takes runner service names: skeleton, maven, npm, cargo, nuget, docker, helm, pypi,
-golang, ruby, and ui (the panel UI suite in headless Chromium, tests/ui; see README.md "UI suite").
+golang, ruby, stack (cases that docker-exec into the Repsy container, tests/stack; local stack only,
+see README.md "Stack runner") and ui (the panel UI suite in headless Chromium, tests/ui; see
+README.md "UI suite").
 
 REPSY_ADMIN_PASSWORD must be set (copy .env.example to .env and fill it in) for every subcommand
 except "local down".
@@ -197,7 +207,8 @@ cmd_test() {
     # No --protocol given: run the skeleton harness proof only. A protocol runner (maven, npm,
     # cargo, nuget, docker, helm, pypi, golang, ruby) is opt-in via --protocol so a plain "run.sh
     # test" stays fast; pass e.g. --protocol maven or
-    # --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby,ui to run more. "ui" is the
+    # --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby,stack,ui to run more. "stack" is
+    # the docker-exec cases against the container of a local stack (tests/stack); "ui" is the
     # panel UI suite (Playwright + headless Chromium, tests/ui), not a package format. "helm" runs
     # BOTH Helm protocols (OCI and classic/ChartMuseum, `tests/helm/*.spec.ts`) from one
     # runner/project.

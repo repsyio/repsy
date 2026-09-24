@@ -75,11 +75,9 @@ export class NpmService {
     pageSize: number,
   ): Observable<PagedData<NpmPackageListItem>> {
     return this.npmPackageApiControllerService
-      .listNpmPackages(
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        scope || undefined,
-      )
+      .listNpmPackages(this.repoName, scope || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map(
           (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<NpmPackageListItem>,
@@ -95,12 +93,9 @@ export class NpmService {
     pageSize: number,
   ): Observable<PagedData<NpmPackageListItem>> {
     return this.npmScopeApiControllerService
-      .listNpmPackagesByScope(
-        scope,
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        name || undefined,
-      )
+      .listNpmPackagesByScope(scope, this.repoName, name || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map(
           (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<NpmPackageListItem>,
@@ -115,11 +110,9 @@ export class NpmService {
     pageSize: number,
   ): Observable<PagedData<NpmPackageListItem>> {
     return this.npmScopeApiControllerService
-      .listUnscopedNpmPackages(
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        name || undefined,
-      )
+      .listUnscopedNpmPackages(this.repoName, name || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map(
           (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<NpmPackageListItem>,
@@ -135,20 +128,24 @@ export class NpmService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<PackageVersionListItem>> {
-    const pageable = { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] };
+    const sort = [`${sortOption.column},${sortOption.type}`];
     const call = scopeName
       ? this.npmPackageApiControllerService.listNpmScopedPackageVersions(
           scopeName,
           packageName,
-          pageable,
           this.repoName,
           version || undefined,
+          pageIndex,
+          pageSize,
+          sort,
         )
       : this.npmPackageApiControllerService.listNpmPackageVersions(
           packageName,
-          pageable,
           this.repoName,
           version || undefined,
+          pageIndex,
+          pageSize,
+          sort,
         );
     return call.pipe(
       map(

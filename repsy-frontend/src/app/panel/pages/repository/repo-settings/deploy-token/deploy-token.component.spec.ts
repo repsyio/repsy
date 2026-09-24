@@ -68,7 +68,7 @@ describe('DeployTokenComponent', () => {
     it('loads the first page of tokens, three at a time, and the usage of the repository', () => {
       component.ngOnInit();
 
-      expect(tokenService.listDeployTokens).toHaveBeenCalledOnceWith({ page: 0, size: 3 }, REPO);
+      expect(tokenService.listDeployTokens).toHaveBeenCalledOnceWith(REPO, 0, 3);
       expect(repoService.getUsage).toHaveBeenCalledOnceWith(REPO);
       expect(component.deployTokens.map((t) => t.id)).toEqual(['a', 'b']);
       expect(component.pagedData.page.totalPages).toBe(4);
@@ -99,7 +99,7 @@ describe('DeployTokenComponent', () => {
       component.loadPage(2);
 
       expect(component.pageNum).toBe(2);
-      expect(tokenService.listDeployTokens).toHaveBeenCalledOnceWith({ page: 2, size: 3 }, REPO);
+      expect(tokenService.listDeployTokens).toHaveBeenCalledOnceWith(REPO, 2, 3);
     });
   });
 
@@ -195,7 +195,7 @@ describe('DeployTokenComponent', () => {
       dangerModalService.call();
 
       expect(component.pageNum).toBe(0);
-      expect(tokenService.listDeployTokens.calls.allArgs()).toEqual([[{ page: 0, size: 3 }, REPO]]);
+      expect(tokenService.listDeployTokens.calls.allArgs()).toEqual([[REPO, 0, 3]]);
       expect(component.deployTokens.map((t) => t.id)).toEqual(['a', 'b', 'c']);
     });
 
@@ -211,7 +211,7 @@ describe('DeployTokenComponent', () => {
       dangerModalService.call();
 
       expect(component.pageNum).toBe(1);
-      expect(tokenService.listDeployTokens.calls.allArgs()).toEqual([[{ page: 1, size: 3 }, REPO]]);
+      expect(tokenService.listDeployTokens.calls.allArgs()).toEqual([[REPO, 1, 3]]);
     });
 
     it('fetches the tokens only after the revoke has completed, and only once', () => {

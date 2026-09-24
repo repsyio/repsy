@@ -48,6 +48,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.ResultActions;
@@ -151,7 +152,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
     this.mockMvc
         .perform(
             get("/api/go/modules/{repo}/search", repo)
-                .param("search", "HELLO")
+                .param("q", "HELLO")
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
@@ -225,7 +226,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
     this.mockMvc
         .perform(
             get("/api/go/modules/{repo}/search", repo)
-                .param("search", "upper")
+                .param("q", "upper")
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
@@ -236,7 +237,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
         .perform(
             get("/api/go/modules/{repo}/versions", repo)
                 .param("modulePath", MODULE)
-                .param("search", "incompatible")
+                .param("q", "incompatible")
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
@@ -256,7 +257,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
     this.mockMvc
         .perform(
             get("/api/go/modules/{repo}", repo)
-                .param("search", "missing")
+                .param("q", "missing")
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
@@ -544,6 +545,21 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
       this.list(VERSIONS, repo, token, "sort", "version,desc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].version").value("v1.2.0"));
+    }
+
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource({SEARCH + ",search", VERSIONS + ",search"})
+    @DisplayName("filters by q only: search, the old name of the filter, is an unknown parameter")
+    void filtersByQOnly(final String path, final String oldName) throws Exception {
+      final var it = GolangModuleControllerIT.this;
+      final var user = it.createUser(uniqueUsername("gomod"), UserRole.USER);
+      final var token = it.bearerTokenFor(user);
+      final var repo = this.seededRepo(user);
+
+      PagingAssertions.expectFilterIsQ(
+          this.list(path, repo, token, "page", "0"),
+          this.list(path, repo, token, oldName, PagingAssertions.NO_MATCH),
+          this.list(path, repo, token, "q", PagingAssertions.NO_MATCH));
     }
 
     @ParameterizedTest(name = "{0}")

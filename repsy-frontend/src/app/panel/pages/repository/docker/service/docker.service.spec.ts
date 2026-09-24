@@ -21,9 +21,9 @@ import {
   describeCalls,
   describePagedCalls,
   describeRepoSelection,
+  PAGE_ARGS,
   PAGE_INDEX,
   PAGE_SIZE,
-  PAGEABLE,
   PagedCase,
   REPO,
   restResponse,
@@ -81,19 +81,19 @@ describe('DockerService', () => {
         name: 'searchImages',
         invoke: (s, name) => s.searchImages(name, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => dockerApi.listDockerImages,
-        args: (name) => [PAGEABLE, REPO, name],
+        args: (name) => [REPO, name, ...PAGE_ARGS],
       },
       {
         name: 'searchTags',
         invoke: (s, name) => s.searchTags(name, SORT, IMAGE, PAGE_INDEX, PAGE_SIZE),
         api: () => dockerApi.listDockerImageTags,
-        args: (name) => [IMAGE, PAGEABLE, REPO, name],
+        args: (name) => [IMAGE, REPO, name, ...PAGE_ARGS],
       },
       {
         name: 'searchManifests',
         invoke: (s, name) => s.searchManifests(name, SORT, IMAGE, TAG, PAGE_INDEX, PAGE_SIZE),
         api: () => dockerApi.listTagManifests,
-        args: (name) => [IMAGE, TAG, PAGEABLE, REPO, name],
+        args: (name) => [IMAGE, TAG, REPO, name, ...PAGE_ARGS],
       },
     ];
     describePagedCalls(() => service, paged);

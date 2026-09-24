@@ -125,8 +125,9 @@ export class DeployTokenComponent implements OnInit {
 
   private listPage(pageNum: number) {
     return this.protocolDeployTokenControllerService.listDeployTokens(
-      { page: pageNum, size: this.pageSize },
       this.activeRepository.repoName,
+      pageNum,
+      this.pageSize,
     );
   }
 

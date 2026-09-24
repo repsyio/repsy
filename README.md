@@ -757,10 +757,15 @@ docker exec repsy env | grep ADMIN
 
   **While Repsy is stopped** (for example, with the embedded H2 database, whose file only one process
   can open), put the marker on the data volume and start Repsy: the directory is read once at
-  startup.
+  startup. Create it with the Repsy image itself, not with a root shell such as `alpine`: the image
+  runs as `appuser`, so the marker (and the directory, if the volume was created by an image that
+  predates this feature and does not have it yet) belongs to the user Repsy runs as. A directory
+  created by root cannot be emptied by Repsy: it logs the error `Could not apply the password reset marker`
+  and leaves the file in place.
   ```bash
   docker stop repsy
-  docker run --rm -v repsy-data:/app/data alpine touch /app/data/password-reset/admin
+  docker run --rm -v repsy-data:/app/data --entrypoint sh repo.repsy.io/repsy/os/repsy:latest \
+    -c 'mkdir -p /app/data/password-reset && touch /app/data/password-reset/admin'
   docker start repsy
   docker logs repsy 2>&1 | grep "New password"
   ```
@@ -770,8 +775,10 @@ docker exec repsy env | grep ADMIN
   **If the marker does nothing:** check that `PASSWORD_RESET_MARKER_ENABLED` is not `false`, and that
   the directory is writable by the user Repsy runs as (`appuser` in the image; a bind-mounted
   `/app/data` owned by root makes Repsy log `Could not create the password reset marker directory`
-  at startup). Anyone who can write to that directory can lock an account out (the account then has
-  a password only the log holds), which is why it is a directory of its own, outside the protocol
+  at startup; a marker Repsy cannot delete, for example on a read-only volume, is not applied and is
+  logged at `ERROR` as `Could not apply the password reset marker`, once per file, not on every
+  poll). Anyone who can write to that directory can lock an account out (the account then has a
+  password only the log holds), which is why it is a directory of its own, outside the protocol
   storage tree in the Docker image. Set `PASSWORD_RESET_MARKER_ENABLED=false` if you do not want it.
 
   **Alternative, without the marker directory (older images):** reset the password by setting the
