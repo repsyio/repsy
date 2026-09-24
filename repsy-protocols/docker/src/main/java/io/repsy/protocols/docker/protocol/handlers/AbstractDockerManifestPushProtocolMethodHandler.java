@@ -50,6 +50,7 @@ import lombok.SneakyThrows;
 import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -211,10 +212,15 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
 
   /**
    * Saves the manifest in one transaction of the facade, and runs that whole transaction again when
-   * it loses a race (RPS-1314): two first pushes of the same digest into one image (or of one new
-   * tag) both find no row and both insert, and the loser fails on a unique index of {@code
-   * docker_manifest} or {@code docker_tag}. The second run sees the row the winner committed and
-   * reuses it, so the client gets its {@code 201} instead of a {@code 500}.
+   * it loses a race. Two first pushes of the same digest into one image (or of one new tag) both
+   * find no row and both insert, and the loser fails on a unique index of {@code docker_manifest}
+   * or {@code docker_tag} (RPS-1314). Two pushes that move the same existing tag both read its
+   * {@code @Version}, and the loser fails the version check at commit (RPS-1322). The second run
+   * sees what the winner committed, so the client gets its {@code 201} instead of an error.
+   *
+   * <p>This is the only place that retries: the facade is the {@code @Transactional} proxy, and a
+   * retry inside its transaction (a retry annotation on the service, which nothing enabled anyway)
+   * would reuse the failed persistence context and could never succeed.
    */
   private String saveManifest(
       final ProtocolContext context, final BaseImageInfo<ID> imageInfo, final ManifestForm form)
@@ -223,7 +229,7 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
     for (var attempt = 1; ; attempt++) {
       try {
         return this.dockerFacade.saveManifest(context, imageInfo, form);
-      } catch (final DataIntegrityViolationException e) {
+      } catch (final DataIntegrityViolationException | OptimisticLockingFailureException e) {
         if (attempt >= RETRY_COUNT) {
           throw e;
         }
