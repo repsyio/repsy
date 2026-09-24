@@ -249,7 +249,7 @@ test.describe('Cargo crate pages', { tag: '@packages' }, () => {
     await versions.expectRow(first);
     await versions.expectRow(second);
     await expect(versions.inRow(second, 'row-name')).toHaveText('2.0.0');
-    await expect(versions.toolbar.getByText(/yanked/i)).toHaveCount(0);
+    await expect(adminPage.getByTestId('pkg-versions-table')).not.toContainText(/yanked/i);
 
     const detail = pages.detail(second);
     await detail.goto();

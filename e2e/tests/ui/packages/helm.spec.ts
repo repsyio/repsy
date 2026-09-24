@@ -157,6 +157,7 @@ test.describe('Helm charts: OCI and classic', { tag: '@packages' }, () => {
       await versions.expectLoaded();
       await expect(versions.emptyList.root).toBeVisible();
       // Read at once, not polled: toasts dismiss themselves after three seconds.
+      // eslint-disable-next-line playwright/prefer-to-have-count -- an immediate read, toHaveCount polls
       expect(await detail.toasts.error().count(), 'error toasts after the delete').toBe(0);
     },
   );

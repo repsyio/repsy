@@ -2832,7 +2832,56 @@ Facts the tests rely on (probed, RPS-1256):
 
 ### Package tests: Cargo, NuGet, Helm, Go, Ruby (RPS-1257)
 
-_Not implemented yet._
+`tests/ui/packages/{cargo,nuget,helm,golang,ruby}.spec.ts`: each is one `registerPackageScenarios(...)`
+call (PKG-<proto>-01..06, `01` is `@smoke`) plus the protocol's own PKG-<proto>-07 tests. All nine
+protocols now have seeders, so `SEEDERS` has no `notImplemented` entry left. Every package is published
+over raw HTTP to the protocol port as the admin, with a real artifact built in code (the `ui` image has
+no toolchain):
+
+| Seeder               | Wire request and artifact                                                                                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/cargo.ts`  | `PUT api/v1/crates/new` (length-prefixed JSON + `.crate`); `.crate` = gzip+ustar with `Cargo.toml` and `src/lib.rs`/`src/main.rs`; `publishCrate` adds README/deps |
+| `packages/nuget.ts`  | `PUT v3/package/` multipart `package`; `.nupkg` = fflate zip with the nuspec                                                                                       |
+| `packages/helm.ts`   | `variant: 'oci'` (default): config blob, chart blob, manifest under the tag; `variant: 'classic'`: multipart `chart` to `/<repo>/api/charts` (ChartMuseum)         |
+| `packages/golang.ts` | `PUT <repo>/<module>/@v/<v>.zip` + `Content-Sha256`; a version without `v` gets one (`1.0.0` seeds `v1.0.0`)                                                       |
+| `packages/ruby.ts`   | `POST api/v1/gems`; `.gem` = tar of `metadata.gz`, `data.tar.gz`, `checksums.yaml.gz`                                                                              |
+
+Default names (`defaultPackageName`): Cargo and Ruby `e2e_<runid>_pkg_<n>` (underscores only: the panel
+keys a crate by its normalised name, `-` becoming `_`), NuGet and Helm `e2e-<runid>-pkg-<n>`, Go
+`e2e.repsy.test/e2e-<runid>-pkg-<n>`. The builders are the ones the protocol suites already use
+(`clients/{cargo,nuget,helm,helm-chart,golang,ruby}-raw.ts`); the only edits there are
+`buildPublishBody`'s optional `readme`/`deps` and `export` on Helm's two OCI body builders.
+
+| ID        | What it does                                                                                                                                                                                                                                                                                             |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| cargo-07  | README renders (and is absent when none was published); deps in the Cargo.toml block; Add Dependency vs Install Binary; the four sorts (crates at different versions); latest version and every version; delete a crate with two versions; a yanked version still listed (the panel shows no yank state) |
+| nuget-07  | stable and pre-release side by side; a stable-only repo (`releases`/`snapshots`) refuses a pre-release and keeps the list; unlist/relist flips `Listed` on the detail (the version stays listed); the four install snippets, no dependencies, nuspec metadata                                            |
+| helm-07   | a chart published to each module (OCI and classic) in one list, both open with digest and Chart.yaml; one chart with versions from both modules; deleting a classic chart; the Latest link                                                                                                               |
+| golang-07 | list -> `/modules?modulePath=` -> `/modules/version?modulePath=&version=` with the breadcrumb; deep link; GOPROXY endpoints; "Version 'x' not found"; the detail without its query goes to the list; a module path with slashes is searchable                                                            |
+| ruby-07   | yanked badge on the versions list and on the detail after a yank through the API; install commands, platform and checksum; the Latest link                                                                                                                                                               |
+
+What the descriptors record (found by running each protocol): a version row's link appends `#security`
+(the template accepts a fragment); a detail Delete lands on the list (Cargo, Ruby), on the versions page
+(NuGet, Helm, Go) and, for the LAST version, on the list for NuGet (`landsOnLast`) and on the empty
+versions page for Helm and Go; deleting the last version removes the package for all but Go, whose module
+stays listed with no versions (like Docker, RPS-1288 (5)); Cargo/NuGet/Helm/Ruby Configure texts have
+`<YOUR_...>` placeholders and the same body in the deploy-token variant (`deployTokenMarker` is optional
+now: absent = same body, only the title differs), Ruby's title is the same in both.
+
+Pinned with `test.fail` / `knownFailures` (each still fails for the stated reason, checked un-pinned):
+
+| Where                                                  | Bug                                                                                                                                                               |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| cargo `05-mobile-versions`, nuget `05-mobile-versions` | RPS-1262 (2): the version list has no `lg:hidden` cards, a phone shows nothing                                                                                    |
+| nuget `02-versions-search`                             | RPS-1262 (3): no search box on the version list                                                                                                                   |
+| helm-07 twelve versions                                | RPS-1262 (3): no pager on the version list, all twelve render                                                                                                     |
+| golang-07 empty versions page                          | RPS-1262 (3): `<app-pagination>` renders under the empty state of an unknown module, printing "1 NaN"                                                             |
+| cargo-07 row menu real click                           | RPS-1299: the menu of a non-last row paints under the next row, Playwright's click is refused ("subtree intercepts pointer events")                               |
+| cargo `02-sort`                                        | unfiled: Newest/Oldest order by `max_version` (a text column), so crates at one version have no publish order; cargo-07 asserts the sorts with different versions |
+| helm-07 deleting the last version                      | unfiled: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                 |
+
+RPS-1298 (a pager without a tie-breaker) is avoided as in the template, by seeding sequentially. The
+mobile-Delete `canWrite` bug of RPS-1262 (1) does not exist in these five protocols (only PyPI and npm).
 
 ### Errors, navigation, mobile and accessibility (RPS-1258)
 
