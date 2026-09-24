@@ -28,3 +28,16 @@ export function toApiRepoType(type: string | null | undefined): ApiRepoType | un
   const wanted = type.toLowerCase();
   return Object.values(ApiRepoType).find((apiType) => apiType.toLowerCase() === wanted);
 }
+
+/**
+ * A repository type as the UI spells it in a ROUTE: the lower-case slug (`maven`). The API's
+ * canonical spelling is upper case (`MAVEN`) and it accepts both on input, so a slug is only ever
+ * needed for URLs and route parameters; an API call takes the generated enum value.
+ */
+export type RepoRouteSlug = Lowercase<ApiRepoType>;
+
+/** The route slug of a repository type given in either case, or `undefined` for a non-type. */
+export function toRouteSlug(type: string | null | undefined): RepoRouteSlug | undefined {
+  const apiType = toApiRepoType(type);
+  return apiType ? (apiType.toLowerCase() as RepoRouteSlug) : undefined;
+}

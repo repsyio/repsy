@@ -1858,8 +1858,8 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @EnumSource(RepoType.class)
-    @DisplayName("returns the lower-cased type name for every RepoType")
-    void lowerCasedTypeName(final RepoType type) throws Exception {
+    @DisplayName("returns the upper-case type name, the RepoType enum, for every RepoType")
+    void upperCasedTypeName(final RepoType type) throws Exception {
       final var repo =
           ProtocolRepoControllerIT.this.seedRepo(
               type, uniqueRepoName(type.name().toLowerCase(Locale.ROOT)));
@@ -1872,12 +1872,11 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               "repoTypeFetched",
               "Repo type fetched.");
 
-      assertThat(JsonPath.<String>read(body, "$.data"))
-          .isEqualTo(type.name().toLowerCase(Locale.ROOT));
+      assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo(type.name());
     }
 
     @Test
-    @DisplayName("returns the same for the startup default repo, spelled 'golang' for Go")
+    @DisplayName("returns the same for the startup default repo, spelled 'GOLANG' for Go")
     void startupGoRepo() throws Exception {
       final var body =
           expectSuccess(
@@ -1887,7 +1886,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               "repoTypeFetched",
               "Repo type fetched.");
 
-      assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo("golang");
+      assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo("GOLANG");
     }
 
     @Test
@@ -1901,7 +1900,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               "repoTypeFetched",
               "Repo type fetched.");
 
-      assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo("helm");
+      assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo("HELM");
     }
 
     @Test

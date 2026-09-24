@@ -5,7 +5,7 @@
     @if (crateVersion) {
       <div data-testid="pkg-detail" class="mb-4" animate.enter="fade-in-up">
         <app-security-scan-section
-          [repoType]="'CARGO'"
+          [repoType]="securityRepoType"
           [repoName]="activeRepo.repoName"
           [artifactName]="packageName"
           [artifactVersion]="versionName"

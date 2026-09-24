@@ -38,9 +38,9 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.RepoScope;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -170,9 +170,8 @@ public class ProtocolRepoController {
 
   @GetMapping("/{repoName}/format")
   @RepoOperation
-  public RestResponse<String> getRepoType(final RepoInfo repoInfo) {
+  public RestResponse<RepoType> getRepoType(final RepoInfo repoInfo) {
 
-    return this.responseFactory.success(
-        "repoTypeFetched", repoInfo.getType().name().toLowerCase(Locale.ROOT));
+    return this.responseFactory.success("repoTypeFetched", repoInfo.getType());
   }
 }

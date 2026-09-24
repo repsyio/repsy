@@ -19,7 +19,7 @@ import { Observable, of } from 'rxjs';
 import { catchError, map, shareReplay } from 'rxjs/operators';
 
 import { SecurityScanControllerService } from '../../../../generated/api';
-
+import { toApiRepoType } from '../util/repo-api-type';
 
 @Injectable({
   providedIn: 'root',
@@ -29,14 +29,14 @@ export class SecurityScanSupportService {
 
   constructor(private readonly securityScanControllerService: SecurityScanControllerService) {
     this.supportedRepoTypes$ = this.securityScanControllerService.getSupportedRepoTypes().pipe(
-      map((response) => new Set((response.data ?? []).map((repoType) => repoType.toUpperCase()))),
+      map((response) => new Set((response.data ?? []).map((repoType) => toApiRepoType(repoType) ?? repoType))),
       catchError(() => of(new Set<string>())),
       shareReplay({ bufferSize: 1, refCount: false }),
     );
   }
 
   public isSupported(repoType: string): Observable<boolean> {
-    return this.supportedRepoTypes$.pipe(map((supported) => supported.has(repoType.toUpperCase())));
+    return this.supportedRepoTypes$.pipe(map((supported) => supported.has(toApiRepoType(repoType) ?? repoType)));
   }
 
   public getSupportedRepoTypes(): Observable<Set<string>> {

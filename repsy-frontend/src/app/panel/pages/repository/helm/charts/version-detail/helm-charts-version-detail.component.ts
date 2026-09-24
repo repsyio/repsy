@@ -22,7 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize, map, switchMap } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { HelmChartDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { HelmChartDetail, RepoPermissionInfo, RepoType } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -46,6 +46,7 @@ import { HelmService } from '../../service/helm.service';
   templateUrl: './helm-charts-version-detail.component.html',
 })
 export class HelmChartsVersionDetailComponent implements OnDestroy {
+  public readonly securityRepoType = RepoType.Helm;
   public loading = true;
   public error: string;
   public chartName: string;
