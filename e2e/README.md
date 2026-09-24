@@ -2806,7 +2806,7 @@ differs the descriptor carries the value (`repoUrlIn`, `detail.delete.landsOn`,
 
 `knownFailures` keys (`PackageScenarioKey`) run their step under `test.fail`, so a fix turns it red and
 the title carries the reason. Pinned today: `05-mobile-*` (RPS-1262: npm scope list and version list,
-PyPI list and version list gate the mobile Delete on `canWrite`), Maven `04-detail` (RPS-1296), and in the
+PyPI list and version list gate the mobile Delete on `canWrite`), and in the
 specs Maven Gradle Groovy = Grape block (RPS-1261), Docker desktop manifest Digest/Config Digest cells
 (RPS-1261), npm Bugs URL and Keywords (RPS-1261), PyPI "Pre release:" for a post release and the mobile
 "Latest" link (RPS-1261), the Maven browser's Settings button for a USER (RPS-1262) and its first click
