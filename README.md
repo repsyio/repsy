@@ -643,9 +643,12 @@ what is verified and where keys are looked up:
   version is *Signed* when its POM signature is verified; with it on, when every file has a
   verified signature). The settings request does not wait for it, so a large repository shows the
   new values within moments, not at once. A signature that was stored while the setting was off was
-  never verified, so it does not count when the setting is turned on: it counts once its file and
-  signature are uploaded again (so an already *Signed* version can show *Unsigned* after turning
-  the setting on). Turning it off leaves held signatures alone: they are deleted when they expire.
+  never verified, so turning the setting on verifies it then, in that same background run, file by
+  file and with the same key rules as an upload (registered keys first, key servers if the lookup
+  is on): an honest publisher's versions stay *Signed*. A stored signature that does not verify, or
+  whose key cannot be found, does not count and its version shows *Unsigned* until the file and
+  signature are uploaded again (or the key is registered and the setting turned off and on again). Turning it off
+  leaves held signatures alone: they are deleted when they expire.
 - **Air-gapped registries (`pgpKeyServerLookupEnabled` off):** the repository consults its
   registered keys only. A signature made with a key that is not registered is refused at once with
   `404 artifactSigningKeyNotRegistered`, without contacting any key server (custom hosts,

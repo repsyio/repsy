@@ -30,6 +30,7 @@ import { UserCreateModalComponent } from '../../panel/shared/components/modals/u
 import { UserEditModalComponent } from '../../panel/shared/components/modals/user-edit-modal/user-edit-modal.component';
 import { ToastService } from '../../panel/shared/components/toast/toast.service';
 import {
+  LOGIN_PASSWORD_MESSAGES,
   LOGIN_USERNAME_MESSAGES,
   PASSWORD_MESSAGES,
   PASSWORD_MISMATCH_MESSAGE,
@@ -234,7 +235,7 @@ describe('the password messages of the create-user, profile and login forms', ()
     expect(form.hasError('notSame')).toBeTrue();
   });
 
-  it('are the same sentences on the login form, which the backend holds to the same rules', async () => {
+  it('are the login sentences on the login form: username as before, password only required and maxlength (RPS-1308)', async () => {
     const { fixture, el } = await renderComponent(LoginComponent, [
       { provide: AuthService, useValue: jasmine.createSpyObj<AuthService>('AuthService', ['logIn']) },
       toast,
@@ -255,23 +256,37 @@ describe('the password messages of the create-user, profile and login forms', ()
       bullet(LOGIN_USERNAME_MESSAGES.maxlength),
     );
     expect(type('username', 'bad user', 'login-username-error-pattern')).toBe(bullet(LOGIN_USERNAME_MESSAGES.pattern));
-    expect(type('password', '', 'login-password-error-required')).toBe(bullet(PASSWORD_MESSAGES.required));
-    expect(type('password', 'Ab1', 'login-password-error-minlength')).toBe(bullet(PASSWORD_MESSAGES.minlength));
-    expect(type('password', TOO_LONG_PASSWORD, 'login-password-error-maxlength')).toBe(
-      bullet(PASSWORD_MESSAGES.maxlength),
+    expect(type('password', '', 'login-password-error-required')).toBe(bullet(LOGIN_PASSWORD_MESSAGES.required));
+    expect(type('password', 'x'.repeat(73), 'login-password-error-maxlength')).toBe(
+      bullet(LOGIN_PASSWORD_MESSAGES.maxlength),
     );
-    expect(type('password', 'abcdefgh', 'login-password-error-pattern')).toBe(bullet(PASSWORD_MESSAGES.pattern));
+    // No complexity message on the login form: a weak password is submitted and the server answers 401.
+    for (const weak of ['Ab1', 'abcdefgh', 'Pass w0rd']) {
+      for (const key of ['minlength', 'pattern']) {
+        expect(type('password', weak, `login-password-error-${key}`))
+          .withContext(`${weak} ${key}`)
+          .toBeUndefined();
+      }
+    }
   });
 
-  it('accept the same password everywhere: what create-user takes, login takes, and the reverse', () => {
+  it('take a weaker password on the login form than on the create-user form, and the same otherwise', () => {
     const login = new LoginComponent({} as Router, new FormBuilder(), {} as AuthService, {} as ToastService);
     login.ngOnInit();
     const create = new UserCreateModalComponent({} as UserService, new FormBuilder(), {} as ToastService);
 
-    for (const password of ['Passw0', 'Aa1' + 'x'.repeat(47), 'Pa1xy', 'password1', 'Pass w0rd', TOO_LONG_PASSWORD]) {
+    // The complexity rule is for a password that is set; login only checks its shape (RPS-1308).
+    for (const password of ['Passw0', 'Aa1' + 'x'.repeat(47)]) {
       login.form.get('password').setValue(password);
       create.form.get('password').setValue(password);
-      expect(login.form.get('password').valid).withContext(password).toBe(create.form.get('password').valid);
+      expect(login.form.get('password').valid).withContext(password).toBeTrue();
+      expect(create.form.get('password').valid).withContext(password).toBeTrue();
+    }
+    for (const password of ['Pa1xy', 'password1', 'Pass w0rd', TOO_LONG_PASSWORD]) {
+      login.form.get('password').setValue(password);
+      create.form.get('password').setValue(password);
+      expect(login.form.get('password').valid).withContext(password).toBeTrue();
+      expect(create.form.get('password').valid).withContext(password).toBeFalse();
     }
   });
 });

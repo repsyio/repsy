@@ -21,8 +21,10 @@
  *
  * The rules behind them mirror the backend (`openapi-spec.yaml`): a username is 3-25 characters of
  * `[a-z0-9_-]`, a password 6-50 with a lower case letter, an upper case letter and a digit and no
- * whitespace, a description at most 500 characters. The login form's username is the backend's wider
- * LoginForm alphabet (3-150 of `[a-zA-Z0-9@_.-]`).
+ * whitespace, a description at most 500 characters. The login form is the exception (RPS-1308): its
+ * username is the backend's wider LoginForm alphabet (3-150 of `[a-zA-Z0-9@_.-]`), and its password
+ * only has to be typed and be at most 72 characters, so a password from before the complexity rule
+ * can still log in.
  */
 export type ValidatorKey = 'required' | 'minlength' | 'maxlength' | 'pattern';
 
@@ -42,6 +44,12 @@ export const PASSWORD_TEXT: Record<ValidatorKey, string> = {
   pattern:
     'Should contain at least 1 lowercase letter, 1 uppercase letter and 1 digit, and no whitespace',
 };
+
+/** The login password has no minlength and no pattern message: only the two below can show. */
+export const LOGIN_PASSWORD_TEXT = {
+  required: REQUIRED_TEXT,
+  maxlength: 'Should be maximum 72 characters',
+} as const;
 
 export const LOGIN_USERNAME_TEXT: Record<ValidatorKey, string> = {
   required: REQUIRED_TEXT,

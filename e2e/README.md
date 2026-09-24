@@ -69,6 +69,7 @@ e2e/
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
   docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
+  docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
   docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle and gpg; see "Adding a protocol adapter" below
@@ -82,6 +83,7 @@ e2e/
   runners/ruby.Dockerfile      # + a pinned Ruby toolchain (ruby/gem/bundle/bundler + stdlib) copied out of the official ruby image
   runners/stack.Dockerfile     # + the static `docker` CLI copied out of docker-cli; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
   runners/ui.Dockerfile        # + Playwright's own headless Chromium (build-time install, /ms-playwright); the "ui" runner, see "UI suite"
+  runners/scanner-stub.Dockerfile  # the stub scanner of the scanner stack (src/stubs/scanner/ on node:24, no dependencies, no build)
   runners/ui-seccomp.json      # Playwright's seccomp profile, so Chromium's sandbox works as a non-root uid in Docker
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
@@ -94,6 +96,7 @@ e2e/
       run-id.ts                 # e2e-<runid>- naming, length/pattern limits
       seeder.ts                 # createUser/createRepo/setSettings/createToken + cleanup(); reserve*/adopt* for entities the UI creates
       sweep.ts                  # deletes e2e-* leftovers older than N hours (or --all)
+    stubs/scanner/             # the stub scanner service (rules.ts, server.ts, multipart.ts, main.ts) and its test client (client.ts), see "Scanner stack"
     scenarios/
       types.ts                  # Scenario/Outcome model, outcomeForStatus(), expectationFor()
       catalog.ts                # the scenario matrix -- see "Scenario model" below
@@ -150,10 +153,11 @@ e2e/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe; both tests tagged @smoke
     skeleton/repo-settings.spec.ts  # RPS-1200 settings-PUT field-by-field matrix across RepoTypes; untagged (not smoke-sized)
     skeleton/repo-type-casing.spec.ts  # RPS-1269 repo type: /format answers upper case; type accepted in any case (query and body)
+    skeleton/login-password.spec.ts  # RPS-1308 POST /api/auth/login: a wrong password of any strength is 401 invalidCredentials; malformed shapes stay 400
     maven/
       publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
-      pgp-signature.spec.ts     # registered PGP public keys (RPS-1189): verify, reject, isolate, delete; every-signature verification (RPS-1188); key-server lookup off (RPS-1204)
+      pgp-signature.spec.ts     # registered PGP public keys (RPS-1189): verify, reject, isolate, delete; every-signature verification (RPS-1188); key-server lookup off (RPS-1204); toggling every-signature verification recomputes `signed` and verifies stored `.asc` files (RPS-1316, RPS-1323)
       parallel-signed-deploy.spec.ts  # a REAL parallel `mvn deploy:deploy-file` of a signed release to a verify-all repo (RPS-1188), plus the one-thread control
       gpg-signed-deploy.spec.ts  # RPS-1316, tag @gpg: maven-gpg-plugin and Gradle `signing` deploys with a real gpg key to a verify-all repo (signed / unsigned / unregistered key)
       remote-throttle.spec.ts   # sanity check of RemoteAuthBudget/withBackoff429, no server needed
@@ -209,6 +213,10 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_UI_WORKERS`            | `4` (compose)              | ui runner only: Playwright workers (each is a Chromium, ~250-400 MB)                                                                                                                                                                                                                                                                                                                                                                     |
 | `REPSY_UI_NO_SANDBOX`         | _(unset — sandbox on)_     | ui runner only: `1` launches Chromium with `chromiumSandbox: false`, see "UI suite"                                                                                                                                                                                                                                                                                                                                                      |
 | `REPSY_UI_OPT_IN`             | _(unset)_                  | ui runner only: comma list of opt-in UI suites (`throttle`, `scanner`); read by `optedIn()`                                                                                                                                                                                                                                                                                                                                              |
+| `REPSY_E2E_SCANNER`           | _(unset)_                  | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_UI_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                     |
+| `REPSY_E2E_SCANNER_PORT`      | `8090`                     | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
+| `REPSY_SCANNER_STUB_URL`      | `http://localhost:8090`    | ui runner only: where the `@scanner` specs reach that API (follows `REPSY_E2E_SCANNER_PORT`)                                                                                                                                                                                                                                                                                                                                             |
+| `REPSY_SCANNER_API_KEY`       | `e2e-scanner-key`          | the shared secret of the stub scanner and the backend's scanner client                                                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_E2E_STACK_PROJECT`     | `repsy-e2e`                | stack runner only: the compose project whose `repsy` container `docker exec` targets (README "Stack runner")                                                                                                                                                                                                                                                                                                                             |
 | `REPSY_E2E_INSECURE_REGISTRY` | _(unset)_                  | docker runner's `--insecure` (only needed for a remote plain-HTTP host; `localhost` already works without it); helm runner's `--insecure-skip-tls-verify` (a REMOTE HTTPS target with a bad cert only -- helm's own `--plain-http` is derived from `REPSY_REPO_BASE_URL`'s scheme instead, unconditionally on this harness's own `http://localhost:9090` stack, confirmed live H3: unlike `crane`, Helm has no localhost auto-detection) |
 
@@ -2484,6 +2492,7 @@ Karma unit tests.
 ./run.sh local up --h2 && ./run.sh test --protocol ui --grep @smoke   # embedded-H2 stack
 ./run.sh test --protocol ui -b                              # after a Playwright bump or a ui.Dockerfile change
 REPSY_UI_OPT_IN=throttle ./run.sh test --protocol ui        # also run an opt-in suite
+./run.sh local up --scanner && REPSY_UI_OPT_IN=scanner ./run.sh test --protocol ui --grep @scanner   # the real-scanner specs
 ```
 
 The host needs Docker only: Chromium lives in the `ui` runner image (`runners/ui.Dockerfile`), never
@@ -2494,11 +2503,11 @@ only `runners/ui.Dockerfile` or `pnpm-lock.yaml` does (`-b`), because the browse
 the locked `@playwright/test` version (the image installs it from `node_modules/.bin/playwright`, so
 it follows the lockfile by itself).
 
-**`REPSY_ADMIN_PASSWORD` must satisfy the panel's login form** (6-50 chars, a lower-case letter, an
-upper-case letter and a digit, no whitespace) or UI login is impossible. The backend already refuses
-to boot with a password that fails the complexity part but does not check the length, so the `ui`
-project runs a worker-scoped preflight (`assertAdminCredentialsUsableInUi`) that fails every test with
-a message saying exactly that. `e2e/.env.example` documents it next to the `REPSY_UI_*` variables.
+**`REPSY_ADMIN_PASSWORD` must be 1-72 characters**, the only rule of the panel's login form (RPS-1308:
+login checks the shape of an existing password, not the complexity rule of a new one, so weak legacy
+passwords can log in; the backend still refuses to boot with an `ADMIN_INITIAL_PASSWORD` that fails
+the complexity rule, and one over 72 bytes). The `ui` project runs a worker-scoped preflight
+(`assertAdminCredentialsUsableInUi`) that fails every test with a message saying exactly that. `e2e/.env.example` documents it next to the `REPSY_UI_*` variables.
 
 | Variable              | Default                                            | Effect                                                                                  |
 | --------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -2664,8 +2673,10 @@ Things a later author must know:
 - **Inline validation messages appear on blur** (`touched`), one at a time, in the order required,
   pattern, minlength, maxlength; `LoginValidation.enter()` types and blurs. The texts are the shared credential
   sentences of `src/ui/credential-messages.ts` (RPS-1265: one wording for a username, a password and a
-  description on every form); the login password rule is the create-user one because the backend's `LoginForm`
-  holds a login password to the same rule, so a weaker one is answered by the form, not the server.
+  description on every form); the login password has only `required` and `maxlength` (72) messages (RPS-1308: the complexity rule
+  is for a password that is set, so a weak password is submitted and a wrong one is the server's 401 toast,
+  see AUTH-03). An account whose password breaks the creation rule cannot be seeded (creation enforces the
+  rule), so that it can log in is proved by `AuthControllerIT`, not here.
 - **AUTH-11 (`@throttle`) is skipped by default.** It needs a stack whose `AUTH_THROTTLE_MAX_FAILURES` is
   below 30 (the harness stack raises it to 100000, see `docker-compose.stack.yml`) and, once it trips,
   the client stays refused for the window (`AUTH_THROTTLE_WINDOW_SECONDS`), so run it alone, on a
@@ -3121,8 +3132,8 @@ by `GET /api/security/supported-repo-types`, which is `[]` in the e2e stack (`SE
 These specs therefore **stub the scanner-facing calls with `page.route`** and let everything else
 (login, repositories, packages, settings) hit the real backend. They are tagged `@mocked`
 (`./run.sh test --protocol ui --grep @mocked`; SEC-02a..e, 51 tests, no scanner, no extra
-stack); one is also `@smoke`. The real-scanner half (a Trivy or stub scanner in the stack, SEC-01) is
-RPS-1270.
+stack); one is also `@smoke`. The real-scanner half (SEC-01, a stub scanner in an opt-in stack) is
+"Scanner stack" below. The `@mocked` specs assume the DEFAULT stack (scanner off): run them there.
 
 | File                                           | What it is                                                                                                                                                                                                                                                                                                                                |
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -3163,6 +3174,113 @@ How the stubs are typed, and the rules they follow:
   value back.
 - **The sidebar Security link does not need a scanner**: it shows for every admin (`isAdmin` only), and
   `/security` then shows its empty states with a type filter that offers only `ALL`.
+
+### Scanner stack (RPS-1270): the real scanner path, offline and fast
+
+The default stack has `SECURITY_SCANNER=disabled`, so the specs above stub the scanner calls in the
+browser. SEC-01 proves the wiring instead: an **opt-in overlay** starts a deterministic **stub of
+`repsy-scanner-trivy`** and Repsy with the scanner enabled, so the real backend-to-scanner path (the
+submit, the polling, the scan states, the stored findings, every badge and page that shows them) runs
+with no Trivy and no vulnerability database download. The stub was chosen over the real Trivy
+container because a scan then takes 2 seconds instead of minutes, the findings are known in advance,
+and a failed or refused scan can be produced on demand; the backend's Trivy client itself is covered
+by the backend's own ITs.
+
+| Cost                  | Real `repsy-scanner-trivy` (not used)       | The stub                                |
+| --------------------- | ------------------------------------------- | --------------------------------------- |
+| First start           | image pull + Trivy DB download (minutes)    | a tiny Node image, seconds              |
+| One scan              | seconds to minutes, depends on the artifact | 2 s by default, a few seconds on demand |
+| Findings              | whatever the DB says today                  | fixed by the package name               |
+| Failed / refused scan | cannot be produced                          | by the package name                     |
+
+```bash
+./run.sh local up --scanner          # (or REPSY_E2E_SCANNER=1) postgres + Repsy + the stub scanner; add --h2 for H2
+REPSY_UI_OPT_IN=scanner ./run.sh test --protocol ui --grep @scanner       # with REPSY_E2E_SCANNER=1 the opt-in is implied
+./run.sh local down --scanner        # give down the same flags as up
+```
+
+What that starts, and what it does not change:
+
+- `docker-compose.stack-scanner.yml` is an **overlay**, passed as a second `-f` after
+  `docker-compose.stack.yml` (or `-stack-h2.yml`): it adds the `scanner-stub` service (built from
+  `runners/scanner-stub.Dockerfile`, published on `127.0.0.1:${REPSY_E2E_SCANNER_PORT:-8090}`) and sets
+  `SECURITY_SCANNER=enabled`, `TRIVY_SCANNER_BASE_URL=http://scanner-stub:8090`, `TRIVY_SCANNER_API_KEY`
+  and `TRIVY_POLL_INTERVAL_MS=1000` on `repsy`. It is an overlay and not a compose `profile` because a
+  profile cannot change the environment of `repsy`, which the scanner needs. The default stack file,
+  the H2 stack file and every existing suite are unchanged: `docker compose config` of either stack
+  file is byte-identical with and without this change, and nothing starts a scanner unless a command
+  passes the overlay.
+- What a workflow (or a per-agent stack) runs is exactly what `run.sh` runs:
+  `docker compose -p <project> -f docker-compose.stack.yml -f docker-compose.stack-scanner.yml [-f <override>] up -d --wait --build`,
+  then `REPSY_UI_OPT_IN=scanner ./run.sh test --protocol ui --grep @scanner` with `REPSY_E2E_SCANNER_PORT`
+  (and `REPSY_SCANNER_STUB_URL`) pointing at the published port when it is not 8090.
+- The `@scanner` specs (`tests/ui/security-real/`) **skip themselves** unless `REPSY_UI_OPT_IN` contains
+  `scanner` (`skipUnlessScannerOptedIn()`), so the default `--protocol ui` run reports them as skipped.
+  Opted in on a stack without the scanner they **fail** with a message that says how to start it
+  (the `scanner` fixture checks the stub's `/health` and `GET /api/security/supported-repo-types`).
+- On the scanner stack run only `--grep @scanner`: the `@mocked` specs of RPS-1259 assume the scanner is
+  off, and a few of them read the real, unscanned state of the stack.
+
+The stub (`src/stubs/scanner/`, Node's own type stripping, no dependencies) speaks the contract of
+`repsy-scanner-trivy` (`ScanController`, `ApiKeyAuthFilter`): `GET /health`; `POST /scan` (multipart
+`scanId`, `repoType`, `artifactName`, `artifactVersion` and a `file` part, or `dockerImageReference`
+for Docker) answering `{"scanId","status":"QUEUED"}`; `GET /scan/{scanId}` answering `QUEUED`,
+`RUNNING`, `COMPLETED` (with `result.findings`) or `FAILED` (with `errorMessage`), 404 for an unknown
+job; the `X-Scanner-Api-Key` header on everything but `/health`. Its unit tests are
+`tests/skeleton/scanner-stub.spec.ts` (run in the `skeleton` runner, no stack needed).
+
+**What a scan reports is decided by the artifact's name and version**, which are all the backend sends
+(never the repo name): they are lower-cased and searched for these whole-word tokens
+(`scanPackageName()` in `src/ui/scanner-fixtures.ts` builds a valid name per protocol around one):
+
+| Token                | Effect                                                                        |
+| -------------------- | ----------------------------------------------------------------------------- |
+| none, or `clean`     | completes with no findings                                                    |
+| `vuln-critical`      | 2 CRITICAL + 1 HIGH                                                           |
+| `vuln-high`          | 2 HIGH + 1 MEDIUM                                                             |
+| `vuln-medium`        | 1 MEDIUM                                                                      |
+| `vuln-low`           | 1 LOW                                                                         |
+| `vuln-mixed`         | 1 each of CRITICAL, HIGH, MEDIUM, LOW, UNKNOWN                                |
+| `vuln-many`          | 12 findings (2 C, 3 H, 4 M, 2 L, 1 U): two pages of the findings table        |
+| `fail`               | the job ends FAILED with `stub scanner: simulated scan failure`               |
+| `unavailable`        | `POST /scan` is refused with 503: the scan is FAILED and never became a job   |
+| `slow`               | `submit5 queue6 run6`: Waiting, Queued and Scanning each last several seconds |
+| `submit<N>`          | the submit answer is held N s (the backend's scan is PENDING, shown Waiting)  |
+| `queue<N>`, `run<N>` | the job stays QUEUED / RUNNING for N s (default 1 s each)                     |
+
+Several `vuln-*` tokens: the first row above wins. `unavailable` beats `fail` beats findings; explicit
+timings beat `slow`; `submit` is capped at 8 s (the backend gives up on a submit after 10 s), the
+others at 120 s. Findings are fixed too: the n-th finding of a severity is always
+`CVE-2099-<rank><nnn>` (CRITICAL `1001`, `1002`; HIGH `2001` ...) in package `stub-lib-<severity>-<n>`,
+so a test can name the exact row (rows of one severity are ordered by a random finding id, so compare a
+severity's block as a set). `rules.ts` is the single definition; `tests/skeleton/scanner-stub.spec.ts`
+pins the table.
+
+**Control API**, for what a name cannot say (`ScannerStubClient`, `src/stubs/scanner/client.ts`, the
+`scanner` fixture): behind the same API key, and published on loopback only, it lets a test read what the
+backend handed the scanner and override one artifact's result.
+
+| Call                                      | Effect                                                                                                                                                              |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /control/calls[?artifactName=]`      | every `POST /scan` seen: scan id, type, name, version, file name and size (or the Docker reference), accepted or refused                                            |
+| `PUT /control/scripts`                    | `{artifactName, script: {submitSeconds, queueSeconds, runSeconds, outcome, findings: [severity...], errorMessage}}`: every later scan of that exact name follows it |
+| `DELETE /control/scripts[?artifactName=]` | drops one script or all                                                                                                                                             |
+| `POST /control/reset`                     | forgets scripts, calls and jobs (a running scan then reads as "job lost"): never from a test that runs beside others                                                |
+
+Tests are independent because every name carries the test's run id, so a script or a `calls` filter only
+ever touches its own package. `SCANNER_STUB_CONTROL=disabled` turns `/control` off.
+
+What `tests/ui/security-real/` covers (20 tests, all `@scanner`, nothing stubbed in the browser):
+
+| File                    | What it checks                                                                                                                                                                                                                                                                |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scan-flow.spec.ts`     | per protocol (maven, npm, pypi, docker): the scanner received the artifact (file, or the Docker reference), the stored scan carries the stub's version, the scan section, the exact findings, and the version, package and repo badges. Also Clean, and twelve findings paged |
+| `scan-states.spec.ts`   | Waiting, Queued, Scanning, Completed on screen while the panel polls; `Scanning...` badges on the three lists until done; a Docker scan                                                                                                                                       |
+| `scan-failures.spec.ts` | a failed scan (Failed, badge `Scan failed`, the scanner's message stored), a refused submit (503), Re-scan after a failure, Re-scan of a clean version with the old result kept until the new one completes, the history                                                      |
+| `scan-settings.spec.ts` | the settings section exists exactly for the supported types (the backend's own answer), off means a push is not scanned and on means it is, Scan Now works either way                                                                                                         |
+| `security-page.spec.ts` | `/security` for one repo (rows, outcomes, severity and type filters, row navigation), the distribution card equals the backend's summary, the dashboard's Security Overview equals the backend's count                                                                        |
+
+A run of the whole `@scanner` set takes about two and a half minutes with two workers.
 
 ## Running
 

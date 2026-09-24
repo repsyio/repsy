@@ -36,11 +36,9 @@ export interface UiSession {
 
 /** The login form's username rule (3-150 chars); `login.component.ts`. */
 export const LOGIN_USERNAME_PATTERN = /^[a-zA-Z0-9@_\-.]+$/;
-/** The login form's password rule (6-50 chars); `login.component.ts`. */
-export const LOGIN_PASSWORD_PATTERN = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=\S+$).+$/;
-
 const USERNAME_LENGTH = { min: 3, max: 150 } as const;
-const PASSWORD_LENGTH = { min: 6, max: 50 } as const;
+/** The login form's password rule (RPS-1308): typed, at most 72 characters; `login.component.ts`. */
+const PASSWORD_LENGTH = { min: 1, max: 72 } as const;
 
 /** sessionStorage flag that makes `seedSession()` a one-shot per tab. */
 const SEEDED_FLAG = 'repsy-e2e-session-seeded';
@@ -122,9 +120,9 @@ export async function assertPageNotAdmin(page: Page): Promise<void> {
 
 /**
  * Throws a clear error unless the admin credentials can be typed into the panel's login form. The
- * backend refuses to boot with a password that fails the complexity part of the rule but does not
- * check the length, and a `remote` target may run with anything, so UI login (impossible with a
- * non-conforming password, the form refuses to submit) is checked here.
+ * form takes any username of its alphabet and any password of 1-72 characters (RPS-1308), and a
+ * `remote` target may run with anything, so UI login (impossible when the form refuses to submit)
+ * is checked here.
  */
 export function assertAdminCredentialsUsableInUi(): void {
   const problems: string[] = [];
@@ -139,13 +137,11 @@ export function assertAdminCredentialsUsableInUi(): void {
     );
   }
   if (
-    !LOGIN_PASSWORD_PATTERN.test(env.adminPassword) ||
     env.adminPassword.length < PASSWORD_LENGTH.min ||
     env.adminPassword.length > PASSWORD_LENGTH.max
   ) {
     problems.push(
-      `REPSY_ADMIN_PASSWORD must be ${PASSWORD_LENGTH.min}-${PASSWORD_LENGTH.max} chars with a ` +
-        'lower-case letter, an upper-case letter and a digit, and no whitespace',
+      `REPSY_ADMIN_PASSWORD must be ${PASSWORD_LENGTH.min}-${PASSWORD_LENGTH.max} chars`,
     );
   }
   if (problems.length > 0) {

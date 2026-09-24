@@ -4929,9 +4929,14 @@ components:
           pattern: "^[a-zA-Z0-9@_\\-.]+$"
         password:
           type: string
-          maxLength: 50
-          minLength: 6
-          pattern: "^(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=\\S+$).+$"
+          maxLength: 72
+          minLength: 1
+          description: |-
+            The shape only: no complexity rule applies at login, so an account whose password
+            predates the creation policy, or an admin bootstrapped from a short or long
+            `ADMIN_INITIAL_PASSWORD`, can log in. A wrong password of any shape answers 401
+            `invalidCredentials`. At most 72 UTF-8 bytes (the BCrypt input limit): a longer one
+            answers 400 `passwordTooLong`. The complexity rule stays where a password is set.
       required:
         - username
         - password

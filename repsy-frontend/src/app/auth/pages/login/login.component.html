@@ -84,14 +84,6 @@
               <p data-testid="login-password-error-required" animate.enter="fade-in-up">
                 • {{ passwordMessages.required }}
               </p>
-            } @else if (form.get('password').errors?.['pattern'] && form.get('password').touched) {
-              <p data-testid="login-password-error-pattern" animate.enter="fade-in-up">
-                • {{ passwordMessages.pattern }}
-              </p>
-            } @else if (form.get('password').errors?.['minlength'] && form.get('password').touched) {
-              <p data-testid="login-password-error-minlength" animate.enter="fade-in-up">
-                • {{ passwordMessages.minlength }}
-              </p>
             } @else if (form.get('password').errors?.['maxlength'] && form.get('password').touched) {
               <p data-testid="login-password-error-maxlength" animate.enter="fade-in-up">
                 • {{ passwordMessages.maxlength }}
