@@ -47,6 +47,7 @@ describe('UserService', () => {
   beforeEach(() => {
     api = jasmine.createSpyObj<UserControllerService>('UserControllerService', [
       'listUsers',
+      'countAdmins',
       'createUser',
       'updateUser',
       'deleteUser',
@@ -74,6 +75,14 @@ describe('UserService', () => {
       args: [undefined, undefined, undefined],
       response: restResponse(PAGE),
       expected: PAGE,
+    },
+    {
+      name: 'countAdmins',
+      invoke: (s) => s.countAdmins(),
+      api: () => api.countAdmins,
+      args: [],
+      response: restResponse(3),
+      expected: 3,
     },
     {
       name: 'createUser',

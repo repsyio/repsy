@@ -157,8 +157,16 @@ export class UsersPage extends UiPage {
   }
 
   async goto(): Promise<void> {
+    // The page asks the server for the admin count next to the first list (RPS-1246); the edit and
+    // delete guards depend on it, so a test starts only once it is in.
+    const adminCount = this.page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        new URL(response.url()).pathname === '/api/users/admin-count',
+    );
     await this.page.goto('/users');
     await expect(this.title).toBeVisible();
+    await adminCount;
   }
 
   /** The desktop row of one user. */

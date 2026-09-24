@@ -67,6 +67,8 @@ export class UserManagementComponent implements OnInit {
   public selectedUser: UserResponse;
   public searchQuery = '';
   public newPassword: string;
+  /** Admins on the server (not only on the loaded page); null until the first answer arrives. */
+  public adminCount: number | null = null;
 
   constructor(
     private readonly userService: UserService,
@@ -83,6 +85,9 @@ export class UserManagementComponent implements OnInit {
     this.userService.listUsers(this.searchQuery || undefined, this.pageNum, this.pageSize).subscribe((pagedModel) => {
       this.pagedData = pagedModel;
       this.users = pagedModel.content ?? [];
+    });
+    this.userService.countAdmins().subscribe((count) => {
+      this.adminCount = count;
     });
   }
 
@@ -193,9 +198,13 @@ export class UserManagementComponent implements OnInit {
     });
   }
 
+  /**
+   * Whether the admin about to be deleted or demoted is the last one on the server (RPS-1246). The
+   * count comes from the server, so a search or a page holding a single admin does not matter. The
+   * server still refuses the change for the real last admin, so an unknown count (null) lets it through.
+   */
   protected isLastAdmin(): boolean {
-    const adminCount = this.users?.filter((u) => u.role === 'ADMIN').length || 0;
-    return adminCount === 1;
+    return this.adminCount !== null && this.adminCount <= 1;
   }
 
   public timeAgo(date: Date | string | null): string {
