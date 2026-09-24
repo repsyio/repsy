@@ -365,6 +365,10 @@ paths:
       description: >-
         Lists the repositories of every type, one page at a time. Open to every authenticated
         user. Bearer token only (Basic authentication is not accepted).
+
+
+        Answers 400 `validationError` for an unknown `type`, a `page` below 0, a `size` outside 1-100
+        or a `sort` property that is not allowed; `data` names the parameter.
       parameters:
         - name: type
           in: query
@@ -418,19 +422,24 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelRepoListInfo"
         '400':
-          description: >-
-            `validationError`: unknown `type` (the response data is `type`), `page` below 0, `size`
-            outside 1-100 or a `sort` property that is not allowed (the data names the parameter).
+          "$ref": "#/components/responses/BadRequest"
         '401':
-          description: Missing or invalid token
+          "$ref": "#/components/responses/Unauthorized"
       summary: List repositories, filtered by type and name
     post:
       tags:
         - repo-collection-controller
       operationId: createRepository
       description: >-
-        Creates a repository of the type given in the body and returns it. Admin only. Bearer token
-        only (Basic authentication is not accepted).
+        Creates a repository of the type given in the body and returns it. Admin only (403
+        `accessDenied` for any other role). Bearer token only (Basic authentication is not
+        accepted).
+
+
+        Answers 400 `validationError` for a missing or unknown `type` or an invalid name or
+        description, `invalidRequest` for a name with characters outside `a-z A-Z 0-9 _ -`, and
+        `repoNameReserved` for a name the panel reserves; 409 `repoExists` when the name is taken by
+        a repository of any type.
       requestBody:
         content:
           application/json:
@@ -445,16 +454,13 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoListInfo"
         '400':
-          description: >-
-            `validationError` (missing or unknown `type`, invalid name or description),
-            `invalidRequest` (a name with characters outside `a-z A-Z 0-9 _ -`) or
-            `repoNameReserved`.
+          "$ref": "#/components/responses/BadRequest"
         '401':
-          description: Missing or invalid token
+          "$ref": "#/components/responses/Unauthorized"
         '403':
-          description: "`accessDenied`: the role is not ADMIN"
+          "$ref": "#/components/responses/Forbidden"
         '409':
-          description: "`repoExists`: the name is taken, by a repository of any type"
+          "$ref": "#/components/responses/Conflict"
       summary: Create a new repository
   "/api/repos/counts":
     get:
@@ -472,7 +478,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoCounts"
         '401':
-          description: Missing or invalid token
+          "$ref": "#/components/responses/Unauthorized"
       summary: Count the repositories of each type
   "/api/repos/{repoType}":
     post:
