@@ -15,14 +15,18 @@
  */
 package io.repsy.os.server.protocols.maven.shared.artifact.services;
 
-import io.repsy.os.config.async.MaintenanceTaskExecutorConfig;
+import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.shared.repo.events.PgpVerifyAllSignaturesToggledEvent;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -34,9 +38,12 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * the versions that only had their POM signed as signed, and one that turned it off kept showing
  * the ones whose POM is signed as unsigned.
  *
- * <p>It runs on the maintenance executor and only after the transaction that toggled the setting
- * has committed, so the settings request does not wait for it and a rolled back change starts
- * nothing. The setting is read again for every version, under that version's row lock (see {@link
+ * <p>It runs on its own executor ({@link SignedRecomputeExecutorConfig}) and only after the
+ * transaction that toggled the setting has committed, so the settings request does not wait for it
+ * (not even when the queue is full: the job is then rejected and logged, it never runs on the
+ * request's thread) and a rolled back change starts nothing. A repo whose run is still waiting in
+ * the queue is not queued again: the run reads the setting when it starts and again for every
+ * version. The setting is read again for every version, under that version's row lock (see {@link
  * VersionSignatureService#recompute}), so what a run applies is always the rule of the setting as
  * it is when the version is done: a second toggle while a run is going, a second run, or a run that
  * overlaps an upload all end in the same state. The rule itself is the one of the upload path
@@ -47,9 +54,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * locks at once, so it cannot deadlock with an upload, which holds the row of its version only. A
  * version that fails is logged and skipped, the rest are still done.
  *
- * <p>A version whose signature was stored while the setting was off has no verified signature to
- * count when it is turned on: such a signature is never verified and is not looked at here. It
- * counts once its file and signature are uploaded again.
+ * <p>A signature that was stored while the setting was off was never verified. When the setting is
+ * turned on the recomputation verifies it, one file at a time and under the lock of its version, by
+ * the same verifier and key rules as an upload, so that the toggle alone does not turn an honest
+ * publisher's versions unsigned ({@link VersionSignatureService#recompute}, RPS-1323).
  */
 @Slf4j
 @Service
@@ -59,24 +67,62 @@ public class SignedRecomputeService {
 
   private final ArtifactVersionRepository artifactVersionRepository;
   private final VersionSignatureService versionSignatureService;
+  private final Executor executor;
   private final int batchSize;
+
+  /** The repos with a run that has been queued and has not started yet. */
+  private final Set<UUID> queued = ConcurrentHashMap.newKeySet();
 
   public SignedRecomputeService(
       final ArtifactVersionRepository artifactVersionRepository,
       final VersionSignatureService versionSignatureService,
+      @Qualifier(SignedRecomputeExecutorConfig.BEAN_NAME) final Executor executor,
       @Value("${repsy.maven.signed-recompute.batch-size:200}") final int batchSize) {
 
     this.artifactVersionRepository = artifactVersionRepository;
     this.versionSignatureService = versionSignatureService;
+    this.executor = executor;
     this.batchSize = Math.max(1, batchSize);
   }
 
-  /** Starts the recomputation of the toggled repo once the toggle is committed. */
-  @Async(MaintenanceTaskExecutorConfig.BEAN_NAME)
+  /**
+   * Queues the recomputation of the toggled repo once the toggle is committed, unless one is
+   * already waiting for it. A run that has started is not waited for: it may have passed versions
+   * that the new setting concerns, so another one is queued behind it.
+   */
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onToggled(final PgpVerifyAllSignaturesToggledEvent event) {
 
-    this.recomputeRepo(event.repoId());
+    final var repoId = event.repoId();
+
+    if (!this.queued.add(repoId)) {
+      log.debug("A recomputation for Maven repo {} is already waiting", repoId);
+
+      return;
+    }
+
+    try {
+      this.executor.execute(() -> this.runQueued(repoId));
+    } catch (final RejectedExecutionException e) {
+      this.queued.remove(repoId);
+
+      log.error(
+          "The queue of signed recomputations is full: the versions of Maven repo {} were not"
+              + " recomputed, toggle the setting again to start it",
+          repoId,
+          e);
+    }
+  }
+
+  private void runQueued(final UUID repoId) {
+
+    this.queued.remove(repoId);
+
+    try {
+      this.recomputeRepo(repoId);
+    } catch (final RuntimeException e) {
+      log.error("Recomputing whether the versions of Maven repo {} are signed failed", repoId, e);
+    }
   }
 
   /**

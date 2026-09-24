@@ -153,7 +153,7 @@ e2e/
     maven/
       publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
-      pgp-signature.spec.ts     # registered PGP public keys (RPS-1189): verify, reject, isolate, delete; every-signature verification (RPS-1188); key-server lookup off (RPS-1204)
+      pgp-signature.spec.ts     # registered PGP public keys (RPS-1189): verify, reject, isolate, delete; every-signature verification (RPS-1188); key-server lookup off (RPS-1204); toggling every-signature verification recomputes `signed` and verifies stored `.asc` files (RPS-1316, RPS-1323)
       parallel-signed-deploy.spec.ts  # a REAL parallel `mvn deploy:deploy-file` of a signed release to a verify-all repo (RPS-1188), plus the one-thread control
       gpg-signed-deploy.spec.ts  # RPS-1316, tag @gpg: maven-gpg-plugin and Gradle `signing` deploys with a real gpg key to a verify-all repo (signed / unsigned / unregistered key)
       remote-throttle.spec.ts   # sanity check of RemoteAuthBudget/withBackoff429, no server needed

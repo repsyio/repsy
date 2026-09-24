@@ -108,4 +108,18 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
   @Modifying(flushAutomatically = true)
   @Query("update ArtifactVersion v set v.signed = :signed where v.id = :versionId")
   void updateSigned(UUID versionId, boolean signed);
+
+  /**
+   * The {@code pgpVerifyAllSignaturesEnabled} setting of the repo a version belongs to, as it is
+   * committed now. It is a scalar query, so it goes to the database even when the repo row is
+   * already in the persistence context of the transaction, with a value read before a toggle
+   * committed (RPS-1323).
+   */
+  @Query(
+      """
+        select r.pgpVerifyAllSignaturesEnabled
+        from ArtifactVersion v join v.artifact a join a.repo r
+        where v.id = :versionId
+      """)
+  @NonNull Optional<Boolean> findVerifyAllSignaturesEnabledByVersionId(UUID versionId);
 }
