@@ -48,6 +48,13 @@ describe('PanelHeaderComponent burger', () => {
     expect(burger().getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('has no burger where there is no sidebar to open', () => {
+    fixture.componentRef.setInput('hasMobileMenu', false);
+    fixture.detectChanges();
+
+    expect(burger()).toBeNull();
+  });
+
   it('asks for the opposite of the current state and leaves aria-expanded to its parent', () => {
     burger().click();
     fixture.detectChanges();
@@ -98,5 +105,19 @@ describe('PanelHeaderComponent profile link', () => {
     expect(click.defaultPrevented).toBeTrue();
     expect(router.url).toBe('/profile');
     expect(query('header-menu')).toBeNull();
+  });
+});
+
+// RPS-1294: the header also renders on the not-found page of an anonymous visitor, who has no username.
+describe('PanelHeaderComponent without a session', () => {
+  it('renders with a fallback avatar character instead of failing on the missing username', () => {
+    TestBed.configureTestingModule({
+      imports: [PanelHeaderComponent],
+      providers: [provideRouter([]), { provide: AuthService, useValue: { username: null } }],
+    });
+    const fixture = TestBed.createComponent(PanelHeaderComponent);
+
+    expect(() => fixture.detectChanges()).not.toThrow();
+    expect(fixture.nativeElement.querySelector('[data-testid="header-avatar"]')).not.toBeNull();
   });
 });
