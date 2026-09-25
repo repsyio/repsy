@@ -27,7 +27,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { isolatedWorkDir, run, type RunResult } from '../exec.js';
+import { isolatedWorkDir, type RunResult } from '../exec.js';
 import { MARKER_FILENAME } from '../npm.js';
 import {
   CLIENT_BINARIES,
@@ -39,7 +39,7 @@ import {
   type PublishOptions,
   type RegistryBinding,
 } from './client.js';
-import { secretsOf, sealedEnv, writeNpmrc } from './config.js';
+import { secretsOf, runSealed, sealedEnv, writeNpmrc } from './config.js';
 
 const BINARY = CLIENT_BINARIES.npm;
 
@@ -68,6 +68,16 @@ function common(ctx: ClientCtx): string[] {
   ];
 }
 
+/** Runs any npm command in `ctx`'s sealed environment (the specs' entry point for what `NpmFamilyClient` lacks). */
+export function runNpm(
+  ctx: ClientCtx,
+  label: string,
+  args: readonly string[],
+  cwd: string = ctx.work,
+): Promise<RunResult> {
+  return exec(ctx, label, args, cwd);
+}
+
 function exec(
   ctx: ClientCtx,
   label: string,
@@ -75,7 +85,7 @@ function exec(
   cwd: string = ctx.work,
   timeoutMs = COMMAND_TIMEOUT_MS,
 ): Promise<RunResult> {
-  return run(BINARY, args, {
+  return runSealed(BINARY, args, {
     cwd,
     env: ctx.env,
     timeoutMs,
