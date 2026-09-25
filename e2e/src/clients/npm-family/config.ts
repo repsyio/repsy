@@ -41,6 +41,7 @@ import { fileURLToPath } from 'node:url';
 import mustache from 'mustache';
 
 import { env } from '../../env.js';
+import { run, type RunOptions, type RunResult } from '../exec.js';
 import type { MaterializedCredential } from '../../scenarios/world.js';
 import type { RegistryBinding } from './client.js';
 
@@ -88,6 +89,20 @@ export function sealedEnv(home: string, extra: NodeJS.ProcessEnv = {}): NodeJS.P
     sealed.TMPDIR = process.env.TMPDIR;
   }
   return sealed;
+}
+
+/**
+ * `run()` for a command that gets exactly `opts.env` and nothing else: `extendEnv: false`, so the
+ * runner's own variables (`REPSY_ADMIN_PASSWORD`, `FORCE_COLOR`, `YARN_VERSION`, `NPM_CLIENTS_*`, ...)
+ * never reach the client, whatever the call site forgets (RPS-1364). Every npm-family invocation goes
+ * through it, with an env built by `sealedEnv`.
+ */
+export function runSealed(
+  command: string,
+  args: readonly string[],
+  opts: Omit<RunOptions, 'extendEnv'>,
+): Promise<RunResult> {
+  return run(command, args, { ...opts, extendEnv: false });
 }
 
 function baseUrlOf(binding: RegistryBinding): string {

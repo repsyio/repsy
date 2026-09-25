@@ -25,17 +25,21 @@
 # exclusive by construction and `run.sh local down [--h2]` tears down whichever is up. Started and
 # stopped by `./run.sh local up|down --h2`; REPSY_ADMIN_PASSWORD must be set (e2e/.env, copied from
 # .env.example).
+# The default project; run.sh passes -p to use another one (README.md "Parallel stacks").
 name: repsy-e2e
 
 services:
   repsy:
-    image: ${REPSY_IMAGE:-repsy-os-e2e:local}
+    # The tag follows the project (run.sh sets REPSY_E2E_IMAGE_TAG), so two checkouts that build at the
+    # same time do not retag each other's image; local for the default project (RPS-1422).
+    image: ${REPSY_IMAGE:-repsy-os-e2e:${REPSY_E2E_IMAGE_TAG:-local}}
     build:
       context: ..
       dockerfile: Dockerfile
     ports:
-      - '8080:8080'
-      - '9090:9090'
+      # Host ports move together with the project (run.sh --port-offset); the container's stay.
+      - '${REPSY_E2E_API_PORT:-8080}:8080'
+      - '${REPSY_E2E_REPO_PORT:-9090}:9090'
     environment:
       DB_URL: jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
       DB_USERNAME: repsy
