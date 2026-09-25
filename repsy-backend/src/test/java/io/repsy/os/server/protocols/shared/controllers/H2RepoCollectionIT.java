@@ -107,7 +107,9 @@ class H2RepoCollectionIT extends H2IntegrationTest {
       expected.add(name);
     }
     this.jdbcTemplate.update(
-        "update repo set created_at = ? where name like ?", Timestamp.from(TIED_AT), tag + "-%");
+        "update \"public\".\"repo\" set \"created_at\" = ? where \"name\" like ?",
+        Timestamp.from(TIED_AT),
+        tag + "-%");
     this.entityManager.clear();
 
     final var first = this.readAllPages(tag);

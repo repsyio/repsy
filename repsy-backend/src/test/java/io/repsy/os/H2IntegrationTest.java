@@ -30,13 +30,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public abstract class H2IntegrationTest {
 
+  /**
+   * The URL of the packaged H2 profile (the README's and the Docker image's {@code DB_URL}) with an
+   * in-memory database. It must not carry {@code DATABASE_TO_LOWER}: the migrations create the
+   * tables with quoted lower-case names, which H2 matches case-sensitively, so a native query that
+   * leaves a table name unquoted finds no table there (RPS-1385). With {@code
+   * DATABASE_TO_LOWER=TRUE} such a query passes here and fails in the image.
+   */
+  private static final String H2_URL = "jdbc:h2:mem:rps957;MODE=PostgreSQL;DB_CLOSE_DELAY=-1";
+
   private static final Path STORAGE_ROOT = createStorageRoot();
 
   @DynamicPropertySource
   static void registerH2Properties(final DynamicPropertyRegistry registry) {
-    registry.add(
-        "spring.datasource.url",
-        () -> "jdbc:h2:mem:rps957;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE");
+    registry.add("spring.datasource.url", () -> H2_URL);
     registry.add("spring.datasource.username", () -> "sa");
     registry.add("spring.datasource.password", () -> "");
     registry.add("storage-gateway.fs.base-path", STORAGE_ROOT::toString);

@@ -71,7 +71,7 @@ class H2ListQueriesIT extends H2IntegrationTest {
     }
     this.helmChartVersionRepository.flush();
     this.jdbcTemplate.update(
-        "update helm_chart_version set created_at = ? where chart_id = ?",
+        "update \"public\".\"helm_chart_version\" set \"created_at\" = ? where \"chart_id\" = ?",
         Timestamp.from(Instant.parse("2026-01-01T00:00:00Z")),
         savedChart.getId());
     this.helmChartVersionRepository.flush();

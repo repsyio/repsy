@@ -74,7 +74,8 @@ class H2ErrorHandlerConstraintViolationIT extends H2IntegrationTest {
         violationOf(
             () ->
                 this.jdbcTemplate.update(
-                    "update users set role = 'NOT_A_ROLE' where id = ?", stored.getId()));
+                    "update \"public\".\"users\" set \"role\" = 'NOT_A_ROLE' where \"id\" = ?",
+                    stored.getId()));
 
     expectError(this.errorHandler, violation, HttpStatus.INTERNAL_SERVER_ERROR, "errorOccurred");
   }
@@ -88,7 +89,8 @@ class H2ErrorHandlerConstraintViolationIT extends H2IntegrationTest {
         violationOf(
             () ->
                 this.jdbcTemplate.update(
-                    "update users set username = null where id = ?", stored.getId()));
+                    "update \"public\".\"users\" set \"username\" = null where \"id\" = ?",
+                    stored.getId()));
 
     expectError(this.errorHandler, violation, HttpStatus.INTERNAL_SERVER_ERROR, "errorOccurred");
   }

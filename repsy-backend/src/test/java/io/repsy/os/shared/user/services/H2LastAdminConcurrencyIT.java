@@ -91,17 +91,21 @@ class H2LastAdminConcurrencyIT extends H2IntegrationTest {
     this.userRepository.deleteAllById(this.createdUserIds);
     this.createdUserIds.clear();
     this.demotedAdminIds.forEach(
-        id -> this.jdbcTemplate.update("update users set role = 'ADMIN' where id = ?", id));
+        id ->
+            this.jdbcTemplate.update(
+                "update \"public\".\"users\" set \"role\" = 'ADMIN' where \"id\" = ?", id));
     this.demotedAdminIds.clear();
   }
 
   private void newAdminPair() {
     final var admins =
-        this.jdbcTemplate.queryForList("select id from users where role = 'ADMIN'", UUID.class);
+        this.jdbcTemplate.queryForList(
+            "select \"id\" from \"public\".\"users\" where \"role\" = 'ADMIN'", UUID.class);
     admins.stream()
         .filter(id -> !this.createdUserIds.contains(id))
         .forEach(this.demotedAdminIds::add);
-    this.jdbcTemplate.update("update users set role = 'USER' where role = 'ADMIN'");
+    this.jdbcTemplate.update(
+        "update \"public\".\"users\" set \"role\" = 'USER' where \"role\" = 'ADMIN'");
 
     this.adminA = this.commitUser();
     this.adminB = this.commitUser();
@@ -119,7 +123,10 @@ class H2LastAdminConcurrencyIT extends H2IntegrationTest {
 
   private String roleOf(final UserInfo user) {
     return this.jdbcTemplate
-        .queryForList("select role from users where id = ?", String.class, user.getId())
+        .queryForList(
+            "select \"role\" from \"public\".\"users\" where \"id\" = ?",
+            String.class,
+            user.getId())
         .stream()
         .findFirst()
         .orElse("deleted");
@@ -166,7 +173,8 @@ class H2LastAdminConcurrencyIT extends H2IntegrationTest {
         this.holder.execute(
             status -> {
               this.jdbcTemplate.update(
-                  "update users set role = 'USER' where id = ?", this.adminB.getId());
+                  "update \"public\".\"users\" set \"role\" = 'USER' where \"id\" = ?",
+                  this.adminB.getId());
               return this.startBlocked(this.demotion(this.adminA));
             });
 
@@ -183,7 +191,8 @@ class H2LastAdminConcurrencyIT extends H2IntegrationTest {
         this.holder.execute(
             status -> {
               this.jdbcTemplate.update(
-                  "update users set role = 'USER' where id = ?", this.adminB.getId());
+                  "update \"public\".\"users\" set \"role\" = 'USER' where \"id\" = ?",
+                  this.adminB.getId());
               return this.startBlocked(this.deletion(this.adminA));
             });
 
@@ -198,7 +207,8 @@ class H2LastAdminConcurrencyIT extends H2IntegrationTest {
     final var pending =
         this.holder.execute(
             status -> {
-              this.jdbcTemplate.update("delete from users where id = ?", this.adminB.getId());
+              this.jdbcTemplate.update(
+                  "delete from \"public\".\"users\" where \"id\" = ?", this.adminB.getId());
               return this.startBlocked(this.deletion(this.adminA));
             });
 
@@ -213,7 +223,8 @@ class H2LastAdminConcurrencyIT extends H2IntegrationTest {
     final var pending =
         this.holder.execute(
             status -> {
-              this.jdbcTemplate.update("delete from users where id = ?", this.adminB.getId());
+              this.jdbcTemplate.update(
+                  "delete from \"public\".\"users\" where \"id\" = ?", this.adminB.getId());
               return this.startBlocked(this.deletion(this.adminB));
             });
 
