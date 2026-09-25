@@ -17,11 +17,13 @@
 /**
  * Deleting one version of a Maven artifact in the panel (RPS-1331), for an artifact published with
  * raw HTTP PUTs. Repsy stores the artifact-level `maven-metadata.xml` only when a client uploads
- * one and never generates it, so an artifact published by Ivy, sbt or a plain `curl -T` has none.
+ * one, so an artifact published by Ivy, sbt or a plain `curl -T` has none stored; it answers a request
+ * for it from the registered versions instead (RPS-1369), which is why the delete drops the version
+ * from that answer without there being a file to rewrite.
  *
  *  - Without a `maven-metadata.xml` the delete used to move the version's files to the trash and
  *    then answer 404 `itemNotFound`, leaving the row listed and the delete impossible to repeat.
- *    It now answers 200, and neither creates a metadata file nor touches the sibling version.
+ *    It now answers 200, and neither stores a metadata file nor touches the sibling version.
  *  - With one (a Maven client deployed it) the version is removed from the file, as before.
  *  - A file without `<versioning>` (`<metadata/>`) lists no versions: the delete answers 200 (it
  *    used to be a 500 after the files had moved) and leaves the file as it was. A file that cannot
@@ -36,6 +38,7 @@ import {
   parseArtifactVersions,
   rawGet,
   rawPut,
+  repoTree,
   versionDir,
 } from '../../src/clients/maven-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
@@ -84,7 +87,13 @@ test.describe('maven version delete (raw HTTP publisher)', () => {
     const fixture = await seedTwoVersions(seeder);
     const { repoName, groupId } = fixture;
     const metadataPath = `${artifactDir(groupId, ARTIFACT_ID)}/maven-metadata.xml`;
-    expect(await status(fixture, metadataPath), 'no metadata was uploaded').toBe(404);
+    expect(Object.keys(await repoTree(repoName)), 'no metadata was uploaded').not.toContain(
+      metadataPath,
+    );
+    // RPS-1369: what is not stored is answered from the registered versions.
+    const before = await rawGet(repoName, adminCredential(), metadataPath);
+    expect(before.status, 'the generated maven-metadata.xml').toBe(200);
+    expect(parseArtifactVersions(before.body.toString('utf8'))).toEqual([FIRST, SECOND]);
 
     await panelApi.deleteMavenArtifactVersion(repoName, groupId, ARTIFACT_ID, FIRST);
 
@@ -97,7 +106,16 @@ test.describe('maven version delete (raw HTTP publisher)', () => {
     const kept = `${versionDir(groupId, ARTIFACT_ID, SECOND)}/${ARTIFACT_ID}-${SECOND}`;
     expect(await status(fixture, `${kept}.jar`)).toBe(200);
     expect(await status(fixture, `${kept}.pom`)).toBe(200);
-    expect(await status(fixture, metadataPath), 'Repsy never generates a metadata file').toBe(404);
+    expect(
+      Object.keys(await repoTree(repoName)),
+      'the delete stores no metadata file',
+    ).not.toContain(metadataPath);
+    const after = await rawGet(repoName, adminCredential(), metadataPath);
+    expect(after.status, 'the generated maven-metadata.xml').toBe(200);
+    expect(
+      parseArtifactVersions(after.body.toString('utf8')),
+      'without the deleted version',
+    ).toEqual([SECOND]);
 
     const info = await panelApi.getMavenArtifactVersion(repoName, groupId, ARTIFACT_ID, SECOND);
     expect(info.versionName).toBe(SECOND);

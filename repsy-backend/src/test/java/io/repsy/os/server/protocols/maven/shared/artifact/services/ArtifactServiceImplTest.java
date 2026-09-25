@@ -55,11 +55,13 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -2021,6 +2023,23 @@ class ArtifactServiceImplTest {
     final var version = ArgumentCaptor.forClass(ArtifactVersion.class);
     verify(this.artifactUpsertHelper).insertArtifactVersion(version.capture(), any(), any());
     assertThat(version.getValue().getPrefix()).isNull();
+  }
+
+  @Test
+  @DisplayName("lists the registered versions of the artifact of the repo, RPS-1369")
+  void registeredVersionsComeFromTheRepositoryOfTheStorageKey() {
+    final var id = UUID.randomUUID();
+    final var rows =
+        List.of(
+            new RegisteredVersion("1.0", Instant.parse("2026-09-21T10:10:10Z")),
+            new RegisteredVersion("1.1", null));
+    when(this.artifactVersionRepository.findRegisteredVersions(id, "com.acme", "lib"))
+        .thenReturn(rows);
+
+    assertThat(
+            this.artifactService.getRegisteredVersions(
+                repo(id, true, true, true), "com.acme", "lib"))
+        .isEqualTo(rows);
   }
 
   private Resource stubStoredPom(final String relativePath) {

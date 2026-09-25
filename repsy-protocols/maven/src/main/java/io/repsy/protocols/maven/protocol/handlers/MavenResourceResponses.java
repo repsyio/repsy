@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.maven.protocol.handlers;
 
+import io.repsy.protocols.maven.protocol.resources.SynthesizedFileResource;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -25,7 +26,8 @@ import org.springframework.http.ResponseEntity;
 /**
  * The headers a Maven path answers with, shared by the {@code GET} and the {@code HEAD} handler so
  * the two cannot drift (RPS-1368): a directory listing is {@code text/html}, a file is an
- * attachment of {@code application/octet-stream}.
+ * attachment of {@code application/octet-stream}. A generated file ({@link
+ * SynthesizedFileResource}) is held in memory like a listing, but it is a file (RPS-1369).
  */
 @NullMarked
 final class MavenResourceResponses {
@@ -36,7 +38,7 @@ final class MavenResourceResponses {
 
     final var builder = ResponseEntity.ok();
 
-    if (resource instanceof ByteArrayResource) {
+    if (resource instanceof ByteArrayResource && !(resource instanceof SynthesizedFileResource)) {
       builder.contentType(MediaType.TEXT_HTML);
     } else {
       builder.contentType(MediaType.APPLICATION_OCTET_STREAM);

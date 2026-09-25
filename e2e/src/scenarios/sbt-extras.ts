@@ -36,6 +36,7 @@ import { RepoType } from '../api/panel-api.js';
 import { uniqueVersion } from '../clients/maven-adapter.js';
 import {
   adminCredential,
+  parseArtifactVersions,
   rawGet,
   rawHead,
   repoTree,
@@ -111,7 +112,7 @@ const sha1Hex = (body: Buffer): string => createHash('sha1').update(body).digest
 export function registerSbtExtras(): void {
   test.describe('sbt extras', () => {
     test(
-      'sbt > stores exactly the files sbt sends, each with its checksums, and no maven-metadata.xml',
+      'sbt > stores exactly the files sbt sends, each with its checksums, and stores no maven-metadata.xml',
       { tag: ['@smoke'] },
       async ({ seeder }) => {
         const { world, repoName, groupId, base, version } = await adminWorld(seeder, 'files');
@@ -162,13 +163,19 @@ export function registerSbtExtras(): void {
         expect(head.bodyLength, 'HEAD carries no body').toBe(0);
         expect((await rawHead(repoName, admin, `${stem}-nope.jar`)).status).toBe(404);
 
-        for (const path of [
-          `${dir}/maven-metadata.xml`,
+        // The version-level file is never generated. The artifact-level one is (RPS-1369) from
+        // the registered versions, though sbt stored none: the tree above holds no such file.
+        const versionLevel = await rawGet(repoName, admin, `${dir}/maven-metadata.xml`);
+        expect(versionLevel.status, `sbt sends no ${dir}/maven-metadata.xml`).toBe(404);
+        const artifactLevel = await rawGet(
+          repoName,
+          admin,
           `${artifactDir(groupId, artifactId)}/maven-metadata.xml`,
-        ]) {
-          const res = await rawGet(repoName, admin, path);
-          expect(res.status, `sbt sends no ${path}`).toBe(404);
-        }
+        );
+        expect(artifactLevel.status, 'the artifact-level maven-metadata.xml is generated').toBe(
+          200,
+        );
+        expect(parseArtifactVersions(artifactLevel.body.toString('utf8'))).toEqual([version]);
       },
     );
 
@@ -334,12 +341,8 @@ export function registerSbtExtras(): void {
     test('sbt > a dynamic revision (latest.release) resolves an sbt-published library', async ({
       seeder,
     }) => {
-      // RPS-1369: the server never generates maven-metadata.xml, sbt sends none, and a dynamic
-      // revision resolves nothing without it.
-      test.fail(
-        true,
-        'RPS-1369: no maven-metadata.xml is generated, so latest.release finds no version',
-      );
+      // RPS-1369: sbt sends no maven-metadata.xml, so the server answers the artifact-level one
+      // from the registered versions, which is what latest.release reads.
       const { world, groupId, base, version } = await adminWorld(seeder, 'dynamic');
 
       const published = await publishWithSbt(world);

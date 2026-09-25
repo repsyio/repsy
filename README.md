@@ -759,10 +759,17 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
   version's page in the panel does, which asks for the jar only; a dependency without a `conf` resolves
   as well, because Repsy answers `404` for the `sources` and `javadoc` artifacts the artifact does not
   have and Ivy then skips them.
-- **No `maven-metadata.xml`:** Repsy stores the `maven-metadata.xml` a client uploads but never
-  generates one. An Ivy, sbt or raw `PUT` publish has none, so Maven `LATEST` and version ranges, and
-  Gradle/sbt dynamic versions, do not resolve for such artifacts. Ivy itself falls back to the
-  directory listing (`latest.integration` and `[1.0,)` resolve), so use fixed versions everywhere else.
+- **`maven-metadata.xml`:** Ivy, sbt and a raw `PUT` publish none, so there is no file to store. Repsy
+  answers a `GET` or `HEAD` of the artifact-level `<group path>/<artifact>/maven-metadata.xml` (and of
+  its `.md5`, `.sha1`, `.sha256` and `.sha512`) from the versions it has registered when no client
+  stored one, so Maven `LATEST`, `RELEASE` and version ranges, Gradle `1.+` and sbt `latest.release`
+  resolve for such artifacts. A file a client did store is always served as it is (Repsy never merges
+  the registered versions into it), so an artifact that `mvn deploy` or Gradle published first and
+  that Ivy or sbt then added a version to keeps listing only what Maven or Gradle wrote; a later
+  `mvn deploy` of the artifact finds the generated list and stores it with its own version added.
+  Nothing generated is stored: it is not in the directory listing, is never signed (`.asc` is a `404`)
+  and is not generated for the version-level file of a SNAPSHOT (Maven, Gradle and Ivy resolve a
+  non-unique SNAPSHOT by its own file name without it).
 
 ### Authenticating from CI
 
