@@ -15,7 +15,8 @@
 # The maven runner: the harness itself (see base.Dockerfile) plus a pinned Temurin JDK and Maven,
 # and the two signing toolchains of the signed-deploy specs (tests/maven/gpg-signed-deploy.spec.ts):
 # the `gpg` binary that maven-gpg-plugin and Gradle's `signing` plugin drive, a pinned Gradle and a
-# pinned sbt (RPS-134), all of them clients of the same Maven repository. Its first layers
+# pinned sbt (RPS-134), and a pinned Apache Ant with the Apache Ivy jar (RPS-135), all of them clients of
+# the same Maven repository. Its first layers
 # intentionally repeat base.Dockerfile's rather than `FROM` a separately built tag: Docker Compose
 # has no way to guarantee that a sibling service's image
 # ("the base runner image") is built before this one, short of an extra explicit prebuild step, and
@@ -53,11 +54,23 @@ ARG GRADLE_SHA256=bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f35
 ARG SBT_VERSION=1.13.0
 ARG SBT_SHA256=06806805ffd26232727326216766ed4793b549f8c1e6ffeef2e610db7245b698
 
+# The published SHA-512 of apache-ant-${ANT_VERSION}-bin.tar.gz and apache-ivy-${IVY_VERSION}-bin.tar.gz
+# (the .sha512 files next to them on archive.apache.org); change each version and its checksum together.
+# The build fails on a mismatch. Ivy is only its jar, on Ant's classpath (`-lib /opt/ivy/ivy.jar`): the
+# plain jar without Apache HttpClient, so Ivy talks HTTP through its own URL handler, the way an Ivy
+# dropped into ANT_HOME/lib does.
+ARG ANT_VERSION=1.10.15
+ARG ANT_SHA512=d78427aff207592c024ff1552dc04f7b57065a195c42d398fcffe7a0145e8d00cd46786f5aa52e77ab0fdf81334f065eb8011eecd2b48f7228e97ff4cb20d16c
+ARG IVY_VERSION=2.5.3
+ARG IVY_SHA512=19e38998eda66a635643f50eec1fe62aeaa4b66e7b12540e38ae9ab67f2402a4df1230c0fa142e391234abf8491b5cd46fa8a3b004324b511a495701be848470
+
 ENV JAVA_HOME="/opt/java/temurin"
 ENV MAVEN_HOME="/opt/maven"
 ENV GRADLE_HOME="/opt/gradle"
 ENV SBT_HOME="/opt/sbt"
-ENV PATH="${JAVA_HOME}/bin:${MAVEN_HOME}/bin:${GRADLE_HOME}/bin:${SBT_HOME}/bin:${PATH}"
+ENV ANT_HOME="/opt/ant"
+ENV IVY_JAR="/opt/ivy/ivy.jar"
+ENV PATH="${JAVA_HOME}/bin:${MAVEN_HOME}/bin:${GRADLE_HOME}/bin:${SBT_HOME}/bin:${ANT_HOME}/bin:${PATH}"
 
 # gpg + gpg-agent (Debian bookworm's GnuPG 2.2, pinned by the base image's release) rather than the
 # full `gnupg` metapackage: signing needs no dirmngr/gpgsm/keyserver tooling, and the specs turn the
@@ -92,6 +105,21 @@ RUN curl -fsSL -o /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v${
     && rm /tmp/sbt.tgz \
     && chmod -R a+rX "${SBT_HOME}"
 
+RUN curl -fsSL -o /tmp/ant.tgz "https://archive.apache.org/dist/ant/binaries/apache-ant-${ANT_VERSION}-bin.tar.gz" \
+    && echo "${ANT_SHA512}  /tmp/ant.tgz" | sha512sum -c - \
+    && tar -xzf /tmp/ant.tgz -C /opt \
+    && mv "/opt/apache-ant-${ANT_VERSION}" "${ANT_HOME}" \
+    && rm /tmp/ant.tgz \
+    && chmod -R a+rX "${ANT_HOME}"
+
+RUN curl -fsSL -o /tmp/ivy.tgz "https://archive.apache.org/dist/ant/ivy/${IVY_VERSION}/apache-ivy-${IVY_VERSION}-bin.tar.gz" \
+    && echo "${IVY_SHA512}  /tmp/ivy.tgz" | sha512sum -c - \
+    && mkdir -p /opt/ivy \
+    && tar -xzf /tmp/ivy.tgz -C /opt/ivy --strip-components=1 "apache-ivy-${IVY_VERSION}/ivy-${IVY_VERSION}.jar" \
+    && mv "/opt/ivy/ivy-${IVY_VERSION}.jar" "${IVY_JAR}" \
+    && rm /tmp/ivy.tgz \
+    && chmod -R a+rX /opt/ivy
+
 # Readable/executable (not necessarily owned) by whatever uid the container runs as
 # (docker-compose.runners.yml's "user:", the host user) -- installed as root during the build, run
 # as that other user at runtime, same reasoning as /app itself above.
@@ -124,6 +152,6 @@ RUN mkdir -p /opt/sbt-cache/boot /opt/sbt-cache/coursier /opt/sbt-cache/ivy /opt
     && rm -rf /tmp/sbt-warmup /tmp/.sbt /opt/sbt-cache/home /opt/sbt-cache/global \
     && mkdir -p /opt/sbt-cache/global && chmod -R a+rwX /opt/sbt-cache
 
-RUN java --version && mvn --version && GRADLE_USER_HOME=/tmp/gradle-check gradle --version && rm -rf /tmp/gradle-check && gpg --version | head -1
+RUN java --version && mvn --version && GRADLE_USER_HOME=/tmp/gradle-check gradle --version && rm -rf /tmp/gradle-check && gpg --version | head -1 && ant -version && java -cp "${IVY_JAR}" org.apache.ivy.Main -version
 
 CMD ["./entrypoint.sh", "maven"]

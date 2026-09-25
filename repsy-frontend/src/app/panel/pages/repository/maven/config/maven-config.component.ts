@@ -108,8 +108,9 @@ uploaded);
 </ivy-module>
 \`\`\`
 
-Then build that POM with \`ivy:makepom\` and publish with \`publishivy="false"\`, otherwise Ivy uploads its own
-ivy file onto the POM path and Repsy refuses it with \`400 invalidArtifactPath\`. \`overwrite="true"\` is needed as well:
+Then build that POM with \`ivy:makepom\` and publish with \`publishivy="false"\`, otherwise Ivy also uploads its own
+ivy file as \`ivy-<revision>.xml\` and Repsy refuses it with \`400 invalidArtifactPath\` (the jar and the POM are
+already stored by then, but the build fails). \`overwrite="true"\` is needed as well:
 Ivy checks with a HEAD request whether a file exists and Repsy answers that with \`200\` even for a missing file
 (without it Ivy stops with "destination file exists and overwrite == false"); Repsy itself decides whether a
 version can be redeployed;
@@ -126,6 +127,9 @@ version can be redeployed;
   </target>
 </project>
 \`\`\`
+
+If your module has dependencies, give \`ivy:makepom\` a \`<mapping conf="default" scope="compile"/>\`, otherwise every
+dependency is written to the POM as optional and a consumer does not resolve it transitively.
 
 Repsy does not generate a \`maven-metadata.xml\` for what a client uploads, so Maven \`LATEST\` and version ranges
 do not resolve for artifacts published this way. Ivy falls back to the directory listing, but prefer fixed versions.

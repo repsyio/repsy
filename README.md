@@ -722,8 +722,13 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
   ```
 
 - **`publishivy="false"`** on `ivy:publish` (it is an attribute of the task, not of the resolver).
-  Otherwise Ivy uploads its own ivy file onto the POM path, which Repsy refuses with
-  `400 invalidArtifactPath`.
+  Otherwise Ivy also uploads its own ivy file, as `ivy-<revision>.xml` after the jar and the POM, which
+  Repsy refuses with `400 invalidArtifactPath`: the build fails, although the jar and the POM are
+  already stored.
+- **Dependencies:** if the module has `<dependencies>`, give `ivy:makepom` a
+  `<mapping conf="default" scope="compile"/>` (a child element of the task). Without a mapping every
+  dependency is written to the POM as `<optional>true</optional>`, and a consumer does not resolve it
+  transitively.
 - **`overwrite="true"`:** Ivy first asks with a `HEAD` request whether a file exists, and Repsy answers
   `HEAD` with `200` for any Maven path (RPS-1368), so without it Ivy stops with "destination file exists
   and overwrite == false". Whether a version may be deployed again is still decided by Repsy.

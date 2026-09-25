@@ -84,6 +84,15 @@ describe('MavenConfigComponent Apache Ivy snippet (RPS-1332)', () => {
       '<ivy:publish resolver="repsy" pubrevision="1.0.0" publishivy="false" overwrite="true">',
     );
     expect(component.markdown).toContain('400 invalidArtifactPath');
+    expect(component.markdown).toContain('as `ivy-<revision>.xml`');
+    expect(component.markdown).not.toContain('onto the POM path');
+  });
+
+  it('tells a module with dependencies to map its configuration to a POM scope', () => {
+    component.ngOnInit();
+
+    expect(component.markdown).toContain('<mapping conf="default" scope="compile"/>');
+    expect(component.markdown).toContain('every\ndependency is written to the POM as optional');
   });
 
   it('documents that no maven-metadata.xml is generated for what a client uploads', () => {

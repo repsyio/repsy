@@ -26,7 +26,8 @@ import type { World } from '../scenarios/world.js';
 import { adminCredential, rawGet, sha256Hex, splitPackageName, versionDir } from './maven-raw.js';
 
 /**
- * A SNAPSHOT that sbt published (once, or twice for a redeploy scenario) and resolved: the jar and the
+ * A SNAPSHOT that sbt published (once, or twice for a redeploy scenario) and resolved (Apache Ivy
+ * publishes the same way, so `clients/ivy-adapter.ts` reuses this, RPS-135): the jar and the
  * POM sit under their literal names, the latest deploy's jar replaced the earlier one in place (so
  * the consumer resolved the latest publish's bytes), and no timestamped file or version-level
  * metadata exists, because sbt never sends either.

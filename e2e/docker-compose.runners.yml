@@ -66,6 +66,10 @@ services:
         MAVEN_VERSION: '3.9.9'
         GRADLE_VERSION: '8.14.3'
         GRADLE_SHA256: 'bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531'
+        ANT_VERSION: '1.10.15'
+        ANT_SHA512: 'd78427aff207592c024ff1552dc04f7b57065a195c42d398fcffe7a0145e8d00cd46786f5aa52e77ab0fdf81334f065eb8011eecd2b48f7228e97ff4cb20d16c'
+        IVY_VERSION: '2.5.3'
+        IVY_SHA512: '19e38998eda66a635643f50eec1fe62aeaa4b66e7b12540e38ae9ab67f2402a4df1230c0fa142e391234abf8491b5cd46fa8a3b004324b511a495701be848470'
     environment:
       <<: *runner-environment
       # Read by clients/maven.ts: Maven's shared, third-party-only "local repository tail" (see that
