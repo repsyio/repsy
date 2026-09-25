@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -35,12 +36,14 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.events.ArtifactPushedEvent;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.os.server.security.scan.entities.VulnerabilityScan;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
 import io.repsy.os.server.security.scanner.VulnerabilityScanner;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.server.security.scanner.dtos.ScanRequest;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
+import java.sql.SQLException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -57,6 +60,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ArtifactScanListener")
@@ -202,6 +207,82 @@ class ArtifactScanListenerTest {
   }
 
   @Test
+  @DisplayName(
+      "logs at INFO and skips recordScanFailure when writing the outcome finds no row to update"
+          + " because the repo was deleted between the read and the write")
+  void skipsFailureRecordingWhenOutcomeWriteLostItsRow() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(false);
+    doThrow(optimisticLockFailure()).when(this.scanner).scan(any());
+
+    assertThatCode(() -> this.listener.handleArtifactPushed(this.dockerEvent()))
+        .doesNotThrowAnyException();
+
+    verify(this.scanTxService, never()).recordScanFailure(any(), any());
+    assertThat(this.logAppender.list)
+        .noneMatch(logEvent -> logEvent.getLevel().isGreaterOrEqual(Level.WARN))
+        .anyMatch(
+            logEvent ->
+                logEvent.getLevel() == Level.INFO
+                    && logEvent.getFormattedMessage().contains("scan row no longer exists"));
+  }
+
+  @Test
+  @DisplayName(
+      "still records a failure and logs at ERROR for an optimistic locking failure on a scan row"
+          + " that still exists")
+  void recordsFailureForOptimisticLockFailureOfExistingRow() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(true);
+    doThrow(optimisticLockFailure()).when(this.scanner).scan(any());
+
+    this.listener.handleArtifactPushed(this.dockerEvent());
+
+    verify(this.scanTxService).recordScanFailure(eq(SCAN_ID), any());
+    assertThat(this.logAppender.list)
+        .anyMatch(
+            logEvent ->
+                logEvent.getLevel() == Level.ERROR
+                    && logEvent.getFormattedMessage().contains("Vulnerability scan failed"));
+  }
+
+  @Test
+  @DisplayName(
+      "logs at INFO and skips recordScanFailure when a finding of the scan hits the foreign key"
+          + " because the scan row is gone")
+  void skipsFailureRecordingWhenFindingsLostTheirScan() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(false);
+    doThrow(integrityViolation("23503")).when(this.scanner).scan(any());
+
+    this.listener.handleArtifactPushed(this.dockerEvent());
+
+    verify(this.scanTxService, never()).recordScanFailure(any(), any());
+    assertThat(this.logAppender.list)
+        .noneMatch(logEvent -> logEvent.getLevel().isGreaterOrEqual(Level.WARN))
+        .anyMatch(logEvent -> logEvent.getFormattedMessage().contains("scan row no longer exists"));
+  }
+
+  @Test
+  @DisplayName(
+      "still records a failure and logs at ERROR for a data integrity violation that is not a"
+          + " foreign key violation, without asking whether the row exists")
+  void recordsFailureForOtherIntegrityViolations() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    doThrow(integrityViolation("23505")).when(this.scanner).scan(any());
+
+    this.listener.handleArtifactPushed(this.dockerEvent());
+
+    verify(this.scanTxService).recordScanFailure(eq(SCAN_ID), any());
+    verify(this.scanTxService, never()).scanExists(any());
+    assertThat(this.logAppender.list).anyMatch(logEvent -> logEvent.getLevel() == Level.ERROR);
+  }
+
+  @Test
   @DisplayName("scans a public Docker repo without a registry token")
   void scansPublicDockerRepoWithoutToken() {
     this.givenDockerScanIsQueued();
@@ -241,6 +322,15 @@ class ArtifactScanListenerTest {
     final var request = this.capturedScanRequest();
     assertThat(request.dockerRegistryReference()).isEqualTo("repo/image:1.0");
     assertThat(request.registryAuthToken()).isEqualTo("token");
+  }
+
+  private static ObjectOptimisticLockingFailureException optimisticLockFailure() {
+    return new ObjectOptimisticLockingFailureException(VulnerabilityScan.class, SCAN_ID);
+  }
+
+  private static DataIntegrityViolationException integrityViolation(final String sqlState) {
+    return new DataIntegrityViolationException(
+        "violation", new SQLException("violation", sqlState));
   }
 
   private void givenDockerScanIsQueued() {
