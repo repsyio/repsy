@@ -39,10 +39,9 @@
           >
             <i
               aria-hidden="true"
-              class="fa-solid"
               [ngClass]="{
-                'fa-eye': !formUi.passwordElement.visiblePassword,
-                'fa-eye-slash': formUi.passwordElement.visiblePassword,
+                'ri-eye-line': !formUi.passwordElement.visiblePassword,
+                'ri-eye-off-line': formUi.passwordElement.visiblePassword,
               }"
             ></i>
           </button>
@@ -100,10 +99,9 @@
           >
             <i
               aria-hidden="true"
-              class="fa-solid"
               [ngClass]="{
-                'fa-eye': !formUi.passwordConfirmationElement.visiblePassword,
-                'fa-eye-slash': formUi.passwordConfirmationElement.visiblePassword,
+                'ri-eye-line': !formUi.passwordConfirmationElement.visiblePassword,
+                'ri-eye-off-line': formUi.passwordConfirmationElement.visiblePassword,
               }"
             ></i>
           </button>

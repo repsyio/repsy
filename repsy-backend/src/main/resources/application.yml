@@ -233,8 +233,8 @@ app:
     # reported, nothing is blocked. Useful while rolling a widened/custom policy out.
     report-only: ${APP_CSP_REPORT_ONLY:false}
     # Overrides the built-in policy outright. Unset keeps the built-in policy (see
-    # SecurityHeadersFilter), which already allows what index.html loads (Google Tag Manager,
-    # cdnjs.cloudflare.com) plus whatever app.allowed-origins allows for connect-src.
+    # SecurityHeadersFilter), which allows the panel's own origin only (RPS-1402: no third-party
+    # host) plus whatever app.allowed-origins allows for connect-src.
     policy: ${APP_CSP_POLICY:}
 
 h2:
