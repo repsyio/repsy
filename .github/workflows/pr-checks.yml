@@ -40,7 +40,7 @@ jobs:
 
   java-checks:
     name: Repsy check
-    runs-on: warp-ubuntu-latest-x64-4x
+    runs-on: warp-ubuntu-latest-x64-32x
     # The SonarCloud scan below reads the frontend coverage report the frontend job produces (there
     # is one analysis per project, so the scan cannot be split per language). This starts the Java
     # build after the frontend job, and skips it when the frontend job fails. That PR is red anyway.
