@@ -41,6 +41,7 @@ import {
 import type { ListLevelName } from '../../../src/ui/pages/protocols/types.js';
 import { RepositoriesPage, rowNames } from '../../../src/ui/pages/repositories.js';
 import { UI_REPO_TYPES } from '../../../src/ui/repo-types.js';
+import { rowLinkPoint } from '../../../src/ui/row-click.js';
 
 const MAVEN_TYPE = UI_REPO_TYPES.find((type) => type.slug === 'maven')!;
 
@@ -128,17 +129,20 @@ async function hrefOf(row: Locator): Promise<string> {
 }
 
 /**
- * Clicks the exact centre of `row` with the mouse: one move, then press and release at once, like a
- * fast user. (`locator.click()` waits for the point to be actionable, which hides an element that
- * covers it for a moment, such as a popup that is still fading in under the arriving pointer.)
+ * Clicks the centre of `row` with the mouse: one move, then press and release at once, like a fast
+ * user. (`locator.click()` waits for the point to be actionable, which hides an element that
+ * covers it for a moment, such as a popup that is still fading in under the arriving pointer.) A
+ * control that sits in the middle of the row, such as the security badge of a Maven row with the
+ * scanner on, is a control and not the row: the click then goes to the nearest point without one
+ * (`rowLinkPoint`, RPS-1337), which is the centre itself on every row without such a control.
  */
 async function clickCentre(page: Page, row: Locator): Promise<void> {
-  await row.scrollIntoViewIfNeeded();
+  const point = await rowLinkPoint(row);
   const box = await row.boundingBox();
   if (box === null) {
     throw new Error('the row has no box');
   }
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.click(box.x + point.x, box.y + point.y);
 }
 
 test.describe('List rows are links', { tag: '@a11y' }, () => {

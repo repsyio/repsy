@@ -36,6 +36,7 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
 import { SecurityService } from '../../../../security/service/security.service';
 import { MavenConfigComponent } from '../../config/maven-config.component';
 import { MavenService } from '../../service/maven.service';
@@ -155,11 +156,12 @@ export class MavenArtifactsListComponent implements OnDestroy {
         )
         .subscribe({
           next: () => {
-            if (this.artifacts.length === 1) {
+            if (emptiesList(this.artifacts.length, this.pageNum, this.searchText)) {
               this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
                 this.toastService.show('Artifact deleted successfully', 'success');
               });
             } else {
+              this.pageNum = pageAfterDelete(this.artifacts.length, this.pageNum);
               this.refreshPage();
               this.toastService.show('Artifact deleted successfully', 'success');
             }

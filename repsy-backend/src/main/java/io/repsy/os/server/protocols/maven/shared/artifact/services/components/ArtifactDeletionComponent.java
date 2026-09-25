@@ -23,11 +23,9 @@ import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServi
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import java.io.IOException;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
@@ -110,18 +108,9 @@ public class ArtifactDeletionComponent {
   public Pair<DeletedItem, BaseUsages> deleteGroup(
       final RepoInfo repoInfo, final String groupName) {
 
-    final var groups = this.artifactService.getGroupNames(repoInfo.getStorageKey());
-
-    final var rootGroupOpt = this.findRootGroup(groups);
-
-    if (rootGroupOpt.isPresent() && rootGroupOpt.get().equals(groupName)) {
-      final var rootGroup = rootGroupOpt.get();
-
-      final var artifacts = this.artifactService.getArtifacts(repoInfo.getStorageKey(), rootGroup);
-
-      return this.deleteArtifacts(repoInfo, rootGroup, artifacts);
-    }
-
+    // No special case for a "root group" (the one whose name prefixes every other group): its own
+    // artifacts are removed like any group's, and a nested group such as com.acme.sub next to
+    // com.acme is never touched (RPS-1190, RPS-1349).
     final var artifacts = this.artifactService.getArtifacts(repoInfo.getStorageKey(), groupName);
     final var versionNamesByArtifact =
         this.collectVersionNamesByArtifact(repoInfo, groupName, artifacts);
@@ -157,45 +146,6 @@ public class ArtifactDeletionComponent {
     }
 
     return versionNamesByArtifact;
-  }
-
-  private Optional<String> findRootGroup(final List<String> groups) {
-
-    if (groups.isEmpty() || groups.size() == 1) {
-      return Optional.empty();
-    }
-
-    final var shortestGroup =
-        groups.stream().min(Comparator.comparingInt(String::length)).orElseThrow();
-
-    final var isCommonPrefix = groups.stream().allMatch(group -> group.startsWith(shortestGroup));
-
-    return isCommonPrefix ? Optional.of(shortestGroup) : Optional.empty();
-  }
-
-  private Pair<DeletedItem, BaseUsages> deleteArtifacts(
-      final RepoInfo repoInfo, final String rootGroup, final List<Artifact> artifacts) {
-
-    var totalUsage = 0L;
-
-    for (final var artifact : artifacts) {
-      final var versionNames =
-          this.artifactService.getArtifactVersionNames(
-              repoInfo.getStorageKey(), rootGroup, artifact.getArtifactName());
-
-      totalUsage +=
-          this.mavenStorageService.deleteArtifact(
-              repoInfo.getStorageKey(), rootGroup, artifact.getArtifactName());
-
-      this.artifactService.deleteArtifact(
-          repoInfo.getStorageKey(), rootGroup, artifact.getArtifactName());
-
-      this.publishVersionsDeleted(repoInfo, rootGroup, artifact.getArtifactName(), versionNames);
-    }
-
-    final var usages = BaseUsages.builder().diskUsage(totalUsage * -1L).build();
-
-    return Pair.of(DeletedItem.GROUP, usages);
   }
 
   private void publishVersionDeleted(

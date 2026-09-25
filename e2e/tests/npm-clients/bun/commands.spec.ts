@@ -414,13 +414,11 @@ test(
     expect(noVersion.exitCode).not.toBe(0);
     expect(noVersion.stdout).toContain('No matching version found');
 
-    // RPS-1357, for a bun publisher: the tarball is kept as `_attachments`, but no `_resolved` path of
-    // the publisher's machine (that is npm's `publish <tarball>`, see `matrix/view.spec.ts`).
+    // RPS-1357, for a bun publisher: the tarball is not kept in the packument as `_attachments`, and
+    // there is no `_resolved` path of the publisher's machine either (that is npm's `publish
+    // <tarball>`, see `matrix/view.spec.ts`).
     const stored = await storedPackument(repo.name, name);
-    expect(
-      Object.keys(stored._attachments ?? {}),
-      'RPS-1357: the latest publish as _attachments',
-    ).toEqual([`${name}-1.1.0.tgz`]);
+    expect(stored._attachments, 'RPS-1357: no copy of the latest publish').toBeUndefined();
     expect(stored.versions['1.1.0']?._resolved, 'bun adds no _resolved').toBeUndefined();
   },
 );
@@ -518,7 +516,7 @@ test(
 );
 
 test(
-  'the tarball download is served inline as f.txt (raw): RPS-1363',
+  'the tarball download is an attachment named after the tarball (raw): RPS-1363',
   {
     tag: ['@bun', '@wire'],
   },
@@ -536,8 +534,8 @@ test(
     );
     expect(published.result.exitCode, `publish: ${published.result.command}`).toBe(0);
 
-    // What `bun add --verbose` shows on every tarball request, and a browser or `curl -OJ` would act
-    // on: a fixed, made-up file name in place of `<name>-<version>.tgz`.
+    // What `bun add --verbose` shows on every tarball request, and a browser or `curl -OJ` acts on:
+    // it used to be a fixed, made-up `inline;filename=f.txt` in place of `<name>-<version>.tgz`.
     const res = await fetch(`${env.repoBaseUrl}/${repo.name}/${name}/-/${name}-1.0.0.tgz`, {
       headers: npmAuthHeader(adminCredential()),
     });
@@ -545,7 +543,7 @@ test(
     expect(res.headers.get('content-type')).toBe('application/octet-stream');
     expect(
       res.headers.get('content-disposition'),
-      'RPS-1363: the file name is f.txt, not the tarball name',
-    ).toBe('inline;filename=f.txt');
+      'RPS-1363: the file name is the tarball name, as an attachment',
+    ).toBe(`attachment; filename="${name}-1.0.0.tgz"`);
   },
 );

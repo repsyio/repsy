@@ -28,11 +28,11 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.protocol.parser.DockerPathParserManifest;
-import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
 import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
 import io.repsy.protocols.docker.shared.layer.services.AbstractDockerLayerRenamer;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
+import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
 import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
 import io.repsy.protocols.docker.shared.utils.DockerManifestValidator;
 import io.repsy.protocols.docker.shared.utils.DockerPushGuards;
@@ -47,7 +47,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import lombok.SneakyThrows;
 import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -67,11 +66,6 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
   private static final int RETRY_COUNT = 3;
   private static final int MAX_IMAGE_RECREATIONS = 20;
   private static final long WAIT_RETRY = 100;
-
-  /**
-   * The digest a save answered with, and the image it was saved into (a new one if it was deleted).
-   */
-  private record SavedManifest<ID>(String digest, BaseImageInfo<ID> image) {}
 
   private final PathParser basePathParser;
   private final DockerProtocolFacade<ID> dockerFacade;
@@ -145,8 +139,6 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
     // Before the image is created: a manifest that cannot be stored must leave nothing behind.
     DockerManifestValidator.validate(contentType, manifestJson);
 
-    final var imageInfo = this.findOrCreateImage(repoInfo.getId(), imageName, 1);
-
     final var manifestBytes = manifestJson.getBytes(StandardCharsets.UTF_8);
     final var digest = DockerDigestCalculator.calculateDigest(manifestBytes);
 
@@ -166,7 +158,7 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
             .manifestBytes(manifestBytes)
             .build();
 
-    final var saved = this.saveManifest(context, repoInfo.getId(), imageInfo, form);
+    final var saved = this.saveManifest(context, imageName, form);
     final var manifestDigest = saved.digest();
 
     if (!contentType.equals(OCI_IMAGE_INDEX) && !contentType.equals(DOCKER_MANIFEST_LIST)) {
@@ -226,9 +218,15 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
    * {@code @Version}, and the loser fails the version check at commit (RPS-1322). The second run
    * sees what the winner committed, so the client gets its {@code 201} instead of an error.
    *
-   * <p>An image goes with its last manifest (RPS-1288), so the image this push looked up may be
-   * deleted before the transaction can write to it. The facade reports that with {@link
-   * ImageDeletedException} and this method creates the image again and saves once more, without
+   * <p>The transaction also creates the image when this is its first manifest (RPS-1350), so a push
+   * that fails leaves no image without a manifest. Two first pushes into a new image both insert
+   * it: the second insert waits for the first transaction, and fails on the image's unique index if
+   * that commits (a run again finds the image), or goes through if it rolls back. The same retry
+   * covers it.
+   *
+   * <p>An image goes with its last manifest (RPS-1288), so the image this push found may be deleted
+   * before the transaction can lock it. The transaction reports that with {@link
+   * ImageDeletedException}; this method runs it again, which creates the image again, without
    * counting it against the retries above: each such run means another request has just deleted the
    * image's last manifest, and it can only happen a bounded number of times for that.
    *
@@ -237,25 +235,18 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
    * would reuse the failed persistence context and could never succeed.
    */
   private SavedManifest<ID> saveManifest(
-      final ProtocolContext context,
-      final ID repoId,
-      final BaseImageInfo<ID> imageInfo,
-      final ManifestForm form)
+      final ProtocolContext context, final String imageName, final ManifestForm form)
       throws IOException {
 
-    var currentImage = imageInfo;
     var recreations = 0;
 
     for (var attempt = 1; ; ) {
       try {
-        return new SavedManifest<>(
-            this.dockerFacade.saveManifest(context, currentImage, form), currentImage);
+        return this.dockerFacade.saveManifest(context, imageName, form);
       } catch (final ImageDeletedException e) {
         if (++recreations > MAX_IMAGE_RECREATIONS) {
           throw e;
         }
-
-        currentImage = this.findOrCreateImage(repoId, currentImage.getName(), 1);
       } catch (final DataIntegrityViolationException | OptimisticLockingFailureException e) {
         if (attempt >= RETRY_COUNT) {
           throw e;
@@ -272,20 +263,6 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
     } catch (final InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException("Interrupted while retrying the manifest save", e);
-    }
-  }
-
-  @SneakyThrows
-  private BaseImageInfo<ID> findOrCreateImage(
-      final ID repoId, final String imageName, final int counter) {
-    try {
-      return this.imageTxService.findOrCreateImage(repoId, imageName);
-    } catch (final DataIntegrityViolationException e) {
-      if (counter == RETRY_COUNT) {
-        throw e;
-      }
-      Thread.sleep(WAIT_RETRY * counter);
-      return this.findOrCreateImage(repoId, imageName, counter + 1);
     }
   }
 

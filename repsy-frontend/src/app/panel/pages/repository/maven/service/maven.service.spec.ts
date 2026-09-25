@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 import { TestBed } from '@angular/core/testing';
+import { of, throwError } from 'rxjs';
 
 import {
   MavenArtifactControllerService,
@@ -187,5 +188,69 @@ describe('MavenService', () => {
       },
     ];
     describeCalls(() => service, calls);
+
+    // RPS-1348: the extra sentence of the delete-version confirmation, from the versions probe and the summary.
+    describe('getVersionDeleteWarning', () => {
+      const versionsPage = (count: number) =>
+        restResponse({ content: Array.from({ length: count }, (_, i) => ({ versionName: `${i}.0` })), page: {} });
+
+      function warning(): string | null | undefined {
+        let result: string | null | undefined;
+        service.getVersionDeleteWarning(GROUP, ARTIFACT).subscribe((w) => (result = w));
+        return result;
+      }
+
+      it('warns that the artifact and the group go too when it is the last version of the only artifact', () => {
+        mavenApi.listMavenArtifactVersions.and.returnValue(of(versionsPage(1)) as never);
+        groupApi.getMavenGroupSummary.and.returnValue(
+          of(restResponse({ groupName: GROUP, artifactCount: 1, versionCount: 1 })) as never,
+        );
+
+        expect(warning()).toBe(
+          'This is the only version of widget and widget is the only artifact of the group io.acme, ' +
+            'so the artifact and the group are removed too. This cannot be undone.',
+        );
+        expect(groupApi.getMavenGroupSummary).toHaveBeenCalledOnceWith(GROUP, REPO);
+      });
+
+      it('probes only the first two versions, of the artifact, unfiltered', () => {
+        mavenApi.listMavenArtifactVersions.and.returnValue(of(versionsPage(2)) as never);
+
+        warning();
+
+        expect(mavenApi.listMavenArtifactVersions).toHaveBeenCalledOnceWith(GROUP, ARTIFACT, REPO, undefined, 0, 2, [
+          'versionName,DESC',
+        ]);
+      });
+
+      it('asks for nothing more, and does not read the group, when the artifact has other versions', () => {
+        mavenApi.listMavenArtifactVersions.and.returnValue(of(versionsPage(2)) as never);
+
+        expect(warning()).toBeNull();
+        expect(groupApi.getMavenGroupSummary).not.toHaveBeenCalled();
+      });
+
+      it('asks for nothing more when the group has other artifacts', () => {
+        mavenApi.listMavenArtifactVersions.and.returnValue(of(versionsPage(1)) as never);
+        groupApi.getMavenGroupSummary.and.returnValue(
+          of(restResponse({ groupName: GROUP, artifactCount: 2, versionCount: 3 })) as never,
+        );
+
+        expect(warning()).toBeNull();
+      });
+
+      it('falls back to the plain confirmation when the probe fails', () => {
+        mavenApi.listMavenArtifactVersions.and.returnValue(throwError(() => new Error('boom')) as never);
+
+        expect(warning()).toBeNull();
+      });
+
+      it('falls back to the plain confirmation when the summary fails', () => {
+        mavenApi.listMavenArtifactVersions.and.returnValue(of(versionsPage(1)) as never);
+        groupApi.getMavenGroupSummary.and.returnValue(throwError(() => new Error('boom')) as never);
+
+        expect(warning()).toBeNull();
+      });
+    });
   });
 });

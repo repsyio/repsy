@@ -6152,7 +6152,8 @@ components:
         size:
           type: integer
           format: int64
-          description: Size of the distinct layers the tagged manifests reach.
+          description: >-
+            Size of the distinct layers the tagged manifests reach, through indexes of any depth.
         digest:
           type: string
           description: Digest of the manifest the most recently moved tag points at; null without tags.
@@ -6168,14 +6169,15 @@ components:
           type: integer
           format: int32
           description: >-
-            Manifests that no tag points at and no tagged index lists: what "Delete untagged
-            manifests" removes.
+            Manifests that no tag points at and no tagged index lists, directly or through other
+            indexes to any depth: what "Delete untagged manifests" removes.
         untaggedSize:
           type: integer
           format: int64
           description: >-
             Size of the distinct layers (config blobs included) that untagged manifests link to and
-            no tagged manifest of the image links to. For an image without tags, all it stores.
+            no manifest a tag reaches (through indexes of any depth) links to. For an image without
+            tags, all it stores.
     RestResponseImageListItem:
       type: object
       properties:
@@ -6975,6 +6977,12 @@ components:
             from; null when no scan of the version has completed yet.
           type: string
           format: date-time
+          nullable: true
+        errorMessage:
+          description: >-
+            Why the version's newest scan failed, as one short line with URLs, addresses and file
+            paths removed; null unless that scan has status FAILED (or no reason was recorded).
+          type: string
           nullable: true
         criticalCount:
           type: integer

@@ -433,13 +433,12 @@ class AbstractDockerProtocolTxFacadeTest {
   void saveManifestRefusesAWrongDigestReference(final String algorithm) throws Exception {
     final var reference = algorithm + ":" + "0".repeat("sha256".equals(algorithm) ? 64 : 128);
     final var form = formFor(reference, "{}".getBytes(StandardCharsets.UTF_8));
-    final var imageInfo =
-        BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name(IMAGE_NAME).build();
 
-    assertThatThrownBy(() -> this.facade().saveManifest(newContext(), imageInfo, form))
+    assertThatThrownBy(() -> this.facade().saveManifest(newContext(), IMAGE_NAME, form))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("digestMismatch");
     verify(this.dockerStorageService, never()).writeInputStreamToPath(any(), any(), any());
+    verify(this.imageService, never()).findOrCreateImage(any(), any());
   }
 
   @Test
@@ -451,17 +450,16 @@ class AbstractDockerProtocolTxFacadeTest {
     final var repoInfo =
         io.repsy.protocols.shared.utils.ProtocolContextUtils.<UUID>getRepoInfo(context);
     repoInfo.setAllowOverride(false);
-    final var imageInfo =
-        BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name(IMAGE_NAME).build();
     when(this.manifestService.findActiveTagByNameAndRepoAndImage(REPO_ID, IMAGE_NAME, "latest"))
         .thenReturn(
             Optional.of(BaseTagDetail.<UUID>builder().digest("sha256:" + "1".repeat(64)).build()));
 
     assertThatThrownBy(
-            () -> this.facade().saveManifest(context, imageInfo, formFor("latest", bytes)))
+            () -> this.facade().saveManifest(context, IMAGE_NAME, formFor("latest", bytes)))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("packageOverrideDisabled");
     verify(this.dockerStorageService, never()).writeInputStreamToPath(any(), any(), any());
+    verify(this.imageService, never()).findOrCreateImage(any(), any());
   }
 
   @Test

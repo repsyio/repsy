@@ -21,12 +21,12 @@ import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestDeletionComponent;
 import io.repsy.os.server.protocols.docker.shared.utils.PathParserUtils;
 import io.repsy.protocols.docker.protocol.facades.AbstractDockerProtocolTxFacade;
-import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
 import io.repsy.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
+import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
 import io.repsy.protocols.docker.shared.utils.BaseParsedPath;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -118,11 +118,11 @@ public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID>
 
   @Override
   @Transactional(rollbackFor = IOException.class)
-  public String saveManifest(
-      final ProtocolContext context, final BaseImageInfo<UUID> imageInfo, final ManifestForm form)
+  public SavedManifest<UUID> saveManifest(
+      final ProtocolContext context, final String imageName, final ManifestForm form)
       throws IOException {
 
-    return super.saveManifest(context, imageInfo, form);
+    return super.saveManifest(context, imageName, form);
   }
 
   @Override

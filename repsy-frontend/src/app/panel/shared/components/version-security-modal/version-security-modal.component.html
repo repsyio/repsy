@@ -53,6 +53,9 @@
         <div class="mb-4">
           <app-rescan-note [status]="overview.status" [hasCompletedScan]="!!overview.lastCompletedAt" />
         </div>
+        @if (overview.status === ScanStatus.Failed) {
+          <app-scan-failure-reason class="mb-4 block" [message]="overview.errorMessage" />
+        }
       }
 
       <app-severity-breakdown [counts]="overview" />

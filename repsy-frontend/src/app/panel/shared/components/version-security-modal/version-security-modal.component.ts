@@ -19,7 +19,7 @@ import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import { ScanOverview, VulnerabilityScanControllerService } from '../../../../../generated/api';
+import { ScanOverview, ScanStatus, VulnerabilityScanControllerService } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
@@ -27,13 +27,21 @@ import { toApiRepoType } from '../../util/repo-api-type';
 import { recentScanNote } from '../../util/rescan-status.util';
 import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
+import { ScanFailureReasonComponent } from '../scan-failure-reason/scan-failure-reason.component';
 import { SeverityBreakdownComponent } from '../severity-breakdown/severity-breakdown.component';
 
 @Component({
   selector: 'app-version-security-modal',
   standalone: true,
   hostDirectives: [PortalToBodyDirective],
-  imports: [DialogDirective, CommonModule, SpinnerComponent, SeverityBreakdownComponent, RescanNoteComponent],
+  imports: [
+    DialogDirective,
+    CommonModule,
+    SpinnerComponent,
+    SeverityBreakdownComponent,
+    RescanNoteComponent,
+    ScanFailureReasonComponent,
+  ],
   templateUrl: './version-security-modal.component.html',
 })
 export class VersionSecurityModalComponent implements OnChanges {
@@ -43,6 +51,8 @@ export class VersionSecurityModalComponent implements OnChanges {
   @Input({ required: true }) public repoType: string;
   @Input({ required: true }) public artifactName: string;
   @Input({ required: true }) public artifactVersion: string;
+
+  protected readonly ScanStatus = ScanStatus;
 
   public loading = false;
   public overview: ScanOverview | null = null;

@@ -26,6 +26,7 @@ import { SecurityService } from '../../../../security/service/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import {
   describeEmptyingDelete,
+  describePagedDelete,
   describeRepoListBehavior,
   ListFixture,
   pageOf,
@@ -46,9 +47,12 @@ describe('MavenArtifactsVersionListComponent', () => {
 
   function build(): ListFixture {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['searchArtifactVersions', 'deleteVersion'], {
-      repoChanges,
-    });
+    mavenService = jasmine.createSpyObj<MavenService>(
+      'MavenService',
+      ['searchArtifactVersions', 'deleteVersion', 'getVersionDeleteWarning'],
+      { repoChanges },
+    );
+    mavenService.getVersionDeleteWarning.and.returnValue(of(null));
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -113,6 +117,36 @@ describe('MavenArtifactsVersionListComponent', () => {
       removeArgs: ['org.acme', 'lib', '1.2.3'],
       navigate: router.navigateByUrl,
       navigateArgs: [`/${REPO_NAME}`],
+    }));
+  });
+
+  // RPS-1348: the last version of a group's only artifact takes the artifact and the group with it.
+  describe('deleteVersion of the last version of the only artifact of its group', () => {
+    beforeEach(() => build());
+
+    it('names the artifact and the group that go too, and deletes nothing before the confirmation', () => {
+      mavenService.getVersionDeleteWarning.and.returnValue(of('the artifact and the group are removed too'));
+      component.versions = [VERSION];
+
+      component.deleteVersion(VERSION);
+
+      expect(mavenService.getVersionDeleteWarning).toHaveBeenCalledOnceWith('org.acme', 'lib');
+      expect(dangerModalService.modal).toEqual({
+        title: 'Delete Version',
+        action: 'Delete',
+        message: 'the artifact and the group are removed too',
+      });
+      expect(mavenService.deleteVersion).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deleting from a later page or under a search (RPS-1340)', () => {
+    describePagedDelete(() => ({
+      list: build(),
+      dangerModal: dangerModalService,
+      remove: mavenService.deleteVersion,
+      invoke: () => component.deleteVersion(VERSION),
+      navigate: router.navigateByUrl,
     }));
   });
 

@@ -656,11 +656,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
         .toList();
   }
 
-  public List<String> getGroupNames(final UUID repoId) {
-
-    return this.artifactRepository.findGroupNamesByRepoId(repoId);
-  }
-
   /**
    * What deleting the group removes: its artifacts and the versions of all of them (RPS-1288).
    *

@@ -198,6 +198,8 @@ export class ScanSection {
   readonly findingsCount: Locator;
   readonly clean: Locator;
   readonly rescanNote: Locator;
+  /** The reason a failed scan failed (RPS-1339), only while the shown scan is FAILED. */
+  readonly failureReason: Locator;
   readonly status: Locator;
   readonly pollingIndicator: Locator;
   readonly emptyBody: Locator;
@@ -219,6 +221,7 @@ export class ScanSection {
     this.findingsCount = this.root.getByTestId('scan-section-findings-count');
     this.clean = this.root.getByTestId('scan-section-clean');
     this.rescanNote = this.root.getByTestId('rescan-note');
+    this.failureReason = this.root.getByTestId('scan-failure-reason-text');
     this.status = this.root.getByTestId('scan-section-status');
     this.pollingIndicator = this.root.getByTestId('status-polling-indicator');
     this.emptyBody = this.root.getByTestId('scan-section-empty');
@@ -294,6 +297,8 @@ export class SecurityModal {
   readonly backdrop: Locator;
   readonly closeButton: Locator;
   readonly breakdown: Locator;
+  /** The reason the newest scan failed (RPS-1339); the version modal only. */
+  readonly failureReason: Locator;
   readonly breakdownEmpty: Locator;
   readonly viewAll: Locator;
   readonly viewDetails: Locator;
@@ -307,6 +312,7 @@ export class SecurityModal {
     this.backdrop = page.getByTestId(`${prefix}-backdrop`);
     this.closeButton = page.getByTestId(`${prefix}-close`);
     this.breakdown = this.root.getByTestId('severity-breakdown');
+    this.failureReason = this.root.getByTestId('scan-failure-reason-text');
     this.breakdownEmpty = this.root.getByTestId('severity-breakdown-empty');
     this.viewAll = page.getByTestId('package-security-modal-view-all');
     this.viewDetails = page.getByTestId('version-security-modal-view-details');

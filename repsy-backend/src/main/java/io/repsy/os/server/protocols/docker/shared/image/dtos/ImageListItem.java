@@ -17,8 +17,11 @@ package io.repsy.os.server.protocols.docker.shared.image.dtos;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public interface ImageListItem {
+  UUID getId();
+
   String getName();
 
   String getDigest();
@@ -30,8 +33,4 @@ public interface ImageListItem {
   Instant getLastUpdatedAt();
 
   Long getTagCount();
-
-  Long getUntaggedManifestCount();
-
-  Long getUntaggedSize();
 }

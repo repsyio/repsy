@@ -33,6 +33,7 @@ import {
   imageRef,
   rawDeleteManifest,
   rawGetManifest,
+  rawPutManifest,
 } from '../../src/clients/docker-raw.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
@@ -114,5 +115,35 @@ test(
       (await rawGetManifest(repo.name, admin, image, second.manifestDigest)).status,
       'and by digest',
     ).toBe(200);
+  },
+);
+
+test(
+  'docker > a manifest push that fails leaves no image behind (RPS-1350)',
+  { tag: ['@negative'] },
+  async ({ seeder, panelApi }) => {
+    const repo = await seeder.createRepo(RepoType.DOCKER, { privateRepo: true });
+    const image = `e2e-${seeder.runId}-failedpush`;
+    const admin = adminCredential();
+    const { work } = await isolatedWorkDir(`docker-failedpush-${seeder.runId}`);
+    const built = await buildImage({ dir: path.join(work, 'v1'), marker: 'failed-push' });
+
+    // No blob was uploaded: the manifest push is refused, after the registry looked the image up.
+    const refused = await rawPutManifest(
+      repo.name,
+      admin,
+      image,
+      'v1',
+      built.manifestBytes,
+      built.manifestMediaType,
+    );
+    expect(refused.status, `PUT manifest without its blobs: ${refused.body}`).toBe(404);
+
+    // The refused push did not leave an image with no manifest in the panel.
+    const afterFailure = await panelApi
+      .getDockerImageSummary(repo.name, image)
+      .catch((e: unknown) => e);
+    expect(afterFailure, 'no image after a failed first push').toBeInstanceOf(ApiError);
+    expect((afterFailure as ApiError).status).toBe(404);
   },
 );
