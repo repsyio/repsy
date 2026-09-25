@@ -24,7 +24,10 @@
  *  - IV4: transitive dependencies through the POM `ivy:makepom` writes, and the optional dependency a
  *    POM without the makepom mapping lists;
  *  - IV5: dynamic revisions (`1.+`, `latest.release`, `latest.integration`, a range) resolved through the
- *    directory listing, since Ivy sends (and Repsy generates) no `maven-metadata.xml`;
+ *    `maven-metadata.xml` Repsy generates from the registered versions, since Ivy sends none (RPS-1369);
+ *  - IV9 (RPS-1369): Maven's `LATEST`, `RELEASE` and version range, and Gradle's `1.+`, resolve an
+ *    Ivy-published artifact through that generated file, and a `mvn deploy` of another version of it
+ *    merges the generated versions into the file it stores;
  *  - IV6/IV7: an unknown module, and Ivy's own default `overwrite="false"` (a first release publish
  *    goes through, a second is refused by Ivy, RPS-1368);
  *  - IV8: the ways a first configuration goes wrong: no realm on the credential, `publishivy="true"`,
@@ -49,6 +52,7 @@ import {
   resolveWithIvy,
   type IvyOptions,
 } from '../../src/clients/ivy.js';
+import { GradleConsumer } from '../../src/clients/gradle-consumer.js';
 import { expectPublishStored } from '../../src/clients/ivy-checks.js';
 import { run } from '../../src/clients/exec.js';
 import * as maven from '../../src/clients/maven.js';
@@ -56,6 +60,7 @@ import { uniqueVersion } from '../../src/clients/maven-adapter.js';
 import {
   adminCredential,
   artifactDir,
+  parseArtifactVersions,
   rawGet,
   rawPut,
   repoTree,
@@ -281,23 +286,34 @@ test.describe('ivy dependencies', () => {
   });
 });
 
-test('ivy > dynamic revisions resolve through the directory listing, there being no maven-metadata.xml', async ({
+test('ivy > dynamic revisions resolve through the generated maven-metadata.xml, Ivy having stored none', async ({
   seeder,
 }) => {
   const { world, repoName, groupId, artifactId } = await newWorld(seeder, 'dynamic');
   for (const version of ['1.0', '1.1', '1.2', '1.10', '2.0-SNAPSHOT']) {
     await publishOk(withTarget(world, { packageName: world.publishTarget.packageName, version }));
   }
+  const metadataPath = `${artifactDir(groupId, artifactId)}/maven-metadata.xml`;
   expect(
-    (
-      await rawGet(
-        repoName,
-        adminCredential(),
-        `${artifactDir(groupId, artifactId)}/maven-metadata.xml`,
-      )
-    ).status,
-    'Ivy sends no maven-metadata.xml and Repsy generates none',
-  ).toBe(404);
+    Object.keys(await repoTree(repoName)).filter((path) => path.includes('maven-metadata.xml')),
+    'Ivy sends no maven-metadata.xml, so none is stored',
+  ).toEqual([]);
+  // RPS-1369: the server answers it from the registered versions, the SNAPSHOT included.
+  const metadata = await rawGet(repoName, adminCredential(), metadataPath);
+  expect(metadata.status, 'the artifact-level maven-metadata.xml is generated').toBe(200);
+  expect(parseArtifactVersions(metadata.body.toString('utf8'))).toEqual([
+    '1.0',
+    '1.1',
+    '1.2',
+    '1.10',
+    '2.0-SNAPSHOT',
+  ]);
+  const versionLevel = await rawGet(
+    repoName,
+    adminCredential(),
+    `${versionDir(groupId, artifactId, '2.0-SNAPSHOT')}/maven-metadata.xml`,
+  );
+  expect(versionLevel.status, 'the version-level file of the SNAPSHOT is not generated').toBe(404);
 
   const expected: Record<string, string> = {
     '1.+': '1.10',
@@ -314,6 +330,70 @@ test('ivy > dynamic revisions resolve through the directory listing, there being
       `${artifactId}-${version}.jar`,
     ]);
   }
+});
+
+test.describe('the generated maven-metadata.xml (RPS-1369)', () => {
+  test('ivy > Maven LATEST, RELEASE and a range, and Gradle 1.+, resolve an Ivy-published artifact', async ({
+    seeder,
+  }) => {
+    const { world, groupId, artifactId } = await newWorld(seeder, 'dyn-mvn');
+    // Releases only, so LATEST and RELEASE are the same version whatever the snapshot policy.
+    for (const version of ['1.0', '1.1', '1.10']) {
+      await publishOk(withTarget(world, { packageName: world.publishTarget.packageName, version }));
+    }
+
+    const expected: Record<string, string> = {
+      LATEST: '1.10',
+      RELEASE: '1.10',
+      '[1.0,1.10)': '1.1',
+    };
+    for (const [requested, version] of Object.entries(expected)) {
+      const resolved = await maven.resolveDynamic(world, requested);
+      expect(
+        resolved.clientExitCode,
+        `mvn dependency:get ${requested}: ${resolved.command}\n${resolved.output}`,
+      ).toBe(0);
+      expect(resolved.versions, `${requested} resolves to ${version}`).toEqual([version]);
+    }
+
+    const gradle = await GradleConsumer.create({
+      dsl: 'groovy',
+      world,
+      dependencies: [`${groupId}:${artifactId}:1.+`],
+      locking: false,
+    });
+    const fetched = await gradle.run('fetchDependencies');
+    expect(fetched.exitCode, `gradle 1.+: ${fetched.command}`).toBe(0);
+    expect(await gradle.resolvedVersions(artifactId)).toEqual(['1.10']);
+  });
+
+  test('ivy > a mvn deploy of another version merges the Ivy versions into the metadata it stores', async ({
+    seeder,
+  }) => {
+    const { world, repoName, groupId, artifactId } = await newWorld(seeder, 'mixed');
+    for (const version of ['1.0', '2.0']) {
+      await publishOk(withTarget(world, { packageName: world.publishTarget.packageName, version }));
+    }
+    const metadataPath = `${artifactDir(groupId, artifactId)}/maven-metadata.xml`;
+    expect(Object.keys(await repoTree(repoName))).not.toContain(metadataPath);
+
+    // mvn deploy asks for the artifact-level file first and merges its own version into it: it used to
+    // find none and to upload a file that listed only 3.0, hiding the versions Ivy published.
+    await maven.seedPublish(
+      withTarget(world, { packageName: world.publishTarget.packageName, version: '3.0' }),
+    );
+
+    expect(Object.keys(await repoTree(repoName)), 'Maven stored its own file').toContain(
+      metadataPath,
+    );
+    const stored = await rawGet(repoName, adminCredential(), metadataPath);
+    expect(stored.status).toBe(200);
+    expect(parseArtifactVersions(stored.body.toString('utf8'))).toEqual(['1.0', '2.0', '3.0']);
+
+    const latest = await maven.resolveDynamic(world, 'LATEST');
+    expect(latest.clientExitCode, `mvn dependency:get LATEST: ${latest.command}`).toBe(0);
+    expect(latest.versions).toEqual(['3.0']);
+  });
 });
 
 test('ivy > a module Repsy does not have is an unresolved dependency', async ({ seeder }) => {
@@ -472,7 +552,13 @@ test('ivy > deleting one of two Ivy-published versions in the panel removes it a
   ]);
   const admin = adminCredential();
   const metadataPath = `${artifactDir(groupId, artifactId)}/maven-metadata.xml`;
-  expect((await rawGet(repoName, admin, metadataPath)).status, 'Ivy sends no metadata').toBe(404);
+  // RPS-1369: Ivy stores no maven-metadata.xml, and the generated one lists the versions that are left.
+  expect(Object.keys(await repoTree(repoName)), 'Ivy sends no metadata').not.toContain(
+    metadataPath,
+  );
+  const generated = await rawGet(repoName, admin, metadataPath);
+  expect(generated.status, 'the generated maven-metadata.xml').toBe(200);
+  expect(parseArtifactVersions(generated.body.toString('utf8'))).toEqual([second]);
   const dir = versionDir(groupId, artifactId, version);
   expect((await rawGet(repoName, admin, `${dir}/${artifactId}-${version}.jar`)).status).toBe(404);
   expect((await rawGet(repoName, admin, `${dir}/${artifactId}-${version}.pom`)).status).toBe(404);
@@ -483,8 +569,8 @@ test('ivy > deleting one of two Ivy-published versions in the panel removes it a
   expect((await rawGet(repoName, admin, `${keptDir}/${artifactId}-${second}.pom`)).status).toBe(
     200,
   );
-  expect((await rawGet(repoName, admin, metadataPath)).status, 'no metadata is generated').toBe(
-    404,
+  expect(Object.keys(await repoTree(repoName)), 'the delete stores no metadata file').not.toContain(
+    metadataPath,
   );
 
   const info = await panelApi.getMavenArtifactVersion(repoName, groupId, artifactId, second);

@@ -178,7 +178,7 @@ e2e/
     maven/
       publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
-      version-delete.spec.ts    # the panel's version delete for a raw-PUT artifact: with no maven-metadata.xml, with one, with `<metadata/>` (RPS-1331)
+      version-delete.spec.ts    # the panel's version delete for a raw-PUT artifact: with no stored maven-metadata.xml (the generated one drops the version, RPS-1331, RPS-1369), with one, with `<metadata/>`
       pgp-signature.spec.ts     # registered PGP public keys (RPS-1189): verify, reject, isolate, delete; every-signature verification (RPS-1188); key-server lookup off (RPS-1204); toggling every-signature verification recomputes `signed` and verifies stored `.asc` files (RPS-1316, RPS-1323)
       parallel-signed-deploy.spec.ts  # a REAL parallel `mvn deploy:deploy-file` of a signed release to a verify-all repo (RPS-1188), plus the one-thread control
       gpg-signed-deploy.spec.ts  # RPS-1316, tag @gpg: maven-gpg-plugin and Gradle `signing` deploys with a real gpg key to a verify-all repo (signed / unsigned / unregistered key)
@@ -191,7 +191,7 @@ e2e/
       gradle-locking-kotlin.spec.ts  # RPS-133: the same for the Kotlin DSL
       sbt.spec.ts               # RPS-134: registerPublishConsumeLoop(sbtAdapter) + the sbt extras
       ivy.spec.ts               # RPS-135: registerPublishConsumeLoop(ivyAdapter), a real `ant` with ivy:publish and ivy:retrieve
-      ivy-client.spec.ts        # RPS-135: IV1-IV8 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete)
+      ivy-client.spec.ts        # RPS-135: IV1-IV9 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete, the generated maven-metadata.xml read by Maven and Gradle, RPS-1369)
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
@@ -739,7 +739,9 @@ on the wire (a fake server logging every request, then this suite):
   literal names `lib_2.13-1.0-SNAPSHOT.pom/.jar`, with no timestamps. Coursier resolves it through the
   literal name. So `sbt` is in `snapshot-deploy`/`snapshot-redeploy`, and `afterSuccessfulRoundTrip`
   (`clients/sbt-checks.ts`) asserts the literal jar is the resolved one and that no version-level
-  metadata exists, instead of Maven's metadata walk.
+  metadata exists (Repsy never generates that one), instead of Maven's metadata walk. The
+  artifact-level file is not stored either, but Repsy answers it from the registered versions (RPS-1369),
+  which is what `latest.release` reads.
 - The first request of a publish is answered 401 with Repsy's `WWW-Authenticate: Basic realm="Repsy"`
   (every Basic challenge of every protocol, npm and Go included, uses the one short realm `Repsy`,
   since RPS-1372; only Docker's Bearer challenge names its token URL as realm; a build written for the
@@ -772,13 +774,10 @@ a dozen parallel workers on a busy machine run out of first (the suite then take
 
 `scenarios/sbt-extras.ts` adds what the catalog cannot say: the exact file set of a publish and its
 checksums, `+publish` for Scala 2.13 and 3 (two artifacts, and a Scala 3 build resolves the `_3` one),
-the credential coming from `~/.sbt/.credentials`, and what the panel shows of an sbt publish. A
-`test.fail` pins the following, found live while building this suite, and is removed when its ticket
-lands:
-
-| Pin                                       | Ticket   | What happens                                                                      |
-| ----------------------------------------- | -------- | --------------------------------------------------------------------------------- |
-| `latest.release` resolving an sbt library | RPS-1369 | the server generates no `maven-metadata.xml`, so a dynamic revision finds nothing |
+the credential coming from `~/.sbt/.credentials`, what the panel shows of an sbt publish, and a dynamic
+revision (`latest.release`) resolving an sbt-published library through the artifact-level
+`maven-metadata.xml` Repsy generates (RPS-1369; it was a `test.fail` pin until that landed). No
+`test.fail` pin is left in this suite.
 
 Not covered: `publishSigned` (sbt-pgp, RPS-1316 covers signing with `mvn`
 and Gradle), `sbtPlugin := true` publishing, `publishLocal`, sbt 2.x (RPS-1327).
@@ -824,11 +823,14 @@ seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
   shared with sbt) and that the stored jar, POM and checksums are what Ivy built (`clients/ivy-checks.ts`).
   The same file names are why `allowOverride: false` had to leave a non-unique snapshot alone for
   `snapshot-redeploy-no-override` to hold for Ivy (RPS-1328).
-- Dynamic revisions work through the directory listing: Ivy looks for the artifact's
-  `maven-metadata.xml` (Repsy has none), then reads the HTML listing of the artifact directory. With 1.0, 1.1, 1.2, 1.10 and 2.0-SNAPSHOT
-  published, `1.+` and `latest.release` resolve 1.10 (numeric order, a SNAPSHOT is not a release),
-  `latest.integration` resolves 2.0-SNAPSHOT and `[1.0,1.2)` resolves 1.1. No other client of this
-  repository can do the same: see RPS-1369 below.
+- Dynamic revisions work through the generated `maven-metadata.xml` (RPS-1369): Ivy looks for the
+  artifact's `maven-metadata.xml` first and only reads the HTML listing of the artifact directory when
+  there is none; Ivy stores none, so Repsy answers it from the registered versions. With 1.0, 1.1, 1.2,
+  1.10 and 2.0-SNAPSHOT published, `1.+` and `latest.release` resolve 1.10 (numeric order, a SNAPSHOT is
+  not a release), `latest.integration` resolves 2.0-SNAPSHOT (through its literal file name: the
+  version-level metadata is not generated) and `[1.0,1.2)` resolves 1.1. Before RPS-1369 no other client
+  of this repository could resolve a dynamic revision of such an artifact; Maven's `LATEST`, `RELEASE`
+  and version ranges and Gradle's `1.+` do now (IV9).
 - Resolving reads the POM. A bare `<dependency org name rev/>` has a default configuration mapping that
   also looks for the `sources` and `javadoc` artifacts, which do not exist. Ivy locates an artifact with
   a HEAD: while Repsy answered 200 for any path it then failed with "FAILED DOWNLOADS"; since it answers
@@ -850,20 +852,24 @@ seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
   keeps the other although Ivy sends no artifact-level `maven-metadata.xml` (RPS-1331, fixed; it used to
   answer 404 after the files were gone and leave the database row).
 
-Repsy stores the `maven-metadata.xml` a client uploads and never generates one, and Ivy uploads none,
-so an artifact published by Ivy has no `<versions>` list: Maven `LATEST`/`RELEASE` and version ranges,
-and Gradle's and sbt's dynamic versions do not resolve it (RPS-1369; only fixed versions do everywhere).
-This is a known limitation, not a test: it is described here and in the README, and pinned only where
-Ivy itself relies on it (the dynamic revision test). If Ivy publishes after another client deployed a
-`maven-metadata.xml`, the stored file is the other client's and does not list the Ivy versions.
+Repsy stores the `maven-metadata.xml` a client uploads and generates none, and Ivy uploads none, so
+an artifact published by Ivy has no stored `<versions>` list. Since RPS-1369 Repsy answers a `GET` or
+`HEAD` of the artifact-level `maven-metadata.xml` (and its `.md5`, `.sha1`, `.sha256` and `.sha512`)
+from the registered versions when nothing is stored there; a stored file always wins, and nothing is
+generated for a `.asc` or for the version-level file of a SNAPSHOT. So if another client deployed a
+`maven-metadata.xml` first, the stored file is that client's and does not list the versions Ivy added
+afterwards (IV9 pins the other order: a `mvn deploy` after Ivy finds the generated list, merges its own
+version into it and stores the result).
 
 `ivy-client.spec.ts` adds what the catalog cannot say: a deploy token's publish and resolve with the
 exact file set (IV1, `@smoke`), Ivy resolving what `mvn deploy` published (a release and a SNAPSHOT
 through its timestamped files, IV2) and `mvn dependency:get` resolving what Ivy published (IV3), a
 dependency through the POM, an optional one and `transitive="false"` (IV4), the dynamic revisions
-above (IV5), an unknown module (IV6), and the first-configuration pitfalls above (IV8: no realm, another
-realm, `publishivy="true"`, the dependency line with and without its `conf`). No `test.fail` pin is
-left in this suite.
+above (IV5), an unknown module (IV6), the first-configuration pitfalls above (IV8: no realm, another
+realm, `publishivy="true"`, the dependency line with and without its `conf`) and the generated
+`maven-metadata.xml` read by other clients (IV9: Maven `LATEST`, `RELEASE` and `[1.0,1.10)` through
+`dependency:get`, which accepts a range in `-Dartifact`, Gradle `1.+`, and the artifact-level file a
+`mvn deploy` after Ivy stores with all the versions). No `test.fail` pin is left in this suite.
 
 Not covered: an Ivy-native (non-Maven) layout, which Repsy cannot serve (a descriptor named
 `<artifact>-<revision>.ivy` is a valid Maven file name and is stored, but nothing registers it), the

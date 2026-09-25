@@ -16,14 +16,17 @@
 package io.repsy.protocols.maven.protocol.facades;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
+import io.repsy.protocols.maven.protocol.resources.SynthesizedFileResource;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
+import io.repsy.protocols.maven.shared.utils.ArtifactMetadataSynthesizer;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.maven.shared.utils.MavenUploadLimits;
@@ -60,15 +63,68 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
   private final MavenStorageService<ID> mavenStorageService;
   private final ArtifactService<ID> artifactService;
 
+  /**
+   * Answers a path with what is stored there. Only the artifact-level {@code maven-metadata.xml}
+   * (and its {@code .md5}, {@code .sha1}, {@code .sha256} and {@code .sha512} checksums) that is
+   * not stored is answered from the registered versions instead of with a 404, so an artifact that
+   * its client published without one (sbt, Ivy) can still be resolved by a dynamic version
+   * (RPS-1369). Nothing is written. A stored file always wins, and a checksum is generated only
+   * when the file it belongs to is not stored either: a client that stored its own metadata is
+   * never answered the digest of a file it was not served. A signature ({@code .asc}) and the
+   * version-level metadata of a {@code SNAPSHOT} are not generated, and an artifact that is not
+   * registered stays a 404.
+   */
   @Override
   public Resource download(final ProtocolContext context) {
 
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var relativePath = ProtocolContextUtils.getRelativePath(context);
 
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
 
-    return this.mavenStorageService.getResource(repoInfo.getName(), storagePath);
+    try {
+      return this.mavenStorageService.getResource(repoInfo.getName(), storagePath);
+    } catch (final ItemNotFoundException e) {
+      final var synthesized = this.synthesizeArtifactMetadata(repoInfo, relativePath.getPath());
+
+      if (synthesized == null) {
+        throw e;
+      }
+
+      return synthesized;
+    }
+  }
+
+  private @Nullable Resource synthesizeArtifactMetadata(
+      final BaseRepoInfo<ID> repoInfo, final String path) {
+
+    final var request = ArtifactMetadataSynthesizer.parse(path);
+
+    if (request == null) {
+      return null;
+    }
+
+    if (request.checksumAlgorithm() != null
+        && this.mavenStorageService.exists(
+            StoragePath.of(repoInfo.getStorageKey(), request.metadataPath()), repoInfo.getName())) {
+      return null;
+    }
+
+    final var versions =
+        this.artifactService.getRegisteredVersions(
+            repoInfo, request.groupId(), request.artifactId());
+
+    if (versions.isEmpty()) {
+      return null;
+    }
+
+    final var xml =
+        ArtifactMetadataSynthesizer.metadataXml(request.groupId(), request.artifactId(), versions);
+    final var algorithm = request.checksumAlgorithm();
+
+    return new SynthesizedFileResource(
+        algorithm == null ? xml : ArtifactMetadataSynthesizer.checksum(xml, algorithm),
+        request.fileName());
   }
 
   /**

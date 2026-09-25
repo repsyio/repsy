@@ -42,6 +42,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
@@ -430,6 +431,15 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     final var fullPath = storagePath.getPath().replace("\\", "/");
 
     return fullPath.substring(fullPath.indexOf("/") + 1, fullPath.lastIndexOf("/"));
+  }
+
+  /** One indexed query, see {@link ArtifactVersionRepository#findRegisteredVersions}. */
+  @Override
+  public List<RegisteredVersion> getRegisteredVersions(
+      final BaseRepoInfo<UUID> repoInfo, final String groupId, final String artifactId) {
+
+    return this.artifactVersionRepository.findRegisteredVersions(
+        repoInfo.getStorageKey(), groupId, artifactId);
   }
 
   @Override

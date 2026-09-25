@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.maven.shared.artifact.repositories;
 
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactVersionListItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -87,6 +88,25 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
       @NonNull String groupName,
       @NonNull String artifactName,
       @NonNull Pageable pageable);
+
+  /**
+   * Every version of an artifact with the time it was last registered, which is all the generated
+   * artifact-level {@code maven-metadata.xml} needs (RPS-1369). A row that has no {@code
+   * lastUpdatedAt} falls back to its {@code createdAt}. It reads the two indexes of the artifact
+   * and its versions and returns no row for an artifact that is not registered.
+   */
+  @Query(
+      """
+        select new io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion(
+          av.versionName, coalesce(av.lastUpdatedAt, av.createdAt))
+        from ArtifactVersion av
+        join av.artifact a
+        where a.repo.id = :repoId
+        and a.groupName = :groupName
+        and a.artifactName = :artifactName
+      """)
+  @NonNull List<RegisteredVersion> findRegisteredVersions(
+      UUID repoId, @NonNull String groupName, @NonNull String artifactName);
 
   @NonNull List<ArtifactVersion> findByArtifactId(UUID artifactId);
 
