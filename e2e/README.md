@@ -72,7 +72,7 @@ e2e/
   docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
   docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
-  runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle/sbt and gpg; see "Adding a protocol adapter" below
+  runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle/sbt/Ant + Ivy and gpg; see "Adding a protocol adapter" below
   runners/sbt-warmup/          # the throwaway sbt project maven.Dockerfile builds once to prime the sbt caches (RPS-134)
   runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
   runners/npm-clients.Dockerfile  # + pinned pnpm, yarn classic, yarn berry (npm --prefix /opt/clients/<name>) and bun (copied from oven/bun); see "npm-family clients"
@@ -135,6 +135,9 @@ e2e/
       sbt.ts                     # the sbt client: publish()/resolve()/seedPublish() with a Scala project (RPS-134)
       sbt-adapter.ts             # sbtAdapter: the ProtocolAdapter registerPublishConsumeLoop takes (`sbt`)
       sbt-checks.ts              # expectLiteralSnapshotStored: what an sbt SNAPSHOT publish leaves (literal names, no metadata)
+      ivy.ts                     # the Apache Ivy client: publish()/resolve()/seedPublish() with an Ant build and the real Ivy jar (RPS-135)
+      ivy-adapter.ts             # ivyAdapter: the ProtocolAdapter registerPublishConsumeLoop takes (`ivy`)
+      ivy-checks.ts              # expectPublishStored: what an Ivy publish leaves (the jar and the POM, each with its .sha1/.md5)
       cargo-raw.ts                 # cargo-specific raw PUT/GET (publish/config.json/sparse-index/download), body builder
       cargo.ts                     # the cargo client + cargoAdapter: publish()/resolve()/seedPublish(), cargo package/publish/fetch
       nuget-raw.ts                  # nuget-specific raw PUT/GET (publish/versions/download/registration/service-index), buildNupkg (fflate)
@@ -155,6 +158,7 @@ e2e/
       ruby.ts                              # the ruby client + rubyAdapter: publish()/resolve()/seedPublish(), real gem push / bundle install
     packages/
       maven/                     # mustache templates of the tiny jar project + settings.xml
+      ivy/                       # mustache templates of the Ant build, ivy.xml, ivysettings.xml and the consumer ivy.xml (RPS-135)
       gradle/                    # mustache templates of the tiny library (publish) and its consumer, as build.gradle and build.gradle.kts; plugin/ holds the plugin fixture (its one class and the publish/consumer templates)
       npm/                       # mustache templates of the tiny package.json/index.js + .npmrc
       npm-family/                # the same for the npm-family clients, plus .yarnrc, .yarnrc.yml and bunfig.toml
@@ -185,6 +189,9 @@ e2e/
       gradle-plugin-kotlin.spec.ts  # RPS-133: the same for the Kotlin DSL
       gradle-locking-groovy.spec.ts  # RPS-133: Gradle dependency locking, Groovy
       gradle-locking-kotlin.spec.ts  # RPS-133: the same for the Kotlin DSL
+      sbt.spec.ts               # RPS-134: registerPublishConsumeLoop(sbtAdapter) + the sbt extras
+      ivy.spec.ts               # RPS-135: registerPublishConsumeLoop(ivyAdapter), a real `ant` with ivy:publish and ivy:retrieve
+      ivy-client.spec.ts        # RPS-135: IV1-IV8 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, RPS-1331/1368/1370 pins)
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
@@ -517,8 +524,8 @@ The adapter's raw publish probe (what pins the exact status) is a PUT of the dep
 release POM for a RELEASE, a fresh timestamped POM (`a-<base>-<now>-9000nn.pom`, a build number no real
 deploy reaches) for a SNAPSHOT. It is not the literal `a-<base>-SNAPSHOT.pom`: `mvn` and Gradle never
 send that name, and it is judged differently (with `allowOverride: false` it is refused as soon as
-the version exists, because that rule looks the version up in the database for a POM). sbt does send
-it, so the sbt adapter's probe does too (`literalSnapshot`, see "Maven runner"); that is why sbt's
+the version exists, because that rule looks the version up in the database for a POM). sbt and Ivy do
+send it, so their adapters' probes do too (`literalSnapshot`, see "Maven runner"); that is why their
 `snapshot-redeploy-no-override` is `forbidden` (RPS-1328).
 
 ### Nothing stored
@@ -583,7 +590,8 @@ five worked examples.
 
 `runners/maven.Dockerfile` adds a pinned Eclipse Temurin JDK and Apache Maven (build args
 `TEMURIN_VERSION`, `MAVEN_VERSION`), a pinned Gradle (`GRADLE_VERSION`, with its published
-`GRADLE_SHA256`, checked at build time), a pinned sbt (`SBT_VERSION`, `SBT_SHA256`, RPS-134) and `gpg`
+`GRADLE_SHA256`, checked at build time), a pinned sbt (`SBT_VERSION`, `SBT_SHA256`, RPS-134), a pinned
+Apache Ant and the Apache Ivy jar (`ANT_VERSION`/`ANT_SHA512`, `IVY_VERSION`/`IVY_SHA512`, RPS-135) and `gpg`
 (Debian's GnuPG 2.2, no key server tooling) to the harness image; `gpg` is only for
 `gpg-signed-deploy.spec.ts` (below). `clients/maven.ts` renders
 `src/packages/maven/{pom,settings}.template.xml` into a per-invocation isolated work directory
@@ -769,8 +777,96 @@ when its ticket lands:
 | the panel detail of an sbt SNAPSHOT                      | RPS-1370 | 404 `itemNotFound`: it reads the version-level metadata sbt never sends. The list works                                                                      |
 | `latest.release` resolving an sbt library                | RPS-1369 | the server generates no `maven-metadata.xml`, so a dynamic revision finds nothing                                                                            |
 
-Not covered: Ivy-style layout (RPS-135), `publishSigned` (sbt-pgp, RPS-1316 covers signing with `mvn`
+Not covered: `publishSigned` (sbt-pgp, RPS-1316 covers signing with `mvn`
 and Gradle), `sbtPlugin := true` publishing, `publishLocal`, sbt 2.x (RPS-1327).
+
+**The Apache Ivy client (`ivy.spec.ts`, `ivy-client.spec.ts`, RPS-135).** A fourth real client of the same
+Maven repository: Apache Ant 1.10.15 with the Apache Ivy 2.5.3 jar (`ivy:makepom`, `ivy:publish`,
+`ivy:resolve`, `ivy:retrieve`), both downloaded from archive.apache.org at image build time and checked
+against their published SHA-512 (2.5.3 is the last 2.5.x; the Ivy jar is the plain one, without Apache
+HttpClient, so Ivy talks HTTP through its JDK URL handler, as an Ivy dropped into `ANT_HOME/lib` does).
+`clients/ivy.ts` renders `src/packages/ivy/*.template.xml` (an `ivysettings.xml`, the module's `ivy.xml`,
+a `build.xml` with a `publish` and a `retrieve` target, and the consumer's `ivy.xml`) into an isolated
+work directory and runs `ant -noinput -lib /opt/ivy/ivy.jar <target>`; `ivyAdapter`
+(`clients/ivy-adapter.ts`) hands it to the same `registerPublishConsumeLoop`: one more protocol key,
+`ivy`, creating `RepoType.MAVEN` repos, and the catalog's Maven-repository scenarios (`MAVEN_CLIENTS`)
+run for it. Keep `ANT_VERSION` and `IVY_VERSION` in `clients/ivy.ts` equal to `maven.Dockerfile` (a
+test compares them with what the image runs). Every run has its own `HOME`, Ivy user directory and
+cache, and the one resolver is Repsy's (no default or public chain), so nothing reaches Maven Central
+and a resolve never finds what a publish fetched. The credential is only written into the run's
+`ivysettings.xml`, never argv. The build sets `overwrite="true"` (below), so the server's own
+`allowOverride` rule decides a redeploy, and, like `mvn`, Gradle and sbt, Ivy hides the HTTP status
+behind its exit code, so the `Outcome` is the raw probe of `clients/maven.ts` (with the LITERAL
+`-SNAPSHOT` POM, which is the file Ivy sends), with Ant's exit code as evidence. The setup is the one
+the README and the panel's Maven configuration dialog document (RPS-1332): an `ibiblio` resolver with
+`m2compatible="true"`, `<credentials realm="Repsy Managed Repository">`, the POM `ivy:makepom` writes
+listed next to the jar in `<publications>`, and `ivy:publish` with `publishivy="false"`. What Ivy does,
+seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
+
+- Repsy is a Maven repository, so only the Maven layout works: Ivy's own layout (`ivy-[revision].xml`,
+  an `ivys/` directory) is `400 invalidArtifactPath`. A publish needs its POM: Repsy registers a
+  version (and shows it in the panel) only when the POM is uploaded.
+- Credentials: Ivy matches a `<credentials>` entry by host (no port) and by the realm of the server's
+  challenge. With `realm="Repsy Managed Repository"` the credential is sent (a deploy token works with
+  an empty username too); an entry with no realm, or another one, is never sent, so the very first PUT
+  is answered 401 ("was refused by the server") and nothing is stored.
+- The jar is sent first, then the POM, each followed by its `.sha1` and `.md5` (Ivy computes them:
+  `ivy.checksums`): jar, jar.sha1, jar.md5, pom, pom.sha1, pom.md5, every one a PUT with
+  `Content-Type: application/octet-stream` (seen on a fake server logging the requests). Nothing else
+  is sent: no `maven-metadata.xml` at either level and, with `publishivy="false"`, no ivy file. A
+  refused first file (every refusal of the catalog) stops the build and stores nothing.
+- A SNAPSHOT is published NON-uniquely, under the literal names `a-1.0-SNAPSHOT.jar/.pom`, and a redeploy
+  replaces them in place, so `ivy` is in `snapshot-deploy`/`snapshot-redeploy`, and
+  `afterSuccessfulRoundTrip` asserts the literal jar is the resolved one (`expectLiteralSnapshotStored`,
+  shared with sbt) and that the stored jar, POM and checksums are what Ivy built (`clients/ivy-checks.ts`).
+  The same file names are why `snapshot-redeploy-no-override` is `forbidden` for Ivy (RPS-1328, below).
+- Dynamic revisions work through the directory listing: Ivy looks for the artifact's
+  `maven-metadata.xml` (Repsy has none), then reads the HTML listing of the artifact directory. With 1.0, 1.1, 1.2, 1.10 and 2.0-SNAPSHOT
+  published, `1.+` and `latest.release` resolve 1.10 (numeric order, a SNAPSHOT is not a release),
+  `latest.integration` resolves 2.0-SNAPSHOT and `[1.0,1.2)` resolves 1.1. No other client of this
+  repository can do the same: see RPS-1369 below.
+- Resolving reads the POM, so a consumer needs `conf="default->default"` on its dependency (or
+  `defaultconf`). The panel's version page shows the bare `<dependency org name rev/>`, whose default
+  configuration mapping also asks for the `sources` and `javadoc` artifacts, which do not exist, and
+  Ivy fails with "FAILED DOWNLOADS" (pinned in `ivy-client.spec.ts`; `retrieve` copies to `lib/`).
+- `ivy:makepom` writes the module's dependencies as optional unless it is given
+  `<mapping conf="default" scope="compile"/>`; only a mapped dependency is resolved transitively.
+- `publishivy="true"` (Ivy's default) makes Ivy also send its own ivy file, as `ivy-<revision>.xml`
+  after the jar and the POM: Repsy answers `400 invalidArtifactPath`, the build fails, and the jar and
+  the POM stay stored and registered. (The first version of the README and the panel's dialog said the
+  ivy file went "onto the POM path"; corrected with this suite, RPS-1332.)
+- `overwrite="false"` (`ivy:publish`'s default) makes Ivy send a HEAD first and refuse when it is
+  answered 200; Repsy answers 200 for any Maven path (RPS-1368), so even the first publish of a release
+  is refused with "destination file exists and overwrite == false".
+- Version deletes: the panel's delete of one of two Ivy-published versions is RPS-1331 (below).
+
+Repsy stores the `maven-metadata.xml` a client uploads and never generates one, and Ivy uploads none,
+so an artifact published by Ivy has no `<versions>` list: Maven `LATEST`/`RELEASE` and version ranges,
+and Gradle's and sbt's dynamic versions do not resolve it (RPS-1369; only fixed versions do everywhere).
+This is a known limitation, not a test: it is described here and in the README, and pinned only where
+Ivy itself relies on it (the dynamic revision test). If Ivy publishes after another client deployed a
+`maven-metadata.xml`, the stored file is the other client's and does not list the Ivy versions.
+
+`ivy-client.spec.ts` adds what the catalog cannot say: a deploy token's publish and resolve with the
+exact file set (IV1, `@smoke`), Ivy resolving what `mvn deploy` published (a release and a SNAPSHOT
+through its timestamped files, IV2) and `mvn dependency:get` resolving what Ivy published (IV3), a
+dependency through the POM, an optional one and `transitive="false"` (IV4), the dynamic revisions
+above (IV5), an unknown module (IV6), and the first-configuration pitfalls above (IV8: no realm, another
+realm, `publishivy="true"`, the bare dependency line). A `test.fail` pins each of the following, all found
+live while building this suite, and each is removed when its ticket lands:
+
+| Pin                                                      | Ticket   | What happens                                                                                                                                                 |
+| -------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `snapshot-redeploy-no-override` (`expectByProtocol.ivy`) | RPS-1328 | `allowOverride: false` refuses Ivy's literal `-SNAPSHOT` redeploy (403), while Maven's timestamped redeploy passes. Pinned as `forbidden`, not as a decision |
+| `ivy:publish` with its own default, `overwrite="false"`  | RPS-1368 | the Maven HEAD handler answers 200 for a file that does not exist, so Ivy refuses even the FIRST publish of a release (IV7)                                  |
+| the panel detail of an Ivy SNAPSHOT                      | RPS-1370 | 404 `itemNotFound`: it reads the version-level metadata Ivy never sends. The list works                                                                      |
+| deleting one of two Ivy-published versions in the panel  | RPS-1331 | 404 after the files are gone, the database row stays (no artifact-level metadata)                                                                            |
+
+Not covered: an Ivy-native (non-Maven) layout, which Repsy cannot serve (a descriptor named
+`<artifact>-<revision>.ivy` is a valid Maven file name and is stored, but nothing registers it), the
+Ivy command line (`java -jar ivy.jar`, which always publishes its ivy file), Ivy with Apache HttpClient
+on the classpath, Ivy 2.6, and Gradle's or sbt's Ivy publishers (RPS-133 and RPS-134 drive those
+clients).
 
 ```bash
 ./run.sh test --protocol maven

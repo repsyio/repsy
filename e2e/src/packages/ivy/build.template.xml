@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright 2026 the original author or authors.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       https://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<!--
+  Rendered by clients/ivy.ts (mustache) into a per-test work directory and run with the real Ant
+  (`ant -lib ivy.jar <target>`). `publish` is the recipe Repsy documents (README.md, "Apache Ivy
+  Clients"): the jar of a resource directory holding a per-publish random marker, the POM `ivy:makepom`
+  writes from the module, and `ivy:publish` of both to the Repsy resolver. `publishivy` is false
+  because Ivy would otherwise also send its own ivy file, which Repsy refuses. `overwrite` is true by
+  default so the server's own `allowOverride` rule decides a redeploy, not Ivy's HEAD check (RPS-1368).
+  `retrieve` resolves the consumer module and copies what it resolved into lib/.
+-->
+<project name="repsy-e2e-ivy" default="publish" xmlns:ivy="antlib:org.apache.ivy.ant">
+  <target name="publish">
+    <ivy:settings file="ivysettings.xml"/>
+    <ivy:resolve file="ivy.xml"/>
+    <mkdir dir="build"/>
+    <jar destfile="build/{{{module}}}.jar" basedir="resources"/>
+    <ivy:makepom ivyfile="ivy.xml" pomfile="build/{{{module}}}.pom">
+      {{#mapDependencies}}
+      <mapping conf="default" scope="compile"/>
+      {{/mapDependencies}}
+    </ivy:makepom>
+    <ivy:publish resolver="repsy" pubrevision="{{{version}}}" status="release" publishivy="{{{publishIvy}}}" overwrite="{{{overwrite}}}">
+      <artifacts pattern="build/[artifact].[ext]"/>
+    </ivy:publish>
+  </target>
+  <target name="retrieve">
+    <ivy:settings file="ivysettings.xml"/>
+    <ivy:resolve file="consumer-ivy.xml"/>
+    <ivy:retrieve pattern="lib/[artifact]-[revision](-[classifier]).[ext]"/>
+  </target>
+</project>

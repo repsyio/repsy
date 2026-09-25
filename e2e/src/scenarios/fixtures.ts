@@ -59,6 +59,8 @@ const REPO_TYPE_BY_PROTOCOL: Record<string, RepoType> = {
   'gradle-plugin-kotlin': RepoType.MAVEN,
   // The sbt client (RPS-134): publishes to and resolves from an ordinary Maven repo.
   sbt: RepoType.MAVEN,
+  // The Apache Ivy client (RPS-135, an Ant build with ivy:publish and ivy:retrieve): an ordinary Maven repo.
+  ivy: RepoType.MAVEN,
   npm: RepoType.NPM,
   pypi: RepoType.PYPI,
   docker: RepoType.DOCKER,
