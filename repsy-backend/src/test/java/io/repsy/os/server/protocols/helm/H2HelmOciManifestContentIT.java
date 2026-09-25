@@ -57,7 +57,6 @@ class H2HelmOciManifestContentIT extends H2IntegrationTest {
     repo.setType(RepoType.HELM);
     repo.setPrivateRepo(false);
     repo.setAllowOverride(true);
-    repo.setSearchable(true);
     repo.setDiskUsage(0);
     repo.setCreatedAt(Instant.now());
     final var savedRepo = this.repoRepository.saveAndFlush(repo);

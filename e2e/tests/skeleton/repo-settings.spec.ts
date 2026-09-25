@@ -115,3 +115,24 @@ for (const repoType of [
     expect(settings.snapshots).toBeUndefined();
   });
 }
+
+/**
+ * RPS-1435: Cargo and Go never replace a published version, so their settings do not show
+ * `allowOverride`, and a PUT that sends it (the panel form does, for every protocol) is answered
+ * 200 with the column left alone instead of being rejected.
+ */
+for (const repoType of [RepoType.CARGO, RepoType.GOLANG]) {
+  test(`allowOverride is omitted from the settings and ignored on write (RPS-1435, ${repoType})`, async ({
+    seeder,
+    panelApi,
+  }) => {
+    const repo = await seeder.createRepo(repoType, { privateRepo: true });
+    expect(await panelApi.getSettings(repo.name)).not.toHaveProperty('allowOverride');
+
+    await panelApi.updateSettings(repo.name, { allowOverride: false, privateRepo: false });
+
+    const settings = await panelApi.getSettings(repo.name);
+    expect(settings).not.toHaveProperty('allowOverride');
+    expect(settings.privateRepo).toBe(false);
+  });
+}

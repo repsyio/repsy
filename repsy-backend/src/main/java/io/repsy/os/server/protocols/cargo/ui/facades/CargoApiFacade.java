@@ -68,11 +68,7 @@ public class CargoApiFacade implements ProtocolApiFacade {
   @Transactional(readOnly = true)
   public RepoSettingsInfo getSettings(final RepoInfo repoInfo) {
 
-    return RepoSettingsInfo.builder()
-        .privateRepo(repoInfo.isPrivateRepo())
-        .searchable(repoInfo.isSearchable())
-        .allowOverride(repoInfo.isAllowOverride())
-        .build();
+    return RepoSettingsInfo.builder().privateRepo(repoInfo.isPrivateRepo()).build();
   }
 
   public void updateSettings(final RepoInfo repoInfo, final RepoSettingsForm settings) {

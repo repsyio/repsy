@@ -113,7 +113,6 @@ class H2DockerImageQueriesIT extends H2IntegrationTest {
     repo.setType(RepoType.DOCKER);
     repo.setPrivateRepo(false);
     repo.setAllowOverride(true);
-    repo.setSearchable(true);
     repo.setDiskUsage(0);
     repo.setCreatedAt(Instant.now());
     return this.repoRepository.saveAndFlush(repo);

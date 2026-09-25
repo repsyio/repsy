@@ -93,7 +93,6 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
         .description(repo.getDescription())
         .privateRepo(repo.isPrivateRepo())
         .allowOverride(repo.isAllowOverride())
-        .searchable(repo.isSearchable())
         .securityScanEnabled(repo.isSecurityScanEnabled())
         .type(repo.getType())
         .build();
