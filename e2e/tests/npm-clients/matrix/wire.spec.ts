@@ -59,6 +59,11 @@ const IDENTITY: Partial<
   Record<ClientId, { accept: RegExp; userAgent: RegExp; npmCommand?: string }>
 > = {
   npm: { accept: /^application\/json$/, userAgent: /^npm\/11\.\d+\.\d+ /, npmCommand: 'install' },
+  // bun asks for the ABBREVIATED packument on an install (H-11), with the rest of the range as a fallback.
+  bun: {
+    accept: /^application\/vnd\.npm\.install-v1\+json; q=1\.0, application\/json; q=0\.8, \*\/\*$/,
+    userAgent: /^Bun\/1\.3\.\d+$/,
+  },
 };
 
 /** The `Authorization` scheme each credential kind is sent with (`_authToken` vs `_auth`). */

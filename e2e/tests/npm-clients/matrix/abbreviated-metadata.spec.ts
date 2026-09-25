@@ -54,6 +54,10 @@ const PLATFORM_FIELDS = ['os', 'cpu', 'libc', 'peerDependenciesMeta', 'funding']
 /** Whether a client installs an optional dependency whose `os` excludes linux (`win32` here). */
 const INSTALLS_WRONG_PLATFORM_OPTIONAL: Partial<Record<ClientId, boolean>> = {
   npm: false,
+  // RPS-1356: bun resolves from the abbreviated packument (`wire.spec.ts`), which has no `os`/`cpu`,
+  // so it installs the win32-only package on linux (`bun/config.spec.ts` proves the cause: the same
+  // install with the request rewritten to the full packument skips it).
+  bun: true,
 };
 
 for (const client of clientsWith('publish')) {

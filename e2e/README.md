@@ -185,6 +185,7 @@ e2e/
       unpublish.spec.ts         # real `npm unpublish` (RPS-1289): one version (unscoped/scoped), the only version, a whole package
     npm-clients/
       npm/publish-consume.spec.ts   # registerPublishConsumeLoop(npmFamilyAdapter(npmClient)): the catalog through the npm-family harness
+      bun/                      # publish-consume.spec.ts (the catalog), config.spec.ts (bunfig/.npmrc, wire), commands.spec.ts (publish, workspaces, info, whoami, audit)
       versions.spec.ts          # --version of every installed client == its pin; config renderers read back by pnpm/yarn
       sealed-network.spec.ts    # the network seal: a misconfigured registry fails fast for all five clients
       matrix/*.spec.ts          # lockfile, dist-tags, deprecate, view, registry-endpoints (whoami/ping/search/audit), scoped-routing, tarball-host, abbreviated-metadata, wire
@@ -866,6 +867,7 @@ src/clients/npm-family/
   client.ts          # NpmFamilyClient: the interface a matrix spec is written against, Capabilities, RegistryBinding, CLIENT_BINARIES
   config.ts          # renders .npmrc / .yarnrc (yarn classic) / .yarnrc.yml (berry) / bunfig.toml from RegistryBinding[] + the SEALED env
   npm-client.ts      # the npm CLI as an NpmFamilyClient (the baseline / reference implementation)
+  bun-client.ts      # bun: bunClient (bunfig.toml), bunfigOnlyClient, bunNpmrcClient, bunExec()
   adapter.ts         # npmFamilyAdapter(client): a ProtocolAdapter (protocol 'npm', label + tag per client) for the shared catalog loop
   registry.ts        # ENABLED_CLIENTS (what the matrix runs against), clientsWith('<capability>'), INSTALLED_CLIENTS, versionOf()
   fixtures.ts        # package builders (single package, lib + app graph, extra manifest fields), publishPackage(), repo/token helpers
@@ -873,6 +875,7 @@ src/clients/npm-family/
 src/packages/npm-family/   # the mustache templates (header-less, triple-mustache everywhere)
 tests/npm-clients/
   npm/publish-consume.spec.ts   # the 13-scenario catalog through the new harness: `npm[npm] > <scenario>`
+  bun/                          # publish-consume.spec.ts (the catalog), config.spec.ts, commands.spec.ts: see "bun"
   versions.spec.ts              # --version of every installed client == its pin; config renderers read back by the client
   sealed-network.spec.ts        # the network seal, proven for all five clients
   matrix/*.spec.ts              # one file per matrix row, iterating clientsWith(...)
@@ -972,6 +975,96 @@ depends on a public package).
 
 Not asserted as fixed, still open: RPS-1343 (a qualifier-only search matches everything), RPS-1344
 (`size`/`from` are not clamped), RPS-1345 (audit findings query performance).
+
+### bun (1.3.14; RPS-1330 PR 5)
+
+`bun-client.ts` is bun as an `NpmFamilyClient`, registered in `ENABLED_CLIENTS` (so every matrix cell
+below is lit for it). Commands: `bun pm pack` + `bun publish <tarball>`, `bun add --no-save`, `bun install
+[--frozen-lockfile]` (`bun.lock`, text), `bun info --json`, `bun pm whoami`, `bun audit --json`. bun has
+no `dist-tag`, `deprecate`, `ping` or `search` command, so those capabilities are off; `viewCmd` and
+`auditCmd` are off too, because `bun info --json` (the latest manifest plus `versions`, no
+`dist-tags`/`time`) and `bun audit --json` (the bare advisory map) are not npm's document shapes: the
+matrix cells that parse those shapes do not fit, and `bun/commands.spec.ts` covers both commands against
+what bun does print. Config: env `BUN_INSTALL_CACHE_DIR`/`BUN_INSTALL` in the isolated HOME, `DO_NOT_TRACK=1`,
+`FORCE_COLOR=0` (Playwright's workers set `FORCE_COLOR`, which bun honours over `NO_COLOR`, and colour
+codes split every message a test matches on).
+
+Three configurations, all exercised: `bunClient` reads `$HOME/.bunfig.toml` (the matrix column),
+`bunfigOnlyClient` is the same with nothing else, `bunNpmrcClient` reads **only** `$HOME/.npmrc` (H-11).
+`bunfig.toml` has no read-back command, so each is asserted by what crosses the wire. Facts probed on 1.3.14:
+
+- bun reads `registry` + `_authToken` (Bearer) or `_auth` (Basic) from `.npmrc` alone, and a bunfig
+  `[install]`/`[install.scopes]` `url` + `token` (Bearer) or `username`/`password` (Basic); both send it
+  to the packument and the tarball. It asks for `Accept: application/vnd.npm.install-v1+json; q=1.0,
+application/json; q=0.8, */*` (the ABBREVIATED packument) on an install and `application/json` for
+  `bun info`, with `User-Agent: Bun/1.3.14` and no `npm-command`.
+- **`bun publish` sends only a Bearer token, whatever the configuration.** A bunfig `username`/`password`,
+  an `.npmrc` `_auth`, `username` + `_password`, all stop at `missing authentication (run bunx npm login)`
+  before a request is made, and a password as `_authToken` is refused (401 `unable to authenticate`). A person
+  with a Repsy password gets a token the way bun's hint says: the registry's couch login
+  (`PUT /-/user/org.couchdb.user:<name>`) answers a Bearer JWT that bun publishes with. `bunClient.publish`
+  does exactly that for a password binding (the catalog's `password-*` scenarios and every admin seed publish),
+  so the catalog runs with no `expectBy*` override; installs still send the password as Basic.
+- A republish needs no flag to reach the server (H-17): bun sends the PUT and the server decides (`override` /
+  `no-override` in the catalog). `--tolerate-republish` does the opposite: bun GETs the packument first, warns
+  `Registry already knows about version 1.0.0; skipping` and never sends the PUT (stored bytes untouched).
+- **bun sends the registry credential to whatever host `dist.tarball` names** (H-16 refuted; the plan and the
+  RPS-1333 note expected it to withhold it from another origin): with the registry configured as one address
+  and the packument naming another, the tarball request to the other host and port still carries
+  `Authorization: Bearer`. What keeps a credential at the registry is the registry always naming its own
+  address (RPS-1333), not the client.
+- A workspace member's `bun publish` needs a lockfile first (`bun install`; otherwise `Failed to resolve
+workspace version`, before any request) and then rewrites `workspace:^` to `^1.2.3`, `workspace:~` to
+  `~1.2.3`, `workspace:*` to the exact `0.4.0` and `catalog:` to the catalog's range; the stored manifest has
+  plain ranges and a consumer of it resolves them from the same repository.
+- `bun add`/`bun install` say nothing about a deprecated version (H-19 refuted for bun): only `bun info
+<pkg>@<version> deprecated` shows the message. `matrix/deprecate.spec.ts` pins that per client
+  (`SILENT_ON_DEPRECATED`).
+- **RPS-1356 has a user-visible effect on bun**: bun resolves from the abbreviated packument, which lacks
+  `os`/`cpu`, so it installs an `os:["win32"]` optional dependency on linux (H-15 confirmed for bun). The
+  same install with the request rewritten to the full packument (`wire-recorder.ts` `forwardHeaders`)
+  skips it: `bun/config.spec.ts` proves the cause, `matrix/abbreviated-metadata.spec.ts` pins the effect.
+- `bun.lock` stores the absolute tarball URL and the `sha512` integrity of each package (H-13); a frozen
+  install from it alone, in a fresh HOME and an empty cache, works; after an override republish it fails with
+  `error: Integrity check failed for tarball: <name>` and installs nothing.
+- Sealed network, success side: every bun test runs under the dead-proxy environment and the registry answers
+  through `NO_PROXY`; `bun/config.spec.ts` also proves it is the only reason (the same install with `NO_PROXY`
+  emptied fails `ConnectionRefused`). `bun` reaches the registry by `localhost` or `127.0.0.1`.
+- `bun pm whoami` and `bun audit` work (RPS-1329): whoami needs a project (`package.json`) in the cwd and a
+  credential (with none, bun stops client-side before any request, on a public repository too); audit sends
+  one `POST /<repo>/-/npm/v1/security/advisories/bulk` (Bearer, 200) and prints `{}` (`No vulnerabilities
+found` in text mode).
+- `bun info --json` shows `dist.tarball` (the registry address, RPS-1333), `versions` and the latest
+  manifest; `dist-tags`, `time` (ISO UTC and now) and `deprecated` are properties (`bun info <pkg> time
+--json`). A bun publisher's manifest has no `_resolved`, but the packument still carries `_attachments`
+  (RPS-1357).
+
+| Cell                                                   | bun result                                                                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| catalog loop (13 scenarios)                            | pass, no override; `@smoke`: `password-admin`. Password publishes go through the login token (above)                                 |
+| 5b dependency graph, 5c lockfile + frozen (`bun.lock`) | pass; `@smoke`: the frozen install                                                                                                   |
+| 5d frozen install after an override republish          | pass: `Integrity check failed for tarball`                                                                                           |
+| 6 dist-tags                                            | N/A (no command); publish `--tag`, `pkg@beta` install and `bun info <pkg> dist-tags` are in `bun/commands.spec.ts`                   |
+| 7 deprecate (as consumer)                              | pinned: bun prints nothing on install; `bun info <pkg>@<v> deprecated` shows it                                                      |
+| 9 view / info                                          | N/A for the npm-shaped cell; `bun/commands.spec.ts` covers `bun info`                                                                |
+| 2 whoami, ping, search                                 | whoami pass (admin password and deploy token); no ping/search command                                                                |
+| 10 audit                                               | N/A for the npm-shaped cell; `bun/commands.spec.ts`: exit 0, `{}`, one bulk POST answered 200                                        |
+| 11 workspace publish                                   | pass (`bun/commands.spec.ts`): the rewrites above                                                                                    |
+| 16 two repos, two scopes                               | pass with `[install.scopes]` (matrix) and with `.npmrc` scopes (`bun/config.spec.ts`): token A only to repo A, tarball GETs included |
+| 17 `dist.tarball` host                                 | pass (RPS-1333); plus the pin that bun sends credentials to another origin                                                           |
+| 18 abbreviated packument                               | RPS-1356 pin: bun installs the `os:["win32"]` optional dependency                                                                    |
+| 19 wire trace                                          | pass: abbreviated `Accept`, `Bun/1.3.14`, Bearer/Basic on packument and tarball; RPS-1358/1359 pins                                  |
+
+New backend candidate from bun (file a ticket, then replace `NC17`): **NC17** the tarball download is
+answered `Content-Disposition: inline;filename=f.txt` (a fixed made-up name, presumably Spring's
+reflected-file-download guard) instead of `<name>-<version>.tgz`; seen on every tarball request in
+`bun add --verbose`, pinned raw in `bun/commands.spec.ts`. Low severity: no client depends on it.
+
+Harness note found while doing this: `sealedEnv()` is documented as an allow-list that never carries the
+runner's own environment, but `exec.ts`'s `run()` calls `execa` with its default `extendEnv: true`, so the
+runner's variables (including `REPSY_ADMIN_PASSWORD`, `FORCE_COLOR`, `YARN_VERSION` and `NPM_CLIENTS_*`) are
+merged into every client's environment (`sealedEnv`'s own keys win). Not changed here (it is `exec.ts`, shared
+by every runner).
 
 ## Cargo runner
 

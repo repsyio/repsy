@@ -22,6 +22,7 @@
  * empty message clears it.
  */
 import { rawGetPackument } from '../../../src/clients/npm-raw.js';
+import type { ClientId } from '../../../src/clients/npm-family/client.js';
 import {
   newRepo,
   packageNameFor,
@@ -32,6 +33,13 @@ import {
 import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
+
+/**
+ * The clients whose `add`/`install` say nothing about a deprecated version (probed: bun prints only
+ * "(v1.1.0 available)"; `bun info <pkg>@<version> deprecated` shows it, see `bun/commands.spec.ts`).
+ * The registry serves the message to all of them; whether the client shows it is the client's.
+ */
+const SILENT_ON_DEPRECATED: ReadonlySet<ClientId> = new Set<ClientId>(['bun']);
 
 async function deprecatedOf(
   repoName: string,
@@ -94,9 +102,9 @@ for (const publisher of clientsWith('deprecateCmd')) {
             `${consumerClient.label} add: ${added.command}\n${added.stderr}`,
           ).toBe(0);
           expect(
-            `${added.stdout}\n${added.stderr}`,
-            `${consumerClient.label} prints the deprecation message`,
-          ).toContain(message);
+            `${added.stdout}\n${added.stderr}`.includes(message),
+            `${consumerClient.label} ${SILENT_ON_DEPRECATED.has(consumerClient.id) ? 'does not print' : 'prints'} the deprecation message`,
+          ).toBe(!SILENT_ON_DEPRECATED.has(consumerClient.id));
         }
 
         const cleared = await publisher.deprecate?.(ctx, `${name}@1.0.0`, '');

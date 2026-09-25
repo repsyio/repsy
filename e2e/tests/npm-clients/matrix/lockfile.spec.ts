@@ -53,6 +53,7 @@ import type { Seeder } from '../../../src/seed/seeder.js';
 /** What a client says when a frozen install finds bytes that differ from its lockfile. */
 const INTEGRITY_FAILURE: Partial<Record<ClientId, RegExp>> = {
   npm: /EINTEGRITY/,
+  bun: /Integrity check failed for tarball/,
 };
 
 interface Graph {
