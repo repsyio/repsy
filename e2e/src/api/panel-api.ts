@@ -436,6 +436,33 @@ export class PanelApi {
     return unwrap(res.data, 'getMavenArtifactVersion');
   }
 
+  /** The artifact names of one Maven group, as the panel lists them (its first page of 100). */
+  async listMavenArtifactNames(repoName: string, groupName: string): Promise<string[]> {
+    const res = await this.client.mavenArtifactController.listMavenArtifacts({
+      repoName,
+      groupName,
+      size: 100,
+    });
+    return (unwrap(res.data, 'listMavenArtifacts').content ?? []).map((a) => a.artifactName ?? '');
+  }
+
+  /** The version names of one Maven artifact, as the panel lists them (its first page of 100). */
+  async listMavenArtifactVersionNames(
+    repoName: string,
+    groupName: string,
+    artifactName: string,
+  ): Promise<string[]> {
+    const res = await this.client.mavenArtifactController.listMavenArtifactVersions({
+      repoName,
+      groupName,
+      artifactName,
+      size: 100,
+    });
+    return (unwrap(res.data, 'listMavenArtifactVersions').content ?? []).map(
+      (v) => v.versionName ?? '',
+    );
+  }
+
   /** Deletes one version of a Maven artifact, its files and its entry in the artifact's metadata. */
   async deleteMavenArtifactVersion(
     repoName: string,

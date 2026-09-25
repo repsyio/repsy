@@ -121,9 +121,10 @@ let probeSeq = 0;
  * with a timestamp of "now" and a build number no real deploy reaches (a deploy counts 1, 2, 3, ...
  * per version; this counts from 900001), so it is a *new* file every time: `allowOverride: false`
  * never sees it as an override, and only the release/snapshot rules can refuse it. A real client
- * never PUTs the literal `a-<base>-SNAPSHOT.pom` name, and that name is judged differently (see
- * `README.md`, "SNAPSHOT and redeploy behaviour, as probed"), so it is no stand-in for what a
- * client sends.
+ * (mvn, Gradle) never PUTs the literal `a-<base>-SNAPSHOT.pom` name, and that name is judged
+ * differently (see `README.md`, "SNAPSHOT and redeploy behaviour, as probed"), so it is no stand-in
+ * for what they send. sbt does send it: it publishes a SNAPSHOT non-uniquely (RPS-134), and
+ * `rawPublishCheck`'s `literalSnapshot` sends exactly that.
  */
 function snapshotProbePomPath(groupId: string, artifactId: string, version: string): string {
   probeSeq += 1;
@@ -143,13 +144,21 @@ function snapshotProbePomPath(groupId: string, artifactId: string, version: stri
  * stream, and a PUT with no content type (curl's default for a raw body is
  * `application/x-www-form-urlencoded`) gets it consumed as form data first, which this harness found
  * out the hard way surfaces as an unrelated `malformedPomFile` 400 instead of the real status.
+ * With `literalSnapshot` a SNAPSHOT is probed under its literal name, `a-<base>-SNAPSHOT.pom`, the
+ * file a non-unique deploy (sbt) sends: unlike the timestamped one it is an override of the earlier
+ * deploy of the same version, so `allowOverride: false` refuses it.
  */
-export async function rawPublishCheck(world: World, pomBytes: Buffer): Promise<number> {
+export async function rawPublishCheck(
+  world: World,
+  pomBytes: Buffer,
+  options: { literalSnapshot?: boolean } = {},
+): Promise<number> {
   const [groupId, artifactId] = splitPackageName(world.publishTarget.packageName);
   const version = world.publishTarget.version;
-  const relPath = isSnapshotVersion(version)
-    ? snapshotProbePomPath(groupId, artifactId, version)
-    : pomPath(groupId, artifactId, version);
+  const relPath =
+    isSnapshotVersion(version) && !options.literalSnapshot
+      ? snapshotProbePomPath(groupId, artifactId, version)
+      : pomPath(groupId, artifactId, version);
 
   const res = await rawPut(
     world.repoName,
