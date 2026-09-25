@@ -32,6 +32,7 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
@@ -110,6 +111,8 @@ public abstract class AbstractNpmPackageDeleteProtocolMethodHandler
           protocolContext, revPath.scopeName(), revPath.packageName(), revPath.tarballFilename());
     }
 
-    return ResponseEntity.ok().build();
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(NpmWriteResponse.of(revPath.scopeName(), revPath.packageName()));
   }
 }
