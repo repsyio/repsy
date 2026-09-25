@@ -31,6 +31,7 @@ import type { Page } from '@playwright/test';
 import { RepoType } from '../../../src/api/panel-api.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { REPO_PAGE_SIZE, RepositoriesPage } from '../../../src/ui/pages/repositories.js';
+import { Shell } from '../../../src/ui/pages/shell.js';
 
 /** axe (WCAG 2.0/2.1 A and AA) on ONE component: the whole page still carries other debt (RPS-1266). */
 async function expectNoAxeViolations(page: Page, selector: string): Promise<void> {
@@ -128,6 +129,36 @@ test.describe('Shared components: ARIA contract', { tag: '@a11y' }, () => {
     await expect(reopened).toHaveCount(0);
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await repos.dangerModal.cancel();
+  });
+
+  // RPS-1347: the click on the header avatar used to be stopped at the button, so it never reached the row
+  // menu's outside-click handler and both menus stayed open together. A real click in Chromium also moves the
+  // focus, and the row menu closes on that (its focusout handler), which would hide the bug: the first part
+  // dispatches the click without moving the focus, as Safari does for a button, so only the click itself can close.
+  test('A11Y-02: opening the profile menu closes an open row menu, and opening a row menu closes the profile menu', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    const repos = new RepositoriesPage(adminPage);
+    await repos.goto();
+    await repos.search(repo.name);
+    const { header } = new Shell(adminPage);
+    const toggle = repos.list.inRow(repo.name, 'row-menu').getByTestId('dropdown-toggle');
+
+    const menu = await repos.list.openRowMenu(repo.name);
+    await header.avatar.dispatchEvent('click');
+    await expect(header.menu).toBeVisible();
+    await expect(menu).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    // The other way round, with a real click, and the avatar still closes its own menu.
+    await repos.list.openRowMenu(repo.name);
+    await expect(header.menu).toHaveCount(0);
+    await header.avatar.click();
+    await expect(header.menu).toBeVisible();
+    await header.avatar.click();
+    await expect(header.menu).toHaveCount(0);
   });
 
   test.describe('toasts', () => {

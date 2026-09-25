@@ -33,6 +33,7 @@ import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { renderComponent, testIds } from '../../../testing/render-spec-helpers';
 import {
   describeLastVersionDelete,
+  describePagedDelete,
   describeRepoListBehavior,
   ListFixture,
   pageOf,
@@ -162,6 +163,17 @@ describe('NugetPackagesVersionListComponent', () => {
 
       expect(router.navigate).toHaveBeenCalledOnceWith(['..'], { relativeTo: route });
       expect(nugetService.fetchPackageVersions).not.toHaveBeenCalled();
+    }));
+  });
+
+  describe('deleting from a later page or under a search (RPS-1340)', () => {
+    describePagedDelete(() => ({
+      list: build(),
+      dangerModal: dangerModalService,
+      remove: nugetService.deletePackageVersion,
+      invoke: () => component.deleteVersion(VERSION),
+      navigate: router.navigate,
+      answer: () => Promise.resolve(NuGetDeletedItem.Version),
     }));
   });
 

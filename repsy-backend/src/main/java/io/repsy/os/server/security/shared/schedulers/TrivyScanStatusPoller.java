@@ -55,13 +55,20 @@ public class TrivyScanStatusPoller {
     }
   }
 
+  /**
+   * Polls one scan. Every step, giving up on a scan that ran too long included, is inside the same
+   * try: a scan row that vanished (its repo was deleted, the foreign key is {@code on delete
+   * cascade}) or a database error while recording must cost this scan one tick at most, never the
+   * scans after it in {@link #pollActiveScans()}. {@code recordScanFailure} is an update by id, so
+   * it does not throw for a vanished row, but nothing else it might throw may stop the loop.
+   */
   private void pollScan(final @NonNull VulnerabilityScan scan) {
-    if (this.hasExceededMaxDuration(scan)) {
-      this.scanTxService.recordScanFailure(scan.getId(), "Scan exceeded maximum duration");
-      return;
-    }
-
     try {
+      if (this.hasExceededMaxDuration(scan)) {
+        this.scanTxService.recordScanFailure(scan.getId(), "Scan exceeded maximum duration");
+        return;
+      }
+
       final var status = this.statusClient.fetchStatus(scan.getId());
       this.applyStatus(scan, status);
     } catch (final ScanJobNotFoundException exception) {
