@@ -47,6 +47,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
@@ -93,7 +94,24 @@ class NpmPublishProtocolIT extends AbstractIntegrationTest {
 
   private MockHttpServletResponse protocol(final AbstractMockHttpServletRequestBuilder<?> request)
       throws Exception {
-    return this.mockMvc.perform(request.with(protocolPort())).andReturn().getResponse();
+    return this.mockMvc
+        .perform(request.with(protocolPort()).with(seenAt("http", "localhost", 9090)))
+        .andReturn()
+        .getResponse();
+  }
+
+  /**
+   * The address a client reached the server at, as Tomcat reports it once it has applied the
+   * forwarded headers: MockMvc does not run the servlet container's valves.
+   */
+  private static RequestPostProcessor seenAt(
+      final String scheme, final String host, final int port) {
+    return request -> {
+      request.setScheme(scheme);
+      request.setServerName(host);
+      request.setServerPort(port);
+      return request;
+    };
   }
 
   /** Builds an npm publish body the way a real client would: one version, one tarball. */
@@ -360,6 +378,204 @@ class NpmPublishProtocolIT extends AbstractIntegrationTest {
       final var downloaded = NpmPublishProtocolIT.this.download(tarballUrl);
       assertThat(downloaded.getStatus()).isEqualTo(200);
       assertThat(downloaded.getContentAsByteArray()).isEqualTo(secondTarball);
+    }
+  }
+
+  @Nested
+  @DisplayName("RPS-1333: dist.tarball is the address the registry is reached at")
+  class RegistryTarballUrl {
+
+    private static final String NPM_ABBREVIATED = "application/vnd.npm.install-v1+json";
+
+    private MockHttpServletResponse at(
+        final AbstractMockHttpServletRequestBuilder<?> request,
+        final String scheme,
+        final String host,
+        final int port)
+        throws Exception {
+
+      return NpmPublishProtocolIT.this
+          .mockMvc
+          .perform(
+              request
+                  .header(AUTHORIZATION, NpmPublishProtocolIT.this.adminProtocolBearerToken())
+                  .with(protocolPort())
+                  .with(seenAt(scheme, host, port)))
+          .andReturn()
+          .getResponse();
+    }
+
+    @SuppressWarnings("unchecked")
+    private String tarballOf(final MockHttpServletResponse response, final String version)
+        throws Exception {
+      assertThat(response.getStatus()).isEqualTo(200);
+
+      final var packument =
+          NpmPublishProtocolIT.this.objectMapper.readValue(
+              response.getContentAsString(StandardCharsets.UTF_8),
+              new TypeReference<Map<String, Object>>() {});
+      final var versions = (Map<String, Object>) packument.get("versions");
+      final var dist =
+          (Map<String, Object>) ((Map<String, Object>) versions.get(version)).get("dist");
+
+      return (String) dist.get("tarball");
+    }
+
+    private void publishAt(
+        final Repo repo,
+        final String packageName,
+        final String version,
+        final String clientsTarballUrl,
+        final String scheme,
+        final String host,
+        final int port)
+        throws Exception {
+
+      final var response =
+          this.at(
+              put(PUBLISH_PATH, repo.getName(), packageName)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      NpmPublishProtocolIT.this.publishBody(
+                          packageName,
+                          version,
+                          clientsTarballUrl,
+                          "bytes".getBytes(StandardCharsets.UTF_8),
+                          null,
+                          null)),
+              scheme,
+              host,
+              port);
+
+      assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName(
+        "a publish through another address is served under the reader's, full and abbreviated")
+    void servedUnderTheReadersAddress() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var pkg = "rps1333-demo";
+
+      // libnpmpublish writes http:// even for an HTTPS registry, and the publisher used an address
+      // the reader cannot reach.
+      this.publishAt(
+          repo,
+          pkg,
+          "1.0.0",
+          "http://publisher.internal:9090/"
+              + repo.getName()
+              + "/"
+              + pkg
+              + "/-/"
+              + pkg
+              + "-1.0.0.tgz",
+          "https",
+          "repo.example.test",
+          443);
+
+      final var expected =
+          "https://repo.example.test/" + repo.getName() + "/" + pkg + "/-/" + pkg + "-1.0.0.tgz";
+      final var full =
+          this.at(get(PUBLISH_PATH, repo.getName(), pkg), "https", "repo.example.test", 443);
+      final var abbreviated =
+          this.at(
+              get(PUBLISH_PATH, repo.getName(), pkg).header("Accept", NPM_ABBREVIATED),
+              "https",
+              "repo.example.test",
+              443);
+
+      assertThat(this.tarballOf(full, "1.0.0")).isEqualTo(expected);
+      assertThat(this.tarballOf(abbreviated, "1.0.0")).isEqualTo(expected);
+
+      final var elsewhere =
+          this.at(get(PUBLISH_PATH, repo.getName(), pkg), "http", "localhost", 9090);
+
+      assertThat(this.tarballOf(elsewhere, "1.0.0"))
+          .as("read from another address, the same file names that one")
+          .isEqualTo(
+              "http://localhost:9090/" + repo.getName() + "/" + pkg + "/-/" + pkg + "-1.0.0.tgz");
+    }
+
+    @Test
+    @DisplayName("every version of a package follows the reader, whichever address published it")
+    void everyVersionFollowsTheReader() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var pkg = "rps1333-many";
+
+      this.publishAt(
+          repo,
+          pkg,
+          "1.0.0",
+          "http://a.internal:9090/x/" + pkg + "/-/" + pkg + "-1.0.0.tgz",
+          "http",
+          "a.internal",
+          9090);
+      this.publishAt(
+          repo,
+          pkg,
+          "1.1.0",
+          "http://b.internal:9090/x/" + pkg + "/-/" + pkg + "-1.1.0.tgz",
+          "http",
+          "b.internal",
+          9090);
+
+      final var response =
+          this.at(get(PUBLISH_PATH, repo.getName(), pkg), "https", "repo.example.test", 443);
+      final var body = response.getContentAsString(StandardCharsets.UTF_8);
+
+      assertThat(body)
+          .contains(
+              "https://repo.example.test/"
+                  + repo.getName()
+                  + "/"
+                  + pkg
+                  + "/-/"
+                  + pkg
+                  + "-1.0.0.tgz",
+              "https://repo.example.test/"
+                  + repo.getName()
+                  + "/"
+                  + pkg
+                  + "/-/"
+                  + pkg
+                  + "-1.1.0.tgz")
+          .doesNotContain("a.internal", "b.internal");
+    }
+
+    @Test
+    @DisplayName("a scoped package's URL has the scope in the path and none in the file name")
+    void scopedPackage() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var packageName = "@rps1333/scoped";
+
+      this.publishAt(
+          repo,
+          packageName,
+          "1.0.0",
+          "http://publisher.internal:9090/"
+              + repo.getName()
+              + "/@rps1333/scoped/-/@rps1333/scoped-1.0.0.tgz",
+          "http",
+          "publisher.internal",
+          9090);
+
+      final var response =
+          this.at(
+              get(PUBLISH_PATH, repo.getName(), packageName), "https", "repo.example.test", 443);
+      final var tarballUrl = this.tarballOf(response, "1.0.0");
+
+      assertThat(tarballUrl)
+          .isEqualTo(
+              "https://repo.example.test/"
+                  + repo.getName()
+                  + "/@rps1333/scoped/-/scoped-1.0.0.tgz");
+
+      final var downloaded = NpmPublishProtocolIT.this.download(tarballUrl);
+
+      assertThat(downloaded.getStatus()).isEqualTo(200);
+      assertThat(downloaded.getContentAsByteArray())
+          .isEqualTo("bytes".getBytes(StandardCharsets.UTF_8));
     }
   }
 

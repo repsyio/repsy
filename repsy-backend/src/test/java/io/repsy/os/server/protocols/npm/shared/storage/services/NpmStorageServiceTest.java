@@ -16,14 +16,19 @@
 package io.repsy.os.server.protocols.npm.shared.storage.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import io.repsy.libs.storage.core.services.StorageStrategy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * RPS-1300: the address a rebuilt {@code dist.tarball} points at is the registry's, whichever port
- * the request that triggered the rebuild came in on.
+ * the request that triggered the rebuild came in on. RPS-1333: the same address names every version
+ * served or published, and a configured public URL takes the request's place.
  */
 @DisplayName("NpmStorageService registry address (RPS-1300)")
 class NpmStorageServiceTest {
@@ -39,6 +44,42 @@ class NpmStorageServiceTest {
     request.setLocalPort(localPort);
 
     return request;
+  }
+
+  private static NpmStorageService serviceWithPublicUrl(final String publicUrl) {
+    return new NpmStorageService(mock(StorageStrategy.class), REPO_PORT, publicUrl);
+  }
+
+  @Test
+  @DisplayName("the configured public URL wins, without its trailing slash, request or none")
+  void publicUrlWins() {
+    final var service = serviceWithPublicUrl(" https://repo.example.test/repsy/ ");
+
+    assertThat(service.registryBaseUrl()).isEqualTo("https://repo.example.test/repsy");
+
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(request("http", "10.0.0.5", 9090, 9090)));
+    try {
+      assertThat(service.registryBaseUrl()).isEqualTo("https://repo.example.test/repsy");
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
+  }
+
+  @Test
+  @DisplayName("without a public URL the request decides, and outside a request nothing does")
+  void requestDecidesWithoutPublicUrl() {
+    final var service = serviceWithPublicUrl("");
+
+    assertThat(service.registryBaseUrl()).isNull();
+
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(request("https", "repo.test", 443, 8080)));
+    try {
+      assertThat(service.registryBaseUrl()).isEqualTo("https://repo.test");
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
   }
 
   @Test

@@ -77,6 +77,13 @@ multiport:
     9443: ""
 
 repsy:
+  npm:
+    # The address the npm registry names itself with in the `dist.tarball` of every version it serves
+    # or stores, e.g. https://repo.example.com (a path prefix is fine). Empty (the default) derives it
+    # from each request (Host and X-Forwarded-* headers). Set it when a reverse proxy strips a path
+    # prefix or cannot send those headers, so that clients fetch tarballs from where they found the
+    # registry (RPS-1333). It is the REPO_BASE_URL of the web UI's config snippets.
+    public-url: ${REPO_BASE_URL:}
   golang:
     # Largest module zip a `go` client may publish. The zip is the raw request body, which the
     # multipart limits above do not apply to, so a larger one is answered with 413 payloadTooLarge.

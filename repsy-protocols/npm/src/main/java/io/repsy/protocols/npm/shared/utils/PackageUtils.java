@@ -245,6 +245,67 @@ public final class PackageUtils {
             + fileName);
   }
 
+  /**
+   * The address of a version's tarball in the registry: {@code <base>/<repoName>/<fullName>/-/<bare
+   * name>-<version>.tgz}, the layout every client and {@code
+   * AbstractNpmPackageDownloadProtocolMethodHandler} agree on. A trailing slash on {@code base} is
+   * dropped, and the base may carry a path prefix.
+   */
+  public static String buildTarballUrl(
+      final String base, final String repoName, final String fullName, final String versionName) {
+
+    return base.replaceAll("/+$", "")
+        + "/"
+        + repoName
+        + "/"
+        + fullName
+        + "/-/"
+        + getTarballFilename(bareName(fullName), versionName);
+  }
+
+  /**
+   * Points every version's {@code dist.tarball} at the registry address {@code base}, whatever the
+   * publisher sent (its host, its port, the {@code http://} that libnpmpublish and yarn classic
+   * write for an HTTPS registry). Clients fetch the URL as served and withhold their credentials
+   * from another origin, so the registry has to name itself, as every other npm registry does. A
+   * version with no {@code dist.tarball} is left as it is, and a version without a {@code name} of
+   * its own takes the package's.
+   */
+  public static void rewriteTarballUrls(
+      final Map<String, Object> metadata, final String base, final String repoName) {
+
+    if (!(metadata.get(NpmConstants.VERSIONS) instanceof final Map<?, ?> versions)) {
+      return;
+    }
+
+    final var packageName = metadata.get(NpmConstants.NAME);
+
+    for (final var entry : versions.entrySet()) {
+      if (entry.getKey() instanceof final String versionName
+          && entry.getValue() instanceof final Map<?, ?> version) {
+        rewriteTarballUrl(version, packageName, versionName, base, repoName);
+      }
+    }
+  }
+
+  private static void rewriteTarballUrl(
+      final Map<?, ?> version,
+      final @Nullable Object packageName,
+      final String versionName,
+      final String base,
+      final String repoName) {
+
+    final var fullName =
+        version.get(NpmConstants.NAME) instanceof final String own ? own : packageName;
+
+    if (version.get("dist") instanceof final Map<?, ?> dist
+        && dist.containsKey(NpmConstants.TARBALL)
+        && fullName instanceof final String name) {
+      ((Map<String, Object>) dist)
+          .put(NpmConstants.TARBALL, buildTarballUrl(base, repoName, name, versionName));
+    }
+  }
+
   private static String bareName(final String packageName) {
 
     final var slash = packageName.indexOf('/');

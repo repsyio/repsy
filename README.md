@@ -497,6 +497,8 @@ If that happens, Repsy fails safe: the limit is generous (20 failures in 60 seco
 
 > **Note:** The web UI's "how to connect" config snippets for repository operations (Maven, npm, pip, etc.) use the `REPO_BASE_URL` environment variable, resolved at container startup — set it to your public repository-operations URL (e.g. `https://repo.example.com`) when running behind a reverse proxy.
 
+**npm tarball URLs.** The npm registry names itself in the `dist.tarball` of every version it serves, whatever host, port or scheme the publisher used (the npm CLI and Yarn 1 write `http://` even for an HTTPS registry). It takes the address from `REPO_BASE_URL` (the `repsy.npm.public-url` property) when that is set, and otherwise from each request (`Host` and the `X-Forwarded-*` headers above). Set `REPO_BASE_URL` when your proxy strips a path prefix or cannot send those headers, and when the proxy is not a trusted one, because the address cannot be derived from the request there. Nothing has to be migrated: versions published earlier are served with the new address too.
+
 ## Usage
 
 ### First Login
