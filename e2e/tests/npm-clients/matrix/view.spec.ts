@@ -21,7 +21,7 @@
  * NOW, not a shifted local time: pnpm's `minimumReleaseAge` and berry's `npmMinimalAgeGate` trust it)
  * -- and pins what the served document also carries:
  *
- * candidate (NC2): the full packument carries `_attachments`, the base64 body of the most recent
+ * RPS-1357: the full packument carries `_attachments`, the base64 body of the most recent
  * publish's tarball, and the `_from`/`_resolved` fields npm's `publish <tarball>` adds (a local path
  * of the publisher's machine), in every read. The public registry's packument has none of them. A
  * package's packument therefore grows by its latest tarball's size on every read, and leaks the
@@ -96,7 +96,7 @@ for (const client of clientsWith('viewCmd')) {
         'the publish time is now',
       ).toBeLessThan(MAX_CLOCK_SKEW_MS);
 
-      // candidate (NC2): what the served full packument also carries.
+      // RPS-1357: what the served full packument also carries.
       const raw = await rawGetPackument(repo.name, adminCredential(), name);
       const served = JSON.parse(raw.body.toString('utf8')) as {
         _attachments?: Record<string, { data?: string; length?: number }>;
@@ -104,7 +104,7 @@ for (const client of clientsWith('viewCmd')) {
       };
       expect(
         Object.keys(served._attachments ?? {}),
-        "candidate (NC2): the packument carries the latest publish's tarball as _attachments",
+        "RPS-1357: the packument carries the latest publish's tarball as _attachments",
       ).toEqual([`${name}-1.0.0.tgz`]);
       expect(served._attachments?.[`${name}-1.0.0.tgz`]?.data).toBe(
         published.tarball.bytes.toString('base64'),
@@ -112,7 +112,7 @@ for (const client of clientsWith('viewCmd')) {
       // `npm publish <tarball>` adds `_from`/`_resolved` (the tarball's local path) to the manifest.
       expect(
         String(served.versions['1.0.0']?._resolved ?? '').includes(published.tarball.file),
-        "candidate (NC2): npm's _resolved (the publisher's local tarball path) is served",
+        "RPS-1357: npm's _resolved (the publisher's local tarball path) is served",
       ).toBe(LEAKS_LOCAL_TARBALL_PATH.has(client.id));
     },
   );

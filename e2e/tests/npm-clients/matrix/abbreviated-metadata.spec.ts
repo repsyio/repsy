@@ -21,7 +21,7 @@
  * compared to the full one, and what each client does with a platform-restricted optional
  * dependency.
  *
- * candidate (NC1): the abbreviated document is built by `AbstractNpmStorageService.
+ * RPS-1356: the abbreviated document is built by `AbstractNpmStorageService.
  * createAbbreviatedMetadata` from a fixed field list that lacks `os`, `cpu`, `libc`,
  * `peerDependenciesMeta` and `funding` (and `hasInstallScript`), all of which the npm
  * abbreviated-metadata format carries and clients read from it. A client that trusts the
@@ -119,7 +119,7 @@ for (const client of clientsWith('publish')) {
       for (const field of PLATFORM_FIELDS) {
         expect(
           abbreviated[field],
-          `candidate (NC1): the abbreviated packument drops "${field}"`,
+          `RPS-1356: the abbreviated packument drops "${field}"`,
         ).toBeUndefined();
       }
     },

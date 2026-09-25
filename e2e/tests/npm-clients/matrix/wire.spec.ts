@@ -22,12 +22,12 @@
  * `_auth` is `Basic`), the client's own identification, and that its tarball fetch carries the
  * credential too.
  *
- * candidate (NC4): the packument answers with no `ETag`, no `Last-Modified` and no `Vary: Accept`
+ * RPS-1359: the packument answers with no `ETag`, no `Last-Modified` and no `Vary: Accept`
  * (the abbreviated and the full document share one URL), so a client cannot revalidate its metadata
  * cache with a conditional request and a shared cache cannot tell the two documents apart; and no
  * compression. Observed live and asserted as it is.
  *
- * candidate (NC3): npm `HEAD` answers 200 for ANY path of an existing repository, including a
+ * RPS-1358: npm `HEAD` answers 200 for ANY path of an existing repository, including a
  * package that does not exist (the same class as the PyPI and Ruby HEAD findings); a `GET` of the
  * same path is 404.
  */
@@ -53,7 +53,7 @@ import type { Seeder } from '../../../src/seed/seeder.js';
  * What each client sends with a packument GET: its `Accept`, `User-Agent` and `npm-command`
  * (`undefined`: none is sent). Probed, not remembered: npm 11.19 asks for the FULL packument
  * (`Accept: application/json`) on an install, not the abbreviated install document the plan
- * expected, so candidate NC1 (the abbreviated document's missing fields) is not what npm reads.
+ * expected, so RPS-1356 (the abbreviated document's missing fields) is not what npm reads.
  */
 const IDENTITY: Partial<
   Record<ClientId, { accept: RegExp; userAgent: RegExp; npmCommand?: string }>
@@ -127,19 +127,13 @@ for (const client of clientsWith('frozenInstall')) {
           expect(packument?.ifNoneMatch, 'a first fetch is unconditional').toBeUndefined();
           expect(packument?.status).toBe(200);
 
-          // candidate (NC4): nothing to revalidate with, nothing to key a cache on.
-          expect(packument?.responseEtag, 'candidate (NC4): no ETag').toBeUndefined();
-          expect(
-            packument?.responseLastModified,
-            'candidate (NC4): no Last-Modified',
-          ).toBeUndefined();
-          expect(packument?.responseVary ?? '', 'candidate (NC4): no Vary: Accept').not.toMatch(
+          // RPS-1359: nothing to revalidate with, nothing to key a cache on.
+          expect(packument?.responseEtag, 'RPS-1359: no ETag').toBeUndefined();
+          expect(packument?.responseLastModified, 'RPS-1359: no Last-Modified').toBeUndefined();
+          expect(packument?.responseVary ?? '', 'RPS-1359: no Vary: Accept').not.toMatch(
             /accept\b/i,
           );
-          expect(
-            packument?.responseContentEncoding,
-            'candidate (NC4): not compressed',
-          ).toBeUndefined();
+          expect(packument?.responseContentEncoding, 'RPS-1359: not compressed').toBeUndefined();
         } finally {
           await recorder.stop();
         }
@@ -162,7 +156,7 @@ test(
     expect(get.status, 'GET of a package that does not exist').toBe(404);
 
     const head = await fetch(missing, { method: 'HEAD', headers });
-    expect(head.status, 'candidate (NC3): HEAD of the same path is 200').toBe(200);
+    expect(head.status, 'RPS-1358: HEAD of the same path is 200').toBe(200);
 
     // Control: a repository that does not exist is 404 for HEAD as well, so the answer is per
     // repository and never per package.
