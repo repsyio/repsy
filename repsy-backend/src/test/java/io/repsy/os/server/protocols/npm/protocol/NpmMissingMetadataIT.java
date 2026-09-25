@@ -152,6 +152,8 @@ class NpmMissingMetadataIT extends AbstractIntegrationTest {
     final var name = uniqueRepoName("npm-lost");
     final var created = this.repoTxService.createRepo(name, RepoType.NPM, false, null);
     this.createdRepoIds.add(created.getId());
+    // No scan, no scan thread through the strategy spy the tests stub (RPS-1336, RPS-1341).
+    this.disableSecurityScan(created.getId());
     this.npmStorageService.createRepo(created.getId());
 
     return this.repoRepository.findByName(name).orElseThrow();
