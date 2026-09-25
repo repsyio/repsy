@@ -46,10 +46,15 @@ class StorageTrashCleanupTaskTest {
 
   private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
   private Logger taskLogger;
+  private Level originalLevel;
 
   @BeforeEach
   void attachLogAppender() {
     this.taskLogger = (Logger) LoggerFactory.getLogger(StorageTrashCleanupTask.class);
+    // Another test in the same JVM may have raised the level (a Spring context applies the logging
+    // config), which would drop the INFO events this test reads.
+    this.originalLevel = this.taskLogger.getLevel();
+    this.taskLogger.setLevel(Level.INFO);
     this.logAppender.start();
     this.taskLogger.addAppender(this.logAppender);
   }
@@ -57,6 +62,7 @@ class StorageTrashCleanupTaskTest {
   @AfterEach
   void detachLogAppender() {
     this.taskLogger.detachAppender(this.logAppender);
+    this.taskLogger.setLevel(this.originalLevel);
   }
 
   private static Map<String, StorageStrategy> strategies(final StorageStrategy... strategies) {
