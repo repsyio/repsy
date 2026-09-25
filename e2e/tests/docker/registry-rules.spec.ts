@@ -214,8 +214,13 @@ test.describe('docker registry rules (raw HTTP)', () => {
       expect(expiredTok.status, 'an expired token is refused at the TOKEN hop').toBe(401);
       expect(
         expiredTok.wwwAuthenticate,
-        "the token endpoint's own bodyless Basic challenge",
+        "the token endpoint's own Basic challenge",
       ).toContain('Basic realm=');
+      // RPS-1435: the client prints "unauthorized: <message>", so the cause is in the body.
+      expect(ociErrorOf(expiredTok.body)?.code, 'an OCI UNAUTHORIZED body').toBe('UNAUTHORIZED');
+      expect(ociErrorOf(expiredTok.body)?.message, 'the expiry is named').toBe(
+        'Deploy token expired.',
+      );
 
       const wrongPassword = {
         transport: 'basic' as const,
@@ -225,6 +230,20 @@ test.describe('docker registry rules (raw HTTP)', () => {
       };
       const wrongTok = await rawToken(wrongPassword, pushScope(layout.repoName, layout.image));
       expect(wrongTok.status, 'a wrong password is refused at the token hop').toBe(401);
+      // RPS-1435: a message instead of the empty "unauthorized: ", and the generic one -- an unknown
+      // user must read the same, or the message would tell whether an account exists.
+      const wrongOci = ociErrorOf(wrongTok.body);
+      expect(wrongOci?.code, 'an OCI UNAUTHORIZED body').toBe('UNAUTHORIZED');
+      expect(wrongOci?.message, 'a message the client can print').toMatch(/credentials/);
+      const unknownUserTok = await rawToken(
+        { ...wrongPassword, username: `${env.adminUsername}-nobody` },
+        pushScope(layout.repoName, layout.image),
+      );
+      expect(unknownUserTok.status).toBe(401);
+      expect(
+        ociErrorOf(unknownUserTok.body),
+        'an unknown user reads exactly like a wrong password',
+      ).toEqual(wrongOci);
 
       const noAuthPush = await rawToken({}, pushScope(layout.repoName, layout.image));
       expect(noAuthPush.status, 'no credentials, a push scope -> 401').toBe(401);
@@ -890,8 +909,8 @@ test.describe('docker registry rules (raw HTTP)', () => {
   );
 
   test(
-    'a PUBLIC repo still requires real credentials to write (refused at the token hop, no OCI ' +
-      'body -- unlike an operation-hop 401)',
+    'a PUBLIC repo still requires real credentials to write (refused at the token hop, with the ' +
+      "token endpoint's own OCI body and Basic challenge)",
     {
       tag: ['@auth', '@negative'],
     },
@@ -904,9 +923,12 @@ test.describe('docker registry rules (raw HTTP)', () => {
           'public repo',
       ).toBe('token');
       expect(upload.status).toBe(401);
-      // The token endpoint's own failure carries NO OCI envelope at all (unlike an operation-hop
-      // 401) -- confirmed live, see docker-raw.ts's file header.
-      expect(ociErrorOf(upload.body), "the token hop's 401 has no OCI body").toBeUndefined();
+      // RPS-1435: the token endpoint's own failure carries an OCI envelope (it was empty, and the
+      // client printed "unauthorized: "), with a Basic challenge instead of an operation-hop 401's
+      // Bearer one.
+      expect(ociErrorOf(upload.body)?.code, "the token hop's 401 has an OCI body").toBe(
+        'UNAUTHORIZED',
+      );
     },
   );
 });
