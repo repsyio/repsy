@@ -133,7 +133,7 @@ test(
 );
 
 test(
-  'pnpm skips a deprecated version when resolving a range (candidate NC5: deprecated "" after undeprecate)',
+  'pnpm skips a deprecated version when resolving a range (RPS-1360: deprecated "" after undeprecate)',
   {
     tag: ['@pnpm', '@resolution', '@deprecate'],
   },
@@ -157,7 +157,7 @@ test(
     const undeprecated = await pnpmClient.deprecate?.(writer, `${published.name}@1.2.0`, '');
     expect(undeprecated?.exitCode, `undeprecate: ${undeprecated?.stderr}`).toBe(0);
 
-    // Candidate NC5: undeprecating leaves `"deprecated": ""` in the served packument (the public
+    // RPS-1360: undeprecating leaves `"deprecated": ""` in the served packument (the public
     // registry drops the field), and pnpm treats a version that HAS the field, empty or not, as
     // deprecated: the range still skips 1.2.0. When the backend drops the field, this reads 1.2.0.
     const served = JSON.parse(
@@ -165,12 +165,10 @@ test(
         await rawGetPackument(published.repoName, adminCredential(), published.name, true)
       ).body.toString('utf8'),
     ) as { versions: Record<string, { deprecated?: string }> };
-    expect(served.versions['1.2.0']?.deprecated, 'candidate NC5: the empty field is served').toBe(
-      '',
-    );
+    expect(served.versions['1.2.0']?.deprecated, 'RPS-1360: the empty field is served').toBe('');
     expect(
       await (await consumerOf(seeder, published, 'undeprecated', '^1.0.0')).marker(),
-      'candidate NC5: pnpm still skips the undeprecated 1.2.0',
+      'RPS-1360: pnpm still skips the undeprecated 1.2.0',
     ).toBe(published.markers['1.1.0']);
   },
 );

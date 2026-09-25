@@ -27,7 +27,7 @@
  *  - `pnpm login` first tries npm's web login, `POST /-/v1/login`, which Repsy does not have (404), and
  *    without a terminal it cannot fall back to prompting for a name and password.
  *  - `pnpm logout` asks the registry to revoke the token (`DELETE /-/user/token/<token>`), which
- *    Repsy does not implement (404), and pnpm then FAILS the command (candidate NC6: the token stays
+ *    Repsy does not implement (404), and pnpm then FAILS the command (RPS-1361: the token stays
  *    valid, and `pnpm logout` exits 1).
  */
 import { createHash } from 'node:crypto';
@@ -228,7 +228,7 @@ test(
 );
 
 test(
-  'pnpm logout fails and the token stays valid: no DELETE /-/user/token/<token> (candidate NC6)',
+  'pnpm logout fails and the token stays valid: no DELETE /-/user/token/<token> (RPS-1361)',
   {
     tag: ['@pnpm', '@commands', '@logout', '@negative'],
   },
@@ -245,7 +245,7 @@ test(
       const logout = await runPnpm(ctx, 'pnpm-logout', ['logout']);
       expect(
         logout.exitCode,
-        'candidate NC6: pnpm fails the logout when the revocation is refused',
+        'RPS-1361: pnpm fails the logout when the revocation is refused',
       ).toBe(1);
       expect(logout.stderr).toContain('ERR_PNPM_LOGOUT_FAILED');
       expect(logout.stdout).toContain('HTTP 404 when revoking token');
@@ -255,7 +255,7 @@ test(
       ]);
       expect(
         recorder.entries[0]?.status,
-        'candidate NC6: the registry has no token revocation route',
+        'RPS-1361: the registry has no token revocation route',
       ).toBe(404);
 
       const whoami = await pnpmClient.whoami?.(ctx);

@@ -1062,15 +1062,15 @@ repository path** (pnpm keeps only the registry's origin for this URL), a harmle
 `pnpm login` first POSTs the web login `/-/v1/login` (404 in Repsy) and, with no terminal, stops with
 `ERR_PNPM_LOGIN_NON_INTERACTIVE`; the prompt path needs a TTY the harness has no way to give (P3, as the
 plan said). `pnpm logout` sends `DELETE /-/user/token/<token>`, gets 404 and **exits 1**
-(`ERR_PNPM_LOGOUT_FAILED`), and the token keeps working (candidate NC6).
+(`ERR_PNPM_LOGOUT_FAILED`), and the token keeps working (RPS-1361).
 
 **Backend candidates found here** (new; not filed yet, the parent files them and replaces the `NCn` keys):
 
-- **NC5**: after `npm/pnpm deprecate <pkg>@<ver> ""` the packument still serves `"deprecated": ""`. The
+- **RPS-1360**: after `npm/pnpm deprecate <pkg>@<ver> ""` the packument still serves `"deprecated": ""`. The
   existing deprecate cell tolerates that (`[undefined, '']`), but pnpm 12 treats a version that has the field
   at all as deprecated, so a range keeps skipping the un-deprecated version (`resolution.spec.ts`).
   Serving no field is what npm's own semantics ask for.
-- **NC6**: no `DELETE /-/user/token/<token>` (token revocation): `pnpm logout` fails, and a deploy token can
+- **RPS-1361**: no `DELETE /-/user/token/<token>` (token revocation): `pnpm logout` fails, and a deploy token can
   not be revoked from a client (`commands.spec.ts`).
 
 Still open and only observed, not asserted as fixed: RPS-1356, 1357, 1358, 1359, 1343, 1344, 1345.
