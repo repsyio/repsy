@@ -20,7 +20,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -127,7 +129,7 @@ public record NpmSearchQuery(
   }
 
   /** The same query without the {@code insecure} filter, for a repository that is not scanned. */
-  public NpmSearchQuery withInsecure(final @Nullable Boolean insecure) {
+  public NpmSearchQuery withInsecure(final @Nullable Boolean value) {
     return new NpmSearchQuery(
         this.terms,
         this.scope,
@@ -136,7 +138,7 @@ public record NpmSearchQuery(
         this.maintainers,
         this.deprecated,
         this.unstable,
-        insecure,
+        value,
         this.boostExact,
         this.matchesNothing,
         this.size,
@@ -162,6 +164,16 @@ public record NpmSearchQuery(
     private boolean seenToken;
     private boolean filtersOnSomething;
 
+    private final Map<String, Consumer<String>> qualifiers =
+        Map.of(
+            SCOPE_QUALIFIER, this::acceptScope,
+            KEYWORDS_QUALIFIER, value -> this.acceptAll(this.keywords, value),
+            AUTHOR_QUALIFIER, value -> this.acceptAll(this.authors, value),
+            MAINTAINER_QUALIFIER, value -> this.acceptAll(this.maintainers, value),
+            IS_QUALIFIER, value -> this.acceptFlag(value, true),
+            NOT_QUALIFIER, value -> this.acceptFlag(value, false),
+            BOOST_EXACT_QUALIFIER, this::acceptBoostExact);
+
     void accept(final String token) {
       if (token.isEmpty()) {
         return;
@@ -169,22 +181,13 @@ public record NpmSearchQuery(
 
       this.seenToken = true;
 
-      if (token.startsWith(SCOPE_QUALIFIER)) {
-        this.acceptScope(token.substring(SCOPE_QUALIFIER.length()));
-      } else if (token.startsWith(KEYWORDS_QUALIFIER)) {
-        this.acceptAll(this.keywords, token.substring(KEYWORDS_QUALIFIER.length()));
-      } else if (token.startsWith(AUTHOR_QUALIFIER)) {
-        this.acceptAll(this.authors, token.substring(AUTHOR_QUALIFIER.length()));
-      } else if (token.startsWith(MAINTAINER_QUALIFIER)) {
-        this.acceptAll(this.maintainers, token.substring(MAINTAINER_QUALIFIER.length()));
-      } else if (token.startsWith(IS_QUALIFIER)) {
-        this.acceptFlag(token.substring(IS_QUALIFIER.length()), true);
-      } else if (token.startsWith(NOT_QUALIFIER)) {
-        this.acceptFlag(token.substring(NOT_QUALIFIER.length()), false);
-      } else if (token.startsWith(BOOST_EXACT_QUALIFIER)) {
-        this.acceptBoostExact(token.substring(BOOST_EXACT_QUALIFIER.length()));
-      } else {
+      final var colon = token.indexOf(':');
+      final var qualifier = colon < 0 ? null : this.qualifiers.get(token.substring(0, colon + 1));
+
+      if (qualifier == null) {
         this.acceptTerm(token);
+      } else {
+        qualifier.accept(token.substring(colon + 1));
       }
     }
 
