@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -37,6 +38,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
@@ -47,13 +49,20 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -83,6 +92,10 @@ import org.springframework.core.io.Resource;
  *
  * <p>RPS-1199: what can still fail after the store is the registration itself. A new POM (or POM
  * signature) is taken back out of the repo and not charged then, a redeploy stays and is charged.
+ *
+ * <p>RPS-1437: a POM that registered a version has it added to the artifact-level {@code
+ * maven-metadata.xml} that is stored, when that lacks it. The rewrite's usage is added to the POM's
+ * and a failure of it never fails the upload.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractMavenProtocolFacade upload")
@@ -986,5 +999,153 @@ class AbstractMavenProtocolFacadeTest {
     verify(this.storageService, never()).deleteFile(any());
     assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage())
         .isEqualTo(VALID_POM.length());
+  }
+
+  private static final String LIB_METADATA_PATH = "com/example/lib/maven-metadata.xml";
+
+  /** Answers {@code delta} to the append and remembers what the version supplier it got says. */
+  private void appendReports(final long delta, final List<Collection<String>> asked)
+      throws Exception {
+    when(this.storageService.addVersionsToMetadata(
+            any(), anyString(), anyString(), any(Supplier.class)))
+        .thenAnswer(
+            invocation -> {
+              asked.add(invocation.<Supplier<Collection<String>>>getArgument(3).get());
+              return delta;
+            });
+  }
+
+  @Test
+  @DisplayName(
+      "adds the version of a registered POM to the stored metadata after registering it, asks for"
+          + " the registered versions of that artifact and adds the rewrite to the usage"
+          + " (RPS-1437)")
+  void appendsTheRegisteredVersionsToTheStoredMetadata() throws Exception {
+    requestFor(POM_PATH);
+    deployIsAllowed();
+    storageReportsUsage(VALID_POM.length());
+    pomIsNewInTheRepo(false);
+    when(this.artifactService.getRegisteredVersions(this.repoInfo, "com.example", "lib"))
+        .thenReturn(
+            List.of(
+                new RegisteredVersion("1.0", Instant.EPOCH),
+                new RegisteredVersion("2.0-SNAPSHOT", null)));
+    final List<Collection<String>> asked = new ArrayList<>();
+    appendReports(-25, asked);
+
+    upload(VALID_POM);
+
+    final var order = inOrder(this.artifactService, this.storageService);
+    order.verify(this.artifactService).createOrUpdateArtifact(any(), any(), any());
+    order
+        .verify(this.storageService)
+        .addVersionsToMetadata(eq(this.repoInfo), eq("com.example"), eq("lib"), any());
+    assertThat(asked).singleElement().isEqualTo(List.of("1.0", "2.0-SNAPSHOT"));
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage())
+        .isEqualTo(VALID_POM.length() - 25L);
+  }
+
+  @Test
+  @DisplayName(
+      "appends for the POM of a snapshot build under the artifact it belongs to (RPS-1437)")
+  void appendsForTheTimestampedPomOfASnapshot() throws Exception {
+    requestFor("com/example/lib/1.0-SNAPSHOT/lib-1.0-20260101.101010-1.pom");
+    deployIsAllowed();
+    storageReportsUsage(VALID_POM.length());
+    pomIsNewInTheRepo(false);
+
+    upload(VALID_POM.replace("<version>1.0</version>", "<version>1.0-SNAPSHOT</version>"));
+
+    verify(this.storageService)
+        .addVersionsToMetadata(eq(this.repoInfo), eq("com.example"), eq("lib"), any());
+  }
+
+  static Stream<Arguments> appendFailures() {
+    return Stream.of(
+        Arguments.of("an unparsable stored file", new BadRequestException("malformedMetadataFile")),
+        Arguments.of("a storage error", new UncheckedIOException(new IOException("disk"))),
+        Arguments.of("a database error", new IllegalStateException("database is down")),
+        Arguments.of("an IO error", new IOException("disk is full")));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("appendFailures")
+  @DisplayName(
+      "answers a success and charges the POM alone when the append fails, the version is"
+          + " registered already (RPS-1437)")
+  void anAppendFailureNeverFailsTheUpload(final String label, final Exception failure)
+      throws Exception {
+    requestFor(POM_PATH);
+    deployIsAllowed();
+    storageReportsUsage(VALID_POM.length());
+    pomIsNewInTheRepo(false);
+    when(this.storageService.addVersionsToMetadata(
+            any(), anyString(), anyString(), any(Supplier.class)))
+        .thenThrow(failure);
+
+    upload(VALID_POM);
+
+    verify(this.storageService, never()).deleteFile(any());
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage())
+        .isEqualTo(VALID_POM.length());
+  }
+
+  @Test
+  @DisplayName(
+      "does not touch the stored metadata when the registration of the POM fails (RPS-1437)")
+  void doesNotAppendWhenTheRegistrationFails() throws Exception {
+    requestFor(POM_PATH);
+    deployIsAllowed();
+    storageReportsUsage(VALID_POM.length());
+    pomIsNewInTheRepo(false);
+    registrationFails();
+
+    assertThatThrownBy(() -> upload(VALID_POM)).isInstanceOf(IllegalStateException.class);
+
+    verify(this.storageService, never()).addVersionsToMetadata(any(), any(), any(), any());
+  }
+
+  static Stream<Arguments> filesThatRegisterNoVersion() {
+    return Stream.of(
+        Arguments.of("com/example/lib/1.0/lib-1.0.jar", "jar bytes"),
+        Arguments.of(POM_PATH + ".sha1", "da39a3ee5e6b4b0d3255bfef95601890afd80709"),
+        Arguments.of(POM_PATH + ".asc", "-----BEGIN PGP SIGNATURE-----"),
+        Arguments.of(LIB_METADATA_PATH, "<metadata/>"));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("filesThatRegisterNoVersion")
+  @DisplayName("appends only for a POM, not for any other file (RPS-1437)")
+  void appendsOnlyForAPom(final String path, final String body) throws Exception {
+    requestFor(path);
+    lenient()
+        .when(this.artifactService.getVersionType(any(), any()))
+        .thenReturn(ArtifactVersionType.RELEASE);
+    lenient()
+        .when(this.artifactService.getVersionTypeByMetadataTypeFiles(any(), any(), any()))
+        .thenReturn(ArtifactVersionType.RELEASE);
+    storageReportsUsage(body.length());
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(body.getBytes(UTF_8)));
+
+    upload(body);
+
+    verify(this.storageService, never()).addVersionsToMetadata(any(), any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage())
+        .isEqualTo(body.length());
+  }
+
+  @Test
+  @DisplayName("appends nothing for a POM signature that is parked, nothing is registered")
+  void aParkedSignatureAppendsNothing() throws Exception {
+    requestFor(POM_PATH + ".asc");
+    deployIsAllowed();
+    when(this.artifactService.verifySignature(any(), any(StoragePath.class), any()))
+        .thenReturn(SignatureOutcome.PARKED);
+
+    upload(ARMORED_SIGNATURE);
+
+    verify(this.storageService, never()).addVersionsToMetadata(any(), any(), any(), any());
+    verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
   }
 }

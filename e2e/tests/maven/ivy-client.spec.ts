@@ -25,9 +25,10 @@
  *    POM without the makepom mapping lists;
  *  - IV5: dynamic revisions (`1.+`, `latest.release`, `latest.integration`, a range) resolved through the
  *    `maven-metadata.xml` Repsy generates from the registered versions, since Ivy sends none (RPS-1369);
- *  - IV9 (RPS-1369): Maven's `LATEST`, `RELEASE` and version range, and Gradle's `1.+`, resolve an
- *    Ivy-published artifact through that generated file, and a `mvn deploy` of another version of it
- *    merges the generated versions into the file it stores;
+ *  - IV9 (RPS-1369, RPS-1437): Maven's `LATEST`, `RELEASE` and version range, and Gradle's `1.+`, resolve
+ *    an Ivy-published artifact through that generated file, a `mvn deploy` of another version of it
+ *    merges the generated versions into the file it stores, and an Ivy publish after a `mvn deploy`
+ *    adds its version to the file Maven stored;
  *  - IV6/IV7: an unknown module, and Ivy's own default `overwrite="false"` (a first release publish
  *    goes through, a second is refused by Ivy, RPS-1368);
  *  - IV8: the ways a first configuration goes wrong: no realm on the credential, `publishivy="true"`,
@@ -42,6 +43,8 @@
  * `publish-consume.spec.ts`, each test builds its `World` by hand, since a coordinate other than the
  * catalog's own is not a scenario.
  */
+import { createHash } from 'node:crypto';
+
 import { RepoType } from '../../src/api/panel-api.js';
 import {
   ANT_VERSION,
@@ -393,6 +396,50 @@ test.describe('the generated maven-metadata.xml (RPS-1369)', () => {
     const latest = await maven.resolveDynamic(world, 'LATEST');
     expect(latest.clientExitCode, `mvn dependency:get LATEST: ${latest.command}`).toBe(0);
     expect(latest.versions).toEqual(['3.0']);
+  });
+});
+
+test.describe('the metadata Maven stored, then an Ivy publish (RPS-1437)', () => {
+  test('ivy > an Ivy publish after mvn deploy adds its version to the metadata Maven stored (RPS-1437)', async ({
+    seeder,
+  }) => {
+    const { world, repoName, groupId, artifactId } = await newWorld(seeder, 'mvn-first');
+    const metadataPath = `${artifactDir(groupId, artifactId)}/maven-metadata.xml`;
+
+    // mvn deploy stores the file (and its checksums) with 1.0 in it; Ivy then publishes 2.0 and
+    // uploads no metadata, so the stored file used to keep answering 1.0 for LATEST and RELEASE.
+    await maven.seedPublish(
+      withTarget(world, { packageName: world.publishTarget.packageName, version: '1.0' }),
+    );
+    expect(Object.keys(await repoTree(repoName)), 'Maven stored its own file').toContain(
+      metadataPath,
+    );
+    const before = await rawGet(repoName, adminCredential(), metadataPath);
+    expect(parseArtifactVersions(before.body.toString('utf8'))).toEqual(['1.0']);
+
+    await publishOk(
+      withTarget(world, { packageName: world.publishTarget.packageName, version: '2.0' }),
+    );
+
+    const stored = await rawGet(repoName, adminCredential(), metadataPath);
+    expect(stored.status).toBe(200);
+    expect(parseArtifactVersions(stored.body.toString('utf8'))).toEqual(['1.0', '2.0']);
+    const sha1 = await rawGet(repoName, adminCredential(), `${metadataPath}.sha1`);
+    expect(sha1.status, 'the stored checksum is rewritten, not dropped').toBe(200);
+    expect(sha1.body.toString('utf8').trim(), 'and matches the rewritten file').toBe(
+      createHash('sha1').update(stored.body).digest('hex'),
+    );
+
+    for (const requested of ['LATEST', 'RELEASE']) {
+      const resolved = await maven.resolveDynamic(world, requested);
+      expect(
+        resolved.clientExitCode,
+        `mvn dependency:get ${requested}: ${resolved.command}\n${resolved.output}`,
+      ).toBe(0);
+      expect(resolved.versions, `${requested} resolves to the version Ivy published`).toEqual([
+        '2.0',
+      ]);
+    }
   });
 });
 

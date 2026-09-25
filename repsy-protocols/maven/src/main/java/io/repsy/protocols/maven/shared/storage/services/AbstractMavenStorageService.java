@@ -27,6 +27,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import io.repsy.libs.storage.core.exceptions.RedirectToSlashEndedLocationException;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.maven.shared.utils.ArtifactMetadataSynthesizer;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.ByteArrayInputStream;
@@ -36,11 +37,15 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
@@ -72,8 +77,40 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
           METADATA_FILENAME + ".asc.sha256",
           METADATA_FILENAME + ".asc.sha512");
 
+  /**
+   * The number of locks an artifact's metadata is guarded by. An artifact takes the one its path
+   * hashes to, so two artifacts may share one: it only makes them wait for each other.
+   */
+  private static final int ARTIFACT_LOCK_STRIPES = 64;
+
   private final Configuration freeMarkerConfiguration;
   private final StorageStrategy storageStrategy;
+
+  /**
+   * Serializes every change of an artifact's stored {@code maven-metadata.xml} inside this process:
+   * the append that a registered POM triggers, the rewrite of a version delete and a client's own
+   * upload of the file, which would otherwise each read the file, change it and write it back over
+   * the change of another (RPS-1437). It does not reach another instance that shares the storage.
+   */
+  private final ReentrantLock[] artifactLocks = newArtifactLocks();
+
+  private static ReentrantLock[] newArtifactLocks() {
+
+    final var locks = new ReentrantLock[ARTIFACT_LOCK_STRIPES];
+
+    for (int i = 0; i < locks.length; i++) {
+      locks[i] = new ReentrantLock();
+    }
+
+    return locks;
+  }
+
+  private ReentrantLock lockOf(final UUID storageKey, final Path artifactBasePath) {
+
+    final var hash = Objects.hash(storageKey, artifactBasePath.toString());
+
+    return this.artifactLocks[Math.floorMod(hash, ARTIFACT_LOCK_STRIPES)];
+  }
 
   @Override
   public void createRepo(final UUID repoUuid) {
@@ -124,7 +161,28 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   public BaseUsages writeInputStreamToPath(
       final StoragePath storagePath, final InputStream inputStream, final String repoName) {
 
-    return this.storageStrategy.write(repoName, storagePath, inputStream);
+    final var artifactMetadata =
+        ArtifactMetadataSynthesizer.parse(storagePath.getRelativePath().getPath());
+
+    if (artifactMetadata == null || artifactMetadata.checksumAlgorithm() != null) {
+      return this.storageStrategy.write(repoName, storagePath, inputStream);
+    }
+
+    // A client's own artifact-level maven-metadata.xml replaces the file whole, so it must not land
+    // between the read and the write of an append or a delete rewrite of the same artifact
+    // (RPS-1437).
+    final var lock =
+        this.lockOf(
+            Objects.requireNonNull(storagePath.getStorageKey()),
+            this.getPath(artifactMetadata.groupId(), artifactMetadata.artifactId()));
+
+    lock.lock();
+
+    try {
+      return this.storageStrategy.write(repoName, storagePath, inputStream);
+    } finally {
+      lock.unlock();
+    }
   }
 
   @SneakyThrows
@@ -333,33 +391,104 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
       final String versionName)
       throws IOException, XmlPullParserException {
 
+    return this.rewriteArtifactMetadata(
+        repoInfo,
+        groupId,
+        artifactId,
+        metadata -> {
+          metadata.getVersioning().getVersions().remove(versionName);
+
+          return true;
+        });
+  }
+
+  /**
+   * Adds the registered versions that the stored file lacks (RPS-1437), the same rewrite as the one
+   * of a version delete: the file is parsed before anything is written, the versions are sorted,
+   * {@code latest} is the highest one and {@code release} the highest that is not a snapshot,
+   * {@code lastUpdated} is now, and the checksums that are stored are recomputed while a stored
+   * signature is deleted. A file that already lists every registered version is left byte for byte
+   * as it is, with its signature.
+   */
+  @Override
+  public long addVersionsToMetadata(
+      final BaseRepoInfo<ID> repoInfo,
+      final String groupId,
+      final String artifactId,
+      final Supplier<? extends Collection<String>> registeredVersions)
+      throws IOException {
+
+    return this.rewriteArtifactMetadata(
+            repoInfo,
+            groupId,
+            artifactId,
+            metadata -> {
+              final var listed = metadata.getVersioning().getVersions();
+              var changed = false;
+
+              for (final var versionName : registeredVersions.get()) {
+                if (!listed.contains(versionName)) {
+                  listed.add(versionName);
+                  changed = true;
+                }
+              }
+
+              return changed;
+            })
+        .getDiskUsage();
+  }
+
+  /**
+   * Reads the artifact's stored {@code maven-metadata.xml} and, when {@code mutate} answers that it
+   * changed the versions, stamps {@code lastUpdated}, recomputes {@code latest} and {@code release}
+   * and writes the file back with the checksums and the signature handling of {@link
+   * #writeMetadataAndChecksumsToFile}. Nothing is written when there is no file, when it has no
+   * {@code <versioning>} (so {@code mutate} always finds one), or when {@code mutate} answers
+   * {@code false}. The whole read-change-write holds the artifact's lock.
+   */
+  private BaseUsages rewriteArtifactMetadata(
+      final BaseRepoInfo<ID> repoInfo,
+      final String groupId,
+      final String artifactId,
+      final Predicate<Metadata> mutate)
+      throws IOException {
+
     final var artifactBasePath = this.getPath(groupId, artifactId);
 
     final var storagePath =
         StoragePath.of(
             repoInfo.getStorageKey(), artifactBasePath.resolve(METADATA_FILENAME).toString());
 
-    final var metadataResource = this.storageStrategy.get(storagePath, repoInfo.getName());
+    final var lock =
+        this.lockOf(Objects.requireNonNull(repoInfo.getStorageKey()), artifactBasePath);
 
-    if (metadataResource.isEmpty()) {
-      return BaseUsages.builder().diskUsage(0L).build();
+    lock.lock();
+
+    try {
+      final var metadataResource = this.storageStrategy.get(storagePath, repoInfo.getName());
+
+      if (metadataResource.isEmpty()) {
+        return BaseUsages.ofDisk(0L);
+      }
+
+      final var metadata =
+          ArtifactUtils.readMetadata(metadataResource.get().getContentAsByteArray());
+
+      final var versioning = metadata.getVersioning();
+
+      if (versioning == null || !mutate.test(metadata)) {
+        return BaseUsages.ofDisk(0L);
+      }
+
+      versioning.setLastUpdatedTimestamp(Date.from(Instant.now()));
+
+      ArtifactUtils.setReleaseAndLatest(metadata);
+
+      return this.writeMetadataAndChecksumsToFile(
+          storagePath, artifactBasePath, metadata, repoInfo.getName());
+    } finally {
+      lock.unlock();
     }
-
-    final var metadata = ArtifactUtils.readMetadata(metadataResource.get().getContentAsByteArray());
-
-    final var versioning = metadata.getVersioning();
-
-    if (versioning == null) {
-      return BaseUsages.builder().diskUsage(0L).build();
-    }
-
-    versioning.getVersions().remove(versionName);
-    versioning.setLastUpdatedTimestamp(Date.from(Instant.now()));
-
-    ArtifactUtils.setReleaseAndLatest(metadata);
-
-    return this.writeMetadataAndChecksumsToFile(
-        storagePath, artifactBasePath, metadata, repoInfo.getName());
   }
 
   private Path[] getPath(final String groupId) {
@@ -424,7 +553,8 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
         usages = this.storageStrategy.write(repoName, metadataStoragePath, metadataInputStream);
       }
 
-      this.updateChecksumsOfMetadata(metadataStoragePath, artifactBasePath, repoName);
+      final var checksumsDelta =
+          this.updateChecksumsOfMetadata(metadataStoragePath, artifactBasePath, repoName);
 
       // A stored maven-metadata.xml.asc signs the file this rewrite just replaced, so it no
       // longer verifies; there is no way to re-sign it here. Delete it and its own checksum
@@ -435,7 +565,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
               artifactBasePath,
               repoName);
 
-      return BaseUsages.builder().diskUsage(usages.getDiskUsage() - deletedSignatureBytes).build();
+      return BaseUsages.ofDisk(usages.getDiskUsage() + checksumsDelta - deletedSignatureBytes);
     }
   }
 
@@ -481,10 +611,11 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   }
 
   /**
-   * Calculate digest checksums of metadata file and write them into checksum files respectively.
-   * Input and Output should be same so no need to return usage.
+   * Calculate digest checksums of metadata file and write them into the checksum files that are
+   * stored, none is created. Returns the change of the disk usage they caused, which a digest
+   * rewritten with a longer or shorter algorithm output would leave out of the count.
    */
-  private void updateChecksumsOfMetadata(
+  private long updateChecksumsOfMetadata(
       final StoragePath metadataStoragePath, final Path artifactBasePath, final String repoName)
       throws IOException {
 
@@ -505,18 +636,23 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
             "sha256", DigestUtils::sha256Hex,
             "sha512", DigestUtils::sha512Hex);
 
+    var delta = 0L;
+
     for (final var entry : hashFunctions.entrySet()) {
-      this.writeChecksumIfExists(
-          Objects.requireNonNull(repoUuid),
-          artifactBasePath,
-          repoName,
-          metadataContent,
-          entry.getKey(),
-          entry.getValue());
+      delta +=
+          this.writeChecksumIfExists(
+              Objects.requireNonNull(repoUuid),
+              artifactBasePath,
+              repoName,
+              metadataContent,
+              entry.getKey(),
+              entry.getValue());
     }
+
+    return delta;
   }
 
-  private void writeChecksumIfExists(
+  private long writeChecksumIfExists(
       final UUID repoUuid,
       final Path artifactBasePath,
       final String repoName,
@@ -532,13 +668,13 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
     final var optionalResource = this.storageStrategy.get(storagePath, repoName);
 
     if (optionalResource.isEmpty() || !optionalResource.get().exists()) {
-      return;
+      return 0L;
     }
 
     final var checksumBytes = hashFunction.apply(content).getBytes(StandardCharsets.UTF_8);
 
     try (final var checksumInputStream = new ByteArrayInputStream(checksumBytes)) {
-      this.storageStrategy.write(repoName, storagePath, checksumInputStream);
+      return this.storageStrategy.write(repoName, storagePath, checksumInputStream).getDiskUsage();
     }
   }
 

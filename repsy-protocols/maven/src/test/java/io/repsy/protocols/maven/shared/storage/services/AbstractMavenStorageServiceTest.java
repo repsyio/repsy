@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,9 +34,23 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.maven.artifact.repository.metadata.Metadata;
+import org.apache.maven.artifact.repository.metadata.io.xpp3.MetadataXpp3Reader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,6 +59,7 @@ import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 
 /**
  * RPS-1190: a version delete used to fail {@code Files.move} with {@code NoSuchFileException} when
@@ -56,6 +72,10 @@ import org.springframework.core.io.ByteArrayResource;
  * maven-metadata.xml.asc} and its checksum siblings behind, signing content that no longer matches.
  * They are deleted along with the rewrite now, and the bytes they freed are folded into the
  * returned usage delta.
+ *
+ * <p>RPS-1437: {@link AbstractMavenStorageService#addVersionsToMetadata} adds the registered
+ * versions a stored {@code maven-metadata.xml} lacks, with the same rewrite, and the rewrite, a
+ * delete's and a client's own upload of the file are serialized per artifact.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractMavenStorageService")
@@ -247,5 +267,395 @@ class AbstractMavenStorageServiceTest {
     verify(this.storageStrategy).delete(pom);
     verify(this.storageStrategy, never()).calculatePathUsage(any());
     verify(this.storageStrategy, never()).listDirectoryContents(any());
+  }
+
+  private static final String METADATA_PATH = "com/example/demo/" + METADATA_FILENAME;
+
+  /** What the fake storage holds, by path. Reads and writes go through it, in call order. */
+  private final Map<String, byte[]> files = new TreeMap<>();
+
+  private final List<String> writes = new ArrayList<>();
+  private final List<String> deletes = new ArrayList<>();
+
+  private BaseRepoInfo<UUID> repoInfo() {
+    return BaseRepoInfo.<UUID>builder().storageKey(REPO_ID).name(REPO_NAME).build();
+  }
+
+  /** Makes the mocked storage strategy a map: what is written is what a later get answers. */
+  private void useInMemoryStorage() {
+    lenient()
+        .when(this.storageStrategy.get(any(), anyString()))
+        .thenAnswer(
+            invocation -> {
+              final var content =
+                  this.files.get(
+                      invocation.<StoragePath>getArgument(0).getRelativePath().getPath());
+
+              return Optional.ofNullable(content).<Resource>map(ByteArrayResource::new);
+            });
+    lenient()
+        .when(this.storageStrategy.write(anyString(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              final var path = invocation.<StoragePath>getArgument(1).getRelativePath().getPath();
+              final var bytes = invocation.<InputStream>getArgument(2).readAllBytes();
+              final var before = this.files.get(path);
+
+              synchronized (this.writes) {
+                this.writes.add(path);
+              }
+
+              this.files.put(path, bytes);
+
+              return BaseUsages.ofDisk(bytes.length - (before == null ? 0 : before.length));
+            });
+    lenient()
+        .doAnswer(
+            invocation -> {
+              final var path = invocation.<StoragePath>getArgument(0).getRelativePath().getPath();
+
+              this.deletes.add(path);
+              this.files.remove(path);
+
+              return null;
+            })
+        .when(this.storageStrategy)
+        .delete(any());
+  }
+
+  private void store(final String fileName, final String content) {
+    this.files.put("com/example/demo/" + fileName, content.getBytes(UTF_8));
+  }
+
+  private String stored(final String fileName) {
+    return new String(this.files.get("com/example/demo/" + fileName), UTF_8);
+  }
+
+  private Metadata storedMetadata() throws Exception {
+    return new MetadataXpp3Reader()
+        .read(new ByteArrayInputStream(this.files.get(METADATA_PATH)), false);
+  }
+
+  private static Supplier<Collection<String>> registered(final String... versions) {
+    return () -> List.of(versions);
+  }
+
+  @Test
+  @DisplayName("adding versions to an artifact without a stored metadata file creates nothing")
+  void addVersionsWithoutMetadataFileIsANoOp() throws Exception {
+    useInMemoryStorage();
+    final var asked = new AtomicBoolean();
+
+    final var delta =
+        this.storageService.addVersionsToMetadata(
+            repoInfo(),
+            GROUP,
+            ARTIFACT,
+            () -> {
+              asked.set(true);
+
+              return List.of("1.0");
+            });
+
+    assertThat(delta).isZero();
+    assertThat(asked).as("no version is asked for when there is no file").isFalse();
+    assertThat(this.writes).isEmpty();
+    assertThat(this.files).isEmpty();
+  }
+
+  @Test
+  @DisplayName("adding versions leaves a file that lists them all byte for byte and keeps its .asc")
+  void addVersionsAlreadyListedWritesNothing() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, METADATA_XML);
+    store(METADATA_FILENAME + ".asc", "signature");
+    store(METADATA_FILENAME + ".sha1", "stale");
+
+    final var delta =
+        this.storageService.addVersionsToMetadata(
+            repoInfo(), GROUP, ARTIFACT, registered("2.0", "1.0"));
+
+    assertThat(delta).isZero();
+    assertThat(this.writes).isEmpty();
+    assertThat(this.deletes).isEmpty();
+    assertThat(stored(METADATA_FILENAME)).isEqualTo(METADATA_XML);
+    assertThat(stored(METADATA_FILENAME + ".asc")).isEqualTo("signature");
+    assertThat(stored(METADATA_FILENAME + ".sha1")).isEqualTo("stale");
+  }
+
+  @Test
+  @DisplayName(
+      "adding a version the file lacks sorts the versions, moves latest and release, stamps"
+          + " lastUpdated, rewrites only the stored checksums, drops the .asc family and counts every"
+          + " byte")
+  void addVersionsAddsTheMissingVersion() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, METADATA_XML);
+    // A checksum file with a trailing newline is 1 byte longer than the digest that replaces it.
+    store(METADATA_FILENAME + ".sha1", DigestUtils.sha1Hex(METADATA_XML) + "\n");
+    store(METADATA_FILENAME + ".md5", "stale");
+    store(METADATA_FILENAME + ".asc", "x".repeat(100));
+    store(METADATA_FILENAME + ".asc.sha1", "y".repeat(40));
+    final var before = this.files.get(METADATA_PATH).length;
+
+    final var delta =
+        this.storageService.addVersionsToMetadata(
+            repoInfo(), GROUP, ARTIFACT, registered("3.0", "1.0", "2.0"));
+
+    final var metadata = storedMetadata();
+    final var versioning = metadata.getVersioning();
+
+    assertThat(versioning.getVersions()).containsExactly("1.0", "2.0", "3.0");
+    assertThat(versioning.getLatest()).isEqualTo("3.0");
+    assertThat(versioning.getRelease()).isEqualTo("3.0");
+    assertThat(versioning.getLastUpdated()).isNotEqualTo("20260101000000");
+    assertThat(metadata.getGroupId()).isEqualTo(GROUP);
+    assertThat(metadata.getArtifactId()).isEqualTo(ARTIFACT);
+
+    final var xml = this.files.get(METADATA_PATH);
+
+    assertThat(stored(METADATA_FILENAME + ".sha1")).isEqualTo(DigestUtils.sha1Hex(xml));
+    assertThat(stored(METADATA_FILENAME + ".md5")).isEqualTo(DigestUtils.md5Hex(xml));
+    assertThat(this.files).doesNotContainKey("com/example/demo/" + METADATA_FILENAME + ".sha256");
+    assertThat(this.files).doesNotContainKey("com/example/demo/" + METADATA_FILENAME + ".asc");
+    assertThat(this.files).doesNotContainKey("com/example/demo/" + METADATA_FILENAME + ".asc.sha1");
+    assertThat(this.deletes).hasSize(2);
+
+    // The xml grew, the sha1 lost its newline (-1), the md5 grew from "stale" (5) to 32, and 140
+    // bytes of signatures were freed.
+    assertThat(delta).isEqualTo((xml.length - before) + (-1) + (32 - 5) - 140);
+  }
+
+  @Test
+  @DisplayName("adding a snapshot version moves latest but leaves release on the last release")
+  void addVersionsAddsASnapshotAsLatestOnly() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, METADATA_XML);
+
+    this.storageService.addVersionsToMetadata(
+        repoInfo(), GROUP, ARTIFACT, registered("1.0", "2.0", "3.0-SNAPSHOT"));
+
+    final var versioning = storedMetadata().getVersioning();
+
+    assertThat(versioning.getVersions()).containsExactly("1.0", "2.0", "3.0-SNAPSHOT");
+    assertThat(versioning.getLatest()).isEqualTo("3.0-SNAPSHOT");
+    assertThat(versioning.getRelease()).isEqualTo("2.0");
+
+    final var written = this.writes.size();
+
+    this.storageService.addVersionsToMetadata(
+        repoInfo(), GROUP, ARTIFACT, registered("1.0", "2.0", "3.0-SNAPSHOT"));
+
+    assertThat(this.writes).as("the second append has nothing to add").hasSize(written);
+  }
+
+  @Test
+  @DisplayName("adding versions never removes one the file lists but the repository does not know")
+  void addVersionsKeepsAVersionThatIsNotRegistered() throws Exception {
+    useInMemoryStorage();
+    store(
+        METADATA_FILENAME,
+        METADATA_XML.replace("<version>2.0</version>", "<version>9.9</version>"));
+
+    this.storageService.addVersionsToMetadata(
+        repoInfo(), GROUP, ARTIFACT, registered("1.0", "3.0"));
+
+    final var versioning = storedMetadata().getVersioning();
+
+    assertThat(versioning.getVersions()).containsExactly("1.0", "3.0", "9.9");
+    assertThat(versioning.getLatest()).isEqualTo("9.9");
+  }
+
+  @Test
+  @DisplayName("adding versions to a file that cannot be parsed fails before anything is written")
+  void addVersionsWithUnparsableFileChangesNothing() {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, "<metadata><versioning>");
+    store(METADATA_FILENAME + ".asc", "signature");
+    final var asked = new AtomicBoolean();
+
+    assertThatThrownBy(
+            () ->
+                this.storageService.addVersionsToMetadata(
+                    repoInfo(),
+                    GROUP,
+                    ARTIFACT,
+                    () -> {
+                      asked.set(true);
+
+                      return List.of("1.0");
+                    }))
+        .isInstanceOf(BadRequestException.class);
+
+    assertThat(asked).isFalse();
+    assertThat(this.writes).isEmpty();
+    assertThat(this.deletes).isEmpty();
+    assertThat(stored(METADATA_FILENAME)).isEqualTo("<metadata><versioning>");
+  }
+
+  @Test
+  @DisplayName("adding versions to a file without <versioning> leaves it alone")
+  void addVersionsWithoutVersioningIsANoOp() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, "<metadata/>");
+    final var asked = new AtomicBoolean();
+
+    final var delta =
+        this.storageService.addVersionsToMetadata(
+            repoInfo(),
+            GROUP,
+            ARTIFACT,
+            () -> {
+              asked.set(true);
+
+              return List.of("1.0");
+            });
+
+    assertThat(delta).isZero();
+    assertThat(asked).isFalse();
+    assertThat(this.writes).isEmpty();
+    assertThat(stored(METADATA_FILENAME)).isEqualTo("<metadata/>");
+  }
+
+  @Test
+  @DisplayName("a delete's rewrite counts the change of the checksum files it rewrites (RPS-1437)")
+  void deleteVersionFromMetadataCountsTheChecksumDelta() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, METADATA_XML);
+    store(METADATA_FILENAME + ".sha1", "z".repeat(60));
+    final var before = this.files.get(METADATA_PATH).length;
+
+    final var usage =
+        this.storageService.deleteVersionFromMetadata(repoInfo(), GROUP, ARTIFACT, "1.0");
+
+    final var xml = this.files.get(METADATA_PATH);
+
+    assertThat(usage.getDiskUsage()).isEqualTo((xml.length - before) + (40 - 60));
+    assertThat(stored(METADATA_FILENAME + ".sha1")).isEqualTo(DigestUtils.sha1Hex(xml));
+  }
+
+  /** Runs an append that stays inside the artifact's lock until {@code release} is counted down. */
+  private CompletableFuture<Long> appendHeldUntil(
+      final CountDownLatch inside, final CountDownLatch release, final String version) {
+
+    return CompletableFuture.supplyAsync(
+        () -> {
+          try {
+            return this.storageService.addVersionsToMetadata(
+                repoInfo(),
+                GROUP,
+                ARTIFACT,
+                () -> {
+                  inside.countDown();
+
+                  try {
+                    release.await(10, TimeUnit.SECONDS);
+                  } catch (final InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                  }
+
+                  return List.of("1.0", "2.0", version);
+                });
+          } catch (final java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+          }
+        });
+  }
+
+  @Test
+  @DisplayName("a client's own upload of the artifact's metadata waits for a running append")
+  void clientUploadOfTheMetadataWaitsForAnAppend() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, METADATA_XML);
+    final var inside = new CountDownLatch(1);
+    final var release = new CountDownLatch(1);
+
+    final var append = appendHeldUntil(inside, release, "3.0");
+    assertThat(inside.await(10, TimeUnit.SECONDS)).isTrue();
+
+    final var clientBytes =
+        "<metadata><versioning><versions><version>1.0</version></versions></versioning></metadata>";
+    final var upload =
+        CompletableFuture.runAsync(
+            () ->
+                this.storageService.writeInputStreamToPath(
+                    StoragePath.of(REPO_ID, METADATA_PATH),
+                    new ByteArrayInputStream(clientBytes.getBytes(UTF_8)),
+                    REPO_NAME));
+
+    // The upload has all the time to get past the lock, and does not.
+    TimeUnit.MILLISECONDS.sleep(300);
+    assertThat(upload).isNotDone();
+    assertThat(this.writes).isEmpty();
+
+    release.countDown();
+    append.get(10, TimeUnit.SECONDS);
+    upload.get(10, TimeUnit.SECONDS);
+
+    // The append wrote first, the client's file is the last word.
+    assertThat(this.writes).containsExactly(METADATA_PATH, METADATA_PATH);
+    assertThat(stored(METADATA_FILENAME)).isEqualTo(clientBytes);
+  }
+
+  @Test
+  @DisplayName("a delete's rewrite waits for a running append and rewrites what it wrote")
+  void deleteRewriteWaitsForAnAppend() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, METADATA_XML);
+    final var inside = new CountDownLatch(1);
+    final var release = new CountDownLatch(1);
+
+    final var append = appendHeldUntil(inside, release, "3.0");
+    assertThat(inside.await(10, TimeUnit.SECONDS)).isTrue();
+
+    final var delete =
+        CompletableFuture.runAsync(
+            () -> {
+              try {
+                this.storageService.deleteVersionFromMetadata(repoInfo(), GROUP, ARTIFACT, "1.0");
+              } catch (final Exception e) {
+                throw new IllegalStateException(e);
+              }
+            });
+
+    TimeUnit.MILLISECONDS.sleep(300);
+    assertThat(delete).isNotDone();
+
+    release.countDown();
+    append.get(10, TimeUnit.SECONDS);
+    delete.get(10, TimeUnit.SECONDS);
+
+    // Without the lock the delete would have read the file before the append and written it back
+    // without 3.0.
+    assertThat(storedMetadata().getVersioning().getVersions()).containsExactly("2.0", "3.0");
+  }
+
+  @Test
+  @DisplayName(
+      "the upload of a checksum, another artifact's metadata or any other file is not locked")
+  void otherUploadsAreNotLocked() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, METADATA_XML);
+    final var inside = new CountDownLatch(1);
+    final var release = new CountDownLatch(1);
+
+    final var append = appendHeldUntil(inside, release, "3.0");
+    assertThat(inside.await(10, TimeUnit.SECONDS)).isTrue();
+
+    final var bytes = new ByteArrayInputStream("x".getBytes(UTF_8));
+
+    // Done on this thread: it would hang here, and fail the test after the latch timeout, if
+    // locked.
+    this.storageService.writeInputStreamToPath(
+        StoragePath.of(REPO_ID, METADATA_PATH + ".sha1"), bytes, REPO_NAME);
+    this.storageService.writeInputStreamToPath(
+        StoragePath.of(REPO_ID, "com/example/demo/1.0/demo-1.0.pom"),
+        new ByteArrayInputStream("pom".getBytes(UTF_8)),
+        REPO_NAME);
+
+    assertThat(append).isNotDone();
+
+    release.countDown();
+    append.get(10, TimeUnit.SECONDS);
   }
 }

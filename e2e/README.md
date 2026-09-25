@@ -191,7 +191,7 @@ e2e/
       gradle-locking-kotlin.spec.ts  # RPS-133: the same for the Kotlin DSL
       sbt.spec.ts               # RPS-134: registerPublishConsumeLoop(sbtAdapter) + the sbt extras
       ivy.spec.ts               # RPS-135: registerPublishConsumeLoop(ivyAdapter), a real `ant` with ivy:publish and ivy:retrieve
-      ivy-client.spec.ts        # RPS-135: IV1-IV9 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete, the generated maven-metadata.xml read by Maven and Gradle, RPS-1369)
+      ivy-client.spec.ts        # RPS-135: IV1-IV9 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete, the generated maven-metadata.xml read by Maven and Gradle, RPS-1369, an Ivy publish after mvn deploy, RPS-1437)
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
@@ -907,11 +907,12 @@ seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
 Repsy stores the `maven-metadata.xml` a client uploads and writes none of its own, and Ivy uploads none, so
 an artifact published by Ivy has no stored `<versions>` list. Since RPS-1369 Repsy answers a `GET` or
 `HEAD` of the artifact-level `maven-metadata.xml` (and its `.md5`, `.sha1`, `.sha256` and `.sha512`)
-from the registered versions when nothing is stored there; a stored file always wins, and nothing is
-generated for a `.asc` or for the version-level file of a SNAPSHOT. So if another client deployed a
-`maven-metadata.xml` first, the stored file is that client's and does not list the versions Ivy added
-afterwards (IV9 pins the other order: a `mvn deploy` after Ivy finds the generated list, merges its own
-version into it and stores the result).
+from the registered versions when nothing is stored there; a stored file is served as it is, and nothing
+is generated for a `.asc` or for the version-level file of a SNAPSHOT. If another client deployed a
+`maven-metadata.xml` first, that stored file would not list the versions Ivy adds afterwards, so when a
+POM registers a version the stored file lacks Repsy adds it to the file (RPS-1437, IV9: the other order
+too, a `mvn deploy` after Ivy finds the generated list, merges its own version into it and stores the
+result).
 
 `ivy-client.spec.ts` adds what the catalog cannot say: a deploy token's publish and resolve with the
 exact file set (IV1, `@smoke`), Ivy resolving what `mvn deploy` published (a release and a SNAPSHOT
@@ -921,7 +922,9 @@ above (IV5), an unknown module (IV6), the first-configuration pitfalls above (IV
 realm, `publishivy="true"`, the dependency line with and without its `conf`) and the generated
 `maven-metadata.xml` read by other clients (IV9: Maven `LATEST`, `RELEASE` and `[1.0,1.10)` through
 `dependency:get`, which accepts a range in `-Dartifact`, Gradle `1.+`, and the artifact-level file a
-`mvn deploy` after Ivy stores with all the versions). No `test.fail` pin is left in this suite.
+`mvn deploy` after Ivy stores with all the versions, and an Ivy publish after a `mvn deploy` that puts
+its version into the file Maven stored, with its checksum rewritten, RPS-1437). No `test.fail` pin is
+left in this suite.
 
 Not covered: an Ivy-native (non-Maven) layout, which Repsy cannot serve (a descriptor named
 `<artifact>-<revision>.ivy` is a valid Maven file name and is stored, but nothing registers it), the

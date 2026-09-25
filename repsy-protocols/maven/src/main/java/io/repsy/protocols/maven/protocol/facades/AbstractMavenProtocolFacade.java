@@ -23,6 +23,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
 import io.repsy.protocols.maven.protocol.resources.SynthesizedFileResource;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
@@ -149,6 +150,10 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * arrival fails (422 {@code pendingSignatureNotVerified}, the new file taken back) when it does
    * not verify (RPS-1188).
    *
+   * <p>A POM that registers a version also adds it to the stored artifact-level {@code
+   * maven-metadata.xml} when the file lacks it and the usage of that rewrite is added to the POM's;
+   * that step never fails the upload (RPS-1437, see {@code reconcileStoredMetadata}).
+   *
    * <p>What is left to fail after the store is the registration itself (a repo or a signed version
    * deleted meanwhile, a database error). The usage is set on the context whether it succeeds or
    * not, and a POM or POM signature that was new is taken back out of the repo first when it fails
@@ -264,7 +269,65 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       throw e;
     }
 
+    if (ArtifactUtils.isPomToParse(storagePath)) {
+      context.addProperty(
+          USAGES,
+          BaseUsages.ofDisk(
+              usage.getDiskUsage() + this.reconcileStoredMetadata(repoInfo, storagePath)));
+
+      return;
+    }
+
     context.addProperty(USAGES, usage);
+  }
+
+  /**
+   * Adds the version a POM has just registered to the artifact-level {@code maven-metadata.xml}
+   * that a client stored earlier, when that file does not list it (RPS-1437). Maven and Gradle
+   * upload the file with each deploy, but Apache Ivy and sbt send none, so without this a later
+   * publish of theirs stays hidden from {@code LATEST}, {@code RELEASE}, version ranges and {@code
+   * 1.+} behind the versions the stored file lists. An artifact that has no stored file is answered
+   * from the registered versions (RPS-1369) and is never asked for them here.
+   *
+   * <p>It is best effort. The version is registered and committed by now, so a failure here (a file
+   * that cannot be parsed, a storage error, a database error) is logged and the upload is still
+   * answered as a success: failing it would take the new POM back out of the repo while its row
+   * stays, and the client's retry would be refused as a conflict. The stored file is only ever
+   * changed by the rewrite that ends with it written, and a file that cannot be parsed is left
+   * untouched.
+   *
+   * @return the change of the disk usage the rewrite caused, {@code 0} when there was none
+   */
+  private long reconcileStoredMetadata(
+      final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath) {
+
+    try {
+      final var gav = ArtifactUtils.getGavByFile(storagePath);
+
+      if (gav == null) {
+        return 0L;
+      }
+
+      return this.mavenStorageService.addVersionsToMetadata(
+          repoInfo,
+          gav.getGroupId(),
+          gav.getArtifactId(),
+          () ->
+              this.artifactService
+                  .getRegisteredVersions(repoInfo, gav.getGroupId(), gav.getArtifactId())
+                  .stream()
+                  .map(RegisteredVersion::versionName)
+                  .toList());
+    } catch (final RuntimeException | IOException e) {
+      log.warn(
+          "Adding the version of {} to the stored maven-metadata.xml of repo {} failed, the file is"
+              + " left as it is: {}",
+          storagePath.getRelativePath().getPath(),
+          repoInfo.getName(),
+          e.toString());
+
+      return 0L;
+    }
   }
 
   /** Removes a file this request has just stored, answering whether it is gone. */
