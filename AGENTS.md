@@ -225,6 +225,21 @@ builds each PR on top of the entries ahead of it and merges it only if that comb
 - If `main` still goes red, fix it with a PR of its own (as RPS-960 did) rather than folding the
   fix into an unrelated PR.
 
+## Keeping the pnpm pin up to date
+
+The pnpm version is a literal in `.github/actions/setup-frontend/action.yml`, the `Dockerfile` and every
+`e2e/runners/*.Dockerfile` (`DockerfileTest` keeps them equal). Dependabot cannot track a literal in a
+`run:` line, so `.github/workflows/pnpm-bump.yml` runs weekly, rewrites all of them to the newest release
+of the pinned major in one commit and opens a PR that is queued with `gh pr merge --auto --squash`. A new
+major is left to a person.
+
+The PR is opened with a GitHub App token, because a PR opened with `GITHUB_TOKEN` triggers no
+`pull_request` workflows and the merge queue would wait for checks that never report. One-time setup
+(repository admin): create a GitHub App with repository permissions Contents: write, Pull requests:
+write and Metadata: read, install it on `repsyio/repsy`, then store its ID as the Actions variable
+`PNPM_BUMP_APP_ID` and its private key as the secret `PNPM_BUMP_APP_PRIVATE_KEY`. Until then the workflow
+only writes a note to its run summary. Trigger it once with `gh workflow run pnpm-bump.yml`.
+
 ## API spec
 
 `repsy-backend/src/main/resources/openapi/openapi-spec.yaml` is the single source of truth for the

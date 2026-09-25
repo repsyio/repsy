@@ -1,0 +1,126 @@
+name: Bump pnpm
+
+# RPS-1167. The pnpm version is a literal in `run:` lines (SonarCloud githubactions:S8543 reads it
+# there, and the "packageManager" field of package.json would make pnpm 12 rewrite pnpm-lock.yaml),
+# so Dependabot cannot track it. This workflow does: once a week it compares the pin in
+# .github/actions/setup-frontend/action.yml with the newest release of the same major, rewrites
+# every pin in one commit (that action, the Dockerfile and the e2e runner Dockerfiles, which
+# DockerfileTest keeps in sync) and opens a PR that is queued for merging once its checks pass.
+#
+# The PR is created with a GitHub App token, not GITHUB_TOKEN: a PR opened with GITHUB_TOKEN triggers
+# no `pull_request` workflows, so the required checks would never report and the merge queue would
+# never take it. Without the App (the PNPM_BUMP_APP_ID variable and PNPM_BUMP_APP_PRIVATE_KEY secret,
+# see AGENTS.md "Merging to main") the job only writes a note to its summary.
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: "43 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: pnpm-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump the pinned pnpm
+    runs-on: warp-ubuntu-latest-x64-2x
+    timeout-minutes: 10
+    env:
+      APP_ID: ${{ vars.PNPM_BUMP_APP_ID }}
+    steps:
+      - name: Check the GitHub App is configured
+        id: configured
+        run: |
+          if [ -n "$APP_ID" ]; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "PNPM_BUMP_APP_ID is not set, so no pnpm bump PR can be opened (see AGENTS.md)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Create the GitHub App token
+        if: steps.configured.outputs.app == 'true'
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.PNPM_BUMP_APP_ID }}
+          private-key: ${{ secrets.PNPM_BUMP_APP_PRIVATE_KEY }}
+
+      - name: Check out main
+        if: steps.configured.outputs.app == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          token: ${{ steps.app.outputs.token }}
+
+      - name: Set up Node
+        if: steps.configured.outputs.app == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24"
+
+      - name: Open the bump PR
+        if: steps.configured.outputs.app == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          set -euo pipefail
+          action=.github/actions/setup-frontend/action.yml
+          files=("$action" Dockerfile e2e/runners/*.Dockerfile)
+
+          current=$(sed -nE 's/^[^#]*npm install -g --ignore-scripts pnpm@([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' "$action")
+          if ! [[ "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::No pinned pnpm version found in $action"
+            exit 1
+          fi
+          major=${current%%.*}
+
+          # Only the current major is bumped automatically: a new major (pnpm 12 rewrote the
+          # lockfile handling, RPS-1093) is a decision for a person. The registry answer is
+          # validated before it reaches sed, a branch name or gh.
+          latest=$(npm view "pnpm@latest-$major" version)
+          if ! [[ "$latest" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Unexpected pnpm version from the registry: $latest"
+            exit 1
+          fi
+          newest=$(npm view pnpm dist-tags.latest)
+          if [ "${newest%%.*}" != "$major" ]; then
+            echo "pnpm $newest is a new major; $current is pinned. Not bumped automatically." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ "$latest" = "$current" ]; then
+            echo "pnpm $current is the newest $major.x release." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          branch="ci/pnpm-$latest"
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            echo "The PR for pnpm $latest is already open." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          sed -i -E "s/(pnpm@)$current\b/\1$latest/" "${files[@]}"
+          if grep -n "pnpm@$current\b" "${files[@]}"; then
+            echo "::error::A pnpm@$current pin was left behind"
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -q -a -m "ci: Bump the pinned pnpm from $current to $latest" \
+            -m "Opened by .github/workflows/pnpm-bump.yml (RPS-1167)."
+          git push -q origin "$branch"
+
+          # An older bump PR that is still open is superseded by this one.
+          for old in $(gh pr list --state open --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("ci/pnpm-")) | .number'); do
+            gh pr close "$old" --delete-branch --comment "Superseded by the bump to pnpm $latest."
+          done
+
+          url=$(gh pr create --base main --head "$branch" \
+            --title "ci: Bump the pinned pnpm from $current to $latest" \
+            --body "Bumps the pnpm pin from $current to $latest in the frontend CI setup action, the Dockerfile and the e2e runner images, which \`DockerfileTest\` keeps in sync. Opened by \`.github/workflows/pnpm-bump.yml\` (RPS-1167); it is queued to merge once the required checks pass.")
+          gh pr merge "$url" --auto --squash
+          echo "Opened $url" >> "$GITHUB_STEP_SUMMARY"
