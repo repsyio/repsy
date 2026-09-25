@@ -50,8 +50,7 @@ public class NpmAdvisorySourceImpl implements NpmAdvisorySource<UUID> {
     }
 
     final var rows =
-        this.scanService.findKnownVulnerabilities(
-            repoInfo.getStorageKey(), versionsByName.keySet());
+        this.scanService.findKnownVulnerabilities(repoInfo.getStorageKey(), versionsByName);
 
     return NpmAdvisoryMapper.toAdvisories(rows, versionsByName);
   }
