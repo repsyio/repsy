@@ -2820,8 +2820,8 @@ rule at all (grep-confirmed: no Go code reads either repo setting) and no SNAPSH
 matrix (R1); every accepted upload-URL spelling — no suffix, `.zip`, and even `.mod` with a zip body,
 G6 (R2); `Content-Sha256` verified when present (case-insensitively), ignored when absent (R3);
 immutability + no storage side effect under BOTH `allowOverride` settings (R4/H9); zip-validation
-errors leaving nothing stored (R5); `@v/list`'s real-semver sort and empty-body-for-unknown-module
-shape (R8); `@latest`'s DB-backed highest-version selection (R9); a malformed module path's bodyless
+errors leaving nothing stored (R5); `@v/list`'s real-semver sort and text/plain-404-for-unknown-module
+shape (R8, RPS-1428); `@latest`'s DB-backed highest-version selection (R9); a malformed module path's bodyless
 400 (R11); `sumdb/supported` 404ing on both ports (R12/G9); over-long module-path/version refusal
 (R13); a deleted version's clean re-upload, never a `410` (R14/RPS-1230); `HEAD` always 404ing,
 the opposite of pypi's always-200 quirk (R15/H17); and that `releases`/`snapshots` are never read

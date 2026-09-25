@@ -63,8 +63,9 @@
  *  - `@v/list`: lists the storage directory `/<modulePath>/@v/`, keeps `*.info` names, strips the
  *    extension, sorts with `GoVersionUtils.COMPARATOR` (real semver precedence; a non-semver string --
  *    `banana` -- falls back to `String.compareTo` against ANY other operand, even a real semver one,
- *    confirmed live), joins with `\n`, `text/plain`. An unknown module is `200` with an EMPTY body
- *    (`listDirectory` swallows `ItemNotFoundException`), never a `404`.
+ *    confirmed live), joins with `\n`, `text/plain`. An unknown module (or one whose last version
+ *    was deleted) is a `text/plain` `404` (`not found: <path>`), so `go` tries the next GOPROXY entry
+ *    (RPS-1428).
  *  - `@latest`: reads the DB (`findLatestPublishedVersion`, `max()` under the same `COMPARATOR`) --
  *    a DIFFERENT source of truth than `@v/list`'s storage directory listing (G5, architectural: the
  *    two routes call `goStorageService.listDirectory` and `goModuleService.findLatestPublishedVersion`

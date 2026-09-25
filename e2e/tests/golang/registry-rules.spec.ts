@@ -337,17 +337,17 @@ test.describe('golang registry rules (raw HTTP)', () => {
   );
 
   test(
-    '@v/list is a sorted, newline-joined text/plain body; an unknown module is 200 with an empty ' +
-      'body, never 404 (R8)',
+    '@v/list is a sorted, newline-joined text/plain body; an unknown module is a text/plain 404, ' +
+      'so the go command tries the next GOPROXY entry (R8, RPS-1428)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'list');
       const admin = adminCredential();
 
       const unknownRes = await rawGet(layout.repoName, admin, listRelPath(layout.modulePath));
-      expect(unknownRes.status, 'an unknown module never 404s').toBe(200);
+      expect(unknownRes.status, 'an unknown module is not found, not an empty list').toBe(404);
       expect(unknownRes.contentType).toBe('text/plain');
-      expect(parseVersionList(unknownRes.body)).toEqual([]);
+      expect(new TextDecoder().decode(unknownRes.body)).toContain('not found');
 
       for (const version of ['v0.2.0', 'v0.1.0', 'v0.10.0']) {
         const built = await buildModuleZip({ modulePath: layout.modulePath, version });
@@ -525,8 +525,8 @@ test.describe('golang registry rules (raw HTTP)', () => {
   );
 
   test(
-    'deleting the last version removes the module, the wire still answers an empty list and a 404 ' +
-      'latest, and a republish brings the module back (RPS-1288)',
+    'deleting the last version removes the module, the wire answers a 404 list and a 404 latest, ' +
+      'and a republish brings the module back (RPS-1288, RPS-1428)',
     { tag: ['@negative'] },
     async ({ seeder, panelApi }) => {
       const layout = await newRepo(seeder, 'lastversion');
@@ -549,11 +549,10 @@ test.describe('golang registry rules (raw HTTP)', () => {
       expect(parseInfo(stillLatest.body).Version).toBe('v0.0.2');
 
       // The last one goes: the module goes with it. The wire answers as it does for a module that
-      // never existed: an empty list (200, not a 404) and no latest version.
+      // never existed: no list and no latest version, both 404 (RPS-1428).
       await panelApi.deleteGolangModuleVersion(layout.repoName, layout.modulePath, 'v0.0.2');
-      const emptyList = await rawGet(layout.repoName, admin, list);
-      expect(emptyList.status, 'an empty @v/list stays 200').toBe(200);
-      expect(emptyList.body, 'with an empty body').toHaveLength(0);
+      const goneList = await rawGet(layout.repoName, admin, list);
+      expect(goneList.status, 'a module without versions has no @v/list').toBe(404);
       expect((await rawGet(layout.repoName, admin, latest)).status).toBe(404);
       expect(
         (await rawGet(layout.repoName, admin, infoRelPath(layout.modulePath, 'v0.0.2'))).status,
