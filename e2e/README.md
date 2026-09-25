@@ -3116,8 +3116,8 @@ reads either repo setting) and no SNAPSHOT-file concept.
 Authorization spellings (R1/R3); the happy-path shape of `/names`/`/versions`/`/info`, including the
 RB-2 observation that no `ruby:`/`rubygems:` keys are ever emitted (R2/R9); the override rule's
 row-first ordering, re-verifying RPS-1060 still holds for Ruby (R4); malformed-gem 400s leaving
-nothing stored (R6); the full yank flow — success, re-yank refusal, a read-only token/USER-role
-password both refused with 401 (`MANAGE` permission), a yanked version's `.gem` file staying
+nothing stored (R6); the full yank flow — success, re-yank refusal, a read-only token refused with
+401 while a USER-role password may yank (yank is a `WRITE`, RPS-1317), a yanked version's `.gem` file staying
 downloadable (R8, RPS-1238, fixed), and a yanked version rejecting even an `allowOverride:true`
 re-push (R8); a panel-API delete (not a yank) allowing a clean re-publish (R5/R16); `specs.4.8.gz`'s
 gzip framing (RFC 1952, `gunzipSync` succeeds and `inflateSync` throws) and the prerelease/latest

@@ -35,8 +35,8 @@ final class DivergentRepoMapping {
   private String description;
 
   /** The column is NOT NULL, and a wrapper type does not imply it. */
-  @Column(name = "searchable")
-  private Boolean searchable;
+  @Column(name = "security_scan_enabled")
+  private Boolean securityScanEnabled;
 
   /** The column is varchar(20), not text. */
   @Column(name = "type", columnDefinition = "text")

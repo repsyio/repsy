@@ -91,7 +91,6 @@ class UsageUpdateServiceIT extends AbstractIntegrationTest {
     repo.setName(uniqueRepoName("usage"));
     repo.setType(RepoType.MAVEN);
     repo.setAllowOverride(true);
-    repo.setSearchable(true);
 
     final var saved = this.repoRepository.saveAndFlush(repo);
     this.createdRepoIds.add(saved.getId());

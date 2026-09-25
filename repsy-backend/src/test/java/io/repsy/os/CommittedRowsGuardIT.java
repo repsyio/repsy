@@ -152,7 +152,6 @@ class CommittedRowsGuardIT extends AbstractIntegrationTest {
     repo.setName(uniqueRepoName("guard"));
     repo.setType(RepoType.MAVEN);
     repo.setAllowOverride(true);
-    repo.setSearchable(true);
 
     return test.repoRepository.saveAndFlush(repo);
   }

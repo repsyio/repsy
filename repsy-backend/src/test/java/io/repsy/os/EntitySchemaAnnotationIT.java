@@ -61,7 +61,7 @@ class EntitySchemaAnnotationIT extends AbstractIntegrationTest {
         .hasSize(5)
         .anyMatch(p -> p.contains("name") && p.contains("varchar(25)") && p.contains("length=26"))
         .anyMatch(p -> p.contains("description") && p.contains("allows null"))
-        .anyMatch(p -> p.contains("searchable") && p.contains("NOT NULL"))
+        .anyMatch(p -> p.contains("security_scan_enabled") && p.contains("NOT NULL"))
         .anyMatch(p -> p.contains("type") && p.contains("columnDefinition"))
         .anyMatch(p -> p.contains("no_such_column") && p.contains("no such column"));
   }

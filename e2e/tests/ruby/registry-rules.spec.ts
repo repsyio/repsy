@@ -314,8 +314,8 @@ test.describe('ruby registry rules (raw HTTP)', () => {
   );
 
   test(
-    'gem yank: success, re-yank is refused, a read-only token/USER-role password cannot yank, a ' +
-      'missing parameter is refused (R8)',
+    'gem yank: success, re-yank is refused, a read-only token cannot yank but a USER-role ' +
+      'password can, a missing parameter is refused (R8, RPS-1317)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'yank');
@@ -334,7 +334,7 @@ test.describe('ruby registry rules (raw HTTP)', () => {
         gemName: layout.packageName,
         version: '1.0.0',
       });
-      expect(roYank.status, 'a read-only token cannot yank (MANAGE)').toBe(401);
+      expect(roYank.status, 'a read-only token cannot yank (WRITE)').toBe(401);
 
       const user = await seeder.createUser();
       const userCred = {
@@ -343,17 +343,13 @@ test.describe('ruby registry rules (raw HTTP)', () => {
         password: user.password,
         kind: 'password' as const,
       };
+      // Yank is a WRITE (RPS-1317), like Cargo yank and NuGet unlist: a USER-role account may
+      // yank, and it is this yank that the admin's re-yank below finds already done.
       const userYank = await rawYank(layout.repoName, userCred, {
         gemName: layout.packageName,
         version: '1.0.0',
       });
-      expect(userYank.status, 'a USER-role password cannot yank (not MANAGE)').toBe(401);
-
-      const okYank = await rawYank(layout.repoName, admin, {
-        gemName: layout.packageName,
-        version: '1.0.0',
-      });
-      expectMsgId(okYank, 200, undefined);
+      expectMsgId(userYank, 200, undefined);
 
       const reyank = await rawYank(layout.repoName, admin, {
         gemName: layout.packageName,
