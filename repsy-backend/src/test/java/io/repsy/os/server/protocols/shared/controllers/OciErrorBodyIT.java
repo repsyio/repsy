@@ -147,7 +147,7 @@ class OciErrorBodyIT extends AbstractIntegrationTest {
         response,
         401,
         "UNAUTHORIZED",
-        "The user has logged in but has no permissions.",
+        "The credentials are missing, invalid or expired, or they do not allow this action.",
         "unAuthorized");
   }
 

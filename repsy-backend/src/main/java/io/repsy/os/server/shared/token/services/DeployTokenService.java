@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.shared.token.services;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.generated.model.DeployTokenForm;
 import io.repsy.os.generated.model.TokenInfo;
@@ -31,6 +32,7 @@ import io.repsy.os.shared.token.utils.TokenFactory;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
@@ -107,6 +109,8 @@ public class DeployTokenService {
 
     if (repoDeployToken.getExpirationDate() == null) {
       repoDeployToken.setExpirationDate(now.plus(DEFAULT_EXPIRATION_DURATION));
+    } else if (isBeyondMaximumExpiration(repoDeployToken.getExpirationDate(), now)) {
+      throw new BadRequestException("deployTokenExpirationTooLate");
     }
 
     final var dayDuration =
@@ -120,6 +124,20 @@ public class DeployTokenService {
         .token(generatedToken)
         .username(repoDeployToken.getUsername())
         .build();
+  }
+
+  /**
+   * Whether the expiration date falls after the last day the panel offers, which is today plus
+   * {@link #DEFAULT_EXPIRATION_DURATION} in UTC. The days are compared, not the instants: the panel
+   * sends the chosen day at the current time of day, so an instant comparison would reject its own
+   * maximum by a few milliseconds.
+   */
+  private static boolean isBeyondMaximumExpiration(
+      final @NonNull Instant expirationDate, final @NonNull Instant now) {
+
+    final var lastDay = now.plus(DEFAULT_EXPIRATION_DURATION).atZone(ZoneOffset.UTC).toLocalDate();
+
+    return expirationDate.atZone(ZoneOffset.UTC).toLocalDate().isAfter(lastDay);
   }
 
   @Transactional
