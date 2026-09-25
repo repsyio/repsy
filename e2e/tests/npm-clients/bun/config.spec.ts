@@ -372,7 +372,7 @@ test(
 );
 
 test(
-  'bun installs an os=win32 optional dependency on linux because the packument it reads is abbreviated',
+  'bun skips an os=win32 optional dependency on linux from the abbreviated packument too (RPS-1356)',
   {
     tag: ['@bun', '@config', '@abbreviated'],
   },
@@ -390,8 +390,8 @@ test(
       expect(published.result.exitCode, `publish: ${published.result.command}`).toBe(0);
     }
 
-    // The same install twice: as bun asks (the abbreviated packument, which lacks `os`/`cpu`,
-    // RPS-1356), and with the request rewritten to the full packument, which has them.
+    // The same install twice: as bun asks (the abbreviated packument, which lacked `os`/`cpu` until
+    // RPS-1356 and made bun install the package), and with the request rewritten to the full one.
     const installs = {} as Record<'abbreviated' | 'full', boolean>;
     for (const [accepted, forwardHeaders] of [
       ['abbreviated', undefined],
@@ -417,7 +417,7 @@ test(
         await recorder.stop();
       }
     }
-    expect(installs.abbreviated, 'RPS-1356: installed from the abbreviated packument').toBe(true);
-    expect(installs.full, 'skipped when the packument carries os/cpu').toBe(false);
+    expect(installs.abbreviated, 'RPS-1356: skipped from the abbreviated packument').toBe(false);
+    expect(installs.full, 'skipped from the full packument').toBe(false);
   },
 );

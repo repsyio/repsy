@@ -21,14 +21,12 @@
  * compared to the full one, and what each client does with a platform-restricted optional
  * dependency.
  *
- * RPS-1356: the abbreviated document is built by `AbstractNpmStorageService.
- * createAbbreviatedMetadata` from a fixed field list that lacks `os`, `cpu`, `libc`,
- * `peerDependenciesMeta` and `funding` (and `hasInstallScript`), all of which the npm
- * abbreviated-metadata format carries and clients read from it. A client that trusts the
- * abbreviated document alone then cannot skip an `os`/`cpu`-mismatched optional dependency, or
- * tell an optional peer from a required one. The full document has every one of them (the control),
- * so the data is stored; only the abbreviated view drops it. Asserted as observed, so a fix is one
- * flipped block.
+ * RPS-1356 (fixed): the abbreviated document is built by `AbstractNpmStorageService.
+ * createAbbreviatedMetadata`, which used to drop `os`, `cpu`, `libc`, `peerDependenciesMeta` and
+ * `funding` (and `hasInstallScript`), all of which the npm abbreviated-metadata format carries and
+ * clients read from it. A client that trusts the abbreviated document alone could then not skip an
+ * `os`/`cpu`-mismatched optional dependency, or tell an optional peer from a required one. They are
+ * copied through now, so both documents carry them.
  *
  * What a client does about it varies: npm, probed here, still skips the mismatched optional
  * dependency (it reads the platform from the tarball's manifest once it has fetched it), so nothing
@@ -58,10 +56,10 @@ const INSTALLS_WRONG_PLATFORM_OPTIONAL: Partial<Record<ClientId, boolean>> = {
   // Yarn 1 asks for the abbreviated document too (`Accept: application/vnd.npm.install-v1+json`, see
   // wire.spec.ts), and still skips the mismatched optional dependency: probed, not assumed.
   'yarn-classic': false,
-  // RPS-1356: bun resolves from the abbreviated packument (`wire.spec.ts`), which has no `os`/`cpu`,
-  // so it installs the win32-only package on linux (`bun/config.spec.ts` proves the cause: the same
-  // install with the request rewritten to the full packument skips it).
-  bun: true,
+  // bun resolves from the abbreviated packument (`wire.spec.ts`). It installed the win32-only package
+  // on linux while that document had no `os`/`cpu` (RPS-1356, `bun/config.spec.ts` proved the cause:
+  // the same install with the request rewritten to the full packument skipped it); it skips it now.
+  bun: false,
   // Berry sends no `Accept` (wire.spec.ts): it reads the full packument, and skips the mismatched
   // optional dependency.
   'yarn-berry': false,
@@ -69,7 +67,7 @@ const INSTALLS_WRONG_PLATFORM_OPTIONAL: Partial<Record<ClientId, boolean>> = {
 
 for (const client of clientsWith('publish')) {
   test(
-    `${client.label} publishes platform fields the abbreviated packument then drops`,
+    `${client.label} publishes platform fields the abbreviated packument carries too`,
     {
       tag: [client.tag, '@abbreviated'],
     },
@@ -121,17 +119,14 @@ for (const client of clientsWith('publish')) {
       expect(full.funding).toBe('https://funding.example/e2e');
 
       const abbreviated = await version(true);
-      expect(
-        abbreviated.peerDependencies,
-        'control: peerDependencies IS in the abbreviated one',
-      ).toEqual({
+      expect(abbreviated.peerDependencies, 'peerDependencies is in the abbreviated one').toEqual({
         [peer]: '*',
       });
       for (const field of PLATFORM_FIELDS) {
         expect(
           abbreviated[field],
-          `RPS-1356: the abbreviated packument drops "${field}"`,
-        ).toBeUndefined();
+          `RPS-1356: the abbreviated packument carries "${field}", as the full one does`,
+        ).toEqual(full[field]);
       }
     },
   );

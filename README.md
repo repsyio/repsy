@@ -385,6 +385,7 @@ and after the upgrade. A manifest whose file is missing or does not match its di
 | `OS_APP_JWT_SECRET` | JWT signing secret. If not set, a random 256-bit secret is generated on every startup — every restart/redeploy invalidates all existing sessions, forcing every user to log in again. Set a stable, secure random value for any production/self-host deployment. | *(random, regenerated on every startup)* |
 | `SERVER_PORT` | Repository operations port | `9090` |
 | `API_PORT` | Backend API and Frontend web UI port | `8080` |
+| `SERVER_COMPRESSION_ENABLED` | Gzip-compress JSON answers of 1 KB or more on the repository port (an npm packument of a package with many versions is megabytes of JSON). Set to `false` when a reverse proxy in front already compresses | `true` |
 | `H2_TCP_SERVER_ENABLED` | Enable the H2 TCP server. It binds loopback-only, so it is reachable only from inside the same container/host, not from an external client | `false` |
 | `H2_TCP_SERVER_PORT` | H2 TCP server port | `9092` |
 | `SECURITY_SCANNER` | Enables vulnerability scanning of pushed artifacts (`enabled`/`disabled`) | `disabled` |

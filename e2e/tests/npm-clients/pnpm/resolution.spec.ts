@@ -133,7 +133,7 @@ test(
 );
 
 test(
-  'pnpm skips a deprecated version when resolving a range (RPS-1360: deprecated "" after undeprecate)',
+  'pnpm skips a deprecated version when resolving a range, and no longer once it is undeprecated (RPS-1360)',
   {
     tag: ['@pnpm', '@resolution', '@deprecate'],
   },
@@ -157,19 +157,24 @@ test(
     const undeprecated = await pnpmClient.deprecate?.(writer, `${published.name}@1.2.0`, '');
     expect(undeprecated?.exitCode, `undeprecate: ${undeprecated?.stderr}`).toBe(0);
 
-    // RPS-1360: undeprecating leaves `"deprecated": ""` in the served packument (the public
-    // registry drops the field), and pnpm treats a version that HAS the field, empty or not, as
-    // deprecated: the range still skips 1.2.0. When the backend drops the field, this reads 1.2.0.
-    const served = JSON.parse(
-      (
-        await rawGetPackument(published.repoName, adminCredential(), published.name, true)
-      ).body.toString('utf8'),
-    ) as { versions: Record<string, { deprecated?: string }> };
-    expect(served.versions['1.2.0']?.deprecated, 'RPS-1360: the empty field is served').toBe('');
+    // RPS-1360: undeprecating removes the `deprecated` field (it used to leave `"deprecated": ""`,
+    // and pnpm treats a version that HAS the field, empty or not, as deprecated), so the range
+    // resolves to 1.2.0 again.
+    for (const abbreviated of [true, false]) {
+      const served = JSON.parse(
+        (
+          await rawGetPackument(published.repoName, adminCredential(), published.name, abbreviated)
+        ).body.toString('utf8'),
+      ) as { versions: Record<string, { deprecated?: string }> };
+      expect(
+        Object.hasOwn(served.versions['1.2.0'] ?? {}, 'deprecated'),
+        `RPS-1360: no deprecated field is served (abbreviated: ${abbreviated})`,
+      ).toBe(false);
+    }
     expect(
       await (await consumerOf(seeder, published, 'undeprecated', '^1.0.0')).marker(),
-      'RPS-1360: pnpm still skips the undeprecated 1.2.0',
-    ).toBe(published.markers['1.1.0']);
+      'RPS-1360: pnpm no longer skips the undeprecated 1.2.0',
+    ).toBe(published.markers['1.2.0']);
   },
 );
 

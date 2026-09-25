@@ -124,10 +124,12 @@ for (const publisher of clientsWith('deprecateCmd')) {
 
         const cleared = await publisher.deprecate?.(ctx, `${name}@1.0.0`, '');
         expect(cleared?.exitCode, `undeprecate: ${cleared?.command}\n${cleared?.stderr}`).toBe(0);
-        expect(
-          [undefined, ''],
-          'an empty deprecation message clears the deprecation (the field is left empty or removed)',
-        ).toContain(await deprecatedOf(repo.name, name, '1.0.0', false));
+        for (const abbreviated of [false, true]) {
+          expect(
+            await deprecatedOf(repo.name, name, '1.0.0', abbreviated),
+            `an empty deprecation message removes the field (RPS-1360), abbreviated: ${abbreviated}`,
+          ).toBeUndefined();
+        }
       },
     );
   });

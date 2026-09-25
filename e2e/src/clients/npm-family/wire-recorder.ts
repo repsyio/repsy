@@ -35,6 +35,7 @@
  */
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import zlib from 'node:zlib';
 
 import { env } from '../../env.js';
 
@@ -127,10 +128,14 @@ export async function startWireRecorder(options: WireRecorderOptions = {}): Prom
         entry.responseContentEncoding = first(upstreamRes.headers['content-encoding']);
 
         const contentType = first(upstreamRes.headers['content-type']) ?? '';
+        // A gzip answer (the registry compresses large packuments, RPS-1359) is unpacked to be
+        // rewritten, and goes on as identity: the recorded `responseContentEncoding` stays the
+        // registry's own.
+        const gzipped = entry.responseContentEncoding === 'gzip';
         const rewrite =
           options.rewriteTarballUrls === true &&
           contentType.includes('json') &&
-          !entry.responseContentEncoding;
+          (!entry.responseContentEncoding || gzipped);
         if (!rewrite) {
           res.writeHead(entry.status, upstreamRes.headers);
           upstreamRes.pipe(res);
@@ -140,12 +145,12 @@ export async function startWireRecorder(options: WireRecorderOptions = {}): Prom
         const chunks: Buffer[] = [];
         upstreamRes.on('data', (chunk: Buffer) => chunks.push(chunk));
         upstreamRes.on('end', () => {
-          const body = Buffer.from(
-            Buffer.concat(chunks).toString('utf8').split(env.repoBaseUrl).join(ownBase),
-            'utf8',
-          );
+          const received = Buffer.concat(chunks);
+          const text = (gzipped ? zlib.gunzipSync(received) : received).toString('utf8');
+          const body = Buffer.from(text.split(env.repoBaseUrl).join(ownBase), 'utf8');
           const headers = { ...upstreamRes.headers, 'content-length': String(body.length) };
           delete headers['transfer-encoding'];
+          delete headers['content-encoding'];
           res.writeHead(entry.status, headers);
           res.end(body);
         });
