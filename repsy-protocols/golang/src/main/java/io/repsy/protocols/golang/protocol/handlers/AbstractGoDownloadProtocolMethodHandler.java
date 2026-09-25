@@ -74,13 +74,24 @@ public abstract class AbstractGoDownloadProtocolMethodHandler<ID> implements Pro
       final var resource = this.goProtocolFacade.download(context);
 
       if (!resource.exists()) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        return notFound(context);
       }
 
       return ResponseEntity.ok().contentType(this.resolveContentType(context)).body(resource);
     } catch (final ItemNotFoundException _) {
-      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+      return notFound(context);
     }
+  }
+
+  /**
+   * The GOPROXY protocol wants a 404 (or 410) for what a proxy does not have, and a text/plain
+   * body, which the go command prints as the reason when no other GOPROXY entry has it either
+   * (RPS-1428).
+   */
+  private static ResponseEntity<Object> notFound(final ProtocolContext context) {
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .contentType(MediaType.TEXT_PLAIN)
+        .body("not found: " + ProtocolContextUtils.getRelativePath(context).getPath());
   }
 
   private MediaType resolveContentType(final ProtocolContext context) {
