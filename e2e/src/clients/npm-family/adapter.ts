@@ -138,6 +138,7 @@ export function npmFamilyAdapter(client: NpmFamilyClient): ProtocolAdapter<NpmFi
     label: client.label,
     tags: [client.tag],
     client: { name: client.label, publishVerb: 'publish', consumeVerb: 'install' },
+    knownClientExitDisagreement: client.exitQuirk,
 
     packageName: (runId, scenario) => `e2e-${runId}-${slugify(scenario.id)}`,
     version: () => boundedSemverVersion(),

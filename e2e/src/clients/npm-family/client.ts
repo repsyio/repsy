@@ -29,6 +29,7 @@
  * parallel workers never share state, and every command runs with that context.
  */
 import type { RunResult } from '../exec.js';
+import type { Outcome, Scenario } from '../../scenarios/types.js';
 import type { MaterializedCredential } from '../../scenarios/world.js';
 
 export type ClientId = 'npm' | 'pnpm' | 'yarn-classic' | 'yarn-berry' | 'bun';
@@ -122,6 +123,13 @@ export interface NpmFamilyClient {
   readonly caps: Capabilities;
   /** The lockfile the client writes, relative to its work directory. */
   readonly lockfile?: string;
+  /**
+   * A client whose exit code does not follow the registry's answer: a reason (never empty) for an
+   * `outcome` the client reports as SUCCESS (exit 0) although the registry refused it, `undefined`
+   * where it fails as it should. Yarn classic exits 0 for a publish refused with 401. The catalog loop
+   * then pins the quirk instead of asserting the usual "a refused request fails the client".
+   */
+  exitQuirk?(scenario: Scenario, side: 'publish' | 'consume', outcome: Outcome): string | undefined;
 
   /** An isolated context (HOME, work directory, config, cache) configured for `bindings`. */
   prepare(label: string, bindings: readonly RegistryBinding[]): Promise<ClientCtx>;

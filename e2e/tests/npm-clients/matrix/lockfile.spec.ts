@@ -54,6 +54,7 @@ import type { Seeder } from '../../../src/seed/seeder.js';
 const INTEGRITY_FAILURE: Partial<Record<ClientId, RegExp>> = {
   npm: /EINTEGRITY/,
   pnpm: /ERR_PNPM_TARBALL_INTEGRITY/,
+  'yarn-classic': /Integrity check failed for/,
 };
 
 /**

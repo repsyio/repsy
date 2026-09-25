@@ -867,6 +867,7 @@ src/clients/npm-family/
   client.ts          # NpmFamilyClient: the interface a matrix spec is written against, Capabilities, RegistryBinding, CLIENT_BINARIES
   config.ts          # renders .npmrc / .yarnrc (yarn classic) / .yarnrc.yml (berry) / bunfig.toml from RegistryBinding[] + the SEALED env
   npm-client.ts      # the npm CLI as an NpmFamilyClient (the baseline / reference implementation)
+  yarn-classic-client.ts  # yarn 1.22.22 as an NpmFamilyClient (RPS-1330 PR 3; see "Yarn classic")
   adapter.ts         # npmFamilyAdapter(client): a ProtocolAdapter (protocol 'npm', label + tag per client) for the shared catalog loop
   registry.ts        # ENABLED_CLIENTS (what the matrix runs against), clientsWith('<capability>'), INSTALLED_CLIENTS, versionOf()
   fixtures.ts        # package builders (single package, lib + app graph, extra manifest fields), publishPackage(), repo/token helpers
@@ -875,6 +876,7 @@ src/packages/npm-family/   # the mustache templates (header-less, triple-mustach
 tests/npm-clients/
   npm/publish-consume.spec.ts   # the 13-scenario catalog through the new harness: `npm[npm] > <scenario>`
   pnpm/*.spec.ts                # pnpm: catalog, workspace publish, commands (H-1/H-2), resolution
+  yarn-classic/publish-consume.spec.ts  # the catalog with yarn 1 + the yarn-only cells (always-auth, auth keys, scoped publish, tag, ...)
   versions.spec.ts              # --version of every installed client == its pin; config renderers read back by the client
   sealed-network.spec.ts        # the network seal, proven for all five clients
   matrix/*.spec.ts              # one file per matrix row, iterating clientsWith(...)
@@ -917,42 +919,42 @@ registry under test) is exercised the first time that client publishes and insta
 `sealedEnv()`: npm's is every test of this suite; the other four were probed by hand here (pnpm, bun and
 berry each answered `whoami` from the stack) and are covered by their own PRs.
 
-### Matrix (npm baseline; cells for the other clients are added by their PRs)
+### Matrix (npm baseline; each client's cells are added by its PR)
 
-| Row                                           | Spec                                          | npm cell                                          | Notes                                                                                                                                           |
-| --------------------------------------------- | --------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| catalog loop (13 scenarios)                   | `npm/publish-consume.spec.ts`                 | pass; `@smoke`: `password-admin`                  | the same catalog as `tests/npm`, through the new adapter                                                                                        |
-| 5b dependency graph                           | `matrix/lockfile.spec.ts`                     | pass                                              | app -> lib, both in one private repo, read-only token consumer                                                                                  |
-| 5c lockfile + frozen install                  | `matrix/lockfile.spec.ts`                     | pass, `@smoke`                                    | `package-lock.json` names the registry's own tarball URLs and integrity; `npm ci` in a fresh HOME works                                         |
-| 5d frozen install after an override republish | `matrix/lockfile.spec.ts`                     | pass (`EINTEGRITY`)                               | packument `integrity` is recomputed from the stored bytes, so `allowOverride` breaks every lockfile that recorded the version                   |
-| 6 dist-tags                                   | `matrix/dist-tags.spec.ts`                    | pass                                              | first publish under `--tag beta` also sets `latest`; add/ls/rm; `rm latest` and a tag on a missing version are refused                          |
-| 7 deprecate                                   | `matrix/deprecate.spec.ts`                    | pass                                              | served in the full and the abbreviated packument, printed on install (`npm warn deprecated`), cleared by an empty message                       |
-| 9 view / info                                 | `matrix/view.spec.ts`                         | pass                                              | `dist.tarball` is the registry address (RPS-1333); `time` is ISO UTC and is now (B5 would show here on a non-UTC stack); RPS-1357 pin           |
-| 2 whoami                                      | `matrix/registry-endpoints.spec.ts`           | pass (RPS-1329)                                   | `admin` for the password, the deploy token's own generated username for a token; anonymous is 401 with a Basic challenge even on a public repo  |
-| ping, search                                  | `matrix/registry-endpoints.spec.ts`           | pass (RPS-1329)                                   | free-text search only: no qualifier-only query (RPS-1343), no `size`/`from` (RPS-1344)                                                          |
-| 10 audit                                      | `matrix/registry-endpoints.spec.ts`           | pass (RPS-1329)                                   | exit 0, no vulnerabilities, and the recorder sees `POST /-/npm/v1/security/advisories/bulk` answered 200; the scanner is off, no Trivy involved |
-| 16 two repos, two scopes                      | `matrix/scoped-routing.spec.ts`               | pass                                              | the recorder proves token A only ever goes to repo A and token B to repo B, tarball GETs included                                               |
-| 17 `dist.tarball` host                        | `matrix/tarball-host.spec.ts` (`@local-only`) | pass (RPS-1333)                                   | published via `127.0.0.1`, consumed via `localhost` on a private repo: installs, and every read names `REPO_BASE_URL`                           |
-| 18 abbreviated packument                      | `matrix/abbreviated-metadata.spec.ts`         | RPS-1356 pin; npm skips a mismatched optional dep | see below                                                                                                                                       |
-| 19 wire trace                                 | `matrix/wire.spec.ts`                         | pass; RPS-1358, RPS-1359 pins                     | Accept, Authorization scheme (Bearer for a token, Basic for a password), User-Agent, `npm-command`                                              |
-| workspaces (11), login (2b), `unpublish` (8)  | --                                            | not in this PR                                    | 8 is `tests/npm/unpublish.spec.ts`; 11 comes with the pnpm/yarn/bun PRs, 2b is optional                                                         |
+| Row                                           | Spec                                          | npm cell                                          | yarn classic cell                                                                                                                              | Notes                                                                                                                                           |
+| --------------------------------------------- | --------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| catalog loop (13 scenarios)                   | `npm/publish-consume.spec.ts`                 | pass; `@smoke`: `password-admin`                  | pass, 13/13, no expectation override; `@smoke`: `password-admin`. A publish refused with 401 exits 0 (pinned by `knownClientExitDisagreement`) | the same catalog as `tests/npm`, through the new adapter                                                                                        |
+| 5b dependency graph                           | `matrix/lockfile.spec.ts`                     | pass                                              | pass                                                                                                                                           | app -> lib, both in one private repo, read-only token consumer                                                                                  |
+| 5c lockfile + frozen install                  | `matrix/lockfile.spec.ts`                     | pass, `@smoke`                                    | pass, `@smoke`; `yarn.lock` `resolved` is the registry URL plus `#<sha1>`                                                                      | `package-lock.json` names the registry's own tarball URLs and integrity; `npm ci` in a fresh HOME works                                         |
+| 5d frozen install after an override republish | `matrix/lockfile.spec.ts`                     | pass (`EINTEGRITY`)                               | pass (`Integrity check failed for`)                                                                                                            | packument `integrity` is recomputed from the stored bytes, so `allowOverride` breaks every lockfile that recorded the version                   |
+| 6 dist-tags                                   | `matrix/dist-tags.spec.ts`                    | pass                                              | pass; `yarn tag add` exits 1 though the tag is set (RPS-1362, pinned)                                                                          | first publish under `--tag beta` also sets `latest`; add/ls/rm; `rm latest` and a tag on a missing version are refused                          |
+| 7 deprecate                                   | `matrix/deprecate.spec.ts`                    | pass                                              | publisher N/A (no command); as consumer: pass, the message is printed as a `warning`                                                           | served in the full and the abbreviated packument, printed on install (`npm warn deprecated`), cleared by an empty message                       |
+| 9 view / info                                 | `matrix/view.spec.ts`                         | pass                                              | pass (`yarn info --json`, one `{"type":"inspect","data":...}` line)                                                                            | `dist.tarball` is the registry address (RPS-1333); `time` is ISO UTC and is now (B5 would show here on a non-UTC stack); RPS-1357 pin           |
+| 2 whoami                                      | `matrix/registry-endpoints.spec.ts`           | pass (RPS-1329)                                   | N/A (no command)                                                                                                                               | `admin` for the password, the deploy token's own generated username for a token; anonymous is 401 with a Basic challenge even on a public repo  |
+| ping, search                                  | `matrix/registry-endpoints.spec.ts`           | pass (RPS-1329)                                   | N/A (no command)                                                                                                                               | free-text search only: no qualifier-only query (RPS-1343), no `size`/`from` (RPS-1344)                                                          |
+| 10 audit                                      | `matrix/registry-endpoints.spec.ts`           | pass (RPS-1329)                                   | N/A: `yarn audit` always asks registry.yarnpkg.com (`@not-applicable` cell)                                                                    | exit 0, no vulnerabilities, and the recorder sees `POST /-/npm/v1/security/advisories/bulk` answered 200; the scanner is off, no Trivy involved |
+| 16 two repos, two scopes                      | `matrix/scoped-routing.spec.ts`               | pass                                              | pass (needs always-auth, the client default)                                                                                                   | the recorder proves token A only ever goes to repo A and token B to repo B, tarball GETs included                                               |
+| 17 `dist.tarball` host                        | `matrix/tarball-host.spec.ts` (`@local-only`) | pass (RPS-1333)                                   | pass (RPS-1333)                                                                                                                                | published via `127.0.0.1`, consumed via `localhost` on a private repo: installs, and every read names `REPO_BASE_URL`                           |
+| 18 abbreviated packument                      | `matrix/abbreviated-metadata.spec.ts`         | RPS-1356 pin; npm skips a mismatched optional dep | RPS-1356 pin; yarn asks for the abbreviated document and still skips the mismatched optional dep                                               | see below                                                                                                                                       |
+| 19 wire trace                                 | `matrix/wire.spec.ts`                         | pass; RPS-1358, RPS-1359 pins                     | pass; RPS-1358, RPS-1359 pins; asks for the abbreviated packument, no `npm-command`                                                            | Accept, Authorization scheme (Bearer for a token, Basic for a password), User-Agent, `npm-command`                                              |
+| workspaces (11), login (2b), `unpublish` (8)  | --                                            | not in this PR                                    | N/A: no `workspace:` protocol, `yarn login` needs a TTY, no unpublish command                                                                  | 8 is `tests/npm/unpublish.spec.ts`; 11 comes with the pnpm/yarn/bun PRs, 2b is optional                                                         |
 
 N/A by design: proxy/remote passthrough (row 12: OS has no npm proxy repository, so no fixture ever
 depends on a public package).
 
 ### Hypotheses probed live for this PR (the plan's H-n, observed)
 
-| H             | Plan                                                                                                          | Observed                                                                                                                                                                                                               |
-| ------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| H-9           | the client asks for the abbreviated packument                                                                 | **refuted for npm 11.19**: an install sends `Accept: application/json` (the full packument) and `npm view` the same, so npm never reads the abbreviated document. Pinned in `matrix/wire.spec.ts`                      |
-| H-14          | a frozen install fails after an override republish                                                            | confirmed for npm: `EINTEGRITY`, nothing installed                                                                                                                                                                     |
-| H-15          | a client installs an `os:["win32"]` optional dependency on linux because the abbreviated packument lacks `os` | **refuted for npm**: npm still skips it (it reads `os`/`cpu` from the tarball's own manifest after fetching it; the lockfile records them). The abbreviated gap itself is real RPS-1356                                |
-| H-16/17 (B1)  | consumers get a foreign tarball host and 401                                                                  | fixed by RPS-1333: publish via `127.0.0.1`, consume via `localhost` on a private repo succeeds                                                                                                                         |
-| H-19          | the deprecation message is printed on install                                                                 | confirmed for npm                                                                                                                                                                                                      |
-| H-11 (partly) | bun reads `.npmrc`                                                                                            | confirmed by hand: bun 1.3.14 and pnpm 12.6.0 read `registry` + `_authToken` from `$HOME/.npmrc` alone (`whoami`, `view` of a private package)                                                                         |
-| H-3 (partly)  | yarn classic sends no auth unless always-auth                                                                 | not tested; but with only a `$HOME/.npmrc` naming the registry, `yarn config get registry` prints registry.yarnpkg.com, so yarn classic needs `.yarnrc` (rendered and read back by `versions.spec.ts`) or `--registry` |
-| H-7 (partly)  | yarn berry needs `npmAlwaysAuth` for an unscoped private read                                                 | confirmed by hand: `yarn npm info <pkg>` on a private repo without it is `YN0041: Invalid authentication (as an anonymous user)`, while `yarn npm whoami` (explicitly authenticated) works                             |
-| H-20, 18      | `npm login` fallback, npm workspaces                                                                          | not probed here                                                                                                                                                                                                        |
+| H             | Plan                                                                                                          | Observed                                                                                                                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H-9           | the client asks for the abbreviated packument                                                                 | **refuted for npm 11.19**: an install sends `Accept: application/json` (the full packument) and `npm view` the same, so npm never reads the abbreviated document. Pinned in `matrix/wire.spec.ts` |
+| H-14          | a frozen install fails after an override republish                                                            | confirmed for npm: `EINTEGRITY`, nothing installed                                                                                                                                                |
+| H-15          | a client installs an `os:["win32"]` optional dependency on linux because the abbreviated packument lacks `os` | **refuted for npm**: npm still skips it (it reads `os`/`cpu` from the tarball's own manifest after fetching it; the lockfile records them). The abbreviated gap itself is real RPS-1356           |
+| H-16/17 (B1)  | consumers get a foreign tarball host and 401                                                                  | fixed by RPS-1333: publish via `127.0.0.1`, consume via `localhost` on a private repo succeeds                                                                                                    |
+| H-19          | the deprecation message is printed on install                                                                 | confirmed for npm                                                                                                                                                                                 |
+| H-11 (partly) | bun reads `.npmrc`                                                                                            | confirmed by hand: bun 1.3.14 and pnpm 12.6.0 read `registry` + `_authToken` from `$HOME/.npmrc` alone (`whoami`, `view` of a private package)                                                    |
+| H-3           | yarn classic sends no auth unless always-auth                                                                 | confirmed for an unscoped packument GET, and a scoped one does send it; see "Yarn classic". (Also refuted: yarn classic does NOT need a `.yarnrc` for its registry, `.npmrc` alone is read.)      |
+| H-7 (partly)  | yarn berry needs `npmAlwaysAuth` for an unscoped private read                                                 | confirmed by hand: `yarn npm info <pkg>` on a private repo without it is `YN0041: Invalid authentication (as an anonymous user)`, while `yarn npm whoami` (explicitly authenticated) works        |
+| H-20, 18      | `npm login` fallback, npm workspaces                                                                          | not probed here                                                                                                                                                                                   |
 
 ### Backend candidates found (npm baseline; file a ticket for each, then replace the placeholder)
 
@@ -1074,6 +1076,96 @@ plan said). `pnpm logout` sends `DELETE /-/user/token/<token>`, gets 404 and **e
   not be revoked from a client (`commands.spec.ts`).
 
 Still open and only observed, not asserted as fixed: RPS-1356, 1357, 1358, 1359, 1343, 1344, 1345.
+
+### Yarn classic (1.22.22, RPS-1330 PR 3)
+
+`yarn-classic-client.ts` (`/opt/clients/yarn1/bin/yarn`, tag `@yarn-classic`) is registered in
+`ENABLED_CLIENTS`, so every matrix cell above runs for it, plus `tests/npm-clients/yarn-classic/
+publish-consume.spec.ts` (the 13-scenario catalog and the yarn-only cells). `--grep @yarn-classic`
+selects all of it (36 tests including the version, config and network-seal smokes, about 19 s warm).
+
+**What a user must configure (B11: the panel's npm instructions cover npm only).** The panel's
+snippet (`npm config set registry <url>/<repo>/` and `//<host>:<port>/<repo>/:_authToken=<token>` in
+`~/.npmrc`) is read by yarn 1 as it is, with **one addition it does not mention**:
+
+| Need                                                                        | What yarn 1 does (probed)                                                                                                                                                                                                                       |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| registry, scopes, credentials                                               | read from `~/.npmrc` (`registry=`, `@scope:registry=`, `//host/repo/:_authToken=`, `:_auth=`); `--registry` works too. No `.yarnrc` needed                                                                                                      |
+| **`always-auth=true`**                                                      | **required to read an unscoped package of a PRIVATE repository**: without it yarn sends no `Authorization` on the packument GET, gets 401 and says `Couldn't find package "<name>" on the "npm" registry` (H-3). A scoped package needs nothing |
+| the auth key's path                                                         | matched exactly against the registry: `//host:port/<repo>/:_authToken` works (with or without a trailing slash on `registry=`); a host-level `//host:port/:_authToken` or another repository's key sends **nothing** (H-4)                      |
+| publish                                                                     | `yarn publish <tarball>` (or none, from the directory); credentials from the same `.npmrc`, no prompt. With no token at all `--non-interactive` stops with "No token found" before sending anything                                             |
+| `.yarnrc`                                                                   | only for `dist.tarball` (below) and `yarn config`; `--no-default-rc` must NOT be used, it makes yarn ignore every `.npmrc`, credentials included, and a `_authToken` line in a `.yarnrc` is not read                                            |
+| `whoami`, `ping`, `search`, `deprecate`, `unpublish`, `audit` against Repsy | none exists (`yarn whoami` is taken for a script name); `yarn audit` always asks `https://registry.yarnpkg.com/-/npm/v1/security/audits`, even with `--registry`, so Repsy's audit endpoints (RPS-1329) are never used by yarn 1                |
+
+So for yarn 1 the panel needs to say `always-auth=true` (for a private repository, unscoped packages)
+and that the `_authToken` key must carry the repository path. `yarn login` is interactive only
+(`Can't answer a question unless a user TTY`), which is not a way to sign in from a script either.
+
+**How the harness runs it.** `.npmrc` in the isolated `$HOME` (`writeNpmrc`), `always-auth=true` unless a
+binding says `alwaysAuth: false`, `--cache-folder` in that HOME, `--non-interactive`,
+`YARN_IGNORE_PATH=1`, `NODE_OPTIONS=--no-deprecation`, no `packageManager` in a fixture. `yarn publish
+<tarball>` reads the manifest from the `package.json` of the working directory and the bytes from the
+tarball, so it runs in the package directory; it has no `--force` and no client-side "version exists"
+check, so an override republish is just another PUT.
+
+**Deviations from the plan and from PR 1** (each observed live):
+
+- **`.npmrc` alone is enough for the registry.** PR 1 read `yarn config get registry` (which prints
+  registry.yarnpkg.com) as "yarn ignores `.npmrc`'s registry"; that command reads yarn's own rc chain.
+  `add`, `install` and `publish` use the npm registry object, which reads `.npmrc`. The `.yarnrc`
+  renderer of PR 1 stays (and is exercised by `@publish` and `@scoped-publish`).
+- **`--no-default-rc` + `--use-yarnrc` (the plan's flags) do not work with credentials**: with
+  `--no-default-rc` yarn ignores every `.npmrc`, and credentials in a `.yarnrc` are not read. The client
+  relies on the isolated `$HOME` instead (yarn walks up from the working directory, then `$HOME`; the
+  temp directory has no rc above it).
+- **`yarn publish` exits 0 and prints "Published." when the registry answers 401** (and 400 or 404):
+  its `request` resolves those as `false`, a "soft rejection" `publish` never checks (`cli.js`). Only 403,
+  409 and 5xx fail the command. Nothing is stored (asserted by the loop's `expectNothingStored`). The
+  catalog loop got one optional hook for it, `ProtocolAdapter.knownClientExitDisagreement`, which
+  replaces "a refused request fails the client" with the pinned quirk for exactly that side and outcome
+  (a publish answered 401 with a credential sent; with none, yarn fails before sending). A consume is
+  unaffected: an unauthorised packument GET fails `add` with exit 1.
+- **An auth failure and a missing package read the same**: 401 on the packument (no credential, a wrong
+  token, a host-level key) is reported as `Couldn't find package`. A 401 on a TARBALL fetch is retried
+  three more times ("trouble with your network connection", about 12 s) before it fails (seen once with
+  a tarball on another host than the registry, not asserted: it costs 12 s).
+- **`dist.tarball` in a publish is built from yarn's own `registry` option**, so with the registry in
+  `.npmrc` alone (default or scope) it names `registry.yarnpkg.com`
+  (`http://registry.yarnpkg.com/<name>/-/<name>-<v>.tgz`, and for a scoped package `@scope/name/-/
+@scope/name-<v>.tgz`, the scope repeated in the file name: H-5); only a `.yarnrc` registry makes it
+  the repository. Since RPS-1333 the registry ignores it: the served `dist.tarball` is
+  `<REPO_BASE_URL>/<repo>/@scope/name/-/name-<v>.tgz`, and the scoped install works
+  (`@scoped-publish`, three configurations; the PUT is one `@scope%2fname` path segment, the attachment
+  is named `@scope/name-<v>.tgz`). Before RPS-1333 every yarn 1 user without a `.yarnrc` would have been
+  served that foreign host.
+- **The packument is asked for in abbreviated form** (`Accept: application/vnd.npm.install-v1+json;
+q=1.0, application/json; q=0.8, */*`, `User-Agent: yarn/1.22.22 npm/? node/v24.x linux x64`, no
+  `npm-command`), so RPS-1356 (the abbreviated document drops `os`/`cpu`/...) is what yarn 1 reads, unlike
+  npm 11.19 (H-9 is confirmed here). It still skips a `win32`-only optional dependency on linux (H-15
+  refuted for yarn 1 too: the tarball's own manifest decides, and `yarn.lock` records no `os`).
+  `yarn info` asks for the full document.
+- **`yarn tag add` reports failure although the tag is set (RPS-1362)**, pinned in
+  `matrix/dist-tags.spec.ts` (`TAG_ADD_EXIT`) and `@tag`: `PUT /-/package/<pkg>/dist-tags/<tag>` answers
+  200 with an EMPTY body; yarn 1 only accepts an answer whose body has an `ok` field, prints "Couldn't
+  add tag" and exits 1. `tag list` and `tag remove` work; `tag rm latest` and a tag on a missing version
+  are refused by the registry (400), which yarn reports as a failure. Use the spellings `list`/`remove`
+  (`ls`/`rm` warn that they are deprecated).
+- **`yarn.lock`**: `resolved "<REPO_BASE_URL>/<repo>/<name>/-/<name>-<v>.tgz#<sha1>"` plus `integrity
+sha512-...`, both from the packument (`@lockfile`); an override republish makes a frozen install fail
+  with `Integrity check failed for "<name>" (computed integrity doesn't match our records ...)`, nothing
+  installed.
+
+**Hypotheses** (plan H-n): H-3 confirmed (unscoped GET carries no `Authorization`, scoped does; the
+credential is per-registry). H-4 confirmed (exact repository path; see above). H-5 confirmed with the
+nuance above (the URL yarn sends is not the repository's, and the registry normalises it). H-9 confirmed
+for yarn 1 (abbreviated). H-14 confirmed. H-15 refuted. H-16/17 fixed by RPS-1333. H-17 (republish
+pre-flight): yarn 1 has none, the request always reaches the server. H-19 confirmed (a `warning` line on
+`add`).
+
+**Backend gap found here** (filed, not asserted as fixed): **RPS-1362**, the empty dist-tag `PUT`
+answer above. Open backend tickets this client meets, asserted as observed: RPS-1356 (`matrix/
+abbreviated-metadata.spec.ts`, and yarn asks for that document), RPS-1357 (`matrix/view.spec.ts`; yarn
+adds no `_resolved`), RPS-1358 and RPS-1359 (`matrix/wire.spec.ts`).
 
 ## Cargo runner
 
