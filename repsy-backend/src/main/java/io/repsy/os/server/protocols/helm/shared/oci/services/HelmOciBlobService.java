@@ -15,12 +15,14 @@
  */
 package io.repsy.os.server.protocols.helm.shared.oci.services;
 
+import com.github.f4b6a3.uuid.UuidCreator;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.helm.shared.oci.entities.HelmOciBlob;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciBlobRepository;
-import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
 import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.Builder;
@@ -37,14 +39,38 @@ public class HelmOciBlobService implements OciBlobService<UUID> {
 
   private final HelmOciBlobRepository helmOciBlobRepository;
 
+  /**
+   * Returns the blob row of the digest, inserting it when this is the first upload of that blob.
+   *
+   * <p>Two uploads of one blob (two CI jobs pushing the same chart, or charts that share a config
+   * blob) both find no row and both insert. The insert skips a row that already exists instead of
+   * failing on the unique index (the loser used to be answered 409 {@code itemAlreadyExists}, which
+   * an OCI client reads as {@code DENIED}); when the other upload has inserted the row but not
+   * committed yet, the statement waits for it, and the second lookup then finds the committed row
+   * (RPS-1342). The caller cannot repeat the transaction instead: the blob file it finalises has
+   * been moved by then.
+   */
   @Override
   @Transactional
   public HelmOciBlobInfo findOrCreate(final HelmOciBlobForm form, final UUID repoId) {
+    final var existing = this.helmOciBlobRepository.findByRepoIdAndDigest(repoId, form.getDigest());
+
+    if (existing.isPresent()) {
+      return this.toDetail(existing.get());
+    }
+
+    this.helmOciBlobRepository.insertIfAbsent(
+        UuidCreator.getTimeOrderedEpoch(),
+        repoId,
+        form.getDigest(),
+        form.getSize(),
+        form.getMediaType(),
+        Instant.now());
+
     return this.helmOciBlobRepository
         .findByRepoIdAndDigest(repoId, form.getDigest())
         .map(this::toDetail)
-        .orElseGet(
-            () -> this.toDetail(this.helmOciBlobRepository.save(this.buildEntity(form, repoId))));
+        .orElseThrow(() -> new ItemNotFoundException("blobNotFound"));
   }
 
   @Override
@@ -56,18 +82,6 @@ public class HelmOciBlobService implements OciBlobService<UUID> {
   @Transactional
   public void deleteByRepoIdAndDigest(final UUID repoId, final String digest) {
     this.helmOciBlobRepository.deleteByRepoIdAndDigest(repoId, digest);
-  }
-
-  private HelmOciBlob buildEntity(final HelmOciBlobForm form, final UUID repoId) {
-    final var repo = new Repo();
-    repo.setId(repoId);
-
-    final var blob = new HelmOciBlob();
-    blob.setRepo(repo);
-    blob.setDigest(form.getDigest());
-    blob.setSize(form.getSize());
-    blob.setMediaType(form.getMediaType());
-    return blob;
   }
 
   private BlobDetail toDetail(final HelmOciBlob blob) {

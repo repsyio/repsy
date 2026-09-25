@@ -31,6 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.ResourceBundleMessageSource;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.http.MediaType;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.web.servlet.MockMvc;
@@ -116,6 +117,20 @@ class OciErrorBodyAdviceTest {
   }
 
   @Test
+  @DisplayName(
+      "answers a lock that could not be taken with 503, Retry-After and the distribution body")
+  void unavailableLockIsARetryableRegistryError() throws Exception {
+    this.mockMvc
+        .perform(protocol("/v2/repo/app/manifests/locked"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string("Retry-After", "1"))
+        .andExpect(jsonPath("$.errors.length()").value(1))
+        .andExpect(jsonPath("$.errors[0].code").value("UNKNOWN"))
+        .andExpect(jsonPath("$.errors[0].detail").value("resourceBusy"))
+        .andExpect(jsonPath("$.msgId").doesNotExist());
+  }
+
+  @Test
   @DisplayName("keeps the content type JSON")
   void keepsContentType() throws Exception {
     final var result =
@@ -171,6 +186,11 @@ class OciErrorBodyAdviceTest {
     @GetMapping("/v2/repo/app/manifests/contended")
     String contended() {
       throw new ObjectOptimisticLockingFailureException(Object.class, "id");
+    }
+
+    @GetMapping("/v2/repo/app/manifests/locked")
+    String locked() {
+      throw new CannotAcquireLockException("lock wait timeout");
     }
 
     @GetMapping("/v2/repo/app/manifests/crash")

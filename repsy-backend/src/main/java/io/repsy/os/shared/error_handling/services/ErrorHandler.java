@@ -35,6 +35,9 @@ import io.repsy.os.shared.error_handling.exceptions.InvalidPagingParameterExcept
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
+import jakarta.persistence.LockTimeoutException;
+import jakarta.persistence.OptimisticLockException;
+import jakarta.persistence.PessimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ValidationException;
@@ -48,6 +51,7 @@ import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.convert.ConversionFailedException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -100,9 +104,10 @@ public class ErrorHandler {
   private static final @NonNull String ERR_SCAN_EXECUTOR_SATURATED = "scanExecutorSaturated";
   private static final @NonNull String ERR_TOO_MANY_REQUESTS = "tooManyRequests";
   private static final @NonNull String ERR_CONCURRENT_MODIFICATION = "concurrentModification";
+  private static final @NonNull String ERR_RESOURCE_BUSY = "resourceBusy";
 
-  /** Seconds an OCI client is told to wait before it repeats a push that lost a version race. */
-  private static final @NonNull String CONCURRENT_MODIFICATION_RETRY_AFTER = "1";
+  /** Seconds a client is told to wait before it repeats a request that lost a lock race. */
+  private static final @NonNull String LOCK_FAILURE_RETRY_AFTER = "1";
 
   private final @NonNull RestResponseFactory resp;
 
@@ -808,9 +813,12 @@ public class ErrorHandler {
    * Handles a write that lost an optimistic-lock race: another request changed the same row (an
    * entity with a {@code @Version}) between this request's read and its commit, so the version
    * check matched no row. It covers {@code ObjectOptimisticLockingFailureException}, which is what
-   * Spring translates that failure to. Nothing of the losing request was written (its transaction
-   * rolled back) and the same request repeated normally succeeds, so it is not a server error
-   * (RPS-1325). Both answers carry the same {@code concurrentModification} message id.
+   * Spring translates that failure to, and a raw {@code
+   * jakarta.persistence.OptimisticLockException} that reaches the handler without Spring's
+   * translation (an {@code EntityManager} used outside a repository). Nothing of the losing request
+   * was written (its transaction rolled back) and the same request repeated normally succeeds, so
+   * it is not a server error (RPS-1325, RPS-1342). Both answers carry the same {@code
+   * concurrentModification} message id.
    *
    * <p>A panel or other protocol request gets 409: the client re-reads and repeats. A request on
    * the OCI {@code /v2/} endpoints gets 503 with a {@code Retry-After} instead. Registry clients
@@ -823,9 +831,9 @@ public class ErrorHandler {
    * @param ex Thrown exception
    * @return REST response
    */
-  @ExceptionHandler(OptimisticLockingFailureException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
-      final @NonNull OptimisticLockingFailureException ex,
+  @ExceptionHandler({OptimisticLockingFailureException.class, OptimisticLockException.class})
+  @Nullable ResponseEntity<RestResponse<String>> handleOptimisticLockFailure(
+      final @NonNull Exception ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
@@ -837,15 +845,64 @@ public class ErrorHandler {
     log.warn("Optimistic lock failure: {}", exceptionToString(ex, request));
 
     if (OciErrors.isOciRequest(request)) {
-      return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-          .contentType(MediaType.APPLICATION_JSON)
-          .header(HttpHeaders.RETRY_AFTER, CONCURRENT_MODIFICATION_RETRY_AFTER)
-          .body(this.resp.error(ERR_CONCURRENT_MODIFICATION));
+      return retryLater(this.resp.error(ERR_CONCURRENT_MODIFICATION));
     }
 
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(ERR_CONCURRENT_MODIFICATION));
+  }
+
+  /**
+   * Handles a statement that could not get a database lock: it timed out waiting for a row that
+   * another transaction holds ({@code CannotAcquireLockException}), the database picked it as the
+   * victim of a deadlock ({@code DeadlockLoserDataAccessException}), or a serializable transaction
+   * could not be ordered ({@code CannotSerializeTransactionException}). All three are subclasses of
+   * Spring's {@code PessimisticLockingFailureException}; the raw {@code
+   * jakarta.persistence.PessimisticLockException} and {@code LockTimeoutException} that reach the
+   * handler without Spring's translation are treated the same. A {@code PESSIMISTIC_WRITE} that
+   * waits too long (RPS-1273 takes one per chart) must not surface as a server error (RPS-1342).
+   *
+   * <p>The answer is 503 with {@code Retry-After} on every endpoint, not the 409 of an optimistic
+   * failure. A 409 says the request collides with the current state of the item and the client
+   * should look at it again; here the item did not change under the request, the server was only
+   * momentarily unable to serve it, and the identical request repeated a moment later succeeds.
+   * That is what 503 with {@code Retry-After} means, and generic HTTP clients (and registry
+   * clients, which retry a 5xx and give up on a 409) act on it without any knowledge of this API.
+   * The message id differs from {@code concurrentModification} because nothing was changed by
+   * another request.
+   *
+   * @param ex Thrown exception
+   * @return REST response
+   */
+  @ExceptionHandler({
+    PessimisticLockingFailureException.class,
+    PessimisticLockException.class,
+    LockTimeoutException.class
+  })
+  @Nullable ResponseEntity<RestResponse<String>> handleLockUnavailable(
+      final @NonNull Exception ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Database lock unavailable", ex);
+      return null;
+    }
+
+    log.warn("Database lock unavailable: {}", exceptionToString(ex, request));
+
+    return retryLater(this.resp.error(ERR_RESOURCE_BUSY));
+  }
+
+  /** A 503 that tells the client to repeat the request after {@code Retry-After} seconds. */
+  private static ResponseEntity<RestResponse<String>> retryLater(
+      final @NonNull RestResponse<String> body) {
+
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .contentType(MediaType.APPLICATION_JSON)
+        .header(HttpHeaders.RETRY_AFTER, LOCK_FAILURE_RETRY_AFTER)
+        .body(body);
   }
 
   @ExceptionHandler(RetryableException.class)

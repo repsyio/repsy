@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.helm.shared.oci.repositories;
 
 import io.repsy.os.server.protocols.helm.shared.oci.entities.HelmOciBlob;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -29,6 +30,26 @@ import org.springframework.stereotype.Repository;
 public interface HelmOciBlobRepository extends JpaRepository<HelmOciBlob, UUID> {
 
   Optional<HelmOciBlob> findByRepoIdAndDigest(UUID repoId, String digest);
+
+  /**
+   * Inserts the blob unless a row for the (repo, digest) pair exists, without failing the
+   * transaction on the unique index when a concurrent upload of the same blob inserted it first.
+   * The blob file is already stored when this runs, so the transaction cannot be repeated (the
+   * upload it would finalise is gone), and on PostgreSQL a failed statement aborts it (RPS-1342).
+   *
+   * @return the number of rows inserted, 0 when the blob already existed
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          insert into "public"."helm_oci_blob"
+            ("id", "version_lock", "repo_id", "digest", "size", "media_type", "created_at")
+            values (:id, 0, :repoId, :digest, :size, :mediaType, :now)
+            on conflict do nothing
+          """,
+      nativeQuery = true)
+  int insertIfAbsent(UUID id, UUID repoId, String digest, long size, String mediaType, Instant now);
 
   @Modifying
   @Query("delete from HelmOciBlob b where b.repo.id = :repoId and b.digest = :digest")
