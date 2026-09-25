@@ -71,7 +71,6 @@ class H2StablePagingIT extends H2IntegrationTest {
     repo.setType(type);
     repo.setPrivateRepo(false);
     repo.setAllowOverride(true);
-    repo.setSearchable(true);
     repo.setDiskUsage(0);
     repo.setCreatedAt(Instant.now());
 

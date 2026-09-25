@@ -68,6 +68,15 @@ public class RepoTxService {
       EnumSet.of(RepoType.MAVEN, RepoType.NUGET);
 
   /**
+   * Repo types whose publish path consults {@code allowOverride} (RPS-1435): every type except
+   * Cargo and Go, which never replace a published version (a crate version and a module version are
+   * immutable). For them the setting is not shown and is ignored on write, so the panel form and
+   * clients that send it for every protocol keep working.
+   */
+  private static final Set<RepoType> OVERRIDE_SUPPORTED_TYPES =
+      EnumSet.complementOf(EnumSet.of(RepoType.CARGO, RepoType.GOLANG));
+
+  /**
    * Repo types whose upload path verifies PGP signatures (RPS-1188, RPS-1204): only Maven does. The
    * settings are refused for any other type, like {@code releases}/{@code snapshots} above.
    */
@@ -131,6 +140,9 @@ public class RepoTxService {
   /**
    * Applies the given settings; a field that is null (absent from the request) is left as it is.
    *
+   * <p>{@code allowOverride} is ignored for Cargo and Go, which never replace a published version
+   * (RPS-1435); it is not rejected, because the panel form sends it for every protocol.
+   *
    * @throws BadRequestException {@code releasesSnapshotsUnsupported} if {@code releases} or {@code
    *     snapshots} is present for a repo type whose publish path does not consult them (RPS-1210)
    * @throws BadRequestException {@code pgpSettingsUnsupported} if {@code
@@ -148,7 +160,9 @@ public class RepoTxService {
     final var verifyAllBefore = repo.isPgpVerifyAllSignaturesEnabled();
 
     applyIfPresent(settings.getPrivateRepo(), repo::setPrivateRepo);
-    applyIfPresent(settings.getAllowOverride(), repo::setAllowOverride);
+    if (OVERRIDE_SUPPORTED_TYPES.contains(repo.getType())) {
+      applyIfPresent(settings.getAllowOverride(), repo::setAllowOverride);
+    }
     applyIfPresent(settings.getReleases(), repo::setReleases);
     applyIfPresent(settings.getSnapshots(), repo::setSnapshots);
     applyIfPresent(settings.getSecurityScanEnabled(), repo::setSecurityScanEnabled);
@@ -206,13 +220,13 @@ public class RepoTxService {
     final var repoInfo = this.getRepo(repoId);
     final var supportsReleasesSnapshots =
         RELEASES_SNAPSHOTS_SUPPORTED_TYPES.contains(repoInfo.getType());
+    final var supportsOverride = OVERRIDE_SUPPORTED_TYPES.contains(repoInfo.getType());
     final var supportsPgp = PGP_SETTINGS_SUPPORTED_TYPES.contains(repoInfo.getType());
     return RepoSettingsInfo.builder()
         .privateRepo(repoInfo.isPrivateRepo())
         .releases(supportsReleasesSnapshots ? repoInfo.getReleases() : null)
         .snapshots(supportsReleasesSnapshots ? repoInfo.getSnapshots() : null)
-        .searchable(repoInfo.isSearchable())
-        .allowOverride(repoInfo.isAllowOverride())
+        .allowOverride(supportsOverride ? repoInfo.isAllowOverride() : null)
         .securityScanEnabled(repoInfo.isSecurityScanEnabled())
         .pgpVerifyAllSignaturesEnabled(
             supportsPgp ? repoInfo.isPgpVerifyAllSignaturesEnabled() : null)

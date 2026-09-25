@@ -288,6 +288,42 @@ class RepoTxServiceTest {
       assertThat(repo.isSecurityScanEnabled()).isFalse();
       verify(RepoTxServiceTest.this.repoRepository).save(repo);
     }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"CARGO", "GOLANG"})
+    @DisplayName("ignores allowOverride, without rejecting it, for a type that never replaces")
+    void ignoresAllowOverrideForTypesThatNeverReplace(final RepoType type) {
+      final var repo = repoOfType(type);
+      when(RepoTxServiceTest.this.repoRepository.findById(repo.getId()))
+          .thenReturn(Optional.of(repo));
+
+      final var settings =
+          RepoSettingsForm.builder().allowOverride(false).securityScanEnabled(false).build();
+
+      RepoTxServiceTest.this.service.updateSettings(repo.getId(), settings);
+
+      assertThat(repo.isAllowOverride()).isTrue();
+      assertThat(repo.isSecurityScanEnabled()).isFalse();
+      verify(RepoTxServiceTest.this.repoRepository).save(repo);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"MAVEN", "NPM", "PYPI", "DOCKER", "NUGET", "HELM", "RUBY"})
+    @DisplayName("applies allowOverride for a type that can replace a version")
+    void appliesAllowOverrideForOtherTypes(final RepoType type) {
+      final var repo = repoOfType(type);
+      when(RepoTxServiceTest.this.repoRepository.findById(repo.getId()))
+          .thenReturn(Optional.of(repo));
+
+      RepoTxServiceTest.this.service.updateSettings(
+          repo.getId(), RepoSettingsForm.builder().allowOverride(false).build());
+
+      assertThat(repo.isAllowOverride()).isFalse();
+    }
   }
 
   /** RPS-1210: GET must mirror the same scope as the PUT rejection. */
@@ -316,7 +352,6 @@ class RepoTxServiceTest {
           .allowOverride(repo.isAllowOverride())
           .releases(repo.getReleases())
           .snapshots(repo.getSnapshots())
-          .searchable(repo.isSearchable())
           .securityScanEnabled(repo.isSecurityScanEnabled())
           .build();
     }
@@ -353,6 +388,36 @@ class RepoTxServiceTest {
 
       assertThat(settings.getReleases()).isTrue();
       assertThat(settings.getSnapshots()).isTrue();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"CARGO", "GOLANG"})
+    @DisplayName("omits allowOverride for a type that never replaces a version (RPS-1435)")
+    void omitsAllowOverrideForTypesThatNeverReplace(final RepoType type) {
+      final var repo = repoOfType(type);
+      when(RepoTxServiceTest.this.repoRepository.findById(repo.getId()))
+          .thenReturn(Optional.of(repo));
+      when(RepoTxServiceTest.this.repoConverter.toRepoInfo(repo)).thenReturn(toRepoInfo(repo));
+
+      assertThat(RepoTxServiceTest.this.service.getRepoSettings(repo.getId()).getAllowOverride())
+          .isNull();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"MAVEN", "NPM", "PYPI", "DOCKER", "NUGET", "HELM", "RUBY"})
+    @DisplayName("exposes allowOverride for a type that can replace a version")
+    void exposesAllowOverrideForOtherTypes(final RepoType type) {
+      final var repo = repoOfType(type);
+      when(RepoTxServiceTest.this.repoRepository.findById(repo.getId()))
+          .thenReturn(Optional.of(repo));
+      when(RepoTxServiceTest.this.repoConverter.toRepoInfo(repo)).thenReturn(toRepoInfo(repo));
+
+      assertThat(RepoTxServiceTest.this.service.getRepoSettings(repo.getId()).getAllowOverride())
+          .isTrue();
     }
   }
 

@@ -61,9 +61,6 @@ public class Repo {
   @Column(name = "releases")
   private Boolean releases;
 
-  @Column(name = "searchable", nullable = false)
-  private boolean searchable;
-
   @Column(name = "security_scan_enabled", nullable = false)
   private boolean securityScanEnabled;
 

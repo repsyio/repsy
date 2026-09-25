@@ -4679,9 +4679,6 @@ components:
         allowOverride:
           type: boolean
           nullable: false
-        searchable:
-          type: boolean
-          nullable: false
         securityScanEnabled:
           type: boolean
           nullable: false
@@ -4706,7 +4703,8 @@ components:
             When false, uploading a version that already exists is refused. Maven: a release, and a
             timestamped snapshot build, cannot be replaced, but a non-unique snapshot (the literal
             -SNAPSHOT file names that sbt and Ivy deploy every time) can always be deployed again,
-            unless snapshots is false.
+            unless snapshots is false. Ignored (not rejected) for Cargo and Go, which never replace
+            a published version.
         releases:
           type: boolean
           nullable: false
@@ -5265,15 +5263,12 @@ components:
             versions are refused, including redeploys of snapshot versions that already exist.
         allowOverride:
           type: boolean
-          nullable: false
           description: >-
             When false, uploading a version that already exists is refused. Maven: a release, and a
             timestamped snapshot build, cannot be replaced, but a non-unique snapshot (the literal
             -SNAPSHOT file names that sbt and Ivy deploy every time) can always be deployed again,
-            unless snapshots is false.
-        searchable:
-          type: boolean
-          nullable: false
+            unless snapshots is false. Omitted for Cargo and Go, which never replace a published
+            version.
         securityScanEnabled:
           type: boolean
           nullable: false
@@ -5292,8 +5287,6 @@ components:
             signer's key that is not registered on the repository.
       required:
         - privateRepo
-        - allowOverride
-        - searchable
         - securityScanEnabled
     RestResponseRepoSettingsInfo:
       type: object

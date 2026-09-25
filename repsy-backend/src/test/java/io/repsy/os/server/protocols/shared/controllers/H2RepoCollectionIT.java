@@ -63,7 +63,6 @@ class H2RepoCollectionIT extends H2IntegrationTest {
     repo.setType(type);
     repo.setPrivateRepo(false);
     repo.setAllowOverride(true);
-    repo.setSearchable(true);
     repo.setDiskUsage(0);
 
     this.repoRepository.saveAndFlush(repo);

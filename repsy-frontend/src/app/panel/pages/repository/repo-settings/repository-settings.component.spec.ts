@@ -29,7 +29,7 @@ const REPO = 'acme-repo';
 const reply = (data: unknown): never => of(restResponse(data)) as never;
 
 function settings(overrides: Partial<RepoSettingsInfo> = {}): RepoSettingsInfo {
-  return { privateRepo: true, allowOverride: false, searchable: true, securityScanEnabled: false, ...overrides };
+  return { privateRepo: true, allowOverride: false, securityScanEnabled: false, ...overrides };
 }
 
 describe('RepositorySettingsComponent', () => {
@@ -123,6 +123,24 @@ describe('RepositorySettingsComponent', () => {
       });
       expect(component.mavenSettingsForm.get('privateRepository').value).toBeFalse();
       expect(component.mavenRepositorySettings).toBeUndefined();
+    });
+  });
+
+  ['cargo', 'golang'].forEach((repoType) => {
+    it(`keeps the override default for a ${repoType} repository, whose settings omit allowOverride (RPS-1435)`, () => {
+      const info = settings({ privateRepo: true, securityScanEnabled: false });
+      delete info.allowOverride;
+      repoApi.getRepoSettings.and.returnValue(reply(info));
+      component.ngOnInit();
+
+      currentRepo$.next({ repoName: REPO, repoType: repoType as RepoContext['repoType'] });
+
+      expect(component.generalSettingsForm.getRawValue()).toEqual({
+        privateRepository: true,
+        allowOverride: true,
+        securityScanEnabled: false,
+      });
+      expect(component.generalSettingsForm.valid).toBeTrue();
     });
   });
 

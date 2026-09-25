@@ -100,7 +100,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   private static final String ERROR_OCCURRED_TEXT = "An error occurred.";
 
   private static final String[] SETTINGS_KEYS = {
-    "privateRepo", "releases", "snapshots", "allowOverride", "searchable", "securityScanEnabled"
+    "privateRepo", "releases", "snapshots", "allowOverride", "securityScanEnabled"
   };
 
   /** What GET returns for a Maven repo: the settings plus the two PGP ones (RPS-1188, RPS-1204). */
@@ -109,7 +109,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     "releases",
     "snapshots",
     "allowOverride",
-    "searchable",
     "securityScanEnabled",
     "pgpVerifyAllSignaturesEnabled",
     "pgpKeyServerLookupEnabled"
@@ -1023,7 +1022,15 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
      * repo type whose publish path does not consult them (RPS-1210).
      */
     private static final String[] SETTINGS_KEYS_WITHOUT_RELEASES_SNAPSHOTS = {
-      "privateRepo", "allowOverride", "searchable", "securityScanEnabled"
+      "privateRepo", "allowOverride", "securityScanEnabled"
+    };
+
+    /**
+     * What GET returns for Cargo and Go: no {@code releases}/{@code snapshots} and no {@code
+     * allowOverride}, because those formats never replace a published version (RPS-1435).
+     */
+    private static final String[] SETTINGS_KEYS_WITHOUT_ALLOW_OVERRIDE = {
+      "privateRepo", "securityScanEnabled"
     };
 
     /** Repo types other than Maven and NuGet, whose publish path never reads releases/snapshots. */
@@ -1067,7 +1074,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           .containsEntry("releases", true)
           .containsEntry("snapshots", true)
           .containsEntry("allowOverride", true)
-          .containsEntry("searchable", false)
           .containsEntry("securityScanEnabled", true)
           .containsEntry("pgpVerifyAllSignaturesEnabled", false)
           .containsEntry("pgpKeyServerLookupEnabled", true);
@@ -1101,7 +1107,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           .containsEntry("releases", false)
           .containsEntry("snapshots", false)
           .containsEntry("allowOverride", false)
-          .containsEntry("searchable", false)
           .containsEntry("securityScanEnabled", false);
       final var row = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
       assertThat(row.isPrivateRepo()).isTrue();
@@ -1411,15 +1416,68 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("ignores fields that are not part of the form, so searchable cannot be set")
+    @DisplayName("ignores fields that are not part of the form, such as the removed searchable")
     void unknownFieldIsIgnored() throws Exception {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
 
       this.updateSettings(repo, "{\"searchable\":true,\"privateRepo\":true}");
 
       assertThat(this.settingsOf(repo))
-          .containsEntry("searchable", false)
+          .containsEntry("privateRepo", true)
+          .doesNotContainKey("searchable");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"CARGO", "GOLANG"})
+    @DisplayName(
+        "Cargo and Go never replace a version, so their settings have no allowOverride (RPS-1435)")
+    void allowOverrideIsHiddenForRepoTypesThatNeverReplace(final RepoType type) throws Exception {
+      final var repo = ProtocolRepoControllerIT.this.seedRepo(type, uniqueRepoName("noovr"));
+
+      assertThat(this.settingsOf(repo))
+          .containsOnlyKeys(SETTINGS_KEYS_WITHOUT_ALLOW_OVERRIDE)
+          .doesNotContainKey("searchable");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"CARGO", "GOLANG"})
+    @DisplayName(
+        "an update that sends allowOverride for Cargo or Go answers 200 and leaves the column"
+            + " alone, while the other fields apply (RPS-1435)")
+    void allowOverrideIsIgnoredOnWriteForRepoTypesThatNeverReplace(final RepoType type)
+        throws Exception {
+      final var repo = ProtocolRepoControllerIT.this.seedRepo(type, uniqueRepoName("ignovr"));
+      final var before = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
+
+      this.updateSettings(repo, "{\"allowOverride\":false,\"privateRepo\":true}");
+
+      final var row = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
+      assertThat(row.isAllowOverride()).isEqualTo(before.isAllowOverride());
+      assertThat(row.isPrivateRepo()).isTrue();
+      assertThat(this.settingsOf(repo))
+          .containsOnlyKeys(SETTINGS_KEYS_WITHOUT_ALLOW_OVERRIDE)
           .containsEntry("privateRepo", true);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"MAVEN", "NPM", "PYPI", "DOCKER", "NUGET", "HELM", "RUBY"})
+    @DisplayName("every other repo type still exposes and applies allowOverride (RPS-1435)")
+    void allowOverrideStillAppliesToTheOtherRepoTypes(final RepoType type) throws Exception {
+      final var repo = ProtocolRepoControllerIT.this.seedRepo(type, uniqueRepoName("ovr"));
+
+      assertThat(this.settingsOf(repo)).containsEntry("allowOverride", true);
+
+      this.updateSettings(repo, "{\"allowOverride\":false}");
+
+      assertThat(this.settingsOf(repo)).containsEntry("allowOverride", false);
+      assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName()).isAllowOverride())
+          .isFalse();
     }
 
     @ParameterizedTest(name = "{0}")

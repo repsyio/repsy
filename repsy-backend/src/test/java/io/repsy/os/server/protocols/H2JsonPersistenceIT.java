@@ -154,7 +154,6 @@ class H2JsonPersistenceIT extends H2IntegrationTest {
     repo.setType(type);
     repo.setPrivateRepo(false);
     repo.setAllowOverride(true);
-    repo.setSearchable(true);
     repo.setDiskUsage(0);
     repo.setCreatedAt(Instant.now());
     return this.repoRepository.saveAndFlush(repo);
@@ -167,7 +166,6 @@ class H2JsonPersistenceIT extends H2IntegrationTest {
         .type(repo.getType())
         .privateRepo(repo.isPrivateRepo())
         .allowOverride(repo.isAllowOverride())
-        .searchable(repo.isSearchable())
         .diskUsage(repo.getDiskUsage())
         .build();
   }

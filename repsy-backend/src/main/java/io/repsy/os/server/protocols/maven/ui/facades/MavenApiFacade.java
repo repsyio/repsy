@@ -77,7 +77,6 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
 
     return RepoSettingsInfo.builder()
         .privateRepo(repoInfo.isPrivateRepo())
-        .searchable(repoInfo.isSearchable())
         .releases(repoInfo.getReleases())
         .snapshots(repoInfo.getSnapshots())
         .allowOverride(repoInfo.isAllowOverride())
