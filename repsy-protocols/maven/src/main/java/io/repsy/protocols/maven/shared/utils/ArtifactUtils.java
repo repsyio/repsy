@@ -61,7 +61,8 @@ public class ArtifactUtils {
   private static final String SNAPSHOT_SUFFIX = "SNAPSHOT";
   private static final String SNAPSHOT_MARKER = "(SNAPSHOT|\\d{8}\\.\\d{6}-\\d+)[.-]";
   private static final String SNAPSHOT_BUILD_MARKER = "(?:SNAPSHOT|(\\d{8}\\.\\d{6})-(\\d+))[.-]";
-  private static final String SNAPSHOT_POM_MARKER = "(?:SNAPSHOT|(\\d{8}\\.\\d{6})-(\\d+))\\.pom";
+  private static final String SNAPSHOT_MAIN_FILE_MARKER =
+      "(?:SNAPSHOT|(\\d{8}\\.\\d{6})-(\\d+))\\.";
   private static final SnapshotBuild LITERAL_SNAPSHOT = new SnapshotBuild("", BigInteger.ZERO);
 
   /**
@@ -423,11 +424,7 @@ public class ArtifactUtils {
 
   /**
    * The name of the main POM that a {@code SNAPSHOT} version directory holds for its newest build,
-   * as {@code <artifactId>-<version>.pom} would be resolved by a client that could not read {@code
-   * maven-metadata.xml}: the POM of the highest {@code yyyyMMdd.HHmmss-N} build, or the literal
-   * {@code <artifactId>-<baseVersion>-SNAPSHOT.pom} when no timestamped build is stored (a literal
-   * file counts as the oldest build, like in {@link #filesToSign}). A POM of another artifact, a
-   * classifier POM, a checksum and a signature are not main POMs. RPS-1370.
+   * see {@link #newestSnapshotMainFileName}. RPS-1370.
    *
    * @param artifactId the artifactId of the version
    * @param version the {@code ...-SNAPSHOT} version, also the name of the directory
@@ -437,18 +434,46 @@ public class ArtifactUtils {
   public static @Nullable String newestSnapshotPomName(
       final String artifactId, final String version, final Collection<String> fileNames) {
 
+    return newestSnapshotMainFileName(artifactId, version, "pom", fileNames);
+  }
+
+  /**
+   * The name of the main file with the given extension that a {@code SNAPSHOT} version directory
+   * holds for its newest build, as {@code <artifactId>-<version>.<extension>} would be resolved by
+   * a client that could not read {@code maven-metadata.xml}: the file of the highest {@code
+   * yyyyMMdd.HHmmss-N} build, or the literal {@code
+   * <artifactId>-<baseVersion>-SNAPSHOT.<extension>} when no timestamped build is stored (a literal
+   * file counts as the oldest build, like in {@link #filesToSign}). A file of another artifact, a
+   * classifier file (for example {@code -sources.jar}), a checksum and a signature are not main
+   * files. RPS-1370, RPS-1420.
+   *
+   * @param artifactId the artifactId of the version
+   * @param version the {@code ...-SNAPSHOT} version, also the name of the directory
+   * @param extension the extension of the main file, without the dot ({@code pom}, {@code jar}...)
+   * @param fileNames the names of the files directly in the version directory
+   * @return the file name, or {@code null} if the version is not a snapshot or holds no such file
+   */
+  public static @Nullable String newestSnapshotMainFileName(
+      final String artifactId,
+      final String version,
+      final String extension,
+      final Collection<String> fileNames) {
+
     if (!version.endsWith(SNAPSHOT_SUFFIX)) {
       return null;
     }
 
     final var stem = version.substring(0, version.length() - SNAPSHOT_SUFFIX.length());
-    final var pomPattern =
-        Pattern.compile(Pattern.quote(artifactId + "-" + stem) + SNAPSHOT_POM_MARKER);
+    final var mainFilePattern =
+        Pattern.compile(
+            Pattern.quote(artifactId + "-" + stem)
+                + SNAPSHOT_MAIN_FILE_MARKER
+                + Pattern.quote(extension));
     String newestName = null;
     SnapshotBuild newest = null;
 
     for (final var name : fileNames) {
-      final var matcher = pomPattern.matcher(name);
+      final var matcher = mainFilePattern.matcher(name);
 
       if (!matcher.matches()) {
         continue;

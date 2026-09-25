@@ -16,6 +16,8 @@
 package io.repsy.os.server.security.shared.resolvers;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
@@ -24,6 +26,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactV
 import io.repsy.os.server.security.shared.ArtifactStorageResolver;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -92,14 +95,18 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
     final var packaging = this.findPackaging(repoId, groupId, artifactId, artifactVersion);
     final var extension = resolveExtension(packaging);
 
+    final var snapshot = ArtifactUtils.isSnapshot(artifactVersion);
     final var resolvedVersion =
-        ArtifactUtils.isSnapshot(artifactVersion)
+        snapshot
             ? this.resolveSnapshotBuildVersion(
                 repoId, repoName, groupId, artifactId, artifactVersion, extension)
             : artifactVersion;
 
     if (resolvedVersion == null) {
-      return Optional.empty();
+      return snapshot
+          ? this.findStoredSnapshotFile(
+              repoId, repoName, groupId, artifactId, artifactVersion, extension)
+          : Optional.empty();
     }
 
     final var gav =
@@ -151,6 +158,50 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
     return findSnapshotVersionForExtension(versioning, extension)
         .or(() -> buildFromSnapshotTimestamp(versioning, artifactVersion))
         .orElse(null);
+  }
+
+  /**
+   * The newest main file of a {@code SNAPSHOT} version directory, for a snapshot whose metadata
+   * names no build (RPS-1420): sbt and Ivy deploy a snapshot under its literal name and upload no
+   * {@code maven-metadata.xml}, and so does a version whose metadata cannot be read. The rule is
+   * the one the panel uses for the POM, see {@link ArtifactUtils#newestSnapshotMainFileName}.
+   */
+  private Optional<String> findStoredSnapshotFile(
+      final UUID repoId,
+      final String repoName,
+      final String groupId,
+      final String artifactId,
+      final String artifactVersion,
+      final String extension) {
+
+    final var versionDirectory =
+        groupId.replace('.', '/') + "/" + artifactId + "/" + artifactVersion;
+    final List<String> fileNames;
+
+    try {
+      fileNames =
+          this.mavenStorageStrategy
+              .listDirectoryContents(StoragePath.of(repoId, versionDirectory))
+              .stream()
+              .filter(item -> !item.isDirectory())
+              .map(StorageItemInfo::getName)
+              .toList();
+    } catch (final ItemNotFoundException _) {
+      return Optional.empty();
+    }
+
+    final var fileName =
+        ArtifactUtils.newestSnapshotMainFileName(artifactId, artifactVersion, extension, fileNames);
+
+    if (fileName == null) {
+      return Optional.empty();
+    }
+
+    final var artifactPath = versionDirectory + "/" + fileName;
+
+    return this.mavenStorageStrategy.get(StoragePath.of(repoId, artifactPath), repoName).isPresent()
+        ? Optional.of(artifactPath)
+        : Optional.empty();
   }
 
   private static @Nullable Metadata readMetadataQuietly(final @NonNull Resource resource) {
