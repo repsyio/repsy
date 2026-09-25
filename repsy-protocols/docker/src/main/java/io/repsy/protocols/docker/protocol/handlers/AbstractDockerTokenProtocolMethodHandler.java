@@ -27,6 +27,7 @@ import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.parser.DockerScopeParser;
 import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
+import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.auth.dtos.LoginResponse;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -56,8 +57,6 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
 
   public static final TemporalAmount DEFAULT_TIMEOUT_ACCESS_TOKEN =
       Duration.of(30, ChronoUnit.MINUTES);
-
-  private static final String WWW_AUTHENTICATE_VALUE = "Basic realm=\"Repsy Managed Repository\"";
 
   private final DockerScopeParser<ID> scopeParser;
   private final DockerAuthService<ID> authService;
@@ -229,7 +228,7 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
 
   private ResponseEntity<Object> buildUnauthorizedResponse() {
     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-        .header(WWW_AUTHENTICATE, WWW_AUTHENTICATE_VALUE)
+        .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
         .build();
   }
 

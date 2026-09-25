@@ -26,6 +26,7 @@ import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
+import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -49,7 +50,6 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
 
   private static final String AUTH_BEARER = "Bearer ";
   private static final String AUTH_BASIC = "Basic ";
-  private static final String CHALLENGE = "Basic realm=\"Repsy Managed Repository\"";
   private static final @NonNull String PERMISSION_KEY = "permission";
   private static final @NonNull String WRITE_OPERATION_KEY = "writeOperation";
 
@@ -86,7 +86,7 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
     try {
       return this.authenticate(context, request, repoInfo, permission);
     } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(ex, CHALLENGE);
+      throw AuthChallenges.challenged(ex, BasicAuthChallenge.REPSY);
     }
   }
 
@@ -113,7 +113,7 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
     if (authHeader == null) {
       return ProcessorResult.of(
           ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, CHALLENGE)
+              .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
               .build());
     }
 

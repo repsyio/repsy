@@ -92,7 +92,7 @@
  *    `200` (RPS-1237, fixed).
  *  - Auth (`RubyAuthPreProcessor`, priority 100): skipped only for a public-repo READ. A
  *    missing/unparseable `Authorization` is a bodyless `401` + `WWW-Authenticate: Basic
- *    realm="Repsy Managed Repository"`. `normalizeAuthHeader` Bearer-prefixes any value that does not
+ *    realm="Repsy"`. `normalizeAuthHeader` Bearer-prefixes any value that does not
  *    already start with `Basic `/`Bearer ` (the cargo/golang trick): `RubyAuthComponent` is a bare
  *    `ProtocolAuthService` with no overrides, so `handleBearerAuth` tries a raw deploy-token secret
  *    first, `handleBasicAuth` tries the PASSWORD as a deploy token first then falls back to

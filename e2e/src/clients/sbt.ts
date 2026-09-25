@@ -59,8 +59,8 @@ export const SBT_VERSION = '1.13.0';
 export const SCALA_213 = '2.13.18';
 export const SCALA_3 = '3.3.8';
 
-/** The realm of Repsy's Basic challenge (`MavenAuthPreProcessor.CHALLENGE`), which sbt's Credentials must name. */
-export const REPSY_REALM = 'Repsy Managed Repository';
+/** The realm of Repsy's Basic challenge (`Basic realm="Repsy"`, `BasicAuthChallenge.REPSY`), which sbt's Credentials must name. */
+export const REPSY_REALM = 'Repsy';
 
 /** A cold sbt (JVM start, build load, compile) is slower than a cold `mvn`. */
 const PUBLISH_TIMEOUT_MS = 240_000;

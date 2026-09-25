@@ -23,6 +23,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
 import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
+import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -81,7 +82,7 @@ public abstract class AbstractMavenUploadProtocolMethodHandler<ID>
           context, request.getInputStream(), request.getContentLengthLong());
     } catch (final UnAuthorizedException _) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
+          .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
           .build();
     }
 

@@ -737,9 +737,10 @@ on the wire (a fake server logging every request, then this suite):
   literal name. So `sbt` is in `snapshot-deploy`/`snapshot-redeploy`, and `afterSuccessfulRoundTrip`
   (`clients/sbt-checks.ts`) asserts the literal jar is the resolved one and that no version-level
   metadata exists, instead of Maven's metadata walk.
-- The first request of a publish is answered 401 with Repsy's `WWW-Authenticate: Basic realm="Repsy
-Managed Repository"`, and sbt then sends the credential: its `Credentials(realm, host, user,
-password)` has to name that realm and the repository's host. Coursier (the resolver) sends it the same way.
+- The first request of a publish is answered 401 with Repsy's `WWW-Authenticate: Basic realm="Repsy"`
+  (every Repsy repository uses the one short realm `Repsy`, since RPS-1372; a build written for the
+  longer realm of earlier versions has to change it), and sbt then sends the credential: its
+  `Credentials(realm, host, user, password)` has to name that realm and the repository's host. Coursier (the resolver) sends it the same way.
 - Like `mvn`, sbt hides the HTTP status behind its exit code, so the `Outcome` is the raw probe of
   `clients/maven.ts`, with sbt's exit code as evidence; the probe sends the LITERAL `-SNAPSHOT` POM
   (`rawPublishCheck`'s `literalSnapshot`), which is the file sbt itself sends.
@@ -799,7 +800,7 @@ and a resolve never finds what a publish fetched. The credential is only written
 behind its exit code, so the `Outcome` is the raw probe of `clients/maven.ts` (with the LITERAL
 `-SNAPSHOT` POM, which is the file Ivy sends), with Ant's exit code as evidence. The setup is the one
 the README and the panel's Maven configuration dialog document (RPS-1332): an `ibiblio` resolver with
-`m2compatible="true"`, `<credentials realm="Repsy Managed Repository">`, the POM `ivy:makepom` writes
+`m2compatible="true"`, `<credentials realm="Repsy">`, the POM `ivy:makepom` writes
 listed next to the jar in `<publications>`, and `ivy:publish` with `publishivy="false"`. What Ivy does,
 seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
 
@@ -807,8 +808,8 @@ seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
   an `ivys/` directory) is `400 invalidArtifactPath`. A publish needs its POM: Repsy registers a
   version (and shows it in the panel) only when the POM is uploaded.
 - Credentials: Ivy matches a `<credentials>` entry by host (no port) and by the realm of the server's
-  challenge. With `realm="Repsy Managed Repository"` the credential is sent (a deploy token works with
-  an empty username too); an entry with no realm, or another one, is never sent, so the very first PUT
+  challenge. With `realm="Repsy"` (the realm of every Repsy repository, RPS-1372) the credential is sent (a deploy
+  token works with an empty username too); an entry with no realm, or another one, is never sent, so the very first PUT
   is answered 401 ("was refused by the server") and nothing is stored.
 - The jar is sent first, then the POM, each followed by its `.sha1` and `.md5` (Ivy computes them:
   `ivy.checksums`): jar, jar.sha1, jar.md5, pom, pom.sha1, pom.md5, every one a PUT with
@@ -2611,7 +2612,7 @@ was written.
 download` with no creds against a private repo exits 1 promptly (`ERROR: Could not find a version
 that satisfies the requirement ...`), no hang, no retry storm.
 - **H5** (`token-ro` publish is a flat 401, not 403; the same token can still read): confirmed live —
-  `401` + `WWW-Authenticate: Basic realm="Repsy Managed Repository"` + the panel's `unAuthorized`
+  `401` + `WWW-Authenticate: Basic realm="Repsy"` + the panel's `unAuthorized`
   envelope on publish; `200` on the project-page read with the identical token.
 - **H6** (`no-override`: real twine gets 403, raw re-POST gets the same, fingerprint unchanged):
   confirmed live.

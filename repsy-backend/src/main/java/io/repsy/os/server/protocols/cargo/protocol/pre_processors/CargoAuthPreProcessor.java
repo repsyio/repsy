@@ -26,6 +26,7 @@ import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
+import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,7 +47,6 @@ public class CargoAuthPreProcessor extends ProtocolProcessor {
   private static final int PRIORITY = 100;
   private static final String AUTH_BASIC = "Basic ";
   private static final String AUTH_BEARER = "Bearer ";
-  private static final String CHALLENGE = "Basic realm=\"Repsy Managed Repository\"";
   private static final String SKIP_PRE_PROCESSOR_KEY = "skipPreProcessor";
   private static final String PERMISSION_KEY = "permission";
   private static final String WRITE_OPERATION_KEY = "writeOperation";
@@ -83,7 +83,7 @@ public class CargoAuthPreProcessor extends ProtocolProcessor {
     if (rawAuthHeader == null) {
       return ProcessorResult.of(
           ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, CHALLENGE)
+              .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
               .build());
     }
 
@@ -93,7 +93,7 @@ public class CargoAuthPreProcessor extends ProtocolProcessor {
     try {
       this.authenticateRequest(authHeader, repoInfo.getId(), properties);
     } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(ex, CHALLENGE);
+      throw AuthChallenges.challenged(ex, BasicAuthChallenge.REPSY);
     }
 
     return ProcessorResult.next();

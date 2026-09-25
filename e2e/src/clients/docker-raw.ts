@@ -38,7 +38,7 @@
  *    runs FIRST regardless of username; not found falls through to username/password. The scope is
  *    NOT checked at issuance -- a read-only token, or a token of a different repo, still gets a JWT;
  *    authorization happens per OPERATION request instead (a second hop). Every failure here is a
- *    bare `401` + `WWW-Authenticate: Basic realm="Repsy Managed Repository"`, no body at all --
+ *    bare `401` + `WWW-Authenticate: Basic realm="Repsy"`, no body at all --
  *    confirmed live, and deliberately different from an operation-hop 401 (Bearer challenge + OCI
  *    body). Success: `{"token": "<jwt>", "access_token": "<jwt>", "expires_in": 1800, ...}` (both
  *    keys, `LoginResponse`).

@@ -41,7 +41,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @DisplayName("Protocol 401 answers carry the challenge of the protocol")
 class ProtocolAuthChallengeIT extends AbstractIntegrationTest {
 
-  private static final String REPOSITORY_REALM = "Basic realm=\"Repsy Managed Repository\"";
+  private static final String REPOSITORY_REALM = "Basic realm=\"Repsy\"";
   private static final String NPM_REALM = "Basic realm=\"Repsy Managed Registry\"";
 
   /**

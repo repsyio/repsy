@@ -29,6 +29,7 @@ import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
+import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,7 +49,6 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
   private static final String SKIP_PRE_PROCESSOR_KEY = "skipPreProcessor";
   private static final String PERMISSION_KEY = "permission";
   private static final String WRITE_OPERATION_KEY = "writeOperation";
-  private static final String WWW_AUTHENTICATE_VALUE = "Basic realm=\"Repsy\"";
 
   private final HelmProtocolProvider provider;
   private final RestResponseFactory resp;
@@ -80,13 +80,13 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
     final var authHeader = this.authComponent.emulateAuthHeader(request);
 
     if (authHeader == null) {
-      return ProcessorResult.of(OciErrors.challenge(request, WWW_AUTHENTICATE_VALUE, this.resp));
+      return ProcessorResult.of(OciErrors.challenge(request, BasicAuthChallenge.REPSY, this.resp));
     }
 
     try {
       this.authenticateRequest(authHeader, repoInfo.getId(), properties);
     } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(ex, WWW_AUTHENTICATE_VALUE);
+      throw AuthChallenges.challenged(ex, BasicAuthChallenge.REPSY);
     }
 
     return ProcessorResult.next();

@@ -64,7 +64,7 @@
  *    from the CURRENT request's own scheme/host/port, so it always names exactly one `/<repoName>/`
  *    segment on Repsy OS's single-tenant layout.
  *  - Auth (`NuGetAuthPreProcessor`): `extractAuthHeader` reads `Authorization` when present, else
- *    `X-NuGet-ApiKey`, else `401` + `WWW-Authenticate: Basic realm="Repsy Managed Repository"`.
+ *    `X-NuGet-ApiKey`, else `401` + `WWW-Authenticate: Basic realm="Repsy"`.
  *    `normalizeAuthHeader` prefixes `Bearer ` onto whatever it got UNLESS it already starts with
  *    `Basic `/`Bearer `, so a raw deploy token (however delivered) is authenticated via
  *    `handleBearerAuth`, and a `Basic <base64>` value (however delivered, `Authorization` or

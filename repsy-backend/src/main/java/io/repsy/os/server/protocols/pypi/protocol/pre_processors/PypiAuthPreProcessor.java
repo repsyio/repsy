@@ -27,6 +27,7 @@ import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
+import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -40,7 +41,6 @@ import org.springframework.stereotype.Component;
 public class PypiAuthPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 100;
-  private static final String CHALLENGE = "Basic realm=\"Repsy Managed Repository\"";
   private static final String PERMISSION_KEY = "permission";
   private static final String WRITE_OPERATION_KEY = "writeOperation";
 
@@ -77,7 +77,7 @@ public class PypiAuthPreProcessor extends ProtocolProcessor {
     try {
       this.authenticate(request, repoInfo.getStorageKey(), permission);
     } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(ex, CHALLENGE);
+      throw AuthChallenges.challenged(ex, BasicAuthChallenge.REPSY);
     }
 
     return ProcessorResult.next();

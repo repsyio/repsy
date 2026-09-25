@@ -51,7 +51,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 class AbstractCargoMeProtocolMethodHandlerTest {
 
   private static final String AUTH_HEADER = "Basic dXNlcjpwYXNz";
-  private static final String WWW_AUTHENTICATE_VALUE = "Basic realm=\"Repsy Managed Repository\"";
+  private static final String WWW_AUTHENTICATE_VALUE = "Basic realm=\"Repsy\"";
 
   @Mock private CargoAuthenticator authenticator;
   @Mock private CargoProtocolProvider provider;
