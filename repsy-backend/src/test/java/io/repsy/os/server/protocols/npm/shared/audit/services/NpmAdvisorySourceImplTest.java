@@ -75,10 +75,11 @@ class NpmAdvisorySourceImplTest {
   void scanOn() {
     final var repo = repo(true);
     final var row = row();
-    when(this.scans.findKnownVulnerabilities(repo.getStorageKey(), Set.of("lodash")))
+    final var requested = Map.of("lodash", Set.of("4.17.20"));
+    when(this.scans.findKnownVulnerabilities(repo.getStorageKey(), requested))
         .thenReturn(List.of(row));
 
-    final var advisories = this.source.findAdvisories(repo, Map.of("lodash", Set.of("4.17.20")));
+    final var advisories = this.source.findAdvisories(repo, requested);
 
     assertThat(advisories).hasSize(1);
     assertThat(advisories.getFirst().packageName()).isEqualTo("lodash");
