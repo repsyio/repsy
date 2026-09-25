@@ -119,6 +119,12 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final StoragePath metadataStoragePath)
       throws IOException {
 
+    // Every write of a packument (a publish, a dist-tag, a deprecation, an unpublish) leaves the
+    // publish-only fields out, so a packument that an earlier version of the registry stored with
+    // the base64 copy of a tarball gives that space back on its next change (RPS-1390). Reads
+    // already filter them (RPS-1357).
+    PackageUtils.removePublishOnlyFields(metadata);
+
     final var mapper = new ObjectMapper();
 
     final var metadataBytes = mapper.writeValueAsBytes(metadata);

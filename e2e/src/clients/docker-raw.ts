@@ -38,9 +38,11 @@
  *    runs FIRST regardless of username; not found falls through to username/password. The scope is
  *    NOT checked at issuance -- a read-only token, or a token of a different repo, still gets a JWT;
  *    authorization happens per OPERATION request instead (a second hop). Every failure here is a
- *    bare `401` + `WWW-Authenticate: Basic realm="Repsy"`, no body at all --
- *    confirmed live, and deliberately different from an operation-hop 401 (Bearer challenge + OCI
- *    body). Success: `{"token": "<jwt>", "access_token": "<jwt>", "expires_in": 1800, ...}` (both
+ *    `401` + `WWW-Authenticate: Basic realm="Repsy"` + an OCI `UNAUTHORIZED` body naming the cause
+ *    (RPS-1435: the generic `unAuthorized` text for a wrong password or an unknown user alike,
+ *    `deployTokenExpired` for an expired deploy token, `unauthorizedRequest` when no credentials
+ *    came with a push scope; it used to be empty, so the client printed `unauthorized: `). It
+ *    still differs from an operation-hop 401 (Bearer challenge instead of Basic). Success: `{"token": "<jwt>", "access_token": "<jwt>", "expires_in": 1800, ...}` (both
  *    keys, `LoginResponse`).
  *  - Blob upload (`AbstractDockerUploadStartProtocolMethodHandler`/`...UploadFinalize...`): `POST
  *    .../blobs/uploads/` (permission WRITE) writes nothing at all (no DB row, no file) and answers

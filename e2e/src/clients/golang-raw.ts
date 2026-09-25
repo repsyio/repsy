@@ -84,8 +84,10 @@
  *    (`pypi-raw.ts`'s file header, P6): Go's router refuses a method it has no handler for, PyPI's
  *    root-level early-return does not check existence at all.
  *  - Auth (`GolangAuthPreProcessor`, priority 100): skipped only for a public-repo READ. Otherwise a
- *    missing/unparseable `Authorization` is a bodyless `401` + `WWW-Authenticate: Basic
- *    realm="Repsy"` (confirmed live). `GolangAuthComponent` is a bare
+ *    missing/unparseable `Authorization` is a `401` + `WWW-Authenticate: Basic realm="Repsy"` with
+ *    a `text/plain` message (RPS-1435: the `go` command prints a body only when it is `text/plain`,
+ *    and it used to be empty, so the client showed a bare `401`; a rejected credential gets the same
+ *    shape, not the panel's JSON envelope). `GolangAuthComponent` is a bare
  *    `ProtocolAuthService` subclass with no overrides: `handleBasicAuth` tries the PASSWORD as a
  *    deploy token FIRST, username ignored for a token credential, then falls back to username/password
  *    -- so a read-only deploy token attempting a WRITE is the same flat `401` every other protocol in

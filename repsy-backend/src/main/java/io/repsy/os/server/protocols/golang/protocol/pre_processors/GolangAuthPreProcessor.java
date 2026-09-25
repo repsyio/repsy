@@ -22,7 +22,6 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.golang.shared.auth.services.GolangAuthComponent;
-import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
@@ -30,10 +29,14 @@ import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
@@ -48,12 +51,15 @@ public class GolangAuthPreProcessor extends ProtocolProcessor {
   private static final @NonNull String WRITE_OPERATION_KEY = "writeOperation";
 
   private final @NonNull GolangAuthComponent authComponent;
+  private final @NonNull MessageSource messageSource;
 
   public GolangAuthPreProcessor(
       final @NonNull GolangAuthComponent authComponent,
+      final @NonNull MessageSource messageSource,
       final @NonNull GolangProtocolProvider provider) {
 
     this.authComponent = authComponent;
+    this.messageSource = messageSource;
     provider.registerPreProcessor(this);
   }
 
@@ -78,10 +84,7 @@ public class GolangAuthPreProcessor extends ProtocolProcessor {
     final var authHeader = this.authComponent.emulateAuthHeader(request);
 
     if (authHeader == null) {
-      return ProcessorResult.of(
-          ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
-              .build());
+      return ProcessorResult.of(this.unauthorized("unauthorizedRequest"));
     }
 
     final var permission = (Permission) properties.get(PERMISSION_KEY);
@@ -89,10 +92,27 @@ public class GolangAuthPreProcessor extends ProtocolProcessor {
     try {
       this.authenticateRequest(authHeader, repoInfo.getStorageKey(), permission);
     } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(ex, BasicAuthChallenge.REPSY);
+      return ProcessorResult.of(
+          this.unauthorized(Objects.toString(ex.getMessage(), "unAuthorized")));
     }
 
     return ProcessorResult.next();
+  }
+
+  /**
+   * The go command prints the body of a failed answer only when it is {@code text/plain}, and shows
+   * nothing but the status for the panel's JSON envelope or an empty body (RPS-1435). The message
+   * is the one the credential check chose: the generic {@code unAuthorized}, which does not tell an
+   * unknown user from a wrong password, or {@code deployTokenExpired}.
+   */
+  private ResponseEntity<Object> unauthorized(final String msgId) {
+
+    final var text = this.messageSource.getMessage(msgId, null, msgId, Locale.getDefault());
+
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+        .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
+        .contentType(MediaType.TEXT_PLAIN)
+        .body(text);
   }
 
   private void authenticateRequest(

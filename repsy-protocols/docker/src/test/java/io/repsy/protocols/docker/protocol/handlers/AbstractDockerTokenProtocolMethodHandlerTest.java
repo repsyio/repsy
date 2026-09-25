@@ -136,13 +136,36 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
     when(this.authService.authenticateUserDockerCli(AUTH_HEADER, List.of()))
         .thenThrow(new UnAuthorizedException("unAuthorized"));
 
-    final var result =
-        this.handler.handle(
-            new ProtocolContext(), this.tokenRequest(), new MockHttpServletResponse());
+    assertThatThrownBy(
+            () ->
+                this.handler.handle(
+                    new ProtocolContext(), this.tokenRequest(), new MockHttpServletResponse()))
+        .satisfies(e -> expectChallenge(e, "unAuthorized"));
+  }
 
-    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    assertThat(result.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE))
-        .startsWith("Basic realm=");
+  /**
+   * RPS-1435: the 401 is thrown so the error handler writes the OCI error body, whose message the
+   * client prints, and it keeps the token endpoint's Basic challenge.
+   */
+  private static void expectChallenge(final Throwable thrown, final String msgId) {
+    assertThat(thrown).isInstanceOf(UnAuthorizedException.class).hasMessage(msgId);
+    assertThat(((UnAuthorizedException) thrown).getHeaders())
+        .hasEntrySatisfying(
+            HttpHeaders.WWW_AUTHENTICATE,
+            challenge -> assertThat(challenge).startsWith("Basic realm="));
+  }
+
+  @Test
+  @DisplayName("keeps the cause the credential check named, an expired deploy token (RPS-1435)")
+  void expiredDeployTokenKeepsItsCause() throws Exception {
+    when(this.authService.authenticateUserDockerCli(AUTH_HEADER, List.of()))
+        .thenThrow(new UnAuthorizedException("deployTokenExpired"));
+
+    assertThatThrownBy(
+            () ->
+                this.handler.handle(
+                    new ProtocolContext(), this.tokenRequest(), new MockHttpServletResponse()))
+        .satisfies(e -> expectChallenge(e, "deployTokenExpired"));
   }
 
   /**
@@ -222,14 +245,13 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
         .when(this.authService)
         .authorizePublicRead(repo);
 
-    final var result =
-        this.handler.handle(
-            new ProtocolContext(), this.anonymousTokenRequest(), new MockHttpServletResponse());
-
-    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    assertThat(result.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE))
-        .startsWith("Basic realm=");
-    assertThat(result.getBody()).isNull();
+    assertThatThrownBy(
+            () ->
+                this.handler.handle(
+                    new ProtocolContext(),
+                    this.anonymousTokenRequest(),
+                    new MockHttpServletResponse()))
+        .satisfies(e -> expectChallenge(e, "unAuthorized"));
     verify(this.authService, never()).createAnonymousUser();
   }
 
@@ -250,15 +272,13 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
       })
   @DisplayName("a delete scope is never anonymous, even for a public repo (RPS-1216)")
   void deleteScopeNeedsCredentials(final String scope) throws Exception {
-    final var result =
-        this.handler.handle(
-            new ProtocolContext(),
-            this.anonymousRequestForScope(scope),
-            new MockHttpServletResponse());
-
-    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    assertThat(result.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE))
-        .startsWith("Basic realm=");
+    assertThatThrownBy(
+            () ->
+                this.handler.handle(
+                    new ProtocolContext(),
+                    this.anonymousRequestForScope(scope),
+                    new MockHttpServletResponse()))
+        .satisfies(e -> expectChallenge(e, "unauthorizedRequest"));
     verify(this.authService, never()).createAnonymousUser();
     verifyNoInteractions(this.scopeParser);
   }
@@ -329,15 +349,13 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
     when(this.authService.authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER, PULL_GRANTS))
         .thenThrow(new UnAuthorizedException("unAuthorized"));
 
-    final var result =
-        this.handler.handle(
-            new ProtocolContext(),
-            this.passwordGrantRequest("bob", "secret"),
-            new MockHttpServletResponse());
-
-    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    assertThat(result.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE))
-        .startsWith("Basic realm=");
+    assertThatThrownBy(
+            () ->
+                this.handler.handle(
+                    new ProtocolContext(),
+                    this.passwordGrantRequest("bob", "secret"),
+                    new MockHttpServletResponse()))
+        .satisfies(e -> expectChallenge(e, "unAuthorized"));
     verify(this.authService, never()).createAnonymousUser();
   }
 

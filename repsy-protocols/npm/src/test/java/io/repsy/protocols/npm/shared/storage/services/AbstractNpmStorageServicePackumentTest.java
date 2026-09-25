@@ -55,7 +55,7 @@ import tools.jackson.databind.ObjectMapper;
  * (RPS-1357), and an empty deprecation is no deprecation (RPS-1360).
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractNpmStorageService packument (RPS-1356, RPS-1357, RPS-1360)")
+@DisplayName("AbstractNpmStorageService packument (RPS-1356, RPS-1357, RPS-1360, RPS-1390)")
 @SuppressWarnings("unchecked")
 class AbstractNpmStorageServicePackumentTest {
 
@@ -363,5 +363,112 @@ class AbstractNpmStorageServicePackumentTest {
     assertThat(versionOf(abbreviated, "1.0.0")).doesNotContainKey("deprecated");
     assertThat(versionOf(full, "1.1.0")).containsEntry("deprecated", "older");
     assertThat(versionOf(abbreviated, "1.1.0")).containsEntry("deprecated", "older");
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // RPS-1390
+  // -------------------------------------------------------------------------------------------
+
+  private static final String CLEAN =
+      "{\"name\":\"demo\",\"dist-tags\":{\"latest\":\"1.1.0\",\"old\":\"1.0.0\"},"
+          + "\"time\":{\"modified\":\"m\",\"1.0.0\":\"a\",\"1.1.0\":\"b\"},"
+          + "\"versions\":{"
+          + "\"1.0.0\":{\"name\":\"demo\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"t0\"}},"
+          + "\"1.1.0\":{\"name\":\"demo\",\"version\":\"1.1.0\",\"dist\":{\"tarball\":\"t1\"}}}}";
+
+  /** What an earlier version of the registry stored: the publish's base64 copy stayed. */
+  private static final String WITH_ATTACHMENTS =
+      CLEAN.replaceFirst(
+          "^\\{", "{\"_attachments\":{\"demo-1.0.0.tgz\":{\"data\":\"AAAA\",\"length\":3}},");
+
+  private void assertRewrittenWithoutAttachmentsAndUntouched() {
+    final var packument = this.writtenPackument();
+
+    assertThat(packument).doesNotContainKey("_attachments");
+    assertThat(packument.get("versions"))
+        .as("the versions are what they were")
+        .isEqualTo(
+            MAPPER.readValue(CLEAN, new TypeReference<Map<String, Object>>() {}).get("versions"));
+    assertThat(this.written).as("no tarball is written or rewritten").hasSize(1);
+  }
+
+  @Test
+  @DisplayName("a dist-tag removal rewrites an old packument without its attachments")
+  void removingADistTagStripsTheAttachments() throws Exception {
+    this.stored(WITH_ATTACHMENTS);
+    this.recordWrites();
+
+    this.service.removeDistributionTag(REPO_ID, REPO_NAME, BASE_PATH, "old");
+
+    this.assertRewrittenWithoutAttachmentsAndUntouched();
+    assertThat(this.writtenPackument().get("dist-tags")).isEqualTo(Map.of("latest", "1.1.0"));
+  }
+
+  @Test
+  @DisplayName("a dist-tag add, written by the facade, drops the attachments of an old packument")
+  void addingADistTagStripsTheAttachments() throws Exception {
+    this.stored(WITH_ATTACHMENTS);
+    this.recordWrites();
+    final var storagePath = StoragePath.of(REPO_ID, "demo/package.json");
+
+    final var metadataAndUsage =
+        this.service.addDistributionTag(REPO_ID, REPO_NAME, BASE_PATH, "next", "1.0.0");
+    this.service.writeMetadataToFile(REPO_NAME, metadataAndUsage.getFirst(), storagePath);
+
+    this.assertRewrittenWithoutAttachmentsAndUntouched();
+    assertThat(this.writtenPackument().get("dist-tags"))
+        .isEqualTo(Map.of("latest", "1.1.0", "old", "1.0.0", "next", "1.0.0"));
+  }
+
+  @Test
+  @DisplayName("a deprecation rewrites an old packument without its attachments")
+  void deprecatingStripsTheAttachments() throws Exception {
+    this.stored(WITH_ATTACHMENTS);
+    this.recordWrites();
+
+    this.service.deprecateVersions(
+        REPO_ID, REPO_NAME, BASE_PATH, new ArrayList<>(List.of(Pair.of("1.0.0", "old"))));
+
+    final var packument = this.writtenPackument();
+    assertThat(packument).doesNotContainKey("_attachments");
+    assertThat(versionOf(packument, "1.0.0")).containsEntry("deprecated", "old");
+    assertThat(versionOf(packument, "1.1.0"))
+        .isEqualTo(
+            versionOf(
+                MAPPER.readValue(CLEAN, new TypeReference<Map<String, Object>>() {}), "1.1.0"));
+  }
+
+  @Test
+  @DisplayName("an unpublish rewrites an old packument without its attachments")
+  void unpublishingStripsTheAttachments() throws Exception {
+    this.stored(WITH_ATTACHMENTS);
+    this.recordWrites();
+
+    this.service.removeVersion(REPO_ID, REPO_NAME, BASE_PATH, "demo", "1.0.0", null, NO_ROWS);
+
+    final var packument = this.writtenPackument();
+    assertThat(packument).doesNotContainKey("_attachments");
+    assertThat(packument.get("versions"))
+        .isInstanceOfSatisfying(
+            Map.class, versions -> assertThat(versions).containsOnlyKeys("1.1.0"));
+  }
+
+  @Test
+  @DisplayName("a packument without attachments is written exactly as it was before")
+  void aCleanPackumentIsWrittenAsBefore() throws Exception {
+    this.recordWrites();
+    final var clean =
+        MAPPER.readValue(CLEAN, new TypeReference<LinkedHashMap<String, Object>>() {});
+
+    this.service.writeMetadataToFile(
+        REPO_NAME, clean, StoragePath.of(REPO_ID, "demo/package.json"));
+
+    assertThat(this.written.values())
+        .singleElement()
+        .isEqualTo(
+            MAPPER.writeValueAsBytes(
+                MAPPER.readValue(CLEAN, new TypeReference<LinkedHashMap<String, Object>>() {})));
+    assertThat(new String(this.written.values().iterator().next(), StandardCharsets.UTF_8))
+        .isEqualTo(CLEAN);
   }
 }

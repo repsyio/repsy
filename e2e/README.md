@@ -2145,8 +2145,10 @@ read-only) is `401` with a Bearer challenge at the request hop and an anonymous 
 the token hop even on a public repo, and an admin's token asked for `pull` or `push,pull` cannot delete
 (`401` `UNAUTHORIZED`, a challenge naming `scope="repository:<repo>/<image>:delete"` with
 `error="insufficient_scope"`, **RPS-1434**); and that even a PUBLIC repo still
-needs real credentials to WRITE, refused at the token hop with no OCI body at all (distinct from an
-operation-hop 401's Bearer challenge + OCI envelope).
+needs real credentials to WRITE, refused at the token hop with an OCI `UNAUTHORIZED` body naming the
+cause (RPS-1435: the generic `unAuthorized` text for a wrong password and an unknown user alike,
+`Deploy token expired.` for an expired token; it used to be empty, which the client printed as
+`unauthorized: `) and a Basic challenge (an operation-hop 401 has a Bearer one).
 
 ### H1-H14, confirmed live
 
