@@ -56,7 +56,7 @@ import type { Seeder } from '../../../src/seed/seeder.js';
  * expected, so RPS-1356 (the abbreviated document's missing fields) is not what npm reads.
  */
 const IDENTITY: Partial<
-  Record<ClientId, { accept: RegExp; userAgent: RegExp; npmCommand?: string }>
+  Record<ClientId, { accept?: RegExp; userAgent: RegExp; npmCommand?: string }>
 > = {
   npm: { accept: /^application\/json$/, userAgent: /^npm\/11\.\d+\.\d+ /, npmCommand: 'install' },
   pnpm: {
@@ -74,6 +74,9 @@ const IDENTITY: Partial<
     accept: /^application\/vnd\.npm\.install-v1\+json; q=1\.0, application\/json; q=0\.8, \*\/\*$/,
     userAgent: /^Bun\/1\.3\.\d+$/,
   },
+  // Berry 4.18 sends no `Accept` at all on a packument GET (so it is served the full document) and
+  // identifies itself as its HTTP library, `got`.
+  'yarn-berry': { userAgent: /^got \(https:\/\/github\.com\/sindresorhus\/got\)$/ },
 };
 
 /** The `Authorization` scheme each credential kind is sent with (`_authToken` vs `_auth`). */
@@ -132,9 +135,10 @@ for (const client of clientsWith('frozenInstall')) {
           expect(tarballGets, 'one tarball GET, through the recorder').toHaveLength(1);
 
           const [packument] = packumentGets;
-          expect(packument?.accept, 'the media type the client asks the packument with').toMatch(
-            identity?.accept as RegExp,
-          );
+          expect(
+            packument?.accept ?? '',
+            'the media type the client asks the packument with (none: berry sends no Accept)',
+          ).toMatch(identity?.accept ?? /^$/);
           expect(packument?.userAgent).toMatch(identity?.userAgent as RegExp);
           expect(packument?.npmCommand).toBe(identity?.npmCommand);
           expect(packument?.authScheme, 'the packument GET carries the credential').toBe(scheme);
