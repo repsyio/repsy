@@ -137,6 +137,8 @@ class CargoPublishStorageConsistencyIT extends AbstractIntegrationTest {
     final var name = uniqueRepoName("cargo-cons");
     final var created = this.repoTxService.createRepo(name, RepoType.CARGO, false, null);
     this.createdRepoIds.add(created.getId());
+    // No scan, no scan thread through the strategy spy the tests stub (RPS-1336, RPS-1341).
+    this.disableSecurityScan(created.getId());
     this.cargoStorageService.createRepo(created.getId());
 
     return this.repoRepository.findByName(name).orElseThrow();

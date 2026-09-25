@@ -112,7 +112,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  */
 @AutoConfigureMockMvc
 @Transactional
-@ExtendWith(CommittedRowsGuard.class)
+@ExtendWith({CommittedRowsGuard.class, ScanThreadsSettler.class})
 @SpringBootTest(
     classes = RepsyApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.MOCK)
@@ -138,8 +138,10 @@ public abstract class AbstractIntegrationTest {
           .withUsername("repsy")
           .withPassword("repsy123")
           // Every cached Spring context keeps its own connection pool, and a class that stubs a
-          // bean gets a context of its own. PostgreSQL's default of 100 connections runs out once
-          // about ten contexts are cached ("sorry, too many clients already").
+          // bean gets a context of its own (about 30 in a full run). PostgreSQL's default of 100
+          // connections runs out once about ten contexts are cached ("sorry, too many clients
+          // already"). registerDynamicProperties lets the pools of the idle ones shrink; the limit
+          // stays generous for the ones that are busy.
           .withCommand("postgres", "-c", "fsync=off", "-c", "max_connections=300");
 
   /** Root of the filesystem storage; each protocol keeps its repos under {@code <root>/<type>}. */
@@ -161,6 +163,21 @@ public abstract class AbstractIntegrationTest {
     // The database is shared by every context of the JVM, so whichever one boots first creates the
     // admin. Without this the admin gets a random password that is only ever logged.
     registry.add("admin.initial-password", () -> SEEDED_ADMIN_PASSWORD);
+    // Every cached Spring context keeps its own Hikari pool, which opens 10 connections at boot
+    // and, with the default minimum-idle (= maximum-pool-size), never gives them back. A full run
+    // caches about 30 contexts, so they alone held 299 of the 300 connections of the container
+    // (RPS-1341). A pool that may shrink to one idle connection after 10 seconds keeps the burst
+    // capacity the concurrency tests need (still 10) and leaves the sleeping contexts with one
+    // connection each.
+    registry.add("spring.datasource.hikari.minimum-idle", () -> "1");
+    registry.add("spring.datasource.hikari.idle-timeout", () -> "10000");
+    // The purge of the pending Maven signatures fires one minute after a context boots and then
+    // every 15 minutes, in every context that is still cached, and it deletes across the shared
+    // database. A test that stubs or calls PendingSignatureService (MavenDeferredSignatureIT) must
+    // not have a scheduler thread call the same spy or delete its aged rows first. No IT relies on
+    // the timer: they call purgeOlderThan directly.
+    registry.add("repsy.maven.pending-signature.purge-initial-delay", () -> "PT24H");
+    registry.add("repsy.maven.pending-signature.purge-interval", () -> "PT24H");
   }
 
   @Autowired protected MockMvc mockMvc;
@@ -191,6 +208,22 @@ public abstract class AbstractIntegrationTest {
         claims.userId(),
         claims.familyId(),
         JWT.decode(token).getExpiresAtAsInstant());
+  }
+
+  /**
+   * Turns off the vulnerability scan of a repo, so a publish to it queues no {@code vuln-scan-N}
+   * thread.
+   *
+   * <p>A test that stubs a bean with {@code doAnswer(...).when(spy).method(...)} must not publish
+   * to a repo with the scan on. Mockito keeps a stub that is being set up on the spy itself, not
+   * per thread, so a scan thread that reads the file system through the same spy (the strategy
+   * beans, {@code osStorageStrategyNpm} and {@code osStorageStrategyCargo}) between {@code
+   * when(spy)} and the stubbed call takes the stub for its own call, and the test fails with {@code
+   * UnfinishedStubbingException} (RPS-1336, RPS-1341). The same thread also outlives the test: it
+   * can still be reading the repo when the test deletes it.
+   */
+  protected void disableSecurityScan(final UUID repoId) {
+    this.jdbcTemplate.update("update repo set security_scan_enabled = false where id = ?", repoId);
   }
 
   /**
