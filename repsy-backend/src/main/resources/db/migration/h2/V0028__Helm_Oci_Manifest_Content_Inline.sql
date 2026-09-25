@@ -1,0 +1,3 @@
+-- RPS-1392: helm_oci_manifest.content is mapped without @Lob from now on (see the PostgreSQL script
+-- of the same version). H2 keeps a clob inline and reads and writes it as the string either way, so
+-- there is nothing to rewrite; the version exists to keep both directories aligned.
