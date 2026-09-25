@@ -16,7 +16,7 @@
 package io.repsy.os.server.protocols.npm.shared.npm_package.services;
 
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.NpmSearchCandidate;
-import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
+import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmSearchCandidateRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageKeywordRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageMaintainerRepository;
 import io.repsy.protocols.npm.shared.search.NpmSearchDocument;
@@ -28,50 +28,61 @@ import io.repsy.protocols.npm.shared.search.NpmSearchService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
-import org.springframework.data.domain.Limit;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Searches the latest versions of the packages of one repository. The database narrows the packages
- * by one search term and by the scope; the terms, the keywords and the scoring are applied to what
- * it returns, and only the maintainers of the requested page are loaded.
+ * Searches the latest versions of the packages of one repository. The database applies every filter
+ * of the query (terms, scope, keywords), counts the matches and returns the best {@code
+ * maxCandidates} of them, whole-name matches first; the scoring orders those in memory, and only
+ * the maintainers of the requested page are loaded. So {@code total} is the number of matches even
+ * when more than {@code maxCandidates} match, and a search can page through the first {@code
+ * maxCandidates} of them.
  */
 @Service
 @Transactional(readOnly = true)
-@RequiredArgsConstructor
 @NullMarked
 public class NpmSearchServiceImpl implements NpmSearchService<UUID> {
 
-  /** The most packages one search looks at, so that an empty search of a huge repo stays cheap. */
-  static final int MAX_SEARCH_CANDIDATES = 5000;
+  /**
+   * The most packages one search loads by default, so that an empty search of a huge repo stays
+   * cheap.
+   */
+  static final int DEFAULT_MAX_CANDIDATES = 5000;
 
   /** How many ids one {@code in} clause takes. */
   static final int ID_CHUNK_SIZE = 1000;
 
-  private final NpmPackageRepository packageRepository;
+  private final NpmSearchCandidateRepository candidateRepository;
   private final PackageKeywordRepository keywordRepository;
   private final PackageMaintainerRepository maintainerRepository;
+  private final int maxCandidates;
+
+  public NpmSearchServiceImpl(
+      final NpmSearchCandidateRepository candidateRepository,
+      final PackageKeywordRepository keywordRepository,
+      final PackageMaintainerRepository maintainerRepository,
+      @Value("${repsy.npm.search.max-candidates:" + DEFAULT_MAX_CANDIDATES + "}")
+          final int maxCandidates) {
+    this.candidateRepository = candidateRepository;
+    this.keywordRepository = keywordRepository;
+    this.maintainerRepository = maintainerRepository;
+    this.maxCandidates = maxCandidates;
+  }
 
   @Override
   public NpmSearchResult search(final BaseRepoInfo<UUID> repoInfo, final NpmSearchQuery query) {
     final var now = Instant.now();
 
     final var candidates =
-        this.packageRepository.findSearchCandidates(
-            repoInfo.getStorageKey(),
-            query.scope(),
-            likePattern(query),
-            Limit.of(MAX_SEARCH_CANDIDATES));
+        this.candidateRepository.find(repoInfo.getStorageKey(), query, this.maxCandidates);
 
     if (candidates.isEmpty()) {
       return NpmSearchResult.empty(now);
@@ -83,13 +94,20 @@ public class NpmSearchServiceImpl implements NpmSearchService<UUID> {
 
     for (final var candidate : candidates) {
       final var document =
-          toDocument(candidate, keywords.getOrDefault(candidate.getVersionId(), List.of()));
+          toDocument(candidate, keywords.getOrDefault(candidate.versionId(), List.of()));
 
       documents.add(document);
-      versionIds.put(document.fullName(), candidate.getVersionId());
+      versionIds.put(document.fullName(), candidate.versionId());
     }
 
     final var ranked = NpmSearchScorer.rank(documents, query);
+
+    // Every filter is in SQL, so the loaded rows are all matches: when they are fewer than the
+    // cap they are all there are, and otherwise the database counts them.
+    final var total =
+        candidates.size() < this.maxCandidates
+            ? candidates.size()
+            : this.candidateRepository.count(repoInfo.getStorageKey(), query);
     final var page = ranked.stream().skip(query.from()).limit(query.size()).toList();
     final var best = ranked.stream().mapToDouble(NpmSearchScorer.Scored::score).max().orElse(1.0);
 
@@ -104,31 +122,14 @@ public class NpmSearchServiceImpl implements NpmSearchService<UUID> {
       maintainersByName.put(name, maintainers.getOrDefault(versionIds.get(name), List.of()));
     }
 
-    return NpmSearchResult.of(page, ranked.size(), best, maintainersByName, now);
-  }
-
-  /**
-   * The {@code like} pattern of the longest free term: a package that matches every term matches
-   * that one too, and the longest is the most selective.
-   */
-  private static @Nullable String likePattern(final NpmSearchQuery query) {
-    return query.terms().stream()
-        .map(term -> term.startsWith("@") ? term.substring(1) : term)
-        .max(Comparator.comparingInt(String::length))
-        .filter(term -> !term.isEmpty())
-        .map(term -> "%" + escapeLike(term) + "%")
-        .orElse(null);
-  }
-
-  private static String escapeLike(final String term) {
-    return term.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+    return NpmSearchResult.of(page, total, best, maintainersByName, now);
   }
 
   private Map<UUID, List<String>> keywordsByVersion(final List<NpmSearchCandidate> candidates) {
     final var keywords = new LinkedHashMap<UUID, List<String>>();
 
     for (final var chunk :
-        chunks(candidates.stream().map(NpmSearchCandidate::getVersionId).toList())) {
+        chunks(candidates.stream().map(NpmSearchCandidate::versionId).toList())) {
       for (final var keyword : this.keywordRepository.findAllByPackageVersionIdIn(chunk)) {
         keywords
             .computeIfAbsent(keyword.getPackageVersionId(), _ -> new ArrayList<>())
@@ -167,17 +168,17 @@ public class NpmSearchServiceImpl implements NpmSearchService<UUID> {
       final NpmSearchCandidate candidate, final List<String> keywords) {
 
     return new NpmSearchDocument(
-        candidate.getScope(),
-        candidate.getName(),
-        candidate.getLatest(),
-        candidate.getDescription(),
+        candidate.scope(),
+        candidate.name(),
+        candidate.latest(),
+        candidate.description(),
         List.copyOf(keywords),
-        candidate.getCreatedAt(),
-        candidate.getHomepage(),
-        candidate.getRepositoryUrl(),
-        candidate.getBugsUrl(),
-        candidate.getAuthorName(),
-        candidate.getAuthorEmail(),
-        candidate.getAuthorUrl());
+        candidate.createdAt(),
+        candidate.homepage(),
+        candidate.repositoryUrl(),
+        candidate.bugsUrl(),
+        candidate.authorName(),
+        candidate.authorEmail(),
+        candidate.authorUrl());
   }
 }

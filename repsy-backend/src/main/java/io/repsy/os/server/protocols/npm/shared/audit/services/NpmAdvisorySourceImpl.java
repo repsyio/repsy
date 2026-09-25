@@ -29,7 +29,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * The advisories of an npm audit come from the vulnerability scans of the repository the audit was
- * sent to, so a repository whose scanner is off, or that has not been scanned yet, reports none.
+ * sent to, so a repository whose security scan setting is off, or that has not been scanned yet,
+ * reports none.
  */
 @Service
 @RequiredArgsConstructor
@@ -42,7 +43,9 @@ public class NpmAdvisorySourceImpl implements NpmAdvisorySource<UUID> {
   public List<NpmAdvisory> findAdvisories(
       final BaseRepoInfo<UUID> repoInfo, final Map<String, Set<String>> versionsByName) {
 
-    if (versionsByName.isEmpty()) {
+    // Findings of scans that ran before the setting was turned off stay in the database, but a
+    // repository that is not scanned reports nothing, as the README says.
+    if (!repoInfo.isSecurityScanEnabled() || versionsByName.isEmpty()) {
       return List.of();
     }
 

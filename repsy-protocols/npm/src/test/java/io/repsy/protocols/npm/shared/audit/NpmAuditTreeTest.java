@@ -172,4 +172,39 @@ class NpmAuditTreeTest {
 
     assertThat(tree.totalDependencies()).isEqualTo(depth);
   }
+
+  @Test
+  @DisplayName(
+      "refuses a tree with more distinct packages than the limit, and one with too many nodes")
+  void refusesTooManyPackages() {
+    final var text = new StringBuilder("{\"dependencies\":{");
+    for (var i = 0; i <= NpmAuditRequestReader.MAX_PACKAGE_NAMES; i++) {
+      text.append(i == 0 ? "" : ",").append("\"p").append(i).append("\":{\"version\":\"1.0.0\"}");
+    }
+    text.append("}}");
+
+    assertThatThrownBy(() -> NpmAuditTree.parse(json(text.toString())))
+        .isInstanceOf(InvalidAuditRequestException.class)
+        .hasMessageContaining("too many");
+  }
+
+  @Test
+  @DisplayName("refuses a tree that lists the same few packages more often than the node limit")
+  void refusesTooManyNodes() {
+    // Distinct field names are needed at one level, so the nodes come from many parents.
+    final var text = new StringBuilder("{\"dependencies\":{");
+    final var perParent = 500;
+    final var parents = NpmAuditTree.MAX_NODES / perParent + 2;
+    for (var p = 0; p < parents; p++) {
+      text.append(p == 0 ? "" : ",").append("\"q").append(p).append("\":{\"dependencies\":{");
+      for (var c = 0; c < perParent; c++) {
+        text.append(c == 0 ? "" : ",").append("\"a").append(c).append("\":{\"version\":\"1.0.0\"}");
+      }
+      text.append("}}");
+    }
+    text.append("}}");
+
+    assertThatThrownBy(() -> NpmAuditTree.parse(unlimitedMapper().readTree(text.toString())))
+        .isInstanceOf(InvalidAuditRequestException.class);
+  }
 }

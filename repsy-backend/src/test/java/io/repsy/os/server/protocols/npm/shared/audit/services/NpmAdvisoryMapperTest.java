@@ -157,7 +157,7 @@ class NpmAdvisoryMapperTest {
     final var medium =
         new Row("CVE-1", Severity.MEDIUM, "a", "1.1.0", null, null, null, null, null, T1, null);
 
-    assertThat(map(List.of(low, medium), "a", "1.0.0").getFirst().severity())
+    assertThat(map(List.of(low, medium), "a", "1.0.0", "1.1.0").getFirst().severity())
         .isEqualTo(NpmSeverity.MODERATE);
   }
 
@@ -187,8 +187,8 @@ class NpmAdvisoryMapperTest {
   }
 
   @Test
-  @DisplayName("lists exactly the vulnerable versions found, oldest first, without duplicates")
-  void vulnerableVersionsAreTheScannedOnes() {
+  @DisplayName("lists the requested vulnerable versions, oldest first, without duplicates")
+  void vulnerableVersionsAreTheRequestedOnes() {
     final var rows =
         List.<KnownVulnerabilityRow>of(
             row("CVE-1", "a", "1.10.0", null),
@@ -196,8 +196,47 @@ class NpmAdvisoryMapperTest {
             row("CVE-1", "a", "1.2.0", null),
             row("CVE-1", "a", "latest", null));
 
-    assertThat(map(rows, "a", "1.2.0").getFirst().vulnerableVersions())
+    assertThat(map(rows, "a", "1.10.0", "1.2.0", "latest").getFirst().vulnerableVersions())
         .containsExactly("1.2.0", "1.10.0");
+    assertThat(map(rows, "a", "1.2.0").getFirst().vulnerableVersions()).containsExactly("1.2.0");
+  }
+
+  @Test
+  @DisplayName("computes everything from the requested versions: 2.0.0 alone is patched in 2.0.3")
+  void restrictsToTheRequestedVersionsBeforeComputing() {
+    final var rows =
+        List.<KnownVulnerabilityRow>of(
+            new Row(
+                "CVE-9",
+                Severity.CRITICAL,
+                "a",
+                "1.0.0",
+                "1.0.5",
+                "one",
+                null,
+                9.8,
+                "v1",
+                T1,
+                "s1"),
+            new Row(
+                "CVE-9", Severity.LOW, "a", "2.0.0", "2.0.3", "two", null, 3.0, "v2", T2, "s2"));
+
+    final var only2 = map(rows, "a", "2.0.0");
+    final var only1 = map(rows, "a", "1.0.0");
+    final var both = map(rows, "a", "1.0.0", "2.0.0");
+
+    assertThat(only2).hasSize(1);
+    assertThat(only2.getFirst().vulnerableVersions()).containsExactly("2.0.0");
+    assertThat(only2.getFirst().patchedVersions()).isEqualTo(">=2.0.3");
+    assertThat(only2.getFirst().severity()).isEqualTo(NpmSeverity.LOW);
+    assertThat(only2.getFirst().cvssScore()).isEqualTo(3.0);
+    assertThat(only2.getFirst().overview()).isEqualTo("two");
+    assertThat(only2.getFirst().reportedBy()).isEqualTo("s2");
+    assertThat(only1.getFirst().vulnerableVersions()).containsExactly("1.0.0");
+    assertThat(only1.getFirst().patchedVersions()).isEqualTo(">=1.0.5");
+    assertThat(only1.getFirst().severity()).isEqualTo(NpmSeverity.CRITICAL);
+    assertThat(both.getFirst().vulnerableVersions()).containsExactly("1.0.0", "2.0.0");
+    assertThat(both.getFirst().patchedVersions()).isEqualTo(">=1.0.5");
   }
 
   @Test
@@ -323,7 +362,7 @@ class NpmAdvisoryMapperTest {
         new Row(
             "CVE-1", Severity.HIGH, "a", "1.1.0", null, null, null, 9.8, "high", T2, "new-scanner");
 
-    final var advisory = map(List.of(lowScore, highScore), "a", "1.0.0").getFirst();
+    final var advisory = map(List.of(lowScore, highScore), "a", "1.0.0", "1.1.0").getFirst();
 
     assertThat(advisory.cvssScore()).isEqualTo(9.8);
     assertThat(advisory.cvssVector()).isEqualTo("high");

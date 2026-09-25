@@ -40,14 +40,14 @@ import org.springframework.http.ResponseEntity;
 @NullMarked
 public abstract class AbstractNpmSearchProtocolMethodHandler<ID> implements ProtocolMethodHandler {
 
-  private final PathParser basePathParser;
+  private final PathParser pathParser;
   private final NpmSearchService<ID> searchService;
 
   public AbstractNpmSearchProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmSearchService<ID> searchService,
       final NpmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
+    this.pathParser = new NpmExactPathParser(basePathParser, HttpMethod.GET, "/-/v1/search");
     this.searchService = searchService;
 
     provider.registerMethodHandler(this);
@@ -68,7 +68,7 @@ public abstract class AbstractNpmSearchProtocolMethodHandler<ID> implements Prot
 
   @Override
   public PathParser getPathParser() {
-    return new NpmExactPathParser(this.basePathParser, HttpMethod.GET, "/-/v1/search");
+    return this.pathParser;
   }
 
   @Override

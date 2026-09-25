@@ -50,14 +50,14 @@ public abstract class AbstractNpmWhoamiProtocolMethodHandler<ID> implements Prot
       "Bearer realm=\"Repsy Managed Registry\", " + CHALLENGE;
   private static final String BEARER_PREFIX = "Bearer ";
 
-  private final PathParser basePathParser;
+  private final PathParser pathParser;
   private final NpmIdentityResolver<ID> identityResolver;
 
   public AbstractNpmWhoamiProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmIdentityResolver<ID> identityResolver,
       final NpmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
+    this.pathParser = new NpmExactPathParser(basePathParser, HttpMethod.GET, "/-/whoami");
     this.identityResolver = identityResolver;
 
     provider.registerMethodHandler(this);
@@ -79,7 +79,7 @@ public abstract class AbstractNpmWhoamiProtocolMethodHandler<ID> implements Prot
 
   @Override
   public PathParser getPathParser() {
-    return new NpmExactPathParser(this.basePathParser, HttpMethod.GET, "/-/whoami");
+    return this.pathParser;
   }
 
   @Override

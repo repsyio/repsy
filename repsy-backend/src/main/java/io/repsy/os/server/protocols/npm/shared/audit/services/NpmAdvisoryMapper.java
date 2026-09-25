@@ -59,9 +59,11 @@ public class NpmAdvisoryMapper {
   record Key(String cveId, String packageName) {}
 
   /**
-   * Builds the advisories of the findings. A vulnerability is one advisory for each package it
-   * affects, and it is reported only when one of the requested versions of that package is among
-   * the versions it was found in.
+   * Builds the advisories of the findings. Only the findings on a requested version count, and
+   * everything is computed from those: a vulnerability found in {@code 1.0.0} (fixed in {@code
+   * 1.0.5}) and in {@code 2.0.0} (fixed in {@code 2.0.3}) is reported for a client that uses only
+   * {@code 2.0.0} as vulnerable in {@code 2.0.0} and patched in {@code >=2.0.3}. A vulnerability is
+   * one advisory for each package it affects.
    *
    * @param rows The findings on the requested packages
    * @param versionsByName The requested versions by package name
@@ -72,48 +74,32 @@ public class NpmAdvisoryMapper {
     final var groups = new LinkedHashMap<Key, List<KnownVulnerabilityRow>>();
 
     for (final var row : rows) {
-      groups
-          .computeIfAbsent(new Key(row.getCveId(), row.getPackageName()), _ -> new ArrayList<>())
-          .add(row);
+      final var requested = versionsByName.getOrDefault(row.getPackageName(), Set.of());
+
+      if (requested.contains(row.getPackageVersion())) {
+        groups
+            .computeIfAbsent(new Key(row.getCveId(), row.getPackageName()), _ -> new ArrayList<>())
+            .add(row);
+      }
     }
 
     final var advisories = new ArrayList<NpmAdvisory>();
 
     for (final var group : groups.entrySet()) {
-      final var requested = versionsByName.getOrDefault(group.getKey().packageName(), Set.of());
+      final var vulnerable = vulnerableVersions(group.getValue());
 
-      toAdvisory(group.getKey(), group.getValue(), requested).ifPresent(advisories::add);
+      if (!vulnerable.isEmpty()) {
+        advisories.add(build(group.getKey(), group.getValue(), vulnerable));
+      }
     }
 
     return advisories;
   }
 
-  private static Optional<NpmAdvisory> toAdvisory(
-      final Key key, final List<KnownVulnerabilityRow> group, final Set<String> requested) {
-
-    final var vulnerable = vulnerableVersions(group, requested);
-
-    if (vulnerable.isEmpty()) {
-      return Optional.empty();
-    }
-
-    return Optional.of(build(key, group, vulnerable));
-  }
-
-  /**
-   * The versions the vulnerability was found in, oldest first, or none when the audit did not ask
-   * about any of them or they are not semantic versions.
-   */
-  private static List<String> vulnerableVersions(
-      final List<KnownVulnerabilityRow> group, final Set<String> requested) {
-
-    final var foundIn = group.stream().map(KnownVulnerabilityRow::getPackageVersion).toList();
-
-    if (foundIn.stream().noneMatch(requested::contains)) {
-      return List.of();
-    }
-
-    return foundIn.stream()
+  /** The requested versions the vulnerability was found in, oldest first; only semver ones. */
+  private static List<String> vulnerableVersions(final List<KnownVulnerabilityRow> group) {
+    return group.stream()
+        .map(KnownVulnerabilityRow::getPackageVersion)
         .distinct()
         .filter(NpmSemver::isValid)
         .sorted(Comparator.comparing(NpmSemver::parse))

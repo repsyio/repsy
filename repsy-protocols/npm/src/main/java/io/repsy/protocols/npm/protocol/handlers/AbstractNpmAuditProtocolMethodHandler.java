@@ -37,7 +37,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * What the audit endpoints have in common: {@code POST}, read access to the repository, and a JSON
@@ -50,23 +49,18 @@ import tools.jackson.databind.ObjectMapper;
 public abstract class AbstractNpmAuditProtocolMethodHandler<ID> implements ProtocolMethodHandler {
 
   /** The largest inflated body an audit request may have. */
-  static final long DEFAULT_MAX_AUDIT_BODY_BYTES = 64L * 1024 * 1024;
+  static final long DEFAULT_MAX_AUDIT_BODY_BYTES = 8L * 1024 * 1024;
 
-  private final PathParser basePathParser;
-  private final String relativePathRegex;
+  private final PathParser pathParser;
   private final NpmAdvisorySource<ID> advisorySource;
-  private final ObjectMapper objectMapper;
 
   protected AbstractNpmAuditProtocolMethodHandler(
       final PathParser basePathParser,
       final String relativePathRegex,
       final NpmAdvisorySource<ID> advisorySource,
-      final ObjectMapper objectMapper,
       final NpmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.relativePathRegex = relativePathRegex;
+    this.pathParser = new NpmExactPathParser(basePathParser, HttpMethod.POST, relativePathRegex);
     this.advisorySource = advisorySource;
-    this.objectMapper = objectMapper;
 
     provider.registerMethodHandler(this);
   }
@@ -99,7 +93,7 @@ public abstract class AbstractNpmAuditProtocolMethodHandler<ID> implements Proto
 
   @Override
   public PathParser getPathParser() {
-    return new NpmExactPathParser(this.basePathParser, HttpMethod.POST, this.relativePathRegex);
+    return this.pathParser;
   }
 
   @Override
@@ -114,7 +108,6 @@ public abstract class AbstractNpmAuditProtocolMethodHandler<ID> implements Proto
           NpmAuditRequestReader.read(
               request.getInputStream(),
               request.getHeader(HttpHeaders.CONTENT_ENCODING),
-              this.objectMapper,
               this.maxAuditBodyBytes());
 
       final var report = this.report(ProtocolContextUtils.<ID>getRepoInfo(context), body);

@@ -15,17 +15,14 @@
  */
 package io.repsy.os.server.protocols.npm.shared.npm_package.repositories;
 
-import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.NpmSearchCandidate;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.NpmPackage;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -111,31 +108,4 @@ public interface NpmPackageRepository extends JpaRepository<NpmPackage, UUID> {
           like %:scope%)""")
   Page<PackageListItem> findAllByRepoIdAndLatestVersionContainsScope(
       UUID repoId, @Nullable String scope, Pageable pageable);
-
-  /**
-   * The latest version of the packages of a repo that a search may match, by name. {@code pattern}
-   * is a {@code like} pattern in lowercase whose {@code %}, {@code _} and {@code !} are escaped
-   * with {@code !}; it narrows the packages to those whose key, description or a keyword contains
-   * one of the search terms, and the search then applies every term to what this returns.
-   */
-  @Query(
-      """
-      select pv.id as versionId, p.scope as scope, p.name as name, p.latest as latest,
-        pv.description as description, pv.createdAt as createdAt,
-        pv.authorName as authorName, pv.authorEmail as authorEmail, pv.authorUrl as authorUrl,
-        pv.homepage as homepage, pv.repositoryUrl as repositoryUrl, pv.bugsUrl as bugsUrl
-      from NpmPackage p
-      join p.packageVersions pv
-      where p.repo.id = :repoId and pv.version = p.latest
-      and (:scope is null or lower(p.scope) = :scope)
-      and (:pattern is null
-        or lower(case when p.scope is null then p.name else concat(p.scope, '/', p.name) end)
-          like :pattern escape '!'
-        or lower(pv.description) like :pattern escape '!'
-        or exists (
-          select k.id from PackageKeyword k
-          where k.packageVersion = pv and lower(k.keyword) like :pattern escape '!'))
-      order by p.name, p.scope""")
-  List<NpmSearchCandidate> findSearchCandidates(
-      UUID repoId, @Nullable String scope, @Nullable String pattern, Limit limit);
 }

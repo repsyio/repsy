@@ -72,8 +72,21 @@ class NpmAuditProtocolIT extends AbstractIntegrationTest {
     return this.mockMvc.perform(request.with(protocolPort())).andReturn().getResponse();
   }
 
+  /**
+   * A repo whose security scan setting is on, because a repo that is not scanned reports nothing.
+   */
   private Repo repo(final boolean privateRepo) {
-    return this.seedRepo(RepoType.NPM, uniqueRepoName("audit"), privateRepo, null);
+    final var repo = this.seedRepo(RepoType.NPM, uniqueRepoName("audit"), privateRepo, null);
+
+    return this.setSecurityScan(repo, true);
+  }
+
+  private Repo setSecurityScan(final Repo repo, final boolean enabled) {
+    final var stored = this.repoRepository.findById(repo.getId()).orElseThrow();
+    stored.setSecurityScanEnabled(enabled);
+    this.repoRepository.saveAndFlush(stored);
+
+    return this.reloadRepo(repo.getName());
   }
 
   private static byte[] gzip(final String text) throws IOException {
@@ -314,7 +327,7 @@ class NpmAuditProtocolIT extends AbstractIntegrationTest {
         FixStatus.AFFECTED);
 
     final var json =
-        this.plain(BULK, repo, "{\"lodash\":[\"4.17.20\"],\"left-pad\":[\"1.0.0\"]}")
+        this.plain(BULK, repo, "{\"lodash\":[\"4.17.19\",\"4.17.20\"],\"left-pad\":[\"1.0.0\"]}")
             .getContentAsString();
 
     assertThat(JsonPath.<String>read(json, "$.lodash[0].severity")).isEqualTo("moderate");
@@ -469,5 +482,90 @@ class NpmAuditProtocolIT extends AbstractIntegrationTest {
 
     assertThat(this.protocol(get(BULK, repo.getName())).getStatus()).isEqualTo(404);
     assertThat(this.protocol(get(AUDITS, repo.getName())).getStatus()).isEqualTo(404);
+  }
+
+  /** One vulnerability found in 1.0.0 (fixed in 1.0.5) and in 2.0.0 (fixed in 2.0.3). */
+  private Repo repoWithTwoVersionsOfOneVulnerability() {
+    final var repo = this.repo(false);
+    final var scan = this.completedScan(repo, "app", T0);
+    this.seedFinding(scan, "CVE-9", Severity.CRITICAL, "pkg", "1.0.0", "1.0.5", FixStatus.FIXED);
+    this.seedFinding(scan, "CVE-9", Severity.LOW, "pkg", "2.0.0", "2.0.3", FixStatus.FIXED);
+
+    return repo;
+  }
+
+  @Test
+  @DisplayName("bulk reports only the requested version: 2.0.0 alone is patched in >=2.0.3")
+  void bulkRestrictsToTheRequestedVersions() throws Exception {
+    final var repo = this.repoWithTwoVersionsOfOneVulnerability();
+
+    final var only2 = this.plain(BULK, repo, "{\"pkg\":[\"2.0.0\"]}").getContentAsString();
+    final var both = this.plain(BULK, repo, "{\"pkg\":[\"1.0.0\",\"2.0.0\"]}").getContentAsString();
+
+    assertThat(JsonPath.<String>read(only2, "$.pkg[0].vulnerable_versions")).isEqualTo("2.0.0");
+    assertThat(JsonPath.<String>read(only2, "$.pkg[0].severity")).isEqualTo("low");
+    assertThat(JsonPath.<String>read(both, "$.pkg[0].vulnerable_versions"))
+        .isEqualTo("1.0.0 || 2.0.0");
+    assertThat(JsonPath.<String>read(both, "$.pkg[0].severity")).isEqualTo("critical");
+  }
+
+  @Test
+  @DisplayName("legacy reports only the requested version: 2.0.0 alone is patched in >=2.0.3")
+  void legacyRestrictsToTheRequestedVersions() throws Exception {
+    final var repo = this.repoWithTwoVersionsOfOneVulnerability();
+
+    final var json =
+        this.plain(AUDITS, repo, "{\"dependencies\":{\"pkg\":{\"version\":\"2.0.0\"}}}")
+            .getContentAsString();
+    final var advisories = JsonPath.<Map<String, Object>>read(json, "$.advisories");
+    final var id = advisories.keySet().iterator().next();
+
+    assertThat(advisories).hasSize(1);
+    assertThat(JsonPath.<String>read(json, "$.advisories." + id + ".vulnerable_versions"))
+        .isEqualTo("2.0.0");
+    assertThat(JsonPath.<String>read(json, "$.advisories." + id + ".patched_versions"))
+        .isEqualTo(">=2.0.3");
+    assertThat(JsonPath.<List<String>>read(json, "$.advisories." + id + ".findings[*].version"))
+        .containsExactly("2.0.0");
+  }
+
+  @Test
+  @DisplayName("a repo whose security scan is off reports nothing, though it has old findings")
+  void scanOffReportsNothing() throws Exception {
+    final var repo = this.setSecurityScan(this.repo(false), false);
+    this.seedLodash(repo);
+
+    assertThat(this.plain(BULK, repo, "{\"lodash\":[\"4.17.20\"]}").getContentAsString())
+        .isEqualTo("{}");
+    final var legacy =
+        this.plain(AUDITS, repo, "{\"dependencies\":{\"lodash\":{\"version\":\"4.17.20\"}}}")
+            .getContentAsString();
+    assertThat(JsonPath.<Map<String, Object>>read(legacy, "$.advisories")).isEmpty();
+
+    final var on = this.setSecurityScan(repo, true);
+    assertThat(this.plain(BULK, on, "{\"lodash\":[\"4.17.20\"]}").getContentAsString())
+        .isNotEqualTo("{}");
+  }
+
+  @Test
+  @DisplayName("answers 413 for a gzip bomb, and 400 for a very deep body or too many names")
+  void boundsTheRequest() throws Exception {
+    final var repo = this.repo(false);
+    final var bomb = "{\"a\":[\"" + "0".repeat(9 * 1024 * 1024) + "\"]}";
+    final var deep = "{\"a\":" + "[".repeat(1000) + "]".repeat(1000) + "}";
+    final var names = new StringBuilder("{");
+    for (var i = 0; i < 20_001; i++) {
+      names.append(i == 0 ? "" : ",").append("\"p").append(i).append("\":[\"1.0.0\"]");
+    }
+    names.append('}');
+
+    final var bombResponse = this.gzipped(BULK, repo, bomb);
+
+    assertThat(bombResponse.getStatus()).isEqualTo(413);
+    assertThat(bombResponse.getContentAsString())
+        .isEqualTo("{\"error\":\"audit request body too large\"}");
+    assertThat(this.gzipped(BULK, repo, deep).getStatus()).isEqualTo(400);
+    assertThat(this.gzipped(BULK, repo, names.toString()).getStatus()).isEqualTo(400);
+    assertThat(this.gzipped(AUDITS, repo, deep).getStatus()).isEqualTo(400);
   }
 }

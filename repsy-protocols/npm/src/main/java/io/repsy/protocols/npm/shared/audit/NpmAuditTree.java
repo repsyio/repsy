@@ -39,7 +39,7 @@ import tools.jackson.databind.JsonNode;
 public record NpmAuditTree(Map<String, Set<String>> versionsByName, List<Node> nodes) {
 
   static final int MAX_DEPTH = 1000;
-  static final int MAX_NODES = 250_000;
+  static final int MAX_NODES = 100_000;
 
   private static final String DEPENDENCIES = "dependencies";
   private static final String PATH_SEPARATOR = ">";
@@ -149,6 +149,10 @@ public record NpmAuditTree(Map<String, Set<String>> versionsByName, List<Node> n
       this.versionsByName
           .computeIfAbsent(node.name(), _ -> new LinkedHashSet<>())
           .add(node.version());
+
+      if (this.versionsByName.size() > NpmAuditRequestReader.MAX_PACKAGE_NAMES) {
+        throw new InvalidAuditRequestException("the request names too many packages");
+      }
     }
   }
 

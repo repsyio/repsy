@@ -17,31 +17,19 @@ package io.repsy.os.server.protocols.npm.shared.npm_package.dtos;
 
 import java.time.Instant;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /** The latest version of a package as the search reads it. */
-public interface NpmSearchCandidate {
-
-  UUID getVersionId();
-
-  String getScope();
-
-  String getName();
-
-  String getLatest();
-
-  String getDescription();
-
-  Instant getCreatedAt();
-
-  String getAuthorName();
-
-  String getAuthorEmail();
-
-  String getAuthorUrl();
-
-  String getHomepage();
-
-  String getRepositoryUrl();
-
-  String getBugsUrl();
-}
+public record NpmSearchCandidate(
+    UUID versionId,
+    @Nullable String scope,
+    String name,
+    String latest,
+    @Nullable String description,
+    @Nullable Instant createdAt,
+    @Nullable String authorName,
+    @Nullable String authorEmail,
+    @Nullable String authorUrl,
+    @Nullable String homepage,
+    @Nullable String repositoryUrl,
+    @Nullable String bugsUrl) {}

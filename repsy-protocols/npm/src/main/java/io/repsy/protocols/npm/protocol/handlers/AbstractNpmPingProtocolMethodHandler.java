@@ -38,12 +38,12 @@ import org.springframework.http.ResponseEntity;
 @NullMarked
 public abstract class AbstractNpmPingProtocolMethodHandler implements ProtocolMethodHandler {
 
-  private final PathParser basePathParser;
+  private final PathParser pathParser;
 
   public AbstractNpmPingProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
+    this.pathParser = new NpmExactPathParser(basePathParser, HttpMethod.GET, "/-/ping");
 
     provider.registerMethodHandler(this);
   }
@@ -63,7 +63,7 @@ public abstract class AbstractNpmPingProtocolMethodHandler implements ProtocolMe
 
   @Override
   public PathParser getPathParser() {
-    return new NpmExactPathParser(this.basePathParser, HttpMethod.GET, "/-/ping");
+    return this.pathParser;
   }
 
   @Override

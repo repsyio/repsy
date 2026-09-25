@@ -24,7 +24,6 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * {@code POST /{repo}/-/npm/v1/security/advisories/bulk}, which npm 10 and 11, yarn berry, bun and
@@ -38,14 +37,8 @@ public abstract class AbstractNpmAuditBulkProtocolMethodHandler<ID>
   public AbstractNpmAuditBulkProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmAdvisorySource<ID> advisorySource,
-      final ObjectMapper objectMapper,
       final NpmProtocolProvider provider) {
-    super(
-        basePathParser,
-        "/-/npm/v1/security/advisories/bulk",
-        advisorySource,
-        objectMapper,
-        provider);
+    super(basePathParser, "/-/npm/v1/security/advisories/bulk", advisorySource, provider);
   }
 
   @Override

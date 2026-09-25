@@ -23,12 +23,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmSearchCandidateRepository;
+import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageKeywordRepository;
+import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageMaintainerRepository;
+import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmSearchServiceImpl;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
+import io.repsy.protocols.npm.shared.search.NpmSearchQuery;
+import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +57,9 @@ class NpmSearchProtocolIT extends AbstractIntegrationTest {
   @MockitoBean private UsageUpdateService usageUpdateService;
 
   @Autowired private ObjectMapper objectMapper;
+  @Autowired private NpmSearchCandidateRepository candidateRepository;
+  @Autowired private PackageKeywordRepository keywordRepository;
+  @Autowired private PackageMaintainerRepository maintainerRepository;
 
   private MockHttpServletResponse protocol(final AbstractMockHttpServletRequestBuilder<?> request)
       throws Exception {
@@ -323,5 +333,68 @@ class NpmSearchProtocolIT extends AbstractIntegrationTest {
     assertThat(packument.getStatus()).isEqualTo(200);
     assertThat(JsonPath.<String>read(packument.getContentAsString(), "$.name")).isEqualTo("search");
     assertThat(names(this.search(repo, "text", "search"))).containsExactly("search");
+  }
+
+  private static List<String> names(
+      final io.repsy.protocols.npm.shared.search.NpmSearchResult result) {
+    return result.objects().stream().map(object -> object.pkg().name()).toList();
+  }
+
+  /** The service with a cap far below the number of packages of the repo. */
+  private NpmSearchServiceImpl cappedService(final int cap) {
+    return new NpmSearchServiceImpl(
+        this.candidateRepository, this.keywordRepository, this.maintainerRepository, cap);
+  }
+
+  private static BaseRepoInfo<UUID> infoOf(final Repo repo) {
+    return BaseRepoInfo.<UUID>builder().name(repo.getName()).storageKey(repo.getId()).build();
+  }
+
+  @Test
+  @DisplayName("when the cap cuts the matches, the best ones stay and total counts every match")
+  void capKeepsTheBestMatches() throws Exception {
+    final var token = this.adminToken();
+    final var repo = this.seedRepo(RepoType.NPM, uniqueRepoName("search"), false, null);
+    for (final var name : List.of("aaa-pad", "pad", "padding", "zzz", "b-pad", "c-pad")) {
+      this.publish(repo, token, name, Map.of("description", "a package"));
+    }
+
+    final var result =
+        this.cappedService(2).search(infoOf(repo), NpmSearchQuery.parse("pad", "20", "0"));
+
+    // Six packages, five of them match. Alphabetically the first two would be aaa-pad and b-pad.
+    assertThat(result.total()).isEqualTo(5);
+    assertThat(names(result)).containsExactly("pad", "padding");
+    assertThat(
+            names(
+                this.cappedService(50)
+                    .search(infoOf(repo), NpmSearchQuery.parse("pad", "20", "0"))))
+        .containsExactly("pad", "padding", "aaa-pad", "b-pad", "c-pad");
+  }
+
+  @Test
+  @DisplayName("the keywords filter is applied in the database, before the cap")
+  void keywordsAreFilteredBeforeTheCap() throws Exception {
+    final var token = this.adminToken();
+    final var repo = this.seedRepo(RepoType.NPM, uniqueRepoName("search"), false, null);
+    for (final var name : List.of("a1", "a2", "a3")) {
+      this.publish(repo, token, name, Map.of("keywords", List.of("other")));
+    }
+    this.publish(repo, token, "z-ui", Map.of("keywords", List.of("UI")));
+
+    final var result =
+        this.cappedService(2).search(infoOf(repo), NpmSearchQuery.parse("keywords:ui", null, null));
+
+    assertThat(names(result)).containsExactly("z-ui");
+    assertThat(result.total()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("the total of the wire answer is the true count of the matches")
+  void totalOnTheWire() throws Exception {
+    final var repo = this.seedPackages(false, this.adminToken());
+
+    assertThat(JsonPath.<Integer>read(this.search(repo, "text", "pad", "size", "1"), "$.total"))
+        .isEqualTo(2);
   }
 }

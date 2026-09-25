@@ -48,7 +48,7 @@ class NpmAuditRequestReaderTest {
 
   private static tools.jackson.databind.JsonNode read(
       final byte[] body, final String encoding, final long max) throws IOException {
-    return NpmAuditRequestReader.read(new ByteArrayInputStream(body), encoding, MAPPER, max);
+    return NpmAuditRequestReader.read(new ByteArrayInputStream(body), encoding, max);
   }
 
   private static byte[] plain(final String text) {
@@ -148,10 +148,25 @@ class NpmAuditRequestReaderTest {
   }
 
   @Test
-  @DisplayName("stops at the most package names")
-  void capsThePackageNames() throws Exception {
+  @DisplayName("refuses a request that names more packages than the limit")
+  void tooManyPackageNames() throws Exception {
     final var json = new StringBuilder("{");
-    for (var i = 0; i < NpmAuditRequestReader.MAX_PACKAGE_NAMES + 5; i++) {
+    for (var i = 0; i <= NpmAuditRequestReader.MAX_PACKAGE_NAMES; i++) {
+      json.append(i == 0 ? "" : ",").append("\"p").append(i).append("\":[\"1.0.0\"]");
+    }
+    json.append('}');
+    final var body = read(plain(json.toString()), null, MAX * 10);
+
+    assertThatThrownBy(() -> NpmAuditRequestReader.bulkVersionsByName(body))
+        .isInstanceOf(InvalidAuditRequestException.class)
+        .hasMessageContaining("too many");
+  }
+
+  @Test
+  @DisplayName("accepts a request with exactly the most package names")
+  void atTheLimitOfPackageNames() throws Exception {
+    final var json = new StringBuilder("{");
+    for (var i = 0; i < NpmAuditRequestReader.MAX_PACKAGE_NAMES; i++) {
       json.append(i == 0 ? "" : ",").append("\"p").append(i).append("\":[\"1.0.0\"]");
     }
     json.append('}');
@@ -160,5 +175,50 @@ class NpmAuditRequestReaderTest {
         NpmAuditRequestReader.bulkVersionsByName(read(plain(json.toString()), null, MAX * 10));
 
     assertThat(versions).hasSize(NpmAuditRequestReader.MAX_PACKAGE_NAMES);
+  }
+
+  @Test
+  @DisplayName("refuses JSON nested deeper than the limit, plain or gzip")
+  void tooDeep() throws Exception {
+    final var depth = NpmAuditRequestReader.MAX_NESTING_DEPTH + 10;
+    final var json = "{\"a\":" + "[".repeat(depth) + "]".repeat(depth) + "}";
+
+    assertThatThrownBy(() -> read(plain(json), null, MAX))
+        .isInstanceOf(InvalidAuditRequestException.class);
+    assertThatThrownBy(() -> read(gzip(json), "gzip", MAX))
+        .isInstanceOf(InvalidAuditRequestException.class);
+  }
+
+  @Test
+  @DisplayName("refuses a body with more JSON tokens than the limit, though it is small")
+  void tooManyTokens() {
+    final var json = "{\"a\":[" + "1,".repeat((int) NpmAuditRequestReader.MAX_TOKEN_COUNT) + "1]}";
+
+    assertThat(json.length()).isLessThan((int) MAX * 4);
+    assertThatThrownBy(() -> read(plain(json), null, MAX * 4))
+        .isInstanceOf(InvalidAuditRequestException.class);
+  }
+
+  @Test
+  @DisplayName("refuses a very long string and a very long field name")
+  void tooLongStrings() {
+    final var longValue =
+        "{\"a\":[\"" + "x".repeat(NpmAuditRequestReader.MAX_STRING_LENGTH + 1) + "\"]}";
+    final var longName = "{\"" + "x".repeat(NpmAuditRequestReader.MAX_NAME_LENGTH + 1) + "\":[]}";
+
+    assertThatThrownBy(() -> read(plain(longValue), null, MAX))
+        .isInstanceOf(InvalidAuditRequestException.class);
+    assertThatThrownBy(() -> read(plain(longName), null, MAX))
+        .isInstanceOf(InvalidAuditRequestException.class);
+  }
+
+  @Test
+  @DisplayName("a gzip bomb is stopped at the limit of the inflated size, not the compressed one")
+  void gzipBomb() throws Exception {
+    final var bomb = gzip("{\"a\":[\"" + "0".repeat(16 * 1024 * 1024) + "\"]}");
+
+    assertThat(bomb.length).isLessThan(64 * 1024);
+    assertThatThrownBy(() -> read(bomb, "gzip", 8L * 1024 * 1024))
+        .isInstanceOf(EntryTooLargeException.class);
   }
 }

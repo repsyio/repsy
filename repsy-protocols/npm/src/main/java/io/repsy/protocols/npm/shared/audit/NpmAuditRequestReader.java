@@ -29,8 +29,10 @@ import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.StreamReadConstraints;
+import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Reads the body of an audit request. npm and bun compress it with gzip, pnpm and yarn send plain
@@ -41,8 +43,42 @@ import tools.jackson.databind.ObjectMapper;
 @NullMarked
 public class NpmAuditRequestReader {
 
-  /** The most package names a bulk request may carry; the rest is ignored. */
-  static final int MAX_PACKAGE_NAMES = 100_000;
+  /**
+   * The most distinct package names an audit request may carry. Every name costs a share of a
+   * database query, and even a very large project has far fewer.
+   */
+  public static final int MAX_PACKAGE_NAMES = 20_000;
+
+  /** The deepest nesting of the JSON; the legacy tree nests two levels for each package level. */
+  static final int MAX_NESTING_DEPTH = 400;
+
+  /** The most JSON tokens a request may have, which bounds the size of the parsed tree. */
+  static final long MAX_TOKEN_COUNT = 1_000_000;
+
+  /** The longest name of a JSON field and the longest JSON string; names and versions are short. */
+  static final int MAX_NAME_LENGTH = 1024;
+
+  static final int MAX_STRING_LENGTH = 8192;
+
+  static final int MAX_NUMBER_LENGTH = 64;
+
+  /**
+   * Parses the request with limits of its own, whatever the application mapper allows: the body is
+   * unauthenticated on a public repository, so the size of the tree it can make is bounded.
+   */
+  private static final JsonMapper MAPPER =
+      JsonMapper.builder(
+              JsonFactory.builder()
+                  .streamReadConstraints(
+                      StreamReadConstraints.builder()
+                          .maxNestingDepth(MAX_NESTING_DEPTH)
+                          .maxTokenCount(MAX_TOKEN_COUNT)
+                          .maxNameLength(MAX_NAME_LENGTH)
+                          .maxStringLength(MAX_STRING_LENGTH)
+                          .maxNumberLength(MAX_NUMBER_LENGTH)
+                          .build())
+                  .build())
+          .build();
 
   private static final int GZIP_MAGIC_FIRST = 0x1f;
   private static final int GZIP_MAGIC_SECOND = 0x8b;
@@ -52,29 +88,26 @@ public class NpmAuditRequestReader {
    *
    * @param body The request body, compressed or not
    * @param contentEncoding The {@code Content-Encoding} header, if the request has one
-   * @param objectMapper The mapper that parses the JSON
    * @param maxBytes The most bytes the inflated body may have
-   * @throws InvalidAuditRequestException If the body is not a JSON object or cannot be inflated
+   * @throws InvalidAuditRequestException If the body is not a JSON object, cannot be inflated or
+   *     exceeds a limit of the parser (nesting, tokens, names, strings)
    * @throws io.repsy.protocols.shared.utils.EntryTooLargeException If the inflated body is larger
    *     than {@code maxBytes}
    */
   public static JsonNode read(
-      final InputStream body,
-      final @Nullable String contentEncoding,
-      final ObjectMapper objectMapper,
-      final long maxBytes)
+      final InputStream body, final @Nullable String contentEncoding, final long maxBytes)
       throws IOException {
 
     final var buffered = new BufferedInputStream(body);
     final var bytes = inflateIfNeeded(buffered, contentEncoding, maxBytes);
 
     if (bytes.length == 0) {
-      return objectMapper.createObjectNode();
+      return MAPPER.createObjectNode();
     }
 
     final JsonNode root;
     try {
-      root = objectMapper.readTree(bytes);
+      root = MAPPER.readTree(bytes);
     } catch (final JacksonException e) {
       throw new InvalidAuditRequestException("the body is not valid JSON", e);
     }
@@ -89,15 +122,14 @@ public class NpmAuditRequestReader {
   /**
    * The versions a bulk request asks about: {@code {"name": ["1.0.0", "1.0.1"]}}. A name whose
    * value is not an array is left out, and so is an element that is not a string.
+   *
+   * @throws InvalidAuditRequestException If the request names more than {@value #MAX_PACKAGE_NAMES}
+   *     packages
    */
   public static Map<String, Set<String>> bulkVersionsByName(final JsonNode root) {
     final var versionsByName = new LinkedHashMap<String, Set<String>>();
 
     for (final var entry : root.properties()) {
-      if (versionsByName.size() >= MAX_PACKAGE_NAMES) {
-        break;
-      }
-
       if (!entry.getValue().isArray()) {
         continue;
       }
@@ -110,6 +142,10 @@ public class NpmAuditRequestReader {
       }
 
       versionsByName.put(entry.getKey(), versions);
+
+      if (versionsByName.size() > MAX_PACKAGE_NAMES) {
+        throw new InvalidAuditRequestException("the request names too many packages");
+      }
     }
 
     return versionsByName;

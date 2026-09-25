@@ -26,7 +26,6 @@ import java.util.List;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * {@code POST /{repo}/-/npm/v1/security/audits} and {@code .../audits/quick}, which npm 6, npm 10
@@ -40,14 +39,8 @@ public abstract class AbstractNpmAuditLegacyProtocolMethodHandler<ID>
   public AbstractNpmAuditLegacyProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmAdvisorySource<ID> advisorySource,
-      final ObjectMapper objectMapper,
       final NpmProtocolProvider provider) {
-    super(
-        basePathParser,
-        "/-/npm/v1/security/audits(?:/quick)?",
-        advisorySource,
-        objectMapper,
-        provider);
+    super(basePathParser, "/-/npm/v1/security/audits(?:/quick)?", advisorySource, provider);
   }
 
   @Override

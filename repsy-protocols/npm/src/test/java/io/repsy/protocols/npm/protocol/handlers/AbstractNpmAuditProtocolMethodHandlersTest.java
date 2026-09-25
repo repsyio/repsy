@@ -27,6 +27,7 @@ import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.handlers.NpmHandlerTestSupport.FixedBaseParser;
 import io.repsy.protocols.npm.shared.audit.NpmAdvisory;
 import io.repsy.protocols.npm.shared.audit.NpmAdvisorySource;
+import io.repsy.protocols.npm.shared.audit.NpmAuditRequestReader;
 import io.repsy.protocols.npm.shared.audit.NpmSeverity;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.ByteArrayOutputStream;
@@ -72,7 +73,7 @@ class AbstractNpmAuditProtocolMethodHandlersTest {
         final NpmAdvisorySource<UUID> source,
         final NpmProtocolProvider p,
         final long limit) {
-      super(base, source, MAPPER, p);
+      super(base, source, p);
       this.limit = limit;
     }
 
@@ -85,7 +86,7 @@ class AbstractNpmAuditProtocolMethodHandlersTest {
   private static class Legacy extends AbstractNpmAuditLegacyProtocolMethodHandler<UUID> {
     Legacy(
         final PathParser base, final NpmAdvisorySource<UUID> source, final NpmProtocolProvider p) {
-      super(base, source, MAPPER, p);
+      super(base, source, p);
     }
   }
 
@@ -254,12 +255,12 @@ class AbstractNpmAuditProtocolMethodHandlersTest {
   }
 
   @Test
-  @DisplayName("the body limit is 64 MiB unless a subclass lowers it")
+  @DisplayName("the body limit is 8 MiB unless a subclass lowers it")
   void defaultLimit() {
     assertThat(
             new Legacy(new FixedBaseParser(AUDITS, true), this.source, this.provider)
                 .maxAuditBodyBytes())
-        .isEqualTo(64L * 1024 * 1024);
+        .isEqualTo(8L * 1024 * 1024);
   }
 
   @Test
@@ -308,5 +309,53 @@ class AbstractNpmAuditProtocolMethodHandlersTest {
         handle(this.legacy(AUDITS), AUDITS, post(AUDITS, "[".getBytes(StandardCharsets.UTF_8)));
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
+  @Test
+  @DisplayName("bulk answers 400 for a request that names too many packages, and asks for nothing")
+  void bulkTooManyPackages() throws Exception {
+    final var json = new StringBuilder("{");
+    for (var i = 0; i <= NpmAuditRequestReader.MAX_PACKAGE_NAMES; i++) {
+      json.append(i == 0 ? "" : ",").append("\"p").append(i).append("\":[\"1.0.0\"]");
+    }
+    json.append('}');
+    final var request = post(BULK, gzip(json.toString()));
+    request.addHeader(HttpHeaders.CONTENT_ENCODING, "gzip");
+
+    final var response = handle(this.bulk(1 << 20), BULK, request);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    verify(this.source, never()).findAdvisories(any(), any());
+  }
+
+  @Test
+  @DisplayName("legacy answers 400 for a tree that names too many packages, and for a deep one")
+  void legacyTooManyPackagesAndTooDeep() throws Exception {
+    final var tree = new StringBuilder("{\"dependencies\":{");
+    for (var i = 0; i <= NpmAuditRequestReader.MAX_PACKAGE_NAMES; i++) {
+      tree.append(i == 0 ? "" : ",").append("\"p").append(i).append("\":{\"version\":\"1.0.0\"}");
+    }
+    tree.append("}}");
+    final var deep =
+        "{\"dependencies\":"
+            + "{\"a\":{\"dependencies\":".repeat(300)
+            + "{}"
+            + "}}".repeat(300)
+            + "}";
+
+    for (final var body : List.of(tree.toString(), deep)) {
+      final var response = handle(this.legacy(AUDITS), AUDITS, post(AUDITS, gzip(body)));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+    verify(this.source, never()).findAdvisories(any(), any());
+  }
+
+  @Test
+  @DisplayName("builds its path parser once and hands out the same one on every call")
+  void pathParserIsBuiltOnce() {
+    final var bulk = this.bulk(1024);
+
+    assertThat(bulk.getPathParser()).isSameAs(bulk.getPathParser());
   }
 }

@@ -23,7 +23,6 @@ import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
 
 @Component
 @NullMarked
@@ -33,9 +32,8 @@ public class NpmAuditBulkProtocolMethodHandler
   public NpmAuditBulkProtocolMethodHandler(
       @Qualifier("osNpmPathParser") final PathParser basePathParser,
       final NpmAdvisorySource<UUID> advisorySource,
-      final ObjectMapper objectMapper,
       final NpmProtocolProvider provider) {
 
-    super(basePathParser, advisorySource, objectMapper, provider);
+    super(basePathParser, advisorySource, provider);
   }
 }
