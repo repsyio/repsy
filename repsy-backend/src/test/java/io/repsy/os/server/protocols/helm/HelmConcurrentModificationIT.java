@@ -24,6 +24,7 @@ import static io.repsy.os.server.protocols.helm.HelmChartFixtures.digest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -35,6 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciBlobRepository;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestRepository;
@@ -52,6 +54,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -75,6 +79,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * RPS-1342: Helm OCI pushes that lose a race on a row.
@@ -99,6 +105,16 @@ import org.springframework.transaction.annotation.Transactional;
  * pinned that mapping with a stub controller only. It is one class so that it shares one Spring
  * context (and one connection pool) with the OCI tests.
  *
+ * <p>RPS-1365: a push takes the chart row first and then the version and manifest rows, so a delete
+ * of that chart (the panel's, one version or all of them, or the classic protocol's) must take the
+ * chart first too, or the two wait on each other and the database fails one of them. The tests
+ * below hold both requests where the old order would deadlock and expect neither to fail.
+ *
+ * <p>RPS-1366: the manifest file is the last write of a push's transaction, so a failure of the
+ * commit itself leaves a file no row describes. The tests below fail the commit with a
+ * synchronization that throws before it, and expect the file to be removed (a new manifest) or put
+ * back (a replaced one).
+ *
  * <p>The races are forced, not hoped for: right after a row is read, another connection bumps its
  * {@code version_lock}, as a concurrent request would. Runs without a test transaction since the
  * pushes have to commit; it deletes the repos and the user it committed.
@@ -115,13 +131,21 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
   private static final String OCTET_STREAM = "application/octet-stream";
   private static final long TIMEOUT_SECONDS = 30;
 
-  /** Called with the method name after every call of the three repositories the pushes read. */
+  /** Called with the method name after every call of the four repositories the pushes read. */
   private static final AtomicReference<Consumer<String>> AFTER_READ = new AtomicReference<>();
 
   private static final String MANIFEST_READ =
       "HelmOciManifestRepository.findByRepoIdAndNameAndReference";
   private static final String VERSION_READ = "HelmChartVersionRepository.findByChartAndVersion";
   private static final String BLOB_READ = "HelmOciBlobRepository.findByRepoIdAndDigest";
+  private static final String CHART_LOCK = "HelmChartRepository.findWithLockByRepoIdAndName";
+  private static final String VERSIONS_OF_CHART = "HelmChartVersionRepository.findAllByChart";
+  private static final String VERSIONS_DELETED = "HelmChartVersionRepository.deleteAllByChart";
+
+  /** Which request of a race the current thread runs, so that the hook can tell them apart. */
+  private static final ThreadLocal<String> ROLE = new ThreadLocal<>();
+
+  private static final long HOLD_SECONDS = 2;
 
   private static final String BUMP_MANIFEST =
       "update helm_oci_manifest set version_lock = version_lock + 1 where repo_id = ?";
@@ -137,8 +161,9 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
   @MockitoSpyBean private HelmStorageService helmStorageService;
 
   /**
-   * Wraps the manifest, chart version and blob repositories in a proxy that calls through and then
-   * runs {@link #AFTER_READ}: a Spring Data repository cannot be a {@code @MockitoSpyBean}.
+   * Wraps the manifest, chart, chart version and blob repositories in a proxy that calls through
+   * and then runs {@link #AFTER_READ}: a Spring Data repository cannot be a
+   * {@code @MockitoSpyBean}.
    */
   @TestConfiguration(proxyBeanMethods = false)
   static class ReadHook {
@@ -180,6 +205,9 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
           if (bean instanceof HelmChartVersionRepository) {
             return HelmChartVersionRepository.class;
           }
+          if (bean instanceof HelmChartRepository) {
+            return HelmChartRepository.class;
+          }
           if (bean instanceof HelmOciBlobRepository) {
             return HelmOciBlobRepository.class;
           }
@@ -204,6 +232,7 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
   @AfterEach
   void deleteCommittedData() {
     AFTER_READ.set(null);
+    ROLE.remove();
     this.createdRepoIds.forEach(
         id -> this.jdbcTemplate.update("delete from repo where id = ?", id));
     this.createdRepoIds.clear();
@@ -672,5 +701,279 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
         .as("the same request repeated without contention")
         .isZero();
     assertThat(chartFile).doesNotExist();
+  }
+
+  /** What the push and the delete of a race answered, and how often the push ran its unit. */
+  private record RaceOutcome(
+      MockHttpServletResponse push, MockHttpServletResponse delete, int pushRuns) {}
+
+  private static boolean await(final CountDownLatch latch) {
+    try {
+      return latch.await(HOLD_SECONDS, TimeUnit.SECONDS);
+    } catch (final InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
+  }
+
+  /**
+   * Runs an override push of the seeded chart and a delete of it against each other, holding each
+   * where the other would need what it holds. The push stops right after it took the chart lock
+   * until the delete holds the rows it has deleted so far (the wait of {@code deleteAfter}), and
+   * the delete stops there until the push holds the chart. The delete starts once the push holds
+   * the chart. When the delete takes the chart first it cannot get past its first statement while
+   * the push holds the chart, so the push's wait ends by its timeout and the push commits, then the
+   * delete runs; when it does not, the two are in a deadlock the database resolves by failing one.
+   */
+  private RaceOutcome pushAgainstDelete(
+      final Repo repo,
+      final String name,
+      final String token,
+      final String deleteAfter,
+      final Callable<MockHttpServletResponse> delete)
+      throws Exception {
+    final var override = chart(name, "1.0.0", "override", null);
+    final var pushHoldsChart = new CountDownLatch(1);
+    final var deleteHoldsRows = new CountDownLatch(1);
+    final var pushRuns = new AtomicInteger();
+
+    AFTER_READ.set(
+        called -> {
+          if ("push".equals(ROLE.get()) && called.equals(CHART_LOCK)) {
+            pushRuns.incrementAndGet();
+            pushHoldsChart.countDown();
+            await(deleteHoldsRows);
+          } else if ("delete".equals(ROLE.get()) && called.equals(deleteAfter)) {
+            deleteHoldsRows.countDown();
+            await(pushHoldsChart);
+          }
+        });
+
+    final var pool = Executors.newFixedThreadPool(2);
+    try {
+      final var push =
+          pool.submit(
+              () -> {
+                ROLE.set("push");
+                return this.pushOci(repo, name, "1.0.0", override, token);
+              });
+      assertThat(pushHoldsChart.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+          .as("the push reached the chart lock")
+          .isTrue();
+      final var deleted =
+          pool.submit(
+              () -> {
+                ROLE.set("delete");
+                return delete.call();
+              });
+
+      return new RaceOutcome(
+          push.get(TIMEOUT_SECONDS, TimeUnit.SECONDS),
+          deleted.get(TIMEOUT_SECONDS, TimeUnit.SECONDS),
+          pushRuns.get());
+    } finally {
+      pool.shutdownNow();
+    }
+  }
+
+  private Repo repoWithSeededOciChart(final String name, final String token) throws Exception {
+    final var repo = this.overridableHelmRepo();
+    assertThat(
+            this.pushOci(repo, name, "1.0.0", chart(name, "1.0.0", "original", null), token)
+                .getStatus())
+        .as("the seed")
+        .isEqualTo(201);
+
+    return repo;
+  }
+
+  private void assertNeitherRequestFailed(final RaceOutcome outcome) throws Exception {
+    assertThat(outcome.push().getStatus())
+        .as("the push answered %s", outcome.push().getContentAsString())
+        .isEqualTo(201);
+    assertThat(outcome.delete().getStatus())
+        .as("the delete answered %s", outcome.delete().getContentAsString())
+        .isBetween(200, 299);
+    assertThat(outcome.pushRuns())
+        .as("the push was not repeated after losing a deadlock")
+        .isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("a panel delete of a version and a push of the chart take their locks in one order")
+  void panelVersionDeleteAndPushDoNotDeadlock() throws Exception {
+    final var name = "lock-order-version";
+    final var admin = this.admin();
+    final var repo = this.repoWithSeededOciChart(name, this.protocolBearerTokenFor(admin));
+    final var panelToken = this.bearerTokenFor(admin);
+
+    final var outcome =
+        this.pushAgainstDelete(
+            repo,
+            name,
+            this.protocolBearerTokenFor(admin),
+            VERSIONS_OF_CHART,
+            () ->
+                this.mockMvc
+                    .perform(
+                        delete(
+                                "/api/helm/charts/{repo}/{chart}/{version}",
+                                repo.getName(),
+                                name,
+                                "1.0.0")
+                            .header(AUTHORIZATION, panelToken)
+                            .with(apiPort()))
+                    .andReturn()
+                    .getResponse());
+
+    this.assertNeitherRequestFailed(outcome);
+    assertThat(this.versionRows(repo, name)).as("the delete came last and won").isZero();
+    assertThat(this.rows("helm_chart", repo)).isZero();
+    assertThat(this.rows("helm_oci_manifest", repo)).isZero();
+  }
+
+  @Test
+  @DisplayName(
+      "a panel delete of a whole chart and a push of the chart take their locks in one order")
+  void panelChartDeleteAndPushDoNotDeadlock() throws Exception {
+    final var name = "lock-order-chart";
+    final var admin = this.admin();
+    final var repo = this.repoWithSeededOciChart(name, this.protocolBearerTokenFor(admin));
+    final var panelToken = this.bearerTokenFor(admin);
+
+    final var outcome =
+        this.pushAgainstDelete(
+            repo,
+            name,
+            this.protocolBearerTokenFor(admin),
+            VERSIONS_DELETED,
+            () ->
+                this.mockMvc
+                    .perform(
+                        delete("/api/helm/charts/{repo}/{chart}", repo.getName(), name)
+                            .header(AUTHORIZATION, panelToken)
+                            .with(apiPort()))
+                    .andReturn()
+                    .getResponse());
+
+    this.assertNeitherRequestFailed(outcome);
+    assertThat(this.versionRows(repo, name)).as("the delete came last and won").isZero();
+    assertThat(this.rows("helm_chart", repo)).isZero();
+    assertThat(this.rows("helm_oci_manifest", repo)).isZero();
+  }
+
+  @Test
+  @DisplayName("a classic protocol delete of a version and a push of the chart take one lock order")
+  void protocolDeleteAndPushDoNotDeadlock() throws Exception {
+    final var name = "lock-order-classic";
+    final var admin = this.admin();
+    final var repo = this.repoWithSeededOciChart(name, this.protocolBearerTokenFor(admin));
+    final var token = this.protocolBearerTokenFor(admin);
+
+    final var outcome =
+        this.pushAgainstDelete(
+            repo,
+            name,
+            token,
+            VERSIONS_OF_CHART,
+            () ->
+                this.mockMvc
+                    .perform(
+                        delete("/{repo}/api/charts/{name}/{version}", repo.getName(), name, "1.0.0")
+                            .header(AUTHORIZATION, token)
+                            .with(protocolPort()))
+                    .andReturn()
+                    .getResponse());
+
+    this.assertNeitherRequestFailed(outcome);
+    assertThat(this.versionRows(repo, name)).as("the delete came last and won").isZero();
+    assertThat(this.rows("helm_chart", repo)).isZero();
+    assertThat(this.rows("helm_oci_manifest", repo)).isZero();
+  }
+
+  /** The manifest file as stored, or null when there is none. */
+  private byte @Nullable [] manifestFile(final Repo repo, final String name, final String tag)
+      throws Exception {
+    final var resource =
+        this.helmStorageService.getManifest(repo.getId(), name, tag, repo.getName());
+    if (resource.isEmpty() || !resource.get().exists()) {
+      return null;
+    }
+
+    return resource.get().getContentAsByteArray();
+  }
+
+  /**
+   * Makes the commit of the next manifest write fail: once the file is written, the transaction
+   * gets a synchronization that throws before the commit, which rolls the rows back.
+   */
+  private void failTheCommitAfterTheManifestFile() {
+    doAnswer(
+            invocation -> {
+              final var written = invocation.callRealMethod();
+              TransactionSynchronizationManager.registerSynchronization(
+                  new TransactionSynchronization() {
+                    @Override
+                    public void beforeCommit(final boolean readOnly) {
+                      throw new IllegalStateException("the commit failed");
+                    }
+                  });
+              return written;
+            })
+        .when(this.helmStorageService)
+        .saveManifest(any(UUID.class), anyString(), anyString(), any(byte[].class), anyString());
+  }
+
+  @Test
+  @DisplayName("a first push whose commit fails leaves no manifest file (RPS-1366)")
+  void firstPushWhoseCommitFailsLeavesNoFile() throws Exception {
+    final var repo = this.overridableHelmRepo();
+    final var name = "commit-first";
+    final var token = this.protocolToken();
+    final var content = chart(name, "1.0.0", "first", null);
+    this.failTheCommitAfterTheManifestFile();
+
+    final var response = this.pushOci(repo, name, "1.0.0", content, token);
+
+    assertThat(response.getStatus()).as("the push fails").isGreaterThanOrEqualTo(500);
+    assertThat(this.rows("helm_oci_manifest", repo)).as("no manifest row").isZero();
+    assertThat(this.rows("helm_chart", repo)).as("no chart row").isZero();
+    assertThat(this.manifestFile(repo, name, "1.0.0"))
+        .as("and no file for a row that does not exist")
+        .isNull();
+
+    Mockito.reset(this.helmStorageService);
+
+    assertThat(this.pushOci(repo, name, "1.0.0", content, token).getStatus())
+        .as("the same push repeated once the commit works")
+        .isEqualTo(201);
+    assertThat(this.manifestFile(repo, name, "1.0.0")).isNotNull();
+  }
+
+  @Test
+  @DisplayName("an override whose commit fails leaves the manifest file it had (RPS-1366)")
+  void overrideWhoseCommitFailsKeepsTheOldFile() throws Exception {
+    final var repo = this.overridableHelmRepo();
+    final var name = "commit-override";
+    final var token = this.protocolToken();
+    assertThat(
+            this.pushOci(repo, name, "1.0.0", chart(name, "1.0.0", "original", null), token)
+                .getStatus())
+        .as("the seed")
+        .isEqualTo(201);
+    final var seeded = this.manifestFile(repo, name, "1.0.0");
+    assertThat(seeded).isNotNull();
+    this.failTheCommitAfterTheManifestFile();
+
+    final var response =
+        this.pushOci(repo, name, "1.0.0", chart(name, "1.0.0", "override", null), token);
+
+    assertThat(response.getStatus()).as("the push fails").isGreaterThanOrEqualTo(500);
+    assertThat(this.manifestFile(repo, name, "1.0.0"))
+        .as("the file is what the surviving row describes, not the bytes of the failed push")
+        .isEqualTo(seeded);
+    assertThat(this.manifestDigest(repo, name, "1.0.0"))
+        .as("and the row still describes the file")
+        .isEqualTo(digest("SHA-256", seeded));
   }
 }

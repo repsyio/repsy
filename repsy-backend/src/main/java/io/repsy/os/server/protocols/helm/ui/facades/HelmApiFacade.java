@@ -99,6 +99,10 @@ public class HelmApiFacade implements ProtocolApiFacade {
   public BaseUsages deleteAllVersions(final RepoInfo repoInfo, final String name)
       throws IOException {
 
+    // The chart first, as a push takes it (RPS-1365), and before the versions and their manifests
+    // are read: what a push that was running commits is then part of what is deleted.
+    this.helmChartService.lockChart(repoInfo.getStorageKey(), name);
+
     final var versions =
         this.helmChartService.findAllVersionsByName(repoInfo.getStorageKey(), name);
 
@@ -133,6 +137,10 @@ public class HelmApiFacade implements ProtocolApiFacade {
   @Transactional(rollbackFor = IOException.class)
   public BaseUsages delete(final RepoInfo repoInfo, final String name, final String version)
       throws IOException {
+    // The chart first, as a push takes it (RPS-1365), and before the version and its manifests are
+    // read: what a push that was running commits is then part of what is deleted.
+    this.helmChartService.lockChart(repoInfo.getStorageKey(), name);
+
     final var chartInfo =
         this.helmChartService.findByRepoIdAndNameAndVersion(
             repoInfo.getStorageKey(), name, version);
