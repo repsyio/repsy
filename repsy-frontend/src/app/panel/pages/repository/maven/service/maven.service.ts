@@ -31,14 +31,13 @@ import {
 } from '../../../../../../generated/api';
 import { PagedData } from '../../../../shared/dto/paged-data';
 import { Sort } from '../../../../shared/dto/sort';
-import {
-  isLastVersion,
-  VERSION_PROBE_SIZE,
-  VERSION_PROBE_SORT,
-} from '../../../../shared/util/version-delete-landing.util';
+import { isLastVersion, VERSION_PROBE_SIZE } from '../../../../shared/util/version-delete-landing.util';
 import { DeletedItem } from '../dto/deleted-item';
 import { FsItemInfo } from '../dto/fs-item-info';
 import { lastVersionOfGroupWarning } from '../util/version-delete-warning.util';
+
+/** The probe's sort: the versions of a Maven artifact sort by `versionName` (the shared probe sort is no column here). */
+const MAVEN_VERSION_PROBE_SORT: Sort = { name: 'Newest', column: 'versionName', type: 'DESC' };
 
 @Injectable({
   providedIn: 'root',
@@ -164,7 +163,14 @@ export class MavenService {
    * fails asks for nothing more than the plain confirmation.
    */
   public getVersionDeleteWarning(groupName: string, artifactName: string): Observable<string | null> {
-    return this.searchArtifactVersions(groupName, artifactName, '', VERSION_PROBE_SORT, 0, VERSION_PROBE_SIZE).pipe(
+    return this.searchArtifactVersions(
+      groupName,
+      artifactName,
+      '',
+      MAVEN_VERSION_PROBE_SORT,
+      0,
+      VERSION_PROBE_SIZE,
+    ).pipe(
       switchMap((probe) => (isLastVersion(probe) ? this.getGroupSummary(groupName) : of(null))),
       map((summary) =>
         summary && summary.artifactCount === 1 ? lastVersionOfGroupWarning(groupName, artifactName) : null,

@@ -218,15 +218,9 @@ describe('MavenService', () => {
 
         warning();
 
-        expect(mavenApi.listMavenArtifactVersions).toHaveBeenCalledOnceWith(
-          GROUP,
-          ARTIFACT,
-          REPO,
-          undefined,
-          0,
-          2,
-          jasmine.any(Array),
-        );
+        expect(mavenApi.listMavenArtifactVersions).toHaveBeenCalledOnceWith(GROUP, ARTIFACT, REPO, undefined, 0, 2, [
+          'versionName,DESC',
+        ]);
       });
 
       it('asks for nothing more, and does not read the group, when the artifact has other versions', () => {
