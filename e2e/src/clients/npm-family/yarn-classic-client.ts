@@ -42,7 +42,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { isolatedWorkDir, run, type RunResult } from '../exec.js';
+import { isolatedWorkDir, type RunResult } from '../exec.js';
 import { MARKER_FILENAME } from '../npm.js';
 import type { Outcome, Scenario } from '../../scenarios/types.js';
 import {
@@ -55,7 +55,7 @@ import {
   type PublishOptions,
   type RegistryBinding,
 } from './client.js';
-import { secretsOf, sealedEnv, writeNpmrc } from './config.js';
+import { secretsOf, runSealed, sealedEnv, writeNpmrc } from './config.js';
 
 const BINARY = CLIENT_BINARIES['yarn-classic'];
 
@@ -118,7 +118,7 @@ function exec(
   cwd: string = ctx.work,
   timeoutMs = COMMAND_TIMEOUT_MS,
 ): Promise<RunResult> {
-  return run(BINARY, [...args, ...common(ctx)], {
+  return runSealed(BINARY, [...args, ...common(ctx)], {
     cwd,
     env: ctx.env,
     timeoutMs,

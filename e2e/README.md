@@ -1063,6 +1063,7 @@ tests/npm-clients/
   yarn-berry/*.spec.ts          # the catalog with berry + the berry-only cells (PnP, hardened mode, settings, `yarn npm` commands, workspaces): see "yarn berry"
   versions.spec.ts              # --version of every installed client == its pin; config renderers read back by the client
   sealed-network.spec.ts        # the network seal, proven for all five clients
+  sealed-env.spec.ts            # the environment is an allow-list: no runner variable reaches a client (RPS-1364)
   matrix/*.spec.ts              # one file per matrix row, iterating clientsWith(...)
 ```
 
@@ -1075,8 +1076,9 @@ catalog need no change per client) and `tags` (`@pnpm`, ...). `clients/npm.ts` o
 
 ### The network seal
 
-Every client invocation runs in `sealedEnv()` (`config.ts`): an allow-list env (never the runner's own,
-which carries the admin password), an isolated HOME, `HTTP_PROXY`/`HTTPS_PROXY` (both cases) at a dead
+Every client invocation runs in `sealedEnv()` (`config.ts`) through `runSealed()` (`run()` with
+`extendEnv: false`, so the child gets that env and nothing else): an allow-list env (never the runner's own,
+which carries the admin password; `sealed-env.spec.ts`, RPS-1364), an isolated HOME, `HTTP_PROXY`/`HTTPS_PROXY` (both cases) at a dead
 loopback port and `NO_PROXY` = `new URL(env.repoBaseUrl).hostname` + `localhost` + `127.0.0.1`. The test
 packages depend only on each other (OS has no proxy repository), so anything a client reaches for beyond
 the registry under test -- registry.npmjs.org, repo.yarnpkg.com, a self-update check -- fails at once
@@ -1375,8 +1377,9 @@ no `dist-tag`, `deprecate`, `ping` or `search` command, so those capabilities ar
 `dist-tags`/`time`) and `bun audit --json` (the bare advisory map) are not npm's document shapes: the
 matrix cells that parse those shapes do not fit, and `bun/commands.spec.ts` covers both commands against
 what bun does print. Config: env `BUN_INSTALL_CACHE_DIR`/`BUN_INSTALL` in the isolated HOME, `DO_NOT_TRACK=1`,
-`FORCE_COLOR=0` (Playwright's workers set `FORCE_COLOR`, which bun honours over `NO_COLOR`, and colour
-codes split every message a test matches on).
+`NO_COLOR=1` (Playwright's workers set `FORCE_COLOR`, which bun honours over `NO_COLOR`; it no longer
+reaches bun since the environment is a real allow-list, RPS-1364, so colour codes stay out of every message a
+test matches on).
 
 Three configurations, all exercised: `bunClient` reads `$HOME/.bunfig.toml` (the matrix column),
 `bunfigOnlyClient` is the same with nothing else, `bunNpmrcClient` reads **only** `$HOME/.npmrc` (H-11).
@@ -1449,11 +1452,14 @@ answered `Content-Disposition: inline;filename=f.txt` (a fixed made-up name, Spr
 reflected-file-download guard) instead of `<name>-<version>.tgz`; seen on every tarball request in
 `bun add --verbose`, asserted raw in `bun/commands.spec.ts` (now `attachment; filename="<name>-<version>.tgz"`). No client depended on it.
 
-Harness note found while doing this: `sealedEnv()` is documented as an allow-list that never carries the
-runner's own environment, but `exec.ts`'s `run()` calls `execa` with its default `extendEnv: true`, so the
-runner's variables (including `REPSY_ADMIN_PASSWORD`, `FORCE_COLOR`, `YARN_VERSION` and `NPM_CLIENTS_*`) are
-merged into every client's environment (`sealedEnv`'s own keys win). Not changed here (it is `exec.ts`, shared
-by every runner); filed as `RPS-1364`.
+Harness note found while doing this, fixed by RPS-1364: `sealedEnv()` is documented as an allow-list that
+never carries the runner's own environment, but `exec.ts`'s `run()` called `execa` with its default
+`extendEnv: true`, so the runner's variables (including `REPSY_ADMIN_PASSWORD`, `FORCE_COLOR`,
+`YARN_VERSION` and `NPM_CLIENTS_*`) were merged into every client's environment (`sealedEnv`'s own keys won).
+`RunOptions` now has `extendEnv` (default `true`, so every other runner is unchanged) and every npm-family
+call goes through `runSealed()` (`config.ts`), which passes `false`; `sealed-env.spec.ts` runs a `node -p`
+package script under each client and asserts that a sentinel set in the worker, `REPSY_*`, `NPM_CLIENTS_*`,
+`FORCE_COLOR` and `YARN_VERSION` are absent from its environment and that `HOME` is the isolated one.
 
 ### yarn berry (4.18.1, RPS-1330 PR 4)
 
