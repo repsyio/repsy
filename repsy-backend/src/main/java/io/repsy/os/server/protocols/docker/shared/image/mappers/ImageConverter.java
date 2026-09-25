@@ -42,7 +42,11 @@ public interface ImageConverter {
   })
   ImageInfo toImageInfo(Image image);
 
+  // The untagged fields follow indexes of any depth, which the list query cannot: the service
+  // sets them from ImageRepository.findUntaggedStatsByImageId.
   @Mapping(target = "updatedAt", expression = "java(resolveUpdatedAt(source))")
+  @Mapping(target = "untaggedManifestCount", ignore = true)
+  @Mapping(target = "untaggedSize", ignore = true)
   io.repsy.os.generated.model.ImageListItem toDto(
       io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem source);
 }

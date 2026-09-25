@@ -26,6 +26,7 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
@@ -170,8 +171,26 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
     return this.cleanup(repo, "");
   }
 
+  /** The image as the panel's list shows it. */
+  private String summary(final Repo repo) throws Exception {
+    return this.expectSuccess(
+        this.perform(
+            get("/api/docker/images/%s/%s/summary".formatted(repo.getName(), IMAGE))
+                .header(AUTHORIZATION, this.panelToken)),
+        "imageFetched",
+        "Image is fetched.");
+  }
+
+  private long layerBytes(final Repo repo) {
+    final var size =
+        this.jdbcTemplate.queryForObject(
+            "select sum(size) from docker_layer where repo_id = ?", Long.class, repo.getId());
+
+    return size == null ? 0 : size;
+  }
+
   private static Number number(final String body, final String field) {
-    return JsonPath.read(body, "$.data." + field);
+    return JsonPath.read(body, field.startsWith("data.") ? "$." + field : "$.data." + field);
   }
 
   private void assertResult(
@@ -470,6 +489,53 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
     assertThat(this.edgeRows(repo)).isZero();
     assertThat(this.status(repo, IMAGE, leaf)).isEqualTo(404);
     this.awaitBlobsDeleted(repo, "layer-leaf");
+  }
+
+  @Test
+  @DisplayName(
+      "the image list counts the untagged manifests and their size through nested indexes, as the"
+          + " cleanup removes them (RPS-1350)")
+  void theListAgreesWithTheCleanupOnNestedIndexes() throws Exception {
+    final var repo = this.dockerRepo();
+    final var leaf = this.pushByDigest(repo, IMAGE, "layer-leaf");
+    final var inner = index(leaf);
+    assertThat(
+            this.wire
+                .putManifest(repo, IMAGE, this.digestOf(inner), DockerWire.OCI_INDEX, inner)
+                .getStatus())
+        .isEqualTo(201);
+    final var outer = index(inner);
+    assertThat(this.wire.putManifest(repo, IMAGE, "top", DockerWire.OCI_INDEX, outer).getStatus())
+        .isEqualTo(201);
+
+    // The leaf is two indexes below the tag: the tag reaches it, so it is neither untagged nor
+    // left out of the size the tag shows.
+    final var tagged = this.summary(repo);
+
+    assertThat(number(tagged, "data.untaggedManifestCount").intValue()).isZero();
+    assertThat(number(tagged, "data.untaggedSize").longValue()).isZero();
+    assertThat(number(tagged, "data.size").longValue())
+        .as("the layers of the leaf are part of the size of the tagged image")
+        .isEqualTo(this.layerBytes(repo))
+        .isPositive();
+
+    // The tag moves to a plain image: the outer index, the inner one and the leaf are untagged,
+    // and the list says exactly what the cleanup then deletes.
+    this.push(repo, IMAGE, "top", "layer-plain");
+
+    final var untagged = this.summary(repo);
+
+    assertThat(number(untagged, "data.untaggedManifestCount").intValue()).isEqualTo(3);
+    assertThat(number(untagged, "data.untaggedSize").longValue())
+        .as("the config blob the tagged manifest shares is not counted")
+        .isEqualTo(length("layer-leaf"));
+
+    final var result = this.cleanup(repo);
+
+    assertThat(number(result, "deletedManifests").intValue())
+        .isEqualTo(number(untagged, "data.untaggedManifestCount").intValue());
+    assertThat(number(result, "orphanLayerBytes").longValue())
+        .isEqualTo(number(untagged, "data.untaggedSize").longValue());
   }
 
   @Test

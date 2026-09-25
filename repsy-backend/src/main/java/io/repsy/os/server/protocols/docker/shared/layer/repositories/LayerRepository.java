@@ -59,23 +59,27 @@ public interface LayerRepository extends JpaRepository<Layer, UUID> {
 
   /**
    * The size of the distinct layers of the manifests the image's tags reach: the manifests a tag
-   * points at and the manifests of the indexes among them. A manifest no tag reaches any more (the
-   * one a tag was moved away from) stays on disk but is not part of what the image shows.
+   * points at and the manifests of the indexes among them, however deep an index lists another (the
+   * recursive CTE follows the edges to the end, as {@code UntaggedManifestFinder} does). A manifest
+   * no tag reaches any more (the one a tag was moved away from) stays on disk but is not part of
+   * what the image shows.
    */
   @Query(
-      """
-    select coalesce(sum(l.size), 0) from Layer l
-      where l.id in (
-        select distinct l2.id from Layer l2
-          join l2.manifests m
-        where m.image.id = :imageId and l2.repo.id = :repoId
-          and (
-            exists (select 1 from Tag t where t.manifest.id = m.id)
-            or exists (
-              select 1 from ManifestChild c, Tag t
-              where c.child.id = m.id and t.manifest.id = c.parent.id)
+      value =
+          """
+          with recursive reach(manifest_id) as (
+            select t.manifest_id from docker_tag t where t.image_id = :imageId
+            union
+            select c.child_id from docker_manifest_child c
+              join reach r on c.parent_id = r.manifest_id
           )
-      )
-  """)
+          select cast(coalesce(sum(l.size), 0) as bigint) from docker_layer l
+          where l.repo_id = :repoId
+            and l.id in (
+              select ml.layer_id from docker_manifest_layer ml
+              where ml.manifest_id in (select manifest_id from reach)
+            )
+          """,
+      nativeQuery = true)
   long sumDistinctSizeByImageId(UUID repoId, UUID imageId);
 }
