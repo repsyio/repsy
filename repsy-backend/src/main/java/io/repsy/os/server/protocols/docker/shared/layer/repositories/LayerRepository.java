@@ -63,21 +63,25 @@ public interface LayerRepository extends JpaRepository<Layer, UUID> {
    * recursive CTE follows the edges to the end, as {@code UntaggedManifestFinder} does). A manifest
    * no tag reaches any more (the one a tag was moved away from) stays on disk but is not part of
    * what the image shows.
+   *
+   * <p>The identifiers are quoted and schema-qualified, as in {@code insertIfAbsent}: the H2
+   * migrations create lower-case quoted names, which H2 matches case-sensitively, so a bare {@code
+   * docker_tag} is {@code DOCKER_TAG} there and is not found (RPS-1385).
    */
   @Query(
       value =
           """
           with recursive reach(manifest_id) as (
-            select t.manifest_id from docker_tag t where t.image_id = :imageId
+            select t."manifest_id" from "public"."docker_tag" t where t."image_id" = :imageId
             union
-            select c.child_id from docker_manifest_child c
-              join reach r on c.parent_id = r.manifest_id
+            select c."child_id" from "public"."docker_manifest_child" c
+              join reach r on c."parent_id" = r.manifest_id
           )
-          select cast(coalesce(sum(l.size), 0) as bigint) from docker_layer l
-          where l.repo_id = :repoId
-            and l.id in (
-              select ml.layer_id from docker_manifest_layer ml
-              where ml.manifest_id in (select manifest_id from reach)
+          select cast(coalesce(sum(l."size"), 0) as bigint) from "public"."docker_layer" l
+          where l."repo_id" = :repoId
+            and l."id" in (
+              select ml."layer_id" from "public"."docker_manifest_layer" ml
+              where ml."manifest_id" in (select manifest_id from reach)
             )
           """,
       nativeQuery = true)

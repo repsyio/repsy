@@ -64,10 +64,21 @@ class H2AdminUserInitializerIT extends H2IntegrationTest {
     this.adminUserInitializer.run(new DefaultApplicationArguments());
   }
 
+  /**
+   * The operator's statement as the operator's H2 shell sees it. The README has the operator open
+   * that shell with {@code DATABASE_TO_LOWER=TRUE}, which reads the unquoted {@code users} as the
+   * lower-case table the migrations created. The application's database is not opened that way
+   * (RPS-1385), so this quotes the identifiers, which is what that setting amounts to.
+   */
+  private static String asOperatorShell(final String sql) {
+    return sql.replaceAll("\\busers\\b", "\"public\".\"users\"")
+        .replaceAll("\\b(hash|role|username)\\b", "\"$1\"");
+  }
+
   /** Makes the database see the operator's SQL and Hibernate forget what it loaded before it. */
   private void applyOperatorSql(final String sql) {
     this.entityManager.flush();
-    this.jdbcTemplate.update(sql);
+    this.jdbcTemplate.update(asOperatorShell(sql));
     this.entityManager.clear();
   }
 
@@ -84,7 +95,7 @@ class H2AdminUserInitializerIT extends H2IntegrationTest {
   @Test
   @DisplayName("users.hash is NOT NULL, so the recovery cannot use NULL")
   void nullHashIsRejectedBySchema() {
-    assertThatThrownBy(() -> this.jdbcTemplate.update(NULL_HASH_SQL))
+    assertThatThrownBy(() -> this.jdbcTemplate.update(asOperatorShell(NULL_HASH_SQL)))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 

@@ -92,7 +92,7 @@ class H2GolangLastVersionRemovalIT extends H2IntegrationTest {
     this.executor.shutdownNow();
     // Every table that references a repo cascades on delete, so this takes the modules with it.
     this.createdRepoIds.forEach(
-        id -> this.jdbcTemplate.update("delete from repo where id = ?", id));
+        id -> this.jdbcTemplate.update("delete from \"public\".\"repo\" where \"id\" = ?", id));
     this.createdRepoIds.clear();
   }
 
@@ -171,7 +171,7 @@ class H2GolangLastVersionRemovalIT extends H2IntegrationTest {
   private int moduleCount(final RepoInfo repo, final String modulePath) {
     final var count =
         this.jdbcTemplate.queryForObject(
-            "select count(*) from go_module where repo_id = ? and module_path = ?",
+            "select count(*) from \"public\".\"go_module\" where \"repo_id\" = ? and \"module_path\" = ?",
             Integer.class,
             repo.getId(),
             modulePath);
@@ -182,10 +182,10 @@ class H2GolangLastVersionRemovalIT extends H2IntegrationTest {
   private List<String> versionsOf(final RepoInfo repo, final String modulePath) {
     return this.jdbcTemplate.queryForList(
         """
-        select v.version from go_module_version v
-          join go_module m on m.id = v.module_id
-        where m.repo_id = ? and m.module_path = ?
-        order by v.version
+        select v."version" from "public"."go_module_version" v
+          join "public"."go_module" m on m."id" = v."module_id"
+        where m."repo_id" = ? and m."module_path" = ?
+        order by v."version"
         """,
         String.class,
         repo.getId(),

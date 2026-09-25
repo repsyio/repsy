@@ -100,7 +100,8 @@ class H2AuthUserServiceRaceIT extends H2IntegrationTest {
     Mockito.doAnswer(
             invocation -> {
               final var result = invocation.callRealMethod();
-              this.jdbcTemplate.update("delete from users where id = ?", user.getId());
+              this.jdbcTemplate.update(
+                  "delete from \"public\".\"users\" where \"id\" = ?", user.getId());
               return result;
             })
         .when(this.userTxServiceSpy)

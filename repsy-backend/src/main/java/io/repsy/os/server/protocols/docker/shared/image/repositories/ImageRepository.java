@@ -147,33 +147,36 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
    * <p>{@code manifestCount} is the number of manifests no tag reaches; {@code size} is the size of
    * the distinct layers (config blobs included) those manifests link to and no reached manifest
    * links to.
+   *
+   * <p>The identifiers are quoted and schema-qualified, as in {@code insertIfAbsent}: the H2
+   * migrations create lower-case quoted names, which H2 matches case-sensitively (RPS-1385).
    */
   @Query(
       value =
           """
           with recursive reach(manifest_id) as (
-            select t.manifest_id from docker_tag t where t.image_id = :imageId
+            select t."manifest_id" from "public"."docker_tag" t where t."image_id" = :imageId
             union
-            select c.child_id from docker_manifest_child c
-              join reach r on c.parent_id = r.manifest_id
+            select c."child_id" from "public"."docker_manifest_child" c
+              join reach r on c."parent_id" = r.manifest_id
           )
           select
             (
-              select count(*) from docker_manifest m
-              where m.image_id = :imageId
-                and m.id not in (select manifest_id from reach)
+              select count(*) from "public"."docker_manifest" m
+              where m."image_id" = :imageId
+                and m."id" not in (select manifest_id from reach)
             ) as "manifestCount",
             cast(coalesce((
-              select sum(l.size) from docker_layer l
-              where l.id in (
-                  select ml.layer_id from docker_manifest_layer ml
-                    join docker_manifest um on um.id = ml.manifest_id
-                  where um.image_id = :imageId
-                    and um.id not in (select manifest_id from reach)
+              select sum(l."size") from "public"."docker_layer" l
+              where l."id" in (
+                  select ml."layer_id" from "public"."docker_manifest_layer" ml
+                    join "public"."docker_manifest" um on um."id" = ml."manifest_id"
+                  where um."image_id" = :imageId
+                    and um."id" not in (select manifest_id from reach)
                 )
-                and l.id not in (
-                  select rl.layer_id from docker_manifest_layer rl
-                  where rl.manifest_id in (select manifest_id from reach)
+                and l."id" not in (
+                  select rl."layer_id" from "public"."docker_manifest_layer" rl
+                  where rl."manifest_id" in (select manifest_id from reach)
                 )
             ), 0) as bigint) as "size"
           """,

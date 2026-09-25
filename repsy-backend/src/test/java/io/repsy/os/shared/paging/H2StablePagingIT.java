@@ -182,7 +182,7 @@ class H2StablePagingIT extends H2IntegrationTest {
     }
     this.entityManager.flush();
     this.jdbcTemplate.update(
-        "update repo_deploy_token set created_at = ? where repo_id = ?",
+        "update \"public\".\"repo_deploy_token\" set \"created_at\" = ? where \"repo_id\" = ?",
         Timestamp.from(TIED_AT),
         repo.getId());
     this.entityManager.clear();
