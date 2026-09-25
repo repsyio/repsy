@@ -32,6 +32,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
@@ -79,7 +80,46 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
       throw AuthChallenges.challenged(ex, DockerAuthChallenge.of(request));
     }
 
+    this.authorizeGrantedAccess(context, request, repoInfo, properties);
+
     return ProcessorResult.next();
+  }
+
+  /**
+   * A token that passed the role check must also have been issued for what the request does
+   * (RPS-1434). The answer is a 401 like any other refusal, and its challenge names the scope to
+   * ask for, so a client that requested less can request the right one.
+   */
+  private void authorizeGrantedAccess(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final RepoInfo repoInfo,
+      final Map<String, Object> properties) {
+
+    final var permission = (Permission) properties.get(PERMISSION_KEY);
+    final var authHeader = this.authComponent.emulateAuthHeader(request);
+
+    if (permission != Permission.MANAGE || authHeader == null) {
+      return;
+    }
+
+    final var name = requestedName(context, repoInfo);
+
+    try {
+      this.authComponent.authorizeGrantedAccess(authHeader, name, permission);
+    } catch (final UnAuthorizedException ex) {
+      throw AuthChallenges.challenged(
+          ex, DockerAuthChallenge.insufficientScope(request, "repository:" + name + ":delete"));
+    }
+  }
+
+  /** The {@code <repo>/<image>} a request addresses: its path is {@code /<image>/manifests/...}. */
+  private static String requestedName(final ProtocolContext context, final RepoInfo repoInfo) {
+
+    final var segments =
+        StringUtils.split(ProtocolContextUtils.getRelativePath(context).getPath(), '/');
+
+    return segments.length > 0 ? repoInfo.getName() + "/" + segments[0] : repoInfo.getName();
   }
 
   private void authenticate(

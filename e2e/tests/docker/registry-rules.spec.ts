@@ -791,6 +791,30 @@ test.describe('docker registry rules (raw HTTP)', () => {
       );
       expect(stillThere.status, 'nothing was deleted by the refused requests').toBe(200);
 
+      // RPS-1434: a token is only as good as the scope it was asked for, an administrator's too.
+      for (const scope of [
+        pullScope(layout.repoName, layout.image),
+        pushScope(layout.repoName, layout.image),
+      ]) {
+        const tooLittle = await rawDeleteManifest(
+          layout.repoName,
+          admin,
+          layout.image,
+          a.built.manifestDigest,
+          scope,
+        );
+        expect(tooLittle.hop, `issuance is not scope-checked (${scope})`).toBe('request');
+        expectOci(tooLittle, 401, 'UNAUTHORIZED');
+        expect(tooLittle.wwwAuthenticate, 'the challenge names the scope to ask for').toContain(
+          `scope="repository:${layout.repoName}/${layout.image}:delete"`,
+        );
+        expect(tooLittle.wwwAuthenticate).toContain('error="insufficient_scope"');
+      }
+      expect(
+        (await rawGetManifest(layout.repoName, admin, layout.image, a.built.manifestDigest)).status,
+        'nothing was deleted by the token asked for less than delete',
+      ).toBe(200);
+
       // By tag: the pointer only; the manifest stays pullable by digest and by its other tag.
       const byTag = await rawDeleteManifest(layout.repoName, admin, layout.image, 'tag-a2');
       expect(byTag.status, 'DELETE by tag').toBe(202);

@@ -351,14 +351,16 @@ export async function rawHeadManifest(
 
 /** `DELETE /v2/<repo>/<image>/manifests/<ref>` (RPS-1216): a digest of either algorithm deletes the
  *  manifest and every tag that pointed at it, a tag deletes the tag only; `202` either way. Needs
- *  MANAGE, so it goes through the two-hop `dockerRequest` for `deleteScope`. */
+ *  MANAGE, so it goes through the two-hop `dockerRequest` for `deleteScope`, unless `scope` says what
+ *  the token is asked for instead (RPS-1434: a token asked for less than `delete` cannot delete). */
 export async function rawDeleteManifest(
   repoName: string,
   credential: MaterializedCredential,
   image: string,
   ref: string,
+  scope: string = deleteScope(repoName, image),
 ): Promise<RawResponse & { hop: 'token' | 'request'; wwwAuthenticate?: string }> {
-  const res = await dockerRequest(credential, deleteScope(repoName, image), (headers) =>
+  const res = await dockerRequest(credential, scope, (headers) =>
     rawFetch(v2Url(`/${repoName}/${image}/manifests/${ref}`), { method: 'DELETE', headers }),
   );
   return {

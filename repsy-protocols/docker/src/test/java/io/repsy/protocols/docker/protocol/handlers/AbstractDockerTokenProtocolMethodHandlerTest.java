@@ -37,6 +37,7 @@ import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,7 +97,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   @Test
   @DisplayName("hands out a token for valid credentials")
   void issuesAToken() throws Exception {
-    when(this.authService.authenticateUserDockerCli(AUTH_HEADER)).thenReturn("tok-123");
+    when(this.authService.authenticateUserDockerCli(AUTH_HEADER, List.of())).thenReturn("tok-123");
 
     final var result =
         this.handler.handle(
@@ -107,10 +108,32 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
     assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("tok-123");
   }
 
+  /**
+   * RPS-1434: the token records what the client asked for. Each {@code scope} parameter may hold
+   * several space separated scopes, and a cross-repo blob mount sends more than one parameter.
+   */
+  @Test
+  @DisplayName("passes every requested repository scope to the token it issues")
+  void passesTheRequestedScopes() throws Exception {
+    final var request = this.tokenRequest();
+    request.addParameter("scope", "repository:images/app:pull,push repository:images/lib:pull");
+    request.addParameter("scope", "repository:other/x:delete");
+    request.addParameter("scope", "registry:catalog:*");
+    when(this.authService.authenticateUserDockerCli(
+            AUTH_HEADER, List.of("images/app:pull,push", "images/lib:pull", "other/x:delete")))
+        .thenReturn("tok-scoped");
+
+    final var result =
+        this.handler.handle(new ProtocolContext(), request, new MockHttpServletResponse());
+
+    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("tok-scoped");
+  }
+
   @Test
   @DisplayName("answers 401 with a challenge when the credentials are wrong")
   void wrongCredentials() throws Exception {
-    when(this.authService.authenticateUserDockerCli(AUTH_HEADER))
+    when(this.authService.authenticateUserDockerCli(AUTH_HEADER, List.of()))
         .thenThrow(new UnAuthorizedException("unAuthorized"));
 
     final var result =
@@ -130,7 +153,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   @Test
   @DisplayName("lets a non-authentication exception propagate instead of answering 401")
   void nonAuthenticationExceptionPropagates() {
-    when(this.authService.authenticateUserDockerCli(AUTH_HEADER))
+    when(this.authService.authenticateUserDockerCli(AUTH_HEADER, List.of()))
         .thenThrow(new IllegalStateException("database is down"));
 
     assertThatThrownBy(
@@ -144,7 +167,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   @Test
   @DisplayName("lets a client over the failed-login limit through as an exception, not 401")
   void tooManyRequests() {
-    when(this.authService.authenticateUserDockerCli(AUTH_HEADER))
+    when(this.authService.authenticateUserDockerCli(AUTH_HEADER, List.of()))
         .thenThrow(new TooManyRequestsException(42));
 
     assertThatThrownBy(
@@ -157,6 +180,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   }
 
   private static final String PULL_SCOPE = "repository:images/app:pull";
+  private static final List<String> PULL_GRANTS = List.of("images/app:pull");
 
   private MockHttpServletRequest anonymousTokenRequest() {
     final var request = new MockHttpServletRequest("GET", "/v2/token");
@@ -282,7 +306,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
       "grant_type=password with valid credentials authenticates through the Basic path and "
           + "returns the caller's own token, not an anonymous one")
   void passwordGrantWithValidCredentialsAuthenticates() throws Exception {
-    when(this.authService.authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER))
+    when(this.authService.authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER, PULL_GRANTS))
         .thenReturn("user-tok-123");
 
     final var result =
@@ -293,7 +317,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
 
     assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("user-tok-123");
-    verify(this.authService).authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER);
+    verify(this.authService).authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER, PULL_GRANTS);
     verify(this.authService, never()).createAnonymousUser();
   }
 
@@ -302,7 +326,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
       "grant_type=password with a wrong password answers 401 and never hands out an anonymous "
           + "token")
   void passwordGrantWithWrongPasswordIsRefused() throws Exception {
-    when(this.authService.authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER))
+    when(this.authService.authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER, PULL_GRANTS))
         .thenThrow(new UnAuthorizedException("unAuthorized"));
 
     final var result =
@@ -332,7 +356,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
 
     assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("anon-tok");
-    verify(this.authService, never()).authenticateUserDockerCli(any());
+    verify(this.authService, never()).authenticateUserDockerCli(any(), any());
   }
 
   @Test
@@ -355,21 +379,23 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   void authorizationHeaderWinsOverFormBody() throws Exception {
     final var request = this.passwordGrantRequest("bob", "secret");
     request.addHeader(HttpHeaders.AUTHORIZATION, AUTH_HEADER);
-    when(this.authService.authenticateUserDockerCli(AUTH_HEADER)).thenReturn("header-tok");
+    when(this.authService.authenticateUserDockerCli(AUTH_HEADER, PULL_GRANTS))
+        .thenReturn("header-tok");
 
     final var result =
         this.handler.handle(new ProtocolContext(), request, new MockHttpServletResponse());
 
     assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("header-tok");
-    verify(this.authService).authenticateUserDockerCli(AUTH_HEADER);
-    verify(this.authService, never()).authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER);
+    verify(this.authService).authenticateUserDockerCli(AUTH_HEADER, PULL_GRANTS);
+    verify(this.authService, never())
+        .authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER, PULL_GRANTS);
   }
 
   @Test
   @DisplayName("a password grant that is rate-limited propagates as 429, not 401")
   void passwordGrantTooManyRequestsPropagates() {
-    when(this.authService.authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER))
+    when(this.authService.authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER, PULL_GRANTS))
         .thenThrow(new TooManyRequestsException(7));
 
     assertThatThrownBy(
