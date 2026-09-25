@@ -141,4 +141,81 @@ class NpmAuthPreProcessorTest {
   void unsupportedScheme() {
     assertThat(this.challengeOf("Digest username=\"x\"")).isEqualTo(BASIC_CHALLENGE);
   }
+
+  private static ProtocolContext publicRepoContext() {
+    final var repoInfo =
+        RepoInfo.builder()
+            .id(UUID.randomUUID())
+            .storageKey(UUID.randomUUID())
+            .name("registry")
+            .privateRepo(false)
+            .build();
+
+    final var context = new ProtocolContext();
+    context.addProperty(
+        "urlProperties",
+        UrlParserProperties.builder()
+            .repoName("registry")
+            .relativePath(new RelativePath(""))
+            .repoInfo(repoInfo)
+            .build());
+    return context;
+  }
+
+  @Test
+  @DisplayName("a read of a public repo needs no credentials")
+  void publicReadIsOpen() {
+    final var result =
+        this.preProcessor.process(
+            publicRepoContext(),
+            new MockHttpServletRequest(),
+            new MockHttpServletResponse(),
+            Map.of("permission", Permission.READ, "writeOperation", false));
+
+    assertThat(result).isNotNull();
+  }
+
+  @Test
+  @DisplayName("requireAuthentication asks for credentials on a public repo too")
+  void requireAuthenticationOnAPublicRepo() {
+    final var refused =
+        catchThrowableOfType(
+            UnAuthorizedException.class,
+            () ->
+                this.preProcessor.process(
+                    publicRepoContext(),
+                    new MockHttpServletRequest(),
+                    new MockHttpServletResponse(),
+                    Map.of(
+                        "permission",
+                        Permission.READ,
+                        "writeOperation",
+                        false,
+                        "requireAuthentication",
+                        true)));
+
+    assertThat(refused).isNotNull();
+    assertThat(refused.getHeaders().get(HttpHeaders.WWW_AUTHENTICATE)).isEqualTo(BASIC_CHALLENGE);
+  }
+
+  @Test
+  @DisplayName("skipPreProcessor still wins over requireAuthentication")
+  void skipWinsOverRequire() {
+    final var result =
+        this.preProcessor.process(
+            privateRepoContext(),
+            new MockHttpServletRequest(),
+            new MockHttpServletResponse(),
+            Map.of(
+                "permission",
+                Permission.NONE,
+                "writeOperation",
+                false,
+                "skipPreProcessor",
+                true,
+                "requireAuthentication",
+                true));
+
+    assertThat(result).isNotNull();
+  }
 }

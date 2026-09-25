@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.npm.shared.auth.services;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -23,6 +24,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.AuthThrottleProperties;
@@ -33,6 +35,7 @@ import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -40,6 +43,8 @@ import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
 import java.time.Period;
+import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -142,5 +147,165 @@ class NpmAuthComponentImplTest {
     verify(this.jwtUtils, never())
         .createProtocolToken(any(), anyString(), any(), any(AuthenticationType.class));
     verify(this.deployTokenService, never()).updateLastUsedTime(any());
+  }
+
+  // whoami: who the credentials of a request belong to.
+
+  private static String basic(final String username, final String password) {
+    return "Basic "
+        + Base64.getEncoder().encodeToString((username + ":" + password).getBytes(UTF_8));
+  }
+
+  private DeployTokenInfo whoamiToken(final String secret, final String username) {
+    final var info = new DeployTokenInfo();
+    info.setId(UUID.randomUUID());
+    info.setUsername(username);
+    when(this.deployTokenService.findByRepoIdAndToken(this.repo.getStorageKey(), secret))
+        .thenReturn(Optional.of(info));
+    return info;
+  }
+
+  @Test
+  @DisplayName("resolveUsername answers unAuthorized for no header and for another scheme")
+  void whoamiWithoutUsableHeader() {
+    assertUnauthorized(() -> this.authComponent.resolveUsername(this.repo, null));
+    assertUnauthorized(() -> this.authComponent.resolveUsername(this.repo, "Digest x"));
+    assertUnauthorized(() -> this.authComponent.resolveUsername(this.repo, "Basic !!!"));
+  }
+
+  @Test
+  @DisplayName("resolveUsername answers the user of a Basic password")
+  void whoamiBasicUser() {
+    assertThat(this.authComponent.resolveUsername(this.repo, basic(USERNAME, PASSWORD)))
+        .isEqualTo(USERNAME);
+  }
+
+  @Test
+  @DisplayName("resolveUsername refuses a wrong Basic password")
+  void whoamiBasicWrongPassword() {
+    assertUnauthorized(
+        () -> this.authComponent.resolveUsername(this.repo, basic(USERNAME, "wrong")));
+  }
+
+  @Test
+  @DisplayName("resolveUsername answers a deploy token's own username, not the typed one")
+  void whoamiBasicDeployToken() {
+    whoamiToken("the-secret", "deploy-1a2b");
+
+    assertThat(this.authComponent.resolveUsername(this.repo, basic(USERNAME, "the-secret")))
+        .isEqualTo("deploy-1a2b");
+    verify(this.userTxService, never()).getUserByUsernameOptional("typed");
+  }
+
+  @Test
+  @DisplayName("resolveUsername refuses an expired deploy token, and one without a username")
+  void whoamiDeployTokenNotUsable() {
+    final var expired = whoamiToken("expired", "deploy-x");
+    expired.setExpirationDate(Instant.now().minusSeconds(60));
+    whoamiToken("nameless", null);
+
+    assertUnauthorized(() -> this.authComponent.resolveUsername(this.repo, basic("t", "expired")));
+    assertUnauthorized(() -> this.authComponent.resolveUsername(this.repo, basic("t", "nameless")));
+  }
+
+  @Test
+  @DisplayName("resolveUsername answers a raw deploy token presented as a Bearer value")
+  void whoamiRawDeployTokenBearer() {
+    whoamiToken("raw-secret", "deploy-raw");
+
+    assertThat(this.authComponent.resolveUsername(this.repo, "Bearer raw-secret"))
+        .isEqualTo("deploy-raw");
+  }
+
+  @Test
+  @DisplayName("resolveUsername answers the user of a protocol JWT")
+  void whoamiUserJwt() {
+    when(this.jwtUtils.extractAuthenticationType("Bearer jwt", TokenRealm.PROTOCOL))
+        .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+    when(this.jwtUtils.verifyAndExtractUsername("Bearer jwt", TokenRealm.PROTOCOL))
+        .thenReturn(USERNAME);
+    when(this.userTxService.getAuthenticatedUserByUsername(USERNAME))
+        .thenReturn(UserInfo.builder().id(UUID.randomUUID()).username(USERNAME).build());
+
+    assertThat(this.authComponent.resolveUsername(this.repo, "Bearer jwt")).isEqualTo(USERNAME);
+  }
+
+  @Test
+  @DisplayName("resolveUsername answers the token's username for a deploy-token JWT")
+  void whoamiDeployTokenJwt() {
+    final var info = whoamiTokenById("deploy-jwt");
+    when(this.jwtUtils.extractAuthenticationType("Bearer jwt", TokenRealm.PROTOCOL))
+        .thenReturn(AuthenticationType.DEPLOY_TOKEN);
+    when(this.jwtUtils.extractUserId("Bearer jwt", TokenRealm.PROTOCOL)).thenReturn(info.getId());
+
+    assertThat(this.authComponent.resolveUsername(this.repo, "Bearer jwt")).isEqualTo("deploy-jwt");
+  }
+
+  @Test
+  @DisplayName("resolveUsername refuses the JWT of a deploy token that is gone or expired")
+  void whoamiDeployTokenJwtRevoked() {
+    final var gone = UUID.randomUUID();
+    when(this.jwtUtils.extractAuthenticationType("Bearer gone", TokenRealm.PROTOCOL))
+        .thenReturn(AuthenticationType.DEPLOY_TOKEN);
+    when(this.jwtUtils.extractUserId("Bearer gone", TokenRealm.PROTOCOL)).thenReturn(gone);
+    when(this.deployTokenService.findByRepoIdAndTokenId(this.repo.getStorageKey(), gone))
+        .thenReturn(Optional.empty());
+
+    assertUnauthorized(() -> this.authComponent.resolveUsername(this.repo, "Bearer gone"));
+
+    final var expired = whoamiTokenById("deploy-old");
+    expired.setExpirationDate(Instant.now().minusSeconds(60));
+    when(this.jwtUtils.extractAuthenticationType("Bearer old", TokenRealm.PROTOCOL))
+        .thenReturn(AuthenticationType.DEPLOY_TOKEN);
+    when(this.jwtUtils.extractUserId("Bearer old", TokenRealm.PROTOCOL))
+        .thenReturn(expired.getId());
+
+    assertUnauthorized(() -> this.authComponent.resolveUsername(this.repo, "Bearer old"));
+  }
+
+  @Test
+  @DisplayName("resolveUsername refuses anonymous and scanner tokens, which name no user")
+  void whoamiTokensWithoutAUser() {
+    for (final var type : List.of(AuthenticationType.ANONYMOUS, AuthenticationType.DOCKER_SCAN)) {
+      when(this.jwtUtils.extractAuthenticationType("Bearer " + type, TokenRealm.PROTOCOL))
+          .thenReturn(type);
+
+      assertUnauthorized(() -> this.authComponent.resolveUsername(this.repo, "Bearer " + type));
+    }
+  }
+
+  @Test
+  @DisplayName("resolveUsername refuses a Bearer value that is no token, or has an unknown type")
+  void whoamiJunkBearer() {
+    when(this.jwtUtils.extractAuthenticationType("Bearer junk", TokenRealm.PROTOCOL))
+        .thenThrow(new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED));
+    when(this.jwtUtils.extractAuthenticationType("Bearer odd", TokenRealm.PROTOCOL))
+        .thenThrow(new BadRequestException("invalidAuthenticationType"));
+
+    assertThatThrownBy(() -> this.authComponent.resolveUsername(this.repo, "Bearer junk"))
+        .isInstanceOf(UnAuthorizedException.class);
+    assertUnauthorized(() -> this.authComponent.resolveUsername(this.repo, "Bearer odd"));
+  }
+
+  @Test
+  @DisplayName("resolveUsername refuses the JWT of a user that no longer exists")
+  void whoamiDeletedUser() {
+    when(this.jwtUtils.extractAuthenticationType("Bearer jwt", TokenRealm.PROTOCOL))
+        .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+    when(this.jwtUtils.verifyAndExtractUsername("Bearer jwt", TokenRealm.PROTOCOL))
+        .thenReturn("ghost");
+    when(this.userTxService.getAuthenticatedUserByUsername("ghost"))
+        .thenThrow(new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+
+    assertUnauthorized(() -> this.authComponent.resolveUsername(this.repo, "Bearer jwt"));
+  }
+
+  private DeployTokenInfo whoamiTokenById(final String username) {
+    final var info = new DeployTokenInfo();
+    info.setId(UUID.randomUUID());
+    info.setUsername(username);
+    when(this.deployTokenService.findByRepoIdAndTokenId(this.repo.getStorageKey(), info.getId()))
+        .thenReturn(Optional.of(info));
+    return info;
   }
 }

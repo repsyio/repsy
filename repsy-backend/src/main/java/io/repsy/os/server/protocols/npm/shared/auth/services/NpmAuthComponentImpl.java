@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.npm.shared.auth.services;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
@@ -22,18 +23,24 @@ import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
+import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.npm.shared.auth.services.NpmAuthComponent;
+import io.repsy.protocols.npm.shared.auth.services.NpmIdentityResolver;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import java.time.Period;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 @Service
-public class NpmAuthComponentImpl extends ProtocolAuthService implements NpmAuthComponent<UUID> {
+public class NpmAuthComponentImpl extends ProtocolAuthService
+    implements NpmAuthComponent<UUID>, NpmIdentityResolver<UUID> {
 
   private static final int TOKEN_EXPIRATION_DAYS = 90;
 
@@ -94,5 +101,96 @@ public class NpmAuthComponentImpl extends ProtocolAuthService implements NpmAuth
         username,
         Period.ofDays(TOKEN_EXPIRATION_DAYS),
         AuthenticationType.DEPLOY_TOKEN);
+  }
+
+  /**
+   * Answers {@code GET /-/whoami}. Everything is verified again here, so the answer does not depend
+   * on the pre-processor having run. A deploy token is answered with its own generated username
+   * whichever way it is presented, because the name a client types with one is its own choice
+   * (RPS-979).
+   */
+  @Override
+  public @NonNull String resolveUsername(
+      final @NonNull BaseRepoInfo<UUID> repoInfo, final @Nullable String authHeader) {
+
+    if (authHeader == null) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    if (AuthUtils.isBasicToken(authHeader)) {
+      return this.basicUsername(repoInfo.getStorageKey(), authHeader);
+    }
+
+    if (AuthUtils.isBearerToken(authHeader)) {
+      return this.bearerUsername(repoInfo.getStorageKey(), authHeader);
+    }
+
+    throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+  }
+
+  private @NonNull String basicUsername(final @NonNull UUID repoId, final @NonNull String header) {
+
+    final var credentials =
+        AuthUtils.extractCredentialsFromBasicToken(AuthUtils.removeBasicPrefix(header));
+
+    if (credentials == null) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    final var deployToken =
+        this.deployTokenService.findByRepoIdAndToken(repoId, credentials.getPassword());
+
+    if (deployToken.isPresent()) {
+      return usernameOf(deployToken.get());
+    }
+
+    return this.authenticateWithPassword(credentials).getUsername();
+  }
+
+  private @NonNull String bearerUsername(final @NonNull UUID repoId, final @NonNull String header) {
+
+    final var deployToken =
+        this.deployTokenService.findByRepoIdAndToken(repoId, AuthUtils.removeBearerHeader(header));
+
+    if (deployToken.isPresent()) {
+      return usernameOf(deployToken.get());
+    }
+
+    final var authenticationType = this.protocolAuthenticationType(header);
+
+    return switch (authenticationType) {
+      case DEPLOY_TOKEN -> {
+        final var tokenId = this.jwtUtils.extractUserId(header, TokenRealm.PROTOCOL);
+
+        yield this.deployTokenService
+            .findByRepoIdAndTokenId(repoId, tokenId)
+            .map(NpmAuthComponentImpl::usernameOf)
+            .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+      }
+      case ANONYMOUS, DOCKER_SCAN -> throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      default -> {
+        final var username = this.jwtUtils.verifyAndExtractUsername(header, TokenRealm.PROTOCOL);
+
+        yield this.userTxService.getAuthenticatedUserByUsername(username).getUsername();
+      }
+    };
+  }
+
+  private @NonNull AuthenticationType protocolAuthenticationType(final @NonNull String header) {
+    try {
+      return this.jwtUtils.extractAuthenticationType(header, TokenRealm.PROTOCOL);
+    } catch (final BadRequestException _) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+  }
+
+  /** The username of a live deploy token; an expired one identifies nobody. */
+  private static @NonNull String usernameOf(final @NonNull DeployTokenInfo deployToken) {
+
+    if (deployToken.isExpired() || deployToken.getUsername() == null) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    return deployToken.getUsername();
   }
 }

@@ -132,6 +132,10 @@ Repsy can scan pushed artifacts (Maven, npm, PyPI, Docker) for known vulnerabili
 
 Each repository has a security scan setting that controls whether newly pushed versions are scanned automatically. It does not block manual scans: a version can always be scanned on demand from the panel or with `POST /api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan`, even when the repository's setting is off.
 
+### Auditing npm packages
+
+`npm audit`, `pnpm audit`, `yarn npm audit` and `bun audit` work against a Repsy npm repository. They report the vulnerabilities the scanner found for the package versions they ask about, taken from the scans of **that repository** only (the latest completed scan of each version). With the repository's security scan setting off (the scanner is disabled, or scanning is turned off for that repository, even if an earlier scan left findings), or before a version has been scanned, they report none and exit with 0. Repsy reports as vulnerable only the versions the audit asks about and a scan found the vulnerability in, so it never flags a version it has not seen. An audit request is limited to 8 MiB (inflated) and 20,000 packages. `yarn audit` (Yarn 1) always queries `registry.yarnpkg.com` and never reaches Repsy. `npm whoami`, `npm ping` and `npm search` are answered as well: `whoami` needs credentials even on a public repository, and `search` looks only at the packages of the repository in the URL.
+
 ## Installation
 
 ### Option 1: Docker with H2 (Embedded Database)

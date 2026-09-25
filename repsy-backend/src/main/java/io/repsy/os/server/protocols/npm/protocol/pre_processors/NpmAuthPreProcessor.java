@@ -60,6 +60,7 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
   private static final String PERMISSION_KEY = "permission";
   private static final String SKIP_PRE_PROCESSOR_KEY = "skipPreProcessor";
   private static final String WRITE_OPERATION_KEY = "writeOperation";
+  private static final String REQUIRE_AUTHENTICATION_KEY = "requireAuthentication";
 
   private final NpmAuthComponentImpl authComponent;
   private final NpmProtocolProvider provider;
@@ -135,6 +136,14 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
 
     if (skipPreProcessor) {
       return true;
+    }
+
+    // whoami is about who is asking, so it needs credentials on a public repo too.
+    final var requireAuthentication =
+        (boolean) properties.getOrDefault(REQUIRE_AUTHENTICATION_KEY, false);
+
+    if (requireAuthentication) {
+      return false;
     }
 
     final var writeOperation = (boolean) properties.get(WRITE_OPERATION_KEY);
