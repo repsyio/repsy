@@ -195,6 +195,21 @@ class NpmTokenRevokeProtocolIT extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("two logins of one user at the same moment are two tokens, revoked one by one")
+  void twoLoginsAreTwoTokens() throws Exception {
+    final var repo = this.privateRepo();
+    final User alice = this.createUser(uniqueUsername("alice"), UserRole.USER);
+    final var first = this.login(repo, alice.getUsername(), VALID_PASSWORD);
+    final var second = this.login(repo, alice.getUsername(), VALID_PASSWORD);
+
+    assertThat(second).isNotEqualTo(first);
+    assertThat(this.logout(repo, bearer(first), first).getResponse().getStatus()).isEqualTo(200);
+
+    assertThat(this.whoami(repo, first)).isEqualTo(401);
+    assertThat(this.whoami(repo, second)).isEqualTo(200);
+  }
+
+  @Test
   @DisplayName("refuses the token of somebody else with 403, and it stays valid")
   void cannotRevokeSomebodyElsesToken() throws Exception {
     final var repo = this.privateRepo();

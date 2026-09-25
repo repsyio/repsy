@@ -217,8 +217,6 @@ test.describe('npm token revocation (raw HTTP)', () => {
     async ({ seeder }) => {
       const repo = await newRepo(seeder, true);
       const first = await rawLogin(repo, env.adminUsername, env.adminPassword);
-      // A JWT is the same within one second, so a second one is asked a moment later.
-      await new Promise((resolve) => setTimeout(resolve, 1100));
       const second = await rawLogin(repo, env.adminUsername, env.adminPassword);
       expect(second.token).not.toBe(first.token);
 

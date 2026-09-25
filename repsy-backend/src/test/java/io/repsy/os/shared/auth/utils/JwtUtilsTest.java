@@ -811,4 +811,23 @@ class JwtUtilsTest {
     assertThatThrownBy(() -> this.jwtUtils.verifyProtocolToken(neverExpires))
         .isInstanceOf(UnAuthorizedException.class);
   }
+
+  @Test
+  @DisplayName("two protocol tokens of one user, made in the same second, are two tokens")
+  void protocolTokensAreUnique() {
+    final var userId = UUID.randomUUID();
+
+    final var first = this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(90));
+    final var second = this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(90));
+    final var deployFirst =
+        this.jwtUtils.createProtocolToken(
+            userId, "alice", Duration.ofDays(90), AuthenticationType.DEPLOY_TOKEN);
+    final var deploySecond =
+        this.jwtUtils.createProtocolToken(
+            userId, "alice", Duration.ofDays(90), AuthenticationType.DEPLOY_TOKEN);
+
+    assertThat(first).isNotEqualTo(second);
+    assertThat(deployFirst).isNotEqualTo(deploySecond);
+    assertThat(JWT.decode(first).getId()).isNotBlank();
+  }
 }

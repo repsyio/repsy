@@ -159,11 +159,16 @@ public class JwtUtils {
         userId, username, timeoutDuration, Instant.now(), tokenVersion);
   }
 
+  /**
+   * Creates a protocol token. It carries a random id, so that two logins of one user in the same
+   * second get two tokens, and revoking one of them (RPS-1361) leaves the other valid.
+   */
   public @NonNull String createProtocolToken(
       final @NonNull UUID userId,
       final @NonNull String username,
       final @NonNull TemporalAmount timeoutDuration) {
     return JWT.create()
+        .withJWTId(UUID.randomUUID().toString())
         .withSubject(userId.toString())
         .withAudience(TokenRealm.PROTOCOL.getAudience())
         .withClaim(CLAIM_USERNAME, username)
@@ -177,6 +182,7 @@ public class JwtUtils {
       final @NonNull TemporalAmount timeoutDuration,
       final @NonNull AuthenticationType authenticationType) {
     return JWT.create()
+        .withJWTId(UUID.randomUUID().toString())
         .withSubject(userId.toString())
         .withAudience(TokenRealm.PROTOCOL.getAudience())
         .withClaim(CLAIM_USERNAME, username)
