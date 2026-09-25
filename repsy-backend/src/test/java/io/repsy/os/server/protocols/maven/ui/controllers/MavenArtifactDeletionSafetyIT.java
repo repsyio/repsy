@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.maven.ui.controllers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -43,6 +44,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,7 +68,7 @@ import org.springframework.beans.factory.annotation.Value;
  * gone answers 200 instead of 500) and the stale {@code maven-metadata.xml.asc} cleanup on a
  * metadata rewrite.
  */
-@DisplayName("Maven artifact deletion safety (RPS-1190, RPS-1197)")
+@DisplayName("Maven artifact deletion safety (RPS-1190, RPS-1197, RPS-1349)")
 class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
 
   @Autowired private RepoTxService repoTxService;
@@ -451,5 +453,143 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
     assertThat(artifactDir.resolve("maven-metadata.xml")).as("rewritten metadata").exists();
 
     this.assertVersionExists(group, artifactName, "2.0");
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // RPS-1349: the "root group" delete (the shortest group prefixing all others).
+  // ---------------------------------------------------------------------------------------------
+
+  /** Every regular file of the repo's storage directory, relative to it, with '/' separators. */
+  private Set<String> storedFiles() throws IOException {
+    final var repoDir = Path.of(this.storageBasePath, "maven", this.repo.getId().toString());
+
+    if (!Files.exists(repoDir)) {
+      return Set.of();
+    }
+
+    try (var walk = Files.walk(repoDir)) {
+      return walk.filter(Files::isRegularFile)
+          .map(file -> repoDir.relativize(file).toString().replace('\\', '/'))
+          .collect(Collectors.toSet());
+    }
+  }
+
+  /** Puts a jar next to the POM of each version, so a version is more than one file. */
+  private void seedJars(final String group, final String artifactName, final String... versions)
+      throws IOException {
+    for (final var version : versions) {
+      Files.writeString(
+          this.versionDir(group, artifactName, version)
+              .resolve(artifactName + "-" + version + ".jar"),
+          "jar of " + group + ":" + artifactName + ":" + version,
+          StandardCharsets.UTF_8);
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "deleting the root group removes exactly the artifacts and versions its confirmation counts,"
+          + " in the database and in storage, and leaves the nested group's files alone")
+  void deletingRootGroupRemovesWhatTheSummarySaysAndKeepsTheNestedGroup() throws Exception {
+    final var rootGroup = "com.acme";
+    final var nestedGroup = "com.acme.sub";
+
+    this.seedArtifact(rootGroup, "alpha", "1.0", "2.0");
+    this.seedArtifact(rootGroup, "beta", "3.0");
+    this.seedArtifact(nestedGroup, "gamma", "1.0");
+    this.seedArtifact(nestedGroup, "delta", "1.0", "2.0");
+    this.seedJars(rootGroup, "alpha", "1.0", "2.0");
+    this.seedJars(rootGroup, "beta", "3.0");
+    this.seedJars(nestedGroup, "gamma", "1.0");
+    this.seedJars(nestedGroup, "delta", "1.0", "2.0");
+
+    final var nestedFilesBefore =
+        this.storedFiles().stream()
+            .filter(file -> file.startsWith("com/acme/sub/"))
+            .collect(Collectors.toSet());
+    // 2 artifacts x (metadata + versions x (pom, jar)): the nested group holds 2 + 6 = 8 files.
+    assertThat(nestedFilesBefore).hasSize(2 + 3 * 2);
+
+    this.mockMvc
+        .perform(
+            get("/api/mvn/groups/{repo}/{group}", this.repoName, rootGroup)
+                .header(AUTHORIZATION, this.bearerToken())
+                .with(apiPort()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.artifactCount").value(2))
+        .andExpect(jsonPath("$.data.versionCount").value(3));
+
+    this.mockMvc
+        .perform(
+            delete("/api/mvn/artifacts/{repo}/{group}", this.repoName, rootGroup)
+                .header(AUTHORIZATION, this.bearerToken())
+                .with(apiPort()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value("GROUP"));
+
+    // What the confirmation counted is gone: rows and files.
+    this.assertArtifactGone(rootGroup, "alpha");
+    this.assertArtifactGone(rootGroup, "beta");
+    assertThat(this.artifactRepository.countByRepoIdAndGroupName(this.repo.getId(), rootGroup))
+        .isZero();
+
+    // The nested group is complete: rows, versions and every file (nothing deleted, nothing
+    // moved).
+    this.assertArtifactExists(nestedGroup, "gamma");
+    this.assertVersionExists(nestedGroup, "gamma", "1.0");
+    this.assertArtifactExists(nestedGroup, "delta");
+    this.assertVersionExists(nestedGroup, "delta", "1.0");
+    this.assertVersionExists(nestedGroup, "delta", "2.0");
+    assertThat(this.artifactRepository.countByRepoIdAndGroupName(this.repo.getId(), nestedGroup))
+        .isEqualTo(2);
+
+    // Storage and database agree: the only files left are the nested group's, none orphaned under
+    // the root group's directory.
+    assertThat(this.storedFiles()).isEqualTo(nestedFilesBefore);
+
+    // The nested group's summary is unchanged by the root group's deletion.
+    this.mockMvc
+        .perform(
+            get("/api/mvn/groups/{repo}/{group}", this.repoName, nestedGroup)
+                .header(AUTHORIZATION, this.bearerToken())
+                .with(apiPort()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.artifactCount").value(2))
+        .andExpect(jsonPath("$.data.versionCount").value(3));
+  }
+
+  @Test
+  @DisplayName(
+      "deleting the root group also removes its own group-level maven-metadata.xml and leaves the"
+          + " nested group's")
+  void deletingRootGroupRemovesItsGroupLevelMetadataOnly() throws Exception {
+    final var rootGroup = "com.acme";
+    final var nestedGroup = "com.acme.sub";
+
+    this.seedArtifact(rootGroup, "alpha", "1.0");
+    this.seedArtifact(nestedGroup, "gamma", "1.0");
+
+    final var rootMetadata = this.artifactDir(rootGroup, "alpha").getParent();
+    final var nestedMetadata = this.artifactDir(nestedGroup, "gamma").getParent();
+    for (final var dir : List.of(rootMetadata, nestedMetadata)) {
+      Files.writeString(dir.resolve("maven-metadata.xml"), "<metadata/>", StandardCharsets.UTF_8);
+      Files.writeString(dir.resolve("maven-metadata.xml.sha1"), "abc", StandardCharsets.UTF_8);
+    }
+
+    this.mockMvc
+        .perform(
+            delete("/api/mvn/artifacts/{repo}/{group}", this.repoName, rootGroup)
+                .header(AUTHORIZATION, this.bearerToken())
+                .with(apiPort()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value("GROUP"));
+
+    assertThat(rootMetadata.resolve("maven-metadata.xml")).as("root group metadata").doesNotExist();
+    assertThat(rootMetadata.resolve("maven-metadata.xml.sha1"))
+        .as("root group metadata checksum")
+        .doesNotExist();
+    assertThat(nestedMetadata.resolve("maven-metadata.xml")).as("nested metadata").exists();
+    assertThat(nestedMetadata.resolve("maven-metadata.xml.sha1")).as("nested checksum").exists();
+    this.assertArtifactExists(nestedGroup, "gamma");
   }
 }

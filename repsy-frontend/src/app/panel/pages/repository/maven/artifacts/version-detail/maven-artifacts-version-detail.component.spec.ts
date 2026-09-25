@@ -59,10 +59,15 @@ describe('MavenArtifactsVersionDetailComponent', () => {
     spyOn(console, 'debug');
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
     currentRepo = { repoName: REPO, repoType: 'maven' };
-    mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['fetchArtifactVersion', 'deleteVersion'], {
-      repoChanges,
-    });
+    mavenService = jasmine.createSpyObj<MavenService>(
+      'MavenService',
+      ['fetchArtifactVersion', 'deleteVersion', 'getVersionDeleteWarning'],
+      {
+        repoChanges,
+      },
+    );
     mavenService.fetchArtifactVersion.and.returnValue(of(VERSION));
+    mavenService.getVersionDeleteWarning.and.returnValue(of(null));
     mavenService.deleteVersion.and.returnValue(of(DeletedItem.VERSION));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
@@ -181,6 +186,21 @@ describe('MavenArtifactsVersionDetailComponent', () => {
       component.deleteVersion();
 
       expect(dangerModalService.modal).toEqual({ title: 'Delete Version', action: 'Delete', message: null });
+      expect(mavenService.deleteVersion).not.toHaveBeenCalled();
+    });
+
+    // RPS-1348: the last version of a group's only artifact takes the artifact and the group with it.
+    it('names the artifact and the group that go too when the version is the last of the only artifact', () => {
+      mavenService.getVersionDeleteWarning.and.returnValue(of('the artifact and the group are removed too'));
+
+      component.deleteVersion();
+
+      expect(mavenService.getVersionDeleteWarning).toHaveBeenCalledOnceWith('org.acme', 'lib');
+      expect(dangerModalService.modal).toEqual({
+        title: 'Delete Version',
+        action: 'Delete',
+        message: 'the artifact and the group are removed too',
+      });
       expect(mavenService.deleteVersion).not.toHaveBeenCalled();
     });
 
