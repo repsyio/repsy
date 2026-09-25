@@ -61,6 +61,7 @@ public class ArtifactUtils {
   private static final String SNAPSHOT_SUFFIX = "SNAPSHOT";
   private static final String SNAPSHOT_MARKER = "(SNAPSHOT|\\d{8}\\.\\d{6}-\\d+)[.-]";
   private static final String SNAPSHOT_BUILD_MARKER = "(?:SNAPSHOT|(\\d{8}\\.\\d{6})-(\\d+))[.-]";
+  private static final String SNAPSHOT_POM_MARKER = "(?:SNAPSHOT|(\\d{8}\\.\\d{6})-(\\d+))\\.pom";
   private static final SnapshotBuild LITERAL_SNAPSHOT = new SnapshotBuild("", BigInteger.ZERO);
 
   /**
@@ -408,6 +409,60 @@ public class ArtifactUtils {
             Pattern.quote(segments[segments.length - 2] + "-" + stem) + SNAPSHOT_BUILD_MARKER);
 
     return newestBuild(signable, buildPattern);
+  }
+
+  /**
+   * Tells whether {@code gav} names a file of a non-unique snapshot: the literal {@code
+   * <artifactId>-<version>-SNAPSHOT} name that sbt and Ivy deploy again and again, with its
+   * classifier jars, checksums and signatures. A unique (timestamped) build has a timestamp, and a
+   * release is not a snapshot at all. RPS-1328.
+   */
+  public static boolean isNonUniqueSnapshotFile(final Gav gav) {
+    return gav.isSnapshot() && gav.getSnapshotTimeStamp() == null;
+  }
+
+  /**
+   * The name of the main POM that a {@code SNAPSHOT} version directory holds for its newest build,
+   * as {@code <artifactId>-<version>.pom} would be resolved by a client that could not read {@code
+   * maven-metadata.xml}: the POM of the highest {@code yyyyMMdd.HHmmss-N} build, or the literal
+   * {@code <artifactId>-<baseVersion>-SNAPSHOT.pom} when no timestamped build is stored (a literal
+   * file counts as the oldest build, like in {@link #filesToSign}). A POM of another artifact, a
+   * classifier POM, a checksum and a signature are not main POMs. RPS-1370.
+   *
+   * @param artifactId the artifactId of the version
+   * @param version the {@code ...-SNAPSHOT} version, also the name of the directory
+   * @param fileNames the names of the files directly in the version directory
+   * @return the file name, or {@code null} if the version is not a snapshot or holds no main POM
+   */
+  public static @Nullable String newestSnapshotPomName(
+      final String artifactId, final String version, final Collection<String> fileNames) {
+
+    if (!version.endsWith(SNAPSHOT_SUFFIX)) {
+      return null;
+    }
+
+    final var stem = version.substring(0, version.length() - SNAPSHOT_SUFFIX.length());
+    final var pomPattern =
+        Pattern.compile(Pattern.quote(artifactId + "-" + stem) + SNAPSHOT_POM_MARKER);
+    String newestName = null;
+    SnapshotBuild newest = null;
+
+    for (final var name : fileNames) {
+      final var matcher = pomPattern.matcher(name);
+
+      if (!matcher.matches()) {
+        continue;
+      }
+
+      final var build = snapshotBuildOf(matcher.group(1), matcher.group(2));
+
+      if (newest == null || build.compareTo(newest) > 0) {
+        newest = build;
+        newestName = name;
+      }
+    }
+
+    return newestName;
   }
 
   private static List<String> newestBuild(final List<String> signable, final Pattern buildPattern) {

@@ -668,6 +668,26 @@ what is verified and where keys are looked up:
   `keyserver.ubuntu.com` or `keys.openpgp.org`), so no network call and no timeout wait. Defaults to
   on.
 
+### Maven *Allow override* and SNAPSHOTs
+
+With *Allow override* off, a Maven repository refuses to store a file that already exists
+(`403 artifactOverrideIsProhibited`), with one exception: a SNAPSHOT can always be deployed again.
+
+- **Releases are immutable.** Any file of a release version that already exists is refused.
+- **A timestamped SNAPSHOT build is immutable.** `mvn deploy` and Gradle write a new build
+  (`lib-1.0-20260921.101010-2.jar`) on every deploy, so a redeploy never touches an existing file,
+  and a file of an existing build is refused like a release file.
+- **A non-unique SNAPSHOT is replaced.** sbt and Apache Ivy deploy `lib-1.0-SNAPSHOT.pom/.jar` (and
+  their checksums, and classifier jars) under those literal names every time, so a repeated deploy
+  replaces the files instead of adding a build. That is accepted, as it is on Nexus and Artifactory,
+  and it is what makes the setting behave the same for every client.
+- The *Snapshots* switch of the repository still decides: with it off, a SNAPSHOT is refused in
+  both forms.
+
+The panel shows the version of a SNAPSHOT that carries no `maven-metadata.xml` (what sbt and Ivy
+leave) with the newest POM stored for it: the POM of the newest timestamped build, or the literal
+`-SNAPSHOT` POM when there is no build.
+
 ### Apache Ivy Clients
 
 The web UI's Maven configuration dialog shows this setup with your repository URL and username filled

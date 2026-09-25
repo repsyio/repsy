@@ -271,12 +271,8 @@ export function registerSbtExtras(): void {
       seeder,
       panelApi,
     }) => {
-      // RPS-1370: the panel's version detail of a non-unique SNAPSHOT needs the version-level
-      // maven-metadata.xml, which sbt never sends, and answers 404. The list already works.
-      test.fail(
-        true,
-        'RPS-1370: the version detail of an sbt SNAPSHOT answers 404 itemNotFound (no version-level metadata)',
-      );
+      // RPS-1370: sbt never sends the version-level maven-metadata.xml, so the detail finds the POM
+      // by the literal file name in the version directory.
       const { world, repoName, groupId, base, version } = await adminWorld(
         seeder,
         'panel-snapshot',
@@ -292,6 +288,9 @@ export function registerSbtExtras(): void {
       ]);
       const info = await panelApi.getMavenArtifactVersion(repoName, groupId, artifactId, version);
       expect(info.versionName).toBe(version);
+      expect(info.pomFile, 'the panel serves the POM').toContain(
+        `<artifactId>${artifactId}</artifactId>`,
+      );
     });
 
     test('sbt > deleting one of two sbt-published versions in the panel removes it and keeps the other', async ({

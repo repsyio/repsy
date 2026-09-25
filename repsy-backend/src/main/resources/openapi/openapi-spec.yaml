@@ -4702,6 +4702,11 @@ components:
         allowOverride:
           type: boolean
           nullable: false
+          description: >-
+            When false, uploading a version that already exists is refused. Maven: a release, and a
+            timestamped snapshot build, cannot be replaced, but a non-unique snapshot (the literal
+            -SNAPSHOT file names that sbt and Ivy deploy every time) can always be deployed again,
+            unless snapshots is false.
         releases:
           type: boolean
           nullable: false
@@ -5258,6 +5263,11 @@ components:
         allowOverride:
           type: boolean
           nullable: false
+          description: >-
+            When false, uploading a version that already exists is refused. Maven: a release, and a
+            timestamped snapshot build, cannot be replaced, but a non-unique snapshot (the literal
+            -SNAPSHOT file names that sbt and Ivy deploy every time) can always be deployed again,
+            unless snapshots is false.
         searchable:
           type: boolean
           nullable: false

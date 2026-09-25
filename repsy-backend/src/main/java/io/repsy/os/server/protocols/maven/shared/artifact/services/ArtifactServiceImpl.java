@@ -197,6 +197,11 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * override rule is checked first for real artifact files, so {@code artifactOverrideIsProhibited}
    * keeps precedence when both rules would refuse the upload. The version-type rule does not depend
    * on the path parsing to a GAV.
+   *
+   * <p>The override rule leaves a non-unique snapshot alone (RPS-1328): sbt and Ivy deploy {@code
+   * <artifactId>-<version>-SNAPSHOT.pom/.jar} under that literal name every time, so refusing the
+   * second deploy made the setting depend on the client. A file of an existing timestamped build
+   * and of a release is still refused. {@code snapshots: false} still refuses a literal snapshot.
    */
   @Override
   public void checkDeploymentRules(
@@ -700,6 +705,12 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       return;
     }
 
+    // A non-unique snapshot is redeployed under its literal name by design (sbt, Ivy): it is not
+    // an override. An existing timestamped build and a release are still immutable (RPS-1328).
+    if (ArtifactUtils.isNonUniqueSnapshotFile(gav)) {
+      return;
+    }
+
     this.checkForStorage(repoInfo, storagePath);
 
     if (fileName.endsWith(POM_SUFFIX)) {
@@ -1156,6 +1167,13 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     return artifactOptional.orElse(null);
   }
 
+  /**
+   * The POM file name of a snapshot version. The version-level {@code maven-metadata.xml} names it
+   * when there is one that lists a {@code pom} (what a Maven client resolves). Without it, or when
+   * it is unusable, the newest POM stored in the version directory is used (RPS-1370): sbt and Ivy
+   * deploy a snapshot under its literal name and upload no metadata at all. A literal POM counts as
+   * older than a timestamped one, see {@link ArtifactUtils#newestSnapshotPomName}.
+   */
   private @Nullable String getSnapshotArtifactVersionPomFileName(
       final Path artifactBasePath,
       final RepoInfo repoInfo,
@@ -1163,26 +1181,69 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final String artifactName)
       throws IOException, XmlPullParserException {
 
-    final var versionPath = artifactBasePath.resolve(versionName + "/" + METADATA_FILENAME);
+    // artifactBasePath is a storage path with a leading slash: only the names of the files in the
+    // version directory are ever matched, never their paths.
+    final var versionDirPath = artifactBasePath.resolve(versionName);
+    final var versionPath =
+        StoragePath.of(
+            repoInfo.getStorageKey(), versionDirPath.resolve(METADATA_FILENAME).toString());
 
-    final var versionStoragePath = StoragePath.of(repoInfo.getStorageKey(), versionPath.toString());
+    final var resourceOpt = this.storageStrategy.get(versionPath, repoInfo.getName());
 
-    final var resource =
-        this.storageStrategy
-            .get(versionStoragePath, repoInfo.getName())
-            .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
+    if (resourceOpt.isPresent()) {
+      final var metadataPomName = this.pomNameOfSnapshotMetadata(resourceOpt.get(), artifactName);
 
-    final var versionMetadata = ArtifactUtils.readMetadata(resource.getContentAsByteArray());
+      if (metadataPomName != null) {
+        return metadataPomName;
+      }
+    }
 
-    final var snapshotVersions = versionMetadata.getVersioning().getSnapshotVersions();
+    final var storedPomName =
+        ArtifactUtils.newestSnapshotPomName(
+            artifactName,
+            versionName,
+            this.fileNamesOf(StoragePath.of(repoInfo.getStorageKey(), versionDirPath.toString())));
 
-    for (final SnapshotVersion sv : snapshotVersions) {
+    if (storedPomName != null) {
+      return storedPomName;
+    }
+
+    // Metadata that lists no pom keeps answering without one; without any metadata a version with
+    // no POM behaves like a release without one (404 when the file is read).
+    return resourceOpt.isPresent() ? null : artifactName + "-" + versionName + ".pom";
+  }
+
+  private @Nullable String pomNameOfSnapshotMetadata(
+      final Resource metadataResource, final String artifactName)
+      throws IOException, XmlPullParserException {
+
+    final var versioning =
+        ArtifactUtils.readMetadata(metadataResource.getContentAsByteArray()).getVersioning();
+
+    if (versioning == null) {
+      return null;
+    }
+
+    for (final SnapshotVersion sv : versioning.getSnapshotVersions()) {
       if ("pom".equals(sv.getExtension())) {
         return artifactName + "-" + sv.getVersion() + ".pom";
       }
     }
 
     return null;
+  }
+
+  /** The names of the files directly in a directory, none when the directory does not exist. */
+  private List<String> fileNamesOf(final StoragePath directory) {
+
+    try {
+      return this.storageStrategy.listDirectoryContents(directory).stream()
+          .filter(item -> !item.isDirectory())
+          .map(StorageItemInfo::getName)
+          .toList();
+    } catch (final ItemNotFoundException _) {
+      return List.of();
+    }
   }
 
   /** The plugin prefix of the POM's artifactId, or {@code null} if it is longer than its column. */

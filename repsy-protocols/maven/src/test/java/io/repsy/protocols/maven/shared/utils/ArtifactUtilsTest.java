@@ -776,6 +776,71 @@ class ArtifactUtilsTest {
         .containsExactlyInAnyOrder("lib-1.0-SNAPSHOT.jar", "lib-1.0-SNAPSHOT.pom");
   }
 
+  @ParameterizedTest(name = "{0} -> {1}")
+  @CsvSource({
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.pom, true",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar, true",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT-sources.jar, true",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.pom.sha1, true",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar.asc, true",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.pom, false",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.jar.sha1, false",
+    "com/acme/lib/1.0/lib-1.0.pom, false",
+    "com/acme/lib/1.0/lib-1.0.jar, false"
+  })
+  @DisplayName("only the literal files of a snapshot are non-unique snapshot files (RPS-1328)")
+  void tellsANonUniqueSnapshotFile(final String path, final boolean nonUnique) {
+    final var gav = ArtifactUtils.convertPathToGav(path);
+
+    assertThat(gav).isNotNull();
+    assertThat(ArtifactUtils.isNonUniqueSnapshotFile(gav)).isEqualTo(nonUnique);
+  }
+
+  @Test
+  @DisplayName("the newest POM of a snapshot directory is the highest build, a literal the oldest")
+  void picksTheNewestSnapshotPom() {
+    final var files =
+        List.of(
+            "lib-1.0-SNAPSHOT.pom",
+            "lib-1.0-20260921.101010-2.pom",
+            "lib-1.0-20260921.101010-10.pom",
+            "lib-1.0-20260920.235959-99.pom",
+            "lib-1.0-20260921.101010-10.pom.sha1",
+            "lib-1.0-20260921.101010-11-sources.pom",
+            "other-1.0-20260922.101010-1.pom",
+            "lib-1.0-20260921.101010-11.jar",
+            "maven-metadata.xml");
+
+    assertThat(ArtifactUtils.newestSnapshotPomName("lib", "1.0-SNAPSHOT", files))
+        .isEqualTo("lib-1.0-20260921.101010-10.pom");
+  }
+
+  @Test
+  @DisplayName("a literal POM is the answer when no timestamped POM is stored")
+  void picksTheLiteralSnapshotPom() {
+    assertThat(
+            ArtifactUtils.newestSnapshotPomName(
+                "lib", "1.0-SNAPSHOT", List.of("lib-1.0-SNAPSHOT.jar", "lib-1.0-SNAPSHOT.pom")))
+        .isEqualTo("lib-1.0-SNAPSHOT.pom");
+    assertThat(ArtifactUtils.newestSnapshotPomName("lib", "SNAPSHOT", List.of("lib-SNAPSHOT.pom")))
+        .isEqualTo("lib-SNAPSHOT.pom");
+  }
+
+  @Test
+  @DisplayName("no snapshot POM is answered for a release, a missing POM or another artifact")
+  void picksNoSnapshotPom() {
+    assertThat(ArtifactUtils.newestSnapshotPomName("lib", "1.0", List.of("lib-1.0.pom"))).isNull();
+    assertThat(ArtifactUtils.newestSnapshotPomName("lib", "1.0-SNAPSHOT", List.of())).isNull();
+    assertThat(
+            ArtifactUtils.newestSnapshotPomName(
+                "lib", "1.0-SNAPSHOT", List.of("lib-1.0-SNAPSHOT.jar", "other-1.0-SNAPSHOT.pom")))
+        .isNull();
+    assertThat(
+            ArtifactUtils.newestSnapshotPomName(
+                "l.b", "1.0-SNAPSHOT", List.of("lib-1.0-SNAPSHOT.pom")))
+        .isNull();
+  }
+
   @Test
   @DisplayName("lists the files that sit directly in the version directory, not nested ones")
   void listsTheFilesOfTheVersionDirectoryOnly() {

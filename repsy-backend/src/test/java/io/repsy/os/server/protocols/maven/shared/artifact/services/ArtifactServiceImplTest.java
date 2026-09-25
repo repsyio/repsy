@@ -59,6 +59,8 @@ import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -640,6 +642,188 @@ class ArtifactServiceImplTest {
     assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(repo, versionType, path))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("artifactOverrideIsProhibited");
+  }
+
+  @ParameterizedTest(name = "{0} may be deployed again")
+  @ValueSource(
+      strings = {
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.pom",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT-sources.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.pom.sha1",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar.asc"
+      })
+  @DisplayName("a literal snapshot file is no override, whatever is stored (RPS-1328)")
+  void literalSnapshotRedeployIsNotAnOverride(final String path) {
+    final var id = UUID.randomUUID();
+    final var repo = repo(id, true, true, false);
+    final var storagePath = StoragePath.of(id, path);
+    final var versionType = this.artifactService.getVersionType(repo, storagePath);
+
+    assertThat(versionType).isEqualTo(SNAPSHOT);
+    assertThatCode(() -> this.artifactService.checkDeploymentRules(repo, versionType, storagePath))
+        .doesNotThrowAnyException();
+
+    verifyNoInteractions(this.storageStrategy, this.artifactRepository);
+  }
+
+  @Test
+  @DisplayName("a literal snapshot is still refused while snapshots are off (RPS-1328, RPS-1174)")
+  void literalSnapshotIsStillRefusedWhileSnapshotsAreOff() {
+    final var id = UUID.randomUUID();
+    final var repo = repo(id, true, false, false);
+    final var path = StoragePath.of(id, "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar");
+
+    assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(repo, SNAPSHOT, path))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("snapshotVersionsAreProhibited");
+  }
+
+  @ParameterizedTest(name = "{0} is still an override")
+  @ValueSource(
+      strings = {
+        SNAPSHOT_JAR,
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.jar.sha1",
+        RELEASE_JAR,
+        "com/acme/lib/1.0/lib-1.0.pom"
+      })
+  @DisplayName("a stored timestamped build and a stored release stay immutable (RPS-1328)")
+  void timestampedBuildAndReleaseStayImmutable(final String path) {
+    final var id = UUID.randomUUID();
+    final var repo = repo(id, true, true, false);
+    final var storagePath = StoragePath.of(id, path);
+    final var versionType = this.artifactService.getVersionType(repo, storagePath);
+    when(this.storageStrategy.get(storagePath, "mvn"))
+        .thenReturn(Optional.of(new ByteArrayResource(new byte[] {1})));
+
+    assertThatThrownBy(
+            () -> this.artifactService.checkDeploymentRules(repo, versionType, storagePath))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("artifactOverrideIsProhibited");
+  }
+
+  @Test
+  @DisplayName("a registered snapshot version does not refuse its literal POM (RPS-1328)")
+  void registeredSnapshotVersionDoesNotRefuseItsLiteralPom() {
+    final var id = UUID.randomUUID();
+    final var repo = repo(id, true, true, false);
+    final var path = StoragePath.of(id, "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.pom");
+
+    assertThatCode(() -> this.artifactService.checkDeploymentRules(repo, SNAPSHOT, path))
+        .doesNotThrowAnyException();
+
+    verify(this.artifactRepository, never())
+        .existsByRepoIdAndArtifactNameAndGroupNameAndArtifactVersionsVersionName(
+            any(), any(), any(), any());
+  }
+
+  private static StorageItemInfo item(final String name, final boolean directory) {
+    return StorageItemInfo.builder().name(name).directory(directory).build();
+  }
+
+  private String pomFilenameOf(final String versionName) throws Exception {
+    return this.artifactService.getArtifactVersionPomFilename(
+        repo(UUID.randomUUID(), true, true, true),
+        Path.of("/com.acme/lib"),
+        SNAPSHOT,
+        "lib",
+        versionName);
+  }
+
+  private void stubVersionDir(final String... names) {
+    when(this.storageStrategy.listDirectoryContents(any(StoragePath.class)))
+        .thenReturn(Arrays.stream(names).map(name -> item(name, name.endsWith("/"))).toList());
+  }
+
+  private void stubNoVersionMetadata() {
+    when(this.storageStrategy.get(any(StoragePath.class), eq("mvn"))).thenReturn(Optional.empty());
+  }
+
+  private void stubVersionMetadata(final String xml) {
+    when(this.storageStrategy.get(any(StoragePath.class), eq("mvn")))
+        .thenReturn(Optional.of(new ByteArrayResource(xml.getBytes(UTF_8))));
+  }
+
+  @Test
+  @DisplayName("without version metadata the literal POM of a snapshot is the POM (RPS-1370)")
+  void snapshotWithoutMetadataUsesItsLiteralPom() throws Exception {
+    this.stubNoVersionMetadata();
+    this.stubVersionDir(
+        "lib-2.0-SNAPSHOT.jar", "lib-2.0-SNAPSHOT.pom", "lib-2.0-SNAPSHOT.pom.sha1");
+
+    assertThat(this.pomFilenameOf("2.0-SNAPSHOT")).isEqualTo("lib-2.0-SNAPSHOT.pom");
+  }
+
+  @Test
+  @DisplayName("without version metadata the newest timestamped POM wins over the others")
+  void snapshotWithoutMetadataUsesTheNewestBuild() throws Exception {
+    this.stubNoVersionMetadata();
+    this.stubVersionDir(
+        "lib-2.0-SNAPSHOT.pom",
+        "lib-2.0-20260921.101010-1.pom",
+        "lib-2.0-20260921.101010-2.pom",
+        "lib-2.0-20260920.235959-9.pom");
+
+    assertThat(this.pomFilenameOf("2.0-SNAPSHOT")).isEqualTo("lib-2.0-20260921.101010-2.pom");
+  }
+
+  @Test
+  @DisplayName(
+      "without version metadata and without a POM the literal name is answered (404 on read)")
+  void snapshotWithoutMetadataAndPomAnswersTheLiteralName() throws Exception {
+    this.stubNoVersionMetadata();
+    this.stubVersionDir("lib-2.0-SNAPSHOT.jar", "sub/");
+
+    assertThat(this.pomFilenameOf("2.0-SNAPSHOT")).isEqualTo("lib-2.0-SNAPSHOT.pom");
+  }
+
+  @Test
+  @DisplayName("a version directory that is gone answers the literal name, it does not throw")
+  void snapshotWithoutMetadataInAMissingDirectory() throws Exception {
+    this.stubNoVersionMetadata();
+    when(this.storageStrategy.listDirectoryContents(any(StoragePath.class)))
+        .thenThrow(new ItemNotFoundException("resourceNotFound"));
+
+    assertThat(this.pomFilenameOf("2.0-SNAPSHOT")).isEqualTo("lib-2.0-SNAPSHOT.pom");
+  }
+
+  @Test
+  @DisplayName("version metadata that lists a pom still decides, as a Maven client resolves it")
+  void snapshotMetadataStillDecides() throws Exception {
+    this.stubVersionMetadata(VERSION_METADATA.formatted("1.0-SNAPSHOT"));
+
+    assertThat(this.pomFilenameOf("1.0-SNAPSHOT")).isEqualTo("lib-1.0-20260921.101010-1.pom");
+
+    verify(this.storageStrategy, never()).listDirectoryContents(any(StoragePath.class));
+  }
+
+  @Test
+  @DisplayName("metadata without versioning falls back to the stored POM instead of failing")
+  void snapshotMetadataWithoutVersioningFallsBack() throws Exception {
+    this.stubVersionMetadata(
+        "<metadata><groupId>com.acme</groupId><artifactId>lib</artifactId></metadata>");
+    this.stubVersionDir("lib-2.0-SNAPSHOT.pom");
+
+    assertThat(this.pomFilenameOf("2.0-SNAPSHOT")).isEqualTo("lib-2.0-SNAPSHOT.pom");
+  }
+
+  @Test
+  @DisplayName("metadata without a pom entry falls back to the stored POM, or to no POM at all")
+  void snapshotMetadataWithoutPomEntryFallsBack() throws Exception {
+    this.stubVersionMetadata(
+        """
+        <metadata><groupId>com.acme</groupId><artifactId>lib</artifactId><versioning>\
+        <snapshot><timestamp>20260921.101010</timestamp><buildNumber>3</buildNumber></snapshot>\
+        <snapshotVersions><snapshotVersion><extension>jar</extension>\
+        <value>2.0-20260921.101010-3</value></snapshotVersion></snapshotVersions>\
+        </versioning></metadata>""");
+    this.stubVersionDir("lib-2.0-20260921.101010-3.pom", "lib-2.0-20260921.101010-3.jar");
+
+    assertThat(this.pomFilenameOf("2.0-SNAPSHOT")).isEqualTo("lib-2.0-20260921.101010-3.pom");
+
+    this.stubVersionDir("lib-2.0-20260921.101010-3.jar");
+
+    assertThat(this.pomFilenameOf("2.0-SNAPSHOT")).isNull();
   }
 
   private static StoragePath pathOf(final String relativePath) {

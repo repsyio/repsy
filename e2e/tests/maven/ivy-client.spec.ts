@@ -29,9 +29,9 @@
  *  - IV8: the ways a first configuration goes wrong: no realm on the credential, `publishivy="true"`,
  *    and a dependency line without a `conf`, next to the panel's own line (with its `conf`, RPS-1395)
  *    used as it is;
- *  - the panel's version detail of an Ivy SNAPSHOT (RPS-1370, still a known gap) and its version
- *    delete (RPS-1331, fixed: it removes the version and keeps the other, with no artifact-level
- *    maven-metadata.xml).
+ *  - the panel's version detail of an Ivy SNAPSHOT (RPS-1370, fixed: the POM is found without a
+ *    version-level maven-metadata.xml) and its version delete (RPS-1331, fixed: it removes the
+ *    version and keeps the other, with no artifact-level maven-metadata.xml).
  *
  * Like the sbt extras (`scenarios/sbt-extras.ts`) and the dotted-artifactId test in
  * `publish-consume.spec.ts`, each test builds its `World` by hand, since a coordinate other than the
@@ -432,12 +432,8 @@ test('ivy > the panel lists and shows a SNAPSHOT that Ivy published', async ({
   seeder,
   panelApi,
 }) => {
-  // RPS-1370: the panel's version detail of a non-unique SNAPSHOT needs the version-level
-  // maven-metadata.xml, which Ivy never sends, and answers 404. The list already works.
-  test.fail(
-    true,
-    'RPS-1370: the version detail of an Ivy SNAPSHOT answers 404 itemNotFound (no version-level metadata)',
-  );
+  // RPS-1370: Ivy never sends the version-level maven-metadata.xml, so the detail finds the POM by
+  // the literal file name in the version directory.
   const { world, repoName, groupId, artifactId, version } = await newWorld(
     seeder,
     'panel-snapshot',
@@ -450,6 +446,9 @@ test('ivy > the panel lists and shows a SNAPSHOT that Ivy published', async ({
   ]);
   const info = await panelApi.getMavenArtifactVersion(repoName, groupId, artifactId, version);
   expect(info.versionName).toBe(version);
+  expect(info.pomFile, 'the panel serves the POM').toContain(
+    `<artifactId>${artifactId}</artifactId>`,
+  );
 });
 
 test('ivy > deleting one of two Ivy-published versions in the panel removes it and keeps the other', async ({

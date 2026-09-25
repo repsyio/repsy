@@ -46,6 +46,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -663,6 +664,105 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
     void invalidPagingParam(final String path, final String param, final String value)
         throws Exception {
       PagingAssertions.expectInvalidParameter(this.list(path, param, value), param);
+    }
+  }
+
+  /**
+   * A snapshot of its own artifact, as sbt and Ivy leave it: the POM and jar files, no {@code
+   * maven-metadata.xml} at any level. It sits under another artifactId than {@code demo}, so the
+   * counts of the other tests hold.
+   */
+  private void seedSnapshotWithoutMetadata(
+      final String artifactName, final String versionName, final Map<String, String> files)
+      throws IOException {
+    seedExtraArtifact(GROUP, artifactName, versionName);
+    final var version =
+        this.artifactVersionRepository
+            .findByArtifactIdAndVersionName(
+                this.artifactRepository
+                    .findByRepoIdAndGroupNameAndArtifactName(this.repo.getId(), GROUP, artifactName)
+                    .orElseThrow()
+                    .getId(),
+                versionName)
+            .orElseThrow();
+    version.setType(ArtifactVersionType.SNAPSHOT);
+    this.artifactVersionRepository.saveAndFlush(version);
+
+    final Path versionDir =
+        Path.of(
+            this.storageBasePath,
+            "maven",
+            this.repo.getId().toString(),
+            GROUP.replace('.', '/'),
+            artifactName,
+            versionName);
+    Files.createDirectories(versionDir);
+
+    for (final var file : files.entrySet()) {
+      Files.writeString(versionDir.resolve(file.getKey()), file.getValue(), StandardCharsets.UTF_8);
+    }
+  }
+
+  private ResultActions versionDetail(final String artifactName, final String versionName)
+      throws Exception {
+    return this.mockMvc.perform(
+        get(
+                "/api/mvn/artifacts/{repo}/{group}/{artifact}/versions/{version}",
+                this.repoName,
+                GROUP,
+                artifactName,
+                versionName)
+            .with(apiPort()));
+  }
+
+  @Nested
+  @DisplayName("a snapshot deployed without maven-metadata.xml (RPS-1370)")
+  class SnapshotWithoutMetadata {
+
+    @Test
+    @DisplayName("the detail shows the literal POM, as sbt and Ivy leave it")
+    void showsTheLiteralPom() throws Exception {
+      MavenArtifactControllerIT.this.seedSnapshotWithoutMetadata(
+          "sbtlib",
+          "2.0-SNAPSHOT",
+          Map.of(
+              "sbtlib-2.0-SNAPSHOT.pom", "<project>literal pom</project>",
+              "sbtlib-2.0-SNAPSHOT.jar", "jar bytes"));
+
+      MavenArtifactControllerIT.this
+          .versionDetail("sbtlib", "2.0-SNAPSHOT")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("artifactVersionFetched"))
+          .andExpect(jsonPath("$.data.versionName").value("2.0-SNAPSHOT"))
+          .andExpect(jsonPath("$.data.pomFile").value("<project>literal pom</project>"));
+    }
+
+    @Test
+    @DisplayName("the detail shows the newest timestamped POM of a directory without metadata")
+    void showsTheNewestTimestampedPom() throws Exception {
+      MavenArtifactControllerIT.this.seedSnapshotWithoutMetadata(
+          "hand",
+          "2.0-SNAPSHOT",
+          Map.of(
+              "hand-2.0-SNAPSHOT.pom", "<project>literal</project>",
+              "hand-2.0-20260921.101010-1.pom", "<project>build 1</project>",
+              "hand-2.0-20260921.101010-2.pom", "<project>build 2</project>"));
+
+      MavenArtifactControllerIT.this
+          .versionDetail("hand", "2.0-SNAPSHOT")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.pomFile").value("<project>build 2</project>"));
+    }
+
+    @Test
+    @DisplayName("a snapshot whose POM is gone answers 404 like a release does")
+    void answers404WithoutAnyPom() throws Exception {
+      MavenArtifactControllerIT.this.seedSnapshotWithoutMetadata(
+          "nopom", "2.0-SNAPSHOT", Map.of("nopom-2.0-SNAPSHOT.jar", "jar bytes"));
+
+      MavenArtifactControllerIT.this
+          .versionDetail("nopom", "2.0-SNAPSHOT")
+          .andExpect(status().isNotFound());
     }
   }
 }

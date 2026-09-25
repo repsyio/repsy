@@ -120,11 +120,12 @@ let probeSeq = 0;
  * The path of a POM a SNAPSHOT deploy could have uploaded, `g/a/<base>-SNAPSHOT/a-<base>-<ts>-<n>.pom`
  * with a timestamp of "now" and a build number no real deploy reaches (a deploy counts 1, 2, 3, ...
  * per version; this counts from 900001), so it is a *new* file every time: `allowOverride: false`
- * never sees it as an override, and only the release/snapshot rules can refuse it. A real client
- * (mvn, Gradle) never PUTs the literal `a-<base>-SNAPSHOT.pom` name, and that name is judged
- * differently (see `README.md`, "SNAPSHOT and redeploy behaviour, as probed"), so it is no stand-in
- * for what they send. sbt does send it: it publishes a SNAPSHOT non-uniquely (RPS-134), and
- * `rawPublishCheck`'s `literalSnapshot` sends exactly that.
+ * never sees it as an override, and only the release/snapshot rules can refuse it. mvn and Gradle
+ * never PUT the literal `a-<base>-SNAPSHOT.pom` name, so it is no stand-in for what they send. sbt
+ * and Ivy do send it: they publish a SNAPSHOT non-uniquely (RPS-134, RPS-135), and
+ * `rawPublishCheck`'s `literalSnapshot` sends exactly that. It is not an override either
+ * (RPS-1328: `allowOverride` leaves a non-unique snapshot alone), see `README.md`, "SNAPSHOT and
+ * redeploy behaviour, as probed".
  */
 function snapshotProbePomPath(groupId: string, artifactId: string, version: string): string {
   probeSeq += 1;
@@ -145,8 +146,8 @@ function snapshotProbePomPath(groupId: string, artifactId: string, version: stri
  * `application/x-www-form-urlencoded`) gets it consumed as form data first, which this harness found
  * out the hard way surfaces as an unrelated `malformedPomFile` 400 instead of the real status.
  * With `literalSnapshot` a SNAPSHOT is probed under its literal name, `a-<base>-SNAPSHOT.pom`, the
- * file a non-unique deploy (sbt) sends: unlike the timestamped one it is an override of the earlier
- * deploy of the same version, so `allowOverride: false` refuses it.
+ * file a non-unique deploy (sbt, Ivy) sends. Like the timestamped one it is never refused by
+ * `allowOverride: false` (RPS-1328), so only the release/snapshot rules can refuse it.
  */
 export async function rawPublishCheck(
   world: World,
