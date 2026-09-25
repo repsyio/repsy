@@ -100,7 +100,13 @@ test.describe('golang registry rules (raw HTTP)', () => {
       const built = await buildModuleZip({ modulePath: layout.modulePath, version: 'v0.0.1' });
 
       const res = await rawUpload(layout.repoName, credential, built);
-      expectMsgId(res, 401, 'unAuthorized');
+      expectMsgId(res, 401, undefined);
+      // RPS-1435: the go command prints a 401 body only when it is text/plain, so that is what the
+      // refusal is (it was the panel's JSON envelope, or empty when no credentials were sent).
+      expect(res.contentType, 'a text/plain refusal the go command can print').toMatch(
+        /^text\/plain/,
+      );
+      expect(res.body.toString('utf8'), 'the generic message').toMatch(/credentials/);
 
       const seedRes = await rawUpload(layout.repoName, adminCredential(), built);
       expectMsgId(seedRes, 200, undefined);
@@ -296,7 +302,8 @@ test.describe('golang registry rules (raw HTTP)', () => {
       }
 
       const listRes = await rawGet(layout.repoName, admin, listRelPath(layout.modulePath));
-      expect(parseVersionList(listRes.body), 'nothing is listed').toEqual([]);
+      // A module without versions is a 404 with a text/plain reason (RPS-1428), not an empty list.
+      expect(listRes.status, 'nothing is listed').toBe(404);
     },
   );
 

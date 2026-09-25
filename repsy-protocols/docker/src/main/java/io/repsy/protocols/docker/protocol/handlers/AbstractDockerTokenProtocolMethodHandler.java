@@ -49,7 +49,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
@@ -115,35 +114,45 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
       throws Exception {
 
     try {
-      final var authHeader = request.getHeader(AUTHORIZATION);
-      final var scope = request.getParameter("scope");
-      final var grants = DockerScopes.parseGrants(request.getParameterValues("scope"));
-
-      final var formCredentials = readPasswordGrantCredentials(request);
-      if (authHeader == null && formCredentials != null) {
-        final var sessionToken =
-            this.authService.authenticateUserDockerCli(formCredentials, grants);
-        return ResponseEntity.ok(this.createLoginResponse(sessionToken));
-      }
-
-      if (authHeader == null) {
-        return this.handleUnauthenticatedRequest(scope);
-      }
-
-      final var sessionToken = this.authService.authenticateUserDockerCli(authHeader, grants);
-      final var loginResponse = this.createLoginResponse(sessionToken);
-
-      return ResponseEntity.ok(loginResponse);
+      return this.issueToken(request);
     } catch (final TooManyRequestsException e) {
       // 429 with Retry-After is the answer, not a 401 that makes the client log in again.
       throw e;
-    } catch (final UnAuthorizedException | ItemNotFoundException _) {
+    } catch (final UnAuthorizedException e) {
+      // The 401 is thrown, not returned, so ErrorHandler and OciErrorBodyAdvice write the OCI error
+      // body with the localised message, which the client prints after "unauthorized: " (RPS-1435).
+      // The message is the one the credential check chose: the generic "unAuthorized", which does
+      // not tell an unknown user from a wrong password, or "deployTokenExpired" for a token whose
+      // secret was right.
+      throw e.getHeaders() != null ? e : challenge(e.getMessage());
+    } catch (final ItemNotFoundException _) {
       // authorizePublicRead deliberately answers a private repo with ItemNotFoundException
       // ("repoNotFound", RPS-1165): the token endpoint must still refuse it with the same generic
       // 401 an anonymous caller gets for a wrong scope, or the status code would give away that
       // the repo exists.
-      return this.buildUnauthorizedResponse();
+      throw challenge("unAuthorized");
     }
+  }
+
+  private ResponseEntity<Object> issueToken(final HttpServletRequest request) {
+    final var authHeader = request.getHeader(AUTHORIZATION);
+    final var scope = request.getParameter("scope");
+    final var grants = DockerScopes.parseGrants(request.getParameterValues("scope"));
+
+    final var formCredentials = readPasswordGrantCredentials(request);
+    if (authHeader == null && formCredentials != null) {
+      final var sessionToken = this.authService.authenticateUserDockerCli(formCredentials, grants);
+      return ResponseEntity.ok(this.createLoginResponse(sessionToken));
+    }
+
+    if (authHeader == null) {
+      return this.handleUnauthenticatedRequest(scope);
+    }
+
+    final var sessionToken = this.authService.authenticateUserDockerCli(authHeader, grants);
+    final var loginResponse = this.createLoginResponse(sessionToken);
+
+    return ResponseEntity.ok(loginResponse);
   }
 
   /**
@@ -169,12 +178,8 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
 
   private ResponseEntity<Object> handleUnauthenticatedRequest(final @Nullable String scope) {
 
-    if (scope == null || scope.trim().isEmpty()) {
-      return this.buildUnauthorizedResponse();
-    }
-
-    if (this.requiresAuthentication(scope)) {
-      return this.buildUnauthorizedResponse();
+    if (scope == null || scope.trim().isEmpty() || this.requiresAuthentication(scope)) {
+      throw challenge("unauthorizedRequest");
     }
 
     return this.handlePublicReadRequest(scope);
@@ -229,10 +234,11 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
     return false;
   }
 
-  private ResponseEntity<Object> buildUnauthorizedResponse() {
-    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-        .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
-        .build();
+  /**
+   * A 401 that keeps the token endpoint's own Basic challenge and names its cause by message id.
+   */
+  private static UnAuthorizedException challenge(final String msgId) {
+    return new UnAuthorizedException(msgId, Map.of(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY));
   }
 
   private boolean isWildcardScope(final String scope) {
