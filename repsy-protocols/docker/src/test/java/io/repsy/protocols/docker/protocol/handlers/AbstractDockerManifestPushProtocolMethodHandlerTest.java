@@ -39,6 +39,7 @@ import io.repsy.protocols.docker.shared.image.services.ImageService;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.layer.services.AbstractDockerLayerRenamer;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
+import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
 import io.repsy.protocols.docker.shared.utils.BaseParsedPath;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
@@ -157,14 +158,13 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   private void stubImageAndSave(final ProtocolContext context, final BaseUsages manifestUsage)
       throws Exception {
     final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
-    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(imageInfo);
-    when(this.dockerFacade.saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class)))
+    when(this.dockerFacade.saveManifest(eq(context), eq("app"), any(ManifestForm.class)))
         .thenAnswer(
             invocation -> {
               if (manifestUsage != null) {
                 context.addProperty("usages", manifestUsage);
               }
-              return "sha256:manifest";
+              return new SavedManifest<>("sha256:manifest", imageInfo);
             });
   }
 
@@ -338,10 +338,9 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   void retriesTheSaveThatLostARace() throws Exception {
     final var context = context();
     final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
-    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(imageInfo);
-    when(this.dockerFacade.saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class)))
+    when(this.dockerFacade.saveManifest(eq(context), eq("app"), any(ManifestForm.class)))
         .thenThrow(new DataIntegrityViolationException("ux_docker_manifest__image_id_digest"))
-        .thenReturn("sha256:manifest");
+        .thenReturn(new SavedManifest<>("sha256:manifest", imageInfo));
     when(this.layerRenamer.findLayersToRename(any(BaseRepoInfo.class), eq(MANIFEST_JSON)))
         .thenReturn(Map.of());
     when(this.layerRenamer.renameLayers(any(BaseRepoInfo.class), any()))
@@ -352,7 +351,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     verify(this.dockerFacade, times(2))
-        .saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class));
+        .saveManifest(eq(context), eq("app"), any(ManifestForm.class));
   }
 
   @Test
@@ -360,10 +359,9 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   void retriesTheSaveThatLostAVersionCheck() throws Exception {
     final var context = context();
     final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
-    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(imageInfo);
-    when(this.dockerFacade.saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class)))
+    when(this.dockerFacade.saveManifest(eq(context), eq("app"), any(ManifestForm.class)))
         .thenThrow(new OptimisticLockingFailureException("docker_tag version"))
-        .thenReturn("sha256:manifest");
+        .thenReturn(new SavedManifest<>("sha256:manifest", imageInfo));
     when(this.layerRenamer.findLayersToRename(any(BaseRepoInfo.class), eq(MANIFEST_JSON)))
         .thenReturn(Map.of());
     when(this.layerRenamer.renameLayers(any(BaseRepoInfo.class), any()))
@@ -374,7 +372,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     verify(this.dockerFacade, times(2))
-        .saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class));
+        .saveManifest(eq(context), eq("app"), any(ManifestForm.class));
   }
 
   @Test
@@ -382,8 +380,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   void givesUpAfterThreeVersionCheckFailures() throws Exception {
     final var context = context();
     final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
-    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(imageInfo);
-    when(this.dockerFacade.saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class)))
+    when(this.dockerFacade.saveManifest(eq(context), eq("app"), any(ManifestForm.class)))
         .thenThrow(new OptimisticLockingFailureException("still stale"));
 
     assertThatThrownBy(
@@ -393,7 +390,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
         .isInstanceOf(OptimisticLockingFailureException.class);
 
     verify(this.dockerFacade, times(3))
-        .saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class));
+        .saveManifest(eq(context), eq("app"), any(ManifestForm.class));
     verifyNoInteractions(this.layerRenamer);
   }
 
@@ -402,8 +399,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   void givesUpAfterThreeAttempts() throws Exception {
     final var context = context();
     final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
-    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(imageInfo);
-    when(this.dockerFacade.saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class)))
+    when(this.dockerFacade.saveManifest(eq(context), eq("app"), any(ManifestForm.class)))
         .thenThrow(new DataIntegrityViolationException("still failing"));
 
     assertThatThrownBy(
@@ -413,7 +409,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
         .isInstanceOf(DataIntegrityViolationException.class);
 
     verify(this.dockerFacade, times(3))
-        .saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class));
+        .saveManifest(eq(context), eq("app"), any(ManifestForm.class));
     verifyNoInteractions(this.layerRenamer);
     verify(this.imageService, never()).refreshImageSize(any(), any());
   }
@@ -423,8 +419,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   void doesNotRetryOtherFailures() throws Exception {
     final var context = context();
     final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
-    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(imageInfo);
-    when(this.dockerFacade.saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class)))
+    when(this.dockerFacade.saveManifest(eq(context), eq("app"), any(ManifestForm.class)))
         .thenThrow(new BadRequestException("digestMismatch"));
 
     assertThatThrownBy(
@@ -433,7 +428,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
                     .handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse()))
         .isInstanceOf(BadRequestException.class);
 
-    verify(this.dockerFacade).saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class));
+    verify(this.dockerFacade).saveManifest(eq(context), eq("app"), any(ManifestForm.class));
   }
 
   @Test
@@ -442,11 +437,9 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
     final var context = context();
     final var gone = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
     final var recreated = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
-    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(gone, recreated);
-    when(this.dockerFacade.saveManifest(eq(context), eq(gone), any(ManifestForm.class)))
-        .thenThrow(new ImageDeletedException(gone.getId()));
-    when(this.dockerFacade.saveManifest(eq(context), eq(recreated), any(ManifestForm.class)))
-        .thenReturn("sha256:manifest");
+    when(this.dockerFacade.saveManifest(eq(context), eq("app"), any(ManifestForm.class)))
+        .thenThrow(new ImageDeletedException(gone.getId()))
+        .thenReturn(new SavedManifest<>("sha256:manifest", recreated));
     when(this.layerRenamer.findLayersToRename(any(BaseRepoInfo.class), eq(MANIFEST_JSON)))
         .thenReturn(Map.of());
     when(this.layerRenamer.renameLayers(any(BaseRepoInfo.class), any()))
@@ -465,8 +458,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   void givesUpWhenTheImageKeepsBeingDeleted() throws Exception {
     final var context = context();
     final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
-    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(imageInfo);
-    when(this.dockerFacade.saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class)))
+    when(this.dockerFacade.saveManifest(eq(context), eq("app"), any(ManifestForm.class)))
         .thenThrow(new ImageDeletedException(imageInfo.getId()));
 
     assertThatThrownBy(
@@ -475,10 +467,9 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
                     .handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse()))
         .isInstanceOf(ImageDeletedException.class);
 
-    // The first lookup plus twenty creations, and twenty-one saves.
-    verify(this.imageService, times(21)).findOrCreateImage(REPO_ID, "app");
+    // The first save plus twenty runs again.
     verify(this.dockerFacade, times(21))
-        .saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class));
+        .saveManifest(eq(context), eq("app"), any(ManifestForm.class));
     verifyNoInteractions(this.layerRenamer);
   }
 }

@@ -45,6 +45,7 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
       """
 
             select
+              i.id as id,
               i.name as name,
               i.size as size,
               i.digest as digest,
@@ -58,40 +59,7 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
                 select count(t2)
                 from Tag t2
                 where t2.image = i
-              ) as tagCount,
-              (
-                select count(um)
-                from Manifest um
-                where um.image = i
-                  and not exists (select 1 from Tag ut where ut.manifest = um)
-                  and not exists (
-                    select 1 from ManifestChild uc, Tag ut2
-                    where uc.child = um and ut2.manifest = uc.parent)
-              ) as untaggedManifestCount,
-              (
-                select coalesce(sum(ul.size), 0)
-                from Layer ul
-                where ul.id in (
-                    select ul2.id from Layer ul2
-                      join ul2.manifests um2
-                    where um2.image = i
-                      and not exists (select 1 from Tag ut3 where ut3.manifest = um2)
-                      and not exists (
-                        select 1 from ManifestChild uc2, Tag ut4
-                        where uc2.child = um2 and ut4.manifest = uc2.parent)
-                  )
-                  and ul.id not in (
-                    select tl.id from Layer tl
-                      join tl.manifests tm
-                    where tm.image = i
-                      and (
-                        exists (select 1 from Tag tt where tt.manifest = tm)
-                        or exists (
-                          select 1 from ManifestChild tc, Tag tt2
-                          where tc.child = tm and tt2.manifest = tc.parent)
-                      )
-                  )
-              ) as untaggedSize
+              ) as tagCount
             from Image i
               join i.repo re
           """;
@@ -99,15 +67,9 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
   /**
    * The images of a repo as the panel lists them. An image stays while it stores any manifest, so a
    * row may have no tag: {@code tagCount} is 0 then, and {@code size} and {@code digest}, which
-   * describe what the tags reach, are 0 and null.
-   *
-   * <p>{@code untaggedManifestCount} counts the manifests of the image that no tag points at and no
-   * tagged index lists, which is what "Delete untagged manifests" removes (an index that lists
-   * another index is followed one level here, the cleanup follows it all the way). {@code
-   * untaggedSize} is the size of the distinct layers (config blobs included) those manifests link
-   * to and no tagged manifest of the image links to: the bytes the image stores only for its
-   * untagged manifests, and the whole stored size of an image without tags. A layer is stored once
-   * per repo, so this is the image's own view, not what deleting it would free.
+   * describe what the tags reach, are 0 and null. The untagged manifests and their size are not
+   * columns here: they follow indexes of any depth, which a JPQL subquery cannot, so {@link
+   * #findUntaggedStatsByImageId} computes them per image.
    */
   @Query(
       LIST_ITEM_SELECT
@@ -143,6 +105,26 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
   @Query("select i from Image i where i.id = :imageId")
   Optional<Image> findByIdForShare(UUID imageId);
 
+  /**
+   * Inserts the image unless one with the same (repo, name) exists, without failing the transaction
+   * on the unique index: on PostgreSQL a failed statement aborts the transaction, which here also
+   * holds the manifest write. When a concurrent push has inserted the image and not committed yet,
+   * the statement waits for it: it does nothing when that push commits, and inserts when it rolls
+   * back (RPS-1350).
+   *
+   * @return 1 when the row was inserted, 0 when it already existed
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          insert into "public"."docker_image" ("id", "repo_id", "name", "size", "created_at", "last_updated_at")
+            values (:id, :repoId, :name, 0, :now, :now)
+            on conflict do nothing
+          """,
+      nativeQuery = true)
+  int insertIfAbsent(UUID id, UUID repoId, String name, Instant now);
+
   @Modifying
   @Query(
       """
@@ -155,4 +137,54 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
       """)
   void updateImageSizeAndDigest(
       UUID repoId, UUID imageId, @Nullable String digest, long size, Instant now);
+
+  /**
+   * What the image stores only for manifests that no tag reaches, computed the way "Delete untagged
+   * manifests" computes it ({@code UntaggedManifestFinder}): a manifest is reached when a tag
+   * points at it or at an index that lists it, directly or through other indexes, to any depth. The
+   * recursive CTE follows the index edges to the end.
+   *
+   * <p>{@code manifestCount} is the number of manifests no tag reaches; {@code size} is the size of
+   * the distinct layers (config blobs included) those manifests link to and no reached manifest
+   * links to.
+   */
+  @Query(
+      value =
+          """
+          with recursive reach(manifest_id) as (
+            select t.manifest_id from docker_tag t where t.image_id = :imageId
+            union
+            select c.child_id from docker_manifest_child c
+              join reach r on c.parent_id = r.manifest_id
+          )
+          select
+            (
+              select count(*) from docker_manifest m
+              where m.image_id = :imageId
+                and m.id not in (select manifest_id from reach)
+            ) as "manifestCount",
+            cast(coalesce((
+              select sum(l.size) from docker_layer l
+              where l.id in (
+                  select ml.layer_id from docker_manifest_layer ml
+                    join docker_manifest um on um.id = ml.manifest_id
+                  where um.image_id = :imageId
+                    and um.id not in (select manifest_id from reach)
+                )
+                and l.id not in (
+                  select rl.layer_id from docker_manifest_layer rl
+                  where rl.manifest_id in (select manifest_id from reach)
+                )
+            ), 0) as bigint) as "size"
+          """,
+      nativeQuery = true)
+  UntaggedStats findUntaggedStatsByImageId(UUID imageId);
+
+  /** The untagged manifests of an image and the size only they store. */
+  interface UntaggedStats {
+
+    Long getManifestCount();
+
+    Long getSize();
+  }
 }

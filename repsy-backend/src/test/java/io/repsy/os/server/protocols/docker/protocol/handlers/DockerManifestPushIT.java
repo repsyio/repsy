@@ -559,11 +559,13 @@ class DockerManifestPushIT extends AbstractIntegrationTest {
 
   /**
    * Asserts an RPS-1116 config rejection: unlike {@link #assertRejected}, the image row is NOT
-   * asserted absent -- {@code findOrCreateImage} runs, and commits within this test's own
-   * transaction, before {@code saveManifest} ever reaches {@code extractPlatform}. What must be
-   * absent is the manifest itself: the ordering fix moves platform extraction before the manifest
-   * is written to disk, so a rejected config leaves no manifest file behind (the flip-and-fail
-   * check for this ordering bug: revert it and this assertion catches the leaked file).
+   * asserted absent -- this test runs in a transaction of its own, which the request joins, so the
+   * image {@code saveManifest} creates before it reaches {@code extractPlatform} is still visible
+   * here although the failed request rolled it back (see {@code DockerFailedFirstPushIT}, which
+   * commits, for the image). What must be absent is the manifest itself: the ordering fix moves
+   * platform extraction before the manifest is written to disk, so a rejected config leaves no
+   * manifest file behind (the flip-and-fail check for this ordering bug: revert it and this
+   * assertion catches the leaked file).
    */
   private void assertConfigRejected(final MockHttpServletResponse response, final Repo repo)
       throws Exception {

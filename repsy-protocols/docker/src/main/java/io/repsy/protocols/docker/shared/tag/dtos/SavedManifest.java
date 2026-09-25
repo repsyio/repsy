@@ -13,24 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.docker.shared.image.dtos;
+package io.repsy.protocols.docker.shared.tag.dtos;
 
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.util.UUID;
+import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
 
-public interface ImageListItem {
-  UUID getId();
-
-  String getName();
-
-  String getDigest();
-
-  Long getSize();
-
-  LocalDateTime getUpdatedAt();
-
-  Instant getLastUpdatedAt();
-
-  Long getTagCount();
-}
+/**
+ * What a manifest save answered with.
+ *
+ * @param digest the digest of the stored manifest
+ * @param image the image it was saved into: the one the push found, or a new one when it was
+ *     created (or created again after it was deleted) by the same transaction
+ * @param <ID> the type of the ids
+ */
+public record SavedManifest<ID>(String digest, BaseImageInfo<ID> image) {}

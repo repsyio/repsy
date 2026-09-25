@@ -17,10 +17,10 @@ package io.repsy.protocols.docker.protocol.facades;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestDetails;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
+import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
 import java.io.IOException;
 import java.io.InputStream;
 import org.jspecify.annotations.NullMarked;
@@ -63,7 +63,15 @@ public interface DockerProtocolFacade<ID> {
   void finalizeLayerUpload(ProtocolContext context, RelativePath relativePath, LayerInfo layerInfo)
       throws IOException;
 
-  String saveManifest(ProtocolContext context, BaseImageInfo<ID> imageInfo, ManifestForm form)
+  /**
+   * Saves the manifest, and the image it belongs to when this is its first one, in one transaction:
+   * a push that fails leaves no image behind (RPS-1350).
+   *
+   * @throws io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException When the image
+   *     went with its last manifest between the moment it was found and the moment it was locked;
+   *     the caller runs the save again
+   */
+  SavedManifest<ID> saveManifest(ProtocolContext context, String imageName, ManifestForm form)
       throws IOException;
 
   Resource getLayer(ProtocolContext context, String digest, String servletPath) throws IOException;
