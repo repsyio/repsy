@@ -208,6 +208,40 @@ class SecurityHeadersFilterTest {
         .contains("https://staging.example.com");
   }
 
+  // RPS-1402: the panel loads nothing from another origin, so the built-in policy must not name a
+  // third-party host (it used to list Google Tag Manager, Google Analytics and cdnjs).
+  @Test
+  @DisplayName("the built-in policy names no third-party host (RPS-1402)")
+  void defaultPolicyNamesNoThirdPartyHost() throws Exception {
+
+    final var filter =
+        new SecurityHeadersFilter(
+            this.multiPortProperties,
+            new AppCorsProperties(null),
+            new ContentSecurityPolicyProperties(true, false, null));
+
+    final var request = request(API_PORT, "/");
+    final var response = Mockito.mock(HttpServletResponse.class);
+    final var policy = new String[1];
+    Mockito.doAnswer(
+            invocation -> {
+              policy[0] = invocation.getArgument(1);
+              return null;
+            })
+        .when(response)
+        .setHeader(Mockito.eq("Content-Security-Policy"), any());
+
+    filter.doFilterInternal(request, response, this.filterChain);
+
+    assertThat(policy[0])
+        .doesNotContain("http:", "https:", "googletagmanager", "google-analytics", "cdnjs")
+        .contains("script-src 'self';")
+        .contains("style-src 'self' 'unsafe-inline';")
+        .contains("font-src 'self' data:;")
+        .contains("img-src 'self' data:;")
+        .contains("connect-src 'self';");
+  }
+
   private static HttpServletRequest request(final int localPort, final String uri) {
     final var request = Mockito.mock(HttpServletRequest.class);
     Mockito.when(request.getLocalPort()).thenReturn(localPort);

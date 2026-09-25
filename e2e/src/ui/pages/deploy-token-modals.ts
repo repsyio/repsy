@@ -160,9 +160,8 @@ export class TokenInfoModal {
   }
 
   /**
-   * Shows or hides the secret. The eye icon is a Font Awesome glyph loaded from a CDN, which the UI
-   * suite blocks (`src/ui/defaults.ts`: no third-party requests), so the button has no size and
-   * cannot be clicked by position; the click event is dispatched to it directly instead.
+   * Shows or hides the secret. The click event is dispatched to the button directly: this predates
+   * RPS-1402, when the eye icon came from a CDN the suite blocks and the button had no box to click.
    */
   async toggleTokenVisibility(): Promise<void> {
     await this.tokenToggle.dispatchEvent('click');

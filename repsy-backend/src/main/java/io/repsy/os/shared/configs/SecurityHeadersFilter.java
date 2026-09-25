@@ -47,13 +47,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * forward:/index.html} responses and the static resources (JS/CSS bundles, {@code index.html}
  * itself) Spring Boot serves from {@code spring.web.resources.static-locations}.
  *
- * <p>The built-in policy allows what the panel's {@code index.html} actually loads: Google Tag
- * Manager/gtag ({@code www.googletagmanager.com}, plus {@code www.google-analytics.com} for the
- * collect/beacon calls gtag.js makes once it loads) and cdnjs.cloudflare.com (Font Awesome CSS and
- * webfonts). {@code connect-src} additionally allows whatever origins {@link AppCorsProperties}
- * allows, since a browser calling the API cross-origin from one of those origins is exactly what
- * CORS was configured to allow. An operator can widen or replace the policy via {@link
- * ContentSecurityPolicyProperties#policy()} without a rebuild.
+ * <p>The built-in policy allows only the panel's own origin (RPS-1402): the panel loads no
+ * analytics, CDN or avatar service, so no third-party host is named. {@code connect-src}
+ * additionally allows whatever origins {@link AppCorsProperties} allows, since a browser calling
+ * the API cross-origin from one of those origins is exactly what CORS was configured to allow. An
+ * operator can widen or replace the policy via {@link ContentSecurityPolicyProperties#policy()}
+ * without a rebuild.
  */
 @Component
 @RequiredArgsConstructor
@@ -110,9 +109,7 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
 
   private @NonNull String buildDefaultPolicy() {
 
-    final var connectSrc =
-        new StringBuilder(
-            "connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com");
+    final var connectSrc = new StringBuilder("connect-src 'self'");
 
     for (final var origin : this.appCorsProperties.allowedOriginList()) {
       connectSrc.append(' ').append(origin);
@@ -122,11 +119,10 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
         "; ",
         List.of(
             "default-src 'self'",
-            "script-src 'self' https://www.googletagmanager.com",
-            "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
-            "font-src 'self' https://cdnjs.cloudflare.com data:",
-            "img-src 'self' data: https://www.googletagmanager.com"
-                + " https://www.google-analytics.com",
+            "script-src 'self'",
+            "style-src 'self' 'unsafe-inline'",
+            "font-src 'self' data:",
+            "img-src 'self' data:",
             connectSrc.toString(),
             "object-src 'none'",
             "base-uri 'self'",

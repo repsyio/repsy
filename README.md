@@ -458,7 +458,7 @@ and after the upgrade. A manifest whose file is missing or does not match its di
 | `APP_ALLOWED_ORIGINS` | Comma-separated list of exact origins (e.g. `https://panel.example.com,https://panel-staging.example.com`) the panel API accepts cross-origin, credentialed requests from. Unset keeps today's behaviour: any origin is allowed. Set it once the panel is reachable from a known, fixed set of origins | *(empty, any origin allowed)* |
 | `APP_CSP_ENABLED` | Send a `Content-Security-Policy` header with the panel SPA and its static assets (JSON API responses are unaffected). See [Content Security Policy](#content-security-policy) | `true` |
 | `APP_CSP_REPORT_ONLY` | Send `Content-Security-Policy-Report-Only` instead of the enforcing header: violations are reported (in a browser that supports the Reporting API and is told where to send reports), nothing is blocked. Useful while rolling out a widened or replaced policy | `false` |
-| `APP_CSP_POLICY` | Overrides the built-in Content-Security-Policy outright, so an operator can widen it (for example to allow another analytics or CDN host) without a rebuild. See [Content Security Policy](#content-security-policy) for the built-in policy | *(empty, built-in policy)* |
+| `APP_CSP_POLICY` | Overrides the built-in Content-Security-Policy outright, so an operator can widen it (for example to allow a CDN or font host) without a rebuild. See [Content Security Policy](#content-security-policy) for the built-in policy | *(empty, built-in policy)* |
 
 **Important Notes:**
 
@@ -478,25 +478,27 @@ The built-in policy:
 
 ```
 default-src 'self';
-script-src 'self' https://www.googletagmanager.com;
-style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
-font-src 'self' https://cdnjs.cloudflare.com data:;
-img-src 'self' data: https://www.googletagmanager.com https://www.google-analytics.com;
-connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com <app.allowed-origins>;
+script-src 'self';
+style-src 'self' 'unsafe-inline';
+font-src 'self' data:;
+img-src 'self' data:;
+connect-src 'self' <app.allowed-origins>;
 object-src 'none';
 base-uri 'self';
 frame-ancestors 'none';
 form-action 'self';
 ```
 
+The panel names no third-party host: it loads no analytics, tag manager, CDN stylesheet, web font
+or avatar image from another origin, so it works with no outbound internet access.
 `connect-src` additionally allows whatever origins `APP_ALLOWED_ORIGINS` allows (see
 [Cross-Origin Requests (CORS)](#cross-origin-requests-cors)), since a browser calling the API
 cross-origin from one of those origins is exactly what CORS was configured to allow.
 
 - Set `APP_CSP_REPORT_ONLY=true` to send `Content-Security-Policy-Report-Only` instead while
   rolling a change out: violations are reported, nothing is blocked.
-- Set `APP_CSP_POLICY` to replace the built-in policy outright, for example to allow a different
-  analytics host or CDN, without a rebuild.
+- Set `APP_CSP_POLICY` to replace the built-in policy outright, for example to allow a CDN or font
+  host, without a rebuild.
 - Set `APP_CSP_ENABLED=false` to turn the header off entirely (for example if a reverse proxy in
   front of Repsy already sends its own).
 

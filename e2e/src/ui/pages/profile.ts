@@ -79,9 +79,9 @@ export class ProfilePage extends UiPage {
   }
 
   /**
-   * Clicks an eye button. It is a Font Awesome glyph and the suite's network allow-list blocks the Font
-   * Awesome CDN, so the button has no box and a real click is refused as "not visible": the click
-   * event is dispatched instead.
+   * Clicks an eye button with a DOM click. This predates RPS-1402: the icon was a Font Awesome glyph
+   * from a CDN the suite blocks, so the button had no box and a real click was refused as "not
+   * visible". The icon is bundled now (remixicon), and the DOM click still works.
    */
   async toggleVisibility(toggle: Locator): Promise<void> {
     await toggle.dispatchEvent('click');

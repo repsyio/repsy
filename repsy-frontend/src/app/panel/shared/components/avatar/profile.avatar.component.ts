@@ -15,10 +15,12 @@
 ///
 
 import { NgStyle } from '@angular/common';
-import { Component, computed, Input, signal } from '@angular/core';
+import { Component, computed, Input } from '@angular/core';
 
-import { gravatarUrl } from '../../util/gravatar.util';
-
+/**
+ * The user's initial on a coloured disc. RPS-1402: no Gravatar (or any other) image is requested, so the
+ * panel never sends the user's email hash to a third party.
+ */
 @Component({
   selector: 'app-profile-avatar',
   standalone: true,
@@ -26,20 +28,9 @@ import { gravatarUrl } from '../../util/gravatar.util';
   imports: [NgStyle],
 })
 export class ProfileAvatarComponent {
-  private emailSig = signal<string | null>(null);
-  private imageErrorSig = signal(false);
-
-  @Input()
-  set email(value: string | null) {
-    this.emailSig.set(value);
-    this.imageErrorSig.set(false);
-  }
-
   @Input() size = 110;
 
   @Input() fallbackChar = '?';
-
-  avatarUrl = computed(() => gravatarUrl(this.emailSig(), this.size));
 
   avatarStyle = computed(() => ({
     width: `${this.size}px`,
@@ -47,10 +38,4 @@ export class ProfileAvatarComponent {
   }));
 
   fontSize = computed(() => Math.round(this.size * 0.5));
-
-  onImageError(): void {
-    this.imageErrorSig.set(true);
-  }
-
-  showFallback = computed(() => this.imageErrorSig());
 }
