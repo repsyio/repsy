@@ -53,8 +53,31 @@ import type { Seeder } from '../../../src/seed/seeder.js';
 /** What a client says when a frozen install finds bytes that differ from its lockfile. */
 const INTEGRITY_FAILURE: Partial<Record<ClientId, RegExp>> = {
   npm: /EINTEGRITY/,
+  pnpm: /ERR_PNPM_TARBALL_INTEGRITY/,
   'yarn-classic': /Integrity check failed for/,
 };
+
+/**
+ * Whether the lockfile records each package's tarball URL. pnpm writes only `resolution: {integrity}`
+ * while the tarball is at the conventional `<registry>/<name>/-/<name>-<version>.tgz` (it rebuilds
+ * the URL from the configured registry), which Repsy's is: the lockfile then names no host at all.
+ */
+const LOCKFILE_RECORDS_TARBALL_URL: Partial<Record<ClientId, boolean>> = {
+  pnpm: false,
+};
+
+/** The lockfile names each tarball URL, or (pnpm) names no URL at all. */
+function expectTarballUrls(client: NpmFamilyClient, lockfile: string, urls: string[]): void {
+  if (LOCKFILE_RECORDS_TARBALL_URL[client.id] ?? true) {
+    for (const url of urls) {
+      expect(lockfile, `${client.lockfile} records the registry's own tarball URL`).toContain(url);
+    }
+  } else {
+    expect(lockfile, `${client.lockfile} records no tarball URL, so no host`).not.toMatch(
+      /tarball:|https?:\/\//,
+    );
+  }
+}
 
 interface Graph {
   repoName: string;
@@ -137,12 +160,13 @@ for (const client of clientsWith('frozenInstall')) {
         expect(installed.exitCode, `install: ${installed.command}\n${installed.stderr}`).toBe(0);
 
         const lockfile = await fs.readFile(path.join(first.work, client.lockfile ?? ''), 'utf8');
-        for (const name of [graph.app, graph.lib]) {
-          expect(
-            lockfile,
-            `${client.lockfile} records ${name}'s tarball from the registry's own address`,
-          ).toContain(`${env.repoBaseUrl}/${graph.repoName}/${name}/-/${name}-1.0.0.tgz`);
-        }
+        expectTarballUrls(
+          client,
+          lockfile,
+          [graph.app, graph.lib].map(
+            (name) => `${env.repoBaseUrl}/${graph.repoName}/${name}/-/${name}-1.0.0.tgz`,
+          ),
+        );
         expect(lockfile, 'and an integrity hash for it').toMatch(/sha512-/);
 
         // A fresh HOME and cache, and only package.json + the lockfile: nothing but the lockfile and
