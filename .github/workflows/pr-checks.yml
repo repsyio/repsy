@@ -167,6 +167,9 @@ jobs:
           google-chrome --version
           pnpm test --watch=false --browsers=ChromeHeadlessCI --code-coverage
 
+      - name: Deliberate failure (throwaway test of RPS-1095)
+        run: exit 1
+
       - name: Upload frontend coverage
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
