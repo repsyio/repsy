@@ -57,9 +57,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
 @DisplayName("NpmAuthPreProcessor")
 class NpmAuthPreProcessorTest {
 
-  private static final String BASIC_CHALLENGE = "Basic realm=\"Repsy Managed Registry\"";
-  private static final String BEARER_CHALLENGE =
-      "Bearer realm=\"Repsy Managed Registry\", " + BASIC_CHALLENGE;
+  private static final String BASIC_CHALLENGE = "Basic realm=\"Repsy\"";
+  private static final String BEARER_CHALLENGE = "Bearer realm=\"Repsy\", " + BASIC_CHALLENGE;
 
   private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
 

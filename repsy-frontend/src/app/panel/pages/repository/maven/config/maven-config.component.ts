@@ -80,7 +80,7 @@ and the credentials in your \`ivysettings.xml\`;
 <ivysettings>
   <settings defaultResolver="repsy"/>
   <credentials host="${this.repoHost()}"
-               realm="Repsy Managed Repository"
+               realm="Repsy"
                username="${this.username}"
                passwd="${password}"/>
   <resolvers>
@@ -89,7 +89,7 @@ and the credentials in your \`ivysettings.xml\`;
 </ivysettings>
 \`\`\`
 
-Ivy looks credentials up by host and realm, so keep \`realm="Repsy Managed Repository"\` exactly as it is,
+Ivy looks credentials up by host and realm, so set \`realm="Repsy"\` as shown,
 without it Ivy sends no credentials and Repsy refuses the request.
 ${tokenNote}
 To publish, list a POM next to the jar in your \`ivy.xml\` (a version shows up in Repsy only when its POM is

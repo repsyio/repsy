@@ -57,9 +57,8 @@ class NpmWhoamiPingProtocolIT extends AbstractIntegrationTest {
   private static final String PING = "/{repo}/-/ping";
   private static final String LOGIN = "/{repo}/-/user/org.couchdb.user:{name}";
   private static final String TYPED_NAME = "whatever-the-client-typed";
-  private static final String BASIC_CHALLENGE = "Basic realm=\"Repsy Managed Registry\"";
-  private static final String BEARER_CHALLENGE =
-      "Bearer realm=\"Repsy Managed Registry\", " + BASIC_CHALLENGE;
+  private static final String BASIC_CHALLENGE = "Basic realm=\"Repsy\"";
+  private static final String BEARER_CHALLENGE = "Bearer realm=\"Repsy\", " + BASIC_CHALLENGE;
 
   @MockitoBean private UsageUpdateService usageUpdateService;
 

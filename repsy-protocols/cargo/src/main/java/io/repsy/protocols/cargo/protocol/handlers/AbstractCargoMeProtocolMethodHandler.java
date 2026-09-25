@@ -25,6 +25,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
+import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,8 +42,6 @@ import org.springframework.http.ResponseEntity;
 
 @NullMarked
 public abstract class AbstractCargoMeProtocolMethodHandler implements ProtocolMethodHandler {
-
-  private static final String WWW_AUTHENTICATE_VALUE = "Basic realm=\"Repsy Managed Repository\"";
 
   private final CargoAuthenticator authenticator;
 
@@ -100,7 +99,7 @@ public abstract class AbstractCargoMeProtocolMethodHandler implements ProtocolMe
 
     if (authHeader == null) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .header(WWW_AUTHENTICATE, WWW_AUTHENTICATE_VALUE)
+          .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
           .build();
     }
 
@@ -116,7 +115,7 @@ public abstract class AbstractCargoMeProtocolMethodHandler implements ProtocolMe
       throw e;
     } catch (final UnAuthorizedException e) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .header(WWW_AUTHENTICATE, WWW_AUTHENTICATE_VALUE)
+          .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
           .body(CargoErrorResponse.of(e.getMessage()));
     }

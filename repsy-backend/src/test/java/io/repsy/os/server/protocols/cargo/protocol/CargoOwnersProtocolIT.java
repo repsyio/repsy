@@ -116,7 +116,7 @@ class CargoOwnersProtocolIT extends AbstractIntegrationTest {
 
       assertThat(result.getResponse().getStatus()).isEqualTo(401);
       assertThat(result.getResponse().getHeader(WWW_AUTHENTICATE))
-          .isEqualTo("Basic realm=\"Repsy Managed Repository\"");
+          .isEqualTo("Basic realm=\"Repsy\"");
     }
 
     @Test

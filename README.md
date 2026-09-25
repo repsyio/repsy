@@ -678,7 +678,7 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
 <ivysettings>
   <settings defaultResolver="repsy"/>
   <credentials host="repo.example.com"
-               realm="Repsy Managed Repository"
+               realm="Repsy"
                username="YOUR_USERNAME"
                passwd="YOUR_PASSWORD"/>
   <resolvers>
@@ -688,8 +688,10 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
 ```
 
 - **Credentials:** Ivy looks them up by host (without the port) and realm. Repsy challenges with
-  `Basic realm="Repsy Managed Repository"`, so `realm` must be exactly that: a `<credentials>` without
-  a realm (or with another one) sends no credentials and every request is answered `401`. With a
+  `Basic realm="Repsy"`, so set `realm="Repsy"`: a `<credentials>` without a realm (or with another
+  one) sends no credentials and every request is answered `401`. Earlier versions used a longer
+  realm name: if your `ivysettings.xml` still names that, change it to `Repsy` (the same goes for the
+  realm in sbt's `Credentials(realm, host, user, password)`). With a
   [deploy token](#repository-access), use it as `passwd`; the `username` can be empty.
 - **Publishing needs a POM.** A version is registered (and shows up in the web UI) by its POM, so list
   a `pom` artifact next to the jar in the `<publications>` of your `ivy.xml` and create it with

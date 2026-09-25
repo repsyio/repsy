@@ -79,7 +79,7 @@
  *    confirmed live/H18: `HEAD` of a path that was never published still answers `200`).
  *  - Auth (`PypiAuthPreProcessor`, priority 100): skipped only for a public-repo READ
  *    (`!privateRepo && !writeOperation`). Otherwise a missing/unparseable `Authorization` is a flat
- *    `401 unAuthorized` + `WWW-Authenticate: Basic realm="Repsy Managed Repository"`.
+ *    `401 unAuthorized` + `WWW-Authenticate: Basic realm="Repsy"`.
  *    `PypiAuthComponent.handleBasicAuthWithToken` tries a deploy token by PASSWORD first (username
  *    ignored), then falls back to username/password auth -- so a read-only deploy token attempting a
  *    WRITE is the same flat `401` every other protocol in this harness gives (confirmed live/H5, not

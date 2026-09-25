@@ -27,6 +27,7 @@ import io.repsy.os.server.protocols.npm.shared.auth.services.NpmAuthComponentImp
 import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
+import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,7 +45,7 @@ import org.springframework.stereotype.Component;
 public class NpmAuthPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 100;
-  private static final String CHALLENGE = "Basic realm=\"Repsy Managed Registry\"";
+  private static final String CHALLENGE = BasicAuthChallenge.REPSY;
 
   /**
    * The challenge of a refused Bearer credential (RPS-1209). The npm client reads only the first
@@ -54,7 +55,7 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
    * registry.npmjs.org sends both schemes as well.
    */
   private static final String BEARER_CHALLENGE =
-      "Bearer realm=\"Repsy Managed Registry\", " + CHALLENGE;
+      "Bearer realm=\"" + BasicAuthChallenge.REALM + "\", " + CHALLENGE;
 
   private static final String URL_PROPERTIES_KEY = "urlProperties";
   private static final String PERMISSION_KEY = "permission";

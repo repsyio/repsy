@@ -112,7 +112,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
   private static final String PUSH_PATH = "/{repo}/v3/package";
   private static final String PACKAGE_PART = "package";
   private static final String API_KEY_HEADER = "X-NuGet-ApiKey";
-  private static final String BASIC_CHALLENGE = "Basic realm=\"Repsy Managed Repository\"";
+  private static final String BASIC_CHALLENGE = "Basic realm=\"Repsy\"";
 
   @MockitoBean private UsageUpdateService usageUpdateService;
 

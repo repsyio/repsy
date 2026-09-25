@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 @DisplayName("AuthChallenges")
 class AuthChallengesTest {
 
-  private static final String CHALLENGE = "Basic realm=\"Repsy Managed Repository\"";
+  private static final String CHALLENGE = "Basic realm=\"Repsy\"";
 
   @Test
   @DisplayName("adds the challenge and keeps the message id of the failure")

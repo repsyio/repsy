@@ -19,7 +19,7 @@
   resolver is an ibiblio resolver in Maven-compatible mode on the Repsy repository, and nothing else
   (no default or public chain, so nothing reaches Maven Central). Ivy matches a <credentials> entry to
   the request by host (without the port) and by the realm of the server's Basic challenge, which is
-  Repsy's "Repsy Managed Repository": an entry without it, or with another realm, is never sent. The
+  `Repsy` on every Repsy repository: an entry without it, or with another realm, is never sent. The
   anonymous credential renders no <credentials> at all, and `realm` is left out for the test that
   proves what an entry without one does. The cache lives in the run's own directory, so a resolve
   never finds what a publish fetched.

@@ -25,6 +25,7 @@ import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.shared.auth.dtos.LoginRequest;
 import io.repsy.protocols.npm.shared.auth.dtos.LoginResponse;
 import io.repsy.protocols.npm.shared.auth.services.NpmAuthComponent;
+import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -128,7 +129,7 @@ public abstract class AbstractNpmLoginProtocolMethodHandler<ID> implements Proto
       final var loginResponse = LoginResponse.builder().ok(false).build();
 
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Registry\"")
+          .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
           .body(loginResponse);
     }
   }

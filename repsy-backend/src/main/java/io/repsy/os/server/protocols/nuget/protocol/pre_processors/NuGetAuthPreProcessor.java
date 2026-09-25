@@ -27,6 +27,7 @@ import io.repsy.os.server.protocols.nuget.shared.auth.services.NuGetAuthComponen
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
+import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -85,7 +86,7 @@ public class NuGetAuthPreProcessor extends ProtocolProcessor {
     if (rawAuthHeader == null) {
       return ProcessorResult.of(
           ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
+              .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
               .build());
     }
 
@@ -96,7 +97,7 @@ public class NuGetAuthPreProcessor extends ProtocolProcessor {
     } catch (final AccessNotAllowedException | UnAuthorizedException ignored) {
       return ProcessorResult.of(
           ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
+              .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
               .build());
     }
 

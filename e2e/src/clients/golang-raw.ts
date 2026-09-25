@@ -84,7 +84,7 @@
  *    root-level early-return does not check existence at all.
  *  - Auth (`GolangAuthPreProcessor`, priority 100): skipped only for a public-repo READ. Otherwise a
  *    missing/unparseable `Authorization` is a bodyless `401` + `WWW-Authenticate: Basic
- *    realm="Repsy Go Module Proxy"` (confirmed live). `GolangAuthComponent` is a bare
+ *    realm="Repsy"` (confirmed live). `GolangAuthComponent` is a bare
  *    `ProtocolAuthService` subclass with no overrides: `handleBasicAuth` tries the PASSWORD as a
  *    deploy token FIRST, username ignored for a token credential, then falls back to username/password
  *    -- so a read-only deploy token attempting a WRITE is the same flat `401` every other protocol in

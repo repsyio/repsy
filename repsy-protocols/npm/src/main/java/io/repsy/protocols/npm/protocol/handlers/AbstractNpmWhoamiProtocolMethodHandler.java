@@ -24,6 +24,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.shared.auth.services.NpmIdentityResolver;
+import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -45,9 +46,9 @@ import org.springframework.http.ResponseEntity;
 @NullMarked
 public abstract class AbstractNpmWhoamiProtocolMethodHandler<ID> implements ProtocolMethodHandler {
 
-  private static final String CHALLENGE = "Basic realm=\"Repsy Managed Registry\"";
+  private static final String CHALLENGE = BasicAuthChallenge.REPSY;
   private static final String BEARER_CHALLENGE =
-      "Bearer realm=\"Repsy Managed Registry\", " + CHALLENGE;
+      "Bearer realm=\"" + BasicAuthChallenge.REALM + "\", " + CHALLENGE;
   private static final String BEARER_PREFIX = "Bearer ";
 
   private final PathParser pathParser;
