@@ -106,7 +106,8 @@ class ArtifactVersionWriteService {
 
     versionNames.sort(new VersionComparator());
 
-    final var latest = versionNames.getLast();
+    // No version left (only reachable by a caller that deletes the last row): nothing is latest.
+    final var latest = versionNames.isEmpty() ? null : versionNames.getLast();
     String release = null;
 
     for (var i = versionNames.size() - 1; i >= 0; i--) {

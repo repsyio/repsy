@@ -298,12 +298,8 @@ export function registerSbtExtras(): void {
       seeder,
       panelApi,
     }) => {
-      // RPS-1331: with no artifact-level maven-metadata.xml (sbt never sends one) the delete moves
-      // the files to the trash, then answers 404 and leaves the database row behind.
-      test.fail(
-        true,
-        'RPS-1331: the version delete answers 404 after the files are gone when there is no maven-metadata.xml',
-      );
+      // RPS-1331: sbt never sends an artifact-level maven-metadata.xml, and the delete used to move
+      // the files to the trash, answer 404 and leave the database row behind.
       const { world, repoName, groupId, base, version } = await adminWorld(seeder, 'delete');
       const artifactId = `${base}${crossSuffix(SCALA_213)}`;
       const second = uniqueVersion('release');

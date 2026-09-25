@@ -53,12 +53,10 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.maven.artifact.repository.metadata.SnapshotVersion;
-import org.apache.maven.artifact.repository.metadata.Versioning;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Model;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
@@ -484,8 +482,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final RepoInfo repoInfo,
       final String groupName,
       final String artifactName,
-      final String versionName,
-      final Versioning versioning) {
+      final String versionName) {
 
     final var artifact =
         this.artifactRepository
@@ -503,13 +500,10 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
         repoInfo.getStorageKey(),
         groupPath(groupName) + "/" + artifactName + "/" + versionName + "/");
 
-    if (!Objects.equals(artifact.getLatest(), versioning.getLatest())
-        || !Objects.equals(artifact.getRelease(), versioning.getRelease())) {
-      artifact.setLatest(versioning.getLatest());
-      artifact.setRelease(versioning.getRelease());
-
-      this.artifactRepository.save(artifact);
-    }
+    // latest/release follow the rows that are left, as they do on upload. The file's own values are
+    // not used: it lists only what a Maven client deployed, and an artifact published by Ivy or sbt
+    // has none (RPS-1331).
+    this.artifactVersionWriteService.updateReleaseAndLatestVersion(artifact);
   }
 
   @Transactional

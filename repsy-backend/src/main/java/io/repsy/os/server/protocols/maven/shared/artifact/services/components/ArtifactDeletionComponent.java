@@ -63,19 +63,22 @@ public class ArtifactDeletionComponent {
       return this.deleteArtifact(repoInfo, groupName, artifactName);
     }
 
+    // The metadata is rewritten first: it is the one step that can refuse (a file that cannot be
+    // parsed), and it does so before a file is moved, so a refused delete has changed nothing. An
+    // artifact without a maven-metadata.xml (Ivy, sbt, a raw PUT) has nothing to rewrite
+    // (RPS-1331).
+    final var metadataUsages =
+        this.mavenStorageService.deleteVersionFromMetadata(
+            repoInfo, groupName, artifactName, versionName);
+
     final var artifactUsage =
         this.mavenStorageService.deleteArtifactVersion(
             repoInfo.getStorageKey(), groupName, artifactName, versionName);
 
-    final var versioningUsagesPair =
-        this.mavenStorageService.deleteVersionFromMetadata(
-            repoInfo, groupName, artifactName, versionName);
-
-    final var totalUsage = artifactUsage - versioningUsagesPair.getSecond().getDiskUsage();
+    final var totalUsage = artifactUsage - metadataUsages.getDiskUsage();
     final var usages = BaseUsages.builder().diskUsage(totalUsage * -1L).build();
 
-    this.artifactService.deleteArtifactVersion(
-        repoInfo, groupName, artifactName, versionName, versioningUsagesPair.getFirst());
+    this.artifactService.deleteArtifactVersion(repoInfo, groupName, artifactName, versionName);
 
     this.publishVersionDeleted(repoInfo, groupName, artifactName, versionName);
 

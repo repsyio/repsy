@@ -62,7 +62,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.apache.maven.artifact.repository.metadata.Versioning;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -1229,7 +1228,7 @@ class ArtifactServiceImplTest {
     when(this.repoRepository.findById(id)).thenReturn(Optional.of(repo));
 
     this.artifactService.deleteArtifactVersion(
-        repo(id, true, true, true), "com.acme", "lib", "1.0", new Versioning());
+        repo(id, true, true, true), "com.acme", "lib", "1.0");
     this.artifactService.deleteArtifact(id, "com.acme", "lib");
     this.artifactService.deleteGroup(id, "com.acme");
 
@@ -1237,6 +1236,21 @@ class ArtifactServiceImplTest {
         .deleteByRepoIdAndSignedFilePathStartingWith(id, "com/acme/lib/1.0/");
     verify(this.pendingSignatureRepository, org.mockito.Mockito.times(2))
         .deleteByRepoIdAndSignedFilePathStartingWith(id, "com/acme/lib/");
+  }
+
+  @Test
+  @DisplayName(
+      "deleting a version recomputes latest and release from the remaining rows (RPS-1331)")
+  void deletingAVersionRecomputesLatestAndReleaseFromTheRows() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "3.0"))
+        .thenReturn(Optional.of(new ArtifactVersion()));
+
+    this.artifactService.deleteArtifactVersion(
+        repo(id, true, true, true), "com.acme", "lib", "3.0");
+
+    verify(this.artifactVersionWriteService).updateReleaseAndLatestVersion(artifact);
   }
 
   @Test
