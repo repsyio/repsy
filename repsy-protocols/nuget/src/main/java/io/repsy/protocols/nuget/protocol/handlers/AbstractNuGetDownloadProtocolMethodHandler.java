@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.nuget.protocol.handlers;
 
+import static org.springframework.http.HttpHeaders.CONTENT_DISPOSITION;
 import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 import static org.springframework.http.MediaType.APPLICATION_XML;
@@ -26,6 +27,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -34,6 +36,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
@@ -93,6 +96,19 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
     };
   }
 
+  /**
+   * The file name is the last segment of the URL ({@code <id>.<version>.nupkg}, {@code
+   * <id>.nuspec}). Without a header of its own Spring names the download "f.txt" (RPS-1389). The
+   * package is an attachment, the nuspec a document a browser may show under its own name.
+   */
+  private static String contentDisposition(final ProtocolContext context, final boolean attach) {
+    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
+    final var filename = path.substring(path.lastIndexOf('/') + 1);
+    final var builder = attach ? ContentDisposition.attachment() : ContentDisposition.inline();
+
+    return builder.filename(filename).build().toString();
+  }
+
   @Override
   public ResponseEntity<Object> handle(
       final ProtocolContext context,
@@ -104,11 +120,15 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
         final var resource = this.facade.downloadNuPackage(context);
         return ResponseEntity.ok()
             .header(CONTENT_TYPE, APPLICATION_OCTET_STREAM.toString())
+            .header(CONTENT_DISPOSITION, contentDisposition(context, true))
             .body(resource);
       }
 
       final var resource = this.facade.downloadNuspec(context);
-      return ResponseEntity.ok().header(CONTENT_TYPE, APPLICATION_XML.toString()).body(resource);
+      return ResponseEntity.ok()
+          .header(CONTENT_TYPE, APPLICATION_XML.toString())
+          .header(CONTENT_DISPOSITION, contentDisposition(context, false))
+          .body(resource);
     } catch (final ItemNotFoundException e) {
       log.debug("NuGet download not found: {}", e.getMessage());
       return ResponseEntity.notFound().build();

@@ -31,7 +31,11 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
@@ -110,5 +114,36 @@ class AbstractGoDownloadProtocolMethodHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.TEXT_PLAIN);
+  }
+
+  @ParameterizedTest(name = "{0} is {1}")
+  @CsvSource({
+    "/example.com/mod/@v/v1.0.0.zip, 'attachment; filename=\"v1.0.0.zip\"'",
+    "/example.com/mod/@v/v1.0.0.info, 'inline; filename=\"v1.0.0.info\"'",
+    "/example.com/mod/@v/v1.0.0.mod, 'inline; filename=\"v1.0.0.mod\"'",
+    "/example.com/mod/@v/v1.2.3+incompatible.zip,"
+        + " 'attachment; filename=\"v1.2.3+incompatible.zip\"'",
+  })
+  @DisplayName("the module files are named after themselves instead of f.txt (RPS-1389)")
+  void namesTheFile(final String path, final String expected) {
+    final var context = context(path);
+    when(this.facade.download(context)).thenReturn(new ByteArrayResource(new byte[] {1}));
+
+    final var response = this.handler.handle(context, null, null);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"/example.com/mod/@v/list", "/example.com/mod/@latest"})
+  @DisplayName("the version list and @latest have no file name and get no header")
+  void listAndLatestHaveNoDisposition(final String path) {
+    final var context = context(path);
+    when(this.facade.download(context)).thenReturn(new ByteArrayResource(new byte[] {1}));
+
+    final var response = this.handler.handle(context, null, null);
+
+    assertThat(response.getHeaders().containsHeader(HttpHeaders.CONTENT_DISPOSITION)).isFalse();
   }
 }

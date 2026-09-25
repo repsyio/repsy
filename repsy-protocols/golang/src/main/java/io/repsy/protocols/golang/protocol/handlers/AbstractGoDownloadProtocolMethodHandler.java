@@ -28,6 +28,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -77,7 +80,14 @@ public abstract class AbstractGoDownloadProtocolMethodHandler<ID> implements Pro
         return notFound(context);
       }
 
-      return ResponseEntity.ok().contentType(this.resolveContentType(context)).body(resource);
+      final var responseBuilder = ResponseEntity.ok().contentType(this.resolveContentType(context));
+      final var contentDisposition = resolveContentDisposition(context);
+
+      if (contentDisposition != null) {
+        responseBuilder.header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition);
+      }
+
+      return responseBuilder.body(resource);
     } catch (final ItemNotFoundException _) {
       return notFound(context);
     }
@@ -92,6 +102,27 @@ public abstract class AbstractGoDownloadProtocolMethodHandler<ID> implements Pro
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .contentType(MediaType.TEXT_PLAIN)
         .body("not found: " + ProtocolContextUtils.getRelativePath(context).getPath());
+  }
+
+  /**
+   * The module zip is an attachment, {@code .info} and {@code .mod} are shown under their own name.
+   * Without a header of its own Spring names all three "f.txt" (RPS-1389). {@code @v/list} and
+   * {@code @latest} have no extension, so Spring adds nothing to them.
+   */
+  @Nullable
+  private static String resolveContentDisposition(final ProtocolContext context) {
+    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
+    final var filename = path.substring(path.lastIndexOf('/') + 1);
+
+    if (filename.endsWith(".zip")) {
+      return ContentDisposition.attachment().filename(filename).build().toString();
+    }
+
+    if (filename.endsWith(".info") || filename.endsWith(".mod")) {
+      return ContentDisposition.inline().filename(filename).build().toString();
+    }
+
+    return null;
   }
 
   private MediaType resolveContentType(final ProtocolContext context) {
