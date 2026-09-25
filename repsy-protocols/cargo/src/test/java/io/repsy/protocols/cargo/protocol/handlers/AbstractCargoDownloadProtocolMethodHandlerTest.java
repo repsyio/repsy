@@ -148,6 +148,19 @@ class AbstractCargoDownloadProtocolMethodHandlerTest {
     }
 
     @Test
+    @DisplayName("names the download <crate>-<version>.crate instead of \"download\" (RPS-1389)")
+    void namesTheCrateFile() {
+      final var ctx = context(DOWNLOAD_PATH);
+      when(facade.download(ctx)).thenReturn(new ByteArrayResource(new byte[] {1}));
+
+      final var result =
+          handler.handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse());
+
+      assertThat(result.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+          .isEqualTo("attachment; filename=\"serde-1.0.0.crate\"");
+    }
+
+    @Test
     @DisplayName("returns 404 when the facade fails")
     void returnsNotFoundOnError() {
       final var ctx = context(DOWNLOAD_PATH);

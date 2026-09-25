@@ -40,6 +40,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -182,6 +183,19 @@ class AbstractNuGetDownloadProtocolMethodHandlerTest {
     }
 
     @Test
+    @DisplayName("is an attachment named after the package file, not f.txt (RPS-1389)")
+    void namesThePackageFile() {
+      final var ctx = context(NUPKG_PATH);
+      when(facade.downloadNuPackage(ctx)).thenReturn(new ByteArrayResource(new byte[] {1}));
+
+      final var response =
+          handler(true).handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse());
+
+      assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+          .isEqualTo("attachment; filename=\"some.package.1.0.0.nupkg\"");
+    }
+
+    @Test
     @DisplayName("answers 404 when the package or version is not found")
     void notFound() {
       final var ctx = context(NUPKG_PATH);
@@ -223,6 +237,19 @@ class AbstractNuGetDownloadProtocolMethodHandlerTest {
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_XML);
       assertThat(response.getBody()).isSameAs(resource);
+    }
+
+    @Test
+    @DisplayName("is shown inline under the nuspec file name, not f.txt (RPS-1389)")
+    void namesTheNuspecFile() {
+      final var ctx = context(NUSPEC_PATH);
+      when(facade.downloadNuspec(ctx)).thenReturn(new ByteArrayResource(new byte[] {1}));
+
+      final var response =
+          handler(false).handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse());
+
+      assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+          .isEqualTo("inline; filename=\"some.package.1.0.0.nuspec\"");
     }
 
     @Test
