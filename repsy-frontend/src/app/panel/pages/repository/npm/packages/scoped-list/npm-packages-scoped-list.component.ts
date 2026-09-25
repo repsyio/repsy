@@ -34,6 +34,7 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
 import { NpmConfigComponent } from '../../config/npm-config.component';
 import { NpmService } from '../../service/npm.service';
 
@@ -167,11 +168,12 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
         )
         .subscribe({
           next: () => {
-            if (this.packages.length - 1 === 0) {
+            if (emptiesList(this.packages.length, this.pageNum, this.searchText)) {
               this.router.navigateByUrl(`/${this.activeRegistry.repoName}`).then(() => {
                 this.toastService.show('Package deleted successfully', 'success');
               });
             } else {
+              this.pageNum = pageAfterDelete(this.packages.length, this.pageNum);
               this.refreshPage();
               this.toastService.show('Package deleted successfully', 'success');
             }

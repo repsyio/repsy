@@ -18,25 +18,22 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack) or all"
+        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack), scanner (the @scanner UI specs against the stub scanner stack) or all"
         type: choice
-        options: [all, ui, wire, h2]
+        options: [all, ui, wire, h2, scanner]
         default: all
       protocol:
         description: "Only these runner services, comma separated (skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby,ui). Empty: every runner of the chosen legs"
         type: string
         default: ""
       grep:
-        description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 leg then keeps its default, @smoke)"
+        description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 leg then keeps its default, @smoke). The scanner leg ignores it and always runs @scanner"
         type: string
         default: ""
       keep_stack_logs:
         description: "Upload the Repsy and PostgreSQL container logs even when the run is green"
         type: boolean
         default: false
-      # A `scanner` input belongs here once RPS-1270 lands the scanner stack profile (Trivy stub,
-      # `REPSY_UI_OPT_IN=scanner`): a further leg in the plan job below that starts that profile and
-      # runs `--protocol ui --grep @scanner`. Not implemented yet.
 
 # One run at a time: the legs are heavy and a manual run must not overlap the nightly one. A run
 # that arrives while another is in progress waits (only the newest waiting run is kept).
@@ -73,12 +70,17 @@ jobs:
           import json, os, re, sys
 
           WIRE = "skeleton maven npm cargo nuget docker helm pypi golang ruby".split()
-          # leg -> (suite it belongs to, stack flag for run.sh local up, runners, default --grep, timeout)
+          # leg -> (suite it belongs to, stack flag for run.sh local up, runners, default --grep, timeout,
+          # REPSY_UI_OPT_IN, whether the --grep input may replace the default)
           LEGS = {
-              "ui": ("ui", "", ["ui"], "", 60),
-              "wire": ("wire", "", WIRE, "", 120),
+              "ui": ("ui", "", ["ui"], "", 60, "", True),
+              "wire": ("wire", "", WIRE, "", 120, "", True),
               # Embedded H2: @smoke of every runner (README.md "Scope decision"), not the catalogs.
-              "h2": ("h2", "--h2", WIRE + ["ui"], "@smoke", 90),
+              "h2": ("h2", "--h2", WIRE + ["ui"], "@smoke", 90, "", True),
+              # The stub scanner overlay (README.md "Scanner stack"): only the opted-in @scanner specs.
+              # Never the whole ui suite there (its @mocked specs assume the scanner is off), so the
+              # grep input does not apply to this leg.
+              "scanner": ("scanner", "--scanner", ["ui"], "@scanner", 45, "scanner", False),
           }
 
           def fail(msg):
@@ -92,7 +94,7 @@ jobs:
               fail(f"unknown protocol(s): {', '.join(unknown)}")
 
           include = []
-          for leg, (owner, stack, runners, default_grep, timeout) in LEGS.items():
+          for leg, (owner, stack, runners, default_grep, timeout, opt_in, grep_input) in LEGS.items():
               if suite not in ("all", owner):
                   continue
               runners = [r for r in runners if not only or r in only]
@@ -103,7 +105,8 @@ jobs:
                   "stack": stack,
                   "protocols": " ".join(runners),
                   "ui": "ui" in runners,
-                  "grep": os.environ["GREP"] or default_grep,
+                  "grep": (os.environ["GREP"] if grep_input else "") or default_grep,
+                  "opt_in": opt_in,
                   "timeout": timeout,
               })
 
@@ -211,7 +214,8 @@ jobs:
         env:
           STACK: ${{ matrix.stack }}
         # REPSY_IMAGE is set (workflow env), so run.sh starts the loaded image and does not build.
-        # $STACK is empty (PostgreSQL profile) or --h2, deliberately unquoted.
+        # $STACK is empty (PostgreSQL profile), --h2 or --scanner (PostgreSQL plus the stub scanner
+        # overlay), deliberately unquoted.
         # shellcheck disable=SC2086
         run: |
           ./run.sh local up $STACK
@@ -251,6 +255,9 @@ jobs:
         env:
           PROTOCOLS: ${{ matrix.protocols }}
           GREP: ${{ matrix.grep }}
+          # The opt-in UI suites (README.md "UI suite"): `scanner` on the scanner leg, empty elsewhere.
+          # The ui runner reads it (docker-compose.runners.yml) and the @scanner specs skip without it.
+          REPSY_UI_OPT_IN: ${{ matrix.opt_in }}
           # Read by playwright.config.ts (retries: 1, forbidOnly, trace on first retry); run.sh
           # forwards it to the ui runner only. GitHub sets it already; explicit for the reader.
           CI: "true"
@@ -270,6 +277,29 @@ jobs:
             echo "::endgroup::"
           done
           exit "$failed"
+
+      # The @scanner specs skip themselves unless the opt-in reached the runner, and a skipped test
+      # is not a failure, so a broken opt-in would leave this leg green with 20 skipped tests. Fail
+      # it instead when nothing ran or anything was skipped.
+      - name: Check the scanner specs ran
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' && matrix.leg == 'scanner' }}
+        run: |
+          python3 - <<'PY'
+          import os, sys
+          import xml.etree.ElementTree as ET
+
+          path = os.path.join(os.environ["ARTIFACTS"], "ui", "junit.xml")
+          try:
+              cases = list(ET.parse(path).getroot().iter("testcase"))
+          except (OSError, ET.ParseError) as e:
+              print(f"::error::no readable junit.xml for the scanner leg ({e})")
+              sys.exit(1)
+          skipped = [c.get("name") for c in cases if c.find("skipped") is not None]
+          if not cases or skipped:
+              print(f"::error::the scanner leg ran {len(cases)} tests and skipped {len(skipped)}: the @scanner specs must all run (REPSY_UI_OPT_IN=scanner)")
+              sys.exit(1)
+          print(f"{len(cases)} @scanner tests ran, none skipped")
+          PY
 
       # Fails the leg when a run left e2e-* repos or users behind. --dry-run prints
       # "[dry-run] would delete ..." for each and always exits 0, so read its output.
@@ -346,11 +376,14 @@ jobs:
         env:
           STACK: ${{ matrix.stack }}
         run: |
-          file=docker-compose.stack.yml
-          [ "$STACK" = "--h2" ] && file=docker-compose.stack-h2.yml
+          # The same -f files as `run.sh local up $STACK` (run.sh stack_args): the stack file, plus the
+          # stub scanner overlay on the scanner leg, or the compose project would list no scanner-stub.
+          files=(-f docker-compose.stack.yml)
+          [ "$STACK" = "--h2" ] && files=(-f docker-compose.stack-h2.yml)
+          [ "$STACK" = "--scanner" ] && files+=(-f docker-compose.stack-scanner.yml)
           mkdir -p stack-logs
-          docker compose -f "$file" ps -a > stack-logs/ps.txt 2>&1 || true
-          docker compose -f "$file" logs --no-color --timestamps > stack-logs/stack.log 2>&1 || true
+          docker compose "${files[@]}" ps -a > stack-logs/ps.txt 2>&1 || true
+          docker compose "${files[@]}" logs --no-color --timestamps > stack-logs/stack.log 2>&1 || true
 
       - name: Upload the reports
         if: ${{ !cancelled() }}
