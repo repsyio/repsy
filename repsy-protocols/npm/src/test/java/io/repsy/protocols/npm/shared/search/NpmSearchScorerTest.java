@@ -125,6 +125,41 @@ class NpmSearchScorerTest {
   }
 
   @Test
+  @DisplayName("a query of qualifiers Repsy cannot filter on matches no package (RPS-1343)")
+  void qualifierOnlyQueryMatchesNothing() {
+    final var docs = List.of(doc(null, "alpha", null), doc("acme", "beta", null));
+
+    assertThat(NpmSearchScorer.rank(docs, query("is:shiny"))).isEmpty();
+    assertThat(NpmSearchScorer.rank(docs, query("author:"))).isEmpty();
+    assertThat(NpmSearchScorer.rank(docs, query("is:shiny alpha"))).hasSize(1);
+    assertThat(NpmSearchScorer.rank(docs, query(""))).hasSize(2);
+  }
+
+  @Test
+  @DisplayName("boost-exact:false takes the whole-name bonus away, so the order falls back")
+  void boostExactFalse() {
+    final var exact = doc(null, "pad", null);
+    final var prefix = doc(null, "padding", null);
+
+    final var boosted = NpmSearchScorer.rank(List.of(prefix, exact), query("pad"));
+    final var plain = NpmSearchScorer.rank(List.of(prefix, exact), query("pad boost-exact:false"));
+
+    assertThat(names(boosted)).containsExactly("pad", "padding");
+    assertThat(names(plain)).containsExactly("pad", "padding");
+    assertThat(boosted.getFirst().score())
+        .isEqualTo(
+            NpmSearchScorer.BASE_SCORE
+                + NpmSearchScorer.EXACT_NAME
+                + NpmSearchScorer.NAME_PREFIX
+                + NpmSearchScorer.NAME_CONTAINS);
+    assertThat(plain.getFirst().score())
+        .isEqualTo(
+            NpmSearchScorer.BASE_SCORE
+                + NpmSearchScorer.NAME_PREFIX
+                + NpmSearchScorer.NAME_CONTAINS);
+  }
+
+  @Test
   @DisplayName("breaks ties by name")
   void tiesByName() {
     final var ranked =

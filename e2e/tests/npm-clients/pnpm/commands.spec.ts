@@ -23,18 +23,24 @@
  * spawned. (`audit` is proven the same way in `matrix/registry-endpoints.spec.ts`.) The endpoint each
  * command uses is pinned below too, so a change of pnpm's wire behaviour on a version bump shows here.
  *
- * `login` and `logout` are the two that do not work end to end:
+ * `login` and `logout`:
  *  - `pnpm login` first tries npm's web login, `POST /-/v1/login`, which Repsy does not have (404), and
  *    without a terminal it cannot fall back to prompting for a name and password.
- *  - `pnpm logout` asks the registry to revoke the token (`DELETE /-/user/token/<token>`), which
- *    Repsy does not implement (404), and pnpm then FAILS the command (RPS-1361: the token stays
- *    valid, and `pnpm logout` exits 1).
+ *  - `pnpm logout` asks the registry to revoke the token (`DELETE /-/user/token/<token>`). For the
+ *    token an `npm login` (the couch flow) issued the registry answers `200 {"ok": true}` and the
+ *    token is refused from then on (RPS-1361). The secret of a deploy token is refused (403): it is
+ *    managed in the panel, so `pnpm logout` fails for it and the token keeps working.
  */
 import { createHash } from 'node:crypto';
 
 import type { RunResult } from '../../../src/clients/exec.js';
 import { MARKER_FILENAME } from '../../../src/clients/npm.js';
-import { npmAuthHeader, rawGetPackument } from '../../../src/clients/npm-raw.js';
+import {
+  npmAuthHeader,
+  rawGetPackument,
+  rawLogin,
+  rawRequestPath,
+} from '../../../src/clients/npm-raw.js';
 import {
   newRepo,
   packageNameFor,
@@ -228,7 +234,54 @@ test(
 );
 
 test(
-  'pnpm logout fails and the token stays valid: no DELETE /-/user/token/<token> (RPS-1361)',
+  'pnpm logout revokes the token of a login, which stops working (RPS-1361)',
+  {
+    tag: ['@pnpm', '@commands', '@logout'],
+  },
+  async ({ seeder }) => {
+    const repo = await newRepo(seeder);
+    const login = await rawLogin(repo.name, env.adminUsername, env.adminPassword);
+    expect(login.status, 'the login the token comes from').toBe(201);
+    const token = login.token ?? '';
+    const recorder = await startWireRecorder();
+    try {
+      const session = {
+        repoName: repo.name,
+        credential: {
+          transport: 'basic' as const,
+          username: env.adminUsername,
+          password: token,
+          kind: 'token' as const,
+        },
+        baseUrl: recorder.baseUrl,
+      };
+      const ctx = await pnpmClient.prepare('logout', [session]);
+      const whoamiBefore = await pnpmClient.whoami?.(ctx);
+      expect(whoamiBefore?.exitCode, 'the token works before the logout').toBe(0);
+      expect(whoamiBefore?.stdout.trim()).toBe(env.adminUsername);
+      const before = recorder.entries.length;
+
+      const logout = await runPnpm(ctx, 'pnpm-logout', ['logout']);
+      expect(logout.exitCode, `${logout.command}\n${logout.stderr}`).toBe(0);
+
+      const entries = recorder.entries.slice(before);
+      expect(entries.map((entry) => shape(entry, repo.name))).toEqual([
+        `DELETE /-/user/token/${token}`,
+      ]);
+      expect(entries[0]?.status, 'the registry revokes the token').toBe(200);
+
+      const after = await rawRequestPath(repo.name, 'GET', '-/whoami', {
+        Authorization: `Bearer ${token}`,
+      });
+      expect(after.status, 'the revoked token is refused from then on').toBe(401);
+    } finally {
+      await recorder.stop();
+    }
+  },
+);
+
+test(
+  'pnpm logout of a deploy token is refused and the token keeps working (RPS-1361)',
   {
     tag: ['@pnpm', '@commands', '@logout', '@negative'],
   },
@@ -240,23 +293,20 @@ test(
         ...(await tokenBinding(seeder, repo.name, { readOnly: true })),
         baseUrl: recorder.baseUrl,
       };
-      const ctx = await pnpmClient.prepare('logout', [reader]);
+      const ctx = await pnpmClient.prepare('logout-deploy', [reader]);
 
       const logout = await runPnpm(ctx, 'pnpm-logout', ['logout']);
-      expect(
-        logout.exitCode,
-        'RPS-1361: pnpm fails the logout when the revocation is refused',
-      ).toBe(1);
+      expect(logout.exitCode, 'pnpm fails a logout the registry refuses').toBe(1);
       expect(logout.stderr).toContain('ERR_PNPM_LOGOUT_FAILED');
-      expect(logout.stdout).toContain('HTTP 404 when revoking token');
+      expect(logout.stdout).toContain('HTTP 403 when revoking token');
 
       expect(recorder.entries.map((entry) => shape(entry, repo.name))).toEqual([
         `DELETE /-/user/token/${reader.credential.password}`,
       ]);
       expect(
         recorder.entries[0]?.status,
-        'RPS-1361: the registry has no token revocation route',
-      ).toBe(404);
+        'a deploy token is managed in the panel, not revoked from the protocol',
+      ).toBe(403);
 
       const whoami = await pnpmClient.whoami?.(ctx);
       expect(whoami?.exitCode, 'the token was not revoked: it still authenticates').toBe(0);

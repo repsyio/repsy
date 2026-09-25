@@ -35,7 +35,8 @@ import org.springframework.http.ResponseEntity;
 
 /**
  * {@code GET /{repo}/-/v1/search?text=&size=&from=}, which {@code npm search} calls. It searches
- * the packages of the repository in the URL only, and needs read access to it.
+ * the packages of the repository in the URL only, and needs read access to it. A {@code size} or
+ * {@code from} that is no whole number of 0 or more is answered with 400 (RPS-1344).
  */
 @NullMarked
 public abstract class AbstractNpmSearchProtocolMethodHandler<ID> implements ProtocolMethodHandler {

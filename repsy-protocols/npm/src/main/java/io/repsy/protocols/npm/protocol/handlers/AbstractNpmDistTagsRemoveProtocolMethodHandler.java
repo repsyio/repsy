@@ -33,8 +33,13 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
+/**
+ * {@code DELETE /{repo}/-/package/{package}/dist-tags/{tag}}, which {@code npm dist-tag rm} calls.
+ * It answers the JSON of {@code NpmDistTagsResponse}, as the add does (RPS-1362).
+ */
 @NullMarked
 public abstract class AbstractNpmDistTagsRemoveProtocolMethodHandler
     implements ProtocolMethodHandler {
@@ -108,6 +113,13 @@ public abstract class AbstractNpmDistTagsRemoveProtocolMethodHandler
     this.npmProtocolFacade.removeDistributionTag(
         context, pathVars.scopeName(), pathVars.packageName(), tagName);
 
-    return ResponseEntity.ok().build();
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(
+            NpmDistTagsResponse.of(
+                pathVars.scopeName(),
+                pathVars.packageName(),
+                this.npmProtocolFacade.getMappedDistributionTags(
+                    context, pathVars.scopeName(), pathVars.packageName())));
   }
 }

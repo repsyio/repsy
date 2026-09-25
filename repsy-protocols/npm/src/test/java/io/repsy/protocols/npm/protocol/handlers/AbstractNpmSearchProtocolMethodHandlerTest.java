@@ -16,10 +16,13 @@
 package io.repsy.protocols.npm.protocol.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.handlers.NpmHandlerTestSupport.FixedBaseParser;
@@ -90,7 +93,7 @@ class AbstractNpmSearchProtocolMethodHandlerTest {
     final var request = NpmHandlerTestSupport.request("GET", "/npm/-/v1/search");
     request.setParameter("text", "Left-Pad scope:acme");
     request.setParameter("size", "500");
-    request.setParameter("from", "x");
+    request.setParameter("from", "99999999999");
 
     final var response =
         this.handler()
@@ -104,10 +107,27 @@ class AbstractNpmSearchProtocolMethodHandlerTest {
     assertThat(captor.getValue().terms()).containsExactly("left-pad");
     assertThat(captor.getValue().scope()).isEqualTo("acme");
     assertThat(captor.getValue().size()).isEqualTo(250);
-    assertThat(captor.getValue().from()).isZero();
+    assertThat(captor.getValue().from()).isEqualTo(Integer.MAX_VALUE);
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
     assertThat(response.getBody()).isSameAs(result);
+  }
+
+  @Test
+  @DisplayName("refuses a size or from that is no whole number instead of taking a default")
+  void refusesJunk() {
+    final var request = NpmHandlerTestSupport.request("GET", "/npm/-/v1/search");
+    request.setParameter("size", "many");
+
+    assertThatThrownBy(
+            () ->
+                this.handler()
+                    .handle(
+                        NpmHandlerTestSupport.context("/-/v1/search"),
+                        request,
+                        new MockHttpServletResponse()))
+        .isInstanceOf(BadRequestException.class);
+    verifyNoInteractions(this.service);
   }
 
   @Test

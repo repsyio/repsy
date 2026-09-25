@@ -20,6 +20,7 @@ import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromBasi
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBearerToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.removeBasicPrefix;
+import static io.repsy.os.shared.auth.utils.AuthUtils.removeBearerHeader;
 import static io.repsy.protocols.shared.repo.dtos.RepoType.CARGO;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
@@ -64,6 +65,8 @@ public class CargoAuthComponent extends ProtocolAuthService {
           != AuthenticationType.USERNAME_PASSWORD) {
         throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
       }
+
+      this.rejectRevokedToken(removeBearerHeader(authHeader));
 
       final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
       final var userInfo = this.userTxService.getAuthenticatedUserByUsername(username);

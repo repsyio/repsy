@@ -80,4 +80,60 @@ class NpmSearchCandidateRepositoryTest {
     assertThat(built.parameters().get("keywords")).asList().containsExactlyInAnyOrder("pad", "ui");
     assertThat(built.order()).isEmpty();
   }
+
+  @Test
+  @DisplayName("author: and maintainer: filter on the name or the email, in any case (RPS-1343)")
+  void people() {
+    final var built = build("author:Ann,bob@x.io maintainer:Carol");
+
+    assertThat(built.where())
+        .contains("lower(pv.authorName) in :authors")
+        .contains("lower(pv.authorEmail) in :authors")
+        .contains("exists (select m.id from PackageMaintainer m where m.packageVersion = pv")
+        .contains("lower(m.name) in :maintainers")
+        .contains("lower(m.email) in :maintainers");
+    assertThat(built.parameters().get("authors"))
+        .asList()
+        .containsExactlyInAnyOrder("ann", "bob@x.io");
+    assertThat(built.parameters().get("maintainers")).asList().containsExactly("carol");
+    assertThat(built.order()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("is: and not: add a condition of their own, and no parameter (RPS-1343)")
+  void flags() {
+    final var is = build("is:deprecated is:unstable is:insecure");
+    final var not = build("not:deprecated not:unstable not:insecure");
+
+    assertThat(is.where())
+        .contains("coalesce(pv.deprecated, false) = true")
+        .contains("(pv.version like '0.%' or pv.version like '1.0.0-%')")
+        .contains("exists (select f.id from VulnerabilityFinding f join f.scan s")
+        .contains("f.packageName = case when p.scope is null then p.name")
+        .contains("f.packageVersion = p.latest")
+        .contains("NOT_AFFECTED");
+    assertThat(not.where())
+        .contains("coalesce(pv.deprecated, false) = false")
+        .contains("not (pv.version like '0.%' or pv.version like '1.0.0-%')")
+        .contains("not exists (select f.id from VulnerabilityFinding f");
+    assertThat(is.parameters()).isEmpty();
+    assertThat(not.parameters()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a query that matches nothing says so in the condition (RPS-1343)")
+  void matchesNothing() {
+    assertThat(build("is:shiny").where()).endsWith(" and 1 = 0");
+    assertThat(build("is:shiny pad").where()).doesNotContain("1 = 0");
+    assertThat(build("").where()).doesNotContain("1 = 0");
+  }
+
+  @Test
+  @DisplayName("boost-exact:false ranks a whole-name match as a prefix, not above it")
+  void boostExact() {
+    assertThat(build("pad").order()).contains(" then 2 when lower(p.name)");
+    assertThat(build("pad boost-exact:false").order())
+        .doesNotContain(" then 2 when")
+        .contains(" then 1 when lower(p.name)");
+  }
 }

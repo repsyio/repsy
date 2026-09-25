@@ -152,6 +152,8 @@ export function buildPublishDocument(opts: {
   description?: string;
   /** The `dist.tarball` the publisher claims, as a client behind another address would send it. */
   tarballUrl?: string;
+  /** More fields of the version's manifest (`author`, `maintainers`, `keywords`, ...). */
+  extra?: Record<string, unknown>;
 }): Record<string, unknown> {
   const tag = opts.tag ?? 'latest';
   const filename = tarballFilename(opts.packageName, opts.version);
@@ -177,6 +179,7 @@ export function buildPublishDocument(opts: {
     // manifest this adapter sends simply includes the field, the same way a real npm client's own
     // normalized `package.json` almost always does.
     keywords: [] as string[],
+    ...opts.extra,
     dist: { integrity, shasum, tarball },
   };
 
@@ -242,6 +245,44 @@ export async function rawGetPath(
   relPath: string,
 ): Promise<RawResponse> {
   return rawRequest(`${repoUrl(repoName)}${relPath}`, { headers: npmAuthHeader(credential) });
+}
+
+/**
+ * A raw request of any method to a repo-relative path, with `headers` sent as they are (no
+ * credential is added): the wire probes of the token and dist-tag routes need `PUT`/`DELETE` with a
+ * Bearer token of their own choosing.
+ */
+export async function rawRequestPath(
+  repoName: string,
+  method: string,
+  relPath: string,
+  headers: Record<string, string> = {},
+  body?: string,
+): Promise<RawResponse> {
+  return rawRequest(`${repoUrl(repoName)}${relPath}`, { method, headers, body });
+}
+
+/**
+ * `npm login`'s couch flow, `PUT /-/user/org.couchdb.user:<name>` with the name and the password:
+ * 201 and a token (a protocol JWT) when the credentials are good.
+ */
+export async function rawLogin(
+  repoName: string,
+  username: string,
+  password: string,
+): Promise<{ status: number; token?: string; response: RawResponse }> {
+  const response = await rawRequestPath(
+    repoName,
+    'PUT',
+    `-/user/org.couchdb.user:${encodeURIComponent(username)}`,
+    { 'Content-Type': 'application/json' },
+    JSON.stringify({ name: username, password }),
+  );
+  const token =
+    response.status === 201
+      ? (JSON.parse(response.body.toString('utf8')) as { token?: string }).token
+      : undefined;
+  return { status: response.status, token, response };
 }
 
 /** Raw `GET` of the tarball by its canonical, real stored path. */

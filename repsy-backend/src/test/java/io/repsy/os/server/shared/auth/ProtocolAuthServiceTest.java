@@ -32,6 +32,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.services.RevokedProtocolTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.auth.utils.TokenRealm;
@@ -1049,6 +1050,97 @@ class ProtocolAuthServiceTest {
 
       assertThat(ProtocolAuthServiceTest.this.authService.emulateAuthHeader(request))
           .isEqualTo("Bearer header-token");
+    }
+  }
+
+  /**
+   * RPS-1361: a login token that {@code npm logout} revoked is refused on every protocol request
+   * that presents it, whether it was issued to a user or to a deploy token.
+   */
+  @Nested
+  @DisplayName("a revoked protocol JWT is unAuthorized")
+  class RevokedProtocolJwt {
+
+    private static final String BEARER = "Bearer signed.jwt.token";
+
+    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final RevokedProtocolTokenService revoked =
+        Mockito.mock(RevokedProtocolTokenService.class);
+    private final UserTxService users = Mockito.mock(UserTxService.class);
+    private final DeployTokenService deployTokens = Mockito.mock(DeployTokenService.class);
+
+    private final ProtocolAuthService service =
+        new ProtocolAuthService(
+            this.users,
+            this.jwtUtils,
+            this.deployTokens,
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+
+    RevokedProtocolJwt() {
+      this.service.setRevokedTokens(this.revoked);
+      when(this.jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
+          .thenReturn(USERNAME);
+      when(this.users.getAuthenticatedUserByUsername(USERNAME)).thenReturn(ALICE);
+    }
+
+    @Test
+    @DisplayName("a user's token is accepted until it is revoked")
+    void userToken() {
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+
+      this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ);
+      verify(this.revoked).isRevoked("signed.jwt.token");
+
+      when(this.revoked.isRevoked("signed.jwt.token")).thenReturn(true);
+
+      assertUnauthorized(
+          () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
+    }
+
+    @Test
+    @DisplayName("a deploy token's token is refused once revoked, before the deploy token is read")
+    void deployTokenToken() {
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.DEPLOY_TOKEN);
+      when(this.revoked.isRevoked("signed.jwt.token")).thenReturn(true);
+
+      assertUnauthorized(
+          () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
+      verify(this.deployTokens, never()).findByRepoIdAndTokenId(any(), any());
+    }
+
+    @Test
+    @DisplayName("a made-up bearer value costs no lookup in the registry")
+    void notAJwt() {
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenThrow(new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED));
+
+      assertUnauthorized(
+          () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
+      verify(this.revoked, never()).isRevoked(anyString());
+    }
+
+    @Test
+    @DisplayName("a revoked token is not counted against the client, as a wrong password is")
+    void revokedIsNotCounted() {
+      final var throttle = Mockito.mock(AuthFailureThrottle.class);
+      final var counting =
+          new ProtocolAuthService(
+              this.users,
+              this.jwtUtils,
+              this.deployTokens,
+              new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+              throttle);
+      counting.setRevokedTokens(this.revoked);
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+      when(this.revoked.isRevoked("signed.jwt.token")).thenReturn(true);
+
+      assertUnauthorized(
+          () -> counting.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
+      verify(throttle, never()).recordFailure();
     }
   }
 }

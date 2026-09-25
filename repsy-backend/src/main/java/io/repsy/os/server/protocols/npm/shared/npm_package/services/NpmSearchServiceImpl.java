@@ -40,11 +40,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Searches the latest versions of the packages of one repository. The database applies every filter
- * of the query (terms, scope, keywords), counts the matches and returns the best {@code
- * maxCandidates} of them, whole-name matches first; the scoring orders those in memory, and only
- * the maintainers of the requested page are loaded. So {@code total} is the number of matches even
- * when more than {@code maxCandidates} match, and a search can page through the first {@code
- * maxCandidates} of them.
+ * of the query (terms, scope, keywords, authors, maintainers, {@code is:}/{@code not:}), counts the
+ * matches and returns the best {@code maxCandidates} of them, whole-name matches first; the scoring
+ * orders those in memory, and only the maintainers of the requested page are loaded. So {@code
+ * total} is the number of matches even when more than {@code maxCandidates} match, and a search can
+ * page through the first {@code maxCandidates} of them.
  */
 @Service
 @Transactional(readOnly = true)
@@ -78,8 +78,16 @@ public class NpmSearchServiceImpl implements NpmSearchService<UUID> {
   }
 
   @Override
-  public NpmSearchResult search(final BaseRepoInfo<UUID> repoInfo, final NpmSearchQuery query) {
+  public NpmSearchResult search(final BaseRepoInfo<UUID> repoInfo, final NpmSearchQuery asked) {
     final var now = Instant.now();
+
+    // What is insecure comes from the vulnerability scan, so a repository that is not scanned has
+    // nothing insecure, exactly as its npm audit reports no advisory.
+    if (!repoInfo.isSecurityScanEnabled() && Boolean.TRUE.equals(asked.insecure())) {
+      return NpmSearchResult.empty(now);
+    }
+
+    final var query = repoInfo.isSecurityScanEnabled() ? asked : asked.withInsecure(null);
 
     final var candidates =
         this.candidateRepository.find(repoInfo.getStorageKey(), query, this.maxCandidates);

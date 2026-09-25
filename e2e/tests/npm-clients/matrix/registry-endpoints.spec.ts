@@ -26,9 +26,9 @@
  *    password, the deploy token's own generated username for a token.
  *  - `ping` succeeds on a private repository with a token.
  *  - `search` finds a package of THIS repository by a free-text term, never another repository's, and
- *    answers `[]` with exit 0 for a term nothing matches. Free-text terms only: a qualifier-only
- *    query (`keywords:foo`) matches everything (RPS-1343) and `size`/`from` are not clamped
- *    (RPS-1344), neither is asserted here.
+ *    answers `[]` with exit 0 for a term nothing matches. The qualifiers (`author:`, `maintainer:`,
+ *    `is:`/`not:`; RPS-1343) go through the client's own text too, and the raw probes of them and of
+ *    `size`/`from` (RPS-1344) are in `tests/npm/search-token-dist-tags.spec.ts`.
  *  - `audit` of an installed tree exits 0 with no vulnerabilities and the client really asked the
  *    registry (the wire recorder sees the audit POST answered 200). The stack's scanner is off, so
  *    the report is empty by design (README "Auditing npm packages"); no scanner is needed.
@@ -199,6 +199,46 @@ for (const client of clientsWith('searchCmd')) {
       const nothing = await client.search?.(ctx, `nomatch${seeder.runId}`);
       expect(nothing?.exitCode, 'a search nothing matches still succeeds').toBe(0);
       expect(JSON.parse(nothing?.stdout ?? 'null')).toEqual([]);
+    },
+  );
+}
+
+for (const client of clientsWith('searchCmd')) {
+  test(
+    `${client.label} search filters on the author qualifier, and a qualifier-only text finds nothing`,
+    {
+      tag: [client.tag, '@search'],
+    },
+    async ({ seeder }) => {
+      const repo = await newRepo(seeder);
+      const writer = await tokenBinding(seeder, repo.name, { readOnly: false });
+      const ctx = await client.prepare('search-author', [writer]);
+      const author = `zz${seeder.runId}author`;
+      const mine = packageNameFor(seeder, 'authored');
+      const other = packageNameFor(seeder, 'anonymous');
+
+      const first = await publishPackage(client, ctx, {
+        packageName: mine,
+        version: '1.0.0',
+        manifest: { author: { name: author } },
+      });
+      expect(first.result.exitCode, `publish: ${first.result.command}`).toBe(0);
+      const second = await publishPackage(client, ctx, { packageName: other, version: '1.0.0' });
+      expect(second.result.exitCode, `publish: ${second.result.command}`).toBe(0);
+
+      const searched = await client.search?.(ctx, `author:${author}`);
+      expect(searched?.exitCode, `search: ${searched?.command}\n${searched?.stderr}`).toBe(0);
+      const names = (JSON.parse(searched?.stdout ?? '[]') as Array<{ name: string }>).map(
+        (entry) => entry.name,
+      );
+      expect(names, 'only the package of that author').toEqual([mine]);
+
+      const nothing = await client.search?.(ctx, 'is:shiny');
+      expect(nothing?.exitCode, `search: ${nothing?.command}\n${nothing?.stderr}`).toBe(0);
+      expect(
+        JSON.parse(nothing?.stdout ?? 'null'),
+        'a text of qualifiers Repsy cannot filter on matches no package (RPS-1343)',
+      ).toEqual([]);
     },
   );
 }

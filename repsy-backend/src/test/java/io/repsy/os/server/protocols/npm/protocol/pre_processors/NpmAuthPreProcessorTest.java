@@ -31,6 +31,7 @@ import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
 import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
+import io.repsy.os.shared.auth.services.RevokedProtocolTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
@@ -69,7 +70,8 @@ class NpmAuthPreProcessorTest {
               this.jwtUtils,
               Mockito.mock(DeployTokenService.class),
               new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-              new AuthFailureThrottle(AuthThrottleProperties.disabled())),
+              new AuthFailureThrottle(AuthThrottleProperties.disabled()),
+              Mockito.mock(RevokedProtocolTokenService.class)),
           Mockito.mock(NpmProtocolProvider.class));
 
   NpmAuthPreProcessorTest() {

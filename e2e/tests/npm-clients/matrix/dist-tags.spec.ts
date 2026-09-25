@@ -22,11 +22,12 @@
  *  - a later publish with no tag moves `latest` and leaves `beta` where it was;
  *  - `dist-tag add` moves a tag, `dist-tag rm` removes it, and `pkg@beta` installs what it names;
  *  - removing `latest` is refused (400 `canNotRemoveTagLatest`), so is tagging a version that does
- *    not exist.
+ *    not exist;
+ *  - `dist-tag add` succeeds for every client, yarn classic included (RPS-1362: the registry answers
+ *    JSON with `ok`, which yarn 1 requires).
  */
 import { MARKER_FILENAME } from '../../../src/clients/npm.js';
 import { rawGetPath } from '../../../src/clients/npm-raw.js';
-import type { ClientId } from '../../../src/clients/npm-family/client.js';
 import {
   newRepo,
   packageNameFor,
@@ -37,14 +38,6 @@ import {
 import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
-
-/**
- * The exit code of a client's `dist-tag add` (0 unless listed). Yarn 1's `tag add` exits 1
- * ("Couldn't add tag") although the registry applied the tag: it only accepts an answer with an `ok`
- * field in its body, and `PUT /-/package/<pkg>/dist-tags/<tag>` answers 200 with an empty body
- * (RPS-1362). The tag IS set, which the step below asserts on the registry either way.
- */
-const TAG_ADD_EXIT: Partial<Record<ClientId, number>> = { 'yarn-classic': 1 };
 
 async function distTagsOf(repoName: string, packageName: string): Promise<Record<string, string>> {
   const res = await rawGetPath(repoName, adminCredential(), `-/package/${packageName}/dist-tags`);
@@ -93,10 +86,9 @@ for (const client of clientsWith('distTagCmd')) {
       expect(listed.stdout).toContain('1.1.0');
 
       const moved = await distTag.add(ctx, `${name}@1.1.0`, 'beta');
-      expect(
-        moved.exitCode,
-        `dist-tag add: ${moved.command}\n${moved.stderr} (RPS-1362 for a non-zero exit)`,
-      ).toBe(TAG_ADD_EXIT[client.id] ?? 0);
+      // Every client, yarn 1 included, sees the add succeed: the answer is JSON with an `ok` field
+      // (RPS-1362; yarn classic took the empty answer for "Couldn't add tag" and exited 1).
+      expect(moved.exitCode, `dist-tag add: ${moved.command}\n${moved.stderr}`).toBe(0);
       expect(await distTagsOf(repo.name, name)).toEqual({ beta: '1.1.0', latest: '1.1.0' });
 
       // A consumer installing `<pkg>@beta` gets what the tag names now.

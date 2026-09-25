@@ -26,7 +26,8 @@ import org.jspecify.annotations.NullMarked;
  * Filters and orders the packages of a search. Every free term of the query has to match (a
  * substring of the package key, of the description or of a keyword), and the score of a match adds
  * up what each term hit: a whole-name match counts far more than a prefix, which counts more than a
- * substring of the name, a keyword or the description.
+ * substring of the name, a keyword or the description. {@code boost-exact:false} takes the
+ * whole-name bonus away.
  */
 @UtilityClass
 @NullMarked
@@ -61,7 +62,17 @@ public class NpmSearchScorer {
     return best <= 0 ? 1.0 : score / best;
   }
 
+  /**
+   * Whether the package matches the free terms, the scope and the keywords of the query. The
+   * qualifiers that filter on data a {@link NpmSearchDocument} does not carry ({@code author:},
+   * {@code maintainer:}, {@code is:}, {@code not:}) are applied where the documents are found, so
+   * the documents here are the packages that passed them.
+   */
   static boolean matches(final NpmSearchDocument document, final NpmSearchQuery query) {
+    if (query.matchesNothing()) {
+      return false;
+    }
+
     if (query.scope() != null && !query.scope().equalsIgnoreCase(document.scope())) {
       return false;
     }
@@ -90,20 +101,23 @@ public class NpmSearchScorer {
     var score = BASE_SCORE;
 
     for (final var term : query.terms()) {
-      score += termScore(document, keywords, term);
+      score += termScore(document, query, keywords, term);
     }
 
     return score;
   }
 
   private static double termScore(
-      final NpmSearchDocument document, final List<String> keywords, final String term) {
+      final NpmSearchDocument document,
+      final NpmSearchQuery query,
+      final List<String> keywords,
+      final String term) {
 
     final var needle = stripAt(term);
     final var name = document.name().toLowerCase(Locale.ROOT);
     final var key = document.key();
 
-    return weight(name.equals(needle) || key.equals(needle), EXACT_NAME)
+    return weight(query.boostExact() && (name.equals(needle) || key.equals(needle)), EXACT_NAME)
         + weight(name.startsWith(needle) || key.startsWith(needle), NAME_PREFIX)
         + weight(key.contains(needle), NAME_CONTAINS)
         + weight(keywords.contains(needle), KEYWORD_EQUALS)
