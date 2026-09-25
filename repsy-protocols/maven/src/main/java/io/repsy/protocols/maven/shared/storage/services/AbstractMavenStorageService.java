@@ -316,9 +316,10 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
 
   /**
    * Removes the given version from the artifact's {@code maven-metadata.xml} and writes the file
-   * back. An artifact published without one (Ivy, sbt or a raw PUT never send it, and Repsy does
-   * not generate it) has nothing to rewrite: no file is created and the usage delta is zero. A file
-   * without a {@code <versioning>} element lists no versions, so it is left as it is.
+   * back. An artifact published without one (Ivy, sbt or a raw PUT never send it, and Repsy only
+   * synthesizes one on read, never storing it) has nothing to rewrite: no file is created and the
+   * usage delta is zero. A file without a {@code <versioning>} element lists no versions, so it is
+   * left as it is.
    *
    * <p>The file is read before anything is written, so a file that cannot be parsed fails here
    * without having changed a byte; the artifact's {@code latest} and {@code release} are not taken

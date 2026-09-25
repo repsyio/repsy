@@ -852,7 +852,7 @@ seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
   keeps the other although Ivy sends no artifact-level `maven-metadata.xml` (RPS-1331, fixed; it used to
   answer 404 after the files were gone and leave the database row).
 
-Repsy stores the `maven-metadata.xml` a client uploads and generates none, and Ivy uploads none, so
+Repsy stores the `maven-metadata.xml` a client uploads and writes none of its own, and Ivy uploads none, so
 an artifact published by Ivy has no stored `<versions>` list. Since RPS-1369 Repsy answers a `GET` or
 `HEAD` of the artifact-level `maven-metadata.xml` (and its `.md5`, `.sha1`, `.sha256` and `.sha512`)
 from the registered versions when nothing is stored there; a stored file always wins, and nothing is

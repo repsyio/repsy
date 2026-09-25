@@ -519,7 +519,9 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
     this.assertVersionGone(artifact, "1.0");
     assertThat(this.versionDir(group, artifactName, "1.0")).doesNotExist();
     this.assertVersionExists(group, artifactName, "2.0");
-    assertThat(metadataFile).as("Repsy never generates a maven-metadata.xml").doesNotExist();
+    assertThat(metadataFile)
+        .as("a delete writes no maven-metadata.xml into storage")
+        .doesNotExist();
 
     final var after = this.artifactRow(group, artifactName);
     assertThat(after.getLatest()).isEqualTo("2.0");
