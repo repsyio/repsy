@@ -29,6 +29,8 @@
  *    answers `[]` with exit 0 for a term nothing matches. The qualifiers (`author:`, `maintainer:`,
  *    `is:`/`not:`; RPS-1343) go through the client's own text too, and the raw probes of them and of
  *    `size`/`from` (RPS-1344) are in `tests/npm/search-token-dist-tags.spec.ts`.
+ *  - `logout` (npm, pnpm; RPS-1361) revokes the token of a login (`DELETE /-/user/token/<token>`): the
+ *    command exits 0 and the token is refused afterwards.
  *  - `audit` of an installed tree exits 0 with no vulnerabilities and the client really asked the
  *    registry (the wire recorder sees the audit POST answered 200). The stack's scanner is off, so
  *    the report is empty by design (README "Auditing npm packages"); no scanner is needed.
@@ -36,7 +38,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { npmAuthHeader } from '../../../src/clients/npm-raw.js';
+import { npmAuthHeader, rawLogin, rawRequestPath } from '../../../src/clients/npm-raw.js';
 import type { ClientId, NpmFamilyClient } from '../../../src/clients/npm-family/client.js';
 import {
   adminBinding,
@@ -46,7 +48,7 @@ import {
   renderConsumer,
   tokenBinding,
 } from '../../../src/clients/npm-family/fixtures.js';
-import { clientsWith } from '../../../src/clients/npm-family/registry.js';
+import { clientsWith, ENABLED_CLIENTS } from '../../../src/clients/npm-family/registry.js';
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { env } from '../../../src/env.js';
@@ -115,6 +117,47 @@ for (const client of clientsWith('whoamiCmd')) {
       expect(whoamiUser(client, named?.stdout ?? ''), "the deploy token's own username").toBe(
         token.credential.username,
       );
+    },
+  );
+}
+
+for (const client of ENABLED_CLIENTS.filter((candidate) => candidate.logout)) {
+  test(
+    `${client.label} logout revokes the token of a login, which stops working`,
+    {
+      tag: [client.tag, '@logout'],
+    },
+    async ({ seeder }) => {
+      const repo = await newRepo(seeder);
+      // The token `npm login` stores: what the registry issues for a name and password.
+      const login = await rawLogin(repo.name, env.adminUsername, env.adminPassword);
+      expect(login.status, 'the login the token comes from').toBe(201);
+      const token = login.token ?? '';
+      const ctx = await client.prepare('logout', [
+        {
+          repoName: repo.name,
+          credential: {
+            transport: 'basic',
+            username: env.adminUsername,
+            password: token,
+            kind: 'token',
+          },
+        },
+      ]);
+
+      const before = await client.whoami?.(ctx);
+      expect(before?.exitCode, `whoami: ${before?.command}\n${before?.stderr}`).toBe(0);
+
+      const loggedOut = await client.logout?.(ctx);
+      expect(
+        loggedOut?.exitCode,
+        `logout: ${loggedOut?.command}\n${loggedOut?.stdout}\n${loggedOut?.stderr} (RPS-1361)`,
+      ).toBe(0);
+
+      const after = await rawRequestPath(repo.name, 'GET', '-/whoami', {
+        Authorization: `Bearer ${token}`,
+      });
+      expect(after.status, 'the revoked token is refused from then on').toBe(401);
     },
   );
 }

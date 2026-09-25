@@ -180,6 +180,7 @@ export const npmClient: NpmFamilyClient = {
     exec(ctx, 'npm-deprecate', ['deprecate', spec, message, ...common(ctx)]),
   view: (ctx, spec) => exec(ctx, 'npm-view', ['view', spec, '--json', ...common(ctx)]),
   whoami: (ctx) => exec(ctx, 'npm-whoami', ['whoami', ...common(ctx)]),
+  logout: (ctx) => exec(ctx, 'npm-logout', ['logout', ...common(ctx)]),
   ping: (ctx) => exec(ctx, 'npm-ping', ['ping', ...common(ctx)]),
   search: (ctx, text) => exec(ctx, 'npm-search', ['search', text, '--json', ...common(ctx)]),
   audit: (ctx) => exec(ctx, 'npm-audit', ['audit', '--json', ...common(ctx)]),
