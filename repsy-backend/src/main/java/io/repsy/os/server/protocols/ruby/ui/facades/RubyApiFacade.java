@@ -81,24 +81,17 @@ public class RubyApiFacade implements ProtocolApiFacade {
       final RepoInfo repoInfo, final String gemName, final String version, final String platform) {
     final var gemId = this.gemService.getGemId(repoInfo.getStorageKey(), gemName);
 
-    if (this.gemService.countNonYankedVersions(gemId) <= 1) {
-      final var result = this.deleteGem(repoInfo, gemName);
+    // Only the requested version goes. The gem goes with it only when no version, yanked or not,
+    // is left (RPS-1426): a yanked version still counts, and a live one must never be lost.
+    final var remaining = this.gemService.deleteVersion(gemId, version, platform);
 
-      this.eventPublisher.publishEvent(
-          new ArtifactVersionDeletedEvent(
-              repoInfo.getStorageKey(),
-              repoInfo.getType().name(),
-              repoInfo.getName(),
-              gemName,
-              version));
-
-      return result;
-    }
-
-    final var freed =
-        this.storageService.deleteGem(
-            repoInfo.getStorageKey(), repoInfo.getName(), gemName, version, platform);
-    this.gemService.deleteVersion(gemId, version, platform);
+    final var usages =
+        remaining == 0
+            ? this.deleteGem(repoInfo, gemName)
+            : BaseUsages.ofDisk(
+                -1L
+                    * this.storageService.deleteGem(
+                        repoInfo.getStorageKey(), repoInfo.getName(), gemName, version, platform));
 
     this.eventPublisher.publishEvent(
         new ArtifactVersionDeletedEvent(
@@ -108,7 +101,7 @@ public class RubyApiFacade implements ProtocolApiFacade {
             gemName,
             version));
 
-    return BaseUsages.ofDisk(-1L * freed);
+    return usages;
   }
 
   @Override
