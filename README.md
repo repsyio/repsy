@@ -58,7 +58,7 @@ Access the application:
   docker logs repsy | grep "password"
   ```
 
-> **Note:** The H2 database is stored at `/app/data` inside the container. File storage defaults to `~/.repsy` on the host and is **not** covered by the volume mount. Set `STORAGE_BASE_PATH` to persist artifacts inside the same volume (see [Option 1](#option-1-docker-with-h2-embedded-database)).
+> **Note:** In the image, the H2 database (`/app/data/repsy`) and the artifact files (`STORAGE_BASE_PATH`, default `/app/data/storage`) both live under `/app/data`, so one volume keeps both. The command above has no volume: everything is lost when the container is removed. Add `-v repsy-data:/app/data` to keep it (see [Option 1](#option-1-docker-with-h2-embedded-database)).
 
 ## HTTPS / SSL
 
@@ -152,7 +152,7 @@ docker run -d \
   repo.repsy.io/repsy/os/repsy:latest
 ```
 
-> The `-v repsy-data:/app/data` flag persists the H2 database across container restarts. Setting `STORAGE_BASE_PATH=/app/data/storage` ensures artifact file storage is also kept inside the same volume. Without it, artifacts default to `~/.repsy` on the host and are **not** covered by the volume mount.
+> The `-v repsy-data:/app/data` flag persists the H2 database and the artifact files (`/app/data/storage`) across container recreation. Without a volume both are lost when the container is removed.
 
 ### Option 2: Docker with PostgreSQL
 
@@ -167,6 +167,7 @@ docker run -d \
   -e POSTGRES_DB=repsy \
   -e POSTGRES_USER=repsy \
   -e POSTGRES_PASSWORD=repsy123 \
+  -v repsy-pgdata:/var/lib/postgresql \
   -p 5432:5432 \
   postgres:18
 
@@ -180,8 +181,11 @@ docker run -d \
   -e DB_USERNAME=repsy \
   -e DB_PASSWORD=repsy123 \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
+  -v repsy-data:/app/data \
   repo.repsy.io/repsy/os/repsy:latest
 ```
+
+> Two volumes keep this install across container recreation: `repsy-data` for the artifact files (`/app/data/storage`) and `repsy-pgdata` for the database. Mount PostgreSQL 18's volume at `/var/lib/postgresql`: it keeps its data in a versioned directory below that path, so a volume at `/var/lib/postgresql/data` does not persist it.
 
 ### Option 3: Docker Compose with PostgreSQL
 
@@ -195,6 +199,8 @@ services:
       - POSTGRES_DB=repsy
       - POSTGRES_USER=repsy
       - POSTGRES_PASSWORD=repsy123
+    volumes:
+      - repsy-pgdata:/var/lib/postgresql
     ports:
       - "5432:5432"
     networks:
@@ -213,12 +219,18 @@ services:
       - DB_USERNAME=repsy
       - DB_PASSWORD=repsy123
       - ADMIN_INITIAL_PASSWORD=YourSecurePassword123
+    volumes:
+      - repsy-data:/app/data
     networks:
       - repsy-network
 
 networks:
   repsy-network:
     driver: bridge
+
+volumes:
+  repsy-data:
+  repsy-pgdata:
 ```
 
 #### Adding vulnerability scanning to the stack
@@ -309,6 +321,28 @@ Access at:
 
 ## Upgrading
 
+### Artifact storage moved to `/app/data/storage` in the Docker image (RPS-1401)
+
+Earlier images did not set `STORAGE_BASE_PATH`, so artifacts went to `/home/appuser/.repsy`, inside the container's writable layer and not on the `/app/data` volume: a recreated container kept its database and lost every artifact. The image now defaults `STORAGE_BASE_PATH` to `/app/data/storage`, on the volume.
+
+**Who is affected:** an existing container whose artifacts are in `/home/appuser/.repsy` (a bind mount of it, or a container that is only restarted, never recreated).
+
+**What happens:** on startup `entrypoint.sh` keeps using `/home/appuser/.repsy` when `STORAGE_BASE_PATH` is still the image default, `/app/data/storage` is empty and `/home/appuser/.repsy` holds data. It logs a `WARN: ... holds artifacts and /app/data/storage is empty` line, so nothing disappears on upgrade. Without a mount of that directory, recreating the container has always lost the artifacts; nothing can restore them.
+
+**To move to the new default** (once): stop Repsy, copy the content of `/home/appuser/.repsy` into `/app/data/storage` (for example `docker cp repsy:/home/appuser/.repsy/. ./repsy-storage` and then copy that directory into the volume with a helper container, or bind-mount your old directory at `/app/data/storage`), and start again. Or set `STORAGE_BASE_PATH=/home/appuser/.repsy` explicitly and keep mounting it.
+
+### `DB_HOST`, `DB_PORT` and `DB_DATABASE` are no longer read (RPS-1173 / RPS-1423)
+
+Releases up to `v26.08.4` built the PostgreSQL URL from `DB_HOST`, `DB_PORT` and `DB_DATABASE`. Only `DB_URL` is read now, and the Docker image defaults it to an embedded H2 file. A container that is upgraded with the old variables and no `DB_URL` therefore starts on a new, empty H2 database: the panel shows a fresh installation and the PostgreSQL data looks lost (it is untouched).
+
+Set `DB_URL=jdbc:postgresql://<host>:<port>/<database>` instead (with `DB_USERNAME` and `DB_PASSWORD`). To help, Repsy logs a `WARN` at startup whenever any of the three variables is set, whatever `DB_URL` is:
+
+```
+The environment variables DB_HOST, DB_PORT are no longer read: only DB_URL selects the database. To keep using PostgreSQL set DB_URL=jdbc:postgresql://pg:5432/repsy (with DB_USERNAME and DB_PASSWORD).
+```
+
+When the effective database is H2 it adds that Repsy is starting on the embedded H2 database, not PostgreSQL. It never prints `DB_URL` itself, since that may carry credentials. Repsy still starts.
+
 ### Password reset when upgrading past the BCrypt migration (RPS-961 / RPS-1033)
 
 The first release that contains both RPS-961 (hashing passwords with BCrypt) and RPS-1033
@@ -378,10 +412,10 @@ and after the upgrade. A manifest whose file is missing or does not match its di
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ADMIN_INITIAL_PASSWORD` | Initial admin password. Only applied on first startup when no admin exists. | *(empty)* |
-| `DB_URL` | JDBC database URL. The Docker image defaults to the embedded H2 database; running from source (`mvn spring-boot:run`) defaults to PostgreSQL on `localhost:5432` instead. | `jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` (image only) |
+| `DB_URL` | JDBC database URL. The Docker image defaults to the embedded H2 database; running from source (`mvn spring-boot:run`) defaults to PostgreSQL on `localhost:5432` instead. `DB_HOST`, `DB_PORT` and `DB_DATABASE` are not read (Repsy warns at startup if they are set). | `jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` (image only) |
 | `DB_USERNAME` | Database username | `repsy` |
 | `DB_PASSWORD` | Database password | `repsy123` |
-| `STORAGE_BASE_PATH` | Base directory for artifact file storage. Set to a path inside `/app/data` (e.g. `/app/data/storage`) to persist artifacts with a single volume mount. Deleting a repo, a package or a version moves its files into a `trash/` directory of the protocol (for example `maven/trash`) first; the trash older than `TRASH_RETENTION` is removed every day (see `TRASH_CLEANUP_ENABLED`). | `~/.repsy` |
+| `STORAGE_BASE_PATH` | Base directory for artifact file storage. Set to a path inside `/app/data` (e.g. `/app/data/storage`) to persist artifacts with a single volume mount (the Docker image already does). Deleting a repo, a package or a version moves its files into a `trash/` directory of the protocol (for example `maven/trash`) first; the trash older than `TRASH_RETENTION` is removed every day (see `TRASH_CLEANUP_ENABLED`). | `~/.repsy` (`/app/data/storage` in the Docker image) |
 | `OS_APP_JWT_SECRET` | JWT signing secret. If not set, a random 256-bit secret is generated on every startup — every restart/redeploy invalidates all existing sessions, forcing every user to log in again. Set a stable, secure random value for any production/self-host deployment. | *(random, regenerated on every startup)* |
 | `SERVER_PORT` | Repository operations port | `9090` |
 | `API_PORT` | Backend API and Frontend web UI port | `8080` |
@@ -977,11 +1011,8 @@ docker logs -f repsy-postgres
 # Stop and remove container
 docker rm -f repsy
 
-# Remove named volume (if used)
+# Remove the named volume: it holds the H2 database and the artifact files (/app/data/storage)
 docker volume rm repsy-data
-
-# Remove file storage
-rm -rf ~/.repsy
 
 # Start fresh (H2 example)
 docker run -d \
@@ -989,7 +1020,6 @@ docker run -d \
   -p 8080:8080 \
   -p 9090:9090 \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
-  -e STORAGE_BASE_PATH=/app/data/storage \
   -v repsy-data:/app/data \
   repo.repsy.io/repsy/os/repsy:latest
 ```

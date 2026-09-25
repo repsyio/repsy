@@ -107,6 +107,7 @@ ENV CI=true
 # Keep this pnpm version equal to the one in .github/actions/setup-frontend/action.yml (the CI
 # checks), so the release image and CI run the same pnpm. It is a literal on purpose (SonarCloud
 # githubactions:S8543 reads the pin off the line): bump both together, and never use @latest.
+# DockerfileTest fails `mvn test` when the two literals differ (RPS-1166).
 RUN corepack enable && corepack prepare pnpm@12.5.1 --activate
 
 # openapi-generator-cli shells out to a JRE to run the generator jar
@@ -161,7 +162,7 @@ FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
-    mkdir -p /app/data/password-reset /app/certs && \
+    mkdir -p /app/data/password-reset /app/data/storage /app/certs && \
     chown -R appuser:appgroup /app/data /app/certs
 
 COPY entrypoint.sh /app/entrypoint.sh
@@ -184,6 +185,13 @@ ENV DB_URL="jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CL
 # Where an operator drops a marker file to reset a user's password (README "Forgot admin password?").
 # It lives on the persisted volume whatever STORAGE_BASE_PATH is. See RPS-1107.
 ENV PASSWORD_RESET_MARKER_DIR="/app/data/password-reset"
+
+# Artifact files live on the volume too (RPS-1401). Without this, application.yml's default
+# ${user.home}/.repsy is /home/appuser/.repsy, in the container's writable layer: the database would
+# survive a container recreation and every artifact it points to would be gone. entrypoint.sh keeps
+# using the old directory when it already holds data (an install that mounted it). DockerfileTest
+# checks that every persisted path is under the VOLUME.
+ENV STORAGE_BASE_PATH="/app/data/storage"
 
 VOLUME /app/data
 
