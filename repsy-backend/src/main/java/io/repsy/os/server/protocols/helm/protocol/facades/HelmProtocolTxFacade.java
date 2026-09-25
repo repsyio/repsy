@@ -18,15 +18,14 @@ package io.repsy.os.server.protocols.helm.protocol.facades;
 import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.helm.protocol.facades.AbstractHelmProtocolTxFacade;
-import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
 import io.repsy.protocols.helm.shared.index.dtos.HelmIndexDto;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
-import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
-import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushResult;
 import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
@@ -125,32 +124,16 @@ public class HelmProtocolTxFacade extends AbstractHelmProtocolTxFacade<UUID> {
 
   @Override
   @Transactional
-  public HelmChartInfo findOrCreateChart(final HelmChartForm form, final UUID repoId) {
-    return super.findOrCreateChart(form, repoId);
-  }
-
-  @Override
-  @Transactional
   public HelmOciBlobInfo findOrCreateBlob(final HelmOciBlobForm form, final UUID repoId) {
     return super.findOrCreateBlob(form, repoId);
   }
 
   @Override
-  @Transactional
-  public HelmOciManifestInfo findOrCreateManifest(
-      final HelmOciManifestForm form, final UUID repoId) {
-    return super.findOrCreateManifest(form, repoId);
-  }
-
-  @Override
   @Transactional(rollbackFor = IOException.class)
-  public void pushManifest(
-      final ProtocolContext context,
-      final String name,
-      final String reference,
-      final byte[] contentBytes)
+  public HelmOciManifestPushResult pushManifest(
+      final ProtocolContext context, final HelmOciManifestPushForm form, final byte[] contentBytes)
       throws IOException {
-    super.pushManifest(context, name, reference, contentBytes);
+    return super.pushManifest(context, form, contentBytes);
   }
 
   @Override
