@@ -18,12 +18,18 @@ package io.repsy.os.server.protocols.helm;
 import static io.repsy.os.server.protocols.helm.HelmChartFixtures.OCI_CONFIG_TYPE;
 import static io.repsy.os.server.protocols.helm.HelmChartFixtures.OCI_LAYER_TYPE;
 import static io.repsy.os.server.protocols.helm.HelmChartFixtures.OCI_MANIFEST_TYPE;
+import static io.repsy.os.server.protocols.helm.HelmChartFixtures.UPLOAD_PATH;
 import static io.repsy.os.server.protocols.helm.HelmChartFixtures.chart;
 import static io.repsy.os.server.protocols.helm.HelmChartFixtures.digest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
@@ -34,6 +40,7 @@ import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
+import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.lang.reflect.InvocationTargetException;
@@ -57,6 +64,8 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockPart;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,14 +86,25 @@ import org.springframework.transaction.annotation.Transactional;
  * it does not cover a version row that is changed or deleted by a request that does not take it
  * (the panel's delete), so the same retry covers the chart step.
  *
+ * <p>The same class pins the panel side of RPS-1325 end to end: {@code DELETE
+ * /api/helm/charts/{repo}/{chart}/{version}} deletes a row that carries a {@code @Version}, and
+ * when another request has changed the row since it was read the panel answers 409 {@code
+ * concurrentModification} (no {@code Retry-After}: the client re-reads and repeats), where RPS-1325
+ * pinned that mapping with a stub controller only. It is one class so that it shares one Spring
+ * context (and one connection pool) with the OCI tests.
+ *
  * <p>The races are forced, not hoped for: right after a row is read, another connection bumps its
  * {@code version_lock}, as a concurrent request would. Runs without a test transaction since the
  * pushes have to commit; it deletes the repos and the user it committed.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@DisplayName("Helm OCI pushes that lose a race on a row (RPS-1342)")
-@Import(HelmOciConcurrentPushIT.ReadHook.class)
-class HelmOciConcurrentPushIT extends AbstractIntegrationTest {
+@DisplayName("Helm writes that lose a race on a row (RPS-1342)")
+@Import(HelmConcurrentModificationIT.ReadHook.class)
+// This class needs a Spring context of its own (the hook below), and every cached context keeps a
+// connection pool open on the one PostgreSQL that all ITs share: a small pool keeps the total
+// under its max_connections. A request and the bump of its row hold two connections at once.
+@TestPropertySource(properties = "spring.datasource.hikari.maximum-pool-size=6")
+class HelmConcurrentModificationIT extends AbstractIntegrationTest {
 
   private static final String OCTET_STREAM = "application/octet-stream";
   private static final long TIMEOUT_SECONDS = 30;
@@ -192,13 +212,17 @@ class HelmOciConcurrentPushIT extends AbstractIntegrationTest {
     return this.repoRepository.findByName(name).orElseThrow();
   }
 
-  private String protocolToken() {
+  private User admin() {
     final var info =
         this.userTxService.create(
-            uniqueUsername("helm-oci"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+            uniqueUsername("helm-race"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
     this.createdUserIds.add(info.getId());
 
-    return this.protocolBearerTokenFor(this.userRepository.findById(info.getId()).orElseThrow());
+    return this.userRepository.findById(info.getId()).orElseThrow();
+  }
+
+  private String protocolToken() {
+    return this.protocolBearerTokenFor(this.admin());
   }
 
   /** Uploads {@code content} as a blob of the chart's name and returns the final response. */
@@ -447,5 +471,83 @@ class HelmOciConcurrentPushIT extends AbstractIntegrationTest {
         .extracting(MockHttpServletResponse::getStatus)
         .containsExactly(201, 201);
     assertThat(this.rows("helm_oci_blob", repo)).as("one row for the one blob").isEqualTo(1);
+  }
+
+  private void pushClassicChart(final Repo repo, final String name, final String token)
+      throws Exception {
+    final var request =
+        multipart(UPLOAD_PATH, repo.getName())
+            .part(new MockPart("chart", "chart.tgz", chart(name, "1.0.0", "1", null)))
+            .header(AUTHORIZATION, token);
+
+    assertThat(
+            this.mockMvc
+                .perform(request.with(protocolPort()))
+                .andReturn()
+                .getResponse()
+                .getStatus())
+        .as("the seeded chart")
+        .isEqualTo(201);
+  }
+
+  private int versionRows(final Repo repo, final String name) {
+    final var count =
+        this.jdbcTemplate.queryForObject(
+            """
+            select count(*) from helm_chart_version v
+              join helm_chart c on c.id = v.chart_id
+            where c.repo_id = ? and c.name = ?
+            """,
+            Integer.class,
+            repo.getId(),
+            name);
+
+    return count == null ? 0 : count;
+  }
+
+  @Test
+  @DisplayName("deleting a chart version that another request updated meanwhile answers 409")
+  void panelDeleteOfAConcurrentlyUpdatedVersionAnswersConflict() throws Exception {
+    final var repo = this.overridableHelmRepo();
+    final var name = "race-panel";
+    final var admin = this.admin();
+    final var panelToken = this.bearerTokenFor(admin);
+    this.pushClassicChart(repo, name, this.protocolBearerTokenFor(admin));
+    final var chartFile = storageDirOf(repo).resolve("charts").resolve(name + "-1.0.0.tgz");
+    // The delete reads the version row once, then removes it with the @Version it read.
+    this.bumpAfterRead(VERSION_READ, BUMP_VERSION, repo, 1, 1);
+
+    final var result =
+        this.mockMvc.perform(
+            delete("/api/helm/charts/{repo}/{chart}/{version}", repo.getName(), name, "1.0.0")
+                .header(AUTHORIZATION, panelToken)
+                .with(apiPort()));
+
+    result
+        .andExpect(status().isConflict())
+        .andExpect(header().doesNotExist("Retry-After"))
+        .andExpect(jsonPath("$.msgId").value("concurrentModification"))
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(
+            jsonPath("$.text")
+                .value(
+                    "The item was changed by another request at the same time. Please try again."))
+        .andExpect(jsonPath("$.errorCode").isString());
+    assertThat(this.bumps).as("the race was forced").hasValue(1);
+    assertThat(this.versionRows(repo, name)).as("the losing delete removed nothing").isEqualTo(1);
+    assertThat(chartFile).as("and left the chart file alone").exists();
+
+    AFTER_READ.set(null);
+
+    this.mockMvc
+        .perform(
+            delete("/api/helm/charts/{repo}/{chart}/{version}", repo.getName(), name, "1.0.0")
+                .header(AUTHORIZATION, panelToken)
+                .with(apiPort()))
+        .andExpect(status().isOk());
+    assertThat(this.versionRows(repo, name))
+        .as("the same request repeated without contention")
+        .isZero();
+    assertThat(chartFile).doesNotExist();
   }
 }

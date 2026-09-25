@@ -821,12 +821,16 @@ public class ErrorHandler {
    * concurrentModification} message id.
    *
    * <p>A panel or other protocol request gets 409: the client re-reads and repeats. A request on
-   * the OCI {@code /v2/} endpoints gets 503 with a {@code Retry-After} instead. Registry clients
-   * retry a 5xx (and 429) but treat a 409 as a final refusal, and the distribution specification
-   * maps a 409 to {@code DENIED}, which tells the user they lack access. The push handler already
-   * repeats the save a few times, so this answer means a heavily contended tag, which is exactly
-   * what a later retry resolves. The body stays in the distribution format through {@link
-   * OciErrorBodyAdvice}. 429 was not chosen because nothing here is rate limiting.
+   * the OCI {@code /v2/} endpoints gets 503 with a {@code Retry-After} instead. The distribution
+   * specification maps a 409 to {@code DENIED}, which tells the user they lack access, and a client
+   * that retries anything retries a 5xx. Checked against real clients (RPS-1342): {@code crane}
+   * repeats a manifest PUT that was answered 503 (after its own 1 s and 3 s backoff, it does not
+   * read the {@code Retry-After} value) and the push then succeeds; the {@code docker} CLI does not
+   * repeat the manifest PUT, it stops with {@code received unexpected HTTP status: 503}, and the
+   * user pushes again. The push handler already repeats the save a few times, so this answer means
+   * a heavily contended tag, which is exactly what a later retry resolves. The body stays in the
+   * distribution format through {@link OciErrorBodyAdvice}. 429 was not chosen because nothing here
+   * is rate limiting.
    *
    * @param ex Thrown exception
    * @return REST response
