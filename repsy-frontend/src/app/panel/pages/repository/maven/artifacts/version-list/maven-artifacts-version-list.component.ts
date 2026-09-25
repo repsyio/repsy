@@ -40,6 +40,7 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
 import { SecurityService } from '../../../../security/service/security.service';
 import { MavenConfigComponent } from '../../config/maven-config.component';
 import { MavenService } from '../../service/maven.service';
@@ -164,11 +165,12 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
       )
       .subscribe({
         next: () => {
-          if (versionCount - 1 === 0) {
+          if (emptiesList(versionCount, this.pageNum, this.searchText)) {
             this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
               this.toastService.show('Version deleted successfully', 'success');
             });
           } else {
+            this.pageNum = pageAfterDelete(versionCount, this.pageNum);
             this.refreshPage();
             this.toastService.show('Version deleted successfully', 'success');
           }
