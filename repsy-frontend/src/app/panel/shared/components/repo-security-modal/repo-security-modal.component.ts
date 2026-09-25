@@ -16,7 +16,7 @@
 
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
-import { Router } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
 import { RecentScannedVersion, RepoSecurityDetail } from '../../../../../generated/api';
@@ -25,7 +25,7 @@ import { SecurityService } from '../../../pages/security/service/security.servic
 import { DialogDirective } from '../../directives/dialog.directive';
 import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
 import { toApiRepoType } from '../../util/repo-api-type';
-import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
+import { ArtifactDetailRoute, buildArtifactDetailRoute } from '../../util/security-detail-route.util';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
 import { SeverityBreakdownComponent } from '../severity-breakdown/severity-breakdown.component';
@@ -41,6 +41,7 @@ import { SeverityBreakdownComponent } from '../severity-breakdown/severity-break
     RescanNoteComponent,
     SeverityBadgeComponent,
     SeverityBreakdownComponent,
+    RouterLink,
   ],
   templateUrl: './repo-security-modal.component.html',
 })
@@ -53,10 +54,9 @@ export class RepoSecurityModalComponent implements OnChanges {
   public loading = false;
   public detail: RepoSecurityDetail | null = null;
 
-  constructor(
-    private readonly securityService: SecurityService,
-    private readonly router: Router,
-  ) {}
+  private readonly recentScanLinks = new WeakMap<RecentScannedVersion, ArtifactDetailRoute | null>();
+
+  constructor(private readonly securityService: SecurityService) {}
 
   public ngOnChanges(changes: SimpleChanges): void {
     if (changes['open'] && this.open && this.repoName) {
@@ -68,25 +68,17 @@ export class RepoSecurityModalComponent implements OnChanges {
     this.openChange.emit(false);
   }
 
-  public isRecentScanClickable(scan: RecentScannedVersion): boolean {
-    return this.buildRecentScanRoute(scan) !== null;
-  }
-
-  public openRecentScan(scan: RecentScannedVersion, event: Event): void {
-    event.stopPropagation();
-
-    const route = this.buildRecentScanRoute(scan);
-    if (!route) {
-      return;
+  /**
+   * The detail page of a recent scan's version. Built once per scan: the template binds its `queryParams`
+   * object, and a new object on every change detection pass would be an ExpressionChanged error.
+   */
+  public recentScanLink(scan: RecentScannedVersion): ArtifactDetailRoute | null {
+    let link = this.recentScanLinks.get(scan);
+    if (link === undefined) {
+      link = this.buildRecentScanRoute(scan);
+      this.recentScanLinks.set(scan, link);
     }
-
-    this.closeModal();
-
-    if (route.queryParams) {
-      this.router.navigate([route.path], { queryParams: route.queryParams, fragment: 'security' });
-    } else {
-      this.router.navigateByUrl(`${route.path}#security`);
-    }
+    return link;
   }
 
   private buildRecentScanRoute(scan: RecentScannedVersion) {

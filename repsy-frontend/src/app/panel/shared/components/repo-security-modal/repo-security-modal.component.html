@@ -51,15 +51,23 @@
         <h4 class="mb-2 text-[13px] text-white">Recently Scanned Versions</h4>
         <div class="flex flex-col gap-1">
           @for (scan of detail.recentScans; track scan.artifactName + scan.artifactVersion) {
+            @let link = recentScanLink(scan);
             <div
               [attr.data-testid]="'security-recent-scan-' + scan.artifactName + '@' + scan.artifactVersion"
-              role="button"
-              tabindex="0"
-              [ngClass]="{ 'cursor-pointer hover:bg-[#1D1C1C]': isRecentScanClickable(scan) }"
-              (click)="openRecentScan(scan, $event)"
-              (keydown.enter)="openRecentScan(scan, $event)"
-              class="flex items-center justify-between gap-2 rounded-lg p-[10px] text-[13px]"
+              [ngClass]="{ 'hover:bg-[#1D1C1C]': link }"
+              class="row-link-host flex items-center justify-between gap-2 rounded-lg p-[10px] text-[13px]"
             >
+              @if (link) {
+                <a
+                  data-testid="row-scan-link"
+                  class="row-link"
+                  [routerLink]="link.path"
+                  [queryParams]="link.queryParams"
+                  fragment="security"
+                  [attr.aria-label]="scan.artifactName + '@' + scan.artifactVersion"
+                  (click)="closeModal()"
+                ></a>
+              }
               <span class="flex-1 truncate text-[#9C9C9D]">
                 {{ scan.artifactName }}<span class="text-[#9FA0A0]">&#64;</span>{{ scan.artifactVersion }}
               </span>

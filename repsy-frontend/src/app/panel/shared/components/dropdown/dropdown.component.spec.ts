@@ -24,19 +24,18 @@ import { DropdownComponent } from './dropdown.component';
   standalone: true,
   imports: [DropdownComponent],
   template: `
-    <button type="button" id="row" (click)="rowClicks = rowClicks + 1">
+    <div id="row">
       <app-dropdown id="first" [label]="'Actions'">
         <button id="one" (click)="picked = 'one'">One</button>
         <button id="two" disabled>Two</button>
         <a id="three" href="javascript:void(0)">Three</a>
       </app-dropdown>
-    </button>
+    </div>
     <app-dropdown id="second"><button id="other">Other</button></app-dropdown>
     <button id="outside">outside</button>
   `,
 })
 class HostComponent {
-  public rowClicks = 0;
   public picked = '';
 }
 
@@ -101,14 +100,25 @@ describe('DropdownComponent', () => {
     expect(el('#three').getAttribute('role')).toBe('menuitem');
   });
 
-  it('does not let clicks reach the row that hosts the dropdown', () => {
+  it('lets clicks bubble, the trigger and a chosen action alike, to whatever hosts the dropdown', () => {
     const host = fixture.componentInstance;
-    trigger('first').click();
-    fixture.detectChanges();
-    el('#one').click();
+    const seenByRow: Event[] = [];
+    const seenByDocument: Event[] = [];
+    const rowListener = (event: Event) => seenByRow.push(event);
+    const documentListener = (event: Event) => seenByDocument.push(event);
+    el('#row').addEventListener('click', rowListener);
+    document.addEventListener('click', documentListener);
+    try {
+      trigger('first').click();
+      fixture.detectChanges();
+      el('#one').click();
 
-    expect(host.picked).toBe('one');
-    expect(host.rowClicks).toBe(0);
+      expect(host.picked).toBe('one');
+      expect(seenByRow.length).toBe(2);
+      expect(seenByDocument.length).toBe(2);
+    } finally {
+      document.removeEventListener('click', documentListener);
+    }
   });
 
   it('opens on ArrowDown and focuses the first enabled item', () => {
@@ -190,6 +200,20 @@ describe('DropdownComponent', () => {
 
     expect(menu('first')).toBeNull();
     expect(menu('second')).not.toBeNull();
+  });
+
+  it('closes an open menu when a click lands anywhere in another dropdown, its menu included', () => {
+    trigger('first').click();
+    fixture.detectChanges();
+    expect(menu('first')).not.toBeNull();
+
+    // A click that reaches the document from inside the second dropdown (not only its trigger) is an outside
+    // click for the first one: the dropdown no longer swallows it.
+    el('#second [data-testid="dropdown"]').click();
+    fixture.detectChanges();
+
+    expect(menu('first')).toBeNull();
+    expect(menu('second')).toBeNull();
   });
 
   it('gives every dropdown its own menu id', () => {

@@ -122,12 +122,6 @@ export class DropdownComponent {
     }
   }
 
-  /** Clicks inside the dropdown must not reach the clickable row that hosts it. */
-  @HostListener('click', ['$event'])
-  onHostClick(event: Event) {
-    event.stopPropagation();
-  }
-
   @HostListener('document:click', ['$event'])
   clickOutside(event: Event) {
     if (!this.eRef.nativeElement.contains(event.target as Node)) {

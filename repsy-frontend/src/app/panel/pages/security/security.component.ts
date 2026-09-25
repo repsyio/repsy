@@ -17,7 +17,7 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Chart, registerables } from 'chart.js';
 import { finalize } from 'rxjs';
 
@@ -36,7 +36,7 @@ import { SelectorComponent } from '../../shared/components/selector/selector.com
 import { SeverityBadgeComponent } from '../../shared/components/severity-badge/severity-badge.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { SecurityScanSupportService } from '../../shared/service/security-scan-support.service';
-import { buildArtifactDetailRoute } from '../../shared/util/security-detail-route.util';
+import { ArtifactDetailRoute, buildArtifactDetailRoute } from '../../shared/util/security-detail-route.util';
 import { SecurityService } from './service/security.service';
 
 Chart.register(...registerables);
@@ -55,6 +55,7 @@ const SEVERITY_CHART_LABELS = ['Critical', 'High', 'Medium', 'Low', 'Unknown'];
     SearchboxComponent,
     SelectorComponent,
     SeverityBadgeComponent,
+    RouterLink,
   ],
   templateUrl: './security.component.html',
 })
@@ -70,6 +71,7 @@ export class SecurityComponent implements OnInit, OnDestroy {
   public loadingSummary = true;
   public scansSummary: SecurityScansSummary | null = null;
   private summaryChart?: Chart;
+  private readonly scanLinks = new WeakMap<VulnerabilityScanInfo, ArtifactDetailRoute | null>();
 
   public readonly severityOptions: string[] = [ALL_OPTION, 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'];
   public repoTypeOptions: string[] = [ALL_OPTION];
@@ -130,21 +132,17 @@ export class SecurityComponent implements OnInit, OnDestroy {
     this.fetchScans();
   }
 
-  public isScanClickable(scan: VulnerabilityScanInfo): boolean {
-    return this.buildDetailRoute(scan) !== null;
-  }
-
-  public openScan(scan: VulnerabilityScanInfo): void {
-    const route = this.buildDetailRoute(scan);
-    if (!route) {
-      return;
+  /**
+   * The detail page of the scan's version. Built once per scan: the template binds its `queryParams` object,
+   * and a new object on every change detection pass would be an ExpressionChanged error.
+   */
+  public scanLink(scan: VulnerabilityScanInfo): ArtifactDetailRoute | null {
+    let link = this.scanLinks.get(scan);
+    if (link === undefined) {
+      link = buildArtifactDetailRoute(scan.repoType, scan.repoName, scan.artifactName, scan.artifactVersion);
+      this.scanLinks.set(scan, link);
     }
-
-    if (route.queryParams) {
-      this.router.navigate([route.path], { queryParams: route.queryParams, fragment: 'security' });
-    } else {
-      this.router.navigateByUrl(`${route.path}#security`);
-    }
+    return link;
   }
 
   private fetchSupportedRepoTypes(): void {
@@ -231,9 +229,5 @@ export class SecurityComponent implements OnInit, OnDestroy {
           }
         },
       });
-  }
-
-  private buildDetailRoute(scan: VulnerabilityScanInfo): { path: string; queryParams?: Record<string, string> } | null {
-    return buildArtifactDetailRoute(scan.repoType, scan.repoName, scan.artifactName, scan.artifactVersion);
   }
 }

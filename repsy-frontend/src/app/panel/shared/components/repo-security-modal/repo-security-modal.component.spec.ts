@@ -14,11 +14,16 @@
 /// limitations under the License.
 
 import { SimpleChange } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
 import { RecentScannedVersion, RepoSecurityDetail } from '../../../../../generated/api';
 import { SecurityService } from '../../../pages/security/service/security.service';
+import { toApiRepoType } from '../../util/repo-api-type';
+import { legacyNavigationUrl } from '../../util/security-detail-route.testing';
+import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
 import { RepoSecurityModalComponent } from './repo-security-modal.component';
 
 const DETAIL = { totalCount: 3 } as unknown as RepoSecurityDetail;
@@ -26,13 +31,11 @@ const DETAIL = { totalCount: 3 } as unknown as RepoSecurityDetail;
 describe('RepoSecurityModalComponent', () => {
   let component: RepoSecurityModalComponent;
   let securityService: jasmine.SpyObj<SecurityService>;
-  let router: jasmine.SpyObj<Router>;
 
   beforeEach(() => {
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['getRepoSecurityDetail']);
     securityService.getRepoSecurityDetail.and.returnValue(of(DETAIL));
-    router = jasmine.createSpyObj<Router>('Router', ['navigate', 'navigateByUrl']);
-    component = new RepoSecurityModalComponent(securityService, router);
+    component = new RepoSecurityModalComponent(securityService);
     component.repoName = 'repo';
     component.repoType = 'npm';
   });
@@ -102,52 +105,99 @@ describe('RepoSecurityModalComponent', () => {
   describe('recent scans', () => {
     const scoped = { artifactName: '@acme/ui', artifactVersion: '1.0.0' } as RecentScannedVersion;
 
-    it('are clickable when their detail page is known', () => {
-      expect(component.isRecentScanClickable(scoped)).toBeTrue();
+    it('lead to their detail page when it is known', () => {
+      expect(component.recentScanLink(scoped)).toEqual({ path: '/repo/acme/ui/1.0.0' });
     });
 
-    it('are not clickable when it is not', () => {
-      expect(component.isRecentScanClickable({ artifactName: '@broken', artifactVersion: '1.0.0' })).toBeFalse();
-      expect(component.isRecentScanClickable({ artifactName: 'ui' })).toBeFalse();
+    it('have no link when it is not', () => {
+      expect(component.recentScanLink({ artifactName: '@broken', artifactVersion: '1.0.0' })).toBeNull();
+      expect(component.recentScanLink({ artifactName: 'ui' })).toBeNull();
     });
 
-    it('open the version detail on its security tab and close the modal', () => {
-      const closed: boolean[] = [];
-      component.openChange.subscribe((value) => closed.push(value));
-      const event = jasmine.createSpyObj<Event>('Event', ['stopPropagation']);
-
-      component.openRecentScan(scoped, event);
-
-      expect(event.stopPropagation).toHaveBeenCalled();
-      expect(closed).toEqual([false]);
-      expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/repo/acme/ui/1.0.0#security');
-    });
-
-    it('open a route with query parameters through navigate', () => {
+    it('build the link once, so that a template binding sees a stable object', () => {
       component.repoType = 'golang';
+      const scan = { artifactName: 'github.com/acme/lib', artifactVersion: 'v1.0.0' };
 
-      component.openRecentScan(
-        { artifactName: 'github.com/acme/lib', artifactVersion: 'v1.0.0' },
-        jasmine.createSpyObj<Event>('Event', ['stopPropagation']),
+      expect(component.recentScanLink(scan)).toBe(component.recentScanLink(scan));
+    });
+  });
+});
+
+describe('RepoSecurityModalComponent recent scan rows', () => {
+  @Component({ template: '' })
+  class BlankPage {}
+
+  let router: Router;
+  let fixture: ComponentFixture<RepoSecurityModalComponent>;
+
+  function render(repoType: string, scans: RecentScannedVersion[]): HTMLElement {
+    const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['getRepoSecurityDetail']);
+    securityService.getRepoSecurityDetail.and.returnValue(
+      of({ totalCount: scans.length, recentScans: scans } as unknown as RepoSecurityDetail),
+    );
+    TestBed.configureTestingModule({
+      imports: [RepoSecurityModalComponent],
+      providers: [
+        provideRouter([{ path: '**', component: BlankPage }]),
+        { provide: SecurityService, useValue: securityService },
+      ],
+    });
+    router = TestBed.inject(Router);
+    fixture = TestBed.createComponent(RepoSecurityModalComponent);
+    fixture.componentRef.setInput('repoName', 'repo');
+    fixture.componentRef.setInput('repoType', repoType);
+    fixture.componentRef.setInput('open', true);
+    fixture.detectChanges();
+    return fixture.nativeElement;
+  }
+
+  const CASES: [string, string, string, string][] = [
+    ['maven', 'org.acme:lib', '1.0.0', '/repo/org.acme/lib/1.0.0#security'],
+    ['npm', '@acme/ui', '1.0.0', '/repo/acme/ui/1.0.0#security'],
+    ['npm', 'left-pad', '1.0.0', '/repo/~/left-pad/1.0.0#security'],
+    ['cargo', 'my crate', '1.0.0', '/repo/my%20crate/1.0.0#security'],
+    ['docker', 'library/nginx', '1.25', '/repo/library/nginx/1.25/detail#security'],
+    [
+      'golang',
+      'github.com/acme/lib',
+      'v1.0.0',
+      '/repo/modules/version?modulePath=github.com%2Facme%2Flib&version=v1.0.0#security',
+    ],
+  ];
+
+  CASES.forEach(([repoType, name, version, expected]) => {
+    it(`links a ${repoType} row for ${name} to the exact URL the row navigated to before`, () => {
+      const dialog = render(repoType, [{ artifactName: name, artifactVersion: version } as RecentScannedVersion]);
+
+      const row = dialog.querySelector('[data-testid^="security-recent-scan-"]');
+      const link = row?.querySelector<HTMLAnchorElement>('a.row-link');
+      expect(row?.getAttribute('role')).toBeNull();
+      expect(row?.classList).toContain('row-link-host');
+      expect(link?.getAttribute('href')).toBe(expected);
+      expect(link?.getAttribute('href')).toBe(
+        legacyNavigationUrl(router, buildArtifactDetailRoute(toApiRepoType(repoType), 'repo', name, version)!),
       );
-
-      expect(router.navigate).toHaveBeenCalledOnceWith(['/repo/modules/version'], {
-        queryParams: { modulePath: 'github.com/acme/lib', version: 'v1.0.0' },
-        fragment: 'security',
-      });
     });
+  });
 
-    it('do nothing, not even close the modal, when the version has no detail page', () => {
-      const closed: boolean[] = [];
-      component.openChange.subscribe((value) => closed.push(value));
-      const event = jasmine.createSpyObj<Event>('Event', ['stopPropagation']);
+  it('gives a row without a detail page no link at all', () => {
+    const dialog = render('docker', [{ artifactName: 'nginx', artifactVersion: 'sha256:abc' } as RecentScannedVersion]);
 
-      component.openRecentScan({ artifactName: '@broken', artifactVersion: '1.0.0' }, event);
+    expect(dialog.querySelector('[data-testid^="security-recent-scan-"]')).not.toBeNull();
+    expect(dialog.querySelector('a.row-link')).toBeNull();
+  });
 
-      expect(event.stopPropagation).toHaveBeenCalled();
-      expect(closed).toEqual([]);
-      expect(router.navigate).not.toHaveBeenCalled();
-      expect(router.navigateByUrl).not.toHaveBeenCalled();
-    });
+  it('opens the version on its security tab and closes the modal on a click', async () => {
+    const dialog = render('maven', [
+      { artifactName: 'org.acme:lib', artifactVersion: '1.0.0' } as RecentScannedVersion,
+    ]);
+    const closed: boolean[] = [];
+    fixture.componentInstance.openChange.subscribe((value) => closed.push(value));
+
+    dialog.querySelector<HTMLAnchorElement>('a.row-link')!.click();
+    await fixture.whenStable();
+
+    expect(router.url).toBe('/repo/org.acme/lib/1.0.0#security');
+    expect(closed).toEqual([false]);
   });
 });
