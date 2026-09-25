@@ -19,6 +19,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -32,9 +33,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * RPS-1369: the artifact-level {@code maven-metadata.xml} of an artifact whose client stored none
- * is built from its registered versions, and only for the paths that are one.
+ * is built from its registered versions, and only for the paths that are one. RPS-1438: the
+ * group-level one is built from the registered plugins of the group.
  */
-@DisplayName("ArtifactMetadataSynthesizer (RPS-1369)")
+@DisplayName("ArtifactMetadataSynthesizer (RPS-1369, RPS-1438)")
 class ArtifactMetadataSynthesizerTest {
 
   private static final Instant T1 = Instant.parse("2026-09-21T10:10:10Z");
@@ -213,6 +215,120 @@ class ArtifactMetadataSynthesizerTest {
   void refusesAnUnknownAlgorithm() {
     assertThatThrownBy(() -> ArtifactMetadataSynthesizer.checksum(new byte[0], "crc32"))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  @DisplayName("parses the group-level file, a one-segment group and a path without a slash")
+  void parsesTheGroupLevelFile() {
+    final var deep =
+        ArtifactMetadataSynthesizer.parseGroupLevel("/com/acme/tools/maven-metadata.xml");
+    final var single = ArtifactMetadataSynthesizer.parseGroupLevel("acme/maven-metadata.xml");
+
+    assertThat(deep)
+        .isEqualTo(new ArtifactMetadataSynthesizer.GroupRequest("com.acme.tools", null));
+    assertThat(deep.fileName()).isEqualTo("maven-metadata.xml");
+    assertThat(deep.metadataPath()).isEqualTo("com/acme/tools/maven-metadata.xml");
+    assertThat(single).isEqualTo(new ArtifactMetadataSynthesizer.GroupRequest("acme", null));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"md5", "sha1", "sha256", "sha512"})
+  @DisplayName("parses each checksum of the group-level file")
+  void parsesEachGroupChecksum(final String algorithm) {
+    final var request =
+        ArtifactMetadataSynthesizer.parseGroupLevel("/com/acme/maven-metadata.xml." + algorithm);
+
+    assertThat(request).isNotNull();
+    assertThat(request.groupId()).isEqualTo("com.acme");
+    assertThat(request.checksumAlgorithm()).isEqualTo(algorithm);
+    assertThat(request.fileName()).isEqualTo("maven-metadata.xml." + algorithm);
+    assertThat(request.metadataPath()).isEqualTo("com/acme/maven-metadata.xml");
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/com/acme/maven-metadata.xml.asc",
+        "/com/acme/maven-metadata.xml.asc.sha1",
+        "/com/acme/maven-metadata.xml.SHA1",
+        "/com/acme/MAVEN-METADATA.XML",
+        "/com/acme/maven-metadata.xml.sha3",
+        "/com/acme/1.0-SNAPSHOT/maven-metadata.xml",
+        "/maven-metadata.xml",
+        "maven-metadata.xml",
+        "//maven-metadata.xml",
+        "/com//acme/maven-metadata.xml",
+        "/com/acme/",
+        "/com/acme/lib-1.0.pom"
+      })
+  @DisplayName("does not parse any other path as a group-level file")
+  void parsesNoGroupLevelFileElse(final String path) {
+    assertThat(ArtifactMetadataSynthesizer.parseGroupLevel(path)).isNull();
+  }
+
+  @Test
+  @DisplayName("writes the plugins in the shape Maven writes for a deployed plugin")
+  void writesThePlugins() {
+    final var xml = ArtifactMetadataSynthesizer.groupMetadataXml(plugins());
+
+    assertThat(new String(xml, UTF_8))
+        .isEqualTo(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <metadata>
+              <plugins>
+                <plugin>
+                  <name>Hello Maven Plugin</name>
+                  <prefix>hello</prefix>
+                  <artifactId>hello-maven-plugin</artifactId>
+                </plugin>
+                <plugin>
+                  <prefix>zed</prefix>
+                  <artifactId>zed-maven-plugin</artifactId>
+                </plugin>
+              </plugins>
+            </metadata>
+            """);
+  }
+
+  @Test
+  @DisplayName("leaves out the name when it is null or blank, and has no group, no versioning")
+  void leavesOutTheName() {
+    final var xml =
+        new String(
+            ArtifactMetadataSynthesizer.groupMetadataXml(
+                List.of(
+                    new RegisteredPlugin("a-maven-plugin", null, "a"),
+                    new RegisteredPlugin("b-maven-plugin", "  ", "b"))),
+            UTF_8);
+
+    assertThat(xml).doesNotContain("<name>", "groupId", "versioning");
+
+    final var metadata = ArtifactUtils.readMetadata(xml.getBytes(UTF_8));
+
+    assertThat(metadata.getPlugins()).hasSize(2);
+    assertThat(metadata.getPlugins().get(1).getPrefix()).isEqualTo("b");
+  }
+
+  @Test
+  @DisplayName("lists the plugins in the order given and is the same bytes on every call")
+  void groupFileIsStable() {
+    final var first = ArtifactMetadataSynthesizer.groupMetadataXml(plugins());
+
+    assertThat(ArtifactMetadataSynthesizer.groupMetadataXml(plugins())).isEqualTo(first);
+    assertThat(
+            ArtifactUtils.readMetadata(first).getPlugins().stream()
+                .map(plugin -> plugin.getArtifactId())
+                .toList())
+        .containsExactly("hello-maven-plugin", "zed-maven-plugin");
+    assertThat(ArtifactMetadataSynthesizer.checksum(first, "sha1"))
+        .isEqualTo(DigestUtils.sha1Hex(first).getBytes(UTF_8));
+  }
+
+  private static List<RegisteredPlugin> plugins() {
+    return List.of(
+        new RegisteredPlugin("hello-maven-plugin", "Hello Maven Plugin", "hello"),
+        new RegisteredPlugin("zed-maven-plugin", null, "zed"));
   }
 
   private static byte[] render(final List<RegisteredVersion> versions) {

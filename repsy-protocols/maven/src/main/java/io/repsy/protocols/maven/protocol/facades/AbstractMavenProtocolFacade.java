@@ -69,11 +69,14 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * (and its {@code .md5}, {@code .sha1}, {@code .sha256} and {@code .sha512} checksums) that is
    * not stored is answered from the registered versions instead of with a 404, so an artifact that
    * its client published without one (sbt, Ivy) can still be resolved by a dynamic version
-   * (RPS-1369). Nothing is written. A stored file always wins, and a checksum is generated only
-   * when the file it belongs to is not stored either: a client that stored its own metadata is
-   * never answered the digest of a file it was not served. A signature ({@code .asc}) and the
-   * version-level metadata of a {@code SNAPSHOT} are not generated, and an artifact that is not
-   * registered stays a 404.
+   * (RPS-1369). The group-level file of the same names is answered from the registered plugins, so
+   * that {@code mvn prefix:goal} finds a plugin that Gradle, sbt or Ivy published (RPS-1438). The
+   * two have the same path shape, so the artifact-level answer is tried first and the group-level
+   * one only when no artifact of that group and name is registered. Nothing is written. A stored
+   * file always wins, and a checksum is generated only when the file it belongs to is not stored
+   * either: a client that stored its own metadata is never answered the digest of a file it was not
+   * served. A signature ({@code .asc}) and the version-level metadata of a {@code SNAPSHOT} are not
+   * generated, and an artifact or group that is not registered stays a 404.
    */
   @Override
   public Resource download(final ProtocolContext context) {
@@ -86,7 +89,11 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     try {
       return this.mavenStorageService.getResource(repoInfo.getName(), storagePath);
     } catch (final ItemNotFoundException e) {
-      final var synthesized = this.synthesizeArtifactMetadata(repoInfo, relativePath.getPath());
+      var synthesized = this.synthesizeArtifactMetadata(repoInfo, relativePath.getPath());
+
+      if (synthesized == null) {
+        synthesized = this.synthesizeGroupMetadata(repoInfo, relativePath.getPath());
+      }
 
       if (synthesized == null) {
         throw e;
@@ -101,13 +108,9 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
     final var request = ArtifactMetadataSynthesizer.parse(path);
 
-    if (request == null) {
-      return null;
-    }
-
-    if (request.checksumAlgorithm() != null
-        && this.mavenStorageService.exists(
-            StoragePath.of(repoInfo.getStorageKey(), request.metadataPath()), repoInfo.getName())) {
+    if (request == null
+        || this.isChecksumOfStoredFile(
+            repoInfo, request.checksumAlgorithm(), request.metadataPath())) {
       return null;
     }
 
@@ -119,13 +122,54 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       return null;
     }
 
-    final var xml =
-        ArtifactMetadataSynthesizer.metadataXml(request.groupId(), request.artifactId(), versions);
-    final var algorithm = request.checksumAlgorithm();
+    return synthesizedResource(
+        ArtifactMetadataSynthesizer.metadataXml(request.groupId(), request.artifactId(), versions),
+        request.checksumAlgorithm(),
+        request.fileName());
+  }
+
+  private @Nullable Resource synthesizeGroupMetadata(
+      final BaseRepoInfo<ID> repoInfo, final String path) {
+
+    final var request = ArtifactMetadataSynthesizer.parseGroupLevel(path);
+
+    if (request == null
+        || this.isChecksumOfStoredFile(
+            repoInfo, request.checksumAlgorithm(), request.metadataPath())) {
+      return null;
+    }
+
+    final var plugins = this.artifactService.getRegisteredPlugins(repoInfo, request.groupId());
+
+    if (plugins.isEmpty()) {
+      return null;
+    }
+
+    return synthesizedResource(
+        ArtifactMetadataSynthesizer.groupMetadataXml(plugins),
+        request.checksumAlgorithm(),
+        request.fileName());
+  }
+
+  /** A checksum is not generated when the file it belongs to is stored: it would not match it. */
+  private boolean isChecksumOfStoredFile(
+      final BaseRepoInfo<ID> repoInfo,
+      final @Nullable String checksumAlgorithm,
+      final String metadataPath) {
+
+    return checksumAlgorithm != null
+        && this.mavenStorageService.exists(
+            StoragePath.of(repoInfo.getStorageKey(), metadataPath), repoInfo.getName());
+  }
+
+  private static Resource synthesizedResource(
+      final byte[] xml, final @Nullable String checksumAlgorithm, final String fileName) {
 
     return new SynthesizedFileResource(
-        algorithm == null ? xml : ArtifactMetadataSynthesizer.checksum(xml, algorithm),
-        request.fileName());
+        checksumAlgorithm == null
+            ? xml
+            : ArtifactMetadataSynthesizer.checksum(xml, checksumAlgorithm),
+        fileName);
   }
 
   /**
