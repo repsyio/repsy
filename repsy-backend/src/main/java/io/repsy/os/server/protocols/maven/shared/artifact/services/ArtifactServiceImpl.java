@@ -42,6 +42,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
@@ -56,6 +57,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.maven.artifact.repository.metadata.Metadata;
 import org.apache.maven.artifact.repository.metadata.SnapshotVersion;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Model;
@@ -430,6 +432,15 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     final var fullPath = storagePath.getPath().replace("\\", "/");
 
     return fullPath.substring(fullPath.indexOf("/") + 1, fullPath.lastIndexOf("/"));
+  }
+
+  /** One indexed query, see {@link ArtifactVersionRepository#findRegisteredVersions}. */
+  @Override
+  public List<RegisteredVersion> getRegisteredVersions(
+      final BaseRepoInfo<UUID> repoInfo, final String groupId, final String artifactId) {
+
+    return this.artifactVersionRepository.findRegisteredVersions(
+        repoInfo.getStorageKey(), groupId, artifactId);
   }
 
   @Override
@@ -1170,9 +1181,12 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   /**
    * The POM file name of a snapshot version. The version-level {@code maven-metadata.xml} names it
    * when there is one that lists a {@code pom} (what a Maven client resolves). Without it, or when
-   * it is unusable, the newest POM stored in the version directory is used (RPS-1370): sbt and Ivy
+   * it is unusable (no {@code <versioning>}, no {@code pom}, or content that cannot be parsed at
+   * all, RPS-1421), the newest POM stored in the version directory is used (RPS-1370): sbt and Ivy
    * deploy a snapshot under its literal name and upload no metadata at all. A literal POM counts as
-   * older than a timestamped one, see {@link ArtifactUtils#newestSnapshotPomName}.
+   * older than a timestamped one, see {@link ArtifactUtils#newestSnapshotPomName}. Unparsable
+   * metadata is treated like absent metadata here, on this read only: an upload of it still answers
+   * 400 {@code malformedMetadataFile}.
    */
   private @Nullable String getSnapshotArtifactVersionPomFileName(
       final Path artifactBasePath,
@@ -1190,8 +1204,13 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
     final var resourceOpt = this.storageStrategy.get(versionPath, repoInfo.getName());
 
-    if (resourceOpt.isPresent()) {
-      final var metadataPomName = this.pomNameOfSnapshotMetadata(resourceOpt.get(), artifactName);
+    final var metadata =
+        resourceOpt.isPresent()
+            ? readSnapshotMetadataQuietly(resourceOpt.get(), versionPath)
+            : null;
+
+    if (metadata != null) {
+      final var metadataPomName = pomNameOfSnapshotMetadata(metadata, artifactName);
 
       if (metadataPomName != null) {
         return metadataPomName;
@@ -1208,17 +1227,36 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       return storedPomName;
     }
 
-    // Metadata that lists no pom keeps answering without one; without any metadata a version with
-    // no POM behaves like a release without one (404 when the file is read).
-    return resourceOpt.isPresent() ? null : artifactName + "-" + versionName + ".pom";
+    // Metadata that lists no pom keeps answering without one; without any usable metadata (absent
+    // or unparsable, RPS-1421) a version with no POM behaves like a release without one (404 when
+    // the file is read).
+    return metadata != null ? null : artifactName + "-" + versionName + ".pom";
   }
 
-  private @Nullable String pomNameOfSnapshotMetadata(
-      final Resource metadataResource, final String artifactName)
-      throws IOException, XmlPullParserException {
+  /**
+   * The parsed version-level metadata, or {@code null} when it cannot be parsed: {@link
+   * ArtifactUtils#readMetadata} refuses it with the unchecked {@link BadRequestException}, which
+   * would answer the panel's version detail with a 400 although the POM is in the directory
+   * (RPS-1421).
+   */
+  private static @Nullable Metadata readSnapshotMetadataQuietly(
+      final Resource metadataResource, final StoragePath metadataPath) throws IOException {
 
-    final var versioning =
-        ArtifactUtils.readMetadata(metadataResource.getContentAsByteArray()).getVersioning();
+    try {
+      return ArtifactUtils.readMetadata(metadataResource.getContentAsByteArray());
+    } catch (final BadRequestException e) {
+      log.warn(
+          "Ignoring the unparsable snapshot metadata at {}, the stored POM is used instead: {}",
+          metadataPath,
+          e.getMessage());
+      return null;
+    }
+  }
+
+  private static @Nullable String pomNameOfSnapshotMetadata(
+      final Metadata metadata, final String artifactName) {
+
+    final var versioning = metadata.getVersioning();
 
     if (versioning == null) {
       return null;

@@ -10,7 +10,8 @@ spring:
   # defaults inside DB_URL's own default, so setting only one of them (e.g. DB_HOST alone) once the
   # Docker image gained its own DB_URL default (RPS-1173) would have silently switched the image to
   # H2 instead of PostgreSQL, with no error. A flat default removes that trap. Set DB_URL directly
-  # to point at a different host/port/database.
+  # to point at a different host/port/database. LegacyDatabaseVariablesWarning logs a WARN at startup
+  # when any of them is still set (RPS-1423).
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/repsy}
     username: ${DB_USERNAME:repsy}
@@ -92,6 +93,15 @@ repsy:
     # from each request (Host and X-Forwarded-* headers). Set it when a reverse proxy strips a path
     # prefix or cannot send those headers, so that clients fetch tarballs from where they found the
     # registry (RPS-1333). It is the REPO_BASE_URL of the web UI's config snippets.
+    public-url: ${REPO_BASE_URL:}
+  nuget:
+    # The address the NuGet service index, registration and search name their URLs with, e.g.
+    # https://repo.example.com (a path prefix is fine): every `@id` of /v3/index.json, the
+    # registration leaves, the `packageContent` .nupkg URLs and the search `registration` URLs start
+    # with it followed by the repo name. Empty (the default) derives it from each request (Host and
+    # X-Forwarded-* headers). Set it when a reverse proxy strips a path prefix or cannot send those
+    # headers, so that `dotnet` follows URLs it can reach (RPS-1432). It is the REPO_BASE_URL of the
+    # web UI's config snippets, like repsy.npm.public-url.
     public-url: ${REPO_BASE_URL:}
   golang:
     # Largest module zip a `go` client may publish. The zip is the raw request body, which the
@@ -223,8 +233,8 @@ app:
     # reported, nothing is blocked. Useful while rolling a widened/custom policy out.
     report-only: ${APP_CSP_REPORT_ONLY:false}
     # Overrides the built-in policy outright. Unset keeps the built-in policy (see
-    # SecurityHeadersFilter), which already allows what index.html loads (Google Tag Manager,
-    # cdnjs.cloudflare.com) plus whatever app.allowed-origins allows for connect-src.
+    # SecurityHeadersFilter), which allows the panel's own origin only (RPS-1402: no third-party
+    # host) plus whatever app.allowed-origins allows for connect-src.
     policy: ${APP_CSP_POLICY:}
 
 h2:

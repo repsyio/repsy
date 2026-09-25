@@ -21,6 +21,7 @@ import { of, Subject, throwError } from 'rxjs';
 import { LoginInfo } from '../../../../../generated/api';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
+import { renderComponent } from '../../repository/testing/render-spec-helpers';
 import { ProfileService } from '../service/profile.service';
 import { AccountInfoComponent } from './account-info.component';
 
@@ -259,5 +260,28 @@ describe('AccountInfoComponent', () => {
       expect(component.usernameForm.enabled).toBeTrue();
       expect(component.loading).toBeFalse();
     });
+  });
+});
+
+describe('AccountInfoComponent template', () => {
+  // RPS-1427: repository URLs of Repsy Open Source hold no username, so a rename cannot change them.
+  it('warns that clients signing in with the username need updating, not that repository URLs change', async () => {
+    const { fixture, el } = await renderComponent(
+      AccountInfoComponent,
+      [
+        { provide: ProfileService, useValue: {} },
+        { provide: ToastService, useValue: {} },
+        { provide: DangerModalService, useValue: {} },
+      ],
+      { username: 'alice' },
+    );
+
+    fixture.componentInstance.usernameForm.get('username').setValue('bob');
+    fixture.detectChanges();
+
+    const warning = el.querySelector('[data-testid="profile-username-warning"]')?.textContent.replace(/\s+/g, ' ');
+    expect(warning).toContain('Repository URLs do not contain your username, so they stay the same.');
+    expect(warning).toContain('must be updated to the new username');
+    expect(warning).not.toContain('will also change your repository');
   });
 });

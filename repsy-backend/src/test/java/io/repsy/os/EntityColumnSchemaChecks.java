@@ -19,6 +19,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -205,6 +206,12 @@ public final class EntityColumnSchemaChecks {
       final Mapping mapping, final DbColumn db, final Dialect dialect) {
 
     final var problems = new ArrayList<String>();
+    if (mapping.field().isAnnotationPresent(Lob.class)) {
+      // RPS-1392: a @Lob String is bound as a CLOB, which stores a large-object OID in a PostgreSQL
+      // text column (helm_oci_manifest.content did).
+      problems.add(
+          "the mapping uses @Lob; an unbounded column is columnDefinition \"text\" instead");
+    }
     final var type = typeProblem(mapping, db, dialect);
     if (type != null) {
       problems.add(type);

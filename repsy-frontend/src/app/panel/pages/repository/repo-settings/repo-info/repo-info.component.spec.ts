@@ -129,8 +129,14 @@ describe('RepoInfoComponent rename form error messages', () => {
   });
 
   it('warns about renaming in correct English (RPS-1261)', () => {
-    expect(element.textContent).toContain('Changing the repo name might break the setup of your current projects.');
+    expect(element.textContent).toContain('Changing the repo name changes the repository URL, so it might break');
     expect(element.textContent).not.toContain('might your current projects set up');
+  });
+
+  // RPS-1427: settings.xml is a Maven file; the warning applies to every package format, so it names none.
+  it("warns about renaming without naming one format's configuration file (RPS-1427)", () => {
+    expect(element.textContent).toContain('update the repository URL in the configuration of your clients');
+    expect(element.textContent).not.toContain('settings.xml');
   });
 
   it('shows the reserved-name message for a name reserved by the panel routes', () => {

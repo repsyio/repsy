@@ -17,6 +17,8 @@
 # network_mode: host so both a local stack (localhost:8080/9090) and a remote URL work unchanged.
 # A distinct project name from docker-compose.stack.yml, or compose reports the stack's own
 # containers as "orphans" of this one merely because both files would otherwise share a name.
+# run.sh passes -p "<stack project>-runners" for a non-default stack project (README.md "Parallel
+# stacks"), so that stack's runner images and shared Maven/Gradle caches are private to it.
 name: repsy-e2e-runners
 
 # Shared by every service below (YAML merge key, `<<: *runner-common`): only mappings (`user`,

@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -90,8 +91,16 @@ public abstract class AbstractRubyGemDownloadHandler implements ProtocolMethodHa
     try {
       final var filename = matcher.group(1);
       final var resource = this.facade.downloadGem(context, filename);
+      // Without a header of its own Spring names the download "f.txt" and shows it inline
+      // (RPS-1389).
       return ResponseEntity.ok()
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
+          .header(
+              HttpHeaders.CONTENT_DISPOSITION,
+              ContentDisposition.attachment()
+                  .filename(filename.substring(filename.lastIndexOf('/') + 1))
+                  .build()
+                  .toString())
           .body(resource);
     } catch (final Exception e) {
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();

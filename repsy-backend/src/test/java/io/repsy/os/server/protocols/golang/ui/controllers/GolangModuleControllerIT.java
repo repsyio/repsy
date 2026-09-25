@@ -500,12 +500,11 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.msgId").value("moduleNotFound"));
 
-    // The proxy answers as it does for a module that was never published: an empty list, no latest.
+    // The proxy answers as it does for a module that was never published: no list, no latest, both
+    // not found so the go command tries the next GOPROXY entry (RPS-1428).
     this.mockMvc
         .perform(get("/{repo}/{module}/@v/list", repo, MODULE).with(protocolPort()))
-        .andExpect(status().isOk())
-        .andExpect(
-            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(""));
+        .andExpect(status().isNotFound());
     this.mockMvc
         .perform(get("/{repo}/{module}/@latest", repo, MODULE).with(protocolPort()))
         .andExpect(status().isNotFound());

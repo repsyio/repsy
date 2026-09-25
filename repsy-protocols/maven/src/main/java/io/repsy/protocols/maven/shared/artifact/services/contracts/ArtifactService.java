@@ -18,8 +18,10 @@ package io.repsy.protocols.maven.shared.artifact.services.contracts;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.util.List;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
@@ -97,4 +99,16 @@ public interface ArtifactService<ID> {
    */
   SignatureOutcome verifySignature(
       BaseRepoInfo<ID> repoInfo, StoragePath signedStoragePath, Resource signature);
+
+  /**
+   * The versions of {@code groupId:artifactId} the repo has registered, which the artifact-level
+   * {@code maven-metadata.xml} answers a request with when the repo stores none (RPS-1369). Empty
+   * when the artifact is not registered. An implementation that does not override it registers
+   * nothing, so such a request keeps being answered with a 404.
+   */
+  default List<RegisteredVersion> getRegisteredVersions(
+      final BaseRepoInfo<ID> repoInfo, final String groupId, final String artifactId) {
+
+    return List.of();
+  }
 }

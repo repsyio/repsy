@@ -28,6 +28,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.exceptions.RedirectToSlashEndedLocationException;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
 import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
+import io.repsy.protocols.maven.protocol.resources.SynthesizedFileResource;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -154,6 +155,47 @@ class AbstractMavenHeadProtocolMethodHandlerTest {
     assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.TEXT_HTML);
     assertThat(response.getHeaders().containsHeader(HttpHeaders.CONTENT_DISPOSITION)).isFalse();
     assertThat(response.getHeaders().getContentLength()).isEqualTo("<html>demo</html>".length());
+  }
+
+  @Test
+  @DisplayName("answers a generated file as a file, not as a directory listing (RPS-1369)")
+  void generatedFile() throws Exception {
+    final var xml = "<metadata/>".getBytes(UTF_8);
+    when(this.facade.download(this.context))
+        .thenReturn(new SynthesizedFileResource(xml, "maven-metadata.xml"));
+
+    final var head = this.head("/g/demo/maven-metadata.xml");
+    final var get = this.get("/g/demo/maven-metadata.xml");
+
+    assertThat(head.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(head.getBody()).isNull();
+    assertThat(head.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
+    assertThat(head.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+        .isEqualTo("attachment; filename=maven-metadata.xml");
+    assertThat(head.getHeaders().getContentLength()).isEqualTo(xml.length);
+    assertThat(head.getHeaders().containsHeader(HttpHeaders.LAST_MODIFIED)).isFalse();
+    assertThat(head.getHeaders().containsHeader(HttpHeaders.ETAG)).isFalse();
+
+    assertThat(get.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(get.getBody()).isInstanceOf(SynthesizedFileResource.class);
+    assertThat(get.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
+    assertThat(get.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+        .isEqualTo("attachment; filename=maven-metadata.xml");
+  }
+
+  @Test
+  @DisplayName("a generated file is equal to another one of the same name and content only")
+  void generatedFileEquality() {
+    final var xml = "<metadata/>".getBytes(UTF_8);
+    final var file = new SynthesizedFileResource(xml, "maven-metadata.xml");
+
+    assertThat(file)
+        .isEqualTo(new SynthesizedFileResource(xml.clone(), "maven-metadata.xml"))
+        .hasSameHashCodeAs(new SynthesizedFileResource(xml.clone(), "maven-metadata.xml"))
+        .isNotEqualTo(new SynthesizedFileResource(xml, "maven-metadata.xml.sha1"))
+        .isNotEqualTo(new SynthesizedFileResource("x".getBytes(UTF_8), "maven-metadata.xml"))
+        .isNotEqualTo(new ByteArrayResource(xml));
+    assertThat(file.getDescription()).contains("maven-metadata.xml");
   }
 
   @Test

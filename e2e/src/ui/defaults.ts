@@ -38,9 +38,9 @@ const STYLE_ELEMENT_ID = 'repsy-e2e-no-motion';
  *  - `NO_MOTION_CSS`, injected into every document as soon as `<head>` exists (an init script, so it
  *    survives reloads and full navigations such as the header's raw "Profile" link);
  *  - an abort for every http(s) request whose origin is not in `allowedOrigins` (the UI, API and repo
- *    base URLs). That blocks Google Tag Manager, gtag, the Font Awesome CDN and Gravatar today and
- *    anything added later, so runs are offline-safe and free of third-party jitter. The avatar
- *    component falls back to the user's initial when Gravatar fails.
+ *    base URLs). The panel itself asks for no such host any more (RPS-1402, pinned by
+ *    `no-third-party-requests.spec.ts`); this blocks anything added later, so runs are offline-safe
+ *    and free of third-party jitter.
  *
  * The route is a URL predicate, so same-origin traffic is never intercepted, and a test's own
  * `page.route()` mock (page routes win over context routes) keeps working.

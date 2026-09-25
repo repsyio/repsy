@@ -62,7 +62,7 @@
             class="group flex items-center justify-center gap-2 text-[#9FA0A0]"
             (click)="toggleProfileDropdown()"
           >
-            <app-profile-avatar [email]="email" [size]="45" [fallbackChar]="username?.[0]?.toUpperCase() ?? '?'" />
+            <app-profile-avatar [size]="45" [fallbackChar]="username?.[0]?.toUpperCase() ?? '?'" />
             <svg
               class="group-hover:text-secondary-500"
               [class.rotate-180]="profileDropdown"

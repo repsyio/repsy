@@ -51,9 +51,9 @@ export class LoginValidation {
   }
 
   /**
-   * Clicks the password eye button. The button holds only a Font Awesome icon, whose font is a
-   * third-party CDN resource the suite blocks (`defaults.ts`): without it the button has no size and
-   * Playwright refuses to click it as "not visible". The DOM click is what the app handles.
+   * Clicks the password eye button with a DOM click, which is what the app handles. This predates
+   * RPS-1402: the icon was a Font Awesome glyph from a CDN the suite blocks, so the button had no size
+   * and Playwright refused to click it as "not visible". The icon is bundled now (remixicon).
    */
   async togglePasswordVisibility(): Promise<void> {
     await this.login.passwordToggle.dispatchEvent('click');

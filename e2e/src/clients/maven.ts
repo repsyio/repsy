@@ -347,12 +347,20 @@ export async function publish(world: World): Promise<AdapterResult> {
   };
 }
 
-export async function resolve(world: World): Promise<AdapterResult> {
+/** One `mvn dependency:get` of `requestedVersion` of the world's consume target, in a clean local repo. */
+async function dependencyGet(
+  world: World,
+  requestedVersion: string,
+): Promise<{
+  execResult: Awaited<ReturnType<typeof run>>;
+  localRepo: string;
+  groupId: string;
+  artifactId: string;
+}> {
   await ensureSharedCacheWarm();
 
   const { home, work } = await isolatedWorkDir(`mvn-con-${world.scenario.id}`);
   const [groupId, artifactId] = splitPackageName(world.consumeTarget.packageName);
-  const version = world.consumeTarget.version;
   const repoUrl = `${env.repoBaseUrl}/${world.repoName}`;
 
   // A minimal, source-free consumer project: dependency:get resolves the explicit -Dartifact below,
@@ -381,7 +389,7 @@ export async function resolve(world: World): Promise<AdapterResult> {
       '-B',
       '-ntp',
       'dependency:get',
-      `-Dartifact=${groupId}:${artifactId}:${version}:jar`,
+      `-Dartifact=${groupId}:${artifactId}:${requestedVersion}:jar`,
       `-DremoteRepositories=repsy::default::${repoUrl}`,
       '-s',
       'settings.xml',
@@ -397,6 +405,13 @@ export async function resolve(world: World): Promise<AdapterResult> {
     },
   );
 
+  return { execResult, localRepo, groupId, artifactId };
+}
+
+export async function resolve(world: World): Promise<AdapterResult> {
+  const version = world.consumeTarget.version;
+  const { execResult, localRepo, groupId, artifactId } = await dependencyGet(world, version);
+
   const httpStatus = await rawConsumeCheck(world);
   const resolved = await findResolvedJar(localRepo, groupId, artifactId, version);
 
@@ -407,6 +422,37 @@ export async function resolve(world: World): Promise<AdapterResult> {
     command: execResult.command,
     contentSha256: resolved?.sha256,
     resolvedFile: resolved?.file,
+  };
+}
+
+/**
+ * `dependency:get` of a version that is not a fixed one (`LATEST`, `RELEASE`, a range): which version
+ * it picked is not known up front, so this reports the versions whose jar the clean local repository
+ * holds afterwards (one, when the resolve worked), instead of the jar of a version the caller names.
+ */
+export async function resolveDynamic(
+  world: World,
+  requestedVersion: string,
+): Promise<{ clientExitCode: number; command: string; output: string; versions: string[] }> {
+  const { execResult, localRepo, groupId, artifactId } = await dependencyGet(
+    world,
+    requestedVersion,
+  );
+
+  const artifactDirectory = path.join(localRepo, groupPath(groupId), artifactId);
+  const names = await fs.readdir(artifactDirectory).catch(() => [] as string[]);
+  const versions: string[] = [];
+  for (const name of names) {
+    if (await digestOf(path.join(artifactDirectory, name, `${artifactId}-${name}.jar`))) {
+      versions.push(name);
+    }
+  }
+
+  return {
+    clientExitCode: execResult.exitCode,
+    command: execResult.command,
+    output: `${execResult.stdout}\n${execResult.stderr}`,
+    versions: versions.sort(),
   };
 }
 

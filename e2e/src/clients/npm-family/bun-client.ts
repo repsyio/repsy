@@ -47,7 +47,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { env } from '../../env.js';
-import { isolatedWorkDir, run, type RunResult } from '../exec.js';
+import { isolatedWorkDir, type RunResult } from '../exec.js';
 import { MARKER_FILENAME } from '../npm.js';
 import {
   CLIENT_BINARIES,
@@ -59,7 +59,7 @@ import {
   type PublishOptions,
   type RegistryBinding,
 } from './client.js';
-import { secretsOf, sealedEnv, writeBunfig, writeNpmrc } from './config.js';
+import { secretsOf, runSealed, sealedEnv, writeBunfig, writeNpmrc } from './config.js';
 
 const BINARY = CLIENT_BINARIES.bun;
 
@@ -92,7 +92,7 @@ export function bunExec(
   cwd: string = ctx.work,
   timeoutMs = COMMAND_TIMEOUT_MS,
 ): Promise<RunResult> {
-  return run(BINARY, args, { cwd, env: ctx.env, timeoutMs, redact: ctx.secrets, label });
+  return runSealed(BINARY, args, { cwd, env: ctx.env, timeoutMs, redact: ctx.secrets, label });
 }
 
 /** bun's package-manager commands refuse to run outside a project: give `ctx.work` a package.json. */
@@ -125,9 +125,8 @@ function preparer(config: BunConfigSource) {
         BUN_INSTALL_CACHE_DIR: cache,
         BUN_INSTALL: path.join(home, '.bun'),
         DO_NOT_TRACK: '1',
-        // Playwright's workers set FORCE_COLOR, which bun honours over NO_COLOR: colour codes would
-        // split every message a test matches on.
-        FORCE_COLOR: '0',
+        // Playwright's workers set FORCE_COLOR, which bun honours over NO_COLOR; the sealed env no
+        // longer carries it (RPS-1364), so NO_COLOR alone keeps colour codes out of the messages.
         NO_COLOR: '1',
       }),
       secrets: secretsOf(bindings),
@@ -250,7 +249,7 @@ function createBunClient(config: BunConfigSource, label: string): NpmFamilyClien
       return bunExec(ctx, 'bun-publish', args, opts.dir);
     }
     const { env: publishEnv, secrets } = await tokenHome(ctx);
-    return run(BINARY, args, {
+    return runSealed(BINARY, args, {
       cwd: opts.dir,
       env: publishEnv,
       timeoutMs: COMMAND_TIMEOUT_MS,

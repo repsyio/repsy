@@ -765,4 +765,42 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
           .andExpect(status().isNotFound());
     }
   }
+
+  @Nested
+  @DisplayName("a snapshot whose version-level maven-metadata.xml cannot be parsed (RPS-1421)")
+  class SnapshotWithMalformedMetadata {
+
+    @Test
+    @DisplayName("the detail falls back to the stored POM instead of answering 400")
+    void showsTheStoredPom() throws Exception {
+      MavenArtifactControllerIT.this.seedSnapshotWithoutMetadata(
+          "garbled",
+          "2.0-SNAPSHOT",
+          Map.of(
+              "maven-metadata.xml", "<metadata><versioning>",
+              "garbled-2.0-20260921.101010-1.pom", "<project>build 1</project>",
+              "garbled-2.0-20260921.101010-2.pom", "<project>build 2</project>"));
+
+      MavenArtifactControllerIT.this
+          .versionDetail("garbled", "2.0-SNAPSHOT")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("artifactVersionFetched"))
+          .andExpect(jsonPath("$.data.pomFile").value("<project>build 2</project>"));
+    }
+
+    @Test
+    @DisplayName("without a stored POM it answers 404 like absent metadata, not 400")
+    void answers404WithoutAnyPom() throws Exception {
+      MavenArtifactControllerIT.this.seedSnapshotWithoutMetadata(
+          "garbledjar",
+          "2.0-SNAPSHOT",
+          Map.of(
+              "maven-metadata.xml", "not xml at all",
+              "garbledjar-2.0-SNAPSHOT.jar", "jar bytes"));
+
+      MavenArtifactControllerIT.this
+          .versionDetail("garbledjar", "2.0-SNAPSHOT")
+          .andExpect(status().isNotFound());
+    }
+  }
 }

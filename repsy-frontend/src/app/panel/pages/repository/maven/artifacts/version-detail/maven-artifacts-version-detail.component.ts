@@ -23,7 +23,13 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { ArtifactVersionInfo, RepoPermissionInfo, RepoType } from '../../../../../../../generated/api';
+import {
+  ArtifactVersionInfo,
+  RepoPermissionInfo,
+  RepoType,
+  VersionDeveloperInfo,
+  VersionLicenseInfo,
+} from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -35,6 +41,36 @@ import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { DeletedItem } from '../../dto/deleted-item';
 import { MavenService } from '../../service/maven.service';
 import { showVersionDeleteDialog } from '../../util/version-delete-warning.util';
+
+/** What the licenses and developers lines show when the POM declares none. */
+const NO_VALUE = '-';
+
+/**
+ * The licenses of a version as one line of plain text (RPS-1425): the name of each, or its URL when it has no name,
+ * sorted because the server sends them in no particular order.
+ */
+export function formatLicenses(licenses: VersionLicenseInfo[] | undefined | null): string {
+  return joinSorted((licenses ?? []).map((license) => license?.name?.trim() || license?.url?.trim()));
+}
+
+/** The developers of a version as one line of plain text (RPS-1425): `Name <email>`, or whichever of the two is there. */
+export function formatDevelopers(developers: VersionDeveloperInfo[] | undefined | null): string {
+  return joinSorted(
+    (developers ?? []).map((developer) => {
+      const name = developer?.name?.trim();
+      const email = developer?.email?.trim();
+      if (name && email) {
+        return `${name} <${email}>`;
+      }
+      return name || email;
+    }),
+  );
+}
+
+function joinSorted(entries: (string | undefined)[]): string {
+  const shown = entries.filter((entry): entry is string => !!entry).sort((a, b) => a.localeCompare(b));
+  return shown.length > 0 ? shown.join(', ') : NO_VALUE;
+}
 
 @Component({
   selector: 'app-maven-artifacts-version-detail',
@@ -70,6 +106,8 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
   public buildrDependencyHtml: string;
   public purlDependencyHtml: string;
   public bazelDependencyHtml: string;
+  public licensesText = NO_VALUE;
+  public developersText = NO_VALUE;
 
   private readonly repositoryChanges$: Subscription;
 
@@ -130,6 +168,8 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
       .subscribe({
         next: (data) => {
           this.version = data;
+          this.licensesText = formatLicenses(data.licenses);
+          this.developersText = formatDevelopers(data.developers);
           this.mavenDependencyHtml = `<dependency>
   <groupId>${this.version.artifactGroupName}</groupId>
   <artifactId>${this.version.artifactName}</artifactId>

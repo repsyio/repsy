@@ -39,10 +39,9 @@
           >
             <i
               aria-hidden="true"
-              class="fa-solid"
               [ngClass]="{
-                'fa-eye': !formUi.passwordElement.visiblePassword,
-                'fa-eye-slash': formUi.passwordElement.visiblePassword,
+                'ri-eye-line': !formUi.passwordElement.visiblePassword,
+                'ri-eye-off-line': formUi.passwordElement.visiblePassword,
               }"
             ></i>
           </button>
@@ -100,10 +99,9 @@
           >
             <i
               aria-hidden="true"
-              class="fa-solid"
               [ngClass]="{
-                'fa-eye': !formUi.passwordConfirmationElement.visiblePassword,
-                'fa-eye-slash': formUi.passwordConfirmationElement.visiblePassword,
+                'ri-eye-line': !formUi.passwordConfirmationElement.visiblePassword,
+                'ri-eye-off-line': formUi.passwordConfirmationElement.visiblePassword,
               }"
             ></i>
           </button>
@@ -189,9 +187,8 @@
       <div class="text-body2 min-h-7 pt-5">
         @if (usernameForm.get('username')?.value !== username) {
           <p data-testid="profile-username-warning" class="text-warning-500" animate.enter="fade-in-up">
-            Usernames are used to build repository URLs. So changing your username will also change your repository
-            URLs, thus this action will most likely affect your current projects set-ups. Be sure to update them after
-            changing your username.
+            Repository URLs do not contain your username, so they stay the same. Clients that sign in with your username
+            (for example a Maven settings.xml or an npm .npmrc) must be updated to the new username after you change it.
           </p>
         }
       </div>

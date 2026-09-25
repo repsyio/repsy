@@ -145,9 +145,9 @@
 
                   <div class="flex gap-2 text-[14px] text-white">
                     @if (version.signed) {
-                      <i class="fa-solid fa-lock mt-[2px]"></i>
+                      <i aria-hidden="true" class="ri-lock-line mt-[2px]"></i>
                     } @else {
-                      <i class="fa-solid fa-unlock mt-[2px]"></i>
+                      <i aria-hidden="true" class="ri-lock-unlock-line mt-[2px]"></i>
                     }
 
                     <app-tooltip
@@ -255,9 +255,9 @@
                       <span data-testid="row-signed" class="text-secondary-500 text-right break-all">
                         {{ version.signed ? 'Signed' : 'Unsigned' }}
                         @if (version.signed) {
-                          <i class="fa-solid fa-lock"></i>
+                          <i aria-hidden="true" class="ri-lock-line"></i>
                         } @else {
-                          <i class="fa-solid fa-unlock"></i>
+                          <i aria-hidden="true" class="ri-lock-unlock-line"></i>
                         }
                       </span>
                     </div>

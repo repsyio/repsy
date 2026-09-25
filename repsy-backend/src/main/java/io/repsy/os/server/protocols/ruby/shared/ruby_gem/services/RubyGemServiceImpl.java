@@ -241,15 +241,49 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
     this.gemRepository.deleteById(gemId);
   }
 
+  /**
+   * Deletes one version row, yanked or not, and keeps the gem's own bookkeeping true for the
+   * versions that are left: {@code latest} moves off a version that no longer exists, and the
+   * versions checksum that {@code /versions} serves follows the new {@code /info} (RPS-1426).
+   *
+   * @return how many versions of the gem remain, so the caller can remove an emptied gem
+   * @throws ItemNotFoundException when the gem has no such version and platform
+   */
   @Transactional
-  public void deleteVersion(final UUID gemId, final String version, final String platform) {
-    this.versionRepository
-        .findByGemIdAndVersionAndPlatform(gemId, version, platform)
-        .ifPresent(v -> this.versionRepository.deleteById(v.getId()));
+  public long deleteVersion(final UUID gemId, final String version, final String platform) {
+    final var gemVersion =
+        this.versionRepository
+            .findByGemIdAndVersionAndPlatform(gemId, version, platform)
+            .orElseThrow(() -> new ItemNotFoundException(GEM_VERSION_NOT_FOUND));
+    this.versionRepository.delete(gemVersion);
+    this.versionRepository.flush();
+
+    final var remaining = this.versionRepository.countByGemId(gemId);
+    if (remaining > 0) {
+      this.refreshGemAfterVersionDelete(gemId);
+    }
+    return remaining;
   }
 
-  public long countNonYankedVersions(final UUID gemId) {
-    return this.versionRepository.countByGemIdAndYankedFalse(gemId);
+  private void refreshGemAfterVersionDelete(final UUID gemId) {
+    final var gem =
+        this.gemRepository
+            .findById(gemId)
+            .orElseThrow(() -> new ItemNotFoundException(GEM_NOT_FOUND));
+
+    if (!this.versionRepository.existsByGemIdAndVersion(gemId, gem.getLatest())) {
+      // Same choice as yankGem: the newest live version, else the newest one there is.
+      final var newLatest =
+          this.versionRepository
+              .findFirstByGemIdAndYankedFalseOrderByCreatedAtDesc(gemId)
+              .or(() -> this.versionRepository.findFirstByGemIdOrderByCreatedAtDesc(gemId));
+      newLatest.ifPresent(v -> gem.setLatest(v.getVersion()));
+    }
+
+    final var entries = this.toCompactEntries(this.versionRepository.findAllCompactByGemId(gemId));
+    gem.setVersionsChecksum(
+        CompactIndexFormatter.md5Hex(CompactIndexFormatter.formatGemInfo(entries)));
+    this.gemRepository.save(gem);
   }
 
   @Override

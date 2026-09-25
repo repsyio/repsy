@@ -557,11 +557,10 @@ public class ErrorHandler {
   }
 
   /**
-   * The message of the shared {@code unAuthorized} id says the user is logged in but lacks the
-   * permission, which is what a package manager is told on the wire. A panel 401 means the
-   * opposite: the credential is missing or invalid, or its account is gone, as a signed-in user
-   * without the permission gets a 403 {@code accessDenied} there (RPS-1268). The panel gets its own
-   * id and text for it (RPS-1352); every other id, and the wire answer, stay as they are.
+   * The panel gets its own id and text for a 401 (RPS-1352): it means the credential is missing or
+   * invalid, or its account is gone, as a signed-in user without the permission gets a 403 {@code
+   * accessDenied} there (RPS-1268). Every other id, and the wire answer with the shared {@code
+   * unAuthorized} id, stay as they are.
    */
   private ResponseEntity<RestResponse<String>> unauthorizedBody(
       final @NonNull HttpServletRequest request, final @NonNull UnAuthorizedException ex) {

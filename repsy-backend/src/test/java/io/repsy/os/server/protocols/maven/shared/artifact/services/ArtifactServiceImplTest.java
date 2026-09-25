@@ -55,11 +55,13 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -824,6 +826,22 @@ class ArtifactServiceImplTest {
     this.stubVersionDir("lib-2.0-20260921.101010-3.jar");
 
     assertThat(this.pomFilenameOf("2.0-SNAPSHOT")).isNull();
+  }
+
+  @Test
+  @DisplayName(
+      "metadata that cannot be parsed is treated like absent metadata, it is not a 400 (RPS-1421)")
+  void snapshotMetadataThatCannotBeParsedFallsBack() throws Exception {
+    this.stubVersionMetadata("<metadata><versioning>");
+    this.stubVersionDir("lib-2.0-20260921.101010-3.pom", "lib-2.0-SNAPSHOT.pom");
+
+    assertThat(this.pomFilenameOf("2.0-SNAPSHOT")).isEqualTo("lib-2.0-20260921.101010-3.pom");
+
+    // no POM stored: the literal name, as for absent metadata (the read then answers 404), not the
+    // null of metadata that parsed and lists no pom
+    this.stubVersionDir("lib-2.0-SNAPSHOT.jar");
+
+    assertThat(this.pomFilenameOf("2.0-SNAPSHOT")).isEqualTo("lib-2.0-SNAPSHOT.pom");
   }
 
   private static StoragePath pathOf(final String relativePath) {
@@ -2021,6 +2039,23 @@ class ArtifactServiceImplTest {
     final var version = ArgumentCaptor.forClass(ArtifactVersion.class);
     verify(this.artifactUpsertHelper).insertArtifactVersion(version.capture(), any(), any());
     assertThat(version.getValue().getPrefix()).isNull();
+  }
+
+  @Test
+  @DisplayName("lists the registered versions of the artifact of the repo, RPS-1369")
+  void registeredVersionsComeFromTheRepositoryOfTheStorageKey() {
+    final var id = UUID.randomUUID();
+    final var rows =
+        List.of(
+            new RegisteredVersion("1.0", Instant.parse("2026-09-21T10:10:10Z")),
+            new RegisteredVersion("1.1", null));
+    when(this.artifactVersionRepository.findRegisteredVersions(id, "com.acme", "lib"))
+        .thenReturn(rows);
+
+    assertThat(
+            this.artifactService.getRegisteredVersions(
+                repo(id, true, true, true), "com.acme", "lib"))
+        .isEqualTo(rows);
   }
 
   private Resource stubStoredPom(final String relativePath) {

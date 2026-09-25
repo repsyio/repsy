@@ -58,7 +58,7 @@ Access the application:
   docker logs repsy | grep "password"
   ```
 
-> **Note:** The H2 database is stored at `/app/data` inside the container. File storage defaults to `~/.repsy` on the host and is **not** covered by the volume mount. Set `STORAGE_BASE_PATH` to persist artifacts inside the same volume (see [Option 1](#option-1-docker-with-h2-embedded-database)).
+> **Note:** In the image, the H2 database (`/app/data/repsy`) and the artifact files (`STORAGE_BASE_PATH`, default `/app/data/storage`) both live under `/app/data`, so one volume keeps both. The command above has no volume: everything is lost when the container is removed. Add `-v repsy-data:/app/data` to keep it (see [Option 1](#option-1-docker-with-h2-embedded-database)).
 
 ## HTTPS / SSL
 
@@ -152,7 +152,7 @@ docker run -d \
   repo.repsy.io/repsy/os/repsy:latest
 ```
 
-> The `-v repsy-data:/app/data` flag persists the H2 database across container restarts. Setting `STORAGE_BASE_PATH=/app/data/storage` ensures artifact file storage is also kept inside the same volume. Without it, artifacts default to `~/.repsy` on the host and are **not** covered by the volume mount.
+> The `-v repsy-data:/app/data` flag persists the H2 database and the artifact files (`/app/data/storage`) across container recreation. Without a volume both are lost when the container is removed.
 
 ### Option 2: Docker with PostgreSQL
 
@@ -167,6 +167,7 @@ docker run -d \
   -e POSTGRES_DB=repsy \
   -e POSTGRES_USER=repsy \
   -e POSTGRES_PASSWORD=repsy123 \
+  -v repsy-pgdata:/var/lib/postgresql \
   -p 5432:5432 \
   postgres:18
 
@@ -180,8 +181,11 @@ docker run -d \
   -e DB_USERNAME=repsy \
   -e DB_PASSWORD=repsy123 \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
+  -v repsy-data:/app/data \
   repo.repsy.io/repsy/os/repsy:latest
 ```
+
+> Two volumes keep this install across container recreation: `repsy-data` for the artifact files (`/app/data/storage`) and `repsy-pgdata` for the database. Mount PostgreSQL 18's volume at `/var/lib/postgresql`: it keeps its data in a versioned directory below that path, so a volume at `/var/lib/postgresql/data` does not persist it.
 
 ### Option 3: Docker Compose with PostgreSQL
 
@@ -195,6 +199,8 @@ services:
       - POSTGRES_DB=repsy
       - POSTGRES_USER=repsy
       - POSTGRES_PASSWORD=repsy123
+    volumes:
+      - repsy-pgdata:/var/lib/postgresql
     ports:
       - "5432:5432"
     networks:
@@ -213,12 +219,18 @@ services:
       - DB_USERNAME=repsy
       - DB_PASSWORD=repsy123
       - ADMIN_INITIAL_PASSWORD=YourSecurePassword123
+    volumes:
+      - repsy-data:/app/data
     networks:
       - repsy-network
 
 networks:
   repsy-network:
     driver: bridge
+
+volumes:
+  repsy-data:
+  repsy-pgdata:
 ```
 
 #### Adding vulnerability scanning to the stack
@@ -309,6 +321,28 @@ Access at:
 
 ## Upgrading
 
+### Artifact storage moved to `/app/data/storage` in the Docker image (RPS-1401)
+
+Earlier images did not set `STORAGE_BASE_PATH`, so artifacts went to `/home/appuser/.repsy`, inside the container's writable layer and not on the `/app/data` volume: a recreated container kept its database and lost every artifact. The image now defaults `STORAGE_BASE_PATH` to `/app/data/storage`, on the volume.
+
+**Who is affected:** an existing container whose artifacts are in `/home/appuser/.repsy` (a bind mount of it, or a container that is only restarted, never recreated).
+
+**What happens:** on startup `entrypoint.sh` keeps using `/home/appuser/.repsy` when `STORAGE_BASE_PATH` is still the image default, `/app/data/storage` is empty and `/home/appuser/.repsy` holds data. It logs a `WARN: ... holds artifacts and /app/data/storage is empty` line, so nothing disappears on upgrade. Without a mount of that directory, recreating the container has always lost the artifacts; nothing can restore them.
+
+**To move to the new default** (once): stop Repsy, copy the content of `/home/appuser/.repsy` into `/app/data/storage` (for example `docker cp repsy:/home/appuser/.repsy/. ./repsy-storage` and then copy that directory into the volume with a helper container, or bind-mount your old directory at `/app/data/storage`), and start again. Or set `STORAGE_BASE_PATH=/home/appuser/.repsy` explicitly and keep mounting it.
+
+### `DB_HOST`, `DB_PORT` and `DB_DATABASE` are no longer read (RPS-1173 / RPS-1423)
+
+Releases up to `v26.08.4` built the PostgreSQL URL from `DB_HOST`, `DB_PORT` and `DB_DATABASE`. Only `DB_URL` is read now, and the Docker image defaults it to an embedded H2 file. A container that is upgraded with the old variables and no `DB_URL` therefore starts on a new, empty H2 database: the panel shows a fresh installation and the PostgreSQL data looks lost (it is untouched).
+
+Set `DB_URL=jdbc:postgresql://<host>:<port>/<database>` instead (with `DB_USERNAME` and `DB_PASSWORD`). To help, Repsy logs a `WARN` at startup whenever any of the three variables is set, whatever `DB_URL` is:
+
+```
+The environment variables DB_HOST, DB_PORT are no longer read: only DB_URL selects the database. To keep using PostgreSQL set DB_URL=jdbc:postgresql://pg:5432/repsy (with DB_USERNAME and DB_PASSWORD).
+```
+
+When the effective database is H2 it adds that Repsy is starting on the embedded H2 database, not PostgreSQL. It never prints `DB_URL` itself, since that may carry credentials. Repsy still starts.
+
 ### Password reset when upgrading past the BCrypt migration (RPS-961 / RPS-1033)
 
 The first release that contains both RPS-961 (hashing passwords with BCrypt) and RPS-1033
@@ -378,10 +412,10 @@ and after the upgrade. A manifest whose file is missing or does not match its di
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ADMIN_INITIAL_PASSWORD` | Initial admin password. Only applied on first startup when no admin exists. | *(empty)* |
-| `DB_URL` | JDBC database URL. The Docker image defaults to the embedded H2 database; running from source (`mvn spring-boot:run`) defaults to PostgreSQL on `localhost:5432` instead. | `jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` (image only) |
+| `DB_URL` | JDBC database URL. The Docker image defaults to the embedded H2 database; running from source (`mvn spring-boot:run`) defaults to PostgreSQL on `localhost:5432` instead. `DB_HOST`, `DB_PORT` and `DB_DATABASE` are not read (Repsy warns at startup if they are set). | `jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` (image only) |
 | `DB_USERNAME` | Database username | `repsy` |
 | `DB_PASSWORD` | Database password | `repsy123` |
-| `STORAGE_BASE_PATH` | Base directory for artifact file storage. Set to a path inside `/app/data` (e.g. `/app/data/storage`) to persist artifacts with a single volume mount. Deleting a repo, a package or a version moves its files into a `trash/` directory of the protocol (for example `maven/trash`) first; the trash older than `TRASH_RETENTION` is removed every day (see `TRASH_CLEANUP_ENABLED`). | `~/.repsy` |
+| `STORAGE_BASE_PATH` | Base directory for artifact file storage. Set to a path inside `/app/data` (e.g. `/app/data/storage`) to persist artifacts with a single volume mount (the Docker image already does). Deleting a repo, a package or a version moves its files into a `trash/` directory of the protocol (for example `maven/trash`) first; the trash older than `TRASH_RETENTION` is removed every day (see `TRASH_CLEANUP_ENABLED`). | `~/.repsy` (`/app/data/storage` in the Docker image) |
 | `OS_APP_JWT_SECRET` | JWT signing secret. If not set, a random 256-bit secret is generated on every startup — every restart/redeploy invalidates all existing sessions, forcing every user to log in again. Set a stable, secure random value for any production/self-host deployment. | *(random, regenerated on every startup)* |
 | `SERVER_PORT` | Repository operations port | `9090` |
 | `API_PORT` | Backend API and Frontend web UI port | `8080` |
@@ -424,7 +458,7 @@ and after the upgrade. A manifest whose file is missing or does not match its di
 | `APP_ALLOWED_ORIGINS` | Comma-separated list of exact origins (e.g. `https://panel.example.com,https://panel-staging.example.com`) the panel API accepts cross-origin, credentialed requests from. Unset keeps today's behaviour: any origin is allowed. Set it once the panel is reachable from a known, fixed set of origins | *(empty, any origin allowed)* |
 | `APP_CSP_ENABLED` | Send a `Content-Security-Policy` header with the panel SPA and its static assets (JSON API responses are unaffected). See [Content Security Policy](#content-security-policy) | `true` |
 | `APP_CSP_REPORT_ONLY` | Send `Content-Security-Policy-Report-Only` instead of the enforcing header: violations are reported (in a browser that supports the Reporting API and is told where to send reports), nothing is blocked. Useful while rolling out a widened or replaced policy | `false` |
-| `APP_CSP_POLICY` | Overrides the built-in Content-Security-Policy outright, so an operator can widen it (for example to allow another analytics or CDN host) without a rebuild. See [Content Security Policy](#content-security-policy) for the built-in policy | *(empty, built-in policy)* |
+| `APP_CSP_POLICY` | Overrides the built-in Content-Security-Policy outright, so an operator can widen it (for example to allow a CDN or font host) without a rebuild. See [Content Security Policy](#content-security-policy) for the built-in policy | *(empty, built-in policy)* |
 
 **Important Notes:**
 
@@ -444,25 +478,27 @@ The built-in policy:
 
 ```
 default-src 'self';
-script-src 'self' https://www.googletagmanager.com;
-style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
-font-src 'self' https://cdnjs.cloudflare.com data:;
-img-src 'self' data: https://www.googletagmanager.com https://www.google-analytics.com;
-connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com <app.allowed-origins>;
+script-src 'self';
+style-src 'self' 'unsafe-inline';
+font-src 'self' data:;
+img-src 'self' data:;
+connect-src 'self' <app.allowed-origins>;
 object-src 'none';
 base-uri 'self';
 frame-ancestors 'none';
 form-action 'self';
 ```
 
+The panel names no third-party host: it loads no analytics, tag manager, CDN stylesheet, web font
+or avatar image from another origin, so it works with no outbound internet access.
 `connect-src` additionally allows whatever origins `APP_ALLOWED_ORIGINS` allows (see
 [Cross-Origin Requests (CORS)](#cross-origin-requests-cors)), since a browser calling the API
 cross-origin from one of those origins is exactly what CORS was configured to allow.
 
 - Set `APP_CSP_REPORT_ONLY=true` to send `Content-Security-Policy-Report-Only` instead while
   rolling a change out: violations are reported, nothing is blocked.
-- Set `APP_CSP_POLICY` to replace the built-in policy outright, for example to allow a different
-  analytics host or CDN, without a rebuild.
+- Set `APP_CSP_POLICY` to replace the built-in policy outright, for example to allow a CDN or font
+  host, without a rebuild.
 - Set `APP_CSP_ENABLED=false` to turn the header off entirely (for example if a reverse proxy in
   front of Repsy already sends its own).
 
@@ -499,6 +535,8 @@ If that happens, Repsy fails safe: the limit is generous (20 failures in 60 seco
 > **Note:** The web UI's "how to connect" config snippets for repository operations (Maven, npm, pip, etc.) use the `REPO_BASE_URL` environment variable, resolved at container startup — set it to your public repository-operations URL (e.g. `https://repo.example.com`) when running behind a reverse proxy.
 
 **npm tarball URLs.** The npm registry names itself in the `dist.tarball` of every version it serves, whatever host, port or scheme the publisher used (the npm CLI and Yarn 1 write `http://` even for an HTTPS registry). It takes the address from `REPO_BASE_URL` (the `repsy.npm.public-url` property) when that is set, and otherwise from each request (`Host` and the `X-Forwarded-*` headers above). Set `REPO_BASE_URL` when your proxy strips a path prefix or cannot send those headers, and when the proxy is not a trusted one, because the address cannot be derived from the request there. Nothing has to be migrated: versions published earlier are served with the new address too.
+
+**NuGet resource URLs.** The NuGet service index (`/v3/index.json`), the registration (including the `packageContent` URL of each `.nupkg`) and the search results name their URLs with an address, and `dotnet restore` follows them. Like npm, NuGet takes that address from `REPO_BASE_URL` (the `repsy.nuget.public-url` property) when that is set, followed by the repository name (`https://repo.example.com/my-repo/v3/index.json`), and otherwise from each request (`Host` and the `X-Forwarded-*` headers above). Set `REPO_BASE_URL` when your proxy strips a path prefix or cannot send those headers, so that clients are not sent to your internal address.
 
 ## Usage
 
@@ -607,9 +645,9 @@ instance per team.
   version of that path again creates the module again. Deleting a module as a whole is the same
   operation for all of its versions. The disk usage of what was deleted is given back to the
   repository, and a deleted version is reported to the vulnerability scanner as deleted.
-- **The Go proxy answers as it does for a module that was never published.** `@v/list` of a module
-  without versions is `200` with an empty body (not `404`, which would make the `go` command try the
-  next `GOPROXY` entry), and `@latest` is `404`.
+- **The Go proxy answers as it does for a module that was never published.** `@v/list` and `@latest`
+  of a module without versions are `404` with a `text/plain` body, so the `go` command tries the
+  next `GOPROXY` entry instead of taking an empty list as an answer.
 - A delete and a publish of the same module take turns, so a publish that arrives while the last
   version is being deleted is stored, in a module that is created again, and never fails.
 
@@ -686,7 +724,8 @@ With *Allow override* off, a Maven repository refuses to store a file that alrea
 
 The panel shows the version of a SNAPSHOT that carries no `maven-metadata.xml` (what sbt and Ivy
 leave) with the newest POM stored for it: the POM of the newest timestamped build, or the literal
-`-SNAPSHOT` POM when there is no build.
+`-SNAPSHOT` POM when there is no build. The same goes for a `maven-metadata.xml` that cannot be
+parsed, and a manual vulnerability scan of such a SNAPSHOT scans its newest stored jar.
 
 ### Apache Ivy Clients
 
@@ -759,10 +798,17 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
   version's page in the panel does, which asks for the jar only; a dependency without a `conf` resolves
   as well, because Repsy answers `404` for the `sources` and `javadoc` artifacts the artifact does not
   have and Ivy then skips them.
-- **No `maven-metadata.xml`:** Repsy stores the `maven-metadata.xml` a client uploads but never
-  generates one. An Ivy, sbt or raw `PUT` publish has none, so Maven `LATEST` and version ranges, and
-  Gradle/sbt dynamic versions, do not resolve for such artifacts. Ivy itself falls back to the
-  directory listing (`latest.integration` and `[1.0,)` resolve), so use fixed versions everywhere else.
+- **`maven-metadata.xml`:** Ivy, sbt and a raw `PUT` publish none, so there is no file to store. Repsy
+  answers a `GET` or `HEAD` of the artifact-level `<group path>/<artifact>/maven-metadata.xml` (and of
+  its `.md5`, `.sha1`, `.sha256` and `.sha512`) from the versions it has registered when no client
+  stored one, so Maven `LATEST`, `RELEASE` and version ranges, Gradle `1.+` and sbt `latest.release`
+  resolve for such artifacts. A file a client did store is always served as it is (Repsy never merges
+  the registered versions into it), so an artifact that `mvn deploy` or Gradle published first and
+  that Ivy or sbt then added a version to keeps listing only what Maven or Gradle wrote; a later
+  `mvn deploy` of the artifact finds the generated list and stores it with its own version added.
+  Nothing generated is stored: it is not in the directory listing, is never signed (`.asc` is a `404`)
+  and is not generated for the version-level file of a SNAPSHOT (Maven, Gradle and Ivy resolve a
+  non-unique SNAPSHOT by its own file name without it).
 
 ### Authenticating from CI
 
@@ -977,11 +1023,8 @@ docker logs -f repsy-postgres
 # Stop and remove container
 docker rm -f repsy
 
-# Remove named volume (if used)
+# Remove the named volume: it holds the H2 database and the artifact files (/app/data/storage)
 docker volume rm repsy-data
-
-# Remove file storage
-rm -rf ~/.repsy
 
 # Start fresh (H2 example)
 docker run -d \
@@ -989,7 +1032,6 @@ docker run -d \
   -p 8080:8080 \
   -p 9090:9090 \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
-  -e STORAGE_BASE_PATH=/app/data/storage \
   -v repsy-data:/app/data \
   repo.repsy.io/repsy/os/repsy:latest
 ```

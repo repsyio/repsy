@@ -353,11 +353,32 @@ class GolangLastVersionRemovalIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, this.panelToken))
         .andExpect(status().isNotFound());
-    // ...and the wire answers as it always did for a module without versions.
+    // ...and the wire answers as it does for a module that was never published: not found, so the
+    // go command tries the next GOPROXY entry instead of taking an empty list as an answer
+    // (RPS-1428).
     final var list = this.wireGet(repo, module, "@v/list");
-    assertThat(list.getStatus()).isEqualTo(200);
-    assertThat(list.getContentAsString()).isEmpty();
+    assertThat(list.getStatus()).isEqualTo(404);
+    assertThat(list.getContentType()).startsWith("text/plain");
+    assertThat(list.getContentAsString()).startsWith("not found: ");
     assertThat(this.wireGet(repo, module, "@latest").getStatus()).isEqualTo(404);
+  }
+
+  @Test
+  @DisplayName("@v/list of a module that was never published is not found, as text (RPS-1428)")
+  void versionListOfANeverPublishedModuleIsNotFound() throws Exception {
+    final var repo = this.goRepo();
+    final var module = uniqueModulePath();
+    final var otherModule = uniqueModulePath();
+    this.publish(repo, otherModule, "v1.0.0");
+
+    final var list = this.wireGet(repo, module, "@v/list");
+
+    assertThat(list.getStatus()).isEqualTo(404);
+    assertThat(list.getContentType()).startsWith("text/plain");
+    assertThat(list.getContentAsString()).isEqualTo("not found: /" + module + "/@v/list");
+    assertThat(this.wireGet(repo, otherModule, "@v/list").getContentAsString())
+        .as("a module that exists is unaffected")
+        .isEqualTo("v1.0.0");
   }
 
   @Test

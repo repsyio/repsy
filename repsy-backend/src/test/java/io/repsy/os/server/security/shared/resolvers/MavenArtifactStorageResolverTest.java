@@ -24,10 +24,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
+import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -39,11 +44,12 @@ import org.springframework.core.io.ByteArrayResource;
 
 /**
  * The stored snapshot metadata is only a hint for finding the build a scan is about. A corrupt one
- * must fall back to "not resolved" and not surface as the {@code 400} that {@code
- * ArtifactUtils.readMetadata} answers an upload with (RPS-1180).
+ * must not surface as the {@code 400} that {@code ArtifactUtils.readMetadata} answers an upload
+ * with (RPS-1180), and a snapshot that has no usable metadata (sbt, Ivy) resolves to the newest
+ * main file stored in its version directory (RPS-1420).
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("MavenArtifactStorageResolver snapshot metadata (RPS-1180)")
+@DisplayName("MavenArtifactStorageResolver snapshots (RPS-1180, RPS-1420)")
 class MavenArtifactStorageResolverTest {
 
   private static final String METADATA_PATH = "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml";
@@ -53,6 +59,9 @@ class MavenArtifactStorageResolverTest {
       <version>1.0-SNAPSHOT</version><versioning><snapshot><timestamp>20260921.101010</timestamp>\
       <buildNumber>1</buildNumber></snapshot><lastUpdated>20260921101010</lastUpdated>\
       </versioning></metadata>""";
+
+  private static final String VERSION_DIRECTORY = "com/acme/lib/1.0-SNAPSHOT/";
+  private static final String LITERAL_JAR_PATH = VERSION_DIRECTORY + "lib-1.0-SNAPSHOT.jar";
 
   private final UUID repoId = UUID.randomUUID();
 
@@ -67,6 +76,19 @@ class MavenArtifactStorageResolverTest {
   private MavenArtifactStorageResolver resolver() {
     return new MavenArtifactStorageResolver(
         this.artifactRepository, this.artifactVersionRepository, this.storageStrategy);
+  }
+
+  private void stubVersionDir(final String... names) {
+    when(this.storageStrategy.listDirectoryContents(any(StoragePath.class)))
+        .thenReturn(
+            Arrays.stream(names)
+                .map(name -> StorageItemInfo.builder().name(name).directory(false).build())
+                .toList());
+  }
+
+  /** A stubbed storage answers a call with other arguments than stubbed as a mismatch: say it. */
+  private void stubNoMetadata() {
+    when(this.storageStrategy.get(pathOf(METADATA_PATH), eq("mvn"))).thenReturn(Optional.empty());
   }
 
   private void stubStored(final String path, final String body) {
@@ -96,8 +118,19 @@ class MavenArtifactStorageResolverTest {
   }
 
   @Test
-  @DisplayName("corrupt stored snapshot metadata resolves to nothing instead of throwing")
-  void corruptMetadataResolvesToNothing() {
+  @DisplayName("corrupt stored snapshot metadata does not throw, it falls back to the stored jar")
+  void corruptMetadataFallsBackToTheStoredJar() {
+    this.stubStored(METADATA_PATH, "<metadata><versioning><snapshot>");
+    this.stubVersionDir("lib-1.0-SNAPSHOT.jar", "lib-1.0-SNAPSHOT.pom");
+    this.stubStored(LITERAL_JAR_PATH, "jar");
+
+    assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0-SNAPSHOT"))
+        .hasValue(LITERAL_JAR_PATH);
+  }
+
+  @Test
+  @DisplayName("corrupt stored snapshot metadata and no stored jar resolves to nothing (RPS-1180)")
+  void corruptMetadataWithoutAJarResolvesToNothing() {
     this.stubStored(METADATA_PATH, "<metadata><versioning><snapshot>");
 
     assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0-SNAPSHOT"))
@@ -106,5 +139,91 @@ class MavenArtifactStorageResolverTest {
         .get(
             argThat(path -> path != null && path.getRelativePath().getPath().endsWith(".jar")),
             any());
+  }
+
+  @Test
+  @DisplayName("a snapshot without any metadata resolves to its literal jar (RPS-1420)")
+  void noMetadataResolvesTheLiteralJar() {
+    this.stubNoMetadata();
+    this.stubVersionDir("lib-1.0-SNAPSHOT.jar", "lib-1.0-SNAPSHOT.pom");
+    this.stubStored(LITERAL_JAR_PATH, "jar");
+
+    assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0-SNAPSHOT"))
+        .hasValue(LITERAL_JAR_PATH);
+  }
+
+  @Test
+  @DisplayName("without metadata the newest timestamped jar wins over the literal one (RPS-1420)")
+  void noMetadataResolvesTheNewestBuild() {
+    this.stubNoMetadata();
+    this.stubVersionDir(
+        "lib-1.0-SNAPSHOT.jar",
+        "lib-1.0-20260921.101010-9.jar",
+        "lib-1.0-20260921.101010-10.jar",
+        "lib-1.0-20260920.101010-99.jar");
+    this.stubStored(VERSION_DIRECTORY + "lib-1.0-20260921.101010-10.jar", "jar");
+
+    assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0-SNAPSHOT"))
+        .hasValue(VERSION_DIRECTORY + "lib-1.0-20260921.101010-10.jar");
+  }
+
+  @Test
+  @DisplayName("classifier jars, checksums and signatures are not the main jar (RPS-1420)")
+  void noMetadataIgnoresClassifierJars() {
+    this.stubVersionDir(
+        "lib-1.0-SNAPSHOT-sources.jar",
+        "lib-1.0-SNAPSHOT-javadoc.jar",
+        "lib-1.0-SNAPSHOT.jar.sha1",
+        "lib-1.0-SNAPSHOT.jar.asc",
+        "other-1.0-SNAPSHOT.jar",
+        "lib-1.0-SNAPSHOT.pom");
+
+    assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0-SNAPSHOT"))
+        .isEmpty();
+  }
+
+  @Test
+  @DisplayName("a version directory that is gone resolves to nothing (RPS-1420)")
+  void noMetadataInAMissingDirectory() {
+    when(this.storageStrategy.listDirectoryContents(any(StoragePath.class)))
+        .thenThrow(new ItemNotFoundException("resourceNotFound"));
+
+    assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0-SNAPSHOT"))
+        .isEmpty();
+  }
+
+  @Test
+  @DisplayName("metadata that names no build falls back to the stored jar (RPS-1420)")
+  void metadataWithoutABuildFallsBack() {
+    this.stubStored(
+        METADATA_PATH,
+        "<metadata><groupId>com.acme</groupId><artifactId>lib</artifactId>"
+            + "<versioning><lastUpdated>20260921101010</lastUpdated></versioning></metadata>");
+    this.stubVersionDir("lib-1.0-SNAPSHOT.jar");
+    this.stubStored(LITERAL_JAR_PATH, "jar");
+
+    assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0-SNAPSHOT"))
+        .hasValue(LITERAL_JAR_PATH);
+  }
+
+  @Test
+  @DisplayName("the packaging of the version decides the extension of the fallback (RPS-1420)")
+  void noMetadataFollowsThePackaging() {
+    this.stubNoMetadata();
+    final var artifact = new Artifact();
+    artifact.setId(UUID.randomUUID());
+    final var version = new ArtifactVersion();
+    version.setPackaging("war");
+    when(this.artifactRepository.findByRepoIdAndGroupNameAndArtifactName(
+            this.repoId, "com.acme", "lib"))
+        .thenReturn(Optional.of(artifact));
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(
+            artifact.getId(), "1.0-SNAPSHOT"))
+        .thenReturn(Optional.of(version));
+    this.stubVersionDir("lib-1.0-SNAPSHOT.jar", "lib-1.0-SNAPSHOT.war");
+    this.stubStored(VERSION_DIRECTORY + "lib-1.0-SNAPSHOT.war", "war");
+
+    assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0-SNAPSHOT"))
+        .hasValue(VERSION_DIRECTORY + "lib-1.0-SNAPSHOT.war");
   }
 }

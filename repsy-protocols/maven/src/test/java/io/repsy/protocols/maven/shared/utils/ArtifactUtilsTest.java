@@ -842,6 +842,64 @@ class ArtifactUtilsTest {
   }
 
   @Test
+  @DisplayName("the newest main jar of a snapshot is the highest build, a number compared as such")
+  void picksTheNewestSnapshotJar() {
+    final var files =
+        List.of(
+            "lib-1.0-SNAPSHOT.jar",
+            "lib-1.0-20260921.101010-9.jar",
+            "lib-1.0-20260921.101010-10.jar",
+            "lib-1.0-20260920.235959-99.jar",
+            "lib-1.0-20260921.101010-11.pom");
+
+    assertThat(ArtifactUtils.newestSnapshotMainFileName("lib", "1.0-SNAPSHOT", "jar", files))
+        .isEqualTo("lib-1.0-20260921.101010-10.jar");
+    assertThat(ArtifactUtils.newestSnapshotMainFileName("lib", "1.0-SNAPSHOT", "pom", files))
+        .isEqualTo("lib-1.0-20260921.101010-11.pom");
+  }
+
+  @Test
+  @DisplayName("a literal snapshot jar is the answer when no timestamped jar is stored (RPS-1420)")
+  void picksTheLiteralSnapshotJar() {
+    assertThat(
+            ArtifactUtils.newestSnapshotMainFileName(
+                "lib",
+                "1.0-SNAPSHOT",
+                "jar",
+                List.of("lib-1.0-SNAPSHOT.jar", "lib-1.0-SNAPSHOT.pom")))
+        .isEqualTo("lib-1.0-SNAPSHOT.jar");
+    assertThat(
+            ArtifactUtils.newestSnapshotMainFileName(
+                "lib", "1.0-SNAPSHOT", "war", List.of("lib-1.0-SNAPSHOT.war")))
+        .isEqualTo("lib-1.0-SNAPSHOT.war");
+  }
+
+  @Test
+  @DisplayName("classifier jars, checksums, signatures and other artifacts are no main jar")
+  void picksNoSnapshotJar() {
+    assertThat(
+            ArtifactUtils.newestSnapshotMainFileName(
+                "lib",
+                "1.0-SNAPSHOT",
+                "jar",
+                List.of(
+                    "lib-1.0-SNAPSHOT-sources.jar",
+                    "lib-1.0-SNAPSHOT-javadoc.jar",
+                    "lib-1.0-20260921.101010-1-sources.jar",
+                    "lib-1.0-SNAPSHOT.jar.sha1",
+                    "lib-1.0-SNAPSHOT.jar.asc",
+                    "other-1.0-SNAPSHOT.jar",
+                    "lib-1.0-SNAPSHOT.pom",
+                    "maven-metadata.xml")))
+        .isNull();
+    assertThat(
+            ArtifactUtils.newestSnapshotMainFileName("lib", "1.0", "jar", List.of("lib-1.0.jar")))
+        .isNull();
+    assertThat(ArtifactUtils.newestSnapshotMainFileName("lib", "1.0-SNAPSHOT", "jar", List.of()))
+        .isNull();
+  }
+
+  @Test
   @DisplayName("lists the files that sit directly in the version directory, not nested ones")
   void listsTheFilesOfTheVersionDirectoryOnly() {
     final var items =

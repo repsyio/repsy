@@ -30,8 +30,9 @@ public class NuGetSearchProtocolMethodHandler extends AbstractNuGetSearchProtoco
   public NuGetSearchProtocolMethodHandler(
       @Qualifier("osNuGetPathParser") final PathParser basePathParser,
       final NuGetProtocolFacade facade,
-      final NuGetProtocolProvider provider) {
+      final NuGetProtocolProvider provider,
+      final NuGetPublicUrlResolver baseUrlResolver) {
 
-    super(basePathParser, facade, provider);
+    super(basePathParser, facade, provider, baseUrlResolver);
   }
 }

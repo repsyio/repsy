@@ -178,7 +178,7 @@ e2e/
     maven/
       publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
-      version-delete.spec.ts    # the panel's version delete for a raw-PUT artifact: with no maven-metadata.xml, with one, with `<metadata/>` (RPS-1331)
+      version-delete.spec.ts    # the panel's version delete for a raw-PUT artifact: with no stored maven-metadata.xml (the generated one drops the version, RPS-1331, RPS-1369), with one, with `<metadata/>`
       pgp-signature.spec.ts     # registered PGP public keys (RPS-1189): verify, reject, isolate, delete; every-signature verification (RPS-1188); key-server lookup off (RPS-1204); toggling every-signature verification recomputes `signed` and verifies stored `.asc` files (RPS-1316, RPS-1323)
       parallel-signed-deploy.spec.ts  # a REAL parallel `mvn deploy:deploy-file` of a signed release to a verify-all repo (RPS-1188), plus the one-thread control
       gpg-signed-deploy.spec.ts  # RPS-1316, tag @gpg: maven-gpg-plugin and Gradle `signing` deploys with a real gpg key to a verify-all repo (signed / unsigned / unregistered key)
@@ -191,7 +191,7 @@ e2e/
       gradle-locking-kotlin.spec.ts  # RPS-133: the same for the Kotlin DSL
       sbt.spec.ts               # RPS-134: registerPublishConsumeLoop(sbtAdapter) + the sbt extras
       ivy.spec.ts               # RPS-135: registerPublishConsumeLoop(ivyAdapter), a real `ant` with ivy:publish and ivy:retrieve
-      ivy-client.spec.ts        # RPS-135: IV1-IV8 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete)
+      ivy-client.spec.ts        # RPS-135: IV1-IV9 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete, the generated maven-metadata.xml read by Maven and Gradle, RPS-1369)
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
@@ -243,22 +243,25 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 
 | Variable                      | Default                    | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ----------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REPSY_API_BASE_URL`          | `http://localhost:8080`    | panel API                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `REPSY_REPO_BASE_URL`         | `http://localhost:9090`    | repository/protocol operations                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `REPSY_API_BASE_URL`          | `http://localhost:8080`    | panel API. Unset, it follows `REPSY_E2E_PORT_OFFSET` (`8080 + offset`); a value set here wins over the offset (see "Parallel stacks")                                                                                                                                                                                                                                                                                                    |
+| `REPSY_REPO_BASE_URL`         | `http://localhost:9090`    | repository/protocol operations. Unset, it follows `REPSY_E2E_PORT_OFFSET` (`9090 + offset`); the stack also prints it in the panel's client snippets                                                                                                                                                                                                                                                                                     |
 | `REPSY_ADMIN_USERNAME`        | `admin`                    |                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `REPSY_ADMIN_PASSWORD`        | _(none — required)_        | must match the target's admin password                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_TARGET`                | `local`                    | `local` \| `remote` \| `ci` — see Targets below                                                                                                                                                                                                                                                                                                                                                                                          |
 | `REPSY_E2E_RUN_ID`            | random 6-char lowercase id | shared by every runner in one `run.sh test`                                                                                                                                                                                                                                                                                                                                                                                              |
 | `REPSY_E2E_STACK`             | _(unset — postgres)_       | `local up\|down` stack profile: unset/anything but `h2` is the postgres profile, `h2` is the embedded-H2 profile; equivalent to `--h2` on the command line. Unread by `run.sh test`, which is identical against either profile — see "Stack profiles" below                                                                                                                                                                              |
+| `REPSY_E2E_PROJECT`           | `repsy-e2e`                | compose project of the local stack (`local up\|down`, `test`, `sweep`, all of which follow it); also `--project NAME`. "Parallel stacks"                                                                                                                                                                                                                                                                                                 |
+| `REPSY_E2E_PORT_OFFSET`       | `0`                        | added to the stack's host ports 8080 (panel API), 9090 (repo protocols) and 8090 (stub scanner); also `--port-offset N`. "Parallel stacks"                                                                                                                                                                                                                                                                                               |
+| `REPSY_E2E_FORCE`             | _(unset)_                  | `1` lets `local up\|down` take over a project or host port held by a stack started from another checkout (same as `--force`)                                                                                                                                                                                                                                                                                                             |
 | `REPSY_UI_BASE_URL`           | _(REPSY_API_BASE_URL)_     | ui runner only: where the panel SPA is (it is served on the API port 8080, not the protocol port 9090)                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_UI_WORKERS`            | `4` (compose)              | ui runner only: Playwright workers (each is a Chromium, ~250-400 MB)                                                                                                                                                                                                                                                                                                                                                                     |
 | `REPSY_UI_NO_SANDBOX`         | _(unset — sandbox on)_     | ui runner only: `1` launches Chromium with `chromiumSandbox: false`, see "UI suite"                                                                                                                                                                                                                                                                                                                                                      |
 | `REPSY_UI_OPT_IN`             | _(unset)_                  | ui runner only: comma list of opt-in UI suites (`throttle`, `scanner`); read by `optedIn()`                                                                                                                                                                                                                                                                                                                                              |
 | `REPSY_E2E_SCANNER`           | _(unset)_                  | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_UI_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                     |
-| `REPSY_E2E_SCANNER_PORT`      | `8090`                     | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
+| `REPSY_E2E_SCANNER_PORT`      | `8090` + offset            | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_SCANNER_STUB_URL`      | `http://localhost:8090`    | ui runner only: where the `@scanner` specs reach that API (follows `REPSY_E2E_SCANNER_PORT`)                                                                                                                                                                                                                                                                                                                                             |
 | `REPSY_SCANNER_API_KEY`       | `e2e-scanner-key`          | the shared secret of the stub scanner and the backend's scanner client                                                                                                                                                                                                                                                                                                                                                                   |
-| `REPSY_E2E_STACK_PROJECT`     | `repsy-e2e`                | stack runner only: the compose project whose `repsy` container `docker exec` targets (README "Stack runner")                                                                                                                                                                                                                                                                                                                             |
+| `REPSY_E2E_STACK_PROJECT`     | `REPSY_E2E_PROJECT`        | stack runner only: the compose project whose `repsy` container `docker exec` targets (README "Stack runner"); `run.sh` sets it from the project                                                                                                                                                                                                                                                                                          |
 | `REPSY_E2E_INSECURE_REGISTRY` | _(unset)_                  | docker runner's `--insecure` (only needed for a remote plain-HTTP host; `localhost` already works without it); helm runner's `--insecure-skip-tls-verify` (a REMOTE HTTPS target with a bad cert only -- helm's own `--plain-http` is derived from `REPSY_REPO_BASE_URL`'s scheme instead, unconditionally on this harness's own `http://localhost:9090` stack, confirmed live H3: unlike `crane`, Helm has no localhost auto-detection) |
 
 ## Targets (`src/target.ts`)
@@ -280,9 +283,9 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
   `postgres` service at all: a compose _override_ cannot remove a service, and profile-gating
   `postgres` while `repsy` still `depends_on` it makes Compose auto-enable the disabled service
   anyway, so this is a second, standalone compose file instead. Both files share the same
-  `name: repsy-e2e` project and the same `8080`/`9090` ports, so the two profiles can never run at
-  once by construction, and `./run.sh local down` (either flavour) always tears down whichever one
-  is actually up.
+  `name: repsy-e2e` project and the same `8080`/`9090` ports by default, so the two profiles can never
+  run at once by construction, and `./run.sh local down` (either flavour) always tears down whichever
+  one is actually up. A different project and port offset (next section) moves both.
 
 `./run.sh test` needs **no flag and no code change at all**: a runner only ever sees
 `REPSY_API_BASE_URL`/`REPSY_REPO_BASE_URL` (both `localhost`, identical in either profile), so every
@@ -293,6 +296,55 @@ deliberate — see "Scope decision" below.
 declares `VOLUME /app/data`, so each `repsy` container gets its own anonymous volume; `down` followed
 by `up` therefore always starts from an empty database with the 9 default repos freshly seeded,
 mirroring the postgres profile's own anonymous `pgdata` volume (confirmed live — see "Verification").
+
+## Parallel stacks (RPS-1422)
+
+The compose files name their project `repsy-e2e` and publish `8080`/`9090`, and the image is built as
+`repsy-os-e2e:local`. Two checkouts on one machine (for example two worktrees, each running an agent's
+e2e suite) therefore replaced each other's `repsy` container mid-run, and the second build retagged the
+image the first stack was about to start. Give each stack its own project and port offset instead:
+
+```bash
+export REPSY_E2E_PROJECT=rps-1422 REPSY_E2E_PORT_OFFSET=300   # or --project / --port-offset on each call
+./run.sh local up [--h2] [--scanner]   # project rps-1422: panel API :8380, repo protocols :9390, stub scanner :8390
+./run.sh test --protocol maven         # reaches that stack: the URLs are derived from the offset
+./run.sh sweep --dry-run               # so does sweep
+./run.sh local down
+```
+
+With both unset nothing changes (project `repsy-e2e`, `8080`/`9090`/`8090`, image tag `local`, runners
+project `repsy-e2e-runners`), and so does the nightly workflow, which calls `docker compose` directly.
+Otherwise `run.sh` does the following for every subcommand:
+
+- passes `-p <project>` to every `docker compose` call (it overrides the files' `name:`). It does **not**
+  use `COMPOSE_PROJECT_NAME`: `run.sh` sources `.env` into its environment, and that variable would also
+  rename the runners project and merge it into the stack's, which brings back the "orphans" problem the
+  header of `docker-compose.runners.yml` describes.
+- exports `REPSY_E2E_API_PORT`, `REPSY_E2E_REPO_PORT` and `REPSY_E2E_SCANNER_PORT` (read by the stack
+  files), `REPSY_API_BASE_URL` and `REPSY_REPO_BASE_URL` (what every runner calls, and what the panel's
+  client snippets print), `REPSY_E2E_STACK_PROJECT` (the stack runner's target) and
+  `REPSY_E2E_IMAGE_TAG` (the project name, so the image is `repsy-os-e2e:<project>` and the stub
+  scanner's `repsy-e2e-scanner-stub:<project>`). Only what is not set yet is derived: an explicit
+  `REPSY_API_BASE_URL` (a remote target) wins, and with an offset it prints a warning that it does, since
+  the usual cause is a leftover line from a copied `.env.example` (which now leaves them commented out).
+- runs the runner containers in the compose project `<project>-runners` for a non-default project.
+  Their shared Maven/Gradle cache volumes and their images are keyed by that name, so they are private to
+  the stack: slower the first time, but a branch that changes a runner Dockerfile cannot swap another
+  worktree's runner image. Remove them with `docker compose -p <project>-runners -f
+  docker-compose.runners.yml down -v --rmi local` when the stack is retired.
+- validates the values: the project is compose's own rule (`[a-z0-9][a-z0-9_-]*`), the offset a
+  non-negative integer with `9090 + offset <= 65535`.
+
+**The guard.** `local up` refuses when a container of the project is running from another checkout
+(the `com.docker.compose.project.working_dir` label differs from this `e2e/` directory), or when a
+container of another project holds one of the host ports, and names the other one and the variables to
+set. `local down` refuses the first case too. `--force` (or `REPSY_E2E_FORCE=1`) overrides both. A
+process outside Docker on one of the ports is not detected: Docker's own "port is already allocated"
+error is what you get. Pick an offset of 100 or more per checkout so that the ports do not meet the
+default stack or the backend dev server.
+
+Verified live: a stack per project and offset came up next to the default one, `test` and `sweep`
+reached each of them, and `down` removed only its own containers.
 
 ### H2-1, confirmed live: which `DB_URL` actually boots the image
 
@@ -739,7 +791,9 @@ on the wire (a fake server logging every request, then this suite):
   literal names `lib_2.13-1.0-SNAPSHOT.pom/.jar`, with no timestamps. Coursier resolves it through the
   literal name. So `sbt` is in `snapshot-deploy`/`snapshot-redeploy`, and `afterSuccessfulRoundTrip`
   (`clients/sbt-checks.ts`) asserts the literal jar is the resolved one and that no version-level
-  metadata exists, instead of Maven's metadata walk.
+  metadata exists (Repsy never generates that one), instead of Maven's metadata walk. The
+  artifact-level file is not stored either, but Repsy answers it from the registered versions (RPS-1369),
+  which is what `latest.release` reads.
 - The first request of a publish is answered 401 with Repsy's `WWW-Authenticate: Basic realm="Repsy"`
   (every Basic challenge of every protocol, npm and Go included, uses the one short realm `Repsy`,
   since RPS-1372; only Docker's Bearer challenge names its token URL as realm; a build written for the
@@ -772,13 +826,10 @@ a dozen parallel workers on a busy machine run out of first (the suite then take
 
 `scenarios/sbt-extras.ts` adds what the catalog cannot say: the exact file set of a publish and its
 checksums, `+publish` for Scala 2.13 and 3 (two artifacts, and a Scala 3 build resolves the `_3` one),
-the credential coming from `~/.sbt/.credentials`, and what the panel shows of an sbt publish. A
-`test.fail` pins the following, found live while building this suite, and is removed when its ticket
-lands:
-
-| Pin                                       | Ticket   | What happens                                                                      |
-| ----------------------------------------- | -------- | --------------------------------------------------------------------------------- |
-| `latest.release` resolving an sbt library | RPS-1369 | the server generates no `maven-metadata.xml`, so a dynamic revision finds nothing |
+the credential coming from `~/.sbt/.credentials`, what the panel shows of an sbt publish, and a dynamic
+revision (`latest.release`) resolving an sbt-published library through the artifact-level
+`maven-metadata.xml` Repsy generates (RPS-1369; it was a `test.fail` pin until that landed). No
+`test.fail` pin is left in this suite.
 
 Not covered: `publishSigned` (sbt-pgp, RPS-1316 covers signing with `mvn`
 and Gradle), `sbtPlugin := true` publishing, `publishLocal`, sbt 2.x (RPS-1327).
@@ -824,11 +875,14 @@ seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
   shared with sbt) and that the stored jar, POM and checksums are what Ivy built (`clients/ivy-checks.ts`).
   The same file names are why `allowOverride: false` had to leave a non-unique snapshot alone for
   `snapshot-redeploy-no-override` to hold for Ivy (RPS-1328).
-- Dynamic revisions work through the directory listing: Ivy looks for the artifact's
-  `maven-metadata.xml` (Repsy has none), then reads the HTML listing of the artifact directory. With 1.0, 1.1, 1.2, 1.10 and 2.0-SNAPSHOT
-  published, `1.+` and `latest.release` resolve 1.10 (numeric order, a SNAPSHOT is not a release),
-  `latest.integration` resolves 2.0-SNAPSHOT and `[1.0,1.2)` resolves 1.1. No other client of this
-  repository can do the same: see RPS-1369 below.
+- Dynamic revisions work through the generated `maven-metadata.xml` (RPS-1369): Ivy looks for the
+  artifact's `maven-metadata.xml` first and only reads the HTML listing of the artifact directory when
+  there is none; Ivy stores none, so Repsy answers it from the registered versions. With 1.0, 1.1, 1.2,
+  1.10 and 2.0-SNAPSHOT published, `1.+` and `latest.release` resolve 1.10 (numeric order, a SNAPSHOT is
+  not a release), `latest.integration` resolves 2.0-SNAPSHOT (through its literal file name: the
+  version-level metadata is not generated) and `[1.0,1.2)` resolves 1.1. Before RPS-1369 no other client
+  of this repository could resolve a dynamic revision of such an artifact; Maven's `LATEST`, `RELEASE`
+  and version ranges and Gradle's `1.+` do now (IV9).
 - Resolving reads the POM. A bare `<dependency org name rev/>` has a default configuration mapping that
   also looks for the `sources` and `javadoc` artifacts, which do not exist. Ivy locates an artifact with
   a HEAD: while Repsy answered 200 for any path it then failed with "FAILED DOWNLOADS"; since it answers
@@ -850,20 +904,24 @@ seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
   keeps the other although Ivy sends no artifact-level `maven-metadata.xml` (RPS-1331, fixed; it used to
   answer 404 after the files were gone and leave the database row).
 
-Repsy stores the `maven-metadata.xml` a client uploads and never generates one, and Ivy uploads none,
-so an artifact published by Ivy has no `<versions>` list: Maven `LATEST`/`RELEASE` and version ranges,
-and Gradle's and sbt's dynamic versions do not resolve it (RPS-1369; only fixed versions do everywhere).
-This is a known limitation, not a test: it is described here and in the README, and pinned only where
-Ivy itself relies on it (the dynamic revision test). If Ivy publishes after another client deployed a
-`maven-metadata.xml`, the stored file is the other client's and does not list the Ivy versions.
+Repsy stores the `maven-metadata.xml` a client uploads and generates none, and Ivy uploads none, so
+an artifact published by Ivy has no stored `<versions>` list. Since RPS-1369 Repsy answers a `GET` or
+`HEAD` of the artifact-level `maven-metadata.xml` (and its `.md5`, `.sha1`, `.sha256` and `.sha512`)
+from the registered versions when nothing is stored there; a stored file always wins, and nothing is
+generated for a `.asc` or for the version-level file of a SNAPSHOT. So if another client deployed a
+`maven-metadata.xml` first, the stored file is that client's and does not list the versions Ivy added
+afterwards (IV9 pins the other order: a `mvn deploy` after Ivy finds the generated list, merges its own
+version into it and stores the result).
 
 `ivy-client.spec.ts` adds what the catalog cannot say: a deploy token's publish and resolve with the
 exact file set (IV1, `@smoke`), Ivy resolving what `mvn deploy` published (a release and a SNAPSHOT
 through its timestamped files, IV2) and `mvn dependency:get` resolving what Ivy published (IV3), a
 dependency through the POM, an optional one and `transitive="false"` (IV4), the dynamic revisions
-above (IV5), an unknown module (IV6), and the first-configuration pitfalls above (IV8: no realm, another
-realm, `publishivy="true"`, the dependency line with and without its `conf`). No `test.fail` pin is
-left in this suite.
+above (IV5), an unknown module (IV6), the first-configuration pitfalls above (IV8: no realm, another
+realm, `publishivy="true"`, the dependency line with and without its `conf`) and the generated
+`maven-metadata.xml` read by other clients (IV9: Maven `LATEST`, `RELEASE` and `[1.0,1.10)` through
+`dependency:get`, which accepts a range in `-Dartifact`, Gradle `1.+`, and the artifact-level file a
+`mvn deploy` after Ivy stores with all the versions). No `test.fail` pin is left in this suite.
 
 Not covered: an Ivy-native (non-Maven) layout, which Repsy cannot serve (a descriptor named
 `<artifact>-<revision>.ivy` is a valid Maven file name and is stored, but nothing registers it), the
@@ -1057,6 +1115,7 @@ tests/npm-clients/
   yarn-berry/*.spec.ts          # the catalog with berry + the berry-only cells (PnP, hardened mode, settings, `yarn npm` commands, workspaces): see "yarn berry"
   versions.spec.ts              # --version of every installed client == its pin; config renderers read back by the client
   sealed-network.spec.ts        # the network seal, proven for all five clients
+  sealed-env.spec.ts            # the environment is an allow-list: no runner variable reaches a client (RPS-1364)
   matrix/*.spec.ts              # one file per matrix row, iterating clientsWith(...)
 ```
 
@@ -1069,8 +1128,9 @@ catalog need no change per client) and `tags` (`@pnpm`, ...). `clients/npm.ts` o
 
 ### The network seal
 
-Every client invocation runs in `sealedEnv()` (`config.ts`): an allow-list env (never the runner's own,
-which carries the admin password), an isolated HOME, `HTTP_PROXY`/`HTTPS_PROXY` (both cases) at a dead
+Every client invocation runs in `sealedEnv()` (`config.ts`) through `runSealed()` (`run()` with
+`extendEnv: false`, so the child gets that env and nothing else): an allow-list env (never the runner's own,
+which carries the admin password; `sealed-env.spec.ts`, RPS-1364), an isolated HOME, `HTTP_PROXY`/`HTTPS_PROXY` (both cases) at a dead
 loopback port and `NO_PROXY` = `new URL(env.repoBaseUrl).hostname` + `localhost` + `127.0.0.1`. The test
 packages depend only on each other (OS has no proxy repository), so anything a client reaches for beyond
 the registry under test -- registry.npmjs.org, repo.yarnpkg.com, a self-update check -- fails at once
@@ -1369,8 +1429,9 @@ no `dist-tag`, `deprecate`, `ping` or `search` command, so those capabilities ar
 `dist-tags`/`time`) and `bun audit --json` (the bare advisory map) are not npm's document shapes: the
 matrix cells that parse those shapes do not fit, and `bun/commands.spec.ts` covers both commands against
 what bun does print. Config: env `BUN_INSTALL_CACHE_DIR`/`BUN_INSTALL` in the isolated HOME, `DO_NOT_TRACK=1`,
-`FORCE_COLOR=0` (Playwright's workers set `FORCE_COLOR`, which bun honours over `NO_COLOR`, and colour
-codes split every message a test matches on).
+`NO_COLOR=1` (Playwright's workers set `FORCE_COLOR`, which bun honours over `NO_COLOR`; it no longer
+reaches bun since the environment is a real allow-list, RPS-1364, so colour codes stay out of every message a
+test matches on).
 
 Three configurations, all exercised: `bunClient` reads `$HOME/.bunfig.toml` (the matrix column),
 `bunfigOnlyClient` is the same with nothing else, `bunNpmrcClient` reads **only** `$HOME/.npmrc` (H-11).
@@ -1443,11 +1504,14 @@ answered `Content-Disposition: inline;filename=f.txt` (a fixed made-up name, Spr
 reflected-file-download guard) instead of `<name>-<version>.tgz`; seen on every tarball request in
 `bun add --verbose`, asserted raw in `bun/commands.spec.ts` (now `attachment; filename="<name>-<version>.tgz"`). No client depended on it.
 
-Harness note found while doing this: `sealedEnv()` is documented as an allow-list that never carries the
-runner's own environment, but `exec.ts`'s `run()` calls `execa` with its default `extendEnv: true`, so the
-runner's variables (including `REPSY_ADMIN_PASSWORD`, `FORCE_COLOR`, `YARN_VERSION` and `NPM_CLIENTS_*`) are
-merged into every client's environment (`sealedEnv`'s own keys win). Not changed here (it is `exec.ts`, shared
-by every runner); filed as `RPS-1364`.
+Harness note found while doing this, fixed by RPS-1364: `sealedEnv()` is documented as an allow-list that
+never carries the runner's own environment, but `exec.ts`'s `run()` called `execa` with its default
+`extendEnv: true`, so the runner's variables (including `REPSY_ADMIN_PASSWORD`, `FORCE_COLOR`,
+`YARN_VERSION` and `NPM_CLIENTS_*`) were merged into every client's environment (`sealedEnv`'s own keys won).
+`RunOptions` now has `extendEnv` (default `true`, so every other runner is unchanged) and every npm-family
+call goes through `runSealed()` (`config.ts`), which passes `false`; `sealed-env.spec.ts` runs a `node -p`
+package script under each client and asserts that a sentinel set in the worker, `REPSY_*`, `NPM_CLIENTS_*`,
+`FORCE_COLOR` and `YARN_VERSION` are absent from its environment and that `HOME` is the isolated one.
 
 ### yarn berry (4.18.1, RPS-1330 PR 4)
 
@@ -2822,8 +2886,8 @@ rule at all (grep-confirmed: no Go code reads either repo setting) and no SNAPSH
 matrix (R1); every accepted upload-URL spelling — no suffix, `.zip`, and even `.mod` with a zip body,
 G6 (R2); `Content-Sha256` verified when present (case-insensitively), ignored when absent (R3);
 immutability + no storage side effect under BOTH `allowOverride` settings (R4/H9); zip-validation
-errors leaving nothing stored (R5); `@v/list`'s real-semver sort and empty-body-for-unknown-module
-shape (R8); `@latest`'s DB-backed highest-version selection (R9); a malformed module path's bodyless
+errors leaving nothing stored (R5); `@v/list`'s real-semver sort and text/plain-404-for-unknown-module
+shape (R8, RPS-1428); `@latest`'s DB-backed highest-version selection (R9); a malformed module path's bodyless
 400 (R11); `sumdb/supported` 404ing on both ports (R12/G9); over-long module-path/version refusal
 (R13); a deleted version's clean re-upload, never a `410` (R14/RPS-1230); `HEAD` always 404ing,
 the opposite of pypi's always-200 quirk (R15/H17); and that `releases`/`snapshots` are never read
@@ -3228,8 +3292,9 @@ process runs as, who owns a directory the Dockerfile creates, the exact log line
 password from. The `stack` runner (`runners/stack.Dockerfile`, Playwright project `stack`, specs under
 `tests/stack/`) covers that by running `docker exec` and `docker logs` against the Repsy container of
 the local stack (`src/clients/stack.ts`). It finds the container by its compose labels (project
-`REPSY_E2E_STACK_PROJECT`, default `repsy-e2e`, the `name:` of both stack files; service `repsy`), so
-it works against either stack profile.
+`REPSY_E2E_STACK_PROJECT`, which `run.sh` sets to `REPSY_E2E_PROJECT`, default `repsy-e2e`, the `name:`
+of both stack files; service `repsy`), so it works against either stack profile and any "Parallel
+stacks" project.
 
 ```bash
 ./run.sh local up
@@ -3381,8 +3446,8 @@ so `panelApi` and `seeder` (per-test run id, cleanup) work unchanged, and adds:
   (the app itself ignores it) plus an injected stylesheet that sets animation-duration to `1ms` and
   transitions to `0s` (`1ms`, not `animation: none`: Angular's `animate.enter`/`animate.leave` wait for
   `animationend`); and an **allow-list** for network access: any http(s) request whose origin is not
-  the UI, API or repo base URL is aborted (Google Tag Manager, gtag, the Font Awesome CDN and Gravatar
-  today), so runs are offline-safe. A test's own `page.route()` mock still wins over it. **Host network changes (RPS-1303):** the `ui` runner shares the host's network namespace, and Chromium
+  the UI, API or repo base URL is aborted, so runs are offline-safe. The panel itself asks for no such host (RPS-1402:
+  `tests/ui/no-third-party-requests.spec.ts` records the `request` event, which fires for an aborted request too, and expects none). A test's own `page.route()` mock still wins over it. **Host network changes (RPS-1303):** the `ui` runner shares the host's network namespace, and Chromium
   fails every in-flight request with `net::ERR_NETWORK_CHANGED` when that namespace changes (any other
   container starting or stopping on the host adds a veth link, a wifi interface refreshes its IPv6
   lifetimes). The SPA bundle (`main-*.js`, `polyfills-*.js`, chunks) is lost with it, the panel never
@@ -3841,20 +3906,21 @@ helper) and `tests/ui/nav/breadcrumb.ts` (the breadcrumb page object). Run them 
 this story added (`package.json`, `pnpm-lock.yaml`), so the `ui` runner image must be rebuilt once
 (`./run.sh test --protocol ui -b`).
 
-| Spec                 | Scenarios   | What is pinned                                                                                                                                                                                                                                                                                                                                                  |
-| -------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `errors/errors`      | ERR-01      | the list request (`GET /api/repos`) answered 500: exactly `Server error` (never the body's text), ONE request, no rows, page alive; `repo-error`, not `empty-list`, and the refresh button retries; a failing search shows `repo-error` too and refresh brings the list back; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast |
-| `errors/errors`      | ERR-02      | an aborted request (status 0): `Connection error`, on the repository list and on the users page                                                                                                                                                                                                                                                                 |
-| `errors/errors`      | ERR-03      | 403 on `GET /api/users`: `Access denied` (no body) or the server's own `text`; 403 on `/security`: `Access denied` plus `You do not have permission to view this page`, and the redirect to the dashboard                                                                                                                                                       |
-| `nav/breadcrumbs`    | NAV-01      | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                  |
-| `nav/mobile`         | NAV-02      | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); the burger opens the mobile sidebar, its links, the X, the backdrop and Escape close it (admin, and a USER without Users/Security); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`                                                      |
-| `nav/mobile`         | NAV-03      | the mobile menu closes when the viewport widens past `md` and stays closed when it narrows again; `document.body.style.overflow` is `hidden` (and the wheel does not scroll the page) while it is open, `''` after every way of closing it                                                                                                                      |
-| `errors/not-found`   | ERR-04      | `/not-found` in the panel layout: an anonymous visitor (phone and desktop, and on a deep unknown path `/a/b/c`) gets no sidebar, no burger, no avatar menu, a `header-login` link and no `/api/profile` request; an admin and a USER at phone width open the mobile sidebar from it; at desktop the sidebar shows and the burger does not                       |
-| `a11y/a11y`          | A11Y-01     | axe on login, dashboard, repository list, repository settings, users (admin), the open modals and, for every protocol, its list, sublist, versions, manifests and detail pages (40 scans); enforced: a serious/critical violation fails the test                                                                                                                |
-| `a11y/rows`          | A11Y-08..10 | list rows are links (RPS-1266 part 4): one stretched `a.row-link` per row, named after the row, nothing interactive inside another, Tab + Enter, a modified click left to the browser, the row menu on top of the next row; the dashboard count rows and the Maven browser use real buttons, no `javascript:` anchors                                           |
-| `a11y/mobile-rows`   | A11Y-12     | 390x844 with a touch screen (RPS-1315): a tap on a repository card, a PyPI package card and a version card opens it, the card menu opens without opening the card, its items are on top of the next card (which is pulled under it to make the overlap real), Delete asks first, a second card's menu closes the first; the open menus are scanned with axe     |
-| `a11y/keyboard`      | A11Y-13     | login, create a repository, open its settings, create a deploy token and delete the repository as ONE flow with Tab, Shift+Tab, Enter, Escape and typing only                                                                                                                                                                                                   |
-| `a11y/security-rows` | A11Y-14     | the `/security` scan rows and the recent-scan rows of the repository and package security modals are `.row-link-host` containers with one named `a.row-link` to the version's detail page on its `#security` tab (mocked scanner data; Enter opens it; axe scans of the page and both modals)                                                                   |
+| Spec                      | Scenarios   | What is pinned                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `errors/errors`           | ERR-01      | the list request (`GET /api/repos`) answered 500: exactly `Server error` (never the body's text), ONE request, no rows, page alive; `repo-error`, not `empty-list`, and the refresh button retries; a failing search shows `repo-error` too and refresh brings the list back; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast |
+| `errors/errors`           | ERR-02      | an aborted request (status 0): `Connection error`, on the repository list and on the users page                                                                                                                                                                                                                                                                 |
+| `errors/errors`           | ERR-03      | 403 on `GET /api/users`: `Access denied` (no body) or the server's own `text`; 403 on `/security`: `Access denied` plus `You do not have permission to view this page`, and the redirect to the dashboard                                                                                                                                                       |
+| `nav/breadcrumbs`         | NAV-01      | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                  |
+| `nav/mobile`              | NAV-02      | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); the burger opens the mobile sidebar, its links, the X, the backdrop and Escape close it (admin, and a USER without Users/Security); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`                                                      |
+| `nav/mobile`              | NAV-03      | the mobile menu closes when the viewport widens past `md` and stays closed when it narrows again; `document.body.style.overflow` is `hidden` (and the wheel does not scroll the page) while it is open, `''` after every way of closing it                                                                                                                      |
+| `errors/not-found`        | ERR-04      | `/not-found` in the panel layout: an anonymous visitor (phone and desktop, and on a deep unknown path `/a/b/c`) gets no sidebar, no burger, no avatar menu, a `header-login` link and no `/api/profile` request; an admin and a USER at phone width open the mobile sidebar from it; at desktop the sidebar shows and the burger does not                       |
+| `no-third-party-requests` | NET-01      | the login page (with its password eye clicked) and the signed-in admin's dashboard, repository list, repository settings, users and profile pages (RPS-1402): no request goes to a host outside the UI, API and repo origins (recorded from the `request` event, so a blocked Google Tag Manager, Font Awesome CDN or Gravatar request still fails the test)    |
+| `a11y/a11y`               | A11Y-01     | axe on login, dashboard, repository list, repository settings, users (admin), the open modals and, for every protocol, its list, sublist, versions, manifests and detail pages (40 scans); enforced: a serious/critical violation fails the test                                                                                                                |
+| `a11y/rows`               | A11Y-08..10 | list rows are links (RPS-1266 part 4): one stretched `a.row-link` per row, named after the row, nothing interactive inside another, Tab + Enter, a modified click left to the browser, the row menu on top of the next row; the dashboard count rows and the Maven browser use real buttons, no `javascript:` anchors                                           |
+| `a11y/mobile-rows`        | A11Y-12     | 390x844 with a touch screen (RPS-1315): a tap on a repository card, a PyPI package card and a version card opens it, the card menu opens without opening the card, its items are on top of the next card (which is pulled under it to make the overlap real), Delete asks first, a second card's menu closes the first; the open menus are scanned with axe     |
+| `a11y/keyboard`           | A11Y-13     | login, create a repository, open its settings, create a deploy token and delete the repository as ONE flow with Tab, Shift+Tab, Enter, Escape and typing only                                                                                                                                                                                                   |
+| `a11y/security-rows`      | A11Y-14     | the `/security` scan rows and the recent-scan rows of the repository and package security modals are `.row-link-host` containers with one named `a.row-link` to the version's detail page on its `#security` tab (mocked scanner data; Enter opens it; axe scans of the page and both modals)                                                                   |
 
 Things a later author must know:
 
@@ -4019,7 +4085,7 @@ What that starts, and what it does not change:
 
 - `docker-compose.stack-scanner.yml` is an **overlay**, passed as a second `-f` after
   `docker-compose.stack.yml` (or `-stack-h2.yml`): it adds the `scanner-stub` service (built from
-  `runners/scanner-stub.Dockerfile`, published on `127.0.0.1:${REPSY_E2E_SCANNER_PORT:-8090}`) and sets
+  `runners/scanner-stub.Dockerfile`, published on `127.0.0.1:${REPSY_E2E_SCANNER_PORT:-8090}`, which `run.sh` moves by the port offset) and sets
   `SECURITY_SCANNER=enabled`, `TRIVY_SCANNER_BASE_URL=http://scanner-stub:8090`, `TRIVY_SCANNER_API_KEY`
   and `TRIVY_POLL_INTERVAL_MS=1000` on `repsy`. It is an overlay and not a compose `profile` because a
   profile cannot change the environment of `repsy`, which the scanner needs. The default stack file,
@@ -4125,6 +4191,8 @@ A run of the whole `@scanner` set takes about two and a half minutes with two wo
 
 ./run.sh local up --h2       # starts the H2 profile instead: Repsy alone, embedded H2, no postgres
                               # (same ports, so stop the postgres profile first if it is up)
+REPSY_E2E_PROJECT=mine REPSY_E2E_PORT_OFFSET=100 ./run.sh local up   # a private stack next to the
+                              # default one: see "Parallel stacks" (give the same to test/sweep/down)
 ./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby --grep '@smoke'
 ./run.sh test --protocol maven   # one full catalog against H2 -- see "Stack profiles" above
 ./run.sh local down --h2

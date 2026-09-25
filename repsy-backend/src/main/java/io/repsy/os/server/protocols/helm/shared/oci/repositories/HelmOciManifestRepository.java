@@ -37,8 +37,8 @@ public interface HelmOciManifestRepository extends JpaRepository<HelmOciManifest
   List<HelmOciManifest> findAllByChartVersionId(UUID chartVersionId);
 
   /**
-   * The JSON of every manifest of the repo. The content is a {@code @Lob}: PostgreSQL keeps it as a
-   * large object, so it cannot be searched with {@code like} in SQL and is read here instead.
+   * The JSON of every manifest of the repo, read here and searched in memory rather than with
+   * {@code like} in SQL.
    */
   @Query("select m.content from HelmOciManifest m where m.repo.id = :repoId")
   Stream<String> streamContentByRepoId(UUID repoId);

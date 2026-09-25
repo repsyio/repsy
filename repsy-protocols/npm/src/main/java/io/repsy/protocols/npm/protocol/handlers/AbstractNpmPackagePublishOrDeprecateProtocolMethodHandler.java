@@ -35,9 +35,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -143,20 +145,28 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
               request.getInputStream(), new TypeReference<Map<String, Object>>() {});
 
       final var revPath = NpmRevPath.parse(relativePath);
+      final @Nullable String scopeName;
+      final String packageName;
 
       if (revPath.isPresent()) {
         // Unpublish version: the package is what precedes /-rev/<rev>, not the whole path
+        scopeName = revPath.get().scopeName();
+        packageName = revPath.get().packageName();
+
         this.npmProtocolFacade.unPublishPackageVersion(
-            protocolContext, revPath.get().scopeName(), revPath.get().packageName(), payload);
+            protocolContext, scopeName, packageName, payload);
       } else {
         // Publish or deprecate
         final var pathVars = ExtractPath.extractPathVars(packagePath);
+        scopeName = pathVars.scopeName();
+        packageName = pathVars.packageName();
 
-        this.npmProtocolFacade.publishOrDeprecate(
-            protocolContext, pathVars.scopeName(), pathVars.packageName(), payload);
+        this.npmProtocolFacade.publishOrDeprecate(protocolContext, scopeName, packageName, payload);
       }
 
-      return ResponseEntity.ok().build();
+      return ResponseEntity.ok()
+          .contentType(MediaType.APPLICATION_JSON)
+          .body(NpmWriteResponse.of(scopeName, packageName));
     } catch (final UnAuthorizedException _) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)

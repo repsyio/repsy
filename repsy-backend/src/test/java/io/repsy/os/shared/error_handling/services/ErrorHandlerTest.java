@@ -679,7 +679,10 @@ class ErrorHandlerTest {
         .perform(get("/unauthorized/plain"))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.msgId").value("unAuthorized"))
-        .andExpect(jsonPath("$.text").value("The user has logged in but has no permissions."));
+        .andExpect(
+            jsonPath("$.text")
+                .value(
+                    "The credentials are missing, invalid or expired, or they do not allow this action."));
   }
 
   @Test

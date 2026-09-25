@@ -30,8 +30,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *     supports the reporting API and is told where to report) and nothing is actually blocked.
  *     Useful while rolling the policy out. {@code false} unless configured
  * @param policy overrides the built-in policy outright, so an operator can widen it (for example to
- *     allow another analytics or CDN host) without a rebuild. {@code null} unless configured, which
- *     keeps the built-in policy
+ *     allow a CDN or font host) without a rebuild. {@code null} unless configured, which keeps the
+ *     built-in policy
  */
 @ConfigurationProperties(prefix = "app.csp")
 public record ContentSecurityPolicyProperties(

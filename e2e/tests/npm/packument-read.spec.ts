@@ -160,6 +160,44 @@ test.describe('npm registry reads (raw HTTP)', () => {
   );
 
   test(
+    'the abbreviated packument derives hasInstallScript from the scripts of a version (RPS-1390)',
+    { tag: ['@abbreviated'] },
+    async ({ seeder }) => {
+      const repoName = await newRepo(seeder);
+      const name = `e2e-${seeder.runId}-install-script`;
+      await publish(repoName, name, '1.0.0', { extra: { scripts: { postinstall: 'node x.js' } } });
+      await publish(repoName, name, '1.1.0', { extra: { scripts: { test: 'jest' } } });
+
+      const served = await versionsOf(await packument(repoName, name, { Accept: PNPM_ACCEPT }));
+      expect(served['1.0.0']?.hasInstallScript).toBe(true);
+      expect(served['1.1.0']).not.toHaveProperty('hasInstallScript');
+    },
+  );
+
+  test(
+    'a publish answers a JSON body with ok, id and success, not an empty 200 (RPS-1390)',
+    { tag: ['@packument'] },
+    async ({ seeder }) => {
+      const repoName = await newRepo(seeder);
+      const name = `@e2e-${seeder.runId}/publish-body`;
+      const res = await rawPublish(
+        repoName,
+        admin,
+        name,
+        buildPublishDocument({
+          repoName,
+          packageName: name,
+          version: '1.0.0',
+          tarballBytes: buildTarball({ packageName: name, version: '1.0.0' }),
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(JSON.parse(res.body.toString('utf8'))).toEqual({ ok: true, id: name, success: true });
+    },
+  );
+
+  test(
     "the packument keeps neither the publish's tarball nor the publisher's paths (RPS-1357)",
     { tag: ['@packument'] },
     async ({ seeder }) => {

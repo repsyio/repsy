@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.helm.shared.oci.services;
 
+import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestMismatch;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestRepository;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
@@ -60,6 +61,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class HelmOciManifestNameRepairService {
 
+  private final HelmChartService helmChartService;
   private final HelmOciManifestRepository helmOciManifestRepository;
   private final HelmStorageService helmStorageService;
 
@@ -87,6 +89,14 @@ public class HelmOciManifestNameRepairService {
     final var fileMoves = new ArrayList<PendingFileMove>();
 
     for (final var mismatch : mismatches) {
+      // The chart first, as a push and a delete take it (RPS-1365), and before the manifest and the
+      // manifest it would collide with are read: the runner starts after the web server, so a push
+      // or a delete of this chart can be running, and what it commits is then what is repaired
+      // (RPS-1392). A chart deleted since the list was read has no manifests left to repair.
+      if (!this.helmChartService.lockChartIfPresent(mismatch.repoId(), mismatch.chartName())) {
+        continue;
+      }
+
       final var manifest = this.helmOciManifestRepository.findById(mismatch.id()).orElse(null);
       if (manifest == null) {
         continue;

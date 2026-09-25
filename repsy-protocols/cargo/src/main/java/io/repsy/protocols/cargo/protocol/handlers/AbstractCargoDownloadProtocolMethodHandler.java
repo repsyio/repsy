@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -41,7 +42,7 @@ import org.springframework.http.ResponseEntity;
 public abstract class AbstractCargoDownloadProtocolMethodHandler implements ProtocolMethodHandler {
 
   private static final Pattern DOWNLOAD_PATTERN =
-      Pattern.compile(".*/api/v1/crates/[^/]+/[^/]+/download$");
+      Pattern.compile(".*/api/v1/crates/([^/]+)/([^/]+)/download$");
 
   private final PathParser basePathParser;
   private final CargoProtocolFacade facade;
@@ -98,8 +99,22 @@ public abstract class AbstractCargoDownloadProtocolMethodHandler implements Prot
     try {
       final var resource = this.facade.download(context);
 
-      return ResponseEntity.ok()
-          .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
+      // The URL ends in "/download", so without a header of its own a browser or a download tool
+      // saves the crate as "download" (RPS-1389). cargo itself ignores the header.
+      final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
+      final var matcher = DOWNLOAD_PATTERN.matcher(relativePath);
+      final var ok = ResponseEntity.ok();
+
+      if (matcher.matches()) {
+        ok.header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.attachment()
+                .filename(matcher.group(1) + "-" + matcher.group(2) + ".crate")
+                .build()
+                .toString());
+      }
+
+      return ok.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
           .body(resource);
     } catch (final Exception e) {
       log.debug("Cargo download failed: {}", e.getMessage());

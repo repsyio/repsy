@@ -249,6 +249,14 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     final var lowerPath = lowerCaseModuleSegment(path);
     final var fallbackVersions =
         lowerPath.equals(path) ? versions : this.listVersions(repoInfo, lowerPath);
+    if (fallbackVersions.isEmpty()) {
+      // No versions at all is "this proxy does not have the module": the GOPROXY protocol wants a
+      // 404 (or 410) for that, because the go command only tries the next GOPROXY entry after
+      // one, and takes an empty 200 as a real answer of "no versions" (RPS-1428). A module whose
+      // last version was deleted is the same case: its rows and files are gone with the version.
+      throw new ItemNotFoundException("itemNotFound");
+    }
+
     return new ByteArrayResource(fallbackVersions.getBytes(StandardCharsets.UTF_8));
   }
 

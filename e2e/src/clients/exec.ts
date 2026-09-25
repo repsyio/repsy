@@ -32,6 +32,13 @@ import { test as playwrightTest } from '@playwright/test';
 export interface RunOptions {
   cwd: string;
   env?: NodeJS.ProcessEnv;
+  /**
+   * Whether `env` is merged over the runner's own `process.env` (`execa`'s default, and this
+   * wrapper's) or is the child's whole environment. A client that must not see the runner's
+   * variables (the admin password among them) passes `false`: the npm-family suite does, through
+   * `runSealed` (RPS-1364).
+   */
+  extendEnv?: boolean;
   timeoutMs?: number;
   /** Argv/output fragments to replace with `***` before logging or attaching (secrets). */
   redact?: readonly string[];
@@ -104,6 +111,7 @@ export async function run(
   const result = await execa(command, args, {
     cwd: opts.cwd,
     env: opts.env,
+    extendEnv: opts.extendEnv ?? true,
     timeout: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     reject: false,
     ...(opts.input !== undefined ? { input: opts.input } : {}),

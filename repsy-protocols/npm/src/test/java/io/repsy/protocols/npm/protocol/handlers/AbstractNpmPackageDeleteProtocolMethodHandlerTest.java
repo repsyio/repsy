@@ -30,6 +30,7 @@ import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +41,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -112,8 +115,26 @@ class AbstractNpmPackageDeleteProtocolMethodHandlerTest {
 
     final var result = this.handler().handle(context(relativePath), request, response);
     response.setStatus(result.getStatusCode().value());
+    this.lastResult = result;
 
     return response;
+  }
+
+  private ResponseEntity<Object> lastResult;
+
+  @ParameterizedTest(name = "DELETE {0} answers ok and the id {1} as JSON")
+  @CsvSource({
+    "/left-pad/-rev/3-abc,                               left-pad",
+    "/@acme/left-pad/-rev/3-abc,                         @acme/left-pad",
+    "/left-pad/-/left-pad-1.0.0.tgz/-rev/3-abc,          left-pad",
+    "/@acme/left-pad/-/left-pad-1.0.0.tgz/-rev/3-abc,    @acme/left-pad"
+  })
+  @DisplayName("handle() answers a JSON body, not an empty 200 (RPS-1390)")
+  void answersJson(final String relativePath, final String id) throws Exception {
+    this.delete(relativePath);
+
+    assertThat(this.lastResult.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
+    assertThat(this.lastResult.getBody()).isEqualTo(Map.of("ok", true, "id", id, "success", true));
   }
 
   @ParameterizedTest(name = "DELETE {0} deletes {2} of scope {1}")

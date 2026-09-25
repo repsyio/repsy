@@ -131,8 +131,9 @@ decides for a release;
 If your module has dependencies, give \`ivy:makepom\` a \`<mapping conf="default" scope="compile"/>\`, otherwise every
 dependency is written to the POM as optional and a consumer does not resolve it transitively.
 
-Repsy does not generate a \`maven-metadata.xml\` for what a client uploads, so Maven \`LATEST\` and version ranges
-do not resolve for artifacts published this way. Ivy falls back to the directory listing, but prefer fixed versions.
+Ivy uploads no \`maven-metadata.xml\`, so Repsy answers a request for the artifact-level one from the versions it has
+registered (a \`maven-metadata.xml\` a client did upload is served as it is). Maven \`LATEST\` and version ranges, and
+Gradle, sbt and Ivy dynamic versions, then resolve an artifact published this way.
 `;
   }
 
