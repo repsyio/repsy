@@ -27,6 +27,7 @@ import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { renderComponent, testIds } from '../../../testing/render-spec-helpers';
 import {
   describeLastVersionDelete,
+  describePagedDelete,
   describeRepoListBehavior,
   ListFixture,
   pageOf,
@@ -130,6 +131,16 @@ describe('CargoCratesVersionListComponent', () => {
       removePackageArgs: ['serde'],
       navigate: router.navigate,
       navigateArgs: [['..'], { relativeTo: route }],
+    }));
+  });
+
+  describe('deleting from a later page or under a search (RPS-1340)', () => {
+    describePagedDelete(() => ({
+      list: build(),
+      dangerModal: dangerModalService,
+      remove: cargoService.deleteCrateVersion,
+      invoke: () => component.deleteVersion(VERSION),
+      navigate: router.navigate,
     }));
   });
 

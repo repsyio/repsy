@@ -468,6 +468,87 @@ export function describeEmptyingDelete(setup: () => EmptyingDeleteFixture): void
   }));
 }
 
+/** A listing whose delete is checked against the page the user is on (RPS-1340). */
+export interface PagedDeleteFixture {
+  list: ListFixture;
+  dangerModal: DangerModalService;
+  /** Deletes the one row (a version, a package), never its parent. */
+  remove: jasmine.Spy;
+  invoke(): void;
+  /** The router method the component navigates with. */
+  navigate: jasmine.Spy;
+  /** What `remove` answers with; a resolved promise for the promise-based services, an observable otherwise. */
+  answer?: () => unknown;
+}
+
+/**
+ * Registers what a paged listing does after a delete when it is not on its first page, or when a search filters it:
+ * the parent of the rows is still there, so the listing stays and shows the page before instead of leaving.
+ */
+export function describePagedDelete(setup: () => PagedDeleteFixture): void {
+  let fixture: PagedDeleteFixture;
+
+  /** A listing of `rows` rows on page `pageNum`, in a list of 11 rows (two pages of 10) unless it is searched. */
+  function openListing(rows: number, pageNum: number, searchText = ''): void {
+    fixture.list.respond(
+      Array.from({ length: rows }, (_, id) => ({ id })),
+      2,
+    );
+    fixture.list.repoChanges.next(permission(REPO_NAME, { canManage: true }));
+    flushMicrotasks();
+    const list = fixture.list.component;
+    list.pageNum = pageNum;
+    list.searchText = searchText;
+    list.pagedData.page = { number: pageNum, size: 10, totalElements: searchText ? rows : 10 + rows, totalPages: 2 };
+    fixture.list.load.calls.reset();
+  }
+
+  function confirmDelete(): void {
+    fixture.invoke();
+    fixture.dangerModal.call();
+    flushMicrotasks();
+  }
+
+  beforeEach(() => {
+    fixture = setup();
+    fixture.remove.and.callFake(() => (fixture.answer ? fixture.answer() : of(undefined)));
+    fixture.navigate.and.returnValue(Promise.resolve(true));
+  });
+
+  afterEach(() => fixture.list.component.ngOnDestroy());
+
+  it('goes back a page, and stays, when the only row of the second page is deleted', fakeAsync(() => {
+    openListing(1, 1);
+
+    confirmDelete();
+
+    expect(fixture.remove).toHaveBeenCalledTimes(1);
+    expect(fixture.navigate).not.toHaveBeenCalled();
+    expect(fixture.list.load).toHaveBeenCalledTimes(1);
+    expect(fixture.list.load.calls.mostRecent().args[fixture.list.args.page]).toBe(0);
+    expect(fixture.list.component.pageNum).toBe(0);
+  }));
+
+  it('reloads the same page when other rows remain on it', fakeAsync(() => {
+    openListing(2, 1);
+
+    confirmDelete();
+
+    expect(fixture.navigate).not.toHaveBeenCalled();
+    expect(fixture.list.load.calls.mostRecent().args[fixture.list.args.page]).toBe(1);
+  }));
+
+  it('stays on the listing when the only match of a search is deleted: the search hid the other rows', fakeAsync(() => {
+    openListing(1, 0, 'v1');
+
+    confirmDelete();
+
+    expect(fixture.remove).toHaveBeenCalledTimes(1);
+    expect(fixture.navigate).not.toHaveBeenCalled();
+    expect(fixture.list.load).toHaveBeenCalledTimes(1);
+  }));
+}
+
 /** A version listing whose delete removes the whole package when its last version goes. */
 export interface LastVersionDeleteFixture {
   list: ListFixture;
