@@ -61,7 +61,7 @@ describe('MavenService', () => {
       'listMavenArtifacts',
       'listMavenArtifactVersions',
       'getMavenArtifactVersion',
-      'deleteGroup',
+      'deleteMavenGroup',
       'deleteMavenArtifact',
       'deleteMavenArtifactVersion',
     ]);
@@ -157,12 +157,12 @@ describe('MavenService', () => {
         args: [GROUP, REPO],
         response: restResponse(summary),
         expected: summary,
-        notCalled: () => [mavenApi.deleteGroup],
+        notCalled: () => [mavenApi.deleteMavenGroup],
       },
       {
         name: 'deleteGroup',
         invoke: (s) => s.deleteGroup(GROUP),
-        api: () => mavenApi.deleteGroup,
+        api: () => mavenApi.deleteMavenGroup,
         args: [GROUP, REPO],
         response: restResponse(deleted),
         expected: deleted,
@@ -175,7 +175,7 @@ describe('MavenService', () => {
         args: [GROUP, ARTIFACT, REPO],
         response: restResponse(deleted),
         expected: deleted,
-        notCalled: () => [mavenApi.deleteGroup, mavenApi.deleteMavenArtifactVersion],
+        notCalled: () => [mavenApi.deleteMavenGroup, mavenApi.deleteMavenArtifactVersion],
       },
       {
         name: 'deleteVersion',
@@ -184,7 +184,7 @@ describe('MavenService', () => {
         args: [GROUP, ARTIFACT, VERSION, REPO],
         response: restResponse(deleted),
         expected: deleted,
-        notCalled: () => [mavenApi.deleteGroup, mavenApi.deleteMavenArtifact],
+        notCalled: () => [mavenApi.deleteMavenGroup, mavenApi.deleteMavenArtifact],
       },
     ];
     describeCalls(() => service, calls);

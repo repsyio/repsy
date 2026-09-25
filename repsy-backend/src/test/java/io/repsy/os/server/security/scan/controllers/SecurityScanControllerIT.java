@@ -123,7 +123,8 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
   private static final String SCANS_PATH = "/api/security/scans";
   private static final String SUMMARY_PATH = "/api/security/scans/summary";
   private static final String SUPPORTED_REPO_TYPES_PATH = "/api/security/supported-repo-types";
-  private static final String UNAUTHORIZED_TEXT = "The user has logged in but has no permissions.";
+  private static final String UNAUTHORIZED_TEXT =
+      "Please log in: the credentials are missing or invalid, or the account is gone.";
   private static final String SCANNER_NAME = "trivy";
   private static final String SCANNER_VERSION = "0.58.0";
   private static final String FAILURE_MESSAGE = "Scanner timed out";
@@ -561,7 +562,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
       expectError(
           SecurityScanControllerIT.this.perform(get(path).header(AUTHORIZATION, token)),
           HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
+          "loginRequired",
           "unAuthorized",
           UNAUTHORIZED_TEXT);
     }
@@ -580,7 +581,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
       expectError(
           SecurityScanControllerIT.this.perform(get(path).header(AUTHORIZATION, token)),
           HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
+          "loginRequired",
           "unAuthorized",
           UNAUTHORIZED_TEXT);
     }

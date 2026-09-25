@@ -86,7 +86,8 @@ import org.springframework.transaction.annotation.Transactional;
 class UsageControllerIT extends AbstractIntegrationTest {
 
   private static final String USAGES_PATH = "/api/usages";
-  private static final String UNAUTHORIZED_TEXT = "The user has logged in but has no permissions.";
+  private static final String UNAUTHORIZED_TEXT =
+      "Please log in: the credentials are missing or invalid, or the account is gone.";
   private static final Duration ASYNC_TIMEOUT = Duration.ofSeconds(10);
 
   private static final String[] TOTAL_USAGE_KEYS = {"diskUsed", "reposCount"};
@@ -287,7 +288,7 @@ class UsageControllerIT extends AbstractIntegrationTest {
       expectError(
           UsageControllerIT.this.getUsages(token),
           HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
+          "loginRequired",
           "unAuthorized",
           UNAUTHORIZED_TEXT);
     }
@@ -306,7 +307,7 @@ class UsageControllerIT extends AbstractIntegrationTest {
       expectError(
           UsageControllerIT.this.getUsages(token),
           HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
+          "loginRequired",
           "unAuthorized",
           UNAUTHORIZED_TEXT);
     }

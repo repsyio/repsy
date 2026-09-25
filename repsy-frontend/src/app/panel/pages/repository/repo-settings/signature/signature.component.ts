@@ -119,7 +119,7 @@ export class SignatureComponent implements OnInit {
   }
 
   private fetchAllowedKeyservers(): void {
-    this.keyStoreControllerService.listAllowedKeyServers().subscribe({
+    this.keyStoreControllerService.listMavenAllowedKeyServers().subscribe({
       next: (r) => {
         this.allowedKeyservers = r.data ?? [];
         this.serverLabels = this.allowedKeyservers.map((s) => `${s.displayName} (${s.host})`);

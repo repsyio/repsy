@@ -91,21 +91,29 @@ test.describe('SEC-01 scan states', { tag: SCANNER_TAG }, () => {
     });
   });
 
-  test('the lists say Scanning... while the scan is unfinished, and the severity once it is done', async ({
+  test('the lists say Scanning... while the scan is unfinished, and change to the severity without a reload', async ({
     adminPage,
     seeder,
     seedPackage,
     panelApi,
   }) => {
+    // The lists watch their security summary while a scan is unfinished (RPS-1128): the first
+    // re-fetch after 10 s, the next after 15 s more. The scan is queued for 15 s, so it is done by the
+    // second re-fetch and the badge changes on a page that was never reloaded (RPS-1352).
+    test.setTimeout(180_000);
+
     const repo = await seeder.createRepo(RepoType.NPM);
-    // Queued for 15 s: long enough to open three lists, short enough to wait out.
     const pkg = await seedPackage(repo, {
       name: scanPackageName('npm', seeder.runId, 'vuln-critical-queue15'),
     });
-    const pages = protocolPages(adminPage, DESCRIPTORS.npm, repo.name);
-    const repos = new RepositoriesPage(adminPage);
-    const versions = pages.versions(pkg);
-    const list = pages.list();
+    // One page per list, all loaded once and left alone, so the three polls run side by side.
+    const context = adminPage.context();
+    const repoPage = adminPage;
+    const packagePage = await context.newPage();
+    const versionPage = await context.newPage();
+    const repos = new RepositoriesPage(repoPage);
+    const list = protocolPages(packagePage, DESCRIPTORS.npm, repo.name).list();
+    const versions = protocolPages(versionPage, DESCRIPTORS.npm, repo.name).versions(pkg);
 
     await repos.goto();
     await repos.search(repo.name);
@@ -118,8 +126,16 @@ test.describe('SEC-01 scan states', { tag: SCANNER_TAG }, () => {
     const versionBadge = badgeText(securityBadgeIn(versions.row(pkg)));
     await expect(versionBadge).toHaveText('Scanning...');
 
-    // The lists do not poll: once the scan is done a fresh load shows the severity.
-    await newestFinishedScan(panelApi, repo.name, pkg);
+    // No goto and no reload from here on: only the polling of each list can change its badge.
+    for (const badge of [versionBadge, packageBadge, repoBadge]) {
+      await expect(badge).toHaveText('Critical', SCAN_TIMEOUT);
+    }
+    expect(await newestFinishedScan(panelApi, repo.name, pkg)).toMatchObject({
+      status: 'COMPLETED',
+      highestSeverity: 'CRITICAL',
+    });
+
+    // A fresh load agrees with what the polling showed.
     await versions.goto();
     await expect(versionBadge).toHaveText('Critical');
     await list.goto();

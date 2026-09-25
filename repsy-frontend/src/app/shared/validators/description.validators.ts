@@ -16,11 +16,24 @@
 import { ValidatorFn, Validators } from '@angular/forms';
 
 /**
- * The description of a repository or a deploy token: at most 500 characters, as the backend
- * (`RepoCreateForm`, `RepoDescriptionForm`, `DeployTokenForm`) has it.
+ * The one description rule of the panel (RPS-1265), used by the create-repository, repository
+ * settings and create-deploy-token forms. Like the username and password rules in
+ * `credentials.validators.ts` it is read off the backend (`openapi-spec.yaml`, the Bean Validation
+ * constraints of the generated DTOs; the panel never needs to be stricter and must not be looser):
  *
- * Every description textarea enforces this with the validator and a character counter, and none has
- * a `maxlength` attribute: the browser would cut typed and pasted text silently, and the message
+ * <pre>
+ * Field                                Backend (form)                   Panel (this file)
+ * ----------------------------------   ------------------------------   ---------------------------
+ * repository description, create       RepoCreateRequest: up to 500     DESCRIPTION_*: at most 500
+ * repository description, settings     RepoDescriptionForm: up to 500   characters, optional
+ * deploy token description             DeployTokenForm: up to 500
+ * </pre>
+ *
+ * There is no lower bound and no pattern: an empty or missing description is valid. The message is
+ * kept next to the rule, so every form shows the same sentence.
+ *
+ * Every description textarea enforces the rule with the validator and a character counter, and none
+ * has a `maxlength` attribute: the browser would cut typed and pasted text silently, and the message
  * below could never show.
  */
 export const DESCRIPTION_MAX_LENGTH = 500;

@@ -717,9 +717,9 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
             DockerImageControllerIT.this.perform(
                 get("/api/docker/images/%s".formatted(repo.getName())).header(AUTHORIZATION, auth)),
             HttpStatus.UNAUTHORIZED,
+            "loginRequired",
             "unAuthorized",
-            "unAuthorized",
-            "The user has logged in but has no permissions.");
+            "Please log in: the credentials are missing or invalid, or the account is gone.");
       }
     }
 
@@ -761,9 +761,9 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           DockerImageControllerIT.this.perform(
               delete("/api/docker/images/%s/app".formatted(repo.getName()))),
           HttpStatus.UNAUTHORIZED,
+          "loginRequired",
           "unAuthorized",
-          "unAuthorized",
-          "The user has logged in but has no permissions.");
+          "Please log in: the credentials are missing or invalid, or the account is gone.");
       DockerImageControllerIT.this.expectError(
           DockerImageControllerIT.this.perform(
               delete("/api/docker/images/%s/app".formatted(repo.getName()))

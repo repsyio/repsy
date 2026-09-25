@@ -91,7 +91,8 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   private static final String REPO_EXISTS_TEXT = "The repository exists. Please try another name.";
   private static final String REPO_NAME_RESERVED_TEXT =
       "This name is reserved for the panel. Please try another name.";
-  private static final String UNAUTHORIZED_TEXT = "The user has logged in but has no permissions.";
+  private static final String UNAUTHORIZED_TEXT =
+      "Please log in: the credentials are missing or invalid, or the account is gone.";
   private static final String ACCESS_NOT_ALLOWED_TEXT = "Access isn't allowed.";
   private static final String SESSION_EXPIRED_TEXT = "Session expired.";
   private static final String ITEM_NOT_FOUND_TEXT = "The requested item is not found.";
@@ -212,7 +213,8 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   }
 
   private static void expectUnauthorized(final ResultActions result) throws Exception {
-    expectError(result, HttpStatus.UNAUTHORIZED, "unAuthorized", "unAuthorized", UNAUTHORIZED_TEXT);
+    expectError(
+        result, HttpStatus.UNAUTHORIZED, "loginRequired", "unAuthorized", UNAUTHORIZED_TEXT);
   }
 
   /** Asserts the exact {@code RepoPermissionInfo} shape; {@code description} is omitted if null. */
@@ -418,7 +420,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           ProtocolRepoControllerIT.this.perform(
               endpoint.request().apply(target).header(AUTHORIZATION, token)),
           HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
+          "loginRequired",
           "unAuthorized",
           UNAUTHORIZED_TEXT);
     }

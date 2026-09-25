@@ -44,7 +44,7 @@ export class DeleteOrphanLayersComponent {
     this.dangerModalService.show('Delete Orphan Layers', 'Delete', () => {
       this.deleting = true;
       this.dockerImageControllerService
-        .deleteOrphanLayers(this.activeRepository.repoName)
+        .deleteDockerOrphanLayers(this.activeRepository.repoName)
         .pipe(
           finalize(() => {
             this.deleting = false;

@@ -322,7 +322,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
             .andReturn()
             .getResponse()
             .getContentAsString();
-    assertErrorEnvelope(privateResponse, "unAuthorized", "unAuthorized");
+    assertErrorEnvelope(privateResponse, "loginRequired", "unAuthorized");
 
     final var publicResponse =
         this.perform(get("/api/pypi/packages/" + publicRepo.getName()))
