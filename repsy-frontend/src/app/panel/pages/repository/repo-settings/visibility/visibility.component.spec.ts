@@ -149,13 +149,13 @@ describe('VisibilityComponent template', () => {
     expect(el.textContent).not.toContain('When active');
     expect(el.textContent).not.toContain('only authorized users can access');
     expect(el.textContent).toContain('Public: anyone can read the repository without signing in.');
-    expect(el.textContent).toContain('Private: access is limited to authorized users.');
+    expect(el.textContent).toContain(
+      'Private: signing in is required, and every signed-in user can read and write it.',
+    );
   });
 
   it('hints at the switch to the OTHER state (RPS-1261)', async () => {
-    expect(text(await render(false), 'settings-visibility-hint')).toBe(
-      'Turn it off to restrict access to authorized users.',
-    );
+    expect(text(await render(false), 'settings-visibility-hint')).toBe('Turn it off to require signing in.');
 
     TestBed.resetTestingModule();
     expect(text(await render(true), 'settings-visibility-hint')).toBe('Turn it on to make the repository public.');
