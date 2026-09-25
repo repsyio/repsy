@@ -41,6 +41,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import tools.jackson.databind.ObjectMapper;
@@ -121,8 +123,26 @@ class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandlerTest {
 
     final var result = this.handler().handle(context(relativePath), request, response);
     response.setStatus(result.getStatusCode().value());
+    this.lastResult = result;
 
     return response;
+  }
+
+  private ResponseEntity<Object> lastResult;
+
+  @ParameterizedTest(name = "PUT {0} answers ok and the id {1} as JSON")
+  @CsvSource({
+    "/left-pad,                    left-pad",
+    "/@acme/left-pad,              @acme/left-pad",
+    "/left-pad/-rev/3-abc,         left-pad",
+    "/@acme/left-pad/-rev/3-abc,   @acme/left-pad"
+  })
+  @DisplayName("handle() answers a JSON body, not an empty 200 (RPS-1390)")
+  void answersJson(final String relativePath, final String id) throws Exception {
+    this.put(relativePath, "{\"versions\":{}}");
+
+    assertThat(this.lastResult.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
+    assertThat(this.lastResult.getBody()).isEqualTo(Map.of("ok", true, "id", id, "success", true));
   }
 
   @ParameterizedTest(name = "PUT {0} unpublishes {2} of scope {1}")

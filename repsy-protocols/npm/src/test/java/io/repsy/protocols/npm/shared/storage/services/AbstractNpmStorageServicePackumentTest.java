@@ -40,6 +40,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
@@ -183,6 +185,64 @@ class AbstractNpmStorageServicePackumentTest {
             "hasInstallScript",
             "funding",
             "acceptDependencies");
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // RPS-1390
+  // -------------------------------------------------------------------------------------------
+
+  private Map<String, Object> abbreviatedVersion(final Map<String, Object> version) {
+    final var full = new LinkedHashMap<String, Object>(version);
+    full.put("name", "demo");
+    full.put("version", "1.0.0");
+
+    return versionOf(
+        this.service.createAbbreviatedMetadata(
+            Map.of(
+                "name",
+                "demo",
+                "dist-tags",
+                Map.of("latest", "1.0.0"),
+                "versions",
+                Map.of("1.0.0", full))),
+        "1.0.0");
+  }
+
+  @ParameterizedTest(name = "scripts {0} -> hasInstallScript")
+  @ValueSource(strings = {"preinstall", "install", "postinstall"})
+  @DisplayName("hasInstallScript is derived from an install script of the version")
+  void hasInstallScriptIsDerivedFromScripts(final String script) {
+    assertThat(abbreviatedVersion(Map.of("scripts", Map.of(script, "node build.js"))))
+        .containsEntry("hasInstallScript", true);
+  }
+
+  @Test
+  @DisplayName("hasInstallScript is left out for scripts that do not run on install")
+  void hasInstallScriptIsNotDerivedFromOtherScripts() {
+    assertThat(
+            abbreviatedVersion(
+                Map.of(
+                    "scripts",
+                    Map.of("test", "jest", "prepare", "tsc", "prepublish", "x", "install", " "))))
+        .doesNotContainKey("hasInstallScript");
+    assertThat(abbreviatedVersion(Map.of("scripts", "not a map")))
+        .doesNotContainKey("hasInstallScript");
+  }
+
+  @Test
+  @DisplayName("a stored hasInstallScript stays true when the version has no install script")
+  void storedHasInstallScriptIsKept() {
+    assertThat(abbreviatedVersion(Map.of("hasInstallScript", true, "scripts", Map.of())))
+        .containsEntry("hasInstallScript", true);
+  }
+
+  @Test
+  @DisplayName("a stored hasInstallScript of false becomes true when scripts say otherwise")
+  void scriptsWinOverAStoredFalse() {
+    assertThat(
+            abbreviatedVersion(
+                Map.of("hasInstallScript", false, "scripts", Map.of("postinstall", "x"))))
+        .containsEntry("hasInstallScript", true);
   }
 
   // -------------------------------------------------------------------------------------------

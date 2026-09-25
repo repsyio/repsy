@@ -73,6 +73,10 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
           "funding",
           "acceptDependencies");
 
+  /** The lifecycle scripts that run on install, which is what {@code hasInstallScript} says. */
+  private static final List<String> INSTALL_SCRIPTS =
+      List.of("preinstall", "install", "postinstall");
+
   private final StorageStrategy storageStrategy;
 
   @Override
@@ -939,6 +943,12 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       }
     }
 
+    // The public registry derives this from the scripts of the version, so a version that was
+    // published without the flag (an older client) still tells the installer to expect a script
+    if (hasInstallScript(version)) {
+      abbreviatedVersion.put("hasInstallScript", true);
+    }
+
     // Optional fields that have default values
     abbreviatedVersion.put("dependencies", version.getOrDefault("dependencies", emptyHashMap));
     abbreviatedVersion.put(
@@ -954,6 +964,23 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
     abbreviatedVersion.put("engines", version.getOrDefault("engines", emptyHashMap));
 
     return abbreviatedVersion;
+  }
+
+  /**
+   * Whether the version installs with a script: the stored flag, or a non-blank {@code preinstall},
+   * {@code install} or {@code postinstall} in its {@code scripts} (RPS-1390).
+   */
+  private static boolean hasInstallScript(final Map<String, Object> version) {
+    if (Boolean.TRUE.equals(version.get("hasInstallScript"))) {
+      return true;
+    }
+
+    if (!(version.get("scripts") instanceof final Map<?, ?> scripts)) {
+      return false;
+    }
+
+    return INSTALL_SCRIPTS.stream()
+        .anyMatch(name -> scripts.get(name) instanceof final String script && !script.isBlank());
   }
 
   @Override
