@@ -368,7 +368,7 @@ public final class EntityColumnSchemaChecks {
         """
         select lower(column_name), upper(data_type), character_maximum_length, is_nullable
           from information_schema.columns
-         where lower(table_schema) = 'public' and lower(table_name) = ?
+          where lower(table_schema) = 'public' and lower(table_name) = ?
         """,
         rs -> {
           // H2 reports Long.MAX_VALUE for a clob.

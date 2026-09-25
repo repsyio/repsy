@@ -126,7 +126,7 @@ class GolangUploadMetadataLengthIT extends AbstractIntegrationTest {
         """
         select m.module_path, v.version, v.go_version
           from go_module_version v join go_module m on m.id = v.module_id
-         where m.repo_id = ?
+          where m.repo_id = ?
         """,
         repo.getId());
   }

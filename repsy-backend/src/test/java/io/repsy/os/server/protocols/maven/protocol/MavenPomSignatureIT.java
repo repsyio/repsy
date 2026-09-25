@@ -268,8 +268,8 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
         """
         select v.signed from maven_artifact_version v
           join maven_artifact a on a.id = v.artifact_id
-         where a.repo_id = ? and a.group_name = 'com.acme' and a.artifact_name = ?
-           and v.version_name = ?""",
+          where a.repo_id = ? and a.group_name = 'com.acme' and a.artifact_name = ?
+            and v.version_name = ?""",
         Boolean.class,
         repo.getId(),
         artifact,
@@ -283,8 +283,8 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
         select s.file_name from maven_version_signature s
           join maven_artifact_version v on v.id = s.artifact_version_id
           join maven_artifact a on a.id = v.artifact_id
-         where a.repo_id = ? and v.version_name = ?
-         order by s.file_name""",
+          where a.repo_id = ? and v.version_name = ?
+          order by s.file_name""",
         String.class,
         repo.getId(),
         version);

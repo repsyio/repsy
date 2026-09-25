@@ -212,7 +212,7 @@ class HelmPushMetadataLengthIT extends AbstractIntegrationTest {
         """
         select c.name, v.version, v.app_version, v.type
           from helm_chart_version v join helm_chart c on c.id = v.chart_id
-         where c.repo_id = ?
+          where c.repo_id = ?
         """,
         repo.getId());
   }

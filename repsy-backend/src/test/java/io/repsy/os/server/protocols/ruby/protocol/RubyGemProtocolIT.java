@@ -468,7 +468,7 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
           """
           select v.version, v.platform, v.checksum, v.authors, v.homepage, v.required_ruby_version
             from ruby_gem_version v join ruby_gem g on g.id = v.gem_id
-           where g.repo_id = ? and g.name = ?
+            where g.repo_id = ? and g.name = ?
           """,
           repo.getId(),
           GEM);
@@ -479,8 +479,8 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
           RubyGemProtocolIT.this.jdbcTemplate.queryForObject(
               """
               select (select count(*) from ruby_gem where repo_id = ?)
-                   + (select count(*) from ruby_gem_version v join ruby_gem g on g.id = v.gem_id
-                       where g.repo_id = ?)
+                    + (select count(*) from ruby_gem_version v join ruby_gem g on g.id = v.gem_id
+                        where g.repo_id = ?)
               """,
               Integer.class,
               repo.getId(),
@@ -663,12 +663,12 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
           RubyGemProtocolIT.this.jdbcTemplate.queryForObject(
               """
               select (select count(*) from ruby_gem where repo_id = ?)
-                   + (select count(*) from ruby_gem_version v join ruby_gem g on g.id = v.gem_id
-                       where g.repo_id = ?)
-                   + (select count(*) from ruby_gem_dependency d
-                       join ruby_gem_version v on v.id = d.gem_version_id
-                       join ruby_gem g on g.id = v.gem_id
-                       where g.repo_id = ?)
+                    + (select count(*) from ruby_gem_version v join ruby_gem g on g.id = v.gem_id
+                        where g.repo_id = ?)
+                    + (select count(*) from ruby_gem_dependency d
+                        join ruby_gem_version v on v.id = d.gem_version_id
+                        join ruby_gem g on g.id = v.gem_id
+                        where g.repo_id = ?)
               """,
               Integer.class,
               repo.getId(),
@@ -730,7 +730,7 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
                 from ruby_gem_dependency d
                 join ruby_gem_version v on v.id = d.gem_version_id
                 join ruby_gem g on g.id = v.gem_id
-               where g.repo_id = ? and g.name = ?
+                where g.repo_id = ? and g.name = ?
               """,
               repo.getId(),
               GEM);

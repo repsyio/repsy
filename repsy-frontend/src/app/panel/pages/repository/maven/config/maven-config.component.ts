@@ -80,9 +80,9 @@ and the credentials in your \`ivysettings.xml\`;
 <ivysettings>
   <settings defaultResolver="repsy"/>
   <credentials host="${this.repoHost()}"
-               realm="Repsy"
-               username="${this.username}"
-               passwd="${password}"/>
+                realm="Repsy"
+                username="${this.username}"
+                passwd="${password}"/>
   <resolvers>
     <ibiblio name="repsy" m2compatible="true" root="${environment.repoBaseUrl}/${this.repoName}/"/>
   </resolvers>
