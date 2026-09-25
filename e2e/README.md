@@ -3543,7 +3543,7 @@ keys a crate by its normalised name, `-` becoming `_`), NuGet and Helm `e2e-<run
 | cargo-07  | README renders (and is absent when none was published); deps in the Cargo.toml block; Add Dependency vs Install Binary; the four sorts (crates published out of version and name order); Newest puts the crate published last on top; latest version and every version; delete a crate with two versions; a yanked version stays listed and is marked yanked on the list and on its detail (RPS-1301) |
 | nuget-07  | stable and pre-release side by side; a stable-only repo (`releases`/`snapshots`) refuses a pre-release and keeps the list; unlist/relist flips `Listed` on the detail (the version stays listed); the four install snippets, no dependencies, nuspec metadata                                                                                                                                         |
 | helm-07   | a chart published to each module (OCI and classic) in one list, both open with digest and Chart.yaml; one chart with versions from both modules; deleting a classic chart; the Latest link; deleting the last version toasts once and lands on the chart list (RPS-1302)                                                                                                                              |
-| golang-07 | list -> `/modules?modulePath=` -> `/modules/version?modulePath=&version=` with the breadcrumb; deep link; GOPROXY endpoints; "Version 'x' not found"; the detail without its query goes to the list; a module path with slashes is searchable                                                                                                                                                         |
+| golang-07 | list -> `/modules?modulePath=` -> `/modules/version?modulePath=&version=` with the breadcrumb; deep link; GOPROXY endpoints; "Version 'x' not found"; the detail without its query goes to the list; a module path with slashes is searchable; deleting the only version left on page 2 stays on the versions page (RPS-1340)                                                                         |
 | ruby-07   | yanked badge on the versions list and on the detail after a yank through the API; install commands, platform and checksum; the Latest link                                                                                                                                                                                                                                                            |
 
 What the descriptors record (found by running each protocol): a version row's link appends `#security`
@@ -3606,7 +3606,8 @@ Things a later author must know:
   scoped to the component (the page-level scans cannot see an open menu or a toast): the menu toggle is
   labelled and carries `aria-haspopup`/`aria-expanded`/`aria-controls`, the menu is `role=menu` with
   `menuitem`s and closes on Escape (focus back on the toggle), on an outside click and after an item is
-  chosen; the stack is `role=status` + `aria-live=polite`, an error toast is `role=alert`, its close button
+  chosen, and closes when the header's profile menu opens and the other way round (the avatar click is dispatched
+  without moving the focus, as Safari does, because a focus move alone would close the row menu; RPS-1347); the stack is `role=status` + `aria-live=polite`, an error toast is `role=alert`, its close button
   is named, it lasts 7 s and is held while hovered or focused (driven with `page.clock`, so no test sleeps);
   pagination is a `nav` named `Pagination` with `aria-current=page` and named previous/next buttons.
 - **Dialogs and forms (A11Y-05..07, `a11y/dialogs.spec.ts`, RPS-1266 parts 2 and 3).** `expectDialogContract()`

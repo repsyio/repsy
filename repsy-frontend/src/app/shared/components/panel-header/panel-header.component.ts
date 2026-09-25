@@ -15,7 +15,7 @@
 ///
 
 import { NgOptimizedImage, ViewportScroller } from '@angular/common';
-import { Component, EventEmitter, HostListener, Input, Output } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Input, Output, viewChild } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../../../auth/pages/service/auth.service';
@@ -39,6 +39,9 @@ export class PanelHeaderComponent {
 
   @Output() mobileMenuToggle = new EventEmitter<boolean>();
 
+  /** The avatar button: only present while there is a session. */
+  private readonly profileToggle = viewChild<ElementRef<HTMLElement>>('profileToggle');
+
   constructor(
     private readonly authService: AuthService,
     private readonly router: Router,
@@ -61,8 +64,7 @@ export class PanelHeaderComponent {
     this.mobileMenuToggle.emit(!this.isMobileMenuOpen);
   }
 
-  toggleProfileDropdown(event: Event) {
-    event.stopPropagation();
+  toggleProfileDropdown() {
     this.profileDropdown = !this.profileDropdown;
     this.docDropdown = false;
   }
@@ -72,8 +74,16 @@ export class PanelHeaderComponent {
     this.router.navigateByUrl('login');
   }
 
-  @HostListener('document:click')
-  onDocumentClick() {
+  /**
+   * Closes the menus on a click anywhere else. The click that opens the profile menu is left alone here rather
+   * than stopped from bubbling (RPS-1347): it has to reach the other dropdowns' own outside-click handlers, or a
+   * row menu would stay open beside it.
+   */
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: Event) {
+    if (this.profileToggle()?.nativeElement.contains(event.target as Node)) {
+      return;
+    }
     this.docDropdown = false;
     this.profileDropdown = false;
   }
