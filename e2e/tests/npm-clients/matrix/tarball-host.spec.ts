@@ -43,6 +43,10 @@ import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import { target } from '../../../src/target.js';
+import type { ClientId } from '../../../src/clients/npm-family/client.js';
+
+/** Clients whose lockfile records no tarball URL for a conventional one (pnpm), only integrity. */
+const LOCKFILE_HAS_NO_TARBALL_URL: ReadonlySet<ClientId> = new Set<ClientId>(['pnpm']);
 
 /** The other name of the local registry: `127.0.0.1` for `localhost`, and the reverse. */
 function alternateBase(base: string): string {
@@ -107,7 +111,10 @@ for (const client of target.isRemote ? [] : clientsWith('frozenInstall')) {
       );
 
       const lockfile = await fs.readFile(path.join(consumer.work, client.lockfile ?? ''), 'utf8');
-      expect(lockfile, 'the lockfile records the registry address').toContain(tarballUrl);
+      expect(
+        LOCKFILE_HAS_NO_TARBALL_URL.has(client.id) || lockfile.includes(tarballUrl),
+        'the lockfile records the registry address',
+      ).toBe(true);
       expect(lockfile, "and nothing of the publisher's address").not.toContain(publishBase);
     },
   );
