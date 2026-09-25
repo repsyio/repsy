@@ -24,6 +24,8 @@ import static org.mockito.Mockito.when;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
+import io.repsy.protocols.nuget.shared.utils.NuGetBaseUrlResolver;
+import io.repsy.protocols.nuget.shared.utils.NuGetUrlBuilder;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +38,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractNuGetServiceIndexProtocolMethodHandler")
@@ -55,7 +58,15 @@ class AbstractNuGetServiceIndexProtocolMethodHandlerTest {
   static class TestHandler extends AbstractNuGetServiceIndexProtocolMethodHandler {
 
     TestHandler(final PathParser p, final NuGetProtocolFacade f, final NuGetProtocolProvider pr) {
-      super(p, f, pr);
+      this(p, f, pr, NuGetUrlBuilder::buildBaseUrl);
+    }
+
+    TestHandler(
+        final PathParser p,
+        final NuGetProtocolFacade f,
+        final NuGetProtocolProvider pr,
+        final NuGetBaseUrlResolver resolver) {
+      super(p, f, pr, resolver);
     }
   }
 
@@ -101,5 +112,37 @@ class AbstractNuGetServiceIndexProtocolMethodHandlerTest {
     } else {
       assertThat(result).isEmpty();
     }
+  }
+
+  @Test
+  @DisplayName(
+      "names the resources with the address the resolver gives, not the request's (RPS-1432)")
+  void usesTheResolvedBaseUrl() {
+    final var resolving =
+        new TestHandler(
+            basePathParser,
+            facade,
+            provider,
+            (request, repoName) -> "https://repo.example.com/prefix/" + repoName);
+    final var ctx = context("/v3/index.json");
+    final var request = new MockHttpServletRequest("GET", "/nuget/v3/index.json");
+
+    final var response = resolving.handle(ctx, request, new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+    verify(facade).getServiceIndex(ctx, "https://repo.example.com/prefix/nuget");
+  }
+
+  @Test
+  @DisplayName("falls back to the request when the resolver is the request-derived one")
+  void requestDerivedBaseUrl() {
+    final var ctx = context("/v3/index.json");
+    final var request = new MockHttpServletRequest("GET", "/nuget/v3/index.json");
+    request.setServerName("internal");
+    request.setServerPort(9090);
+
+    handler.handle(ctx, request, new MockHttpServletResponse());
+
+    verify(facade).getServiceIndex(ctx, "http://internal:9090/nuget");
   }
 }

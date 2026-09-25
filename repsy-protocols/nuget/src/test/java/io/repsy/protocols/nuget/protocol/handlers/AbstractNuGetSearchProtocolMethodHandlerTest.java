@@ -33,6 +33,8 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
 import io.repsy.protocols.nuget.shared.dtos.NuGetSearchResponse;
+import io.repsy.protocols.nuget.shared.utils.NuGetBaseUrlResolver;
+import io.repsy.protocols.nuget.shared.utils.NuGetUrlBuilder;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,7 +75,15 @@ class AbstractNuGetSearchProtocolMethodHandlerTest {
   static class TestHandler extends AbstractNuGetSearchProtocolMethodHandler {
 
     TestHandler(final PathParser p, final NuGetProtocolFacade f, final NuGetProtocolProvider pr) {
-      super(p, f, pr);
+      this(p, f, pr, NuGetUrlBuilder::buildBaseUrl);
+    }
+
+    TestHandler(
+        final PathParser p,
+        final NuGetProtocolFacade f,
+        final NuGetProtocolProvider pr,
+        final NuGetBaseUrlResolver resolver) {
+      super(p, f, pr, resolver);
     }
   }
 
@@ -113,6 +123,34 @@ class AbstractNuGetSearchProtocolMethodHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     verify(this.facade).search(eq(ctx), eq(""), eq(0), eq(20), eq(false), eq(false), anyString());
+  }
+
+  @Test
+  @DisplayName(
+      "names the results with the address the resolver gives, not the request's (RPS-1432)")
+  void usesTheResolvedBaseUrl() {
+    final var resolving =
+        new TestHandler(
+            this.basePathParser,
+            this.facade,
+            this.provider,
+            (request, repoName) -> "https://repo.example.com/prefix/" + repoName);
+    final var ctx = context(SEARCH_PATH);
+    when(this.facade.search(
+            eq(ctx), anyString(), anyInt(), anyInt(), anyBoolean(), anyBoolean(), anyString()))
+        .thenReturn(new NuGetSearchResponse(0, List.of()));
+
+    resolving.handle(ctx, request(null), new MockHttpServletResponse());
+
+    verify(this.facade)
+        .search(
+            eq(ctx),
+            eq(""),
+            eq(0),
+            eq(20),
+            eq(false),
+            eq(false),
+            eq("https://repo.example.com/prefix/nuget"));
   }
 
   @Test

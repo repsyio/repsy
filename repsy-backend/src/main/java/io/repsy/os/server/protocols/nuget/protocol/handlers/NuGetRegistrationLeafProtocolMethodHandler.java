@@ -31,8 +31,9 @@ public class NuGetRegistrationLeafProtocolMethodHandler
   public NuGetRegistrationLeafProtocolMethodHandler(
       @Qualifier("osNuGetPathParser") final PathParser basePathParser,
       final NuGetProtocolFacade facade,
-      final NuGetProtocolProvider provider) {
+      final NuGetProtocolProvider provider,
+      final NuGetPublicUrlResolver baseUrlResolver) {
 
-    super(basePathParser, facade, provider, false);
+    super(basePathParser, facade, provider, baseUrlResolver, false);
   }
 }
