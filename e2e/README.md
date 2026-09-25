@@ -3979,7 +3979,7 @@ and on demand only, by the product owner's decision (RPS-1260): it has no `pull_
 
 ```bash
 gh workflow run e2e-nightly.yml                            # everything, like the nightly run
-gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 | all
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 | scanner | all
 gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
 gh workflow run e2e-nightly.yml -f grep=@smoke             # a Playwright --grep for every leg
 gh workflow run e2e-nightly.yml -f keep_stack_logs=true    # upload the container logs of a green run too
@@ -3999,6 +3999,7 @@ cancelling): a second one waits.
 | `ui`      | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                     | 60 min  |
 | `wire`    | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, one `run.sh test` each | 120 min |
 | `h2`      | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui` (the "Scope decision" above: the catalogs are not repeated per database)             | 90 min  |
+| `scanner` | PostgreSQL + the stub scanner overlay       | `REPSY_UI_OPT_IN=scanner`, `--protocol ui --grep @scanner` only (20 tests, "Scanner stack" above), never the whole `ui` suite | 45 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
 others. Every leg does the same: load the image, `./run.sh local up [--h2]` (with `REPSY_IMAGE` set, so
@@ -4009,6 +4010,12 @@ lists an `e2e-*` repository or user that a run left behind (the dry run always e
 greps its `[dry-run] would delete` lines). `CI=true` reaches the `ui` runner (`retries: 1`,
 `forbidOnly`, `trace: on-first-retry`); a test that only passes on its retry is listed in the summary
 as a flake candidate and should get a ticket, it is not a pass to ignore.
+
+The `scanner` leg starts the stack with `./run.sh local up --scanner` (Repsy with the scanner enabled plus the
+stub of `repsy-scanner-trivy`, built from `runners/scanner-stub.Dockerfile` on the runner) and ignores the
+`grep` input: it always runs `@scanner`, because the `@mocked` specs of the plain `ui` leg assume the scanner
+is off. The `@scanner` specs skip themselves without the opt-in, and a skipped test is not a failure, so the
+step "Check the scanner specs ran" fails the leg when its `junit.xml` holds no test or any skipped one.
 
 Each runner gets its own `run.sh test` invocation because every invocation overwrites `test-results/`
 and `playwright-report/` (see "Running"); the workflow copies each runner's output aside first.
