@@ -26,6 +26,7 @@ import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { renderComponent } from '../../../testing/render-spec-helpers';
 import {
   describeEmptyingDelete,
+  describePagedDelete,
   describeRepoListBehavior,
   ListFixture,
   pageOf,
@@ -134,6 +135,16 @@ describe('NpmPackagesVersionListComponent', () => {
       removeArgs: ['ui', 'acme', '1.0.0'],
       navigate: router.navigateByUrl,
       navigateArgs: [`/${REPO_NAME}`],
+    }));
+  });
+
+  describe('deleting from a later page or under a search (RPS-1340)', () => {
+    describePagedDelete(() => ({
+      list: build(),
+      dangerModal: dangerModalService,
+      remove: npmService.deletePackageVersion,
+      invoke: () => component.deleteVersion(VERSION),
+      navigate: router.navigateByUrl,
     }));
   });
 

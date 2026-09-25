@@ -3626,7 +3626,7 @@ keys a crate by its normalised name, `-` becoming `_`), NuGet and Helm `e2e-<run
 | cargo-07  | README renders (and is absent when none was published); deps in the Cargo.toml block; Add Dependency vs Install Binary; the four sorts (crates published out of version and name order); Newest puts the crate published last on top; latest version and every version; delete a crate with two versions; a yanked version stays listed and is marked yanked on the list and on its detail (RPS-1301) |
 | nuget-07  | stable and pre-release side by side; a stable-only repo (`releases`/`snapshots`) refuses a pre-release and keeps the list; unlist/relist flips `Listed` on the detail (the version stays listed); the four install snippets, no dependencies, nuspec metadata                                                                                                                                         |
 | helm-07   | a chart published to each module (OCI and classic) in one list, both open with digest and Chart.yaml; one chart with versions from both modules; deleting a classic chart; the Latest link; deleting the last version toasts once and lands on the chart list (RPS-1302)                                                                                                                              |
-| golang-07 | list -> `/modules?modulePath=` -> `/modules/version?modulePath=&version=` with the breadcrumb; deep link; GOPROXY endpoints; "Version 'x' not found"; the detail without its query goes to the list; a module path with slashes is searchable                                                                                                                                                         |
+| golang-07 | list -> `/modules?modulePath=` -> `/modules/version?modulePath=&version=` with the breadcrumb; deep link; GOPROXY endpoints; "Version 'x' not found"; the detail without its query goes to the list; a module path with slashes is searchable; deleting the only version left on page 2 stays on the versions page (RPS-1340)                                                                         |
 | ruby-07   | yanked badge on the versions list and on the detail after a yank through the API; install commands, platform and checksum; the Latest link                                                                                                                                                                                                                                                            |
 
 What the descriptors record (found by running each protocol): a version row's link appends `#security`
@@ -3689,7 +3689,8 @@ Things a later author must know:
   scoped to the component (the page-level scans cannot see an open menu or a toast): the menu toggle is
   labelled and carries `aria-haspopup`/`aria-expanded`/`aria-controls`, the menu is `role=menu` with
   `menuitem`s and closes on Escape (focus back on the toggle), on an outside click and after an item is
-  chosen; the stack is `role=status` + `aria-live=polite`, an error toast is `role=alert`, its close button
+  chosen, and closes when the header's profile menu opens and the other way round (the avatar click is dispatched
+  without moving the focus, as Safari does, because a focus move alone would close the row menu; RPS-1347); the stack is `role=status` + `aria-live=polite`, an error toast is `role=alert`, its close button
   is named, it lasts 7 s and is held while hovered or focused (driven with `page.clock`, so no test sleeps);
   pagination is a `nav` named `Pagination` with `aria-current=page` and named previous/next buttons.
 - **Dialogs and forms (A11Y-05..07, `a11y/dialogs.spec.ts`, RPS-1266 parts 2 and 3).** `expectDialogContract()`
@@ -3981,7 +3982,7 @@ and on demand only, by the product owner's decision (RPS-1260): it has no `pull_
 
 ```bash
 gh workflow run e2e-nightly.yml                            # everything, like the nightly run
-gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 | all
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 | scanner | all
 gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
 gh workflow run e2e-nightly.yml -f grep=@smoke             # a Playwright --grep for every leg
 gh workflow run e2e-nightly.yml -f keep_stack_logs=true    # upload the container logs of a green run too
@@ -4001,6 +4002,7 @@ cancelling): a second one waits.
 | `ui`      | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                     | 60 min  |
 | `wire`    | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, one `run.sh test` each | 120 min |
 | `h2`      | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui` (the "Scope decision" above: the catalogs are not repeated per database)             | 90 min  |
+| `scanner` | PostgreSQL + the stub scanner overlay       | `REPSY_UI_OPT_IN=scanner`, `--protocol ui --grep @scanner` only (20 tests, "Scanner stack" above), never the whole `ui` suite | 45 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
 others. Every leg does the same: load the image, `./run.sh local up [--h2]` (with `REPSY_IMAGE` set, so
@@ -4011,6 +4013,12 @@ lists an `e2e-*` repository or user that a run left behind (the dry run always e
 greps its `[dry-run] would delete` lines). `CI=true` reaches the `ui` runner (`retries: 1`,
 `forbidOnly`, `trace: on-first-retry`); a test that only passes on its retry is listed in the summary
 as a flake candidate and should get a ticket, it is not a pass to ignore.
+
+The `scanner` leg starts the stack with `./run.sh local up --scanner` (Repsy with the scanner enabled plus the
+stub of `repsy-scanner-trivy`, built from `runners/scanner-stub.Dockerfile` on the runner) and ignores the
+`grep` input: it always runs `@scanner`, because the `@mocked` specs of the plain `ui` leg assume the scanner
+is off. The `@scanner` specs skip themselves without the opt-in, and a skipped test is not a failure, so the
+step "Check the scanner specs ran" fails the leg when its `junit.xml` holds no test or any skipped one.
 
 Each runner gets its own `run.sh test` invocation because every invocation overwrites `test-results/`
 and `playwright-report/` (see "Running"); the workflow copies each runner's output aside first.

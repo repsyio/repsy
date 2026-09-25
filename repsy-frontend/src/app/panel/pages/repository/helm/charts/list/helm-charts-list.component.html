@@ -111,7 +111,6 @@
                   data-testid="row-latest-link"
                   class="group text-secondary-500 flex w-max max-w-full min-w-0 gap-2 text-[14px]"
                   [routerLink]="'/' + activeRepo.repoName + '/' + chart.name + '/' + chart.latestVersion"
-                  (click)="$event.stopPropagation()"
                 >
                   <app-tooltip
                     truncate
@@ -233,7 +232,6 @@
                       data-testid="row-latest-link"
                       class="group text-secondary-500 flex gap-2 text-[14px]"
                       [routerLink]="'/' + activeRepo.repoName + '/' + chart.name + '/' + chart.latestVersion"
-                      (click)="$event.stopPropagation()"
                     >
                       <span class="text-right text-sm break-all group-hover:underline">{{ chart.latestVersion }}</span>
                       <svg

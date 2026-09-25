@@ -26,6 +26,7 @@ import { SecurityService } from '../../../../security/service/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import {
   describeLastVersionDelete,
+  describePagedDelete,
   describeRepoListBehavior,
   ListFixture,
   pageOf,
@@ -114,6 +115,16 @@ describe('RubyGemsVersionListComponent', () => {
       removePackageArgs: ['rails'],
       navigate: router.navigate,
       navigateArgs: [['..'], { relativeTo: route }],
+    }));
+  });
+
+  describe('deleting from a later page or under a search (RPS-1340)', () => {
+    describePagedDelete(() => ({
+      list: build(),
+      dangerModal: dangerModalService,
+      remove: rubyService.deleteGemVersion,
+      invoke: () => component.deleteVersion(VERSION),
+      navigate: router.navigate,
     }));
   });
 
