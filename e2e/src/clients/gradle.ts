@@ -71,8 +71,10 @@ const WARM_LOCK_STALE_MS = 600_000;
  */
 export const SHARED_GRADLE_HOME_DIR =
   process.env.GRADLE_SHARED_HOME_DIR ?? path.join(os.tmpdir(), 'repsy-e2e-gradle-home');
-const WARM_READY = path.join(SHARED_GRADLE_HOME_DIR, '.e2e-warm-ready');
-const WARM_LOCK = path.join(SHARED_GRADLE_HOME_DIR, '.e2e-warm-lock');
+/** Bumped whenever the warm-up learns to prime more, so a volume primed by an older one is primed again. */
+const WARM_VERSION = 3;
+const WARM_READY = path.join(SHARED_GRADLE_HOME_DIR, `.e2e-warm-ready-${WARM_VERSION}`);
+const WARM_LOCK = path.join(SHARED_GRADLE_HOME_DIR, `.e2e-warm-lock-${WARM_VERSION}`);
 
 export type GradleDsl = 'groovy' | 'kotlin';
 
@@ -128,10 +130,10 @@ async function waitForWarm(): Promise<boolean> {
   return false;
 }
 
-/** Runs `gradle help` in a project rendered from both templates of `dsl`, into `SHARED_GRADLE_HOME_DIR`. */
+/** Primes `SHARED_GRADLE_HOME_DIR` with everything a build of `dsl`'s templates needs to start. */
 async function warmDsl(dsl: GradleDsl): Promise<void> {
   const { home, work } = await isolatedWorkDir(`gradle-warm-${dsl}`);
-  for (const template of ['publish', 'consumer']) {
+  for (const template of ['publish', 'consumer', 'locking-consumer']) {
     const project = path.join(work, template);
     await fs.mkdir(project, { recursive: true });
     await renderGradleTemplate(dsl, 'settings', path.join(project, settingsFileName(dsl)), {
@@ -143,16 +145,49 @@ async function warmDsl(dsl: GradleDsl): Promise<void> {
       repoUrl: 'http://localhost/none',
       hasCredential: false,
       coordinates: 'io.repsy.e2e.warm:warm:0.0.0',
+      locking: true,
+      dependencies: ['io.repsy.e2e.warm:warm:0.0.0'],
     });
     // `help` configures the project (compiles the build script, generates the accessors of the
     // plugins it applies) and resolves nothing.
-    await run('gradle', gradleArgs('help'), {
-      cwd: project,
-      env: { ...process.env, HOME: home, GRADLE_USER_HOME: SHARED_GRADLE_HOME_DIR },
-      timeoutMs: WARM_TIMEOUT_MS,
-      label: `gradle-warm-${dsl}-${template}`,
-    });
+    await warmRun(home, project, `${dsl}-${template}`, 'help');
   }
+
+  // A Gradle plugin project (clients/gradle-plugin.ts): compiling its class is what generates the
+  // Gradle API jar `java-gradle-plugin` puts on the compile classpath.
+  const plugin = path.join(work, 'plugin');
+  await fs.mkdir(plugin, { recursive: true });
+  await renderGradleTemplate(dsl, 'settings', path.join(plugin, settingsFileName(dsl)), {
+    artifactId: 'warm-plugin',
+  });
+  await renderGradleTemplate(dsl, 'plugin/publish', path.join(plugin, buildFileName(dsl)), {
+    groupId: 'io.repsy.e2e.warm',
+    pluginId: 'io.repsy.e2e.warm.plugin',
+    version: '0.0.0',
+    repoUrl: 'http://localhost/none',
+    hasCredential: false,
+  });
+  await writePluginSource(plugin);
+  await warmRun(home, plugin, `${dsl}-plugin`, 'classes');
+}
+
+async function warmRun(home: string, cwd: string, label: string, task: string): Promise<void> {
+  await run('gradle', gradleArgs(task), {
+    cwd,
+    env: { ...process.env, HOME: home, GRADLE_USER_HOME: SHARED_GRADLE_HOME_DIR },
+    timeoutMs: WARM_TIMEOUT_MS,
+    label: `gradle-warm-${label}`,
+  });
+}
+
+/** The plugin fixture's one class, `packages/gradle/plugin/MarkerPlugin.java`, into `project`. */
+export async function writePluginSource(project: string): Promise<void> {
+  const dir = path.join(project, 'src', 'main', 'java', 'io', 'repsy', 'e2e', 'plugin');
+  await fs.mkdir(dir, { recursive: true });
+  await fs.copyFile(
+    path.join(TEMPLATES_DIR, 'plugin', 'MarkerPlugin.java'),
+    path.join(dir, 'MarkerPlugin.java'),
+  );
 }
 
 let warmPromise: Promise<boolean> | undefined;
@@ -224,7 +259,7 @@ export async function prepareGradleRun(
     // one, or another run.
     await fs.cp(SHARED_GRADLE_HOME_DIR, gradleUserHome, {
       recursive: true,
-      filter: (source) => path.basename(source) !== '.e2e-warm-lock',
+      filter: (source) => !path.basename(source).startsWith('.e2e-warm-lock'),
     });
   }
 

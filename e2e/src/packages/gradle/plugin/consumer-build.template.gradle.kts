@@ -1,0 +1,5 @@
+// Rendered by clients/gradle-plugin.ts (mustache) into the consumer project (the Kotlin DSL): applies
+// the plugin from Repsy. Applying it registers the `e2eMarker` task the test runs.
+plugins {
+  id("{{{pluginId}}}"){{^legacy}} version "{{{version}}}"{{/legacy}}
+}
