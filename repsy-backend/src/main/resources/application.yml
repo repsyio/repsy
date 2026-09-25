@@ -93,6 +93,15 @@ repsy:
     # prefix or cannot send those headers, so that clients fetch tarballs from where they found the
     # registry (RPS-1333). It is the REPO_BASE_URL of the web UI's config snippets.
     public-url: ${REPO_BASE_URL:}
+  nuget:
+    # The address the NuGet service index, registration and search name their URLs with, e.g.
+    # https://repo.example.com (a path prefix is fine): every `@id` of /v3/index.json, the
+    # registration leaves, the `packageContent` .nupkg URLs and the search `registration` URLs start
+    # with it followed by the repo name. Empty (the default) derives it from each request (Host and
+    # X-Forwarded-* headers). Set it when a reverse proxy strips a path prefix or cannot send those
+    # headers, so that `dotnet` follows URLs it can reach (RPS-1432). It is the REPO_BASE_URL of the
+    # web UI's config snippets, like repsy.npm.public-url.
+    public-url: ${REPO_BASE_URL:}
   golang:
     # Largest module zip a `go` client may publish. The zip is the raw request body, which the
     # multipart limits above do not apply to, so a larger one is answered with 413 payloadTooLarge.

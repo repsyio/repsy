@@ -15,14 +15,13 @@
  */
 package io.repsy.protocols.nuget.protocol.handlers;
 
-import static io.repsy.protocols.nuget.shared.utils.NuGetUrlBuilder.buildBaseUrl;
-
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
+import io.repsy.protocols.nuget.shared.utils.NuGetBaseUrlResolver;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -53,16 +52,19 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler
 
   private final PathParser basePathParser;
   private final NuGetProtocolFacade facade;
+  private final NuGetBaseUrlResolver baseUrlResolver;
   private final boolean isIndex;
 
   protected AbstractNuGetRegistrationProtocolMethodHandler(
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider,
+      final NuGetBaseUrlResolver baseUrlResolver,
       final boolean isIndex) {
 
     this.basePathParser = basePathParser;
     this.facade = facade;
+    this.baseUrlResolver = baseUrlResolver;
     this.isIndex = isIndex;
 
     provider.registerMethodHandler(this);
@@ -104,7 +106,7 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler
 
     try {
       final var repoName = ProtocolContextUtils.<Object>getRepoInfo(context).getName();
-      final var baseUrl = buildBaseUrl(request, repoName);
+      final var baseUrl = this.baseUrlResolver.baseUrl(request, repoName);
 
       if (this.isIndex) {
         final var result = this.facade.getRegistrationIndex(context, baseUrl);

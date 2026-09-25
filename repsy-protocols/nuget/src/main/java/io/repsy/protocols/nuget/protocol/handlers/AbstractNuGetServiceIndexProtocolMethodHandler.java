@@ -15,13 +15,12 @@
  */
 package io.repsy.protocols.nuget.protocol.handlers;
 
-import static io.repsy.protocols.nuget.shared.utils.NuGetUrlBuilder.buildBaseUrl;
-
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
+import io.repsy.protocols.nuget.shared.utils.NuGetBaseUrlResolver;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,14 +42,17 @@ public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
 
   private final PathParser basePathParser;
   private final NuGetProtocolFacade facade;
+  private final NuGetBaseUrlResolver baseUrlResolver;
 
   public AbstractNuGetServiceIndexProtocolMethodHandler(
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
-      final NuGetProtocolProvider provider) {
+      final NuGetProtocolProvider provider,
+      final NuGetBaseUrlResolver baseUrlResolver) {
 
     this.basePathParser = basePathParser;
     this.facade = facade;
+    this.baseUrlResolver = baseUrlResolver;
 
     provider.registerMethodHandler(this);
   }
@@ -94,7 +96,7 @@ public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
 
     try {
       final var repoName = ProtocolContextUtils.<Object>getRepoInfo(context).getName();
-      final var baseUrl = buildBaseUrl(request, repoName);
+      final var baseUrl = this.baseUrlResolver.baseUrl(request, repoName);
       final var serviceIndex = this.facade.getServiceIndex(context, baseUrl);
 
       return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(serviceIndex);

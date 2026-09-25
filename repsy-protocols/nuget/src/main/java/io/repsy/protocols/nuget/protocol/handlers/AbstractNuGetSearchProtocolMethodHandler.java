@@ -15,7 +15,6 @@
  */
 package io.repsy.protocols.nuget.protocol.handlers;
 
-import static io.repsy.protocols.nuget.shared.utils.NuGetUrlBuilder.buildBaseUrl;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 import io.repsy.libs.protocol.router.PathParser;
@@ -23,6 +22,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
+import io.repsy.protocols.nuget.shared.utils.NuGetBaseUrlResolver;
 import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -42,14 +42,17 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler implements Protoc
 
   private final PathParser basePathParser;
   private final NuGetProtocolFacade facade;
+  private final NuGetBaseUrlResolver baseUrlResolver;
 
   public AbstractNuGetSearchProtocolMethodHandler(
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
-      final NuGetProtocolProvider provider) {
+      final NuGetProtocolProvider provider,
+      final NuGetBaseUrlResolver baseUrlResolver) {
 
     this.basePathParser = basePathParser;
     this.facade = facade;
+    this.baseUrlResolver = baseUrlResolver;
 
     provider.registerMethodHandler(this);
   }
@@ -100,7 +103,7 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler implements Protoc
               NuGetPackageUtils.MAX_SEARCH_TAKE);
 
       final var repoName = ProtocolContextUtils.<Object>getRepoInfo(context).getName();
-      final var baseUrl = buildBaseUrl(request, repoName);
+      final var baseUrl = this.baseUrlResolver.baseUrl(request, repoName);
 
       final var results =
           this.facade.search(context, q != null ? q : "", skip, take, prerelease, semVer2, baseUrl);
