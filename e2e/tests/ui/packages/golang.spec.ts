@@ -161,6 +161,38 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
     await versions.expectRow(nested);
   });
 
+  // RPS-1340: "the last version" was read off the current page, so deleting the only row left on page 2
+  // was taken for the end of the module and the page went back to the module list.
+  test('PKG-golang-07 deleting the only version left on page 2 stays on the versions page (RPS-1340)', async ({
+    adminPage,
+    seeder,
+    seedVersions,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.GOLANG);
+    const seeded = await seedVersions(
+      repo,
+      Array.from({ length: 11 }, (_, i) => `v1.0.${i}`),
+    );
+    const oldest = seeded[0];
+    const versions = protocolPages(adminPage, golang, repo.name).versions(oldest);
+    await versions.goto();
+    await expect(versions.rows()).toHaveCount(10);
+    await versions.expectNoRow(oldest);
+    await versions.pagination.next.click();
+    await expect(versions.rows()).toHaveCount(1);
+    await versions.expectRow(oldest);
+
+    await versions.deleteRow(oldest);
+
+    // Still the module's versions page, on the page before: ten rows, the module and its other versions intact.
+    await expect(adminPage).toHaveURL(
+      `${env.apiBaseUrl}/${repo.name}/modules?modulePath=${encodeURIComponent(oldest.name)}`,
+    );
+    await expect(versions.rows()).toHaveCount(10);
+    await versions.expectNoRow(oldest);
+    await expect(versions.pagination.page(2)).toHaveCount(0);
+  });
+
   // RPS-1302: the page loaded its permissions twice, so the versions of an unknown module were asked
   // for twice and the same "Module not found." toasted twice.
   test('PKG-golang-07 the versions page of an unknown module shows its error once (RPS-1302)', async ({

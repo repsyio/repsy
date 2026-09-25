@@ -42,6 +42,7 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
 import { SecurityService } from '../../../../security/service/security.service';
 import { NugetConfigComponent } from '../../config/nuget-config.component';
 import { NugetService } from '../../service/nuget.service';
@@ -141,7 +142,7 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
   }
 
   public deleteVersion(version: NuGetVersionListItem): void {
-    const isLastVersion = this.pagedData.page.totalElements === 1;
+    const isLastVersion = this.pagedData.page.totalElements === 1 && !this.searchText;
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       const action = isLastVersion
@@ -153,6 +154,7 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
           if (isLastVersion || deletedItem === NuGetDeletedItem.Package) {
             this.router.navigate(['..'], { relativeTo: this.route });
           } else {
+            this.pageNum = pageAfterDelete(this.versions.length, this.pageNum);
             this.fetchVersions();
           }
         })

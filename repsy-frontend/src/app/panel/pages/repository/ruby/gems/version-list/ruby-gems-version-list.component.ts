@@ -35,6 +35,7 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
 import { SecurityService } from '../../../../security/service/security.service';
 import { RubyConfigComponent } from '../../config/ruby-config.component';
 import { RubyService } from '../../service/ruby.service';
@@ -139,7 +140,7 @@ export class RubyGemsVersionListComponent implements OnDestroy {
   }
 
   public deleteVersion(version: GemVersionListItem): void {
-    const isLastVersion = this.pagedData.page.totalElements === 1;
+    const isLastVersion = this.pagedData.page.totalElements === 1 && !this.searchText;
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       const deleteAction = isLastVersion
@@ -157,6 +158,7 @@ export class RubyGemsVersionListComponent implements OnDestroy {
             if (isLastVersion) {
               this.router.navigate(['..'], { relativeTo: this.route });
             } else {
+              this.pageNum = pageAfterDelete(this.versions.length, this.pageNum);
               this.fetchVersions();
             }
           },

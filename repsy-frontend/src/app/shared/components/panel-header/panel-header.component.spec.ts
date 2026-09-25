@@ -13,10 +13,12 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 ///
+import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 
 import { AuthService } from '../../../auth/pages/service/auth.service';
+import { DropdownComponent } from '../../../panel/shared/components/dropdown/dropdown.component';
 import { PanelHeaderComponent } from './panel-header.component';
 
 describe('PanelHeaderComponent burger', () => {
@@ -167,5 +169,83 @@ describe('PanelHeaderComponent with a session', () => {
 
     expect(fixture.nativeElement.querySelector('[data-testid="header-avatar"]')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="header-login"]')).toBeNull();
+  });
+});
+
+// RPS-1347: the click that opens the profile menu used to be stopped at the button, so it never reached the row
+// dropdowns' outside-click handlers and a row menu stayed open beside it.
+@Component({
+  selector: 'app-header-with-row-menu',
+  imports: [PanelHeaderComponent, DropdownComponent],
+  template: `
+    <app-panel-header />
+    <p data-testid="elsewhere">Page content</p>
+    <app-dropdown>
+      <button type="button" data-testid="row-action">Delete</button>
+    </app-dropdown>
+  `,
+})
+class HeaderWithRowMenuComponent {}
+
+describe('PanelHeaderComponent next to a row menu', () => {
+  let fixture: ComponentFixture<HeaderWithRowMenuComponent>;
+
+  const query = (testId: string): HTMLElement | null =>
+    fixture.nativeElement.querySelector(`[data-testid="${testId}"]`);
+
+  const click = (testId: string): void => {
+    query(testId)!.click();
+    fixture.detectChanges();
+  };
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HeaderWithRowMenuComponent],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: { username: 'admin', isAuthenticated: () => true } },
+      ],
+    });
+    fixture = TestBed.createComponent(HeaderWithRowMenuComponent);
+    // The menus listen on the document, so the clicks have to bubble up to a real one.
+    document.body.appendChild(fixture.nativeElement);
+    fixture.detectChanges();
+  });
+
+  afterEach(() => fixture.nativeElement.remove());
+
+  it('opens the profile menu and keeps it open (its own click is not an outside click)', () => {
+    click('header-avatar');
+
+    expect(query('header-menu')).not.toBeNull();
+  });
+
+  it('closes an open row menu when the profile menu is opened', () => {
+    click('dropdown-toggle');
+    expect(query('dropdown-menu')).not.toBeNull();
+
+    click('header-avatar');
+
+    expect(query('header-menu')).not.toBeNull();
+    expect(query('dropdown-menu')).toBeNull();
+  });
+
+  it('closes the profile menu when a row menu is opened', () => {
+    click('header-avatar');
+
+    click('dropdown-toggle');
+
+    expect(query('header-menu')).toBeNull();
+    expect(query('dropdown-menu')).not.toBeNull();
+  });
+
+  it('closes the profile menu on a click anywhere else, and with the avatar again', () => {
+    click('header-avatar');
+    click('elsewhere');
+    expect(query('header-menu')).toBeNull();
+
+    click('header-avatar');
+    click('header-avatar');
+    expect(query('header-menu')).toBeNull();
   });
 });
