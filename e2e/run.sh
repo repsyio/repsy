@@ -33,6 +33,16 @@ if [ -f .env ]; then
   set +a
 fi
 
+# The stack's compose project and its host-port offset (README.md "Parallel stacks"). The defaults are
+# what the compose files always used: project repsy-e2e on 8080/9090. Several worktrees on one machine
+# each pick their own pair, or a second "local up" replaces the first one's containers (RPS-1422).
+# Both are also settable per call: --project NAME, --port-offset N (see extract_global_options).
+DEFAULT_PROJECT="repsy-e2e"
+PROJECT="${REPSY_E2E_PROJECT:-$DEFAULT_PROJECT}"
+PORT_OFFSET="${REPSY_E2E_PORT_OFFSET:-0}"
+# The compose project of the runner containers (docker-compose.runners.yml); see derive_stack_env.
+RUNNERS_PROJECT="repsy-e2e-runners"
+
 # Read by docker-compose.runners.yml's "user:", so a runner container writes the regenerated API
 # client and test reports as this user, not as the image's default root (see that file's comment).
 HOST_UID="$(id -u)"
@@ -50,9 +60,12 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  run.sh local up|down [--h2] [--scanner]
+  run.sh local up|down [--h2] [--scanner] [--force]
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
+
+Every subcommand also takes --project NAME and --port-offset N (or REPSY_E2E_PROJECT and
+REPSY_E2E_PORT_OFFSET), anywhere on the line.
 
 --protocol takes runner service names: skeleton, maven, npm, npm-clients (the npm registry under pnpm,
 yarn classic, yarn berry and bun as well as npm; see README.md "npm-family clients"), cargo, nuget,
@@ -74,6 +87,13 @@ combinable with --h2): Repsy starts with SECURITY_SCANNER=enabled pointed at a d
 repsy-scanner-trivy, which the @scanner UI specs need (REPSY_UI_OPT_IN=scanner; with REPSY_E2E_SCANNER=1
 "run.sh test" adds that opt-in itself). The default stack never starts a scanner. Give "down" the same
 flags as "up". See README.md "Scanner stack".
+
+Parallel stacks (README.md "Parallel stacks"): the stack is the compose project --project NAME
+(default repsy-e2e) with its host ports moved up by --port-offset N (default 0: panel API 8080, repo
+protocols 9090, stub scanner 8090). Two checkouts that run stacks at the same time each need their
+own pair, e.g. REPSY_E2E_PROJECT=rps-1 REPSY_E2E_PORT_OFFSET=100, given to "local up|down", "test"
+and "sweep" alike so all of them reach that stack. "local up|down" refuse to touch a project (or a
+host port) that a stack started from another checkout holds; --force (or REPSY_E2E_FORCE=1) overrides.
 EOF
 }
 
@@ -89,16 +109,19 @@ env_switch_on() {
 # switched on from the environment: REPSY_E2E_STACK=h2 and REPSY_E2E_SCANNER=1.
 USE_H2="false"
 USE_SCANNER="false"
+FORCE="false"
 parse_stack_flags() {
   local sub="$1"
   shift
   USE_H2="false"
   USE_SCANNER="false"
+  FORCE="false"
   local arg
   for arg in "$@"; do
     case "$arg" in
       --h2) USE_H2="true" ;;
       --scanner) USE_SCANNER="true" ;;
+      --force) FORCE="true" ;;
       *)
         echo "Unknown option for 'local $sub': $arg" >&2
         usage
@@ -108,7 +131,145 @@ parse_stack_flags() {
   done
   [ "${REPSY_E2E_STACK:-}" = "h2" ] && USE_H2="true"
   env_switch_on "${REPSY_E2E_SCANNER:-}" && USE_SCANNER="true"
+  env_switch_on "${REPSY_E2E_FORCE:-}" && FORCE="true"
   return 0
+}
+
+# Takes --project NAME and --port-offset N (also as --project=NAME) out of the command line, wherever
+# they stand, into PROJECT and PORT_OFFSET. Fills REMAINING_ARGS with the rest.
+REMAINING_ARGS=()
+extract_global_options() {
+  REMAINING_ARGS=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --project | --port-offset)
+        if [ $# -lt 2 ]; then
+          echo "$1 needs a value" >&2
+          exit 1
+        fi
+        if [ "$1" = "--project" ]; then PROJECT="$2"; else PORT_OFFSET="$2"; fi
+        shift 2
+        ;;
+      --project=*)
+        PROJECT="${1#--project=}"
+        shift
+        ;;
+      --port-offset=*)
+        PORT_OFFSET="${1#--port-offset=}"
+        shift
+        ;;
+      *)
+        REMAINING_ARGS+=("$1")
+        shift
+        ;;
+    esac
+  done
+}
+
+# Validates PROJECT and PORT_OFFSET and exports everything that follows from them, so "local up|down",
+# "test" and "sweep" (and the runner containers behind them) all reach the same stack with no other
+# change. A variable the user already set (typically REPSY_API_BASE_URL for a remote target) wins.
+#   REPSY_E2E_API_PORT / REPSY_E2E_REPO_PORT   host ports of the stack (8080/9090 + offset), read by
+#                                              the stack compose files
+#   REPSY_E2E_SCANNER_PORT                     host port of the stub scanner (8090 + offset)
+#   REPSY_API_BASE_URL / REPSY_REPO_BASE_URL   what the runners call; the stack also prints the latter
+#                                              in the panel's client snippets (REPO_BASE_URL)
+#   REPSY_E2E_STACK_PROJECT                    the project the stack runner docker-execs into
+#   REPSY_E2E_IMAGE_TAG                        tag of the locally built images: "local" for the default
+#                                              project, else the project, so two checkouts building at
+#                                              once cannot retag each other's image
+# The runner containers get their own compose project per stack project ("<project>-runners"), so the
+# shared Maven/Gradle caches and the runner images are private to it too, not swapped by a branch that
+# changes a runner Dockerfile. The default project keeps repsy-e2e-runners.
+derive_stack_env() {
+  case "$PROJECT" in
+    '' | *[!a-z0-9_-]* | [-_]*)
+      echo "Invalid project name \"$PROJECT\": lower-case letters, digits, '-' and '_', starting with a letter or digit (compose's rule)." >&2
+      exit 1
+      ;;
+  esac
+  case "$PORT_OFFSET" in
+    '' | *[!0-9]*)
+      echo "Invalid port offset \"$PORT_OFFSET\": a non-negative integer." >&2
+      exit 1
+      ;;
+  esac
+  # 10# so that 0100 is a hundred, not an invalid octal number. Five digits cannot overflow.
+  if [ "${#PORT_OFFSET}" -gt 5 ] || [ $((10#$PORT_OFFSET)) -gt $((65535 - 9090)) ]; then
+    echo "Invalid port offset \"$PORT_OFFSET\": 9090 + offset must stay at or below 65535." >&2
+    exit 1
+  fi
+  PORT_OFFSET=$((10#$PORT_OFFSET))
+
+  local api_port=$((8080 + PORT_OFFSET)) repo_port=$((9090 + PORT_OFFSET))
+  REPSY_E2E_API_PORT="$api_port"
+  REPSY_E2E_REPO_PORT="$repo_port"
+  REPSY_E2E_SCANNER_PORT="${REPSY_E2E_SCANNER_PORT:-$((8090 + PORT_OFFSET))}"
+  # A URL that is already set wins, but with an offset it usually is a leftover from a copied
+  # .env.example and points at some other stack: say so instead of testing the wrong one silently.
+  REPSY_API_BASE_URL="${REPSY_API_BASE_URL:-http://localhost:$api_port}"
+  REPSY_REPO_BASE_URL="${REPSY_REPO_BASE_URL:-http://localhost:$repo_port}"
+  if [ "$PORT_OFFSET" -ne 0 ]; then
+    if [ "$REPSY_API_BASE_URL" != "http://localhost:$api_port" ]; then
+      echo "Warning: REPSY_API_BASE_URL=$REPSY_API_BASE_URL is set, so it is used instead of http://localhost:$api_port (port offset $PORT_OFFSET). Unset it (e2e/.env?) to follow the offset." >&2
+    fi
+    if [ "$REPSY_REPO_BASE_URL" != "http://localhost:$repo_port" ]; then
+      echo "Warning: REPSY_REPO_BASE_URL=$REPSY_REPO_BASE_URL is set, so it is used instead of http://localhost:$repo_port (port offset $PORT_OFFSET). Unset it (e2e/.env?) to follow the offset." >&2
+    fi
+  fi
+  REPSY_E2E_STACK_PROJECT="${REPSY_E2E_STACK_PROJECT:-$PROJECT}"
+  if [ "$PROJECT" = "$DEFAULT_PROJECT" ]; then
+    REPSY_E2E_IMAGE_TAG="${REPSY_E2E_IMAGE_TAG:-local}"
+  else
+    RUNNERS_PROJECT="$PROJECT-runners"
+    REPSY_E2E_IMAGE_TAG="${REPSY_E2E_IMAGE_TAG:-$PROJECT}"
+  fi
+  # REPSY_E2E_PROJECT is deliberately not COMPOSE_PROJECT_NAME: .env is sourced into this environment,
+  # and COMPOSE_PROJECT_NAME would also rename the runners project. Every compose call below passes
+  # -p instead.
+  export REPSY_E2E_PROJECT="$PROJECT" REPSY_E2E_PORT_OFFSET="$PORT_OFFSET"
+  export REPSY_E2E_API_PORT REPSY_E2E_REPO_PORT REPSY_E2E_SCANNER_PORT
+  export REPSY_API_BASE_URL REPSY_REPO_BASE_URL REPSY_E2E_STACK_PROJECT REPSY_E2E_IMAGE_TAG
+}
+
+# Refuses to start or stop a stack that another checkout owns: a container of PROJECT running from a
+# compose working directory other than this one, or a container of another project (or not from
+# compose) publishing one of the host ports this stack needs. "local up" from a second worktree used
+# to replace the first one's containers mid-run (RPS-1422). --force (REPSY_E2E_FORCE=1) skips it.
+guard_stack_owner() {
+  local action="$1"
+  [ "$FORCE" = "true" ] && return 0
+  local here_real
+  here_real="$(pwd -P)"
+  local dir
+  while IFS= read -r dir; do
+    if [ -z "$dir" ] || [ "$dir" = "$SCRIPT_DIR" ] || [ "$dir" = "$here_real" ]; then
+      continue
+    fi
+    echo "Refusing to $action: the compose project \"$PROJECT\" is running from another checkout ($dir)," >&2
+    echo "not from $SCRIPT_DIR. Use your own stack, e.g." >&2
+    echo "  REPSY_E2E_PROJECT=<name> REPSY_E2E_PORT_OFFSET=<n> ./run.sh local $action" >&2
+    echo "(and the same variables for \"test\" and \"sweep\"), or pass --force to take it over." >&2
+    exit 1
+  done < <(docker ps --filter "label=com.docker.compose.project=$PROJECT" \
+    --format '{{.Label "com.docker.compose.project.working_dir"}}' | sort -u)
+  [ "$action" = "up" ] || return 0
+
+  local -a ports=("$REPSY_E2E_API_PORT" "$REPSY_E2E_REPO_PORT")
+  [ "$USE_SCANNER" = "true" ] && ports+=("$REPSY_E2E_SCANNER_PORT")
+  local port line name project
+  for port in "${ports[@]}"; do
+    while IFS= read -r line; do
+      [ -z "$line" ] && continue
+      name="${line%%|*}"
+      project="${line#*|}"
+      if [ "$project" != "$PROJECT" ]; then
+        echo "Refusing to up: host port $port is published by the container \"$name\" (compose project \"${project:-none}\")." >&2
+        echo "Pick another stack, e.g. REPSY_E2E_PROJECT=<name> REPSY_E2E_PORT_OFFSET=<n> ./run.sh local up, or pass --force." >&2
+        exit 1
+      fi
+    done < <(docker ps --filter "publish=$port" --format '{{.Names}}|{{.Label "com.docker.compose.project"}}')
+  done
 }
 
 # The "-f" arguments of the stack for the parsed flags: --h2 (or REPSY_E2E_STACK=h2) selects
@@ -116,10 +277,11 @@ parse_stack_flags() {
 # Fills STACK_ARGS.
 STACK_ARGS=()
 stack_args() {
+  # -p overrides the "name:" of the files.
   if [ "$USE_H2" = "true" ]; then
-    STACK_ARGS=(-f "$STACK_FILE_H2")
+    STACK_ARGS=(-p "$PROJECT" -f "$STACK_FILE_H2")
   else
-    STACK_ARGS=(-f "$STACK_FILE")
+    STACK_ARGS=(-p "$PROJECT" -f "$STACK_FILE")
   fi
   if [ "$USE_SCANNER" = "true" ]; then
     STACK_ARGS+=(-f "$STACK_FILE_SCANNER")
@@ -159,10 +321,11 @@ cmd_local_up() {
   parse_stack_flags up "$@"
   require_admin_password
   stack_args
+  guard_stack_owner up
   local db_label="postgres" scanner_label=""
   [ "$USE_H2" = "true" ] && db_label="h2"
   [ "$USE_SCANNER" = "true" ] && scanner_label=", stub scanner"
-  # `up` alone builds the Repsy image only when repsy-os-e2e:local does not exist yet, so a stale one
+  # `up` alone builds the Repsy image only when repsy-os-e2e:$REPSY_E2E_IMAGE_TAG does not exist yet, so a stale one
   # from an earlier checkout was reused and the runners tested old code (RPS-1321). Build every time
   # instead: Docker's layer cache makes it a near no-op when nothing under the build context
   # changed, and a changed source is never missed (an mtime check would miss e.g. a branch switch
@@ -173,7 +336,13 @@ cmd_local_up() {
   else
     docker compose "${STACK_ARGS[@]}" up -d --wait --build
   fi
-  echo "Repsy is up ($db_label$scanner_label): panel API on http://localhost:8080, repo protocols on http://localhost:9090"
+  echo "Repsy is up ($db_label$scanner_label, project $PROJECT): panel API on $REPSY_API_BASE_URL, repo protocols on $REPSY_REPO_BASE_URL"
+  if [ "$USE_SCANNER" = "true" ]; then
+    echo "Stub scanner control API on http://localhost:$REPSY_E2E_SCANNER_PORT"
+  fi
+  if [ "$PROJECT" != "$DEFAULT_PROJECT" ] || [ "$PORT_OFFSET" -ne 0 ]; then
+    echo "Give the same to test, sweep and down: REPSY_E2E_PROJECT=$PROJECT REPSY_E2E_PORT_OFFSET=$PORT_OFFSET ./run.sh ..."
+  fi
   if [ "$USE_SCANNER" = "true" ]; then
     echo "Scanner enabled: run the @scanner specs with REPSY_UI_OPT_IN=scanner (or REPSY_E2E_SCANNER=1) ./run.sh test --protocol ui --grep @scanner"
   fi
@@ -182,6 +351,7 @@ cmd_local_up() {
 cmd_local_down() {
   parse_stack_flags down "$@"
   stack_args
+  guard_stack_owner down
   # Compose interpolates the whole file for every command, "down" included, and the stack file
   # requires REPSY_ADMIN_PASSWORD. Tearing down does not use it, so any value will do.
   REPSY_ADMIN_PASSWORD="${REPSY_ADMIN_PASSWORD:-unused}" docker compose "${STACK_ARGS[@]}" down
@@ -259,7 +429,7 @@ cmd_test() {
   fi
 
   if [ "$rebuild" = "true" ]; then
-    docker compose -f "$RUNNERS_FILE" build "${services[@]}"
+    docker compose -p "$RUNNERS_PROJECT" -f "$RUNNERS_FILE" build "${services[@]}"
   fi
 
   local -a play_args=()
@@ -273,7 +443,7 @@ cmd_test() {
     echo "==> Running $service"
     # entrypoint.sh regenerates the API client, then runs Playwright for the given project with
     # any extra args (e.g. --grep) appended.
-    if ! docker compose -f "$RUNNERS_FILE" run --rm "$service" \
+    if ! docker compose -p "$RUNNERS_PROJECT" -f "$RUNNERS_FILE" run --rm "$service" \
       ./entrypoint.sh "$service" "${play_args[@]}"; then
       failed="true"
     fi
@@ -290,10 +460,13 @@ cmd_sweep() {
   # Reuses the "skeleton" image: sweeping needs the harness and no protocol-specific tooling. Calls
   # tsx directly (see entrypoint.sh's comment: "pnpm exec" fails under the container's non-root,
   # host-matching uid because it re-verifies node_modules against a store built as root).
-  docker compose -f "$RUNNERS_FILE" run --rm skeleton ./node_modules/.bin/tsx src/seed/sweep.ts "$@"
+  docker compose -p "$RUNNERS_PROJECT" -f "$RUNNERS_FILE" run --rm skeleton ./node_modules/.bin/tsx src/seed/sweep.ts "$@"
 }
 
 main() {
+  extract_global_options "$@"
+  set -- ${REMAINING_ARGS[@]+"${REMAINING_ARGS[@]}"}
+  derive_stack_env
   local group="${1:-}"
 
   case "$group" in

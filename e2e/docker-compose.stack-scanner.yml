@@ -23,11 +23,12 @@
 #
 #   docker compose -f docker-compose.stack.yml -f docker-compose.stack-scanner.yml up -d --wait --build
 #
-# The stub is published on loopback only (REPSY_E2E_SCANNER_PORT, default 8090): the ui runner (host
-# network) reaches its /control API there; Repsy reaches it as scanner-stub:8090 on the compose network.
+# The stub is published on loopback only (REPSY_E2E_SCANNER_PORT, default 8090; run.sh adds its port
+# offset): the ui runner (host network) reaches its /control API there; Repsy reaches it as
+# scanner-stub:8090 on the compose network.
 services:
   scanner-stub:
-    image: ${REPSY_SCANNER_STUB_IMAGE:-repsy-e2e-scanner-stub:local}
+    image: ${REPSY_SCANNER_STUB_IMAGE:-repsy-e2e-scanner-stub:${REPSY_E2E_IMAGE_TAG:-local}}
     build:
       context: .
       dockerfile: runners/scanner-stub.Dockerfile

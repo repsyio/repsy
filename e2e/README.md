@@ -243,22 +243,25 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 
 | Variable                      | Default                    | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ----------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REPSY_API_BASE_URL`          | `http://localhost:8080`    | panel API                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `REPSY_REPO_BASE_URL`         | `http://localhost:9090`    | repository/protocol operations                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `REPSY_API_BASE_URL`          | `http://localhost:8080`    | panel API. Unset, it follows `REPSY_E2E_PORT_OFFSET` (`8080 + offset`); a value set here wins over the offset (see "Parallel stacks")                                                                                                                                                                                                                                                                                                    |
+| `REPSY_REPO_BASE_URL`         | `http://localhost:9090`    | repository/protocol operations. Unset, it follows `REPSY_E2E_PORT_OFFSET` (`9090 + offset`); the stack also prints it in the panel's client snippets                                                                                                                                                                                                                                                                                     |
 | `REPSY_ADMIN_USERNAME`        | `admin`                    |                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `REPSY_ADMIN_PASSWORD`        | _(none — required)_        | must match the target's admin password                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_TARGET`                | `local`                    | `local` \| `remote` \| `ci` — see Targets below                                                                                                                                                                                                                                                                                                                                                                                          |
 | `REPSY_E2E_RUN_ID`            | random 6-char lowercase id | shared by every runner in one `run.sh test`                                                                                                                                                                                                                                                                                                                                                                                              |
 | `REPSY_E2E_STACK`             | _(unset — postgres)_       | `local up\|down` stack profile: unset/anything but `h2` is the postgres profile, `h2` is the embedded-H2 profile; equivalent to `--h2` on the command line. Unread by `run.sh test`, which is identical against either profile — see "Stack profiles" below                                                                                                                                                                              |
+| `REPSY_E2E_PROJECT`           | `repsy-e2e`                | compose project of the local stack (`local up\|down`, `test`, `sweep`, all of which follow it); also `--project NAME`. "Parallel stacks"                                                                                                                                                                                                                                                                                                 |
+| `REPSY_E2E_PORT_OFFSET`       | `0`                        | added to the stack's host ports 8080 (panel API), 9090 (repo protocols) and 8090 (stub scanner); also `--port-offset N`. "Parallel stacks"                                                                                                                                                                                                                                                                                               |
+| `REPSY_E2E_FORCE`             | _(unset)_                  | `1` lets `local up\|down` take over a project or host port held by a stack started from another checkout (same as `--force`)                                                                                                                                                                                                                                                                                                             |
 | `REPSY_UI_BASE_URL`           | _(REPSY_API_BASE_URL)_     | ui runner only: where the panel SPA is (it is served on the API port 8080, not the protocol port 9090)                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_UI_WORKERS`            | `4` (compose)              | ui runner only: Playwright workers (each is a Chromium, ~250-400 MB)                                                                                                                                                                                                                                                                                                                                                                     |
 | `REPSY_UI_NO_SANDBOX`         | _(unset — sandbox on)_     | ui runner only: `1` launches Chromium with `chromiumSandbox: false`, see "UI suite"                                                                                                                                                                                                                                                                                                                                                      |
 | `REPSY_UI_OPT_IN`             | _(unset)_                  | ui runner only: comma list of opt-in UI suites (`throttle`, `scanner`); read by `optedIn()`                                                                                                                                                                                                                                                                                                                                              |
 | `REPSY_E2E_SCANNER`           | _(unset)_                  | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_UI_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                     |
-| `REPSY_E2E_SCANNER_PORT`      | `8090`                     | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
+| `REPSY_E2E_SCANNER_PORT`      | `8090` + offset            | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_SCANNER_STUB_URL`      | `http://localhost:8090`    | ui runner only: where the `@scanner` specs reach that API (follows `REPSY_E2E_SCANNER_PORT`)                                                                                                                                                                                                                                                                                                                                             |
 | `REPSY_SCANNER_API_KEY`       | `e2e-scanner-key`          | the shared secret of the stub scanner and the backend's scanner client                                                                                                                                                                                                                                                                                                                                                                   |
-| `REPSY_E2E_STACK_PROJECT`     | `repsy-e2e`                | stack runner only: the compose project whose `repsy` container `docker exec` targets (README "Stack runner")                                                                                                                                                                                                                                                                                                                             |
+| `REPSY_E2E_STACK_PROJECT`     | `REPSY_E2E_PROJECT`        | stack runner only: the compose project whose `repsy` container `docker exec` targets (README "Stack runner"); `run.sh` sets it from the project                                                                                                                                                                                                                                                                                          |
 | `REPSY_E2E_INSECURE_REGISTRY` | _(unset)_                  | docker runner's `--insecure` (only needed for a remote plain-HTTP host; `localhost` already works without it); helm runner's `--insecure-skip-tls-verify` (a REMOTE HTTPS target with a bad cert only -- helm's own `--plain-http` is derived from `REPSY_REPO_BASE_URL`'s scheme instead, unconditionally on this harness's own `http://localhost:9090` stack, confirmed live H3: unlike `crane`, Helm has no localhost auto-detection) |
 
 ## Targets (`src/target.ts`)
@@ -280,9 +283,9 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
   `postgres` service at all: a compose _override_ cannot remove a service, and profile-gating
   `postgres` while `repsy` still `depends_on` it makes Compose auto-enable the disabled service
   anyway, so this is a second, standalone compose file instead. Both files share the same
-  `name: repsy-e2e` project and the same `8080`/`9090` ports, so the two profiles can never run at
-  once by construction, and `./run.sh local down` (either flavour) always tears down whichever one
-  is actually up.
+  `name: repsy-e2e` project and the same `8080`/`9090` ports by default, so the two profiles can never
+  run at once by construction, and `./run.sh local down` (either flavour) always tears down whichever
+  one is actually up. A different project and port offset (next section) moves both.
 
 `./run.sh test` needs **no flag and no code change at all**: a runner only ever sees
 `REPSY_API_BASE_URL`/`REPSY_REPO_BASE_URL` (both `localhost`, identical in either profile), so every
@@ -293,6 +296,55 @@ deliberate — see "Scope decision" below.
 declares `VOLUME /app/data`, so each `repsy` container gets its own anonymous volume; `down` followed
 by `up` therefore always starts from an empty database with the 9 default repos freshly seeded,
 mirroring the postgres profile's own anonymous `pgdata` volume (confirmed live — see "Verification").
+
+## Parallel stacks (RPS-1422)
+
+The compose files name their project `repsy-e2e` and publish `8080`/`9090`, and the image is built as
+`repsy-os-e2e:local`. Two checkouts on one machine (for example two worktrees, each running an agent's
+e2e suite) therefore replaced each other's `repsy` container mid-run, and the second build retagged the
+image the first stack was about to start. Give each stack its own project and port offset instead:
+
+```bash
+export REPSY_E2E_PROJECT=rps-1422 REPSY_E2E_PORT_OFFSET=300   # or --project / --port-offset on each call
+./run.sh local up [--h2] [--scanner]   # project rps-1422: panel API :8380, repo protocols :9390, stub scanner :8390
+./run.sh test --protocol maven         # reaches that stack: the URLs are derived from the offset
+./run.sh sweep --dry-run               # so does sweep
+./run.sh local down
+```
+
+With both unset nothing changes (project `repsy-e2e`, `8080`/`9090`/`8090`, image tag `local`, runners
+project `repsy-e2e-runners`), and so does the nightly workflow, which calls `docker compose` directly.
+Otherwise `run.sh` does the following for every subcommand:
+
+- passes `-p <project>` to every `docker compose` call (it overrides the files' `name:`). It does **not**
+  use `COMPOSE_PROJECT_NAME`: `run.sh` sources `.env` into its environment, and that variable would also
+  rename the runners project and merge it into the stack's, which brings back the "orphans" problem the
+  header of `docker-compose.runners.yml` describes.
+- exports `REPSY_E2E_API_PORT`, `REPSY_E2E_REPO_PORT` and `REPSY_E2E_SCANNER_PORT` (read by the stack
+  files), `REPSY_API_BASE_URL` and `REPSY_REPO_BASE_URL` (what every runner calls, and what the panel's
+  client snippets print), `REPSY_E2E_STACK_PROJECT` (the stack runner's target) and
+  `REPSY_E2E_IMAGE_TAG` (the project name, so the image is `repsy-os-e2e:<project>` and the stub
+  scanner's `repsy-e2e-scanner-stub:<project>`). Only what is not set yet is derived: an explicit
+  `REPSY_API_BASE_URL` (a remote target) wins, and with an offset it prints a warning that it does, since
+  the usual cause is a leftover line from a copied `.env.example` (which now leaves them commented out).
+- runs the runner containers in the compose project `<project>-runners` for a non-default project.
+  Their shared Maven/Gradle cache volumes and their images are keyed by that name, so they are private to
+  the stack: slower the first time, but a branch that changes a runner Dockerfile cannot swap another
+  worktree's runner image. Remove them with `docker compose -p <project>-runners -f
+  docker-compose.runners.yml down -v --rmi local` when the stack is retired.
+- validates the values: the project is compose's own rule (`[a-z0-9][a-z0-9_-]*`), the offset a
+  non-negative integer with `9090 + offset <= 65535`.
+
+**The guard.** `local up` refuses when a container of the project is running from another checkout
+(the `com.docker.compose.project.working_dir` label differs from this `e2e/` directory), or when a
+container of another project holds one of the host ports, and names the other one and the variables to
+set. `local down` refuses the first case too. `--force` (or `REPSY_E2E_FORCE=1`) overrides both. A
+process outside Docker on one of the ports is not detected: Docker's own "port is already allocated"
+error is what you get. Pick an offset of 100 or more per checkout so that the ports do not meet the
+default stack or the backend dev server.
+
+Verified live: a stack per project and offset came up next to the default one, `test` and `sweep`
+reached each of them, and `down` removed only its own containers.
 
 ### H2-1, confirmed live: which `DB_URL` actually boots the image
 
@@ -3232,8 +3284,9 @@ process runs as, who owns a directory the Dockerfile creates, the exact log line
 password from. The `stack` runner (`runners/stack.Dockerfile`, Playwright project `stack`, specs under
 `tests/stack/`) covers that by running `docker exec` and `docker logs` against the Repsy container of
 the local stack (`src/clients/stack.ts`). It finds the container by its compose labels (project
-`REPSY_E2E_STACK_PROJECT`, default `repsy-e2e`, the `name:` of both stack files; service `repsy`), so
-it works against either stack profile.
+`REPSY_E2E_STACK_PROJECT`, which `run.sh` sets to `REPSY_E2E_PROJECT`, default `repsy-e2e`, the `name:`
+of both stack files; service `repsy`), so it works against either stack profile and any "Parallel
+stacks" project.
 
 ```bash
 ./run.sh local up
@@ -4023,7 +4076,7 @@ What that starts, and what it does not change:
 
 - `docker-compose.stack-scanner.yml` is an **overlay**, passed as a second `-f` after
   `docker-compose.stack.yml` (or `-stack-h2.yml`): it adds the `scanner-stub` service (built from
-  `runners/scanner-stub.Dockerfile`, published on `127.0.0.1:${REPSY_E2E_SCANNER_PORT:-8090}`) and sets
+  `runners/scanner-stub.Dockerfile`, published on `127.0.0.1:${REPSY_E2E_SCANNER_PORT:-8090}`, which `run.sh` moves by the port offset) and sets
   `SECURITY_SCANNER=enabled`, `TRIVY_SCANNER_BASE_URL=http://scanner-stub:8090`, `TRIVY_SCANNER_API_KEY`
   and `TRIVY_POLL_INTERVAL_MS=1000` on `repsy`. It is an overlay and not a compose `profile` because a
   profile cannot change the environment of `repsy`, which the scanner needs. The default stack file,
@@ -4129,6 +4182,8 @@ A run of the whole `@scanner` set takes about two and a half minutes with two wo
 
 ./run.sh local up --h2       # starts the H2 profile instead: Repsy alone, embedded H2, no postgres
                               # (same ports, so stop the postgres profile first if it is up)
+REPSY_E2E_PROJECT=mine REPSY_E2E_PORT_OFFSET=100 ./run.sh local up   # a private stack next to the
+                              # default one: see "Parallel stacks" (give the same to test/sweep/down)
 ./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby --grep '@smoke'
 ./run.sh test --protocol maven   # one full catalog against H2 -- see "Stack profiles" above
 ./run.sh local down --h2
