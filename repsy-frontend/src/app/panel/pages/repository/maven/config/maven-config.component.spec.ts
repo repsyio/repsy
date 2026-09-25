@@ -104,11 +104,13 @@ describe('MavenConfigComponent Apache Ivy snippet (RPS-1332)', () => {
     expect(component.markdown).toContain('every\ndependency is written to the POM as optional');
   });
 
-  it('documents that no maven-metadata.xml is generated for what a client uploads', () => {
+  it('documents that Repsy answers the artifact-level maven-metadata.xml Ivy does not upload', () => {
     component.ngOnInit();
 
-    expect(component.markdown).toContain('does not generate a `maven-metadata.xml`');
-    expect(component.markdown).toContain('prefer fixed versions');
+    const markdown = component.markdown.replace(/\s+/g, ' ');
+    expect(markdown).toContain('Ivy uploads no `maven-metadata.xml`');
+    expect(markdown).toContain('answers a request for the artifact-level one from the versions it has registered');
+    expect(markdown).not.toContain('prefer fixed versions');
   });
 
   it('shows the deploy token as the Ivy password and says the username can be empty', () => {
