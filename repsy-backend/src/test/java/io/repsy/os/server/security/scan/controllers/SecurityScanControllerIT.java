@@ -269,7 +269,10 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
   private record TestRepo(UUID id, String name, RepoType type) {}
 
   private TestRepo createRepo(final RepoType type) {
-    final var name = "s" + randomTag() + "-" + type.name().toLowerCase(Locale.ROOT);
+    return this.createRepo("s" + randomTag() + "-" + type.name().toLowerCase(Locale.ROOT), type);
+  }
+
+  private TestRepo createRepo(final String name, final RepoType type) {
     final var id = this.repoTxService.createRepo(name, type, false, null).getId();
     this.createdRepoIds.add(id);
     return new TestRepo(id, name, type);
@@ -1088,24 +1091,83 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("matches repoName exactly: neither a prefix nor another case matches")
-    void repoNameIsAnExactMatch() throws Exception {
+    @DisplayName("matches repoName by a part of the name, whatever its case (RPS-1338)")
+    void repoNameIsACaseInsensitiveContainsMatch() throws Exception {
+      this.seedFilterFixture();
+      final var name = this.repoNames.get("mavenA");
+      final var middle = name.substring(1, name.length() - 1);
+      final var mixed = name.substring(0, 3).toUpperCase(Locale.ROOT) + name.substring(3);
+
+      for (final var term : List.of(name, middle, name.toUpperCase(Locale.ROOT), mixed)) {
+        final var body =
+            expectScans(
+                SecurityScanControllerIT.this.getScans(
+                    SecurityScanControllerIT.this.seededAdminBearerToken(),
+                    Map.of("repoName", term)));
+
+        assertThat(content(body))
+            .as("term %s", term)
+            .extracting(scan -> scan.get("repoName"), scan -> scan.get("artifactVersion"))
+            .containsExactlyInAnyOrder(
+                tuple(name, "mavenA-critical"),
+                tuple(name, "mavenA-high"),
+                tuple(name, "mavenA-clean"));
+      }
+    }
+
+    @Test
+    @DisplayName("counts the pages of a partial repoName the way the rows are listed")
+    void repoNameContainsCountsMatchTheRows() throws Exception {
       this.seedFilterFixture();
       final var name = this.repoNames.get("mavenA");
 
-      final var prefix =
+      final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
                   SecurityScanControllerIT.this.seededAdminBearerToken(),
-                  Map.of("repoName", name.substring(0, name.length() - 1))));
-      final var upperCase =
-          expectScans(
-              SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.seededAdminBearerToken(),
-                  Map.of("repoName", name.toUpperCase(Locale.ROOT))));
+                  Map.of("repoName", name.substring(1), "size", "2")));
 
-      assertThat(content(prefix)).isEmpty();
-      assertThat(content(upperCase)).isEmpty();
+      assertPage(body, 2, 0, 3, 2);
+      assertThat(content(body)).hasSize(2);
+    }
+
+    /**
+     * A repository name cannot hold {@code %}, {@code _} or a backslash, so a term with one matches
+     * nothing. Read as a wildcard it would match the repositories below.
+     */
+    @Test
+    @DisplayName("takes % and _ in repoName literally, and a blank repoName filters nothing")
+    void repoNameWildcardsAreLiteral() throws Exception {
+      final var t = SecurityScanControllerIT.this;
+      final var tag = randomTag();
+      final var dashed = t.createRepo("s" + tag + "-a-b", RepoType.MAVEN);
+      final var plain = t.createRepo("s" + tag + "-axb", RepoType.MAVEN);
+      t.completedScan(dashed, "a", "1", at(1), t.findings(Severity.HIGH));
+      t.completedScan(plain, "a", "1", at(2), t.findings(Severity.HIGH));
+
+      assertThat(this.reposFound("s" + tag + "-a"))
+          .containsExactlyInAnyOrder(dashed.name(), plain.name());
+      assertThat(this.reposFound("s" + tag + "-a-b")).containsExactly(dashed.name());
+      assertThat(this.reposFound("s" + tag + "-a_b")).isEmpty();
+      assertThat(this.reposFound("s" + tag + "-a%b")).isEmpty();
+      assertThat(this.reposFound("s" + tag + "-a%")).isEmpty();
+      assertThat(this.reposFound("s" + tag + "-_-b")).isEmpty();
+      assertThat(this.reposFound("s" + tag + "-a\\b")).isEmpty();
+      // A % alone is a literal %, no repository has one: it does not match everything.
+      assertThat(this.reposFound("%")).isEmpty();
+      assertThat(this.reposFound("_")).isEmpty();
+      // A blank term filters nothing.
+      assertThat(this.reposFound("  ")).contains(dashed.name(), plain.name());
+    }
+
+    private List<Object> reposFound(final String term) throws Exception {
+      final var body =
+          expectScans(
+              SecurityScanControllerIT.this.getScans(
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
+                  Map.of("repoName", term, "size", "100")));
+
+      return content(body).stream().map(scan -> scan.get("repoName")).distinct().toList();
     }
 
     @ParameterizedTest(name = "severity={0}")
@@ -1673,6 +1735,46 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
 
       assertSummary(match, 1, 1, 0, 0, 0);
       assertSummary(contradiction, 0, 0, 0, 0, 0);
+    }
+
+    @Test
+    @DisplayName(
+        "filters by a part of the repoName, whatever its case, and takes % and _ literally")
+    void filterByRepoNameContains() throws Exception {
+      final var t = SecurityScanControllerIT.this;
+      final var repos = this.seedFilterFixture();
+      final var name = repos[0].name();
+      final var tag = randomTag();
+      final var dashed = t.createRepo("s" + tag + "-w-x", RepoType.MAVEN);
+      final var plain = t.createRepo("s" + tag + "-wyx", RepoType.MAVEN);
+      t.completedScan(dashed, "a", "1", at(4), t.findings(Severity.CRITICAL));
+      t.completedScan(plain, "a", "1", at(5), t.findings(Severity.LOW));
+
+      for (final var term : List.of(name.substring(1), name.toUpperCase(Locale.ROOT))) {
+        assertSummary(
+            expectSummary(t.getSummary(t.seededAdminBearerToken(), Map.of("repoName", term))),
+            1,
+            1,
+            0,
+            0,
+            0);
+      }
+      assertSummary(
+          expectSummary(
+              t.getSummary(t.seededAdminBearerToken(), Map.of("repoName", "s" + tag + "-w-x"))),
+          1,
+          0,
+          0,
+          0,
+          0);
+      assertSummary(
+          expectSummary(
+              t.getSummary(t.seededAdminBearerToken(), Map.of("repoName", "s" + tag + "-w%x"))),
+          0,
+          0,
+          0,
+          0,
+          0);
     }
 
     /** Pinned current behavior: an unknown repository name is 200 with zero counts, not 404. */
