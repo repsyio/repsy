@@ -18,6 +18,124 @@ installation, configuration and usage.
 | `repsy-protocols/` | One module per package format, plus `shared` |
 | `repsy-frontend/` | Angular app (pnpm) |
 | `repsy-scanner-trivy/` | Optional standalone vulnerability-scanner service; not part of the root Maven reactor |
+| `e2e/` | Playwright + TypeScript end-to-end harness (real `mvn`, `npm`, `cargo`, `docker`... clients against a running Repsy, plus a UI suite); not part of the Maven reactor. See `e2e/README.md` |
+
+The root reactor (`pom.xml`) builds `repsy-backend`, `libs`, `repsy-protocols` and `repsy-frontend`.
+
+## Related repositories
+
+Repsy is spread over three repositories under the `repsyio` GitHub organisation:
+
+| Repository | What lives there | How it relates to this one |
+| --- | --- | --- |
+| [`repsy`](https://github.com/repsyio/repsy) (this one) | The application: backend, frontend, protocol modules, scanner, e2e | |
+| [`repsy-core`](https://github.com/repsyio/repsy-core) | Shared parent POM (`core-parent`: plugins, quality gates, Java/Maven enforcement), BOM (`core-bom`: dependency versions) and small shared libraries (`core-event`, `core-error-handling`, `core-response`, `core-uuidv7`) | Vendored here as the `core/` git submodule. See "Submodule" below |
+| [`repsy-docs`](https://github.com/repsyio/repsy-docs) | The user documentation, published at [docs.repsy.io](https://docs.repsy.io) | Not vendored. It describes the behaviour users rely on (client setup per protocol, repositories, deploy tokens) |
+
+- A change to how a build is configured, a dependency version or a shared library belongs in
+  `repsy-core`, not here. Merge it there first, then bump the submodule.
+- A change to user-visible behaviour (a protocol's client configuration, a panel feature, a
+  documented setting or status code) needs a matching `repsy-docs` PR. Tests that pin documented
+  behaviour name the docs issue they follow (for example `DeployTokenPasswordOnlyIT` cites
+  `repsy-docs #42`), so read those before changing such a behaviour.
+- `README.md` here covers installation, configuration and operation. Protocol usage guides live in
+  `repsy-docs`, so link to them instead of copying them into `README.md`.
+
+## Architecture
+
+### Runtime shape
+
+One Spring Boot process (`RepsyApplication`) serves two HTTP ports, set up by the `multiport`
+library (`libs/multiport`, `@EnableMultiport`, `@RestApiPort`):
+
+| Port | Default | Serves |
+| --- | --- | --- |
+| `api` | 8080 (`API_PORT`) | The panel REST API (`/api/...`) and the Angular single-page app (`spa/`) |
+| main | 9090 (`SERVER_PORT`) | The package-format wire protocols (`mvn deploy`, `npm publish`, `docker push`...) |
+
+Optional HTTPS listeners sit beside them (8443 aliased to `api`, 9443 to the main port); HTTP is never
+turned off. The frontend is built into the same image and served by the backend, so a plain install
+is one container plus, optionally, PostgreSQL (embedded H2 is the default) and the scanner service.
+
+### Two request paths
+
+- **Panel (`api` port).** Angular calls the REST API implemented in `repsy-backend/.../panel/` (`auth`,
+  `profile`) and in the `ui/` packages of each protocol and of `server/security/scan/`. The contract
+  is `openapi-spec.yaml` (see "API spec").
+- **Protocol (main port).** `ProtocolRouterController` (`libs/protocol-router`) is a catch-all
+  `@RequestMapping("/**")`. Each package format contributes a `ProtocolProvider` and a set of
+  `ProtocolMethodHandler`s, each with a `PathParser`. The router asks the parsers of the handlers
+  registered for the HTTP method, the first one that recognises the URL builds the `ProtocolContext`,
+  and that handler serves the request. Pre-processors (for example `MavenAuthPreProcessor`)
+  authenticate the caller before the handler runs. Post-processors (`ProtocolProcessor`s ordered by
+  priority) run after it, for example `UsagePostProcessor` and `ArtifactPushedEventPostProcessor`;
+  by default they are skipped when the handler failed unless they opt in with `runsOnFailure()`.
+
+### Module layout
+
+- **`libs/`** has no Repsy domain knowledge: `protocol-router` (the routing above), `multiport`
+  (several Tomcat connectors and per-port controller mapping), `storage`
+  (`storage-gateway` defines `StorageStrategy`, a path-based API where deletes are soft and
+  recoverable until the trash is cleared; `storage-gateway-fs` is the filesystem implementation).
+- **`repsy-protocols/<format>`** (`maven`, `npm`, `pypi`, `docker`, `cargo`, `golang`, `helm`,
+  `nuget`, `ruby`) holds the format's wire-protocol logic that does not depend on Repsy's database:
+  the `ProtocolProvider`, abstract handlers and facades, contracts (interfaces) the backend must
+  implement, and format parsing and storage utilities. `repsy-protocols/shared` is what all of them
+  use (`RepoType`, `Permission`, `Credentials`, bounded upload readers, digest helpers).
+- **`repsy-backend/.../server/protocols/<format>`** implements those contracts on top of the
+  entities, repositories and services, and is split the same way in each format:
+  `protocol/` (concrete handlers, facades, path parser, pre-processors), `shared/`
+  (entities, auth, listeners, storage code that the `protocol` and `ui` parts both use) and `ui/`
+  (the panel controllers for that format). To add a format, add a module under `repsy-protocols/`, the
+  matching package here, an `ArtifactStorageResolver` for scanning if it can be scanned, and a
+  `RepoType`.
+- **`repsy-backend/.../shared/`** holds what the panel and the protocols share: users and
+  authentication, repos, deploy tokens, usage, paging, error handling, security headers and CORS.
+- **`server/core`, `server/shared`** hold the cross-protocol server plumbing (URL parsing, auth,
+  tokens, usage post-processors).
+
+### Module boundaries
+
+The backend is a Spring Modulith application. Each top-level package with a `package-info.java`
+annotated `@ApplicationModule` is a module (`panel.auth`, `panel.profile`, each protocol's
+`protocol`, `shared` and `ui`, and so on), and packages marked `Type.OPEN` (`shared`, `server.core`,
+`server.shared`, `server.security`, each protocol's `shared`) may be used by any module. Anything
+else should not reach into another module's internals. Modules talk through Spring events, for
+example an `ArtifactPushedEvent` that starts a vulnerability scan. The `spring-modulith-starter-test`
+and ArchUnit dependencies are on the backend's classpath, but no test verifies the module structure
+yet, so nothing fails the build if a boundary is crossed: keep to it by hand, and give shared code
+an OPEN `shared` home or an event rather than a direct dependency on another module's internals.
+
+### Data and storage
+
+- **Metadata** (users, repos, artifacts, versions, tokens, scans) lives in PostgreSQL or embedded
+  H2 through Spring Data JPA. Flyway owns the schema, once per dialect (`db/migration/postgresql`,
+  `db/migration/h2`); see "Database".
+- **Artifact bytes** live behind `StorageStrategy`, namespaced by repo UUID. A publish must write
+  its metadata rows and its files as one unit, so a failed one leaves neither behind.
+- **Authentication.** The panel uses a JWT access token (`Authorization: Bearer`, from `login` and
+  `refreshToken`). Protocol clients authenticate with account credentials or deploy tokens.
+
+### Vulnerability scanning
+
+Optional and off by default (`SECURITY_SCANNER=disabled`). `server/security/` defines
+`VulnerabilityScanner` with a no-op and a Trivy implementation. After a publish,
+`ArtifactScanListener` (an `@EventListener` that runs the scan on the `scanTaskExecutor` pool)
+resolves the artifact's files
+through the format's `ArtifactStorageResolver`, sends them to `repsy-scanner-trivy` (a separate
+service with `POST /scan`, guarded by an API key) and `TrivyScanStatusPoller` collects the result.
+Findings are stored per repo and surfaced in the panel and in `npm audit`.
+
+### Frontend
+
+`repsy-frontend/` is an Angular app (standalone components, `src/app/{auth,panel,shared}`). Its API
+client is generated from `openapi-spec.yaml` into `src/generated/api` (git-ignored) with `pnpm gen:api`.
+
+### Tests at three levels
+
+`*Test` (unit, no Docker) and `*IT` (Testcontainers, see "Testing") live with the Maven modules;
+`e2e/` drives real package-manager clients and the panel UI against a running stack and is where a
+protocol is proven against the real tool. It has its own README, runners and `run.sh`.
 
 ## Requirements
 

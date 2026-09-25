@@ -43,10 +43,11 @@ const OMITS_DEPRECATION_MESSAGE: ReadonlySet<ClientId> = new Set<ClientId>(['pnp
 
 /**
  * Clients whose `add`/`install` say nothing at all about a deprecated version (probed: bun prints only
- * "(v1.1.0 available)"; `bun info <pkg>@<version> deprecated` shows it, see `bun/commands.spec.ts`).
+ * "(v1.1.0 available)"; `bun info <pkg>@<version> deprecated` shows it, see `bun/commands.spec.ts`;
+ * berry prints nothing either, `yarn npm info -f deprecated` shows it, `yarn-berry/commands.spec.ts`).
  * The registry serves the message to every client; whether it shows it is the client's.
  */
-const SILENT_ON_DEPRECATED: ReadonlySet<ClientId> = new Set<ClientId>(['bun']);
+const SILENT_ON_DEPRECATED: ReadonlySet<ClientId> = new Set<ClientId>(['bun', 'yarn-berry']);
 
 async function deprecatedOf(
   repoName: string,

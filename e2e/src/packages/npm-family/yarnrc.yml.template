@@ -2,9 +2,12 @@ nodeLinker: {{{nodeLinker}}}
 enableTelemetry: false
 enableGlobalCache: false
 enableProgressBars: false
+enableColors: false
+enableHyperlinks: false
 enableImmutableInstalls: {{{immutableInstalls}}}
 enableHardenedMode: {{{hardenedMode}}}
 httpRetry: 0
+npmMinimalAgeGate: "{{{minimalAgeGate}}}"
 cacheFolder: "{{{cacheFolder}}}"
 httpProxy: "{{{proxyUrl}}}"
 httpsProxy: "{{{proxyUrl}}}"
@@ -33,6 +36,8 @@ npmScopes:
 {{#scopes}}
   "{{{scopeName}}}":
     npmRegistryServer: "{{{registryUrl}}}"
+    npmPublishRegistry: "{{{registryUrl}}}"
+    npmMinimalAgeGate: "{{{minimalAgeGate}}}"
 {{#hasToken}}
     npmAuthToken: "{{{token}}}"
 {{/hasToken}}
