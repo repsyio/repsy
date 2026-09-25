@@ -43,6 +43,12 @@ updates:
     directory: "/repsy-frontend"
     schedule:
       interval: "weekly"
+    ignore:
+      # RPS-1371: jasmine-core 7 freezes the Jasmine Env, so zone.js's zone-testing patch
+      # ("Cannot assign to read only property 'describe'") fails at Karma startup, and no zone.js
+      # release (0.16.3 is the latest) supports it. Stay on the 6.x line until zone.js does.
+      - dependency-name: "jasmine-core"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "gitsubmodule"
     directory: "/"
