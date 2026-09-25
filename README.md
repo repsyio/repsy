@@ -607,9 +607,9 @@ instance per team.
   version of that path again creates the module again. Deleting a module as a whole is the same
   operation for all of its versions. The disk usage of what was deleted is given back to the
   repository, and a deleted version is reported to the vulnerability scanner as deleted.
-- **The Go proxy answers as it does for a module that was never published.** `@v/list` of a module
-  without versions is `200` with an empty body (not `404`, which would make the `go` command try the
-  next `GOPROXY` entry), and `@latest` is `404`.
+- **The Go proxy answers as it does for a module that was never published.** `@v/list` and `@latest`
+  of a module without versions are `404` with a `text/plain` body, so the `go` command tries the
+  next `GOPROXY` entry instead of taking an empty list as an answer.
 - A delete and a publish of the same module take turns, so a publish that arrives while the last
   version is being deleted is stored, in a module that is created again, and never fails.
 
