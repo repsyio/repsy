@@ -30,6 +30,7 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -41,6 +42,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -163,6 +165,23 @@ class AbstractNpmDistTagsRemoveProtocolMethodHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     verify(this.facade).removeDistributionTag(context, null, "left-pad", "next");
+  }
+
+  @Test
+  @DisplayName("handle() answers ok, the package and its remaining tags as JSON (RPS-1362)")
+  void answersOkAsJson() throws Exception {
+    final var context = context("/-/package/@scope/left-pad/dist-tags/next");
+    when(this.facade.getMappedDistributionTags(context, "scope", "left-pad"))
+        .thenReturn(Map.of("latest", "1.0.0"));
+
+    final var response =
+        this.handler().handle(context, new MockHttpServletRequest(), new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
+    assertThat(response.getBody())
+        .isEqualTo(
+            Map.of("ok", true, "id", "@scope/left-pad", "dist-tags", Map.of("latest", "1.0.0")));
   }
 
   @Test

@@ -20,11 +20,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.AuthThrottleProperties;
@@ -33,6 +36,8 @@ import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.dtos.ProtocolTokenClaims;
+import io.repsy.os.shared.auth.services.RevokedProtocolTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.auth.utils.TokenRealm;
@@ -52,6 +57,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.dao.DataIntegrityViolationException;
 
 /**
  * RPS-906: `npm login` must not reveal whether the username exists. RPS-1045: `npm login` with a
@@ -69,6 +75,8 @@ class NpmAuthComponentImplTest {
   private final UserTxService userTxService = Mockito.mock(UserTxService.class);
   private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
   private final DeployTokenService deployTokenService = Mockito.mock(DeployTokenService.class);
+  private final RevokedProtocolTokenService revokedTokens =
+      Mockito.mock(RevokedProtocolTokenService.class);
 
   private final NpmAuthComponentImpl authComponent =
       new NpmAuthComponentImpl(
@@ -76,7 +84,8 @@ class NpmAuthComponentImplTest {
           this.jwtUtils,
           this.deployTokenService,
           new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-          new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+          new AuthFailureThrottle(AuthThrottleProperties.disabled()),
+          this.revokedTokens);
 
   private final BaseRepoInfo<UUID> repo =
       BaseRepoInfo.<UUID>builder().name("npm").storageKey(UUID.randomUUID()).build();
@@ -307,5 +316,138 @@ class NpmAuthComponentImplTest {
     when(this.deployTokenService.findByRepoIdAndTokenId(this.repo.getStorageKey(), info.getId()))
         .thenReturn(Optional.of(info));
     return info;
+  }
+
+  // RPS-1361: revoking a login token (DELETE /-/user/token/<token>).
+
+  private static final Instant EXPIRES = Instant.parse("2027-01-01T00:00:00Z");
+
+  /** The caller presents the protocol JWT {@code Bearer caller} of a user that has {@code id}. */
+  private UUID callerIsUserWithBearer(final String jwt) {
+    final var id = UUID.randomUUID();
+    when(this.jwtUtils.extractAuthenticationType("Bearer " + jwt, TokenRealm.PROTOCOL))
+        .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+    when(this.jwtUtils.verifyAndExtractUsername("Bearer " + jwt, TokenRealm.PROTOCOL))
+        .thenReturn(USERNAME);
+    when(this.userTxService.getAuthenticatedUserByUsername(USERNAME))
+        .thenReturn(UserInfo.builder().id(id).username(USERNAME).build());
+    return id;
+  }
+
+  private void tokenClaims(
+      final String token, final UUID subject, final AuthenticationType authenticationType) {
+    when(this.jwtUtils.verifyProtocolToken(token))
+        .thenReturn(new ProtocolTokenClaims(subject, authenticationType, EXPIRES));
+  }
+
+  @Test
+  @DisplayName("revokeToken revokes the token the caller presents, until it would expire")
+  void revokeOwnBearerToken() {
+    final var id = this.callerIsUserWithBearer("mine");
+    tokenClaims("mine", id, AuthenticationType.USERNAME_PASSWORD);
+
+    this.authComponent.revokeToken(this.repo, "Bearer mine", "mine");
+
+    verify(this.revokedTokens).revoke("mine", EXPIRES);
+  }
+
+  @Test
+  @DisplayName("revokeToken lets a Basic caller revoke a token issued to the same user")
+  void revokeAnotherTokenOfTheSameUser() {
+    final var user = this.userTxService.getUserByUsernameOptional(USERNAME).orElseThrow();
+    tokenClaims("other-login", user.getId(), AuthenticationType.USERNAME_PASSWORD);
+
+    this.authComponent.revokeToken(this.repo, basic(USERNAME, PASSWORD), "other-login");
+
+    verify(this.revokedTokens).revoke("other-login", EXPIRES);
+  }
+
+  @Test
+  @DisplayName("revokeToken refuses the token of somebody else and revokes nothing")
+  void revokeSomebodyElsesToken() {
+    this.callerIsUserWithBearer("mine");
+    tokenClaims("theirs", UUID.randomUUID(), AuthenticationType.USERNAME_PASSWORD);
+
+    assertThatThrownBy(() -> this.authComponent.revokeToken(this.repo, "Bearer mine", "theirs"))
+        .isExactlyInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("loginTokenNotYours");
+    verify(this.revokedTokens, never()).revoke(anyString(), any());
+  }
+
+  @Test
+  @DisplayName("revokeToken refuses the secret of a deploy token, which the panel manages")
+  void revokeDeployTokenSecret() {
+    whoamiToken("the-secret", "deploy-1");
+
+    assertThatThrownBy(
+            () -> this.authComponent.revokeToken(this.repo, "Bearer the-secret", "the-secret"))
+        .isExactlyInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("deployTokenNotRevocable");
+    verify(this.revokedTokens, never()).revoke(anyString(), any());
+    verify(this.jwtUtils, never()).verifyProtocolToken(anyString());
+  }
+
+  @Test
+  @DisplayName("revokeToken lets a deploy-token JWT revoke itself, and only itself")
+  void revokeDeployTokenJwt() {
+    final var info = whoamiTokenById("deploy-jwt");
+    when(this.jwtUtils.extractAuthenticationType("Bearer jwt", TokenRealm.PROTOCOL))
+        .thenReturn(AuthenticationType.DEPLOY_TOKEN);
+    when(this.jwtUtils.extractUserId("Bearer jwt", TokenRealm.PROTOCOL)).thenReturn(info.getId());
+    tokenClaims("jwt", info.getId(), AuthenticationType.DEPLOY_TOKEN);
+    tokenClaims("user-jwt", UUID.randomUUID(), AuthenticationType.USERNAME_PASSWORD);
+
+    this.authComponent.revokeToken(this.repo, "Bearer jwt", "jwt");
+
+    verify(this.revokedTokens).revoke("jwt", EXPIRES);
+    assertThatThrownBy(() -> this.authComponent.revokeToken(this.repo, "Bearer jwt", "user-jwt"))
+        .isInstanceOf(AccessNotAllowedException.class);
+  }
+
+  @Test
+  @DisplayName("revokeToken answers tokenNotFound for a value that is no login token")
+  void revokeJunk() {
+    this.callerIsUserWithBearer("mine");
+    when(this.jwtUtils.verifyProtocolToken("junk"))
+        .thenThrow(new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED));
+    when(this.jwtUtils.verifyProtocolToken("odd"))
+        .thenThrow(new BadRequestException("invalidAuthenticationType"));
+    tokenClaims("scanner", UUID.randomUUID(), AuthenticationType.DOCKER_SCAN);
+    tokenClaims("anon", UUID.randomUUID(), AuthenticationType.ANONYMOUS);
+
+    for (final var token : List.of("junk", "odd", "scanner", "anon")) {
+      assertThatThrownBy(() -> this.authComponent.revokeToken(this.repo, "Bearer mine", token))
+          .isExactlyInstanceOf(ItemNotFoundException.class)
+          .hasMessage("loginTokenNotFound");
+    }
+    verify(this.revokedTokens, never()).revoke(anyString(), any());
+  }
+
+  @Test
+  @DisplayName("revokeToken needs credentials, and revoking twice at once is not an error")
+  void revokeNeedsCredentials() {
+    assertUnauthorized(() -> this.authComponent.revokeToken(this.repo, null, "x"));
+    assertUnauthorized(() -> this.authComponent.revokeToken(this.repo, "Digest x", "x"));
+
+    final var id = this.callerIsUserWithBearer("mine");
+    tokenClaims("mine", id, AuthenticationType.USERNAME_PASSWORD);
+    doThrow(new DataIntegrityViolationException("duplicate key"))
+        .when(this.revokedTokens)
+        .revoke("mine", EXPIRES);
+
+    this.authComponent.revokeToken(this.repo, "Bearer mine", "mine");
+
+    verify(this.revokedTokens).revoke("mine", EXPIRES);
+  }
+
+  @Test
+  @DisplayName("a revoked login token identifies nobody: whoami and revokeToken refuse it")
+  void revokedTokenIsRefused() {
+    this.callerIsUserWithBearer("gone");
+    when(this.revokedTokens.isRevoked("gone")).thenReturn(true);
+
+    assertUnauthorized(() -> this.authComponent.resolveUsername(this.repo, "Bearer gone"));
+    assertUnauthorized(() -> this.authComponent.revokeToken(this.repo, "Bearer gone", "gone"));
+    verify(this.revokedTokens, never()).revoke(anyString(), any());
   }
 }

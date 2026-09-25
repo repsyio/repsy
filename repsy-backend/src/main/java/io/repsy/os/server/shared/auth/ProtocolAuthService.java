@@ -30,6 +30,7 @@ import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.dtos.PermissionInfo;
+import io.repsy.os.shared.auth.services.RevokedProtocolTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.auth.utils.TokenRealm;
@@ -45,6 +46,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 
@@ -59,6 +61,18 @@ public class ProtocolAuthService {
   protected final @NonNull DeployTokenService deployTokenService;
   protected final @NonNull VerifiedPasswordCache verifiedPasswordCache;
   protected final @NonNull AuthFailureThrottle authFailureThrottle;
+
+  private @Nullable RevokedProtocolTokenService revokedTokens;
+
+  /**
+   * Setter-injected so that the protocol auth components, which all pass the five arguments above
+   * to {@code super}, need no change. It is always present in the application; it is absent only in
+   * a unit test that builds a component by hand, which then has no revoked tokens.
+   */
+  @Autowired(required = false)
+  public void setRevokedTokens(final @Nullable RevokedProtocolTokenService revokedTokens) {
+    this.revokedTokens = revokedTokens;
+  }
 
   /**
    * The credential a protocol request carries, which is its {@code Authorization} header and
@@ -99,6 +113,8 @@ public class ProtocolAuthService {
 
     final var authenticationType = this.verifiedAuthenticationType(authHeader);
 
+    this.rejectRevokedToken(bearerToken);
+
     if (authenticationType == AuthenticationType.DEPLOY_TOKEN) {
       this.authorizeTokenRequestTokenId(
           repoId, this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL), permission);
@@ -119,6 +135,22 @@ public class ProtocolAuthService {
     }
 
     this.authorizeJWTRequest(authHeader, permission);
+  }
+
+  /**
+   * Refuses a protocol JWT that was revoked, for example by {@code npm logout} (RPS-1361). It is
+   * called after the signature was verified, so a made-up Bearer value never costs a lookup. A
+   * revoked token is a credential Repsy recognizes, so like a revoked deploy token it is refused
+   * with {@code unAuthorized} and does not count against {@link AuthFailureThrottle}.
+   *
+   * @param token The JWT without its {@code Bearer} prefix
+   */
+  protected void rejectRevokedToken(final @NonNull String token) {
+    final var registry = this.revokedTokens;
+
+    if (registry != null && registry.isRevoked(token)) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
   }
 
   /**

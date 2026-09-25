@@ -244,6 +244,7 @@ export const pnpmClient: NpmFamilyClient = {
       : exec(ctx, 'pnpm-deprecate', ['deprecate', spec, message]),
   view: (ctx, spec) => exec(ctx, 'pnpm-view', ['view', spec, '--json']),
   whoami: (ctx) => exec(ctx, 'pnpm-whoami', ['whoami']),
+  logout: (ctx) => exec(ctx, 'pnpm-logout', ['logout']),
   ping: (ctx) => exec(ctx, 'pnpm-ping', ['ping']),
   search: (ctx, text) => exec(ctx, 'pnpm-search', ['search', text, '--json']),
   audit: (ctx) => exec(ctx, 'pnpm-audit', ['audit', '--json']),

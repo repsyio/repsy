@@ -35,7 +35,7 @@
  *    <v>.tgz` (under registry.yarnpkg.com unless a `.yarnrc` names the registry) and an attachment
  *    named `@scope/name-<v>.tgz`; the registry stores its own conventional URL and serves it
  *    (RPS-1333), and the scoped install works.
- *  - `@tag`: `yarn tag add` fails although the registry applied the tag (RPS-1362).
+ *  - `@tag`: `yarn tag add` succeeds: the registry's answer is JSON with `ok` (RPS-1362).
  *  - `@lockfile`: `yarn.lock` `resolved` is the registry's tarball URL plus the sha1 as a fragment.
  *  - `@publish`: `yarn publish` with no tarball argument, and the `.yarnrc` registry source.
  *  - `@not-applicable`: `yarn audit` always asks registry.yarnpkg.com, and yarn 1 has no `whoami`.
@@ -371,7 +371,7 @@ for (const config of SCOPED_PUBLISH_CONFIGS) {
 }
 
 test(
-  'yarn-classic tag add fails although the registry applied the tag (RPS-1362)',
+  'yarn-classic tag add succeeds and the registry answers JSON with ok (RPS-1362)',
   { tag: [client.tag, '@tag'] },
   async ({ seeder }) => {
     const repo = await newRepo(seeder);
@@ -381,24 +381,28 @@ test(
     const published = await publishPackage(client, ctx, { packageName: name, version: '1.0.0' });
     expect(published.result.exitCode, published.result.command).toBe(0);
 
+    // yarn 1 accepts only an answer with an `ok` field in its body: it used to print "Couldn't add
+    // tag" and exit 1 for the registry's empty 200, although the tag was set.
     const added = await client.distTag?.add(ctx, `${name}@1.0.0`, 'stable');
-    expect(added?.exitCode, 'yarn tag add reports a failure').toBe(1);
-    expect(`${added?.stdout}\n${added?.stderr}`).toContain("Couldn't add tag");
+    expect(added?.exitCode, `yarn tag add: ${added?.command}\n${added?.stderr}`).toBe(0);
+    expect(`${added?.stdout}\n${added?.stderr}`).not.toContain("Couldn't add tag");
     const tags = await rawGetPath(repo.name, adminCredential(), `-/package/${name}/dist-tags`);
     expect(JSON.parse(tags.body.toString('utf8')), 'and the tag is set').toEqual({
       latest: '1.0.0',
       stable: '1.0.0',
     });
 
-    // The cause: yarn 1 accepts only an answer with an `ok` field in its body, and the registry's
-    // 200 has no body at all. (npm and pnpm read the status only.)
     const put = await fetch(`${env.repoBaseUrl}/${repo.name}/-/package/${name}/dist-tags/other`, {
       method: 'PUT',
       headers: { ...npmAuthHeader(adminCredential()), 'Content-Type': 'application/json' },
       body: '"1.0.0"',
     });
     expect(put.status, 'PUT dist-tags/<tag>').toBe(200);
-    expect(await put.text(), 'RPS-1362: the answer has no body, so no "ok"').toBe('');
+    expect(await put.json(), 'RPS-1362: the answer names the package and its tags').toEqual({
+      ok: true,
+      id: name,
+      'dist-tags': { latest: '1.0.0', stable: '1.0.0', other: '1.0.0' },
+    });
   },
 );
 

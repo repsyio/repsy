@@ -25,14 +25,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 
 /**
  * Finds the packages a search matches. The query is built for the terms of the search, because a
- * search has up to five terms and an optional scope and keyword filter, and a fixed query would
- * have to say "no term" with null parameters. Every filter is in SQL, so the count of the matches
- * is true, and a cap on the rows the search loads takes the best matches: whole-name matches first,
- * then prefixes, then the rest by name.
+ * search has up to five terms and optional scope, keyword, author, maintainer and flag filters, and
+ * a fixed query would have to say "no term" with null parameters. Every filter is in SQL, so the
+ * count of the matches is true, and a cap on the rows the search loads takes the best matches:
+ * whole-name matches first, then prefixes, then the rest by name.
  */
 @Repository
 @NullMarked
@@ -47,6 +48,36 @@ public class NpmSearchCandidateRepository {
       "lower(case when p.scope is null then p.name else concat(p.scope, '/', p.name) end)";
 
   private static final String LIKE = " like :%s escape '!'";
+
+  /** The name a vulnerability finding of an npm package carries: {@code @scope/name}. */
+  private static final String FULL_NAME =
+      "case when p.scope is null then p.name else concat('@', p.scope, '/', p.name) end";
+
+  /**
+   * The version is below 1.0.0, which is what npm calls unstable: {@code 0.x}, and a prerelease of
+   * 1.0.0 itself.
+   */
+  private static final String UNSTABLE = "(pv.version like '0.%' or pv.version like '1.0.0-%')";
+
+  /**
+   * The latest version has a finding in the latest completed scan of it, as {@code npm audit}
+   * reports it: one that says the version is not affected does not count.
+   */
+  private static final String INSECURE =
+      """
+      exists (select f.id from VulnerabilityFinding f join f.scan s
+        where s.repo.id = :repoId
+          and s.status = io.repsy.os.server.security.scan.dtos.ScanStatus.COMPLETED
+          and f.packageName = %s
+          and f.packageVersion = p.latest
+          and f.fixStatus <> io.repsy.os.server.security.scan.dtos.FixStatus.NOT_AFFECTED
+          and s.createdAt = (
+            select max(s2.createdAt) from VulnerabilityScan s2
+            where s2.repo.id = s.repo.id
+              and s2.artifactName = s.artifactName
+              and s2.artifactVersion = s.artifactVersion
+              and s2.status = io.repsy.os.server.security.scan.dtos.ScanStatus.COMPLETED))"""
+          .formatted(FULL_NAME);
 
   @PersistenceContext private EntityManager entityManager;
 
@@ -118,8 +149,16 @@ public class NpmSearchCandidateRepository {
       parameters.put("keywords", List.copyOf(query.keywords()));
     }
 
+    addPeopleFilters(where, parameters, query);
+    addFlagFilters(where, query);
+
+    if (query.matchesNothing()) {
+      where.append(" and 1 = 0");
+    }
+
     for (var i = 0; i < query.terms().size(); i++) {
-      addTerm(where, order, parameters, rankParameters, i, query.terms().get(i));
+      addTerm(
+          where, order, parameters, rankParameters, i, query.terms().get(i), query.boostExact());
     }
 
     if (!order.isEmpty()) {
@@ -132,7 +171,8 @@ public class NpmSearchCandidateRepository {
 
   /**
    * A term matches the key, the description or a keyword by substring, as the ranking of the search
-   * does in memory. The order counts a whole-name match as 2 and a prefix as 1 for each term.
+   * does in memory. The order counts a whole-name match as 2 and a prefix as 1 for each term, and a
+   * whole-name match as a prefix when {@code boost-exact:false} took its bonus away.
    */
   private static void addTerm(
       final StringBuilder where,
@@ -140,7 +180,8 @@ public class NpmSearchCandidateRepository {
       final Map<String, Object> parameters,
       final Map<String, Object> rankParameters,
       final int index,
-      final String term) {
+      final String term,
+      final boolean boostExact) {
 
     final var needle = term.startsWith("@") ? term.substring(1) : term;
     final var contains = "c" + index;
@@ -168,12 +209,62 @@ public class NpmSearchCandidateRepository {
         .append(KEY)
         .append(" = :")
         .append(exact)
-        .append(" then 2 when lower(p.name)")
+        .append(boostExact ? " then 2 when lower(p.name)" : " then 1 when lower(p.name)")
         .append(LIKE.formatted(prefix))
         .append(" or ")
         .append(KEY)
         .append(LIKE.formatted(prefix))
         .append(" then 1 else 0 end + ");
+  }
+
+  /**
+   * {@code author:} matches the name or the email of the author of the latest version, {@code
+   * maintainer:} the name or the email of one of its maintainers, each in any case and as one of
+   * the values given.
+   */
+  private static void addPeopleFilters(
+      final StringBuilder where, final Map<String, Object> parameters, final NpmSearchQuery query) {
+
+    if (!query.authors().isEmpty()) {
+      where.append(" and (lower(pv.authorName) in :authors or lower(pv.authorEmail) in :authors)");
+      parameters.put("authors", List.copyOf(query.authors()));
+    }
+
+    if (!query.maintainers().isEmpty()) {
+      where
+          .append(" and ")
+          .append(
+              maintainerExists(
+                  "(lower(m.name) in :maintainers or lower(m.email) in :maintainers)"));
+      parameters.put("maintainers", List.copyOf(query.maintainers()));
+    }
+  }
+
+  private static void addFlagFilters(final StringBuilder where, final NpmSearchQuery query) {
+    addFlag(
+        where,
+        query.deprecated(),
+        "coalesce(pv.deprecated, false) = true",
+        "coalesce(pv.deprecated, false) = false");
+    addFlag(where, query.unstable(), UNSTABLE, "not " + UNSTABLE);
+    addFlag(where, query.insecure(), INSECURE, "not " + INSECURE);
+  }
+
+  private static void addFlag(
+      final StringBuilder where,
+      final @Nullable Boolean flag,
+      final String whenTrue,
+      final String whenFalse) {
+
+    if (flag != null) {
+      where.append(" and (").append(flag ? whenTrue : whenFalse).append(")");
+    }
+  }
+
+  private static String maintainerExists(final String condition) {
+    return "exists (select m.id from PackageMaintainer m where m.packageVersion = pv and "
+        + condition
+        + ")";
   }
 
   private static String keywordExists(final String condition) {

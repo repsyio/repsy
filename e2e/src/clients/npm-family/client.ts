@@ -152,6 +152,8 @@ export interface NpmFamilyClient {
   deprecate?(ctx: ClientCtx, spec: string, message: string): Promise<RunResult>;
   view?(ctx: ClientCtx, spec: string): Promise<RunResult>;
   whoami?(ctx: ClientCtx): Promise<RunResult>;
+  /** `logout`, which asks the registry to revoke the token (`DELETE /-/user/token/<token>`). */
+  logout?(ctx: ClientCtx): Promise<RunResult>;
   ping?(ctx: ClientCtx): Promise<RunResult>;
   search?(ctx: ClientCtx, text: string): Promise<RunResult>;
   audit?(ctx: ClientCtx): Promise<RunResult>;

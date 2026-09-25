@@ -23,6 +23,7 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.dtos.PanelTokenClaims;
+import io.repsy.os.shared.auth.dtos.ProtocolTokenClaims;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.constants.ErrorConstants;
 import jakarta.annotation.PostConstruct;
@@ -158,11 +159,16 @@ public class JwtUtils {
         userId, username, timeoutDuration, Instant.now(), tokenVersion);
   }
 
+  /**
+   * Creates a protocol token. It carries a random id, so that two logins of one user in the same
+   * second get two tokens, and revoking one of them (RPS-1361) leaves the other valid.
+   */
   public @NonNull String createProtocolToken(
       final @NonNull UUID userId,
       final @NonNull String username,
       final @NonNull TemporalAmount timeoutDuration) {
     return JWT.create()
+        .withJWTId(UUID.randomUUID().toString())
         .withSubject(userId.toString())
         .withAudience(TokenRealm.PROTOCOL.getAudience())
         .withClaim(CLAIM_USERNAME, username)
@@ -176,6 +182,7 @@ public class JwtUtils {
       final @NonNull TemporalAmount timeoutDuration,
       final @NonNull AuthenticationType authenticationType) {
     return JWT.create()
+        .withJWTId(UUID.randomUUID().toString())
         .withSubject(userId.toString())
         .withAudience(TokenRealm.PROTOCOL.getAudience())
         .withClaim(CLAIM_USERNAME, username)
@@ -406,6 +413,24 @@ public class JwtUtils {
     }
   }
 
+  /**
+   * Verifies a protocol token (the JWT itself, without {@code Bearer }) and reads what it says in
+   * one decode. It answers {@code unAuthorized}-type errors like every other extractor: a bad
+   * signature, another realm, a refresh token, an expired token or one without a usable subject or
+   * type. A protocol token that carries no expiry cannot be told when to forget, so it is refused.
+   */
+  public @NonNull ProtocolTokenClaims verifyProtocolToken(final @NonNull String token) {
+    final var decodedJWT = this.verifyAndDecode(token, TokenRealm.PROTOCOL);
+    final var expiresAt = decodedJWT.getExpiresAtAsInstant();
+
+    if (expiresAt == null) {
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+
+    return new ProtocolTokenClaims(
+        subjectAsUuid(decodedJWT), authenticationTypeOf(decodedJWT), expiresAt);
+  }
+
   public void verify(final @NonNull String authHeader, final @NonNull TokenRealm realm) {
     this.verifyAndDecode(this.getToken(authHeader), realm);
   }
@@ -417,7 +442,11 @@ public class JwtUtils {
 
   public @NonNull AuthenticationType getAuthenticationType(
       final @NonNull String token, final @NonNull TokenRealm realm) {
-    final var decodedJWT = this.verifyAndDecode(token, realm);
+    return authenticationTypeOf(this.verifyAndDecode(token, realm));
+  }
+
+  private static @NonNull AuthenticationType authenticationTypeOf(
+      final @NonNull DecodedJWT decodedJWT) {
     final var authTypeClaim = decodedJWT.getClaim(AUTH_TYPE);
 
     if (authTypeClaim.isNull() || authTypeClaim.asString() == null) {

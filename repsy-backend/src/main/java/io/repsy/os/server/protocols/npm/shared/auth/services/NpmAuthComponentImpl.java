@@ -15,7 +15,9 @@
  */
 package io.repsy.os.server.protocols.npm.shared.auth.services;
 
+import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
@@ -23,6 +25,8 @@ import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.dtos.ProtocolTokenClaims;
+import io.repsy.os.shared.auth.services.RevokedProtocolTokenService;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
@@ -30,28 +34,36 @@ import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.npm.shared.auth.services.NpmAuthComponent;
 import io.repsy.protocols.npm.shared.auth.services.NpmIdentityResolver;
+import io.repsy.protocols.npm.shared.auth.services.NpmTokenRevoker;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import java.time.Period;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
 public class NpmAuthComponentImpl extends ProtocolAuthService
-    implements NpmAuthComponent<UUID>, NpmIdentityResolver<UUID> {
+    implements NpmAuthComponent<UUID>, NpmIdentityResolver<UUID>, NpmTokenRevoker<UUID> {
 
   private static final int TOKEN_EXPIRATION_DAYS = 90;
+
+  private final @NonNull RevokedProtocolTokenService revokedTokenService;
 
   public NpmAuthComponentImpl(
       final @NonNull UserTxService userTxService,
       final @NonNull JwtUtils jwtUtils,
       final @NonNull DeployTokenService deployTokenService,
       final @NonNull VerifiedPasswordCache verifiedPasswordCache,
-      final @NonNull AuthFailureThrottle authFailureThrottle) {
+      final @NonNull AuthFailureThrottle authFailureThrottle,
+      final @NonNull RevokedProtocolTokenService revokedTokenService) {
 
     super(userTxService, jwtUtils, deployTokenService, verifiedPasswordCache, authFailureThrottle);
+
+    this.revokedTokenService = revokedTokenService;
+    this.setRevokedTokens(revokedTokenService);
   }
 
   @Override
@@ -113,22 +125,83 @@ public class NpmAuthComponentImpl extends ProtocolAuthService
   public @NonNull String resolveUsername(
       final @NonNull BaseRepoInfo<UUID> repoInfo, final @Nullable String authHeader) {
 
+    return this.resolveCaller(repoInfo.getStorageKey(), authHeader).username();
+  }
+
+  /**
+   * Answers {@code DELETE /-/user/token/<token>} (RPS-1361). The protocol token of a login is a
+   * stateless JWT, so it is revoked by remembering it in {@link RevokedProtocolTokenService}, which
+   * every protocol bearer authentication asks. The caller is verified again here, and may only
+   * revoke a token whose subject is the caller itself: the user, or the deploy token a deploy-token
+   * login was made with. That is the same token it presents, or another one issued to it, never one
+   * of somebody else's. The secret of a deploy token is refused: it is managed in the panel, and
+   * its revocation would take the deploy token away from every CI job that uses it.
+   */
+  @Override
+  public void revokeToken(
+      final @NonNull BaseRepoInfo<UUID> repoInfo,
+      final @Nullable String authHeader,
+      final @NonNull String token) {
+
+    final var caller = this.resolveCaller(repoInfo.getStorageKey(), authHeader);
+
+    if (this.deployTokenService.findByRepoIdAndToken(repoInfo.getStorageKey(), token).isPresent()) {
+      throw new AccessNotAllowedException("deployTokenNotRevocable");
+    }
+
+    final var claims = this.issuedTokenClaims(token);
+
+    if (!claims.subject().equals(caller.id())) {
+      throw new AccessNotAllowedException("loginTokenNotYours");
+    }
+
+    try {
+      this.revokedTokenService.revoke(token, claims.expiresAt());
+    } catch (final DataIntegrityViolationException _) {
+      // Somebody revoked the same token at the same time: it is revoked, which is what was asked.
+    }
+  }
+
+  /**
+   * The claims of a token this registry issued, or {@code loginTokenNotFound} for anything else.
+   */
+  private @NonNull ProtocolTokenClaims issuedTokenClaims(final @NonNull String token) {
+    try {
+      final var claims = this.jwtUtils.verifyProtocolToken(token);
+
+      if (claims.authenticationType() == AuthenticationType.ANONYMOUS
+          || claims.authenticationType() == AuthenticationType.DOCKER_SCAN) {
+        throw new ItemNotFoundException("loginTokenNotFound");
+      }
+
+      return claims;
+    } catch (final UnAuthorizedException | BadRequestException _) {
+      throw new ItemNotFoundException("loginTokenNotFound");
+    }
+  }
+
+  /** Who a request's credentials belong to: the id of the user or deploy token, and its name. */
+  private record Caller(@NonNull UUID id, @NonNull String username) {}
+
+  private @NonNull Caller resolveCaller(
+      final @NonNull UUID repoId, final @Nullable String authHeader) {
+
     if (authHeader == null) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
     if (AuthUtils.isBasicToken(authHeader)) {
-      return this.basicUsername(repoInfo.getStorageKey(), authHeader);
+      return this.basicCaller(repoId, authHeader);
     }
 
     if (AuthUtils.isBearerToken(authHeader)) {
-      return this.bearerUsername(repoInfo.getStorageKey(), authHeader);
+      return this.bearerCaller(repoId, authHeader);
     }
 
     throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
   }
 
-  private @NonNull String basicUsername(final @NonNull UUID repoId, final @NonNull String header) {
+  private @NonNull Caller basicCaller(final @NonNull UUID repoId, final @NonNull String header) {
 
     final var credentials =
         AuthUtils.extractCredentialsFromBasicToken(AuthUtils.removeBasicPrefix(header));
@@ -141,22 +214,26 @@ public class NpmAuthComponentImpl extends ProtocolAuthService
         this.deployTokenService.findByRepoIdAndToken(repoId, credentials.getPassword());
 
     if (deployToken.isPresent()) {
-      return usernameOf(deployToken.get());
+      return callerOf(deployToken.get());
     }
 
-    return this.authenticateWithPassword(credentials).getUsername();
+    final var user = this.authenticateWithPassword(credentials);
+
+    return new Caller(user.getId(), user.getUsername());
   }
 
-  private @NonNull String bearerUsername(final @NonNull UUID repoId, final @NonNull String header) {
+  private @NonNull Caller bearerCaller(final @NonNull UUID repoId, final @NonNull String header) {
 
     final var deployToken =
         this.deployTokenService.findByRepoIdAndToken(repoId, AuthUtils.removeBearerHeader(header));
 
     if (deployToken.isPresent()) {
-      return usernameOf(deployToken.get());
+      return callerOf(deployToken.get());
     }
 
     final var authenticationType = this.protocolAuthenticationType(header);
+
+    this.rejectRevokedToken(AuthUtils.removeBearerHeader(header));
 
     return switch (authenticationType) {
       case DEPLOY_TOKEN -> {
@@ -164,14 +241,15 @@ public class NpmAuthComponentImpl extends ProtocolAuthService
 
         yield this.deployTokenService
             .findByRepoIdAndTokenId(repoId, tokenId)
-            .map(NpmAuthComponentImpl::usernameOf)
+            .map(NpmAuthComponentImpl::callerOf)
             .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
       }
       case ANONYMOUS, DOCKER_SCAN -> throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
       default -> {
         final var username = this.jwtUtils.verifyAndExtractUsername(header, TokenRealm.PROTOCOL);
+        final var user = this.userTxService.getAuthenticatedUserByUsername(username);
 
-        yield this.userTxService.getAuthenticatedUserByUsername(username).getUsername();
+        yield new Caller(user.getId(), user.getUsername());
       }
     };
   }
@@ -184,13 +262,13 @@ public class NpmAuthComponentImpl extends ProtocolAuthService
     }
   }
 
-  /** The username of a live deploy token; an expired one identifies nobody. */
-  private static @NonNull String usernameOf(final @NonNull DeployTokenInfo deployToken) {
+  /** A live deploy token; an expired one identifies nobody. */
+  private static @NonNull Caller callerOf(final @NonNull DeployTokenInfo deployToken) {
 
     if (deployToken.isExpired() || deployToken.getUsername() == null) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
-    return deployToken.getUsername();
+    return new Caller(deployToken.getId(), deployToken.getUsername());
   }
 }

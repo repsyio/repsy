@@ -223,7 +223,7 @@ class NpmSearchProtocolIT extends AbstractIntegrationTest {
     assertThat(names(this.search(repo, "text", "keywords:ui"))).containsExactly("@acme/widget");
     assertThat(names(this.search(repo, "text", "keywords:ui,string")))
         .containsExactlyInAnyOrder("@acme/widget", "left-pad");
-    assertThat(names(this.search(repo, "text", "author:bob is-odd"))).containsExactly("is-odd");
+    assertThat(names(this.search(repo, "text", "is:shiny is-odd"))).containsExactly("is-odd");
   }
 
   @Test
@@ -243,14 +243,13 @@ class NpmSearchProtocolIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("takes junk parameters as their defaults instead of answering 400")
-  void junkParameters() throws Exception {
+  @DisplayName("ignores parameters it does not know, such as the ranking weights of npms")
+  void unknownParameters() throws Exception {
     final var repo = this.seedPackages(false, this.adminToken());
 
-    final var json = this.search(repo, "size", "many", "from", "-3", "quality", "0.5");
+    final var json = this.search(repo, "quality", "0.5", "popularity", "1", "maintenance", "0");
 
     assertThat(names(json)).hasSize(4);
-    assertThat(names(this.search(repo, "size", "0"))).hasSize(1);
   }
 
   @Test

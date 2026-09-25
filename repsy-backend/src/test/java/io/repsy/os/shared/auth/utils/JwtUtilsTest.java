@@ -758,4 +758,76 @@ class JwtUtilsTest {
           .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
   }
+
+  @Test
+  @DisplayName("verifyProtocolToken reads the subject, the type and the expiry of a user's token")
+  void verifyProtocolTokenOfAUser() {
+    final var userId = UUID.randomUUID();
+    final var before = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+    final var token = this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(90));
+
+    final var claims = this.jwtUtils.verifyProtocolToken(token);
+
+    assertThat(claims.subject()).isEqualTo(userId);
+    assertThat(claims.authenticationType()).isEqualTo(AuthenticationType.USERNAME_PASSWORD);
+    assertThat(claims.expiresAt())
+        .isBetween(
+            before.plus(Duration.ofDays(90)), before.plus(Duration.ofDays(90)).plusSeconds(5));
+  }
+
+  @Test
+  @DisplayName("verifyProtocolToken reads the type of a deploy token's token")
+  void verifyProtocolTokenOfADeployToken() {
+    final var tokenId = UUID.randomUUID();
+    final var token =
+        this.jwtUtils.createProtocolToken(
+            tokenId, "typed", Duration.ofDays(1), AuthenticationType.DEPLOY_TOKEN);
+
+    final var claims = this.jwtUtils.verifyProtocolToken(token);
+
+    assertThat(claims.subject()).isEqualTo(tokenId);
+    assertThat(claims.authenticationType()).isEqualTo(AuthenticationType.DEPLOY_TOKEN);
+  }
+
+  @Test
+  @DisplayName("verifyProtocolToken refuses a panel token, an expired token, junk and no expiry")
+  void verifyProtocolTokenRefuses() {
+    final var userId = UUID.randomUUID();
+    final var panel = this.jwtUtils.createPanelAccessToken(userId, "alice", Duration.ofMinutes(5));
+    final var expired = this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(-1));
+    final var neverExpires =
+        JWT.create()
+            .withSubject(userId.toString())
+            .withAudience(TokenRealm.PROTOCOL.getAudience())
+            .sign(Algorithm.HMAC512(TEST_SECRET));
+
+    assertThatThrownBy(() -> this.jwtUtils.verifyProtocolToken(panel))
+        .isInstanceOf(UnAuthorizedException.class);
+    assertThatThrownBy(() -> this.jwtUtils.verifyProtocolToken(expired))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessage("sessionExpired");
+    assertThatThrownBy(() -> this.jwtUtils.verifyProtocolToken("not.a.jwt"))
+        .isInstanceOf(UnAuthorizedException.class);
+    assertThatThrownBy(() -> this.jwtUtils.verifyProtocolToken(neverExpires))
+        .isInstanceOf(UnAuthorizedException.class);
+  }
+
+  @Test
+  @DisplayName("two protocol tokens of one user, made in the same second, are two tokens")
+  void protocolTokensAreUnique() {
+    final var userId = UUID.randomUUID();
+
+    final var first = this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(90));
+    final var second = this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(90));
+    final var deployFirst =
+        this.jwtUtils.createProtocolToken(
+            userId, "alice", Duration.ofDays(90), AuthenticationType.DEPLOY_TOKEN);
+    final var deploySecond =
+        this.jwtUtils.createProtocolToken(
+            userId, "alice", Duration.ofDays(90), AuthenticationType.DEPLOY_TOKEN);
+
+    assertThat(first).isNotEqualTo(second);
+    assertThat(deployFirst).isNotEqualTo(deploySecond);
+    assertThat(JWT.decode(first).getId()).isNotBlank();
+  }
 }

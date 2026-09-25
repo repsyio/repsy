@@ -33,8 +33,14 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
+/**
+ * {@code PUT /{repo}/-/package/{package}/dist-tags/{tag}}, which {@code npm dist-tag add} calls. It
+ * answers the JSON of {@code NpmDistTagsResponse}, because yarn classic takes an answer without an
+ * {@code ok} field for a failure (RPS-1362).
+ */
 @NullMarked
 public abstract class AbstractNpmDistTagsAddProtocolMethodHandler implements ProtocolMethodHandler {
 
@@ -109,7 +115,14 @@ public abstract class AbstractNpmDistTagsAddProtocolMethodHandler implements Pro
     this.npmProtocolFacade.addDistributionTag(
         context, pathVars.scopeName(), pathVars.packageName(), tagName, versionName);
 
-    return ResponseEntity.ok().build();
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(
+            NpmDistTagsResponse.of(
+                pathVars.scopeName(),
+                pathVars.packageName(),
+                this.npmProtocolFacade.getMappedDistributionTags(
+                    context, pathVars.scopeName(), pathVars.packageName())));
   }
 
   private String readRequestBody(final HttpServletRequest request) throws Exception {
