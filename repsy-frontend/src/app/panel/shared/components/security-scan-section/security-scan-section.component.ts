@@ -35,6 +35,7 @@ import { pollUntilTerminal } from '../../util/poll-until-terminal.util';
 import { scanStatusLabel } from '../../util/scan-status-label.util';
 import { PaginationComponent } from '../pagination/pagination.component';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
+import { ScanFailureReasonComponent } from '../scan-failure-reason/scan-failure-reason.component';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
 import { StatusPollingIndicatorComponent } from '../status-polling-indicator/status-polling-indicator.component';
 import { ToastService } from '../toast/toast.service';
@@ -60,6 +61,7 @@ const SCROLL_RETRY_DELAYS_MS = [0, 300, 800];
     TooltipComponent,
     StatusPollingIndicatorComponent,
     RescanNoteComponent,
+    ScanFailureReasonComponent,
   ],
   templateUrl: './security-scan-section.component.html',
 })

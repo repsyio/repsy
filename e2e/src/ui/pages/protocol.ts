@@ -38,6 +38,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
 import type { PackageProtocol, PackageRef } from '../../seed/packages.js';
+import { rowLinkPoint } from '../row-click.js';
 import { UiPage } from './base.js';
 import { DangerModal, DesktopList, EmptyList, Pagination, Spinner, Toasts } from './components.js';
 import { cargoDescriptor } from './protocols/cargo.js';
@@ -275,7 +276,9 @@ export class ProtocolListPage extends UiPage {
     if (!opens) {
       throw new Error(`the ${this.descriptor.protocol} ${this.levelName} rows are not clickable`);
     }
-    await this.row(target).click();
+    const row = this.row(target);
+    // The row's centre may be a control of its own (the security badge with the scanner on): click free row.
+    await row.click({ position: await rowLinkPoint(row) });
     return this.pageFor(opens, target);
   }
 
