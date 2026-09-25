@@ -53,6 +53,26 @@ import type { Seeder } from '../../../src/seed/seeder.js';
 /** What a client says when a frozen install finds bytes that differ from its lockfile. */
 const INTEGRITY_FAILURE: Partial<Record<ClientId, RegExp>> = {
   npm: /EINTEGRITY/,
+  'yarn-berry': /YN0018.*checksum/,
+};
+
+/**
+ * How a client's lockfile pins a resolution: whether it records the tarball's URL (a client that
+ * builds the conventional URL itself, berry, records none unless the packument's differs, and then as
+ * `__archiveUrl`), and the pattern of the integrity value it records.
+ */
+const LOCKFILE_RECORDS_TARBALL_URL: Partial<Record<ClientId, boolean>> = {
+  npm: true,
+  'yarn-berry': false,
+};
+/** What a client's lockfile entry for `name@1.0.0` contains. */
+const LOCKFILE_ENTRY: Partial<Record<ClientId, (name: string) => string>> = {
+  npm: (name) => `node_modules/${name}`,
+  'yarn-berry': (name) => `resolution: "${name}@npm:1.0.0"`,
+};
+const LOCKFILE_INTEGRITY: Partial<Record<ClientId, RegExp>> = {
+  npm: /sha512-/,
+  'yarn-berry': /checksum: 10c0\/[0-9a-f]{128}/,
 };
 
 interface Graph {
@@ -137,12 +157,22 @@ for (const client of clientsWith('frozenInstall')) {
 
         const lockfile = await fs.readFile(path.join(first.work, client.lockfile ?? ''), 'utf8');
         for (const name of [graph.app, graph.lib]) {
+          const tarballUrl = `${env.repoBaseUrl}/${graph.repoName}/${name}/-/${name}-1.0.0.tgz`;
+          expect(
+            lockfile.includes(tarballUrl),
+            `${client.lockfile} ${LOCKFILE_RECORDS_TARBALL_URL[client.id] ? 'records' : 'does not record'} ${name}'s tarball URL`,
+          ).toBe(LOCKFILE_RECORDS_TARBALL_URL[client.id]);
           expect(
             lockfile,
-            `${client.lockfile} records ${name}'s tarball from the registry's own address`,
-          ).toContain(`${env.repoBaseUrl}/${graph.repoName}/${name}/-/${name}-1.0.0.tgz`);
+            "no URL is pinned to something other than the client's own conventional one",
+          ).not.toContain('__archiveUrl');
+          expect(lockfile, `${client.lockfile} has an entry for ${name}`).toContain(
+            LOCKFILE_ENTRY[client.id]?.(name) ?? '',
+          );
         }
-        expect(lockfile, 'and an integrity hash for it').toMatch(/sha512-/);
+        expect(lockfile, 'and an integrity hash for it').toMatch(
+          LOCKFILE_INTEGRITY[client.id] as RegExp,
+        );
 
         // A fresh HOME and cache, and only package.json + the lockfile: nothing but the lockfile and
         // the registry can produce the install.

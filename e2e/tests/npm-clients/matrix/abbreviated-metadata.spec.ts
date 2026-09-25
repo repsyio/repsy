@@ -54,6 +54,7 @@ const PLATFORM_FIELDS = ['os', 'cpu', 'libc', 'peerDependenciesMeta', 'funding']
 /** Whether a client installs an optional dependency whose `os` excludes linux (`win32` here). */
 const INSTALLS_WRONG_PLATFORM_OPTIONAL: Partial<Record<ClientId, boolean>> = {
   npm: false,
+  'yarn-berry': false,
 };
 
 for (const client of clientsWith('publish')) {
