@@ -116,7 +116,7 @@ class AbstractNpmWhoamiProtocolMethodHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     assertThat(response.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE))
-        .isEqualTo("Basic realm=\"Repsy Managed Registry\"");
+        .isEqualTo("Basic realm=\"Repsy\"");
     assertThat(response.getBody()).isEqualTo(Map.of("error", "unAuthorized"));
   }
 
@@ -135,8 +135,7 @@ class AbstractNpmWhoamiProtocolMethodHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     assertThat(response.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE))
-        .isEqualTo(
-            "Bearer realm=\"Repsy Managed Registry\", Basic realm=\"Repsy Managed Registry\"");
+        .isEqualTo("Bearer realm=\"Repsy\", Basic realm=\"Repsy\"");
   }
 
   @Test

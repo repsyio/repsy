@@ -738,8 +738,9 @@ on the wire (a fake server logging every request, then this suite):
   (`clients/sbt-checks.ts`) asserts the literal jar is the resolved one and that no version-level
   metadata exists, instead of Maven's metadata walk.
 - The first request of a publish is answered 401 with Repsy's `WWW-Authenticate: Basic realm="Repsy"`
-  (every Repsy repository uses the one short realm `Repsy`, since RPS-1372; a build written for the
-  longer realm of earlier versions has to change it), and sbt then sends the credential: its
+  (every Basic challenge of every protocol, npm and Go included, uses the one short realm `Repsy`,
+  since RPS-1372; only Docker's Bearer challenge names its token URL as realm; a build written for the
+  longer realms of earlier versions has to change it), and sbt then sends the credential: its
   `Credentials(realm, host, user, password)` has to name that realm and the repository's host. Coursier (the resolver) sends it the same way.
 - Like `mvn`, sbt hides the HTTP status behind its exit code, so the `Outcome` is the raw probe of
   `clients/maven.ts`, with sbt's exit code as evidence; the probe sends the LITERAL `-SNAPSHOT` POM

@@ -86,7 +86,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
   private static final int AUTHENTICATED = 404;
   private static final String PRIVATE_READ = "/{repo}/com/example/lib/1.0/lib-1.0.pom";
   private static final String NPM_BEARER_CHALLENGE =
-      "Bearer realm=\"Repsy Managed Registry\", Basic realm=\"Repsy Managed Registry\"";
+      "Bearer realm=\"Repsy\", Basic realm=\"Repsy\"";
   private static final String OTHER_CLIENT = "198.51.100.9";
   private static final String TOO_MANY_TEXT =
       "Too many failed authentication attempts. Please try again later.";

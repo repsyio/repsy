@@ -214,8 +214,7 @@ class TokenRealmIT extends AbstractIntegrationTest {
       assertThat(result.getResponse().getContentAsString()).contains("unAuthorized");
       assertThat(result.getResponse().getContentAsString()).doesNotContain("accessNotAllowed");
       assertThat(result.getResponse().getHeader(WWW_AUTHENTICATE))
-          .isEqualTo(
-              "Bearer realm=\"Repsy Managed Registry\", Basic realm=\"Repsy Managed Registry\"");
+          .isEqualTo("Bearer realm=\"Repsy\", Basic realm=\"Repsy\"");
     }
 
     @Test

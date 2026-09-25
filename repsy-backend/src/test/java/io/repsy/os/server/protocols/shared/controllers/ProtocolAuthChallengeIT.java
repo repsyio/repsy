@@ -42,17 +42,16 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class ProtocolAuthChallengeIT extends AbstractIntegrationTest {
 
   private static final String REPOSITORY_REALM = "Basic realm=\"Repsy\"";
-  private static final String NPM_REALM = "Basic realm=\"Repsy Managed Registry\"";
+  private static final String NPM_REALM = "Basic realm=\"Repsy\"";
 
   /**
    * RPS-1209: a refused npm Bearer token is challenged with both schemes, Bearer first, because the
    * npm client takes the first scheme it knows from the first value and prints its "token seems to
    * be invalid" text for Bearer, "Incorrect or missing password" for Basic.
    */
-  private static final String NPM_BEARER_REALM =
-      "Bearer realm=\"Repsy Managed Registry\", " + NPM_REALM;
+  private static final String NPM_BEARER_REALM = "Bearer realm=\"Repsy\", " + NPM_REALM;
 
-  private static final String GO_REALM = "Basic realm=\"Repsy Go Module Proxy\"";
+  private static final String GO_REALM = "Basic realm=\"Repsy\"";
   private static final String HELM_REALM = "Basic realm=\"Repsy\"";
   private static final String DOCKER_REALM_PREFIX = "Bearer realm=";
 
@@ -121,7 +120,7 @@ class ProtocolAuthChallengeIT extends AbstractIntegrationTest {
       throws Exception {
     final var repoName = this.seedPrivateRepo(type);
 
-    final var expected = NPM_REALM.equals(challenge) ? NPM_BEARER_REALM : challenge;
+    final var expected = type == RepoType.NPM ? NPM_BEARER_REALM : challenge;
 
     expectChallenge(
         this.protocol(get(path, repoName).header(AUTHORIZATION, "Bearer not.a.token")), expected);

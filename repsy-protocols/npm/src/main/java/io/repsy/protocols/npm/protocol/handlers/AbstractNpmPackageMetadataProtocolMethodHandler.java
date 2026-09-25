@@ -25,6 +25,7 @@ import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.shared.utils.ExtractPath;
 import io.repsy.protocols.npm.shared.utils.PackageUtils;
+import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -144,7 +145,7 @@ public abstract class AbstractNpmPackageMetadataProtocolMethodHandler
 
     } catch (final UnAuthorizedException e) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Registry\"")
+          .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
           .build();
     }
   }
