@@ -21,6 +21,17 @@
         <app-copy-clipboard [text]="installation" />
       </div>
 
+      <h3 class="mb-2 text-[13px] text-white">Registry (.npmrc):</h3>
+      <div
+        data-testid="pkg-detail-snippet-npmrc"
+        class="mb-8 inline-flex items-center gap-2 overflow-x-auto rounded-lg bg-[#101112] p-[14px]"
+      >
+        <img class="h-[15.6px] w-[24px]" ngSrc="/assets/icons/npm/npm.svg" alt="Npm Logo" height="84" width="141" />
+
+        <span data-testid="pkg-detail-snippet-npmrc-text" class="text-[13px] text-[#9C9C9D]">{{ npmrc }}</span>
+        <app-copy-clipboard [text]="npmrc" />
+      </div>
+
       <div data-testid="pkg-detail-metadata" class="mb-8 flex flex-col gap-2 text-[14px]">
         <div class="inline-flex items-center gap-2 overflow-x-auto rounded-lg bg-[#101112] p-[14px]">
           <span class="text-white">Homepage URL: </span>

@@ -20,7 +20,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 
-import { NuGetVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { NuGetDeletedItem, NuGetVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
@@ -139,5 +139,85 @@ describe('NugetPackagesVersionDetailComponent README', () => {
     expect(fixture.componentInstance.loading).toBeFalse();
     expect(TestBed.inject(ToastService).show).not.toHaveBeenCalled();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Version not found');
+  });
+});
+
+describe('NugetPackagesVersionDetailComponent delete (RPS-1288)', () => {
+  const REPO = 'nuget-repo';
+  let nugetService: jasmine.SpyObj<NugetService>;
+  let router: jasmine.SpyObj<Router>;
+  let toast: jasmine.SpyObj<ToastService>;
+  let danger: jasmine.SpyObj<DangerModalService>;
+  const route = {
+    snapshot: { paramMap: convertToParamMap({ packageId: 'Acme.Lib', version: '1.2.3' }) },
+  } as ActivatedRoute;
+
+  async function confirmDelete(): Promise<void> {
+    const fixture = TestBed.createComponent(NugetPackagesVersionDetailComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.componentInstance.deleteVersion();
+    danger.show.calls.mostRecent().args[2]();
+    await fixture.whenStable();
+  }
+
+  beforeEach(() => {
+    nugetService = jasmine.createSpyObj<NugetService>('NugetService', ['fetchPackageVersion', 'deletePackageVersion'], {
+      repoChanges: new BehaviorSubject<RepoPermissionInfo>({
+        repoName: REPO,
+        canRead: true,
+        canWrite: true,
+        canManage: true,
+        private: false,
+      }),
+    });
+    nugetService.fetchPackageVersion.and.resolveTo({ packageId: 'Acme.Lib', version: '1.2.3' } as NuGetVersionInfo);
+    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
+    router.navigate.and.resolveTo(true);
+    toast = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
+    danger = jasmine.createSpyObj<DangerModalService>('DangerModalService', ['show']);
+
+    TestBed.configureTestingModule({
+      imports: [NugetPackagesVersionDetailComponent],
+      providers: [
+        { provide: NugetService, useValue: nugetService },
+        { provide: ActivatedRoute, useValue: route },
+        { provide: ToastService, useValue: toast },
+        { provide: DangerModalService, useValue: danger },
+        { provide: Router, useValue: router },
+      ],
+    });
+    TestBed.overrideComponent(NugetPackagesVersionDetailComponent, {
+      remove: { imports: [SecurityScanSectionComponent] },
+      add: { imports: [SecurityScanSectionStubComponent] },
+    });
+  });
+
+  it('goes to the versions page of the package when only the version was deleted', async () => {
+    nugetService.deletePackageVersion.and.resolveTo(NuGetDeletedItem.Version);
+
+    await confirmDelete();
+
+    expect(nugetService.deletePackageVersion).toHaveBeenCalledOnceWith('Acme.Lib', '1.2.3');
+    expect(router.navigate).toHaveBeenCalledOnceWith(['..'], { relativeTo: route });
+    expect(toast.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
+  });
+
+  it('goes to the package list of the repository when the package went with its last version', async () => {
+    nugetService.deletePackageVersion.and.resolveTo(NuGetDeletedItem.Package);
+
+    await confirmDelete();
+
+    expect(router.navigate).toHaveBeenCalledOnceWith(['/', REPO]);
+    expect(toast.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
+  });
+
+  it('stays on the page, without a toast, when the delete fails', async () => {
+    nugetService.deletePackageVersion.and.rejectWith(new HttpErrorResponse({ status: 500 }));
+
+    await confirmDelete();
+
+    expect(router.navigate).not.toHaveBeenCalled();
+    expect(toast.show).not.toHaveBeenCalled();
   });
 });

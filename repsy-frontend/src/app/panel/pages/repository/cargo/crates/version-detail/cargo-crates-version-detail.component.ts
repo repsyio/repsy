@@ -21,6 +21,7 @@ import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
 import { Subscription } from 'rxjs';
 import { finalize, switchMap } from 'rxjs/operators';
 
+import { environment } from '../../../../../../../environments/environment';
 import {
   CrateDependencyInfo,
   CrateInfo,
@@ -34,6 +35,12 @@ import { MarkdownComponent } from '../../../../../shared/components/markdown/mar
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import {
+  deleteVersionAndCheckLast$,
+  landAfterVersionDelete,
+  VERSION_PROBE_SIZE,
+  VERSION_PROBE_SORT,
+} from '../../../../../shared/util/version-delete-landing.util';
 import { CargoService } from '../../service/cargo.service';
 
 @Component({
@@ -60,6 +67,7 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
   public addDependencyCommand: string;
   public installBinaryCommand: string;
   public cargoToml = '';
+  public cargoConfig: string;
   public activeRepo: RepoPermissionInfo;
   public crate: CrateInfo;
   public crateVersion: CrateVersionInfo;
@@ -96,6 +104,9 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
     this.versionName = version;
     this.addDependencyCommand = `cargo add ${crateName}@${version} --registry repsy`;
     this.installBinaryCommand = `cargo install ${crateName} --version ${version} --registry repsy`;
+    // The same registry entry as the Configure modal's.
+    this.cargoConfig = `[registries]
+repsy = { index = "sparse+${environment.repoBaseUrl}/${this.activeRepo.repoName}/" }`;
 
     this.loading = true;
     this.cargoService
@@ -122,18 +133,24 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
   public deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
-      this.cargoService
-        .deleteCrateVersion(this.packageName, this.versionName)
+      deleteVersionAndCheckLast$(
+        this.cargoService.fetchCrateVersions(this.packageName, '', VERSION_PROBE_SORT, 0, VERSION_PROBE_SIZE),
+        () => this.cargoService.deleteCrateVersion(this.packageName, this.versionName),
+      )
         .pipe(
           finalize(() => {
             this.loading = false;
           }),
         )
         .subscribe({
-          next: () => {
-            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
-              this.toastService.show('Version deleted successfully', 'success');
-            });
+          next: (wasLastVersion) => {
+            landAfterVersionDelete(
+              this.router,
+              this.route,
+              this.toastService,
+              this.activeRepo.repoName,
+              wasLastVersion,
+            );
           },
           error: () => {},
         });

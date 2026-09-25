@@ -27,7 +27,7 @@ import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
  *    list container (UX-15), which does not change its ids.
  *  - The detail page's install block is the "go get" one; the endpoints block is `pkg-detail-goproxy`
  *    (one `pkg-detail-goproxy-<label>` per endpoint). Deleting the last version deletes the module
- *    (RPS-1288), so a confirmed detail delete lands on the versions page (`/:repo/modules?modulePath=`),
+ *    (RPS-1288), so a confirmed detail delete follows the shared convention: the versions page (`/:repo/modules?modulePath=`),
  *    or on the list when it was the last version.
  *  - A version that does not exist renders `pkg-error` with "Version '<v>' not found".
  *  - Go has no Package Override setting.
@@ -77,8 +77,6 @@ export const golangDescriptor: ProtocolDescriptor = {
       delete: {
         dialogTitle: 'Delete Version',
         successToast: 'Version deleted successfully',
-        landsOn: 'versions',
-        landsOnLast: 'list',
       },
     },
   },

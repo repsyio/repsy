@@ -20,6 +20,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
+import { environment } from '../../../../../../../environments/environment';
 import { PackageVersionDetail, RepoPermissionInfo, RepoType } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
@@ -28,6 +29,12 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
+import {
+  deleteVersionAndCheckLast$,
+  landAfterVersionDelete,
+  VERSION_PROBE_SIZE,
+  VERSION_PROBE_SORT,
+} from '../../../../../shared/util/version-delete-landing.util';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { NpmService } from '../../service/npm.service';
 
@@ -51,6 +58,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
   public packageName: string;
   public versionName: string;
   public installation: string;
+  public npmrc: string;
   public error: string;
   public activeRegistry: RepoPermissionInfo;
   private readonly registryChanges$: Subscription;
@@ -111,6 +119,10 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
       ? `npm install @${this.scopeName}/${this.packageName}`
       : `npm install ${this.packageName}`;
 
+    // The trailing slash matters to npm's auth-key matching, like in the Configure modal (RPS-1206).
+    const registryUrl = `${environment.repoBaseUrl}/${this.activeRegistry.repoName}/`;
+    this.npmrc = this.scopeName ? `@${this.scopeName}:registry=${registryUrl}` : `registry=${registryUrl}`;
+
     this.npmService
       .fetchPackageVersion(this.packageName, this.scopeName, this.versionName)
       .pipe(
@@ -137,18 +149,31 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
   public deleteVersion() {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
-      this.npmService
-        .deletePackageVersion(this.packageName, this.scopeName, this.versionInfo.versionName)
+      deleteVersionAndCheckLast$(
+        this.npmService.searchPackageVersions(
+          this.packageName,
+          this.scopeName,
+          '',
+          VERSION_PROBE_SORT,
+          0,
+          VERSION_PROBE_SIZE,
+        ),
+        () => this.npmService.deletePackageVersion(this.packageName, this.scopeName, this.versionInfo.versionName),
+      )
         .pipe(
           finalize(() => {
             this.loading = false;
           }),
         )
         .subscribe({
-          next: () => {
-            this.router.navigateByUrl(`/${this.activeRegistry.repoName}`).then(() => {
-              this.toastService.show('Version deleted successfully', 'success');
-            });
+          next: (wasLastVersion) => {
+            landAfterVersionDelete(
+              this.router,
+              this.route,
+              this.toastService,
+              this.activeRegistry.repoName,
+              wasLastVersion,
+            );
           },
           error: () => {},
         });

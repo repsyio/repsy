@@ -92,12 +92,18 @@ export interface DetailLevel {
    */
   installContains: (repoName: string, target: PackageRef) => readonly string[];
   /**
-   * Where the stack's repo URL shows on the detail page: in the primary `install` text, in the
-   * `snippet:<slug>` block of that name, or `none` (maven, npm and cargo show no URL there: their
-   * URL lives in the Configure modal). A scenario asserting "the install snippet contains the repo
-   * URL" must branch on this, as data, not on the protocol.
+   * Where the stack's repo URL shows on the detail page: in the primary `install` text, or in the
+   * `snippet:<slug>` block of that name (NuGet, Helm and, since RPS-1288, Maven, npm and Cargo: the
+   * registry configuration next to the install command). A scenario asserting "the install snippet
+   * contains the repo URL" must branch on this, as data, not on the protocol.
    */
-  repoUrlIn: 'install' | 'none' | `snippet:${string}`;
+  repoUrlIn: 'install' | `snippet:${string}`;
+  /**
+   * The exact registry configuration the `snippet:<slug>` block of `repoUrlIn` shows for a repo, when
+   * the protocol has one to pin (`repoUrl` is the stack's repo base URL, without the repo name): the
+   * template asserts each substring and that the block's copy button puts them on the clipboard.
+   */
+  repoConfigContains?: (repoName: string, repoUrl: string, target: PackageRef) => readonly string[];
   /** The element that holds the install text inside `pkg-detail-install-text`. */
   installTextElement: 'span' | 'code' | 'pre';
   /** `pkg-detail-snippet-<slug>` blocks besides the install one. */
@@ -106,11 +112,17 @@ export interface DetailLevel {
   extraIds: readonly string[];
   /** The page renders `data-testid="readme"`. */
   readme: boolean;
-  /** The Delete button (managers only) and where the browser lands after a confirmed delete. */
+  /**
+   * The Delete button (managers only). Where the browser lands after a confirmed delete is ONE
+   * convention for every protocol (RPS-1288): the package's versions page, or the package list of the
+   * repo when it was the package's LAST version. A protocol that follows it sets neither field; one that
+   * deviates records its own landing (`landsOn` for a version that has siblings, `landsOnLast` for the
+   * last one, which defaults to `landsOn`): Docker's image stays with `No tags` after its last tag, so it
+   * lands on the image's tag list.
+   */
   delete:
     | (DeleteAffordance & {
-        landsOn: LevelName | 'unverified';
-        /** Where deleting the package's LAST version lands, when that differs from `landsOn` (NuGet, Helm). */
+        landsOn?: LevelName | 'unverified';
         landsOnLast?: LevelName;
       })
     | null;

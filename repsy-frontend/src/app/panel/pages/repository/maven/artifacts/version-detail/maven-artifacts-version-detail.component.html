@@ -95,6 +95,22 @@
       </pre>
       </div>
 
+      <!-- Apache Maven repository: where the dependency above is downloaded from -->
+      <div
+        data-testid="pkg-detail-snippet-repository"
+        class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]"
+      >
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <img ngSrc="/assets/icons/maven/maven2.svg" alt="Apache Maven" width="24" height="24" />
+          <span class="text-[14px] text-[#FDFDFD]">Apache Maven Repository</span>
+          <app-copy-clipboard class="ml-auto" [text]="mavenRepositoryHtml" />
+        </div>
+        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code tabindex="0" data-testid="pkg-detail-snippet-repository-text" [highlight]="mavenRepositoryHtml" language="xml" lineNumbers>
+        </code>
+      </pre>
+      </div>
+
       <!-- Gradle Groovy DSL -->
       <div
         data-testid="pkg-detail-snippet-gradle-groovy"

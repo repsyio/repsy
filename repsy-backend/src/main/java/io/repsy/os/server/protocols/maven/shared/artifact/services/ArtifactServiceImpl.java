@@ -26,6 +26,7 @@ import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.generated.model.ArtifactVersionInfo;
+import io.repsy.os.generated.model.MavenGroupSummary;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactConverter;
@@ -658,6 +659,26 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   public List<String> getGroupNames(final UUID repoId) {
 
     return this.artifactRepository.findGroupNamesByRepoId(repoId);
+  }
+
+  /**
+   * What deleting the group removes: its artifacts and the versions of all of them (RPS-1288).
+   *
+   * @throws ItemNotFoundException {@code groupNotFound} when the repo has no artifact of the group
+   */
+  public MavenGroupSummary getGroupSummary(final UUID repoId, final String groupName) {
+
+    final var artifactCount = this.artifactRepository.countByRepoIdAndGroupName(repoId, groupName);
+
+    if (artifactCount == 0) {
+      throw new ItemNotFoundException("groupNotFound");
+    }
+
+    return MavenGroupSummary.builder()
+        .groupName(groupName)
+        .artifactCount(artifactCount)
+        .versionCount(this.artifactVersionRepository.countByRepoIdAndGroupName(repoId, groupName))
+        .build();
   }
 
   public boolean hasOnlyOneArtifact(final UUID repoId, final String groupName) {

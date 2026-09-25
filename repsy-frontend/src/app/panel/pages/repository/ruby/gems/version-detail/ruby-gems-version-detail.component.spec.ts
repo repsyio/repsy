@@ -20,11 +20,14 @@ import { environment } from '../../../../../../../environments/environment';
 import { GemVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { VERSION_PROBE_SORT } from '../../../../../shared/util/version-delete-landing.util';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { RubyService } from '../../service/ruby.service';
 import { RubyGemsVersionDetailComponent } from './ruby-gems-version-detail.component';
 
 const REPO = 'ruby-repo';
+/** A page of versions: the delete flow reads nothing but `content`. */
+const pageOf = (content: unknown[]): never => ({ content }) as never;
 const GEM_VERSION = { platform: 'x86_64-linux' } as GemVersionInfo;
 
 describe('RubyGemsVersionDetailComponent', () => {
@@ -44,9 +47,12 @@ describe('RubyGemsVersionDetailComponent', () => {
 
   beforeEach(() => {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    rubyService = jasmine.createSpyObj<RubyService>('RubyService', ['fetchGemVersion', 'deleteGemVersion'], {
-      repoChanges,
-    });
+    rubyService = jasmine.createSpyObj<RubyService>(
+      'RubyService',
+      ['fetchGemVersion', 'fetchGemVersions', 'deleteGemVersion'],
+      { repoChanges },
+    );
+    rubyService.fetchGemVersions.and.returnValue(of(pageOf([{ version: '7.1.0' }, { version: '7.0.0' }])));
     rubyService.fetchGemVersion.and.returnValue(of(GEM_VERSION));
     rubyService.deleteGemVersion.and.returnValue(of(undefined));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -132,15 +138,40 @@ describe('RubyGemsVersionDetailComponent', () => {
       expect(rubyService.deleteGemVersion).not.toHaveBeenCalled();
     });
 
-    it('deletes the version with its platform, then leaves the page and toasts', async () => {
+    it('deletes the version with its platform, then goes to the versions page of the gem and toasts', async () => {
+      component.deleteVersion();
+
+      dangerModalService.call();
+      await Promise.resolve();
+
+      expect(rubyService.fetchGemVersions).toHaveBeenCalledOnceWith('rails', '', VERSION_PROBE_SORT, 0, 2);
+      expect(rubyService.deleteGemVersion).toHaveBeenCalledOnceWith('rails', '7.1.0', 'x86_64-linux');
+      expect(router.navigate).toHaveBeenCalledOnceWith(['..'], { relativeTo: route });
+      expect(toastService.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
+      expect(component.loading).toBeFalse();
+    });
+
+    // The gem is gone with its last version, so its versions page would answer 404 (RPS-1288).
+    it('goes to the gem list of the repository after the last version', async () => {
+      rubyService.fetchGemVersions.and.returnValue(of(pageOf([{ version: '7.1.0' }])));
       component.deleteVersion();
 
       dangerModalService.call();
       await Promise.resolve();
 
       expect(rubyService.deleteGemVersion).toHaveBeenCalledOnceWith('rails', '7.1.0', 'x86_64-linux');
-      expect(router.navigate).toHaveBeenCalledOnceWith(['../..'], { relativeTo: route });
+      expect(router.navigate).toHaveBeenCalledOnceWith(['/', REPO]);
       expect(toastService.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
+    });
+
+    it('deletes nothing when the versions of the gem cannot be read', () => {
+      rubyService.fetchGemVersions.and.returnValue(throwError(() => new Error('boom')));
+      component.deleteVersion();
+
+      dangerModalService.call();
+
+      expect(rubyService.deleteGemVersion).not.toHaveBeenCalled();
+      expect(router.navigate).not.toHaveBeenCalled();
       expect(component.loading).toBeFalse();
     });
 

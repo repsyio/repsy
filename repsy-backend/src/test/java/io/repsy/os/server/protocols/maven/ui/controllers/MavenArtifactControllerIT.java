@@ -154,6 +154,36 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
     }
   }
 
+  /** A further artifact, DB rows only: the summary counts rows and reads no storage. */
+  private void seedExtraArtifact(
+      final String group, final String artifactName, final String... versions) {
+    final var artifact = new Artifact();
+    artifact.setRepo(this.repo);
+    artifact.setGroupName(group);
+    artifact.setArtifactName(artifactName);
+    artifact.setName(artifactName);
+    artifact.setPackaging("jar");
+    artifact.setPlugin(false);
+    artifact.setLatest(versions[versions.length - 1]);
+    artifact.setRelease(versions[versions.length - 1]);
+    artifact.setLastUpdatedAt(Instant.now());
+    this.artifactRepository.saveAndFlush(artifact);
+    for (final var versionName : versions) {
+      final var version = new ArtifactVersion();
+      version.setArtifact(artifact);
+      version.setCreatedAt(Instant.now());
+      version.setLastUpdatedAt(Instant.now());
+      version.setType(ArtifactVersionType.RELEASE);
+      version.setVersionName(versionName);
+      version.setName(artifactName);
+      version.setPackaging("jar");
+      version.setHasSources(false);
+      version.setHasDocuments(false);
+      version.setHasModules(false);
+      this.artifactVersionRepository.saveAndFlush(version);
+    }
+  }
+
   private static String pomXml(final String version) {
     return "<project><modelVersion>4.0.0</modelVersion><groupId>"
         + GROUP
@@ -271,6 +301,56 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                   .with(apiPort()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content", hasSize(0)));
+    }
+
+    /**
+     * RPS-1288: the delete confirmation of a group says what goes with it, so the summary counts
+     * the group's artifacts and the versions of all of them, and nothing of another group.
+     */
+    @Test
+    void groupSummaryCountsTheArtifactsAndVersionsOfExactlyThatGroup() throws Exception {
+      MavenArtifactControllerIT.this.seedExtraArtifact(GROUP, "second", "1.0", "2.0", "3.0");
+      MavenArtifactControllerIT.this.seedExtraArtifact(GROUP + ".sub", "nested", "9.9");
+
+      MavenArtifactControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/mvn/groups/{repo}/{group}", MavenArtifactControllerIT.this.repoName, GROUP)
+                  .with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("groupSummaryFetched"))
+          .andExpect(jsonPath("$.type").value("SUCCESS"))
+          .andExpect(jsonPath("$.data.groupName").value(GROUP))
+          .andExpect(jsonPath("$.data.artifactCount").value(2))
+          // demo: 1.0.0 and 1.1.0-SNAPSHOT, second: three
+          .andExpect(jsonPath("$.data.versionCount").value(5));
+
+      MavenArtifactControllerIT.this
+          .mockMvc
+          .perform(
+              get(
+                      "/api/mvn/groups/{repo}/{group}",
+                      MavenArtifactControllerIT.this.repoName,
+                      GROUP + ".sub")
+                  .with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.artifactCount").value(1))
+          .andExpect(jsonPath("$.data.versionCount").value(1));
+    }
+
+    @Test
+    void groupSummaryOfAnUnknownGroupIsNotFound() throws Exception {
+      MavenArtifactControllerIT.this
+          .mockMvc
+          .perform(
+              get(
+                      "/api/mvn/groups/{repo}/{group}",
+                      MavenArtifactControllerIT.this.repoName,
+                      "com.nobody.published")
+                  .with(apiPort()))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.type").value("ERROR"))
+          .andExpect(jsonPath("$.data").value("groupNotFound"));
     }
 
     /**

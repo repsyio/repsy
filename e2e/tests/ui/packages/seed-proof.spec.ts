@@ -66,14 +66,14 @@ async function expectOpened(opened: ProtocolPage, pkg: PackageRef): Promise<void
   }
 }
 
-/** The stack's own repo URL shows in the install text exactly where the descriptor says. */
+/** The stack's own repo URL shows exactly where the descriptor says: the install text or a snippet. */
 async function expectRepoUrlIn(detail: VersionDetailPage): Promise<void> {
   const host = new URL(env.repoBaseUrl).host;
   const where = detail.detail.repoUrlIn;
   if (where === 'install') {
     await expect(detail.installText).toContainText(host);
-  } else if (where === 'none') {
-    await expect(detail.installText).not.toContainText(host);
+  } else {
+    await expect(detail.snippet(where.slice('snippet:'.length))).toContainText(host);
   }
 }
 
@@ -174,12 +174,18 @@ test.describe('package seeding proof', () => {
         await list.expectNoRow(second);
         await list.expectRow(first);
 
-        // Delete from the detail page: it lands where the descriptor says (the list, except docker, whose
-        // image stays and whose tag list it lands on, RPS-1288).
+        // Delete from the detail page: `first` is the package's only version, so it lands on the list;
+        // docker's image stays (`No tags`), so it lands on the image's tag list (RPS-1288).
         const detail = protocolPages(adminPage, DESCRIPTORS[protocol], repo.name).detail(first);
         await detail.goto();
         await detail.delete();
-        expect(detail.detail.delete?.landsOn).toBe(protocol === 'docker' ? 'versions' : 'list');
+        if (protocol === 'docker') {
+          expect(detail.detail.delete?.landsOnLast ?? detail.detail.delete?.landsOn).toBe(
+            'versions',
+          );
+        } else {
+          await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
+        }
         await expectAfterLastVersionDelete(list, first);
       });
     }

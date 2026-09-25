@@ -54,11 +54,10 @@ import { env } from '../env.js';
 import type { PackageRef, SeededPackage } from '../seed/packages.js';
 import { expect, test } from './package-fixtures.js';
 import {
-  type DeleteAffordance,
   type LevelName,
   pageOf,
   type ProtocolDescriptor,
-  type ProtocolListPage,
+  ProtocolListPage,
   type ProtocolPage,
   protocolPages,
   VersionDetailPage,
@@ -165,19 +164,35 @@ async function expectOnPage(page: Page, opened: ProtocolPage, target: PackageRef
   }
 }
 
-/** The page a delete lands on, when the descriptor has verified it. */
+/**
+ * The convention for where a delete from a version's detail page lands (RPS-1288 (7)), the same for
+ * every protocol: the package's versions page, or, after the package's LAST version, the package list.
+ * A descriptor that has not adopted it yet records its own landing (`landsOn`, `landsOnLast`).
+ */
+function expectedLanding(
+  affordance: { landsOn?: LevelName | 'unverified'; landsOnLast?: LevelName },
+  wasLastVersion: boolean,
+): LevelName | 'unverified' {
+  if (wasLastVersion) {
+    return affordance.landsOnLast ?? affordance.landsOn ?? 'list';
+  }
+  return affordance.landsOn ?? 'versions';
+}
+
+/** The page a delete lands on: its URL, and it is a loaded page of that level. */
 async function expectLandedOn(
   page: Page,
   descriptor: ProtocolDescriptor,
-  affordance: DeleteAffordance & { landsOn: LevelName | 'unverified' },
+  level: LevelName | 'unverified',
   repoName: string,
   target: PackageRef,
-): Promise<void> {
-  if (affordance.landsOn === 'unverified') {
-    return;
+): Promise<ProtocolPage | null> {
+  if (level === 'unverified') {
+    return null;
   }
-  const lands = pageOf(page, descriptor, affordance.landsOn, repoName, target);
+  const lands = pageOf(page, descriptor, level, repoName, target);
   await expect(page).toHaveURL(endsWith(lands.path()));
+  return lands;
 }
 
 function sorted(keys: readonly string[]): string[] {
@@ -258,10 +273,23 @@ export function registerPackageScenarios(
         const host = new URL(env.repoBaseUrl).host;
         if (detail.repoUrlIn === 'install') {
           await expect(opened.installText).toContainText(host);
-        } else if (detail.repoUrlIn.startsWith('snippet:')) {
-          await expect(opened.snippet(detail.repoUrlIn.slice('snippet:'.length))).toContainText(
-            host,
-          );
+        } else {
+          const configSnippet = opened.snippet(detail.repoUrlIn.slice('snippet:'.length));
+          await expect(configSnippet).toContainText(host);
+          // The protocol's registry configuration (RPS-1288 (6)): the exact lines, and they copy.
+          const config = detail.repoConfigContains?.(repo.name, env.repoBaseUrl, pkg) ?? [];
+          for (const part of config) {
+            await expect(configSnippet).toContainText(part);
+          }
+          if (config.length > 0) {
+            const copy = configSnippet.getByTestId('copy-button');
+            await copy.click();
+            await expect(copy).toHaveAttribute('data-copied', 'true');
+            const copied = await adminPage.evaluate(() => navigator.clipboard.readText());
+            for (const part of config) {
+              expect(copied).toContain(part);
+            }
+          }
         }
 
         // The copy button says so and puts the snippet on the clipboard.
@@ -480,7 +508,7 @@ export function registerPackageScenarios(
       test(
         title(
           '04',
-          'deleting a version from its detail page toasts and lands where the panel says',
+          'deleting a version from its detail page toasts and lands on the versions page',
           '04-detail',
         ),
         async ({ adminPage, seeder, seedVersions }) => {
@@ -492,9 +520,21 @@ export function registerPackageScenarios(
           const page = pages.detail(first);
           await page.goto();
           await page.delete(); // the dialog title and the toast are the descriptor's
-          await expectLandedOn(adminPage, descriptor, detailDelete, repo.name, first);
+          // The convention (RPS-1288 (7)): the package still has a version, so its versions page.
+          const landed = await expectLandedOn(
+            adminPage,
+            descriptor,
+            expectedLanding(detailDelete, false),
+            repo.name,
+            second,
+          );
 
-          // Only that version is gone.
+          // Only that version is gone, and the page it landed on says so.
+          if (landed instanceof ProtocolListPage && landed.levelName === 'versions') {
+            await landed.expectLoaded();
+            await landed.expectNoRow(first);
+            await landed.expectRow(second);
+          }
           const versions = pages.versions(second);
           await versions.goto();
           await versions.expectNoRow(first);
@@ -519,13 +559,20 @@ export function registerPackageScenarios(
           const page = pages.detail(pkg);
           await page.goto();
           await page.delete();
-          await expectLandedOn(
+          // The convention (RPS-1288 (7)): nothing left of the package, so the package list.
+          const landed = await expectLandedOn(
             adminPage,
             descriptor,
-            { ...detailDelete, landsOn: detailDelete.landsOnLast ?? detailDelete.landsOn },
+            expectedLanding(detailDelete, true),
             repo.name,
             pkg,
           );
+          if (landed instanceof ProtocolListPage && landed.levelName === 'list') {
+            await landed.expectLoaded();
+            if (descriptor.lastVersionRemovesPackage === true) {
+              await landed.expectNoRow(pkg);
+            }
+          }
 
           const list = pages.list();
           await list.goto();

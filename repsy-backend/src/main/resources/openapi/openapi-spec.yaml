@@ -2193,6 +2193,44 @@ paths:
         required: true
         schema:
           type: string
+  "/api/mvn/groups/{repoName}/{groupName}":
+    get:
+      tags:
+        - maven-group-controller
+      operationId: getMavenGroupSummary
+      description: >-
+        What deleting the group removes: how many artifacts the group holds and how many versions
+        they have together. The panel shows it in the delete confirmation. The group is an exact
+        `groupName`; a group nobody published to answers 404.
+      parameters:
+        - name: groupName
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseMavenGroupSummary"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Count the artifacts and versions of a Maven group
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
   "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}/versions":
     get:
       tags:
@@ -5805,6 +5843,36 @@ components:
           "$ref": "#/components/schemas/ResponseType"
         data:
           "$ref": "#/components/schemas/PagedModelArtifactListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    MavenGroupSummary:
+      type: object
+      description: >-
+        The content of one Maven group: what deleting it removes.
+      properties:
+        groupName:
+          type: string
+        artifactCount:
+          type: integer
+          format: int64
+        versionCount:
+          type: integer
+          format: int64
+      required:
+        - groupName
+        - artifactCount
+        - versionCount
+    RestResponseMavenGroupSummary:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/MavenGroupSummary"
         errorCode:
           type: string
         text:

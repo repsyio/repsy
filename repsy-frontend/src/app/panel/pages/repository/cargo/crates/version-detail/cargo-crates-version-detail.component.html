@@ -52,6 +52,23 @@
           </div>
         }
 
+        <h3 class="mb-2 text-[13px] text-white">Registry (.cargo/config.toml):</h3>
+        <div
+          data-testid="pkg-detail-snippet-cargo-config"
+          class="relative mb-6 overflow-x-auto rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]"
+        >
+          <div class="flex items-center justify-between gap-2 border-b border-[#2A2A2A] p-4">
+            <span class="text-[14px] text-[#FDFDFD]">config.toml</span>
+            <app-copy-clipboard [text]="cargoConfig" />
+          </div>
+          <pre class="text-[13px]"><code
+            tabindex="0"
+            data-testid="pkg-detail-snippet-cargo-config-text"
+            [highlight]="cargoConfig"
+            language="toml"
+          ></code></pre>
+        </div>
+
         <h3 class="mb-2 text-[13px] text-white">Cargo.toml:</h3>
         <div
           data-testid="pkg-detail-snippet-cargo-toml"

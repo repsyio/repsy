@@ -17,13 +17,15 @@
 import { Component, Input } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
-import { BehaviorSubject, of } from 'rxjs';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 
+import { environment } from '../../../../../../../environments/environment';
 import { PackageVersionDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
+import { VERSION_PROBE_SORT } from '../../../../../shared/util/version-delete-landing.util';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { NpmService } from '../../service/npm.service';
 import { NpmPackagesVersionDetailComponent } from './npm-packages-version-detail.component';
@@ -147,5 +149,124 @@ describe('NpmPackagesVersionDetailComponent README', () => {
   it('says so when the package has no keywords', () => {
     expect(metadataLine(render(undefined), 'Keywords:')).toBe('Keywords: No keywords found!');
     expect(metadataLine(render(undefined, { keywords: [] }), 'Keywords:')).toBe('Keywords: No keywords found!');
+  });
+});
+
+describe('NpmPackagesVersionDetailComponent registry snippet and delete (RPS-1288)', () => {
+  const REPO = 'npm-repo';
+  let npmService: jasmine.SpyObj<NpmService>;
+  let router: jasmine.SpyObj<Router>;
+  let toast: jasmine.SpyObj<ToastService>;
+  let danger: jasmine.SpyObj<DangerModalService>;
+  let route: ActivatedRoute;
+
+  function render(scope: string): ComponentFixture<NpmPackagesVersionDetailComponent> {
+    route = {
+      snapshot: { paramMap: convertToParamMap({ scope, package: 'acme-lib', version: '1.2.3' }) },
+    } as ActivatedRoute;
+    TestBed.overrideProvider(ActivatedRoute, { useValue: route });
+    const fixture = TestBed.createComponent(NpmPackagesVersionDetailComponent);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  const text = (fixture: ComponentFixture<NpmPackagesVersionDetailComponent>, testId: string): string =>
+    (fixture.nativeElement as HTMLElement).querySelector(`[data-testid="${testId}"]`)?.textContent?.trim() ?? '';
+
+  beforeEach(() => {
+    npmService = jasmine.createSpyObj<NpmService>(
+      'NpmService',
+      ['fetchPackageVersion', 'searchPackageVersions', 'deletePackageVersion'],
+      {
+        repoChanges: new BehaviorSubject<RepoPermissionInfo>({
+          repoName: REPO,
+          canRead: true,
+          canWrite: true,
+          canManage: true,
+          private: false,
+        }),
+      },
+    );
+    npmService.fetchPackageVersion.and.returnValue(of({ packageName: 'acme-lib' } as PackageVersionDetail));
+    npmService.searchPackageVersions.and.returnValue(of({ content: [{}, {}] } as never));
+    npmService.deletePackageVersion.and.returnValue(of(undefined));
+    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
+    router.navigate.and.resolveTo(true);
+    toast = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
+    danger = jasmine.createSpyObj<DangerModalService>('DangerModalService', ['show']);
+
+    TestBed.configureTestingModule({
+      imports: [NpmPackagesVersionDetailComponent],
+      providers: [
+        { provide: NpmService, useValue: npmService },
+        { provide: ActivatedRoute, useValue: {} },
+        { provide: ToastService, useValue: toast },
+        { provide: DangerModalService, useValue: danger },
+        { provide: Router, useValue: router },
+        {
+          provide: BreadcrumbSecurityLinkService,
+          useValue: jasmine.createSpyObj<BreadcrumbSecurityLinkService>('BreadcrumbSecurityLinkService', [
+            'show',
+            'clear',
+          ]),
+        },
+        { provide: RepoLookupService, useValue: { currentRepo: { repoName: REPO, repoType: 'npm' } } },
+      ],
+    });
+    TestBed.overrideComponent(NpmPackagesVersionDetailComponent, {
+      remove: { imports: [SecurityScanSectionComponent] },
+      add: { imports: [SecurityScanSectionStubComponent] },
+    });
+  });
+
+  it('shows the registry line of this repository for an unscoped package, next to the install command', () => {
+    const fixture = render('~');
+
+    expect(text(fixture, 'pkg-detail-snippet-npmrc-text')).toBe(`registry=${environment.repoBaseUrl}/${REPO}/`);
+    expect(text(fixture, 'pkg-detail-install-text')).toBe('npm install acme-lib');
+  });
+
+  it('scopes the registry line to the scope of a scoped package', () => {
+    const fixture = render('acme');
+
+    expect(text(fixture, 'pkg-detail-snippet-npmrc-text')).toBe(`@acme:registry=${environment.repoBaseUrl}/${REPO}/`);
+    expect(text(fixture, 'pkg-detail-install-text')).toBe('npm install @acme/acme-lib');
+  });
+
+  function confirmDelete(fixture: ComponentFixture<NpmPackagesVersionDetailComponent>): Promise<void> {
+    fixture.componentInstance.deleteVersion();
+    danger.show.calls.mostRecent().args[2]();
+    return fixture.whenStable();
+  }
+
+  it('goes to the versions page of the package after deleting one of several versions', async () => {
+    const fixture = render('acme');
+
+    await confirmDelete(fixture);
+
+    expect(npmService.searchPackageVersions).toHaveBeenCalledOnceWith('acme-lib', 'acme', '', VERSION_PROBE_SORT, 0, 2);
+    expect(npmService.deletePackageVersion).toHaveBeenCalledOnceWith('acme-lib', 'acme', '1.2.3');
+    expect(router.navigate).toHaveBeenCalledOnceWith(['..'], { relativeTo: route });
+    expect(toast.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
+  });
+
+  it('goes to the package list of the repository after the last version', async () => {
+    npmService.searchPackageVersions.and.returnValue(of({ content: [{}] } as never));
+    const fixture = render('~');
+
+    await confirmDelete(fixture);
+
+    expect(router.navigate).toHaveBeenCalledOnceWith(['/', REPO]);
+    expect(toast.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
+  });
+
+  it('deletes nothing when the versions of the package cannot be read', async () => {
+    npmService.searchPackageVersions.and.returnValue(throwError(() => new Error('boom')));
+    const fixture = render('~');
+
+    await confirmDelete(fixture);
+
+    expect(npmService.deletePackageVersion).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 });

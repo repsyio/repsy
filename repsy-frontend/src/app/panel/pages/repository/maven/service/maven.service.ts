@@ -23,6 +23,8 @@ import {
   ArtifactVersionInfo,
   ArtifactVersionListItem,
   MavenArtifactControllerService,
+  MavenGroupControllerService,
+  MavenGroupSummary,
   ProtocolRepoControllerService,
   RepoPermissionInfo,
   RepoSettingsForm,
@@ -43,6 +45,7 @@ export class MavenService {
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly mavenArtifactControllerService: MavenArtifactControllerService,
+    private readonly mavenGroupControllerService: MavenGroupControllerService,
   ) {
     this.repoChanges = this.repoSubject.asObservable();
   }
@@ -141,6 +144,11 @@ export class MavenService {
     return this.mavenArtifactControllerService
       .getMavenArtifactVersion(groupName, artifactName, versionName, this.repoName)
       .pipe(map((r) => r.data!));
+  }
+
+  /** What deleting the group removes: how many artifacts and versions it holds. */
+  public getGroupSummary(groupName: string): Observable<MavenGroupSummary> {
+    return this.mavenGroupControllerService.getMavenGroupSummary(groupName, this.repoName).pipe(map((r) => r.data!));
   }
 
   public deleteGroup(groupName: string): Observable<DeletedItem> {

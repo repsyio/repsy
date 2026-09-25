@@ -80,7 +80,6 @@ export const pypiDescriptor: ProtocolDescriptor = {
       delete: {
         dialogTitle: 'Delete Release',
         successToast: 'Version deleted successfully',
-        landsOn: 'list',
       },
     },
   },

@@ -31,7 +31,8 @@ function coordinates(target: PackageRef | undefined): {
  * Maven: groups -> artifacts -> versions -> detail, plus the file browser.
  *
  *  - `list` (`/:repo`) is the GROUP list, but its rows are one per ARTIFACT, keyed `group:artifact`;
- *    deleting from it deletes the whole GROUP ("Delete Group"). Its row click opens the latest
+ *    deleting from it deletes the whole GROUP ("Delete Group"; RPS-1288 (4): the dialog names the group
+ *    and counts the artifacts and versions that go). Its row click opens the latest
  *    version's detail; `row-group-link` opens `/:repo/:group` and `row-artifact-link` the versions.
  *  - `sublist` (`/:repo/:group`) lists that group's artifacts, keyed by the bare artifactId.
  *  - Every list page has a "Browse Files" button (`pkg-browse-files`, `/:repo/browser`).
@@ -102,10 +103,12 @@ export const mavenDescriptor: ProtocolDescriptor = {
           `<version>${c.version}</version>`,
         ];
       },
-      repoUrlIn: 'none',
+      repoUrlIn: 'snippet:repository',
+      repoConfigContains: (repo, url) => [`<url>${url}/${repo}</url>`, '<repositories>'],
       installTextElement: 'code',
       snippets: [
         'pom',
+        'repository',
         'gradle-groovy',
         'gradle-kotlin',
         'sbt',
@@ -121,7 +124,6 @@ export const mavenDescriptor: ProtocolDescriptor = {
       delete: {
         dialogTitle: 'Delete Version',
         successToast: 'Version deleted successfully',
-        landsOn: 'list',
       },
     },
   },

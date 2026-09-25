@@ -35,6 +35,7 @@ import { MarkdownComponent } from '../../../../../shared/components/markdown/mar
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { landAfterVersionDelete } from '../../../../../shared/util/version-delete-landing.util';
 import { NugetService } from '../../service/nuget.service';
 
 @Component({
@@ -125,10 +126,13 @@ export class NugetPackagesVersionDetailComponent implements OnDestroy {
       this.nugetService
         .deletePackageVersion(this.packageId, this.versionName)
         .then((deletedItem) => {
-          const target = deletedItem === NuGetDeletedItem.Package ? ['../..'] : ['..'];
-          this.router.navigate(target, { relativeTo: this.route }).then(() => {
-            this.toastService.show('Version deleted successfully', 'success');
-          });
+          landAfterVersionDelete(
+            this.router,
+            this.route,
+            this.toastService,
+            this.activeRepo.repoName,
+            deletedItem === NuGetDeletedItem.Package,
+          );
         })
         // The error interceptor has already shown the failure to the user.
         .catch(() => undefined)
