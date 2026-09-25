@@ -178,6 +178,17 @@ public class HelmChartService implements ChartService<UUID> {
     this.lockExistingChart(repoId, name);
   }
 
+  /**
+   * Locks the chart row like {@link #lockChart}, but answers {@code false} instead of throwing when
+   * the chart is gone. A caller that works from a list it read earlier (the OCI manifest name
+   * repair, RPS-1392) skips such a chart; a thrown exception would mark its transaction rollback
+   * only even when it caught it.
+   */
+  @Transactional
+  public boolean lockChartIfPresent(final UUID repoId, final String name) {
+    return this.helmChartRepository.findWithLockByRepoIdAndName(repoId, name).isPresent();
+  }
+
   @Transactional
   public void deleteVersion(final UUID repoId, final String name, final String version) {
     final var chart = this.lockExistingChart(repoId, name);
