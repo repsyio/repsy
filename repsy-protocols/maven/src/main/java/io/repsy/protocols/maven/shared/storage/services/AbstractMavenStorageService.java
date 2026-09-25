@@ -46,13 +46,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.maven.artifact.repository.metadata.Metadata;
-import org.apache.maven.artifact.repository.metadata.Versioning;
 import org.apache.maven.artifact.repository.metadata.io.xpp3.MetadataXpp3Writer;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
-import org.springframework.data.util.Pair;
 import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
 
 @RequiredArgsConstructor
@@ -317,11 +315,17 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   }
 
   /**
-   * Read artifact metadata and remove given version. Then reset the latest and release fields both
-   * in Artifact and metadata and write metadata back to file.
+   * Removes the given version from the artifact's {@code maven-metadata.xml} and writes the file
+   * back. An artifact published without one (Ivy, sbt or a raw PUT never send it, and Repsy does
+   * not generate it) has nothing to rewrite: no file is created and the usage delta is zero. A file
+   * without a {@code <versioning>} element lists no versions, so it is left as it is.
+   *
+   * <p>The file is read before anything is written, so a file that cannot be parsed fails here
+   * without having changed a byte; the artifact's {@code latest} and {@code release} are not taken
+   * from it but computed from the version rows (RPS-1331).
    */
   @Override
-  public Pair<Versioning, BaseUsages> deleteVersionFromMetadata(
+  public BaseUsages deleteVersionFromMetadata(
       final BaseRepoInfo<ID> repoInfo,
       final String groupId,
       final String artifactId,
@@ -334,25 +338,27 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
         StoragePath.of(
             repoInfo.getStorageKey(), artifactBasePath.resolve(METADATA_FILENAME).toString());
 
-    final var metadataResource =
-        this.storageStrategy
-            .get(storagePath, repoInfo.getName())
-            .orElseThrow(() -> new ItemNotFoundException(ERR_ITEM_NOT_FOUND));
+    final var metadataResource = this.storageStrategy.get(storagePath, repoInfo.getName());
 
-    final var metadata = ArtifactUtils.readMetadata(metadataResource.getContentAsByteArray());
+    if (metadataResource.isEmpty()) {
+      return BaseUsages.builder().diskUsage(0L).build();
+    }
+
+    final var metadata = ArtifactUtils.readMetadata(metadataResource.get().getContentAsByteArray());
 
     final var versioning = metadata.getVersioning();
+
+    if (versioning == null) {
+      return BaseUsages.builder().diskUsage(0L).build();
+    }
 
     versioning.getVersions().remove(versionName);
     versioning.setLastUpdatedTimestamp(Date.from(Instant.now()));
 
     ArtifactUtils.setReleaseAndLatest(metadata);
 
-    final var usages =
-        this.writeMetadataAndChecksumsToFile(
-            storagePath, artifactBasePath, metadata, repoInfo.getName());
-
-    return Pair.of(versioning, usages);
+    return this.writeMetadataAndChecksumsToFile(
+        storagePath, artifactBasePath, metadata, repoInfo.getName());
   }
 
   private Path[] getPath(final String groupId) {

@@ -46,6 +46,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -108,6 +109,24 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
 
     final var latest = versions[versions.length - 1];
 
+    this.seedArtifactWithMetadata(
+        group, artifactName, metadataXml(group, artifactName, List.of(versions), latest), versions);
+  }
+
+  /**
+   * Seeds the rows and the version directories of an artifact and, when {@code metadata} is not
+   * null, writes it as the artifact-level {@code maven-metadata.xml}. A null {@code metadata} is an
+   * artifact published without one, like every artifact of Ivy, sbt or a raw PUT (RPS-1331).
+   */
+  private void seedArtifactWithMetadata(
+      final String group,
+      final String artifactName,
+      final @Nullable String metadata,
+      final String... versions)
+      throws IOException {
+
+    final var latest = versions[versions.length - 1];
+
     var artifact = new Artifact();
     artifact.setRepo(this.repo);
     artifact.setGroupName(group);
@@ -143,10 +162,12 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
           StandardCharsets.UTF_8);
     }
 
-    Files.writeString(
-        this.artifactDir(group, artifactName).resolve("maven-metadata.xml"),
-        metadataXml(group, artifactName, List.of(versions), latest),
-        StandardCharsets.UTF_8);
+    if (metadata != null) {
+      Files.writeString(
+          this.artifactDir(group, artifactName).resolve("maven-metadata.xml"),
+          metadata,
+          StandardCharsets.UTF_8);
+    }
   }
 
   private Path artifactDir(final String group, final String artifactName) {
@@ -453,6 +474,128 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
     assertThat(artifactDir.resolve("maven-metadata.xml")).as("rewritten metadata").exists();
 
     this.assertVersionExists(group, artifactName, "2.0");
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // RPS-1331: a version delete is all or nothing, also for an artifact without maven-metadata.xml.
+  // ---------------------------------------------------------------------------------------------
+
+  private org.springframework.test.web.servlet.ResultActions deleteVersion(
+      final String group, final String artifactName, final String version) throws Exception {
+    return this.mockMvc.perform(
+        delete(
+                "/api/mvn/artifacts/{repo}/{group}/{artifact}/versions/{version}",
+                this.repoName,
+                group,
+                artifactName,
+                version)
+            .header(AUTHORIZATION, this.bearerToken())
+            .with(apiPort()));
+  }
+
+  private Artifact artifactRow(final String group, final String artifactName) {
+    return this.artifactRepository
+        .findByRepoIdAndGroupNameAndArtifactName(this.repo.getId(), group, artifactName)
+        .orElseThrow();
+  }
+
+  @Test
+  @DisplayName(
+      "deleting one of two versions of an artifact published without maven-metadata.xml answers"
+          + " 200, removes the row and the files, keeps the sibling and creates no metadata")
+  void deletingAVersionOfAnArtifactWithoutMetadataSucceeds() throws Exception {
+    final var group = "io.repsy.nometa";
+    final var artifactName = "demo";
+    this.seedArtifactWithMetadata(group, artifactName, null, "1.0", "2.0");
+    final var artifact = this.artifactRow(group, artifactName);
+    final var metadataFile = this.artifactDir(group, artifactName).resolve("maven-metadata.xml");
+    assertThat(metadataFile).doesNotExist();
+
+    this.deleteVersion(group, artifactName, "1.0")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.msgId").value("artifactVersionDeleted"))
+        .andExpect(jsonPath("$.data").value("VERSION"));
+
+    this.assertVersionGone(artifact, "1.0");
+    assertThat(this.versionDir(group, artifactName, "1.0")).doesNotExist();
+    this.assertVersionExists(group, artifactName, "2.0");
+    assertThat(metadataFile).as("Repsy never generates a maven-metadata.xml").doesNotExist();
+
+    final var after = this.artifactRow(group, artifactName);
+    assertThat(after.getLatest()).isEqualTo("2.0");
+    assertThat(after.getRelease()).isEqualTo("2.0");
+
+    // A retry of the same delete is an ordinary 404 now: the version is really gone.
+    this.deleteVersion(group, artifactName, "1.0")
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.msgId").value("artifactVersionNotFound"));
+  }
+
+  @Test
+  @DisplayName(
+      "a maven-metadata.xml without a <versioning> element is nothing to rewrite: the delete"
+          + " answers 200 instead of a 500, and the file is left as it was")
+  void deletingAVersionWhoseMetadataHasNoVersioningSucceeds() throws Exception {
+    final var group = "io.repsy.emptymeta";
+    final var artifactName = "demo";
+    this.seedArtifactWithMetadata(group, artifactName, "<metadata/>", "1.0", "2.0");
+    final var artifact = this.artifactRow(group, artifactName);
+
+    this.deleteVersion(group, artifactName, "1.0")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").value("VERSION"));
+
+    this.assertVersionGone(artifact, "1.0");
+    assertThat(this.versionDir(group, artifactName, "1.0")).doesNotExist();
+    this.assertVersionExists(group, artifactName, "2.0");
+    assertThat(this.artifactDir(group, artifactName).resolve("maven-metadata.xml"))
+        .hasContent("<metadata/>");
+  }
+
+  @Test
+  @DisplayName(
+      "latest and release of the artifact are recomputed from the remaining versions, not copied"
+          + " from a metadata file that only lists what a Maven client deployed")
+  void latestAndReleaseComeFromTheRemainingRowsNotFromTheClientsMetadata() throws Exception {
+    final var group = "io.repsy.mixed";
+    final var artifactName = "demo";
+    // mvn deployed 1.0 (and its metadata), Ivy published 2.0 and 3.0 (no metadata update).
+    this.seedArtifactWithMetadata(
+        group,
+        artifactName,
+        metadataXml(group, artifactName, List.of("1.0"), "1.0"),
+        "1.0",
+        "2.0",
+        "3.0");
+
+    this.deleteVersion(group, artifactName, "3.0").andExpect(status().isOk());
+
+    final var after = this.artifactRow(group, artifactName);
+    assertThat(after.getLatest()).as("latest").isEqualTo("2.0");
+    assertThat(after.getRelease()).as("release").isEqualTo("2.0");
+    this.assertVersionExists(group, artifactName, "1.0");
+    this.assertVersionExists(group, artifactName, "2.0");
+  }
+
+  @Test
+  @DisplayName(
+      "a maven-metadata.xml that cannot be parsed makes the delete fail before anything is"
+          + " changed: the files stay in place and the row stays listed")
+  void aMetadataFileThatCannotBeReadChangesNothing() throws Exception {
+    final var group = "io.repsy.badmeta";
+    final var artifactName = "demo";
+    this.seedArtifactWithMetadata(group, artifactName, "<metadata><versioning>", "1.0", "2.0");
+    final var artifact = this.artifactRow(group, artifactName);
+
+    this.deleteVersion(group, artifactName, "1.0")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.msgId").value("malformedMetadataFile"));
+
+    this.assertVersionExists(group, artifactName, "1.0");
+    this.assertVersionExists(group, artifactName, "2.0");
+    assertThat(this.artifactVersionRepository.findByArtifactId(artifact.getId())).hasSize(2);
+    assertThat(this.artifactDir(group, artifactName).resolve("maven-metadata.xml"))
+        .hasContent("<metadata><versioning>");
   }
 
   // ---------------------------------------------------------------------------------------------

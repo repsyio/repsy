@@ -24,11 +24,9 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
-import org.apache.maven.artifact.repository.metadata.Versioning;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
-import org.springframework.data.util.Pair;
 
 @NullMarked
 public interface MavenStorageService<ID> {
@@ -73,7 +71,7 @@ public interface MavenStorageService<ID> {
 
   void deleteRepo(UUID repoUuid);
 
-  Pair<Versioning, BaseUsages> deleteVersionFromMetadata(
+  BaseUsages deleteVersionFromMetadata(
       BaseRepoInfo<ID> repoInfo, String groupId, String artifactId, String versionName)
       throws IOException, XmlPullParserException;
 

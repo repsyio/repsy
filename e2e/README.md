@@ -174,6 +174,7 @@ e2e/
     maven/
       publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
+      version-delete.spec.ts    # the panel's version delete for a raw-PUT artifact: with no maven-metadata.xml, with one, with `<metadata/>` (RPS-1331)
       pgp-signature.spec.ts     # registered PGP public keys (RPS-1189): verify, reject, isolate, delete; every-signature verification (RPS-1188); key-server lookup off (RPS-1204); toggling every-signature verification recomputes `signed` and verifies stored `.asc` files (RPS-1316, RPS-1323)
       parallel-signed-deploy.spec.ts  # a REAL parallel `mvn deploy:deploy-file` of a signed release to a verify-all repo (RPS-1188), plus the one-thread control
       gpg-signed-deploy.spec.ts  # RPS-1316, tag @gpg: maven-gpg-plugin and Gradle `signing` deploys with a real gpg key to a verify-all repo (signed / unsigned / unregistered key)
@@ -766,7 +767,6 @@ when its ticket lands:
 | `snapshot-redeploy-no-override` (`expectByProtocol.sbt`) | RPS-1328 | `allowOverride: false` refuses sbt's literal `-SNAPSHOT` redeploy (403), while Maven's timestamped redeploy passes. Pinned as `forbidden`, not as a decision |
 | a release published with sbt's own defaults              | RPS-1368 | the Maven HEAD handler answers 200 for a file that does not exist, so sbt (overwrite off for a release) refuses even the FIRST publish                       |
 | the panel detail of an sbt SNAPSHOT                      | RPS-1370 | 404 `itemNotFound`: it reads the version-level metadata sbt never sends. The list works                                                                      |
-| deleting one of two sbt versions in the panel            | RPS-1331 | 404 after the files are gone, the database row stays (no artifact-level metadata)                                                                            |
 | `latest.release` resolving an sbt library                | RPS-1369 | the server generates no `maven-metadata.xml`, so a dynamic revision finds nothing                                                                            |
 
 Not covered: Ivy-style layout (RPS-135), `publishSigned` (sbt-pgp, RPS-1316 covers signing with `mvn`

@@ -17,6 +17,7 @@ package io.repsy.protocols.maven.shared.storage.services;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -25,6 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import freemarker.template.Configuration;
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -157,14 +159,66 @@ class AbstractMavenStorageServiceTest {
     final var result =
         this.storageService.deleteVersionFromMetadata(repoInfo, GROUP, ARTIFACT, "1.0");
 
-    assertThat(result.getFirst().getVersions()).containsExactly("2.0");
     // -20 (metadata rewrite delta) - 100 (.asc) - 40 (.asc.sha1) = -160.
-    assertThat(result.getSecond().getDiskUsage()).isEqualTo(-160L);
+    assertThat(result.getDiskUsage()).isEqualTo(-160L);
 
     verify(this.storageStrategy).delete(argThat(pathEndingWith(METADATA_FILENAME + ".asc")));
     verify(this.storageStrategy).delete(argThat(pathEndingWith(METADATA_FILENAME + ".asc.sha1")));
     verify(this.storageStrategy, never())
         .delete(argThat(pathEndingWith(METADATA_FILENAME + ".asc.md5")));
+  }
+
+  @Test
+  @DisplayName(
+      "deleting a version's metadata of an artifact that has no maven-metadata.xml is nothing to"
+          + " rewrite: zero usage, no file written or deleted, no exception (RPS-1331)")
+  void deleteVersionFromMetadataWithoutMetadataFileIsANoOp() throws Exception {
+
+    final var repoInfo = BaseRepoInfo.<UUID>builder().storageKey(REPO_ID).name(REPO_NAME).build();
+    when(this.storageStrategy.get(any(), anyString())).thenReturn(Optional.empty());
+
+    final var result =
+        this.storageService.deleteVersionFromMetadata(repoInfo, GROUP, ARTIFACT, "1.0");
+
+    assertThat(result.getDiskUsage()).isZero();
+    verify(this.storageStrategy, never()).write(anyString(), any(), any());
+    verify(this.storageStrategy, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName(
+      "deleting a version's metadata of a file without <versioning> leaves the file alone and"
+          + " answers zero usage instead of a NullPointerException (RPS-1331)")
+  void deleteVersionFromMetadataWithoutVersioningIsANoOp() throws Exception {
+
+    final var repoInfo = BaseRepoInfo.<UUID>builder().storageKey(REPO_ID).name(REPO_NAME).build();
+    when(this.storageStrategy.get(any(), anyString()))
+        .thenReturn(Optional.of(new ByteArrayResource("<metadata/>".getBytes(UTF_8))));
+
+    final var result =
+        this.storageService.deleteVersionFromMetadata(repoInfo, GROUP, ARTIFACT, "1.0");
+
+    assertThat(result.getDiskUsage()).isZero();
+    verify(this.storageStrategy, never()).write(anyString(), any(), any());
+    verify(this.storageStrategy, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName(
+      "deleting a version's metadata of a file that cannot be parsed fails before anything is"
+          + " written or deleted (RPS-1331)")
+  void deleteVersionFromMetadataWithUnparsableFileChangesNothing() {
+
+    final var repoInfo = BaseRepoInfo.<UUID>builder().storageKey(REPO_ID).name(REPO_NAME).build();
+    when(this.storageStrategy.get(any(), anyString()))
+        .thenReturn(Optional.of(new ByteArrayResource("<metadata><versioning>".getBytes(UTF_8))));
+
+    assertThatThrownBy(
+            () -> this.storageService.deleteVersionFromMetadata(repoInfo, GROUP, ARTIFACT, "1.0"))
+        .isInstanceOf(BadRequestException.class);
+
+    verify(this.storageStrategy, never()).write(anyString(), any(), any());
+    verify(this.storageStrategy, never()).delete(any());
   }
 
   @Test
