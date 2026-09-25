@@ -30,7 +30,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { isolatedWorkDir, run, type RunResult } from '../exec.js';
+import { isolatedWorkDir, type RunResult } from '../exec.js';
 import { MARKER_FILENAME } from '../npm.js';
 import {
   CLIENT_BINARIES,
@@ -42,7 +42,7 @@ import {
   type PublishOptions,
   type RegistryBinding,
 } from './client.js';
-import { secretsOf, sealedEnv, writeNpmrc } from './config.js';
+import { secretsOf, runSealed, sealedEnv, writeNpmrc } from './config.js';
 
 const BINARY = CLIENT_BINARIES.pnpm;
 
@@ -78,7 +78,7 @@ export function runPnpm(
   args: readonly string[],
   options: PnpmRunOptions = {},
 ): Promise<RunResult> {
-  return run(BINARY, args, {
+  return runSealed(BINARY, args, {
     cwd: options.cwd ?? ctx.work,
     env: ctx.env,
     timeoutMs: options.timeoutMs ?? COMMAND_TIMEOUT_MS,

@@ -31,9 +31,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { isolatedWorkDir, run } from '../../src/clients/exec.js';
+import { isolatedWorkDir } from '../../src/clients/exec.js';
 import { CLIENT_BINARIES, CLIENT_VERSION_ENV } from '../../src/clients/npm-family/client.js';
 import {
+  runSealed,
   sealedEnv,
   writeNpmrc,
   writeYarnBerryRc,
@@ -101,7 +102,7 @@ test.describe('npm-family config renderers, read back by the client', () => {
     const { home, work } = await isolatedWorkDir('npmc-cfg-pnpm');
     await writeNpmrc(home, bindings);
 
-    const defaults = await run(CLIENT_BINARIES.pnpm, ['config', 'get', 'registry'], {
+    const defaults = await runSealed(CLIENT_BINARIES.pnpm, ['config', 'get', 'registry'], {
       cwd: work,
       env: sealedEnv(home),
       redact: ['tok', 'pw'],
@@ -109,7 +110,7 @@ test.describe('npm-family config renderers, read back by the client', () => {
     expect(defaults.exitCode, defaults.stderr).toBe(0);
     expect(defaults.stdout.trim()).toBe(registryA);
 
-    const scoped = await run(CLIENT_BINARIES.pnpm, ['config', 'get', '@scoped:registry'], {
+    const scoped = await runSealed(CLIENT_BINARIES.pnpm, ['config', 'get', '@scoped:registry'], {
       cwd: work,
       env: sealedEnv(home),
       redact: ['tok', 'pw'],
@@ -125,10 +126,14 @@ test.describe('npm-family config renderers, read back by the client', () => {
       const { home, work } = await isolatedWorkDir('npmc-cfg-yarn1');
       await writeYarnClassicRc(path.join(home, '.yarnrc'), bindings);
 
-      const registry = await run(CLIENT_BINARIES['yarn-classic'], ['config', 'get', 'registry'], {
-        cwd: work,
-        env: sealedEnv(home, { NODE_OPTIONS: '--no-deprecation', YARN_IGNORE_PATH: '1' }),
-      });
+      const registry = await runSealed(
+        CLIENT_BINARIES['yarn-classic'],
+        ['config', 'get', 'registry'],
+        {
+          cwd: work,
+          env: sealedEnv(home, { NODE_OPTIONS: '--no-deprecation', YARN_IGNORE_PATH: '1' }),
+        },
+      );
       expect(registry.exitCode, registry.stderr).toBe(0);
       // Yarn 1 clears the line with ANSI escapes even when its output is not a terminal.
       // eslint-disable-next-line no-control-regex
@@ -149,7 +154,7 @@ test.describe('npm-family config renderers, read back by the client', () => {
       });
       const yarnEnv = sealedEnv(home, { YARN_IGNORE_PATH: '1' });
 
-      const registry = await run(
+      const registry = await runSealed(
         CLIENT_BINARIES['yarn-berry'],
         ['config', 'get', 'npmRegistryServer'],
         {
@@ -161,7 +166,7 @@ test.describe('npm-family config renderers, read back by the client', () => {
       expect(registry.exitCode, registry.stderr).toBe(0);
       expect(registry.stdout.trim()).toBe(registryA);
 
-      const scopes = await run(
+      const scopes = await runSealed(
         CLIENT_BINARIES['yarn-berry'],
         ['config', 'get', 'npmScopes', '--json'],
         {

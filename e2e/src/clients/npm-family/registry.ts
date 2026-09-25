@@ -25,14 +25,14 @@
  * the capability, never a `test.skip` (which would add a skipped row per missing cell to every
  * report); the README table lists the N/A cells.
  */
-import { run, isolatedWorkDir, type RunResult } from '../exec.js';
+import { isolatedWorkDir, type RunResult } from '../exec.js';
 import {
   CLIENT_BINARIES,
   type Capabilities,
   type ClientId,
   type NpmFamilyClient,
 } from './client.js';
-import { sealedEnv } from './config.js';
+import { runSealed, sealedEnv } from './config.js';
 import { bunClient } from './bun-client.js';
 import { npmClient } from './npm-client.js';
 import { pnpmClient } from './pnpm-client.js';
@@ -70,7 +70,7 @@ export const INSTALLED_CLIENTS: readonly InstalledClient[] = [
 /** `<binary> --version` of an installed client, by its absolute path, in the sealed environment. */
 export async function versionOf(id: ClientId): Promise<RunResult> {
   const { home, work } = await isolatedWorkDir(`npmc-${id}-version`);
-  return run(CLIENT_BINARIES[id], ['--version'], {
+  return runSealed(CLIENT_BINARIES[id], ['--version'], {
     cwd: work,
     env: sealedEnv(home),
     timeoutMs: 60_000,
