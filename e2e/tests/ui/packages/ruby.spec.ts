@@ -20,7 +20,13 @@
  */
 import { RepoType } from '../../../src/api/panel-api.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
-import { buildGem, rawPublish, rawYank } from '../../../src/clients/ruby-raw.js';
+import {
+  buildGem,
+  infoRelPath,
+  rawGet,
+  rawPublish,
+  rawYank,
+} from '../../../src/clients/ruby-raw.js';
 import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { registerPackageScenarios } from '../../../src/ui/package-scenarios.js';
@@ -69,6 +75,35 @@ test.describe('Ruby gem pages', { tag: '@packages' }, () => {
     const other = pages.detail(one);
     await other.goto();
     await expect(other.byId('pkg-detail-yanked')).toHaveCount(0);
+  });
+
+  test('RPS-1426 deleting a yanked version from the versions page keeps the live version', async ({
+    adminPage,
+    seeder,
+    seedVersions,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.RUBY);
+    const [one, two] = await seedVersions(repo, ['1.0.0', '2.0.0']);
+    const yank = await rawYank(repo.name, adminCredential(), {
+      gemName: two.name,
+      version: two.version,
+    });
+    expect(yank.status, 'gem yank').toBe(200);
+    const versions = protocolPages(adminPage, ruby, repo.name).versions(one);
+    await versions.goto();
+    await versions.expectRow(two);
+
+    // The yanked version is the one deleted; the only live version must survive it.
+    await versions.deleteRow(two);
+    await versions.expectNoRow(two);
+    await versions.expectRow(one);
+
+    await versions.goto();
+    await versions.expectNoRow(two);
+    await versions.expectRow(one);
+    const info = await rawGet(repo.name, adminCredential(), infoRelPath(one.name));
+    expect(info.status, 'the gem is still served').toBe(200);
+    expect(info.body.toString('utf8')).toContain('1.0.0');
   });
 
   test('PKG-ruby-07 the gem detail shows the install commands, the platform and the checksum', async ({

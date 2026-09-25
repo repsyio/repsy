@@ -35,7 +35,11 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
 
   Optional<RubyGemVersion> findFirstByGemIdAndYankedFalseOrderByCreatedAtDesc(UUID gemId);
 
-  long countByGemIdAndYankedFalse(UUID gemId);
+  Optional<RubyGemVersion> findFirstByGemIdOrderByCreatedAtDesc(UUID gemId);
+
+  long countByGemId(UUID gemId);
+
+  boolean existsByGemIdAndVersion(UUID gemId, String version);
 
   boolean existsByGemIdAndVersionAndYankedFalse(UUID gemId, String version);
 
