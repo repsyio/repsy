@@ -49,6 +49,17 @@ public interface ChartService<ID> {
       ID repoId, HelmChartForm form, boolean allowOverride, ChartFileWriter fileWriter)
       throws IOException;
 
+  /**
+   * Locks the chart's row until the transaction ends. A request that deletes a version or a whole
+   * chart takes it first, before it reads or removes anything else of the chart, which is the order
+   * a push takes its locks in ({@link #findOrCreate}, {@link #publish}: chart, then version, then
+   * manifest). Two requests that take the same locks in opposite orders can deadlock (RPS-1365).
+   *
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException When there is no such
+   *     chart
+   */
+  void lockChart(ID repoId, String name);
+
   HelmChartInfo findByRepoIdAndNameAndVersion(ID repoId, String name, String version);
 
   List<HelmChartInfo> findAllByRepoId(ID repoId);

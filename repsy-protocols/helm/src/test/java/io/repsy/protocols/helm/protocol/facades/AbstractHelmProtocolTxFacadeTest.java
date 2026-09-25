@@ -24,6 +24,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -55,6 +56,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
@@ -68,8 +70,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractHelmProtocolTxFacade OCI blob uploads")
@@ -618,6 +623,124 @@ class AbstractHelmProtocolTxFacadeTest {
           .satisfies(e -> assertThat(e.getSuppressed()).hasSize(1));
     }
 
+    /**
+     * Runs the push with transaction synchronization active, as it is inside the facade's
+     * transaction, and ends the transaction with {@code status}.
+     */
+    private void pushThenComplete(final int status) throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      TransactionSynchronizationManager.initSynchronization();
+      try {
+        it.facade.pushManifest(it.context, this.form(), this.content);
+        for (final var synchronization : TransactionSynchronizationManager.getSynchronizations()) {
+          synchronization.afterCompletion(status);
+        }
+      } finally {
+        TransactionSynchronizationManager.clearSynchronization();
+      }
+    }
+
+    private void fileHolds(final byte[]... contents) {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      final var reads = new ArrayList<Optional<Resource>>();
+      for (final var bytes : contents) {
+        reads.add(Optional.of(new ByteArrayResource(bytes)));
+      }
+      final var first = reads.remove(0);
+      when(it.helmStorageService.getManifest(REPO_ID, "payments", "1.0.0", REPO_NAME))
+          .thenReturn(first, reads.toArray(new Optional[0]));
+    }
+
+    @Test
+    @DisplayName("removes the file of a new manifest when the transaction rolls back (RPS-1366)")
+    void removesTheFileOfANewManifestWhenTheCommitFails() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      this.rowsAreWritten(false);
+      this.fileHolds(this.content);
+
+      this.pushThenComplete(TransactionSynchronization.STATUS_ROLLED_BACK);
+
+      verify(it.helmStorageService).deleteManifestFile(REPO_ID, "payments", "1.0.0", REPO_NAME);
+    }
+
+    @Test
+    @DisplayName("keeps the file of a manifest whose transaction committed (RPS-1366)")
+    void keepsTheFileWhenTheTransactionCommits() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      this.rowsAreWritten(false);
+
+      this.pushThenComplete(TransactionSynchronization.STATUS_COMMITTED);
+
+      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any(), any());
+      verify(it.helmStorageService, never()).getManifest(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("keeps the file when the outcome of the commit is unknown (RPS-1366)")
+    void keepsTheFileWhenTheOutcomeIsUnknown() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      this.rowsAreWritten(false);
+
+      this.pushThenComplete(TransactionSynchronization.STATUS_UNKNOWN);
+
+      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("puts back the bytes of a replaced manifest when the transaction rolls back")
+    void restoresTheFileOfAReplacedManifest() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      final var previous = "{\"previous\":true}".getBytes(StandardCharsets.UTF_8);
+      this.rowsAreWritten(true);
+      // Read before the write to keep, and after the rollback to see the file is still ours.
+      this.fileHolds(previous, this.content);
+
+      this.pushThenComplete(TransactionSynchronization.STATUS_ROLLED_BACK);
+
+      verify(it.helmStorageService).saveManifest(REPO_ID, "payments", "1.0.0", previous, REPO_NAME);
+      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("leaves a file that a later push has already written again alone")
+    void leavesAFileThatAnotherPushWrote() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      this.rowsAreWritten(false);
+      this.fileHolds("{\"later\":true}".getBytes(StandardCharsets.UTF_8));
+
+      this.pushThenComplete(TransactionSynchronization.STATUS_ROLLED_BACK);
+
+      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("leaves a replaced manifest's file when the bytes it had could not be read")
+    void leavesAReplacedFileWithNoPreviousBytes() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      this.rowsAreWritten(true);
+      when(it.helmStorageService.getManifest(REPO_ID, "payments", "1.0.0", REPO_NAME))
+          .thenReturn(Optional.empty(), Optional.of(new ByteArrayResource(this.content)));
+
+      this.pushThenComplete(TransactionSynchronization.STATUS_ROLLED_BACK);
+
+      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any(), any());
+      verify(it.helmStorageService, times(1)).saveManifest(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("does not fail the rolled back transaction when the file cannot be removed")
+    void survivesAFailingCleanup() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      this.rowsAreWritten(false);
+      this.fileHolds(this.content);
+      when(it.helmStorageService.deleteManifestFile(REPO_ID, "payments", "1.0.0", REPO_NAME))
+          .thenThrow(new IOException("no such file"));
+
+      this.pushThenComplete(TransactionSynchronization.STATUS_ROLLED_BACK);
+
+      verify(it.helmStorageService).deleteManifestFile(REPO_ID, "payments", "1.0.0", REPO_NAME);
+    }
+
     @Test
     @DisplayName("never writes the file when the rows are refused")
     void neverWritesTheFileWhenTheManifestRowIsRefused() {
@@ -771,6 +894,17 @@ class AbstractHelmProtocolTxFacadeTest {
               AbstractHelmProtocolTxFacadeTest.this.ociManifestService,
               AbstractHelmProtocolTxFacadeTest.this.chartService,
               AbstractHelmProtocolTxFacadeTest.this.chartFilesService);
+      // The chart is locked before anything else of it is read or deleted, the order a push takes
+      // its locks in (RPS-1365).
+      order
+          .verify(AbstractHelmProtocolTxFacadeTest.this.chartService)
+          .lockChart(REPO_ID, "payments");
+      order
+          .verify(AbstractHelmProtocolTxFacadeTest.this.chartService)
+          .findByRepoIdAndNameAndVersion(REPO_ID, "payments", "1.0.0");
+      order
+          .verify(AbstractHelmProtocolTxFacadeTest.this.ociManifestService)
+          .findAllByChartId(chartId);
       order
           .verify(AbstractHelmProtocolTxFacadeTest.this.ociManifestService)
           .deleteAllByChartId(chartId);
