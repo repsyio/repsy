@@ -828,6 +828,22 @@ class ArtifactServiceImplTest {
     assertThat(this.pomFilenameOf("2.0-SNAPSHOT")).isNull();
   }
 
+  @Test
+  @DisplayName(
+      "metadata that cannot be parsed is treated like absent metadata, it is not a 400 (RPS-1421)")
+  void snapshotMetadataThatCannotBeParsedFallsBack() throws Exception {
+    this.stubVersionMetadata("<metadata><versioning>");
+    this.stubVersionDir("lib-2.0-20260921.101010-3.pom", "lib-2.0-SNAPSHOT.pom");
+
+    assertThat(this.pomFilenameOf("2.0-SNAPSHOT")).isEqualTo("lib-2.0-20260921.101010-3.pom");
+
+    // no POM stored: the literal name, as for absent metadata (the read then answers 404), not the
+    // null of metadata that parsed and lists no pom
+    this.stubVersionDir("lib-2.0-SNAPSHOT.jar");
+
+    assertThat(this.pomFilenameOf("2.0-SNAPSHOT")).isEqualTo("lib-2.0-SNAPSHOT.pom");
+  }
+
   private static StoragePath pathOf(final String relativePath) {
     return argThat(path -> path.getRelativePath().getPath().equals(relativePath));
   }

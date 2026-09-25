@@ -686,7 +686,8 @@ With *Allow override* off, a Maven repository refuses to store a file that alrea
 
 The panel shows the version of a SNAPSHOT that carries no `maven-metadata.xml` (what sbt and Ivy
 leave) with the newest POM stored for it: the POM of the newest timestamped build, or the literal
-`-SNAPSHOT` POM when there is no build.
+`-SNAPSHOT` POM when there is no build. The same goes for a `maven-metadata.xml` that cannot be
+parsed, and a manual vulnerability scan of such a SNAPSHOT scans its newest stored jar.
 
 ### Apache Ivy Clients
 
