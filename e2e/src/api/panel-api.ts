@@ -434,6 +434,21 @@ export class PanelApi {
     return unwrap(res.data, 'getMavenArtifactVersion');
   }
 
+  /** Deletes one version of a Maven artifact, its files and its entry in the artifact's metadata. */
+  async deleteMavenArtifactVersion(
+    repoName: string,
+    groupName: string,
+    artifactName: string,
+    versionName: string,
+  ): Promise<void> {
+    await this.client.mavenArtifactController.deleteMavenArtifactVersion({
+      repoName,
+      groupName,
+      artifactName,
+      version: versionName,
+    });
+  }
+
   /** Removes a registered PGP public key from a Maven repo's key store (RPS-1189). */
   async deletePgpPublicKey(repoName: string, id: string): Promise<void> {
     await this.client.keyStoreController.deleteMavenPgpPublicKey({ repoName, publicKeyId: id });
