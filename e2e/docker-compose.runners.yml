@@ -100,6 +100,35 @@ services:
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
 
+  # The npm-family clients (pnpm, yarn classic, yarn berry, bun, plus npm as the baseline) against the
+  # same npm repositories the "npm" runner tests with npm alone (tests/npm-clients, README.md
+  # "npm-family clients"). Its own runner so `--protocol npm` stays exactly as small and fast as it
+  # was; opt in with `--protocol npm-clients`.
+  npm-clients:
+    <<: *runner-common
+    build:
+      context: .
+      dockerfile: runners/npm-clients.Dockerfile
+      args:
+        # Resolved live (`npm view pnpm dist-tags`, `npm view @yarnpkg/cli-dist dist-tags`,
+        # `docker run --rm oven/bun:1.3-debian bun --version`); the Dockerfile fails the build when a
+        # client's own `--version` differs. yarn classic is a frozen line (1.22.22 is its last release).
+        PNPM_CLIENT_VERSION: '12.6.0'
+        YARN_CLASSIC_VERSION: '1.22.22'
+        YARN_BERRY_VERSION: '4.18.1'
+        BUN_VERSION: '1.3.14'
+    environment:
+      <<: *runner-environment
+    volumes:
+      # No shared/named cache volume, same reasoning as npm's: the test packages are dependency-free
+      # apart from each other (every one lives in the repo under test), so there is nothing third-party
+      # to warm a cache with. Each client invocation gets its own store/cache in an isolated HOME.
+      - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
+      - ./src:/app/src
+      - ./tests:/app/tests:ro
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+
   cargo:
     <<: *runner-common
     build:

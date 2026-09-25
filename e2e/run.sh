@@ -54,10 +54,11 @@ Usage:
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
---protocol takes runner service names: skeleton, maven, npm, cargo, nuget, docker, helm, pypi,
-golang, ruby, stack (cases that docker-exec into the Repsy container, tests/stack; local stack only,
-see README.md "Stack runner") and ui (the panel UI suite in headless Chromium, tests/ui; see
-README.md "UI suite").
+--protocol takes runner service names: skeleton, maven, npm, npm-clients (the npm registry under pnpm,
+yarn classic, yarn berry and bun as well as npm; see README.md "npm-family clients"), cargo, nuget,
+docker, helm, pypi, golang, ruby, stack (cases that docker-exec into the Repsy container, tests/stack;
+local stack only, see README.md "Stack runner") and ui (the panel UI suite in headless Chromium,
+tests/ui; see README.md "UI suite").
 
 REPSY_ADMIN_PASSWORD must be set (copy .env.example to .env and fill it in) for every subcommand
 except "local down".
@@ -247,9 +248,9 @@ cmd_test() {
     IFS=',' read -ra services <<< "$protocols"
   else
     # No --protocol given: run the skeleton harness proof only. A protocol runner (maven, npm,
-    # cargo, nuget, docker, helm, pypi, golang, ruby) is opt-in via --protocol so a plain "run.sh
-    # test" stays fast; pass e.g. --protocol maven or
-    # --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby,stack,ui to run more. "stack" is
+    # npm-clients, cargo, nuget, docker, helm, pypi, golang, ruby) is opt-in via --protocol so a plain
+    # "run.sh test" stays fast; pass e.g. --protocol maven or
+    # --protocol skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,golang,ruby,stack,ui to run more. "stack" is
     # the docker-exec cases against the container of a local stack (tests/stack); "ui" is the
     # panel UI suite (Playwright + headless Chromium, tests/ui), not a package format. "helm" runs
     # BOTH Helm protocols (OCI and classic/ChartMuseum, `tests/helm/*.spec.ts`) from one

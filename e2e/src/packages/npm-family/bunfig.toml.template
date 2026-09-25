@@ -1,0 +1,11 @@
+[install]
+{{#defaultRegistry}}
+registry = { url = "{{{registryUrl}}}"{{#hasToken}}, token = "{{{token}}}"{{/hasToken}}{{#hasBasic}}, username = "{{{username}}}", password = "{{{password}}}"{{/hasBasic}} }
+{{/defaultRegistry}}
+{{#hasScopes}}
+
+[install.scopes]
+{{#scopes}}
+"{{{scopeName}}}" = { url = "{{{registryUrl}}}"{{#hasToken}}, token = "{{{token}}}"{{/hasToken}}{{#hasBasic}}, username = "{{{username}}}", password = "{{{password}}}"{{/hasBasic}} }
+{{/scopes}}
+{{/hasScopes}}

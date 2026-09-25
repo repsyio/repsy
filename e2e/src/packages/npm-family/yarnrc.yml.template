@@ -1,0 +1,44 @@
+nodeLinker: {{{nodeLinker}}}
+enableTelemetry: false
+enableGlobalCache: false
+enableProgressBars: false
+enableImmutableInstalls: {{{immutableInstalls}}}
+enableHardenedMode: {{{hardenedMode}}}
+httpRetry: 0
+cacheFolder: "{{{cacheFolder}}}"
+httpProxy: "{{{proxyUrl}}}"
+httpsProxy: "{{{proxyUrl}}}"
+networkSettings:
+{{#registryHosts}}
+  "{{{.}}}":
+    httpProxy: ""
+    httpsProxy: ""
+{{/registryHosts}}
+unsafeHttpWhitelist:
+{{#registryHosts}}
+  - "{{{.}}}"
+{{/registryHosts}}
+{{#defaultRegistry}}
+npmRegistryServer: "{{{registryUrl}}}"
+{{#hasToken}}
+npmAuthToken: "{{{token}}}"
+{{/hasToken}}
+{{#hasBasic}}
+npmAuthIdent: "{{{userAndPassword}}}"
+{{/hasBasic}}
+npmAlwaysAuth: {{{alwaysAuth}}}
+{{/defaultRegistry}}
+{{#hasScopes}}
+npmScopes:
+{{#scopes}}
+  "{{{scopeName}}}":
+    npmRegistryServer: "{{{registryUrl}}}"
+{{#hasToken}}
+    npmAuthToken: "{{{token}}}"
+{{/hasToken}}
+{{#hasBasic}}
+    npmAuthIdent: "{{{userAndPassword}}}"
+{{/hasBasic}}
+    npmAlwaysAuth: {{{alwaysAuth}}}
+{{/scopes}}
+{{/hasScopes}}

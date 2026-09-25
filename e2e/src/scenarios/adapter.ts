@@ -66,6 +66,15 @@ export interface ProtocolAdapter<F = unknown> {
   /** Lower-case runner/service name, e.g. `'maven'` | `'npm'` -- also `adapter.protocol` is what
    *  `scenariosFor`/`expectationFor` filter and look up by. */
   readonly protocol: string;
+  /**
+   * Which client of the protocol this adapter drives, when a protocol has several (RPS-1330: the
+   * npm registry under npm, pnpm, yarn and bun). It only changes the loop's test and describe titles
+   * (`npm[pnpm] > token-rw`); `protocol` stays what `scenariosFor`/`expectationFor` key off, so the
+   * catalog needs no change per client. Left out, titles are exactly `${protocol} > ...` as before.
+   */
+  readonly label?: string;
+  /** Extra tags on every test the loop registers for this adapter (e.g. `@pnpm`, to `--grep` one client). */
+  readonly tags?: readonly `@${string}`[];
   /** Used only in failure/log messages (e.g. "the real mvn deploy should succeed for ..."). */
   readonly client: { name: string; publishVerb: string; consumeVerb: string };
 

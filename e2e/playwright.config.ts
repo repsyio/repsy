@@ -62,6 +62,13 @@ export default defineConfig({
       testMatch: 'npm/**/*.spec.ts',
     },
     {
+      // The npm registry under the other npm-family clients too -- pnpm, yarn classic, yarn berry and
+      // bun, with npm as the baseline (README.md "npm-family clients", RPS-1330). Its own project and
+      // runner so `--protocol npm` stays exactly as small and fast as it is.
+      name: 'npm-clients',
+      testMatch: 'npm-clients/**/*.spec.ts',
+    },
+    {
       name: 'cargo',
       testMatch: 'cargo/**/*.spec.ts',
     },

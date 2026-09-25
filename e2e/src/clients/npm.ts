@@ -75,7 +75,7 @@ const PUBLISH_TIMEOUT_MS = 120_000;
 const CONSUME_TIMEOUT_MS = 120_000;
 const PACK_TIMEOUT_MS = 60_000;
 
-const MARKER_FILENAME = 'e2e-marker.txt';
+export const MARKER_FILENAME = 'e2e-marker.txt';
 
 async function renderTemplate(
   templateName: string,
@@ -401,7 +401,7 @@ export interface NpmFingerprint {
   versionTarballSha256: Record<string, string>;
 }
 
-async function fingerprint(world: World): Promise<NpmFingerprint> {
+export async function fingerprint(world: World): Promise<NpmFingerprint> {
   const admin = adminCredential();
   const packageName = world.publishTarget.packageName;
 
@@ -428,7 +428,7 @@ async function fingerprint(world: World): Promise<NpmFingerprint> {
   return { packumentSha256, versionTarballSha256 };
 }
 
-async function expectNothingStored(world: World, before: NpmFingerprint): Promise<void> {
+export async function expectNothingStored(world: World, before: NpmFingerprint): Promise<void> {
   const after = await fingerprint(world);
   expect(after, 'a refused publish must leave the package exactly as it was').toEqual(before);
 }

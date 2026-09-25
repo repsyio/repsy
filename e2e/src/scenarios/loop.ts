@@ -21,7 +21,9 @@
  * `scenarios/adapter.ts`) can reuse it verbatim: `registerPublishConsumeLoop(mavenAdapter)`,
  * `registerPublishConsumeLoop(npmAdapter)`, and so on. The test titles (`${adapter.protocol} >
  * ${scenario.id}`) and describe-block names (`${adapter.protocol} publish/consume[ (negative)]`)
- * keep the exact shape the maven suite always had, so its JUnit/HTML report is unchanged.
+ * keep the exact shape the maven suite always had, so its JUnit/HTML report is unchanged. An adapter
+ * that names its `label` (a protocol driven by several clients, RPS-1330) gets `npm[pnpm]` in place
+ * of `npm` in both; `protocol` still selects the scenarios.
  *
  * Every catalog scenario that applies to a protocol publishes and then consumes with the scenario's
  * credential, asserting the `Outcome` `expectationFor(scenario, adapter.protocol)` pins. Beyond the
@@ -108,6 +110,8 @@ function expectResolvedContent(w: World, published: AdapterResult, resolved: Ada
 /** Registers the whole scenario catalog for `adapter.protocol`, as two `test.describe` blocks. */
 export function registerPublishConsumeLoop<F>(adapter: ProtocolAdapter<F>): void {
   const remoteAuthBudget = new RemoteAuthBudget();
+  // `npm[pnpm]` when the adapter names a client (RPS-1330), plain `npm` otherwise.
+  const title = adapter.label ? `${adapter.protocol}[${adapter.label}]` : adapter.protocol;
 
   /** Publishes, then resolves, and checks everything the catalog pins for `scenario`. */
   async function runScenario(w: World, scenario: Scenario): Promise<void> {
@@ -150,31 +154,35 @@ export function registerPublishConsumeLoop<F>(adapter: ProtocolAdapter<F>): void
   }
 
   function registerScenario(scenario: Scenario): void {
-    test(`${adapter.protocol} > ${scenario.id}`, { tag: [...scenario.tags] }, async ({ world }) => {
-      test.skip(
-        target.isRemote && scenario.tags.includes('@local-only'),
-        'a @local-only scenario is skipped on a remote target',
-      );
+    test(
+      `${title} > ${scenario.id}`,
+      { tag: [...scenario.tags, ...(adapter.tags ?? [])] },
+      async ({ world }) => {
+        test.skip(
+          target.isRemote && scenario.tags.includes('@local-only'),
+          'a @local-only scenario is skipped on a remote target',
+        );
 
-      if (target.isRemote && scenario.tags.includes('@negative')) {
-        await remoteAuthBudget.reserve();
-      }
+        if (target.isRemote && scenario.tags.includes('@negative')) {
+          await remoteAuthBudget.reserve();
+        }
 
-      await runScenario(await world(scenario, adapter), scenario);
-    });
+        await runScenario(await world(scenario, adapter), scenario);
+      },
+    );
   }
 
   const scenarios = scenariosFor(SCENARIOS, adapter.protocol);
   const negativeScenarios = scenarios.filter((scenario) => scenario.tags.includes('@negative'));
   const otherScenarios = scenarios.filter((scenario) => !scenario.tags.includes('@negative'));
 
-  test.describe(`${adapter.protocol} publish/consume`, () => {
+  test.describe(`${title} publish/consume`, () => {
     for (const scenario of otherScenarios) {
       registerScenario(scenario);
     }
   });
 
-  test.describe(`${adapter.protocol} publish/consume (negative)`, () => {
+  test.describe(`${title} publish/consume (negative)`, () => {
     // Parallel on local/ci (the stack's own throttle is raised for exactly this, see
     // docker-compose.stack.yml); serial on remote, where it cannot be, so these scenarios' failed-auth
     // attempts spend the RemoteAuthBudget one at a time instead of bursting together.

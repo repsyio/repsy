@@ -65,15 +65,16 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
-  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" (the panel in headless Chromium, see "UI suite")
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" (the panel in headless Chromium, see "UI suite")
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
   docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
   docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui"
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle and gpg; see "Adding a protocol adapter" below
   runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
+  runners/npm-clients.Dockerfile  # + pinned pnpm, yarn classic, yarn berry (npm --prefix /opt/clients/<name>) and bun (copied from oven/bun); see "npm-family clients"
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
   runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
   runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image; no daemon, no socket
@@ -120,6 +121,7 @@ e2e/
       maven-adapter.ts           # mavenAdapter: the ProtocolAdapter object registerPublishConsumeLoop takes
       npm-raw.ts                  # npm-specific raw PUT/GET (packument/tarball), publish-document builder
       npm.ts                      # the npm client + npmAdapter: publish()/resolve()/seedPublish(), npm pack/publish/install
+      npm-family/                 # the npm-family clients (npm baseline, later pnpm/yarn/bun): NpmFamilyClient, config renderers + the sealed env, adapter, fixtures, wire recorder -- see "npm-family clients"
       pgp.ts                     # real OpenPGP.js key generation and detached signing, no gpg/network
       gpg.ts                     # a real `gpg` key in its own GNUPGHOME (RPS-1316): generate, export the public key, dispose
       maven-signing.ts           # a real `mvn deploy` with maven-gpg-plugin and a Gradle maven-publish + signing publish (RPS-1316)
@@ -150,6 +152,7 @@ e2e/
       maven/                     # mustache templates of the tiny jar project + settings.xml
       gradle/                    # mustache templates of the tiny library (publish) and its consumer, as build.gradle and build.gradle.kts; plugin/ holds the plugin fixture (its one class and the publish/consumer templates)
       npm/                       # mustache templates of the tiny package.json/index.js + .npmrc
+      npm-family/                # the same for the npm-family clients, plus .yarnrc, .yarnrc.yml and bunfig.toml
       cargo/                     # mustache templates of the tiny crate + consumer Cargo.toml + .cargo/config.toml
       nuget/                     # mustache templates of nuget.config + the consumer .csproj (the .nupkg itself is built in code, see nuget-raw.ts)
       docker/                    # config.template.json (DOCKER_CONFIG auths entry; the image itself is built in code, see docker-image.ts)
@@ -180,6 +183,11 @@ e2e/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
       unpublish.spec.ts         # real `npm unpublish` (RPS-1289): one version (unscoped/scoped), the only version, a whole package
+    npm-clients/
+      npm/publish-consume.spec.ts   # registerPublishConsumeLoop(npmFamilyAdapter(npmClient)): the catalog through the npm-family harness
+      versions.spec.ts          # --version of every installed client == its pin; config renderers read back by pnpm/yarn
+      sealed-network.spec.ts    # the network seal: a misconfigured registry fails fast for all five clients
+      matrix/*.spec.ts          # lockfile, dist-tags, deprecate, view, registry-endpoints (whoami/ping/search/audit), scoped-routing, tarball-host, abbreviated-metadata, wire
     cargo/
       publish-consume.spec.ts   # registerPublishConsumeLoop(cargoAdapter) + a hyphenated-crate-name real-client test
       registry-rules.spec.ts    # raw-HTTP pins of the duplicate-version/version-validation/config.json/name-normalisation rules
@@ -808,6 +816,162 @@ cast, so no shape can throw there again. `clients/npm-raw.ts`'s `buildPublishDoc
 `src/packages/npm/package.template.json` still always include `"keywords": []` (a real npm client's
 own normalised manifest almost always does too, and removing it to add a no-`keywords` redeploy
 scenario is tracked as a small follow-up, not required for this fix to be effective).
+
+## npm-family clients (RPS-1330)
+
+The npm registry under the other package managers that talk to it: **pnpm, yarn classic (1.x), yarn
+berry (4.x) and bun**, with **npm as the baseline column**. The plan is `RPS-1330`; this is its first
+PR (the harness and provisioning, npm as the only registered client). The other four are installed
+and version-smoke-tested here, and each gets its `NpmFamilyClient` in its own PR, which joins
+`ENABLED_CLIENTS` (`src/clients/npm-family/registry.ts`) and lights up every matrix cell for it.
+
+```bash
+./run.sh test --protocol npm-clients -b       # build the runner image, then everything (about 25 s warm)
+./run.sh test --protocol npm-clients --grep @smoke   # one publish + install round trip and one frozen lockfile cell (about 8 s)
+./run.sh test --protocol npm-clients --grep @pnpm    # one client (@npm @pnpm @yarn-classic @yarn-berry @bun)
+```
+
+It is its own runner and Playwright project, so `--protocol npm` stays exactly as small and fast as it
+is. It is opt-in like every protocol runner and is not part of a plain `./run.sh test`.
+
+### Provisioning (`runners/npm-clients.Dockerfile`)
+
+The first layers repeat `base.Dockerfile`'s (see the header of every runner Dockerfile for why), then
+each client goes under its own `/opt/clients/<name>`, **before** `COPY src`/`tests` (bind-mounted at run
+time anyway, so editing a test never rebuilds a client). The harness always calls a client by its
+**absolute path** (`CLIENT_BINARIES` in `clients/npm-family/client.ts`), never through `PATH` (the
+node image carries its own `yarn` 1.22 and the harness's own global `pnpm` is a different thing from
+the pnpm under test), and there is **no corepack** (it would download at run time and write a
+`packageManager` field into a fixture's `package.json`, changing the very tarball a test packs).
+Versions are compose build args, exported as `ENV NPM_CLIENTS_*_VERSION`, printed in the build log and
+checked against each client's own `--version` at build time and by `tests/npm-clients/versions.spec.ts`.
+
+| Client       | How it is installed                                                                                                                                                      | Pinned version (build arg)                                                                           | Resolved with                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| npm          | the `node:24-bookworm-slim` base's own                                                                                                                                   | 11.19.0 (not pinned: printed in the build log, the spec asserts major 11)                            | `npm --version`                                   |
+| pnpm         | `npm install -g --ignore-scripts --prefix /opt/clients/pnpm pnpm@…`                                                                                                      | `PNPM_CLIENT_VERSION` = **12.6.0** (one major only, on purpose; the harness's own pnpm stays 12.5.1) | `npm view pnpm dist-tags` (`latest`)              |
+| yarn classic | `… --prefix /opt/clients/yarn1 yarn@…`                                                                                                                                   | `YARN_CLASSIC_VERSION` = **1.22.22** (the frozen last release of the line)                           | `npm view yarn dist-tags` (`latest`)              |
+| yarn berry   | `… --prefix /opt/clients/yarn4 @yarnpkg/cli-dist@…`                                                                                                                      | `YARN_BERRY_VERSION` = **4.18.1**                                                                    | `npm view @yarnpkg/cli-dist dist-tags` (`latest`) |
+| bun          | `COPY --from=oven/bun:<v>-debian /usr/local/bin/bun /opt/clients/bun/bin/bun` (the cargo/golang/ruby "copy the toolchain" pattern; a glibc binary runs on bookworm-slim) | `BUN_VERSION` = **1.3.14**                                                                           | the newest `1.3.x-debian` tag of `oven/bun`       |
+
+To bump one: change its build arg in `docker-compose.runners.yml`, `./run.sh test --protocol
+npm-clients -b` (the Dockerfile fails the build when a client reports another version), then re-run the
+suite and read what changed. Every install is `--ignore-scripts`; `/opt/clients` is root-owned and
+world-readable, and the runner uses it as the host uid.
+
+### Layout
+
+```
+src/clients/npm-family/
+  client.ts          # NpmFamilyClient: the interface a matrix spec is written against, Capabilities, RegistryBinding, CLIENT_BINARIES
+  config.ts          # renders .npmrc / .yarnrc (yarn classic) / .yarnrc.yml (berry) / bunfig.toml from RegistryBinding[] + the SEALED env
+  npm-client.ts      # the npm CLI as an NpmFamilyClient (the baseline / reference implementation)
+  adapter.ts         # npmFamilyAdapter(client): a ProtocolAdapter (protocol 'npm', label + tag per client) for the shared catalog loop
+  registry.ts        # ENABLED_CLIENTS (what the matrix runs against), clientsWith('<capability>'), INSTALLED_CLIENTS, versionOf()
+  fixtures.ts        # package builders (single package, lib + app graph, extra manifest fields), publishPackage(), repo/token helpers
+  wire-recorder.ts   # in-process HTTP reverse proxy that records method/path/Accept/Authorization/UA/status/caching headers
+src/packages/npm-family/   # the mustache templates (header-less, triple-mustache everywhere)
+tests/npm-clients/
+  npm/publish-consume.spec.ts   # the 13-scenario catalog through the new harness: `npm[npm] > <scenario>`
+  versions.spec.ts              # --version of every installed client == its pin; config renderers read back by the client
+  sealed-network.spec.ts        # the network seal, proven for all five clients
+  matrix/*.spec.ts              # one file per matrix row, iterating clientsWith(...)
+```
+
+A matrix spec registers a cell only for a client that HAS the capability (`clientsWith('distTagCmd')`),
+never a `test.skip` (a skipped row per missing cell would be noise in every report); the table below
+lists the N/A cells. `ProtocolAdapter` gained two optional fields for this: `label` (`npm[pnpm] >
+token-rw` in the loop's titles; `protocol` stays `npm`, so `scenariosFor`/`expectationFor` and the
+catalog need no change per client) and `tags` (`@pnpm`, ...). `clients/npm.ts` only got `export` on
+`fingerprint`, `expectNothingStored` and `MARKER_FILENAME`; the `npm` runner is unchanged.
+
+### The network seal
+
+Every client invocation runs in `sealedEnv()` (`config.ts`): an allow-list env (never the runner's own,
+which carries the admin password), an isolated HOME, `HTTP_PROXY`/`HTTPS_PROXY` (both cases) at a dead
+loopback port and `NO_PROXY` = `new URL(env.repoBaseUrl).hostname` + `localhost` + `127.0.0.1`. The test
+packages depend only on each other (OS has no proxy repository), so anything a client reaches for beyond
+the registry under test -- registry.npmjs.org, repo.yarnpkg.com, a self-update check -- fails at once
+instead of silently succeeding against the internet. `tests/npm-clients/sealed-network.spec.ts` proves
+it for every client, by pointing each at `https://registry.npmjs.org/` (which the container CAN reach
+unsealed) and asserting a fast connection error to `127.0.0.1:9`; a flip check (empty proxy variables)
+makes the npm case reach the internet and go red. What probing found:
+
+- npm, bun and yarn classic honour the proxy environment. npm retries a refused connection with a 10 s
+  and then 60 s back-off (`--fetch-retries=0`, and the rendered `.npmrc` sets `fetch-retries=0`, keep a
+  test from spending 70 s failing); yarn classic retries three times (about 12 s, `--network-timeout`
+  does not shorten it) and `yarn info` exits **0** when it cannot reach the registry, so the case uses
+  `yarn add`.
+- **yarn berry ignores the proxy environment entirely**: with `HTTP_PROXY`/`NO_PROXY` alone it fetched
+  left-pad from registry.npmjs.org, and it has no `NO_PROXY`. Its seal is in `.yarnrc.yml`: dead
+  `httpProxy`/`httpsProxy`, a direct connection for each registry host (`networkSettings.<host>.
+httpProxy: ""`, the only way found to exempt one host from a global proxy) and `httpRetry: 0`.
+- **pnpm 12 is a native binary** with its own CLI (`--fetch-retries` is an unknown argument) and gives
+  up on a refused connection only after 70 s of back-off; `fetchRetries: 0` and `fetchRetryMintimeout`/
+  `fetchRetryMaxtimeout` in `pnpm-workspace.yaml` make it fail in about 100 ms.
+
+The seal cases prove the failure side. Each client's success side (its `NO_PROXY` exemption for the
+registry under test) is exercised the first time that client publishes and installs through
+`sealedEnv()`: npm's is every test of this suite; the other four were probed by hand here (pnpm, bun and
+berry each answered `whoami` from the stack) and are covered by their own PRs.
+
+### Matrix (npm baseline; cells for the other clients are added by their PRs)
+
+| Row                                           | Spec                                          | npm cell                                          | Notes                                                                                                                                           |
+| --------------------------------------------- | --------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| catalog loop (13 scenarios)                   | `npm/publish-consume.spec.ts`                 | pass; `@smoke`: `password-admin`                  | the same catalog as `tests/npm`, through the new adapter                                                                                        |
+| 5b dependency graph                           | `matrix/lockfile.spec.ts`                     | pass                                              | app -> lib, both in one private repo, read-only token consumer                                                                                  |
+| 5c lockfile + frozen install                  | `matrix/lockfile.spec.ts`                     | pass, `@smoke`                                    | `package-lock.json` names the registry's own tarball URLs and integrity; `npm ci` in a fresh HOME works                                         |
+| 5d frozen install after an override republish | `matrix/lockfile.spec.ts`                     | pass (`EINTEGRITY`)                               | packument `integrity` is recomputed from the stored bytes, so `allowOverride` breaks every lockfile that recorded the version                   |
+| 6 dist-tags                                   | `matrix/dist-tags.spec.ts`                    | pass                                              | first publish under `--tag beta` also sets `latest`; add/ls/rm; `rm latest` and a tag on a missing version are refused                          |
+| 7 deprecate                                   | `matrix/deprecate.spec.ts`                    | pass                                              | served in the full and the abbreviated packument, printed on install (`npm warn deprecated`), cleared by an empty message                       |
+| 9 view / info                                 | `matrix/view.spec.ts`                         | pass                                              | `dist.tarball` is the registry address (RPS-1333); `time` is ISO UTC and is now (B5 would show here on a non-UTC stack); RPS-1357 pin           |
+| 2 whoami                                      | `matrix/registry-endpoints.spec.ts`           | pass (RPS-1329)                                   | `admin` for the password, the deploy token's own generated username for a token; anonymous is 401 with a Basic challenge even on a public repo  |
+| ping, search                                  | `matrix/registry-endpoints.spec.ts`           | pass (RPS-1329)                                   | free-text search only: no qualifier-only query (RPS-1343), no `size`/`from` (RPS-1344)                                                          |
+| 10 audit                                      | `matrix/registry-endpoints.spec.ts`           | pass (RPS-1329)                                   | exit 0, no vulnerabilities, and the recorder sees `POST /-/npm/v1/security/advisories/bulk` answered 200; the scanner is off, no Trivy involved |
+| 16 two repos, two scopes                      | `matrix/scoped-routing.spec.ts`               | pass                                              | the recorder proves token A only ever goes to repo A and token B to repo B, tarball GETs included                                               |
+| 17 `dist.tarball` host                        | `matrix/tarball-host.spec.ts` (`@local-only`) | pass (RPS-1333)                                   | published via `127.0.0.1`, consumed via `localhost` on a private repo: installs, and every read names `REPO_BASE_URL`                           |
+| 18 abbreviated packument                      | `matrix/abbreviated-metadata.spec.ts`         | RPS-1356 pin; npm skips a mismatched optional dep | see below                                                                                                                                       |
+| 19 wire trace                                 | `matrix/wire.spec.ts`                         | pass; RPS-1358, RPS-1359 pins                     | Accept, Authorization scheme (Bearer for a token, Basic for a password), User-Agent, `npm-command`                                              |
+| workspaces (11), login (2b), `unpublish` (8)  | --                                            | not in this PR                                    | 8 is `tests/npm/unpublish.spec.ts`; 11 comes with the pnpm/yarn/bun PRs, 2b is optional                                                         |
+
+N/A by design: proxy/remote passthrough (row 12: OS has no npm proxy repository, so no fixture ever
+depends on a public package).
+
+### Hypotheses probed live for this PR (the plan's H-n, observed)
+
+| H             | Plan                                                                                                          | Observed                                                                                                                                                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H-9           | the client asks for the abbreviated packument                                                                 | **refuted for npm 11.19**: an install sends `Accept: application/json` (the full packument) and `npm view` the same, so npm never reads the abbreviated document. Pinned in `matrix/wire.spec.ts`                      |
+| H-14          | a frozen install fails after an override republish                                                            | confirmed for npm: `EINTEGRITY`, nothing installed                                                                                                                                                                     |
+| H-15          | a client installs an `os:["win32"]` optional dependency on linux because the abbreviated packument lacks `os` | **refuted for npm**: npm still skips it (it reads `os`/`cpu` from the tarball's own manifest after fetching it; the lockfile records them). The abbreviated gap itself is real RPS-1356                                |
+| H-16/17 (B1)  | consumers get a foreign tarball host and 401                                                                  | fixed by RPS-1333: publish via `127.0.0.1`, consume via `localhost` on a private repo succeeds                                                                                                                         |
+| H-19          | the deprecation message is printed on install                                                                 | confirmed for npm                                                                                                                                                                                                      |
+| H-11 (partly) | bun reads `.npmrc`                                                                                            | confirmed by hand: bun 1.3.14 and pnpm 12.6.0 read `registry` + `_authToken` from `$HOME/.npmrc` alone (`whoami`, `view` of a private package)                                                                         |
+| H-3 (partly)  | yarn classic sends no auth unless always-auth                                                                 | not tested; but with only a `$HOME/.npmrc` naming the registry, `yarn config get registry` prints registry.yarnpkg.com, so yarn classic needs `.yarnrc` (rendered and read back by `versions.spec.ts`) or `--registry` |
+| H-7 (partly)  | yarn berry needs `npmAlwaysAuth` for an unscoped private read                                                 | confirmed by hand: `yarn npm info <pkg>` on a private repo without it is `YN0041: Invalid authentication (as an anonymous user)`, while `yarn npm whoami` (explicitly authenticated) works                             |
+| H-20, 18      | `npm login` fallback, npm workspaces                                                                          | not probed here                                                                                                                                                                                                        |
+
+### Backend candidates found (npm baseline; file a ticket for each, then replace the placeholder)
+
+- **RPS-1356**: the abbreviated packument (`Accept: application/vnd.npm.install-v1+json`) drops
+  `os`, `cpu`, `libc`, `peerDependenciesMeta` and `funding` (the full one, the control, has all of them).
+  `AbstractNpmStorageService.createAbbreviatedMetadata` copies a fixed field list. Pinned in
+  `matrix/abbreviated-metadata.spec.ts`. npm 11.19 does not read this document; the alternative clients
+  do (their PRs decide the user-visible effect).
+- **RPS-1357**: the full packument carries `_attachments` -- the base64 body of the **most recent
+  publish's tarball** -- and npm's `_from`/`_resolved` (the publisher's local tarball path) in every
+  read; the public registry serves none of them. A packument grows by its latest tarball on every
+  read and leaks the publisher's file system paths. Pinned in `matrix/view.spec.ts`.
+- **RPS-1358**: npm `HEAD` answers 200 for any path of an existing repository, including a
+  package that does not exist (`GET` of it is 404). Pinned in `matrix/wire.spec.ts` (the same class as the
+  PyPI/Ruby HEAD findings; B6 of the plan).
+- **RPS-1359**: a packument answers with no `ETag`, no `Last-Modified`, no `Vary: Accept` (the
+  abbreviated and the full document share one URL) and no compression, so a client cannot revalidate its
+  metadata cache. Pinned in `matrix/wire.spec.ts` (B8 of the plan).
+
+Not asserted as fixed, still open: RPS-1343 (a qualifier-only search matches everything), RPS-1344
+(`size`/`from` are not clamped), RPS-1345 (audit findings query performance).
 
 ## Cargo runner
 
@@ -3597,6 +3761,7 @@ pnpm exec prettier --check .
 ./run.sh test --protocol maven   # again, without resetting the stack — proves run isolation
 ./run.sh test --protocol npm
 ./run.sh test --protocol npm     # again — proves run isolation for npm too
+./run.sh test --protocol npm-clients -b   # the npm-family clients (RPS-1330), twice like the others
 ./run.sh test --protocol cargo
 ./run.sh test --protocol cargo   # again — proves run isolation for cargo too
 ./run.sh test --protocol nuget
