@@ -45,8 +45,14 @@ import { expect, test } from '../../../src/scenarios/fixtures.js';
 import { target } from '../../../src/target.js';
 import type { ClientId } from '../../../src/clients/npm-family/client.js';
 
-/** Clients whose lockfile records no tarball URL for a conventional one (pnpm), only integrity. */
-const LOCKFILE_HAS_NO_TARBALL_URL: ReadonlySet<ClientId> = new Set<ClientId>(['pnpm']);
+/**
+ * Clients whose lockfile records no tarball URL for a conventional one, only integrity (pnpm), or that
+ * pin one (`__archiveUrl`) only when the packument's differs from the URL they build themselves (berry).
+ */
+const LOCKFILE_HAS_NO_TARBALL_URL: ReadonlySet<ClientId> = new Set<ClientId>([
+  'pnpm',
+  'yarn-berry',
+]);
 
 /** The other name of the local registry: `127.0.0.1` for `localhost`, and the reverse. */
 function alternateBase(base: string): string {
