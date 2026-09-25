@@ -102,7 +102,8 @@ public class UntaggedManifestCleanupService {
     final var untagged = this.untaggedManifestFinder.findUntagged(image.getId());
 
     if (untagged.isEmpty()) {
-      // An image with no manifest at all (a push that failed after it created the image) goes too.
+      // An image with no manifest at all goes too: only an image an earlier version left behind (a
+      // push that failed after it created the image) can be one, since RPS-1350.
       this.imageService.deleteImageIfEmpty(repoInfo.getStorageKey(), image.getId());
 
       return new Result(0, 0L);

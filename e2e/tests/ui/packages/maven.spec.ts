@@ -27,7 +27,7 @@ import type { Page } from '@playwright/test';
 import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
-import { rawGet } from '../../../src/clients/maven-raw.js';
+import { groupPath, rawGet, repoTree, versionDir } from '../../../src/clients/maven-raw.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { registerPackageScenarios, rowKeys } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
@@ -331,6 +331,78 @@ test.describe('Maven group page', { tag: '@packages' }, () => {
     await list.expectRow(other);
     await expect(list.rows()).toHaveCount(1);
   });
+
+  // RPS-1349: the "root group" delete (`com.acme` prefixes every other group of the repo). The database
+  // removes only the artifacts with that exact group name, and so must the storage: the nested group
+  // `com.acme.sub` keeps its rows and every one of its files, and nothing of the root group is orphaned.
+  test('PKG-maven-04 deleting a root group removes exactly what the dialog counts and keeps the nested group', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+    seedVersions,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    // Root group: `alpha` with two versions and its sibling `beta` with one (2 artifacts, 3 versions).
+    const [alpha] = await seedVersions(repo, ['1.0.0', '2.0.0']);
+    const beta = await seedPackage(repo, { name: maven.levels.sublist!.siblingName!(alpha, 1) });
+    const [group] = alpha.name.split(':');
+    // The nested group `<root>.sub`: `gamma` with two versions, its own group.
+    const nestedGroup = `${group}.sub`;
+    const [gamma] = await seedVersions(repo, ['1.0.0', '2.0.0'], { name: `${nestedGroup}:gamma` });
+    const list = protocolPages(adminPage, maven, repo.name).list();
+    await list.goto();
+    await list.expectRow(alpha);
+    await list.expectRow(beta);
+    await list.expectRow(gamma);
+
+    const nestedFiles = (tree: Record<string, string>) =>
+      Object.fromEntries(
+        Object.entries(tree).filter(([file]) => file.startsWith(`${groupPath(nestedGroup)}/`)),
+      );
+    const before = await repoTree(repo.name);
+    const nestedBefore = nestedFiles(before);
+    // jar, pom (x2 versions) and the artifact metadata: the nested group has files to lose.
+    expect(Object.keys(nestedBefore).length).toBeGreaterThanOrEqual(5);
+    expect(Object.keys(before).length).toBeGreaterThan(Object.keys(nestedBefore).length);
+
+    // The dialog counts the root group's own artifacts and versions, not the nested group's.
+    const dialog = await list.openDeleteDialog(alpha);
+    await expect(dialog.message).toContainText(`The whole group ${group} will be deleted`);
+    await expect(dialog.message).toContainText('2 artifacts and 3 versions');
+    await dialog.confirm();
+    await list.toasts.expectSuccess('Group deleted successfully');
+
+    // The panel: the root group's rows are gone, the nested group's stay.
+    await list.expectNoRow(alpha);
+    await list.expectNoRow(beta);
+    await list.expectRow(gamma);
+    await expect(list.rows()).toHaveCount(1);
+
+    // The storage agrees with the panel: the nested group's files are all there, byte for byte, and
+    // nothing else is left (no orphaned file of the root group).
+    const after = await repoTree(repo.name);
+    expect(after).toEqual(nestedBefore);
+    for (const artifact of [alpha, beta]) {
+      const pom = `${versionDir(group, artifact.name.split(':')[1], artifact.version)}/${artifact.name.split(':')[1]}-${artifact.version}.pom`;
+      const served = await rawGet(repo.name, adminCredential(), `/${pom}`);
+      expect(served.status).toBe(404);
+    }
+    const gammaPom = `${versionDir(nestedGroup, 'gamma', '1.0.0')}/gamma-1.0.0.pom`;
+    expect((await rawGet(repo.name, adminCredential(), `/${gammaPom}`)).status).toBe(200);
+
+    // And the nested group is still a working group: its detail loads, and its own summary counts stay.
+    const detail = protocolPages(adminPage, maven, repo.name).detail(gamma);
+    await detail.goto();
+    await expect(detail.byId('pkg-detail-meta-group')).toContainText(nestedGroup);
+    const nestedList = protocolPages(adminPage, maven, repo.name).list();
+    await nestedList.goto();
+    const nestedDialog = await nestedList.openDeleteDialog(gamma);
+    await expect(nestedDialog.message).toContainText(
+      `The whole group ${nestedGroup} will be deleted`,
+    );
+    await expect(nestedDialog.message).toContainText('1 artifact and 2 versions');
+    await nestedDialog.cancel();
+  });
 });
 
 test.describe('Maven version detail', { tag: '@packages' }, () => {
@@ -356,6 +428,93 @@ test.describe('Maven version detail', { tag: '@packages' }, () => {
       ['purl', 'Purl', `pkg:maven/${group}/${artifact}@${version}`],
       ['bazel', 'Bazel', `artifact = "${group}:${artifact}:${version}"`],
     ] as const;
+
+  // RPS-1348: the last version of the only artifact of a group takes the artifact and the group with it
+  // (the server answers GROUP), so the confirmation says so; a version that is not that one does not.
+  const ONLY_VERSION_OF = (artifact: string): string => `This is the only version of ${artifact}`;
+  const GROUP_GOES_TOO = 'the artifact and the group are removed too';
+
+  test("PKG-maven-04 the detail of the last version of a group's only artifact says the artifact and the group go too", async ({
+    adminPage,
+    seeder,
+    seedPackage,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    const pkg = await seedPackage(repo);
+    const [group, artifact] = pkg.name.split(':');
+    const pages = protocolPages(adminPage, maven, repo.name);
+    const detail = pages.detail(pkg);
+    await detail.goto();
+
+    const dialog = await detail.openDeleteDialog();
+    await expect(dialog.message).toContainText(ONLY_VERSION_OF(artifact));
+    await expect(dialog.message).toContainText(`only artifact of the group ${group}`);
+    await expect(dialog.message).toContainText(GROUP_GOES_TOO);
+    // Cancelling deletes nothing.
+    await dialog.cancel();
+    await dialog.expectClosed();
+    await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}/${group}/${artifact}/`));
+    expect(Object.keys(await repoTree(repo.name)).length).toBeGreaterThan(0);
+
+    // What the dialog said happens: the package list is empty, and so is the storage (no group left).
+    await detail.openDeleteDialog();
+    await dialog.confirm();
+    await detail.toasts.expectSuccess('Version deleted successfully');
+    await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
+    const list = pages.list();
+    await list.goto();
+    await expect(list.emptyList.root).toBeVisible();
+    expect(await repoTree(repo.name)).toEqual({});
+  });
+
+  test('PKG-maven-04 the detail dialog stays plain when the version is not the last of the only artifact of its group', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+    seedVersions,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    // `many` has two versions; `only` is the last version of its artifact but has a sibling in its group.
+    const [many] = await seedVersions(repo, ['1.0.0', '2.0.0']);
+    const only = await seedPackage(repo, { name: maven.levels.sublist!.siblingName!(many, 1) });
+    const pages = protocolPages(adminPage, maven, repo.name);
+
+    for (const target of [many, only]) {
+      const detail = pages.detail(target);
+      await detail.goto();
+      const dialog = await detail.openDeleteDialog();
+      await expect(dialog.message).toHaveCount(0);
+      await dialog.cancel();
+      await dialog.expectClosed();
+    }
+  });
+
+  test('PKG-maven-04 the versions list says the same for its last version, and deleting it lands on the package list', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    const pkg = await seedPackage(repo);
+    const artifact = pkg.name.split(':')[1];
+    const pages = protocolPages(adminPage, maven, repo.name);
+    const versions = pages.versions(pkg);
+    await versions.goto();
+    await versions.expectRow(pkg);
+
+    const dialog = await versions.openDeleteDialog(pkg);
+    await expect(dialog.message).toContainText(ONLY_VERSION_OF(artifact));
+    await expect(dialog.message).toContainText(GROUP_GOES_TOO);
+    await dialog.cancel();
+    await dialog.expectClosed();
+    await versions.expectRow(pkg);
+
+    await versions.deleteRow(pkg);
+    await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
+    const list = pages.list();
+    await list.goto();
+    await expect(list.emptyList.root).toBeVisible();
+  });
 
   // RPS-1296: the API's `artifactVersionName` used to be the artifact's latest version, so every
   // snippet (and the Delete button) of an older version's detail named the latest one.

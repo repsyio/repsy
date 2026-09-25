@@ -40,6 +40,7 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
 import { SecurityService } from '../../../../security/service/security.service';
 import { GolangConfigComponent } from '../../config/golang-config.component';
 import { GolangService } from '../../service/golang.service';
@@ -158,11 +159,12 @@ export class GolangModuleVersionListComponent implements OnDestroy {
         )
         .subscribe({
           next: () => {
-            if (this.versions.length - 1 === 0) {
+            if (emptiesList(this.versions.length, this.pageNum, this.searchText)) {
               this.router.navigateByUrl('/' + this.activeRepo.repoName).then(() => {
                 this.toastService.show('Version deleted successfully', 'success');
               });
             } else {
+              this.pageNum = pageAfterDelete(this.versions.length, this.pageNum);
               this.refreshPage();
               this.toastService.show('Version deleted successfully', 'success');
             }

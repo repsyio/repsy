@@ -34,6 +34,7 @@ import { landAfterVersionDelete } from '../../../../../shared/util/version-delet
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { DeletedItem } from '../../dto/deleted-item';
 import { MavenService } from '../../service/maven.service';
+import { showVersionDeleteDialog } from '../../util/version-delete-warning.util';
 
 @Component({
   selector: 'app-maven-artifacts-version-detail',
@@ -162,29 +163,33 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
   }
 
   public deleteVersion() {
-    this.dangerModalService.show('Delete Version', 'Delete', () => {
-      this.loading = true;
-      this.mavenService
-        .deleteVersion(this.groupName, this.artifactName, this.version.artifactVersionName)
-        .pipe(
-          finalize(() => {
-            this.loading = false;
-          }),
-        )
-        .subscribe({
-          // The server says what went with the version: the last version of an artifact takes the artifact
-          // (and the last artifact of a group takes the group) with it.
-          next: (deletedItem) => {
-            landAfterVersionDelete(
-              this.router,
-              this.route,
-              this.toastService,
-              this.activeRepo.repoName,
-              deletedItem !== DeletedItem.VERSION,
-            );
-          },
-          error: () => {},
-        });
+    this.mavenService.getVersionDeleteWarning(this.groupName, this.artifactName).subscribe((warning) => {
+      showVersionDeleteDialog(this.dangerModalService, warning, () => this.confirmDeleteVersion());
     });
+  }
+
+  private confirmDeleteVersion() {
+    this.loading = true;
+    this.mavenService
+      .deleteVersion(this.groupName, this.artifactName, this.version.artifactVersionName)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        // The server says what went with the version: the last version of an artifact takes the artifact
+        // (and the last artifact of a group takes the group) with it.
+        next: (deletedItem) => {
+          landAfterVersionDelete(
+            this.router,
+            this.route,
+            this.toastService,
+            this.activeRepo.repoName,
+            deletedItem !== DeletedItem.VERSION,
+          );
+        },
+        error: () => {},
+      });
   }
 }

@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.docker.shared.image.services;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.docker.shared.image.dtos.ImageInfo;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
@@ -24,8 +25,8 @@ import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerReposi
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
-import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
 import java.time.Instant;
 import java.util.List;
@@ -51,26 +52,36 @@ public class ImageTxService implements ImageService<UUID> {
   private final TagRepository tagRepository;
   private final ManifestRepository manifestRepository;
 
+  /**
+   * The image, created when it is not there. Runs in the caller's transaction, so a manifest push
+   * that creates the image and then fails rolls the image back with everything else (RPS-1350).
+   *
+   * <p>The insert skips a row that exists instead of failing on the unique index, so two first
+   * pushes into one new image never fail on it: the second waits for the first transaction, and
+   * uses its image when it commits or creates the image itself when it rolls back.
+   *
+   * @throws ImageDeletedException if the image that made the insert skip is gone again by the time
+   *     it is read (its last manifest was deleted): the caller runs the save again
+   */
   @Override
   @Transactional
   public ImageInfo findOrCreateImage(final UUID repoId, final String imageName) {
 
-    final var imageOpt = this.imageRepository.findByRepoIdAndName(repoId, imageName);
+    final var existing = this.imageRepository.findByRepoIdAndName(repoId, imageName);
 
-    if (imageOpt.isPresent()) {
-      return this.imageConverter.toImageInfo(imageOpt.get());
+    if (existing.isPresent()) {
+      return this.imageConverter.toImageInfo(existing.get());
     }
 
-    final var repo = new Repo();
-    repo.setId(repoId);
+    this.imageRepository.insertIfAbsent(
+        UuidCreator.getTimeOrderedEpoch(), repoId, imageName, Instant.now());
 
-    final var image = new Image();
-    image.setName(imageName);
-    image.setRepo(repo);
+    final var image =
+        this.imageRepository
+            .findByRepoIdAndName(repoId, imageName)
+            .orElseThrow(() -> new ImageDeletedException(imageName));
 
-    final var savedImage = this.imageRepository.save(image);
-
-    return this.imageConverter.toImageInfo(savedImage);
+    return this.imageConverter.toImageInfo(image);
   }
 
   /**
@@ -184,7 +195,7 @@ public class ImageTxService implements ImageService<UUID> {
 
     return this.imageRepository
         .findAllByRepoIdAndContainsName(repo.getId(), imageName, pageable)
-        .map(this.imageConverter::toDto);
+        .map(this::toDto);
   }
 
   /**
@@ -197,8 +208,22 @@ public class ImageTxService implements ImageService<UUID> {
 
     return this.imageRepository
         .findListItemByRepoIdAndName(repoId, imageName)
-        .map(this.imageConverter::toDto)
+        .map(this::toDto)
         .orElseThrow(() -> new ItemNotFoundException("imageNotFound"));
+  }
+
+  /**
+   * The list item with what the image stores only for untagged manifests, which the cleanup and
+   * this count both take from the whole index graph of the image (RPS-1350).
+   */
+  private io.repsy.os.generated.model.ImageListItem toDto(
+      final io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem item) {
+
+    final var dto = this.imageConverter.toDto(item);
+    final var untagged = this.imageRepository.findUntaggedStatsByImageId(item.getId());
+
+    return dto.untaggedManifestCount(Math.toIntExact(untagged.getManifestCount()))
+        .untaggedSize(untagged.getSize());
   }
 
   @Override

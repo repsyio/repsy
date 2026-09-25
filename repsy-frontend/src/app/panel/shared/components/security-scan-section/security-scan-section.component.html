@@ -99,6 +99,10 @@
       }
     </div>
 
+    @if (selectedScan?.status === ScanStatus.Failed) {
+      <app-scan-failure-reason class="mb-4 block" [message]="selectedScan?.errorMessage" />
+    }
+
     @if (findingsTotalCount > 0) {
       <div class="mb-6 flex flex-wrap gap-2">
         @if (selectedScanSeverityCounts.criticalCount > 0) {

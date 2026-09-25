@@ -668,6 +668,73 @@ what is verified and where keys are looked up:
   `keyserver.ubuntu.com` or `keys.openpgp.org`), so no network call and no timeout wait. Defaults to
   on.
 
+### Apache Ivy Clients
+
+The web UI's Maven configuration dialog shows this setup with your repository URL and username filled
+in. Apache Ivy reads a Maven repository through an `ibiblio` resolver in Maven-compatible mode; put
+this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-repo` the repository):
+
+```xml
+<ivysettings>
+  <settings defaultResolver="repsy"/>
+  <credentials host="repo.example.com"
+               realm="Repsy Managed Repository"
+               username="YOUR_USERNAME"
+               passwd="YOUR_PASSWORD"/>
+  <resolvers>
+    <ibiblio name="repsy" m2compatible="true" root="https://repo.example.com/my-repo/"/>
+  </resolvers>
+</ivysettings>
+```
+
+- **Credentials:** Ivy looks them up by host (without the port) and realm. Repsy challenges with
+  `Basic realm="Repsy Managed Repository"`, so `realm` must be exactly that: a `<credentials>` without
+  a realm (or with another one) sends no credentials and every request is answered `401`. With a
+  [deploy token](#repository-access), use it as `passwd`; the `username` can be empty.
+- **Publishing needs a POM.** A version is registered (and shows up in the web UI) by its POM, so list
+  a `pom` artifact next to the jar in the `<publications>` of your `ivy.xml` and create it with
+  `ivy:makepom`:
+
+  ```xml
+  <ivy-module version="2.0">
+    <info organisation="com.example" module="my-lib" revision="1.0.0"/>
+    <configurations>
+      <conf name="default"/>
+    </configurations>
+    <publications>
+      <artifact name="my-lib" type="jar" ext="jar" conf="default"/>
+      <artifact name="my-lib" type="pom" ext="pom" conf="default"/>
+    </publications>
+  </ivy-module>
+  ```
+
+  ```xml
+  <project name="my-lib" xmlns:ivy="antlib:org.apache.ivy.ant">
+    <target name="publish">
+      <ivy:settings file="ivysettings.xml"/>
+      <ivy:resolve file="ivy.xml"/>
+      <ivy:makepom ivyfile="ivy.xml" pomfile="build/my-lib.pom"/>
+      <ivy:publish resolver="repsy" pubrevision="1.0.0" publishivy="false" overwrite="true">
+        <artifacts pattern="build/[artifact].[ext]"/>
+      </ivy:publish>
+    </target>
+  </project>
+  ```
+
+- **`publishivy="false"`** on `ivy:publish` (it is an attribute of the task, not of the resolver).
+  Otherwise Ivy uploads its own ivy file onto the POM path, which Repsy refuses with
+  `400 invalidArtifactPath`.
+- **`overwrite="true"`:** Ivy first asks with a `HEAD` request whether a file exists, and Repsy answers
+  `HEAD` with `200` for any Maven path (RPS-1368), so without it Ivy stops with "destination file exists
+  and overwrite == false". Whether a version may be deployed again is still decided by Repsy.
+- **Reading:** the same `ivysettings.xml` resolves dependencies. A dependency on an artifact published
+  like this uses the `default` configuration (`conf="default->default"`); the default `*` also asks for
+  the `sources` and `javadoc` artifacts that the artifact does not have.
+- **No `maven-metadata.xml`:** Repsy stores the `maven-metadata.xml` a client uploads but never
+  generates one. An Ivy, sbt or raw `PUT` publish has none, so Maven `LATEST` and version ranges, and
+  Gradle/sbt dynamic versions, do not resolve for such artifacts. Ivy itself falls back to the
+  directory listing (`latest.integration` and `[1.0,)` resolve), so use fixed versions everywhere else.
+
 ### Authenticating from CI
 
 Prefer a [deploy token](#repository-access) for CI jobs, build servers and anything else that

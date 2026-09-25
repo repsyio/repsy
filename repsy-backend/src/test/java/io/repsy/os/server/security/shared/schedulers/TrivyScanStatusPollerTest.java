@@ -15,7 +15,9 @@
  */
 package io.repsy.os.server.security.shared.schedulers;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -38,6 +40,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class TrivyScanStatusPollerTest {
 
@@ -199,6 +202,29 @@ class TrivyScanStatusPollerTest {
     verify(this.txService).recordScanFailure(scan.getId(), "Scan exceeded maximum duration");
     verify(this.statusClient, never()).fetchStatus(any());
     verifyNoMoreInteractions(this.txService);
+  }
+
+  @Test
+  void aScanOverTheMaximumDurationWhoseRowIsGoneShouldNotStopThePollOfTheScansAfterIt() {
+
+    final var vanished = new VulnerabilityScan();
+    vanished.setId(UUID.randomUUID());
+    vanished.setStatus(ScanStatus.RUNNING);
+    vanished.setCreatedAt(Instant.now());
+    vanished.setStartedAt(Instant.now().minusSeconds(MAX_SCAN_DURATION_SECONDS + 1));
+    final var healthy = new VulnerabilityScan();
+    healthy.setId(UUID.randomUUID());
+    healthy.setStatus(ScanStatus.QUEUED);
+    healthy.setCreatedAt(Instant.now());
+    when(this.repository.findAllByStatusIn(any())).thenReturn(List.of(vanished, healthy));
+    doThrow(new DataIntegrityViolationException("scan row gone"))
+        .when(this.txService)
+        .recordScanFailure(vanished.getId(), "Scan exceeded maximum duration");
+    this.scannerReports(healthy, ScanJobStatus.RUNNING, null, null);
+
+    assertThatCode(this.poller::pollActiveScans).doesNotThrowAnyException();
+
+    verify(this.txService).markRunning(healthy.getId());
   }
 
   private VulnerabilityScan activeScan(final ScanStatus status) {

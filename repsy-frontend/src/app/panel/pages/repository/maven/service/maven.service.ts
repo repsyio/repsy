@@ -15,8 +15,8 @@
 ///
 
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { map, tap } from 'rxjs/operators';
+import { BehaviorSubject, Observable, of } from 'rxjs';
+import { catchError, map, switchMap, tap } from 'rxjs/operators';
 
 import {
   ArtifactListItem,
@@ -31,8 +31,13 @@ import {
 } from '../../../../../../generated/api';
 import { PagedData } from '../../../../shared/dto/paged-data';
 import { Sort } from '../../../../shared/dto/sort';
+import { isLastVersion, VERSION_PROBE_SIZE } from '../../../../shared/util/version-delete-landing.util';
 import { DeletedItem } from '../dto/deleted-item';
 import { FsItemInfo } from '../dto/fs-item-info';
+import { lastVersionOfGroupWarning } from '../util/version-delete-warning.util';
+
+/** The probe's sort: the versions of a Maven artifact sort by `versionName` (the shared probe sort is no column here). */
+const MAVEN_VERSION_PROBE_SORT: Sort = { name: 'Newest', column: 'versionName', type: 'DESC' };
 
 @Injectable({
   providedIn: 'root',
@@ -149,6 +154,29 @@ export class MavenService {
   /** What deleting the group removes: how many artifacts and versions it holds. */
   public getGroupSummary(groupName: string): Observable<MavenGroupSummary> {
     return this.mavenGroupControllerService.getMavenGroupSummary(groupName, this.repoName).pipe(map((r) => r.data!));
+  }
+
+  /**
+   * What the confirmation of deleting a version has to add (RPS-1348): the warning when it is the artifact's
+   * last version and the artifact is the only one of its group, as the server then removes both with it;
+   * `null` when only the version goes. Read from the versions probe and the group summary; a probe that
+   * fails asks for nothing more than the plain confirmation.
+   */
+  public getVersionDeleteWarning(groupName: string, artifactName: string): Observable<string | null> {
+    return this.searchArtifactVersions(
+      groupName,
+      artifactName,
+      '',
+      MAVEN_VERSION_PROBE_SORT,
+      0,
+      VERSION_PROBE_SIZE,
+    ).pipe(
+      switchMap((probe) => (isLastVersion(probe) ? this.getGroupSummary(groupName) : of(null))),
+      map((summary) =>
+        summary && summary.artifactCount === 1 ? lastVersionOfGroupWarning(groupName, artifactName) : null,
+      ),
+      catchError(() => of(null)),
+    );
   }
 
   public deleteGroup(groupName: string): Observable<DeletedItem> {

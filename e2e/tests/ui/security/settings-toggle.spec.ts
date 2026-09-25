@@ -45,7 +45,9 @@ test.describe('SEC-02c Vulnerability Scanning setting', { tag: MOCKED }, () => {
       const settings = new RepoSettingsPage(adminPage, repo.name);
       const scanning = new VulnerabilityScanningSection(adminPage);
 
-      // The e2e default: no scanner at all, so no section.
+      // The e2e default: no scanner at all, so no section. Stubbed, not assumed, so that the test also
+      // holds on the scanner stack (the stub scanner supports maven, npm, pypi and docker there).
+      await stubSupportedRepoTypes(adminPage, []);
       await settings.goto();
       await expect(settings.visibility.root).toBeVisible();
       await expect(scanning.root).toHaveCount(0);

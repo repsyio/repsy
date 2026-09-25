@@ -238,8 +238,10 @@ export class PanelApi {
   }
 
   /** `GET /api/security/scans/summary`: findings per severity over the latest completed scan of every version (admin only). */
-  async securityScansSummary(): Promise<SecurityScansSummary> {
-    const res = await this.client.securityScanController.getSecurityScansSummary({});
+  async securityScansSummary(
+    filter: { repoType?: RepoType; repoName?: string } = {},
+  ): Promise<SecurityScansSummary> {
+    const res = await this.client.securityScanController.getSecurityScansSummary(filter);
     return unwrap(res.data, 'getSecurityScansSummary');
   }
 

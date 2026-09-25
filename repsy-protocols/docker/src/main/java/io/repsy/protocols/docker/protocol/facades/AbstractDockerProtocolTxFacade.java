@@ -46,6 +46,7 @@ import io.repsy.protocols.docker.shared.tag.dtos.ManifestDetails;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestList;
+import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
 import io.repsy.protocols.docker.shared.utils.DockerConstants;
@@ -139,14 +140,19 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
   }
 
   @Override
-  public String saveManifest(
-      final ProtocolContext context, final BaseImageInfo<ID> imageInfo, final ManifestForm form)
+  public SavedManifest<ID> saveManifest(
+      final ProtocolContext context, final String imageName, final ManifestForm form)
       throws IOException {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
     this.verifyReference(form);
-    this.checkRepoAllowOverride(repoInfo, form.getTagName(), imageInfo, form.getDigest());
+    this.checkRepoAllowOverride(repoInfo, form.getTagName(), imageName, form.getDigest());
+
+    // Created in this transaction, after every check that needs no image: a push that fails from
+    // here on rolls the new image back with everything else, so it never leaves an image that
+    // stores no manifest (RPS-1350).
+    final var imageInfo = this.imageService.findOrCreateImage(repoInfo.getId(), imageName);
 
     // DockerManifestValidator.validate already refused a Content-Type the registry does not
     // store, before anything for this push was looked up or written.
@@ -165,7 +171,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     context.addProperty(ARTIFACT_VERSION_PROPERTY, form.getTagName());
     context.addProperty(USAGES_PROPERTY, usage);
 
-    return form.getDigest();
+    return new SavedManifest<>(form.getDigest(), imageInfo);
   }
 
   @Override
@@ -278,7 +284,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
   private void checkRepoAllowOverride(
       final BaseRepoInfo<ID> repoInfo,
       final String reference,
-      final BaseImageInfo<ID> imageInfo,
+      final String imageName,
       final String digest) {
 
     if (repoInfo.isAllowOverride()) {
@@ -287,7 +293,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
     final var existingTag =
         this.manifestService.findActiveTagByNameAndRepoAndImage(
-            repoInfo.getId(), imageInfo.getName(), reference);
+            repoInfo.getId(), imageName, reference);
 
     if (existingTag.isPresent() && !digest.equals(existingTag.get().getDigest())) {
       throw new AccessNotAllowedException("packageOverrideDisabled");
