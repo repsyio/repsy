@@ -112,7 +112,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  */
 @AutoConfigureMockMvc
 @Transactional
-@ExtendWith({CommittedRowsGuard.class, ScanThreadsSettler.class})
+@ExtendWith({CommittedRowsGuard.class, ScanThreadsSettler.class, ContextCountGuard.class})
 @SpringBootTest(
     classes = RepsyApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.MOCK)

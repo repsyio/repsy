@@ -28,6 +28,7 @@ import io.repsy.os.server.security.scanner.ResourceArtifactContent;
 import io.repsy.os.server.security.scanner.VulnerabilityScanner;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.server.security.scanner.dtos.ScanRequest;
+import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.utils.BlobDigests;
@@ -41,6 +42,8 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.event.EventListener;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -157,6 +160,9 @@ public class ArtifactScanListener {
               scanInputs.registryAuthToken()));
     } catch (final ItemNotFoundException exception) {
       this.handleScanRowGone(event, scanId, exception);
+    } catch (final ObjectOptimisticLockingFailureException
+        | DataIntegrityViolationException exception) {
+      this.handleScanWriteConflict(event, scanId, exception);
     } catch (final Exception exception) {
       this.handleScanFailure(event, scanId, exception);
     }
@@ -164,10 +170,11 @@ public class ArtifactScanListener {
 
   /**
    * The scan row is gone when the repo it belonged to was deleted after the scan was queued (the
-   * foreign key is {@code on delete cascade}); the no-op scanner then fails to record its outcome
-   * with {@link ItemNotFoundException}("{@value #SCAN_NOT_FOUND_MSG_ID}"). That is a benign race,
-   * not a real scan failure, so it is logged at INFO and does not record a failed scan for a row
-   * that no longer exists. Any other {@link ItemNotFoundException} is treated as a genuine failure.
+   * foreign key is {@code on delete cascade}); the scanner then fails to record its outcome with
+   * {@link ItemNotFoundException}("{@value #SCAN_NOT_FOUND_MSG_ID}") when the row is already gone
+   * at the read. That is a benign race, not a real scan failure, so it is logged at INFO and does
+   * not record a failed scan for a row that no longer exists. Any other {@link
+   * ItemNotFoundException} is treated as a genuine failure.
    */
   private void handleScanRowGone(
       final @NonNull ArtifactPushedEvent event,
@@ -179,12 +186,45 @@ public class ArtifactScanListener {
       return;
     }
 
+    this.logScanRowGone(event);
+  }
+
+  /**
+   * The same race one step later: the row was read, the repo was deleted, and the write of the
+   * outcome then found no row to update ({@link ObjectOptimisticLockingFailureException}) or a
+   * finding whose scan is gone ({@link DataIntegrityViolationException} on the foreign key). Only
+   * when the row is really gone is that the benign case; while it is still there, the failure is a
+   * genuine one and is recorded and logged at ERROR.
+   */
+  private void handleScanWriteConflict(
+      final @NonNull ArtifactPushedEvent event,
+      final @NonNull UUID scanId,
+      final @NonNull RuntimeException exception) {
+
+    if (isOtherIntegrityViolation(exception) || this.scanTxService.scanExists(scanId)) {
+      this.handleScanFailure(event, scanId, exception);
+      return;
+    }
+
+    this.logScanRowGone(event);
+  }
+
+  private void logScanRowGone(final @NonNull ArtifactPushedEvent event) {
     log.info(
         "Skipping vulnerability scan outcome for {}@{} (repo={}): the scan row no longer exists,"
             + " most likely because the repo was deleted while the scan was in flight",
         event.artifactName(),
         event.artifactVersion(),
         event.repoName());
+  }
+
+  /**
+   * A data integrity violation is the deleted-scan race only when it is a foreign key violation
+   * (the finding's scan is gone); any other one is unexpected and stays a failure.
+   */
+  private static boolean isOtherIntegrityViolation(final @NonNull RuntimeException exception) {
+    return exception instanceof DataIntegrityViolationException violation
+        && !ConstraintViolations.isForeignKeyViolation(violation);
   }
 
   private void handleScanFailure(

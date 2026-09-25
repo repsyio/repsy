@@ -62,6 +62,9 @@ const INSTALLS_WRONG_PLATFORM_OPTIONAL: Partial<Record<ClientId, boolean>> = {
   // so it installs the win32-only package on linux (`bun/config.spec.ts` proves the cause: the same
   // install with the request rewritten to the full packument skips it).
   bun: true,
+  // Berry sends no `Accept` (wire.spec.ts): it reads the full packument, and skips the mismatched
+  // optional dependency.
+  'yarn-berry': false,
 };
 
 for (const client of clientsWith('publish')) {
