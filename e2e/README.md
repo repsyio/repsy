@@ -1055,7 +1055,7 @@ found` in text mode).
 | 18 abbreviated packument                               | RPS-1356 pin: bun installs the `os:["win32"]` optional dependency                                                                    |
 | 19 wire trace                                          | pass: abbreviated `Accept`, `Bun/1.3.14`, Bearer/Basic on packument and tarball; RPS-1358/1359 pins                                  |
 
-New backend candidate from bun (file a ticket, then replace `NC17`): **NC17** the tarball download is
+New backend finding from bun: **RPS-1363**, the tarball download is
 answered `Content-Disposition: inline;filename=f.txt` (a fixed made-up name, presumably Spring's
 reflected-file-download guard) instead of `<name>-<version>.tgz`; seen on every tarball request in
 `bun add --verbose`, pinned raw in `bun/commands.spec.ts`. Low severity: no client depends on it.
@@ -1064,7 +1064,7 @@ Harness note found while doing this: `sealedEnv()` is documented as an allow-lis
 runner's own environment, but `exec.ts`'s `run()` calls `execa` with its default `extendEnv: true`, so the
 runner's variables (including `REPSY_ADMIN_PASSWORD`, `FORCE_COLOR`, `YARN_VERSION` and `NPM_CLIENTS_*`) are
 merged into every client's environment (`sealedEnv`'s own keys win). Not changed here (it is `exec.ts`, shared
-by every runner).
+by every runner); filed as `RPS-1364`.
 
 ## Cargo runner
 

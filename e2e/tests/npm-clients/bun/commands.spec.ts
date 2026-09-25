@@ -518,7 +518,7 @@ test(
 );
 
 test(
-  'the tarball download is served inline as f.txt (raw): candidate (NC17)',
+  'the tarball download is served inline as f.txt (raw): RPS-1363',
   {
     tag: ['@bun', '@wire'],
   },
@@ -545,7 +545,7 @@ test(
     expect(res.headers.get('content-type')).toBe('application/octet-stream');
     expect(
       res.headers.get('content-disposition'),
-      'candidate (NC17): the file name is f.txt, not the tarball name',
+      'RPS-1363: the file name is f.txt, not the tarball name',
     ).toBe('inline;filename=f.txt');
   },
 );
