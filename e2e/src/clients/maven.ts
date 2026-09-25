@@ -144,7 +144,7 @@ function snapshotProbePomPath(groupId: string, artifactId: string, version: stri
  * `application/x-www-form-urlencoded`) gets it consumed as form data first, which this harness found
  * out the hard way surfaces as an unrelated `malformedPomFile` 400 instead of the real status.
  */
-async function rawPublishCheck(world: World, pomBytes: Buffer): Promise<number> {
+export async function rawPublishCheck(world: World, pomBytes: Buffer): Promise<number> {
   const [groupId, artifactId] = splitPackageName(world.publishTarget.packageName);
   const version = world.publishTarget.version;
   const relPath = isSnapshotVersion(version)
@@ -168,7 +168,7 @@ async function rawPublishCheck(world: World, pomBytes: Buffer): Promise<number> 
  * decision `dependency:get` gets -- and, unlike the artifact's own path, it does not require
  * replicating Maven's server-negotiated timestamped SNAPSHOT filename to find the right path to GET.
  */
-async function rawConsumeCheck(world: World): Promise<number> {
+export async function rawConsumeCheck(world: World): Promise<number> {
   const url = `${env.repoBaseUrl}/${world.repoName}/`;
   return withBackoff429(async () => {
     const res = await fetch(url, { headers: authHeader(world.credential) });
@@ -316,7 +316,7 @@ async function deploy(world: World): Promise<DeployRun> {
 }
 
 /** sha256 of a file's content, or `undefined` when it does not exist. */
-async function digestOf(file: string): Promise<string | undefined> {
+export async function digestOf(file: string): Promise<string | undefined> {
   try {
     return sha256Hex(await fs.readFile(file));
   } catch {

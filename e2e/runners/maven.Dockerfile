@@ -88,6 +88,10 @@ RUN chmod -R a+rX "${JAVA_HOME}" "${MAVEN_HOME}"
 # of a fresh named volume copies that (world-writable) ownership instead of defaulting to root.
 RUN mkdir -p /app/.maven-shared-m2 && chmod 777 /app/.maven-shared-m2
 
+# The primed Gradle user home of clients/gradle.ts (a named volume at runtime, like the directory
+# above, so it has to exist here, world-writable, for the same reason).
+RUN mkdir -p /app/.gradle-shared && chmod 777 /app/.gradle-shared
+
 RUN java --version && mvn --version && GRADLE_USER_HOME=/tmp/gradle-check gradle --version && rm -rf /tmp/gradle-check && gpg --version | head -1
 
 CMD ["./entrypoint.sh", "maven"]

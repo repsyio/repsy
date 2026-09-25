@@ -106,6 +106,7 @@ e2e/
       world.ts                  # World/Coordinates/MaterializedCredential types
       fixtures.ts                # Playwright fixtures: panelApi, seeder, world(scenario, adapter)
       remote-throttle.ts        # RemoteAuthBudget/withBackoff429 -- see "Remote hardening" below
+      gradle-extras.ts          # registerGradleExtras(dsl): the Gradle-only checks (module metadata, gradle.properties credential), RPS-133
     ui/                        # the panel UI suite's plumbing (fixtures, session seeding, page objects) -- see "UI suite"
     clients/
       stack.ts                  # findRepsyContainer()/dockerExec()/logLinesContaining(): docker exec + docker logs against the local stack's Repsy container ("Stack runner")
@@ -120,6 +121,8 @@ e2e/
       pgp.ts                     # real OpenPGP.js key generation and detached signing, no gpg/network
       gpg.ts                     # a real `gpg` key in its own GNUPGHOME (RPS-1316): generate, export the public key, dispose
       maven-signing.ts           # a real `mvn deploy` with maven-gpg-plugin and a Gradle maven-publish + signing publish (RPS-1316)
+      gradle.ts                  # the Gradle client: publish()/resolve()/seedPublish() with a Groovy or a Kotlin DSL build file (RPS-133)
+      gradle-adapter.ts          # gradleAdapter(dsl): the ProtocolAdapter registerPublishConsumeLoop takes, one per DSL (`gradle-groovy`, `gradle-kotlin`)
       cargo-raw.ts                 # cargo-specific raw PUT/GET (publish/config.json/sparse-index/download), body builder
       cargo.ts                     # the cargo client + cargoAdapter: publish()/resolve()/seedPublish(), cargo package/publish/fetch
       nuget-raw.ts                  # nuget-specific raw PUT/GET (publish/versions/download/registration/service-index), buildNupkg (fflate)
@@ -140,6 +143,7 @@ e2e/
       ruby.ts                              # the ruby client + rubyAdapter: publish()/resolve()/seedPublish(), real gem push / bundle install
     packages/
       maven/                     # mustache templates of the tiny jar project + settings.xml
+      gradle/                    # mustache templates of the tiny library (publish) and its consumer, as build.gradle and build.gradle.kts
       npm/                       # mustache templates of the tiny package.json/index.js + .npmrc
       cargo/                     # mustache templates of the tiny crate + consumer Cargo.toml + .cargo/config.toml
       nuget/                     # mustache templates of nuget.config + the consumer .csproj (the .nupkg itself is built in code, see nuget-raw.ts)
@@ -161,6 +165,8 @@ e2e/
       parallel-signed-deploy.spec.ts  # a REAL parallel `mvn deploy:deploy-file` of a signed release to a verify-all repo (RPS-1188), plus the one-thread control
       gpg-signed-deploy.spec.ts  # RPS-1316, tag @gpg: maven-gpg-plugin and Gradle `signing` deploys with a real gpg key to a verify-all repo (signed / unsigned / unregistered key)
       remote-throttle.spec.ts   # sanity check of RemoteAuthBudget/withBackoff429, no server needed
+      gradle-groovy.spec.ts     # RPS-133: registerPublishConsumeLoop(gradleAdapter('groovy')) + the Gradle extras, build.gradle
+      gradle-kotlin.spec.ts     # RPS-133: the same for the Kotlin DSL, build.gradle.kts
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
@@ -597,6 +603,43 @@ the sha256 and file name of the jar `dependency:get` left in its clean local rep
 timestamped file, not the literal `-SNAPSHOT` copy Maven also writes), so a test can prove the consumer
 got the very bytes that were deployed. The fixture's pre-publish runs only the real client (no raw
 probe), so a later "repository unchanged" comparison sees exactly what a real deploy stored.
+
+**The Gradle client, in the Groovy and the Kotlin DSL (`gradle-{groovy,kotlin}.spec.ts`, RPS-133).**
+Repsy serves Gradle through the Maven protocol, so the same repository, credentials and catalog are
+driven by a second real client. `clients/gradle.ts` renders `src/packages/gradle/*.template.gradle`
+(Groovy) or `*.template.gradle.kts` (Kotlin) into an isolated work directory and runs the real
+`gradle` binary of the maven runner, and `gradleAdapter(dsl)` (`clients/gradle-adapter.ts`) hands it to
+the same `registerPublishConsumeLoop` as `mvn`: two more protocol keys, `gradle-groovy` and
+`gradle-kotlin`, both creating `RepoType.MAVEN` repos, and the catalog's Maven-repository scenarios
+(release/snapshot switches, SNAPSHOT deploys and redeploys) list them next to `maven`
+(`MAVEN_CLIENTS` in `catalog.ts`).
+
+- **`publish`**: `gradle --no-daemon publish` of a `java-library` + `maven-publish` project (a marker
+  resource, the jar, the sources jar, the POM and the Gradle module metadata). The credential is the
+  `repsyUsername`/`repsyPassword` project property, from `ORG_GRADLE_PROJECT_*`; the anonymous
+  credential renders no `credentials` block.
+- **`resolve`**: a `java-library` consumer that declares only the Repsy repository and the dependency
+  line the panel shows (`implementation 'g:a:v'`, `implementation("g:a:v")`); `fetchDependencies`
+  copies what was resolved into `build/resolved`. Every run has its own `HOME` and `GRADLE_USER_HOME`,
+  so a resolve never finds the artifact in a cache a publish filled.
+- Like `mvn`, Gradle hides the HTTP status behind its exit code, so the `Outcome` is the raw probe of
+  `clients/maven.ts` (`rawPublishCheck`/`rawConsumeCheck`), and the exit code has to agree with it.
+- A resolved SNAPSHOT keeps the name `a-1.0-SNAPSHOT.jar` in Gradle's cache (Maven's is the
+  timestamped file), so `expectSnapshotFollowedThroughMetadata` compares the resolved jar's bytes with
+  the latest timestamped jar stored, and expects the module metadata (`module`) among the files a
+  Gradle publish lists in the version-level `maven-metadata.xml`.
+- `scenarios/gradle-extras.ts` adds what the catalog cannot say: the sources jar, POM and module
+  metadata a Gradle publish stores (the module metadata's listed jar digest is the stored jar's), and
+  the credential coming from `gradle.properties` instead of the environment.
+
+A cold Gradle home costs tens of seconds of CPU per build (native libraries, the generated Gradle API
+and Kotlin DSL jars, the plugin accessors), which a dozen parallel workers turn into timeouts. Like
+Maven's shared cache tail, `clients/gradle.ts` therefore primes one Gradle user home per volume
+(`GRADLE_SHARED_HOME_DIR`, the named volume `gradle_home_shared`; `gradle help` on both DSLs'
+templates, guarded by a lock file and a ready marker so one worker warms and the rest wait) and copies
+it into each run's own `GRADLE_USER_HOME`. The warm-up resolves nothing, so no run can find a Repsy
+artifact there, and nothing a run writes reaches the shared copy. Both specs still raise the per-test
+timeout to 6 minutes, for a machine that is busy with something else.
 
 ```bash
 ./run.sh test --protocol maven

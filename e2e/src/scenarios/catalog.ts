@@ -131,6 +131,13 @@
  */
 import type { Scenario } from './types.js';
 
+/**
+ * The protocol keys that talk to a Maven repository: `mvn` itself and the Gradle client in both build
+ * file languages (RPS-133). A scenario about Maven repository rules (release/snapshot switches,
+ * SNAPSHOT deploys) lists these instead of `'maven'` alone.
+ */
+const MAVEN_CLIENTS = ['maven', 'gradle-groovy', 'gradle-kotlin'];
+
 export const SCENARIOS: readonly Scenario[] = [
   {
     id: 'password-admin',
@@ -256,7 +263,7 @@ export const SCENARIOS: readonly Scenario[] = [
     repo: { privateRepo: true, releases: false },
     credential: 'token-rw',
     versionType: 'release',
-    protocols: ['maven', 'nuget'],
+    protocols: [...MAVEN_CLIENTS, 'nuget'],
     // Pinned: 403 ("releaseVersionsAreProhibited") for a first deploy of a version that does not
     // exist yet (`redeploy-releases-off` covers an existing one). nuget: 422 ("rejected") --
     // `checkVersionAllowance`, see the file-level comment's nuget bullet.
@@ -269,7 +276,7 @@ export const SCENARIOS: readonly Scenario[] = [
     repo: { privateRepo: true, snapshots: false },
     credential: 'token-rw',
     versionType: 'snapshot',
-    protocols: ['maven', 'nuget'],
+    protocols: [...MAVEN_CLIENTS, 'nuget'],
     // Pinned: 403 ("snapshotVersionsAreProhibited") for a first deploy of a version that does not
     // exist yet (`redeploy-snapshots-off` covers an existing one). nuget: 422 ("rejected") -- a
     // nuget "snapshot" is a `-pre` prerelease version, see the file-level comment's nuget bullet.
@@ -282,7 +289,7 @@ export const SCENARIOS: readonly Scenario[] = [
     repo: { privateRepo: true },
     credential: 'token-rw',
     versionType: 'snapshot',
-    protocols: ['maven'],
+    protocols: MAVEN_CLIENTS,
     // The client deploys timestamped files plus the two metadata files; the consumer resolves the
     // SNAPSHOT through the version-level metadata to the timestamped jar that was deployed.
     expect: { publish: 'ok', consume: 'ok' },
@@ -294,7 +301,7 @@ export const SCENARIOS: readonly Scenario[] = [
     credential: 'token-rw',
     versionType: 'snapshot',
     reuseCoordinates: true,
-    protocols: ['maven'],
+    protocols: MAVEN_CLIENTS,
     // The everyday CI flow: the same SNAPSHOT deployed a second time (buildNumber 2), which the
     // consumer then resolves to the second deploy's jar, not the first.
     expect: { publish: 'ok', consume: 'ok' },
@@ -306,7 +313,7 @@ export const SCENARIOS: readonly Scenario[] = [
     credential: 'token-rw',
     versionType: 'snapshot',
     reuseCoordinates: true,
-    protocols: ['maven'],
+    protocols: MAVEN_CLIENTS,
     // Pinned: succeeds. Maven writes new timestamped files, so nothing existing is overridden, and
     // metadata is never judged for override -- see the file-level comment.
     expect: { publish: 'ok', consume: 'ok' },
@@ -318,7 +325,7 @@ export const SCENARIOS: readonly Scenario[] = [
     credential: 'token-rw',
     versionType: 'snapshot',
     reuseCoordinates: true,
-    protocols: ['maven', 'nuget'],
+    protocols: [...MAVEN_CLIENTS, 'nuget'],
     // Pinned (RPS-1174): 403 ("snapshotVersionsAreProhibited") on the first file of the redeploy.
     // The version published while snapshots were still on stays consumable. nuget: 422
     // ("rejected"), never 409 -- `checkVersionAllowance` runs before the override/conflict check.
@@ -332,7 +339,7 @@ export const SCENARIOS: readonly Scenario[] = [
     credential: 'token-rw',
     versionType: 'release',
     reuseCoordinates: true,
-    protocols: ['maven', 'nuget'],
+    protocols: [...MAVEN_CLIENTS, 'nuget'],
     // Pinned (RPS-1174): 403 ("releaseVersionsAreProhibited"), as above. nuget: 422 ("rejected"),
     // as above.
     expect: { publish: 'forbidden', consume: 'ok' },
