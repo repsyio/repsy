@@ -52,6 +52,8 @@ export interface WireEntry {
   npmSession?: string;
   ifNoneMatch?: string;
   ifModifiedSince?: string;
+  /** The request body as text, only when `captureRequestBody` is on (a publish's JSON document). */
+  requestBody?: string;
   status: number;
   responseEtag?: string;
   responseLastModified?: string;
@@ -78,6 +80,8 @@ export interface WireRecorderOptions {
    * for the abbreviated one, to tell what a client does with each.
    */
   forwardHeaders?: Record<string, string>;
+  /** Keep each request's body in `WireEntry.requestBody` (what a client PUT, e.g. a publish document). */
+  captureRequestBody?: boolean;
 }
 
 function first(value: string | string[] | undefined): string | undefined {
@@ -151,6 +155,13 @@ export async function startWireRecorder(options: WireRecorderOptions = {}): Prom
       entry.status = 502;
       res.destroy(err);
     });
+    if (options.captureRequestBody) {
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => {
+        entry.requestBody = Buffer.concat(chunks).toString('utf8');
+      });
+    }
     req.pipe(upstreamReq);
   });
 

@@ -35,9 +35,16 @@ import { adminCredential } from '../../../src/clients/raw-http.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 
 /**
- * The clients whose `add`/`install` say nothing about a deprecated version (probed: bun prints only
+ * Clients that leave the deprecation MESSAGE out of what an install prints. pnpm 12.6 names only the
+ * deprecated package and version (`[WARN] deprecated <name>@<version>`): its changelog lists it as a
+ * security fix (a registry-controlled message is untrusted terminal output).
+ */
+const OMITS_DEPRECATION_MESSAGE: ReadonlySet<ClientId> = new Set<ClientId>(['pnpm']);
+
+/**
+ * Clients whose `add`/`install` say nothing at all about a deprecated version (probed: bun prints only
  * "(v1.1.0 available)"; `bun info <pkg>@<version> deprecated` shows it, see `bun/commands.spec.ts`).
- * The registry serves the message to all of them; whether the client shows it is the client's.
+ * The registry serves the message to every client; whether it shows it is the client's.
  */
 const SILENT_ON_DEPRECATED: ReadonlySet<ClientId> = new Set<ClientId>(['bun']);
 
@@ -101,10 +108,17 @@ for (const publisher of clientsWith('deprecateCmd')) {
             added.exitCode,
             `${consumerClient.label} add: ${added.command}\n${added.stderr}`,
           ).toBe(0);
+          const printed = `${added.stdout}\n${added.stderr}`;
+          const silent = SILENT_ON_DEPRECATED.has(consumerClient.id);
+          const omitsMessage = silent || OMITS_DEPRECATION_MESSAGE.has(consumerClient.id);
           expect(
-            `${added.stdout}\n${added.stderr}`.includes(message),
-            `${consumerClient.label} ${SILENT_ON_DEPRECATED.has(consumerClient.id) ? 'does not print' : 'prints'} the deprecation message`,
-          ).toBe(!SILENT_ON_DEPRECATED.has(consumerClient.id));
+            printed.includes(omitsMessage ? `deprecated ${name}@1.0.0` : message),
+            `${consumerClient.label} ${silent ? 'says nothing' : 'warns'} about the deprecated version`,
+          ).toBe(!silent);
+          expect(
+            printed.includes(message),
+            `${consumerClient.label} ${omitsMessage ? 'leaves out' : 'prints'} the deprecation message`,
+          ).toBe(!omitsMessage);
         }
 
         const cleared = await publisher.deprecate?.(ctx, `${name}@1.0.0`, '');

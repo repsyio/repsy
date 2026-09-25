@@ -54,6 +54,10 @@ const PLATFORM_FIELDS = ['os', 'cpu', 'libc', 'peerDependenciesMeta', 'funding']
 /** Whether a client installs an optional dependency whose `os` excludes linux (`win32` here). */
 const INSTALLS_WRONG_PLATFORM_OPTIONAL: Partial<Record<ClientId, boolean>> = {
   npm: false,
+  pnpm: false,
+  // Yarn 1 asks for the abbreviated document too (`Accept: application/vnd.npm.install-v1+json`, see
+  // wire.spec.ts), and still skips the mismatched optional dependency: probed, not assumed.
+  'yarn-classic': false,
   // RPS-1356: bun resolves from the abbreviated packument (`wire.spec.ts`), which has no `os`/`cpu`,
   // so it installs the win32-only package on linux (`bun/config.spec.ts` proves the cause: the same
   // install with the request rewritten to the full packument skips it).
