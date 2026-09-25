@@ -113,7 +113,8 @@ class DeployTokenPasswordOnlyIT extends AbstractIntegrationTest {
         new Read(RepoType.PYPI, "/{repo}/simple/some-package/", 404),
         new Read(RepoType.HELM, "/{repo}/index.yaml", 200),
         new Read(RepoType.CARGO, "/{repo}/so/me/some-crate", 404),
-        new Read(RepoType.GOLANG, "/{repo}/" + MODULE + "/@v/list", 200),
+        // The module is never published, and an unknown module is a 404 (RPS-1428).
+        new Read(RepoType.GOLANG, "/{repo}/" + MODULE + "/@v/list", 404),
         new Read(RepoType.RUBY, "/{repo}/names", 200),
         // The NuGet service index is public even on a private repo, so read a package instead.
         new Read(RepoType.NUGET, "/{repo}/v3/package/some.pkg/index.json", 404));

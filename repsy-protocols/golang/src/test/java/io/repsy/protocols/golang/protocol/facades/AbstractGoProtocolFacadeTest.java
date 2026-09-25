@@ -20,13 +20,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.golang.shared.module.services.GoModuleFilesWriter;
 import io.repsy.protocols.golang.shared.module.services.GoModuleService;
@@ -38,6 +41,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -202,5 +206,83 @@ class AbstractGoProtocolFacadeTest {
     verify(this.moduleService, never())
         .publishModule(any(), any(), any(), any(), any(), any(), any());
     verify(this.storageService, never()).writeInputStreamToPath(any(), any(), any());
+  }
+
+  private ProtocolContext listContext(final String escapedModulePath) {
+    final var urlProps =
+        BaseUrlParserProperties.<UUID, BaseRepoInfo<UUID>>builder()
+            .repoName(this.repoInfo.getName())
+            .relativePath(new RelativePath("/" + escapedModulePath + "/@v/list"))
+            .repoInfo(this.repoInfo)
+            .build();
+    final var ctx = new ProtocolContext();
+    ctx.addProperty("urlProperties", urlProps);
+
+    return ctx;
+  }
+
+  private static StorageItemInfo infoFile(final String version) {
+    return StorageItemInfo.builder().name(version + ".info").directory(false).build();
+  }
+
+  @Test
+  @DisplayName("@v/list of a module without versions is not found, so the go command moves on")
+  void versionListOfAnUnknownModuleIsNotFound() {
+    when(this.storageService.listDirectory(any())).thenReturn(List.of());
+
+    assertThatThrownBy(() -> this.facade.download(this.listContext(MODULE)))
+        .isInstanceOf(ItemNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("@v/list ignores directories and files that are not .info when it finds nothing")
+  void versionListWithoutInfoFilesIsNotFound() {
+    when(this.storageService.listDirectory(any()))
+        .thenReturn(
+            List.of(
+                StorageItemInfo.builder().name("v1.0.0.info").directory(true).build(),
+                StorageItemInfo.builder().name("v1.0.0.zip").directory(false).build()));
+
+    assertThatThrownBy(() -> this.facade.download(this.listContext(MODULE)))
+        .isInstanceOf(ItemNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("@v/list lists the versions in semver order")
+  void versionListIsSorted() throws IOException {
+    when(this.storageService.listDirectory(any()))
+        .thenReturn(List.of(infoFile("v0.10.0"), infoFile("v0.2.0")));
+
+    final var body = this.facade.download(this.listContext(MODULE));
+
+    assertThat(new String(body.getInputStream().readAllBytes(), StandardCharsets.UTF_8))
+        .isEqualTo("v0.2.0\nv0.10.0");
+  }
+
+  @Test
+  @DisplayName("@v/list of a mixed-case module falls back to its legacy lower-case listing")
+  void versionListFallsBackToTheLegacyLowerCaseListing() throws IOException {
+    final var captor = ArgumentCaptor.forClass(StoragePath.class);
+    when(this.storageService.listDirectory(captor.capture()))
+        .thenReturn(List.of())
+        .thenReturn(List.of(infoFile("v1.0.0")));
+
+    final var body = this.facade.download(this.listContext("example.com/!mod"));
+
+    assertThat(new String(body.getInputStream().readAllBytes(), StandardCharsets.UTF_8))
+        .isEqualTo("v1.0.0");
+    assertThat(captor.getAllValues())
+        .extracting(path -> path.getRelativePath().getPath())
+        .containsExactly("/example.com/!mod/@v/", "/example.com/mod/@v/");
+  }
+
+  @Test
+  @DisplayName("@v/list of a mixed-case module with no legacy listing either is not found")
+  void versionListOfAnUnknownMixedCaseModuleIsNotFound() {
+    when(this.storageService.listDirectory(any())).thenReturn(List.of());
+
+    assertThatThrownBy(() -> this.facade.download(this.listContext("example.com/!mod")))
+        .isInstanceOf(ItemNotFoundException.class);
+    verify(this.storageService, times(2)).listDirectory(any());
   }
 }
