@@ -29,12 +29,9 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
@@ -92,21 +89,6 @@ public abstract class AbstractMavenDownloadProtocolMethodHandler<ID>
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
 
-    return this.buildSuccessResponse(resource);
-  }
-
-  private ResponseEntity<Object> buildSuccessResponse(final Resource resource) {
-
-    final var builder = ResponseEntity.ok();
-
-    if (resource instanceof ByteArrayResource) {
-      builder.contentType(MediaType.TEXT_HTML);
-    } else {
-      builder.contentType(MediaType.APPLICATION_OCTET_STREAM);
-      builder.header(
-          HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + resource.getFilename());
-    }
-
-    return builder.body(resource);
+    return MavenResourceResponses.ok(resource).body(resource);
   }
 }

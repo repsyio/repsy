@@ -17,19 +17,22 @@ package io.repsy.os.server.protocols.maven.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
+import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
 import io.repsy.protocols.maven.protocol.handlers.AbstractMavenHeadProtocolMethodHandler;
+import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
 @NullMarked
-public class MavenHeadProtocolMethodHandler extends AbstractMavenHeadProtocolMethodHandler {
+public class MavenHeadProtocolMethodHandler extends AbstractMavenHeadProtocolMethodHandler<UUID> {
 
   public MavenHeadProtocolMethodHandler(
       @Qualifier("osMavenPathParser") final PathParser pathParser,
+      final MavenProtocolFacade<UUID> mavenFacade,
       final MavenProtocolProvider protocolProvider) {
 
-    super(pathParser, protocolProvider);
+    super(pathParser, mavenFacade, protocolProvider);
   }
 }

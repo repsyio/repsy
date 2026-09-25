@@ -110,10 +110,10 @@ uploaded);
 
 Then build that POM with \`ivy:makepom\` and publish with \`publishivy="false"\`, otherwise Ivy also uploads its own
 ivy file as \`ivy-<revision>.xml\` and Repsy refuses it with \`400 invalidArtifactPath\` (the jar and the POM are
-already stored by then, but the build fails). \`overwrite="true"\` is needed as well:
-Ivy checks with a HEAD request whether a file exists and Repsy answers that with \`200\` even for a missing file
-(without it Ivy stops with "destination file exists and overwrite == false"); Repsy itself decides whether a
-version can be redeployed;
+already stored by then, but the build fails). Ivy's \`overwrite\` defaults to \`false\`, so Ivy itself refuses to
+publish over a file that already exists ("destination file exists and overwrite == false"): set
+\`overwrite="true"\` on \`ivy:publish\` to republish a SNAPSHOT, while Repsy's *Allow override* setting still
+decides for a release;
 
 \`\`\`xml
 <project name="my-lib" xmlns:ivy="antlib:org.apache.ivy.ant">
@@ -121,7 +121,7 @@ version can be redeployed;
     <ivy:settings file="ivysettings.xml"/>
     <ivy:resolve file="ivy.xml"/>
     <ivy:makepom ivyfile="ivy.xml" pomfile="build/my-lib.pom"/>
-    <ivy:publish resolver="repsy" pubrevision="1.0.0" publishivy="false" overwrite="true">
+    <ivy:publish resolver="repsy" pubrevision="1.0.0" publishivy="false">
       <artifacts pattern="build/[artifact].[ext]"/>
     </ivy:publish>
   </target>

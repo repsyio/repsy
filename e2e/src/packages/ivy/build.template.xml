@@ -20,7 +20,8 @@
   Clients"): the jar of a resource directory holding a per-publish random marker, the POM `ivy:makepom`
   writes from the module, and `ivy:publish` of both to the Repsy resolver. `publishivy` is false
   because Ivy would otherwise also send its own ivy file, which Repsy refuses. `overwrite` is true by
-  default so the server's own `allowOverride` rule decides a redeploy, not Ivy's HEAD check (RPS-1368).
+  default so the server's own `allowOverride` rule decides a redeploy, not Ivy's own HEAD check
+  (IV7 covers Ivy's default, `overwrite="false"`).
   `retrieve` resolves the consumer module and copies what it resolved into lib/.
 -->
 <project name="repsy-e2e-ivy" default="publish" xmlns:ivy="antlib:org.apache.ivy.ant">
