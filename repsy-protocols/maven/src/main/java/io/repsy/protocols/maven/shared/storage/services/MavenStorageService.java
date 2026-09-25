@@ -22,8 +22,10 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
@@ -74,6 +76,32 @@ public interface MavenStorageService<ID> {
   BaseUsages deleteVersionFromMetadata(
       BaseRepoInfo<ID> repoInfo, String groupId, String artifactId, String versionName)
       throws IOException, XmlPullParserException;
+
+  /**
+   * Adds to the artifact-level {@code maven-metadata.xml} that is stored the versions that the
+   * repository has registered and the file does not list yet, so a version registered by a client
+   * that sends no metadata (Apache Ivy, sbt) is not hidden by the file another client stored
+   * earlier (RPS-1437). It only ever adds: a version the file lists and the repository does not
+   * know is kept.
+   *
+   * <p>When a version is added, {@code latest}, {@code release} and {@code lastUpdated} are
+   * recomputed, the file and the checksums that are stored next to it are rewritten, and a stored
+   * signature of it, which no longer verifies, is deleted. Nothing is written, deleted or created
+   * when the artifact has no stored file, when the file has no {@code <versioning>}, or when it
+   * lists every registered version already. {@code registeredVersions} is only asked for once the
+   * file is known to be there, and it is asked inside the lock that also serializes the delete
+   * rewrite and a client's own upload of that file.
+   *
+   * @return the change of the disk usage of the repository, negative when the files shrank
+   * @throws io.repsy.core.error_handling.exceptions.BadRequestException {@code
+   *     malformedMetadataFile}, before anything is written, when the stored file cannot be parsed
+   */
+  long addVersionsToMetadata(
+      BaseRepoInfo<ID> repoInfo,
+      String groupId,
+      String artifactId,
+      Supplier<? extends Collection<String>> registeredVersions)
+      throws IOException;
 
   Path getPath(String groupId, String artifactId);
 
