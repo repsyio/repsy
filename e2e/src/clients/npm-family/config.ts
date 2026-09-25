@@ -186,6 +186,8 @@ export interface YarnBerryOptions {
   nodeLinker?: 'node-modules' | 'pnp';
   immutableInstalls?: boolean;
   hardenedMode?: boolean;
+  /** `npmMinimalAgeGate` (berry quarantines a version younger than it; default here `0`: off). */
+  minimalAgeGate?: string;
   cacheFolder: string;
 }
 
@@ -221,6 +223,7 @@ export async function writeYarnBerryRc(
     nodeLinker: options.nodeLinker ?? 'node-modules',
     immutableInstalls: Boolean(options.immutableInstalls),
     hardenedMode: Boolean(options.hardenedMode),
+    minimalAgeGate: options.minimalAgeGate ?? '0',
     cacheFolder: options.cacheFolder,
     proxyUrl: DEAD_PROXY_URL,
     registryHosts: [...hosts],

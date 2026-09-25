@@ -56,6 +56,8 @@ const INTEGRITY_FAILURE: Partial<Record<ClientId, RegExp>> = {
   pnpm: /ERR_PNPM_TARBALL_INTEGRITY/,
   'yarn-classic': /Integrity check failed for/,
   bun: /Integrity check failed for tarball/,
+  // YN0018: the checksum berry recorded (of its own zip of the tarball) no longer matches.
+  'yarn-berry': /YN0018.*checksum/,
 };
 
 /**
@@ -65,6 +67,13 @@ const INTEGRITY_FAILURE: Partial<Record<ClientId, RegExp>> = {
  */
 const LOCKFILE_RECORDS_TARBALL_URL: Partial<Record<ClientId, boolean>> = {
   pnpm: false,
+  // Berry builds the conventional URL itself and pins the packument's (`__archiveUrl`) only when it differs.
+  'yarn-berry': false,
+};
+
+/** The integrity value a lockfile records: an SRI hash, or berry's `checksum: 10c0/<sha512 hex>`. */
+const LOCKFILE_INTEGRITY: Partial<Record<ClientId, RegExp>> = {
+  'yarn-berry': /checksum: 10c0\/[0-9a-f]{128}/,
 };
 
 /** The lockfile names each tarball URL, or (pnpm) names no URL at all. */
@@ -75,7 +84,7 @@ function expectTarballUrls(client: NpmFamilyClient, lockfile: string, urls: stri
     }
   } else {
     expect(lockfile, `${client.lockfile} records no tarball URL, so no host`).not.toMatch(
-      /tarball:|https?:\/\//,
+      /tarball:|https?:\/\/|__archiveUrl/,
     );
   }
 }
@@ -168,7 +177,9 @@ for (const client of clientsWith('frozenInstall')) {
             (name) => `${env.repoBaseUrl}/${graph.repoName}/${name}/-/${name}-1.0.0.tgz`,
           ),
         );
-        expect(lockfile, 'and an integrity hash for it').toMatch(/sha512-/);
+        expect(lockfile, 'and an integrity hash for it').toMatch(
+          LOCKFILE_INTEGRITY[client.id] ?? /sha512-/,
+        );
 
         // A fresh HOME and cache, and only package.json + the lockfile: nothing but the lockfile and
         // the registry can produce the install.
