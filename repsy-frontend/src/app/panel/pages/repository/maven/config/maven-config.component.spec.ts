@@ -48,9 +48,9 @@ describe('MavenConfigComponent Apache Ivy snippet (RPS-1332)', () => {
     expect(component.markdown).toContain(`<ivysettings>
   <settings defaultResolver="repsy"/>
   <credentials host="repo.example.com"
-               realm="Repsy"
-               username="alice"
-               passwd="YOUR_PASSWORD"/>
+                realm="Repsy"
+                username="alice"
+                passwd="YOUR_PASSWORD"/>
   <resolvers>
     <ibiblio name="repsy" m2compatible="true" root="https://repo.example.com:9090/my-repo/"/>
   </resolvers>

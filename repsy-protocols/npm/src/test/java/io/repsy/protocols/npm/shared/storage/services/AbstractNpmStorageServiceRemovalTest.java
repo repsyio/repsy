@@ -70,12 +70,12 @@ class AbstractNpmStorageServiceRemovalTest {
   private static final String METADATA =
       """
       {"name":"demo","description":"three",
-       "dist-tags":{"latest":"1.2.0","beta":"1.2.0","old":"1.0.0"},
-       "time":{"modified":"then","1.0.0":"a","1.1.0":"b","1.2.0":"c"},
-       "versions":{
-         "1.0.0":{"name":"demo","version":"1.0.0","description":"one"},
-         "1.1.0":{"name":"demo","version":"1.1.0","description":"two","readme":"r2"},
-         "1.2.0":{"name":"demo","version":"1.2.0","description":"three"}}}
+        "dist-tags":{"latest":"1.2.0","beta":"1.2.0","old":"1.0.0"},
+        "time":{"modified":"then","1.0.0":"a","1.1.0":"b","1.2.0":"c"},
+        "versions":{
+          "1.0.0":{"name":"demo","version":"1.0.0","description":"one"},
+          "1.1.0":{"name":"demo","version":"1.1.0","description":"two","readme":"r2"},
+          "1.2.0":{"name":"demo","version":"1.2.0","description":"three"}}}
       """;
 
   /** For a package whose metadata is stored: the rows are never asked for. */
