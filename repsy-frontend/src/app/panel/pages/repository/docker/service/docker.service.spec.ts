@@ -55,13 +55,13 @@ describe('DockerService', () => {
     dockerApi = jasmine.createSpyObj<DockerImageControllerService>('DockerImageControllerService', [
       'listDockerImages',
       'listDockerImageTags',
-      'listTagManifests',
+      'listDockerTagManifests',
       'deleteDockerImage',
       'getDockerImageSummary',
       'getDockerImageTag',
-      'deleteTag',
-      'getManifest',
-      'getConfig',
+      'deleteDockerTag',
+      'getDockerImageManifest',
+      'getDockerImageConfig',
     ]);
     TestBed.configureTestingModule({
       providers: [
@@ -102,7 +102,7 @@ describe('DockerService', () => {
       {
         name: 'searchManifests',
         invoke: (s, name) => s.searchManifests(name, SORT, IMAGE, TAG, PAGE_INDEX, PAGE_SIZE),
-        api: () => dockerApi.listTagManifests,
+        api: () => dockerApi.listDockerTagManifests,
         args: (name) => [IMAGE, TAG, REPO, name, ...PAGE_ARGS],
       },
     ];
@@ -131,7 +131,7 @@ describe('DockerService', () => {
       {
         name: 'deleteTag',
         invoke: (s) => s.deleteTag(IMAGE, TAG),
-        api: () => dockerApi.deleteTag,
+        api: () => dockerApi.deleteDockerTag,
         args: [IMAGE, TAG, REPO],
         response: restResponse('ignored'),
         expected: undefined,
@@ -139,7 +139,7 @@ describe('DockerService', () => {
       {
         name: 'fetchManifestText',
         invoke: (s) => s.fetchManifestText(IMAGE, DIGEST),
-        api: () => dockerApi.getManifest,
+        api: () => dockerApi.getDockerImageManifest,
         args: [IMAGE, DIGEST, REPO],
         response: restResponse(manifestText),
         expected: manifestText,
@@ -147,7 +147,7 @@ describe('DockerService', () => {
       {
         name: 'fetchConfigText',
         invoke: (s) => s.fetchConfigText(IMAGE, DIGEST),
-        api: () => dockerApi.getConfig,
+        api: () => dockerApi.getDockerImageConfig,
         args: [IMAGE, DIGEST, REPO],
         response: restResponse(configText),
         expected: configText,

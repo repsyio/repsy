@@ -135,7 +135,7 @@ class PagedListsIT extends AbstractIntegrationTest {
               "latestVersion",
               "updatedAt"),
           list(
-              "listReleases",
+              "listPypiReleases",
               RepoType.PYPI,
               "/api/pypi/packages/{repo}/alpha/releases",
               true,
@@ -269,7 +269,7 @@ class PagedListsIT extends AbstractIntegrationTest {
               "name",
               "createdAt"),
           list(
-              "listTagManifests",
+              "listDockerTagManifests",
               RepoType.DOCKER,
               "/api/docker/images/{repo}/alpha/tags/latest/manifests",
               true,

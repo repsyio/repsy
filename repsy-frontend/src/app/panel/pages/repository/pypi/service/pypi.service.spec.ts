@@ -46,10 +46,10 @@ describe('PypiService', () => {
     ]);
     pypiApi = jasmine.createSpyObj<PypiPackageControllerService>('PypiPackageControllerService', [
       'listPypiPackages',
-      'listReleases',
+      'listPypiReleases',
       'deletePypiPackage',
-      'getRelease',
-      'deleteRelease',
+      'getPypiRelease',
+      'deletePypiRelease',
     ]);
     TestBed.configureTestingModule({
       providers: [
@@ -83,7 +83,7 @@ describe('PypiService', () => {
       {
         name: 'fetchPackageReleasesLikeName',
         invoke: (s, version) => s.fetchPackageReleasesLikeName(PACKAGE, version, SORT, PAGE_INDEX, PAGE_SIZE),
-        api: () => pypiApi.listReleases,
+        api: () => pypiApi.listPypiReleases,
         args: (version) => [PACKAGE, REPO, version, ...PAGE_ARGS],
       },
     ];
@@ -98,12 +98,12 @@ describe('PypiService', () => {
         args: [PACKAGE, REPO],
         response: restResponse('ignored'),
         expected: undefined,
-        notCalled: () => [pypiApi.deleteRelease],
+        notCalled: () => [pypiApi.deletePypiRelease],
       },
       {
         name: 'fetchRelease',
         invoke: (s) => s.fetchRelease(PACKAGE, RELEASE),
-        api: () => pypiApi.getRelease,
+        api: () => pypiApi.getPypiRelease,
         args: [PACKAGE, RELEASE, REPO],
         response: restResponse(release),
         expected: release,
@@ -111,7 +111,7 @@ describe('PypiService', () => {
       {
         name: 'deleteRelease',
         invoke: (s) => s.deleteRelease(PACKAGE, RELEASE),
-        api: () => pypiApi.deleteRelease,
+        api: () => pypiApi.deletePypiRelease,
         args: [PACKAGE, RELEASE, REPO],
         response: restResponse('ignored'),
         expected: undefined,

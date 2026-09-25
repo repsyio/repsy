@@ -47,12 +47,12 @@ describe('SignatureComponent', () => {
 
   beforeEach(() => {
     keyStoreService = jasmine.createSpyObj<KeyStoreControllerService>('KeyStoreControllerService', [
-      'listAllowedKeyServers',
+      'listMavenAllowedKeyServers',
       'listMavenKeyStores',
       'createMavenKeyStore',
       'deleteMavenKeyStore',
     ]);
-    keyStoreService.listAllowedKeyServers.and.returnValue(of({ data: [UBUNTU, OPENPGP] }) as never);
+    keyStoreService.listMavenAllowedKeyServers.and.returnValue(of({ data: [UBUNTU, OPENPGP] }) as never);
     keyStoreService.listMavenKeyStores.and.returnValue(of({ data: { content: [keyStore('k1')] } }) as never);
     keyStoreService.createMavenKeyStore.and.returnValue(of({}) as never);
     keyStoreService.deleteMavenKeyStore.and.returnValue(of({}) as never);
@@ -158,7 +158,7 @@ describe('SignatureComponent', () => {
     });
 
     it('selects nothing when no keyserver is allowed', () => {
-      keyStoreService.listAllowedKeyServers.and.returnValue(of({}) as never);
+      keyStoreService.listMavenAllowedKeyServers.and.returnValue(of({}) as never);
 
       component.ngOnInit();
 
@@ -167,7 +167,7 @@ describe('SignatureComponent', () => {
     });
 
     it('keeps its defaults when the lists cannot be loaded', () => {
-      keyStoreService.listAllowedKeyServers.and.returnValue(throwError(() => new Error('boom')));
+      keyStoreService.listMavenAllowedKeyServers.and.returnValue(throwError(() => new Error('boom')));
       keyStoreService.listMavenKeyStores.and.returnValue(throwError(() => new Error('boom')));
 
       component.ngOnInit();

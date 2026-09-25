@@ -78,7 +78,8 @@ class UserControllerIT extends AbstractIntegrationTest {
   private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String USERNAME_IN_USE_TEXT = "Username is in use. Please try another one.";
   private static final String USER_NOT_FOUND_TEXT = "User not found.";
-  private static final String UNAUTHORIZED_TEXT = "The user has logged in but has no permissions.";
+  private static final String UNAUTHORIZED_TEXT =
+      "Please log in: the credentials are missing or invalid, or the account is gone.";
   private static final Instant BASE_TIME = Instant.parse("2026-01-01T00:00:00Z");
 
   private static final String[] USER_KEYS = {"id", "username", "role", "createdAt", "lastLoginAt"};
@@ -277,7 +278,7 @@ class UserControllerIT extends AbstractIntegrationTest {
           UserControllerIT.this.perform(
               endpoint.request().apply(UUID.randomUUID()).header(AUTHORIZATION, token)),
           HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
+          "loginRequired",
           "unAuthorized",
           UNAUTHORIZED_TEXT);
     }
@@ -1250,7 +1251,7 @@ class UserControllerIT extends AbstractIntegrationTest {
       expectError(
           UserControllerIT.this.perform(get("/api/users").header(AUTHORIZATION, token)),
           HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
+          "loginRequired",
           "unAuthorized",
           UNAUTHORIZED_TEXT);
     }

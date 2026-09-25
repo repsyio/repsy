@@ -487,8 +487,8 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
         expectError(
             CargoCrateControllerIT.this.request("GET", path, auth),
             HttpStatus.UNAUTHORIZED,
-            "unAuthorized",
-            "The user has logged in but has no permissions.");
+            "loginRequired",
+            "Please log in: the credentials are missing or invalid, or the account is gone.");
       }
     }
 
@@ -502,8 +502,8 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
           CargoCrateControllerIT.this.request(
               "GET", "/api/cargo/crates/" + repo.getName(), authHeader),
           HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
-          "The user has logged in but has no permissions.");
+          "loginRequired",
+          "Please log in: the credentials are missing or invalid, or the account is gone.");
     }
 
     @Test
@@ -514,8 +514,8 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
       expectError(
           CargoCrateControllerIT.this.request("GET", path, null),
           HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
-          "The user has logged in but has no permissions.");
+          "loginRequired",
+          "Please log in: the credentials are missing or invalid, or the account is gone.");
       expectError(
           CargoCrateControllerIT.this.request("GET", path, "Bearer garbage"),
           HttpStatus.UNAUTHORIZED,
@@ -533,8 +533,8 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
           CargoCrateControllerIT.this.request(
               "GET", path, CargoCrateControllerIT.this.bearerTokenFor(user)),
           HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
-          "The user has logged in but has no permissions.");
+          "loginRequired",
+          "Please log in: the credentials are missing or invalid, or the account is gone.");
     }
 
     @Test
@@ -550,8 +550,8 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
           CargoCrateControllerIT.this.request(
               "GET", "/api/cargo/crates/" + privateRepo.getName(), null),
           HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
-          "The user has logged in but has no permissions.");
+          "loginRequired",
+          "Please log in: the credentials are missing or invalid, or the account is gone.");
     }
 
     @Test

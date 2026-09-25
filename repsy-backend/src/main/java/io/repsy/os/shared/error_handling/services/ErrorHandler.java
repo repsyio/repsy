@@ -31,6 +31,7 @@ import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
+import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.error_handling.exceptions.InvalidPagingParameterException;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.error_handling.utils.OciErrors;
@@ -96,6 +97,7 @@ public class ErrorHandler {
   private static final @NonNull String ERR_PAYLOAD_TOO_LARGE = "payloadTooLarge";
   private static final @NonNull String ERR_ACCESS_NOT_ALLOWED = "accessNotAllowed";
   private static final @NonNull String ERR_UNAUTHORIZED = "unauthorizedRequest";
+  private static final @NonNull String ERR_PANEL_LOGIN_REQUIRED = "loginRequired";
   private static final @NonNull String ERR_ITEM_ALREADY_EXISTS = "itemAlreadyExists";
   private static final @NonNull String ERR_MOVED_TO_PATH = "movedToPath";
   private static final @NonNull String ERR_MFA_EXCEPTION = "mfaException";
@@ -551,7 +553,27 @@ public class ErrorHandler {
 
     log.info(exceptionToString(ex, request));
 
+    return this.unauthorizedBody(request, ex);
+  }
+
+  /**
+   * The message of the shared {@code unAuthorized} id says the user is logged in but lacks the
+   * permission, which is what a package manager is told on the wire. A panel 401 means the
+   * opposite: the credential is missing or invalid, or its account is gone, as a signed-in user
+   * without the permission gets a 403 {@code accessDenied} there (RPS-1268). The panel gets its own
+   * id and text for it (RPS-1352); every other id, and the wire answer, stay as they are.
+   */
+  private ResponseEntity<RestResponse<String>> unauthorizedBody(
+      final @NonNull HttpServletRequest request, final @NonNull UnAuthorizedException ex) {
+
     final var exceptionMessage = ex.getMessage();
+
+    if (ErrorConstants.UN_AUTHORIZED.equals(exceptionMessage) && isPanelRequest(request)) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .contentType(MediaType.APPLICATION_JSON)
+          .body(this.resp.error(ERR_PANEL_LOGIN_REQUIRED, exceptionMessage));
+    }
+
     final var messageText = exceptionMessage != null ? exceptionMessage : ERR_UNAUTHORIZED;
 
     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

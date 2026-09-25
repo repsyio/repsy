@@ -45,9 +45,9 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  * <ul>
  *   <li>a signed-in USER (no ADMIN role): 403 {@code accessDenied}, whether the repository exists
  *       or not, so a missing repository is not revealed either;
- *   <li>no credential: 401 {@code unAuthorized};
+ *   <li>no credential: 401 {@code loginRequired};
  *   <li>a token that does not verify: 401 {@code accessNotAllowed};
- *   <li>a valid token of an account that is gone: 401 {@code unAuthorized}.
+ *   <li>a valid token of an account that is gone: 401 {@code loginRequired}.
  * </ul>
  *
  * <p>The routes are not listed here: they are every panel handler of
@@ -199,9 +199,9 @@ class ManageRoutesStatusIT extends AbstractIntegrationTest {
     for (final var route : this.manageRoutes()) {
       final var url = route.urlFor(repo.getName());
 
-      this.expectError(softly, route, url, null, 401, "unAuthorized");
+      this.expectError(softly, route, url, null, 401, "loginRequired");
       this.expectError(softly, route, url, valid + "x", 401, "accessNotAllowed");
-      this.expectError(softly, route, url, ghost, 401, "unAuthorized");
+      this.expectError(softly, route, url, ghost, 401, "loginRequired");
     }
 
     softly.assertAll();

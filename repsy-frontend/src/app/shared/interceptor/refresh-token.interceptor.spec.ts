@@ -209,9 +209,9 @@ describe('RefreshTokenInterceptor', () => {
       expectLoggedOut('Session invalid, please log in again.');
     });
 
-    it('unAuthorized (account gone, credentials missing or invalid) logs out without a refresh', () => {
+    it('loginRequired (account gone, credentials missing or invalid) logs out without a refresh', () => {
       call();
-      refuse('unAuthorized');
+      refuse('loginRequired');
       expectLoggedOut('Session invalid, please log in again.');
     });
 

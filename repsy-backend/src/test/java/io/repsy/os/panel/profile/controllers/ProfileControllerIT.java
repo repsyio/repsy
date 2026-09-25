@@ -243,9 +243,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("unAuthorized"))
+          .andExpect(jsonPath("$.msgId").value("loginRequired"))
           .andExpect(jsonPath("$.data").value("unAuthorized"))
-          .andExpect(jsonPath("$.text").value("The user has logged in but has no permissions."));
+          .andExpect(
+              jsonPath("$.text")
+                  .value(
+                      "Please log in: the credentials are missing or invalid, or the account is gone."));
     }
 
     @Test
@@ -257,9 +260,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("unAuthorized"))
+          .andExpect(jsonPath("$.msgId").value("loginRequired"))
           .andExpect(jsonPath("$.data").value("unAuthorized"))
-          .andExpect(jsonPath("$.text").value("The user has logged in but has no permissions."));
+          .andExpect(
+              jsonPath("$.text")
+                  .value(
+                      "Please log in: the credentials are missing or invalid, or the account is gone."));
     }
 
     @Test
@@ -271,9 +277,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("unAuthorized"))
+          .andExpect(jsonPath("$.msgId").value("loginRequired"))
           .andExpect(jsonPath("$.data").value("unAuthorized"))
-          .andExpect(jsonPath("$.text").value("The user has logged in but has no permissions."));
+          .andExpect(
+              jsonPath("$.text")
+                  .value(
+                      "Please log in: the credentials are missing or invalid, or the account is gone."));
     }
   }
 
@@ -619,7 +628,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body(uniqueUsername("newone"))))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("unAuthorized"));
+          .andExpect(jsonPath("$.msgId").value("loginRequired"));
     }
   }
 
@@ -907,7 +916,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("NewPassword2@")))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("unAuthorized"));
+          .andExpect(jsonPath("$.msgId").value("loginRequired"));
     }
   }
 
@@ -1006,7 +1015,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(delete("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("unAuthorized"));
+          .andExpect(jsonPath("$.msgId").value("loginRequired"));
     }
   }
 }

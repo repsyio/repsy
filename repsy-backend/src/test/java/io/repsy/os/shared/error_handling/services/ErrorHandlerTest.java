@@ -658,6 +658,31 @@ class ErrorHandlerTest {
   }
 
   @Test
+  @DisplayName(
+      "gives a panel 401 unAuthorized its own id and text: the login is missing or invalid")
+  void panelUnauthorizedIsLoginRequired() throws Exception {
+    this.mockMvc
+        .perform(get("/panel/unauthorized/plain"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.msgId").value("loginRequired"))
+        .andExpect(jsonPath("$.data").value("unAuthorized"))
+        .andExpect(
+            jsonPath("$.text")
+                .value(
+                    "Please log in: the credentials are missing or invalid, or the account is gone."));
+  }
+
+  @Test
+  @DisplayName("keeps the unAuthorized id and text a protocol endpoint answers")
+  void protocolUnauthorizedKeepsItsIdAndText() throws Exception {
+    this.mockMvc
+        .perform(get("/unauthorized/plain"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.msgId").value("unAuthorized"))
+        .andExpect(jsonPath("$.text").value("The user has logged in but has no permissions."));
+  }
+
+  @Test
   @DisplayName("does not add the panel challenge to a protocol endpoint's 401")
   void protocolUnauthorizedHasNoPanelChallenge() throws Exception {
     this.mockMvc
@@ -789,6 +814,11 @@ class ErrorHandlerTest {
       throw new UnAuthorizedException("accessNotAllowed");
     }
 
+    @GetMapping("/unauthorized/plain")
+    String unauthorizedPlain() {
+      throw new UnAuthorizedException("unAuthorized");
+    }
+
     @GetMapping("/unauthorized/no-message")
     String unauthorizedWithoutMessage() {
       throw new UnAuthorizedException(null);
@@ -898,6 +928,11 @@ class ErrorHandlerTest {
     @GetMapping("/unauthorized")
     String unauthorized() {
       throw new UnAuthorizedException("accessNotAllowed");
+    }
+
+    @GetMapping("/unauthorized/plain")
+    String unauthorizedPlain() {
+      throw new UnAuthorizedException("unAuthorized");
     }
 
     @GetMapping("/unauthorized/basic")

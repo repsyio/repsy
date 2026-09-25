@@ -39,7 +39,8 @@ const SESSION_INVALID_MESSAGE = 'Session invalid, please log in again.';
  *   The retry is not intercepted again, and a 401 on it logs out, so this can never loop.
  * - Any 401 on the refresh call itself (`refreshTokenExpired`: expired, unknown, already used or
  *   revoked), or a refresh that fails otherwise: the session cannot be renewed, log out.
- * - `unAuthorized` (the account behind a valid token is gone, or credentials are missing or invalid):
+ * - `loginRequired` (the account behind a valid token is gone, or credentials are missing or invalid;
+ *   the panel's own id, the wire protocols answer `unAuthorized` for the same cases, RPS-1352):
  *   a lost session like the rest, so it logs out. A signed-in caller who merely lacks the permission
  *   for an operation is NOT a 401 any more but a 403 `accessDenied` (RPS-1284), which this interceptor
  *   never touches: the session is fine, the caller shows the refusal and the user stays logged in.

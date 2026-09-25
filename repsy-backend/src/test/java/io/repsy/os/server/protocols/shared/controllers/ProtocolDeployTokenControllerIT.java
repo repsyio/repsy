@@ -85,7 +85,8 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
   private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String TOKEN_NOT_FOUND_TEXT = "Deploy token not found.";
   private static final String REPO_NOT_FOUND_TEXT = "Repository not found";
-  private static final String UNAUTHORIZED_TEXT = "The user has logged in but has no permissions.";
+  private static final String UNAUTHORIZED_TEXT =
+      "Please log in: the credentials are missing or invalid, or the account is gone.";
   private static final Map<String, String> SUCCESS_TEXTS =
       Map.of(
           "tokenCreated", "Deploy token created.",
@@ -272,7 +273,8 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
   }
 
   private static void expectUnauthorized(final ResultActions result) throws Exception {
-    expectError(result, HttpStatus.UNAUTHORIZED, "unAuthorized", "unAuthorized", UNAUTHORIZED_TEXT);
+    expectError(
+        result, HttpStatus.UNAUTHORIZED, "loginRequired", "unAuthorized", UNAUTHORIZED_TEXT);
   }
 
   /** Asserts the complete {@code DeployTokenInfoListItem} shape against the stored row. */
@@ -437,7 +439,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
                   .apply(UUID.randomUUID())
                   .header(AUTHORIZATION, token)),
           HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
+          "loginRequired",
           "unAuthorized",
           UNAUTHORIZED_TEXT);
     }

@@ -29,9 +29,9 @@ describe('DeleteOrphanLayersComponent', () => {
 
   beforeEach(() => {
     dockerService = jasmine.createSpyObj<DockerImageControllerService>('DockerImageControllerService', [
-      'deleteOrphanLayers',
+      'deleteDockerOrphanLayers',
     ]);
-    dockerService.deleteOrphanLayers.and.returnValue(of({}) as never);
+    dockerService.deleteDockerOrphanLayers.and.returnValue(of({}) as never);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
     component = new DeleteOrphanLayersComponent(dockerService, dangerModalService, toastService);
@@ -42,7 +42,7 @@ describe('DeleteOrphanLayersComponent', () => {
     component.deleteOrphanLayers();
 
     expect(dangerModalService.modal).toEqual({ title: 'Delete Orphan Layers', action: 'Delete', message: null });
-    expect(dockerService.deleteOrphanLayers).not.toHaveBeenCalled();
+    expect(dockerService.deleteDockerOrphanLayers).not.toHaveBeenCalled();
     expect(component.deleting).toBeFalse();
   });
 
@@ -51,14 +51,14 @@ describe('DeleteOrphanLayersComponent', () => {
 
     dangerModalService.call();
 
-    expect(dockerService.deleteOrphanLayers).toHaveBeenCalledOnceWith('docker-repo');
+    expect(dockerService.deleteDockerOrphanLayers).toHaveBeenCalledOnceWith('docker-repo');
     expect(toastService.show).toHaveBeenCalledOnceWith('Orphan layers deleted successfully', 'success');
     expect(component.deleting).toBeFalse();
   });
 
   it('shows the deletion as running until the request answers', () => {
     const answer = new Subject<unknown>();
-    dockerService.deleteOrphanLayers.and.returnValue(answer as never);
+    dockerService.deleteDockerOrphanLayers.and.returnValue(answer as never);
     component.deleteOrphanLayers();
 
     dangerModalService.call();
@@ -70,7 +70,7 @@ describe('DeleteOrphanLayersComponent', () => {
   });
 
   it('does not toast, and stops showing it as running, when the deletion fails', () => {
-    dockerService.deleteOrphanLayers.and.returnValue(throwError(() => new Error('boom')));
+    dockerService.deleteDockerOrphanLayers.and.returnValue(throwError(() => new Error('boom')));
     component.deleteOrphanLayers();
 
     dangerModalService.call();

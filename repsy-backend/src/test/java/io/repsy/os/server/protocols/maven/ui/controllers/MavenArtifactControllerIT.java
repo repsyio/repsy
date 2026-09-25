@@ -521,7 +521,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
           .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.*", hasSize(5)))
           .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.msgId").value("unAuthorized"))
+          .andExpect(jsonPath("$.msgId").value("loginRequired"))
           .andExpect(jsonPath("$.data").value("unAuthorized"))
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)))
           .andExpect(jsonPath("$.text").value(notNullValue()));
@@ -545,11 +545,14 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                   .with(apiPort()))
           .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("unAuthorized"))
+          .andExpect(jsonPath("$.msgId").value("loginRequired"))
           .andExpect(jsonPath("$.type").value("ERROR"))
           .andExpect(jsonPath("$.data").value("unAuthorized"))
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)))
-          .andExpect(jsonPath("$.text").value("The user has logged in but has no permissions."));
+          .andExpect(
+              jsonPath("$.text")
+                  .value(
+                      "Please log in: the credentials are missing or invalid, or the account is gone."));
     }
 
     @Test

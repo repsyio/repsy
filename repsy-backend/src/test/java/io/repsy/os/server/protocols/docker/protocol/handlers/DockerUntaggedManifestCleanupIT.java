@@ -574,9 +574,9 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
     this.expectError(
         this.perform(delete(path)),
         HttpStatus.UNAUTHORIZED,
+        "loginRequired",
         "unAuthorized",
-        "unAuthorized",
-        "The user has logged in but has no permissions.");
+        "Please log in: the credentials are missing or invalid, or the account is gone.");
     this.expectError(
         this.perform(delete(path).header(AUTHORIZATION, this.panelTokenOf(user))),
         HttpStatus.FORBIDDEN,

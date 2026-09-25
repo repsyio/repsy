@@ -39,9 +39,9 @@ describe('DeleteUntaggedManifestsComponent', () => {
 
   beforeEach(() => {
     dockerService = jasmine.createSpyObj<DockerImageControllerService>('DockerImageControllerService', [
-      'deleteUntaggedManifests',
+      'deleteDockerUntaggedManifests',
     ]);
-    dockerService.deleteUntaggedManifests.and.returnValue(
+    dockerService.deleteDockerUntaggedManifests.and.returnValue(
       of(
         answer({ deletedManifests: 3, freedManifestBytes: 1024, orphanLayersScheduled: 2, orphanLayerBytes: 3072 }),
       ) as never,
@@ -59,7 +59,7 @@ describe('DeleteUntaggedManifestsComponent', () => {
     expect(dangerModalService.modal.action).toBe('Delete');
     expect(dangerModalService.modal.message).toContain('no tag points to');
     expect(dangerModalService.modal.message).toContain('stop being pullable by digest');
-    expect(dockerService.deleteUntaggedManifests).not.toHaveBeenCalled();
+    expect(dockerService.deleteDockerUntaggedManifests).not.toHaveBeenCalled();
     expect(component.deleting).toBeFalse();
   });
 
@@ -68,7 +68,7 @@ describe('DeleteUntaggedManifestsComponent', () => {
 
     dangerModalService.call();
 
-    expect(dockerService.deleteUntaggedManifests).toHaveBeenCalledOnceWith('docker-repo', undefined);
+    expect(dockerService.deleteDockerUntaggedManifests).toHaveBeenCalledOnceWith('docker-repo', undefined);
     expect(toastService.show).toHaveBeenCalledOnceWith(
       'Deleted 3 untagged manifests and 2 unused layers (4 K freed)',
       'success',
@@ -77,7 +77,7 @@ describe('DeleteUntaggedManifestsComponent', () => {
   });
 
   it('uses the singular for one manifest and one layer', () => {
-    dockerService.deleteUntaggedManifests.and.returnValue(
+    dockerService.deleteDockerUntaggedManifests.and.returnValue(
       of(
         answer({ deletedManifests: 1, freedManifestBytes: 512, orphanLayersScheduled: 1, orphanLayerBytes: 512 }),
       ) as never,
@@ -93,7 +93,7 @@ describe('DeleteUntaggedManifestsComponent', () => {
   });
 
   it('says so when there was nothing to delete', () => {
-    dockerService.deleteUntaggedManifests.and.returnValue(
+    dockerService.deleteDockerUntaggedManifests.and.returnValue(
       of(
         answer({ deletedManifests: 0, freedManifestBytes: 0, orphanLayersScheduled: 0, orphanLayerBytes: 0 }),
       ) as never,
@@ -106,7 +106,7 @@ describe('DeleteUntaggedManifestsComponent', () => {
   });
 
   it('still toasts when the answer carries no data', () => {
-    dockerService.deleteUntaggedManifests.and.returnValue(of({}) as never);
+    dockerService.deleteDockerUntaggedManifests.and.returnValue(of({}) as never);
     component.deleteUntaggedManifests();
 
     dangerModalService.call();
@@ -116,7 +116,7 @@ describe('DeleteUntaggedManifestsComponent', () => {
 
   it('shows the deletion as running until the request answers', () => {
     const pending = new Subject<unknown>();
-    dockerService.deleteUntaggedManifests.and.returnValue(pending as never);
+    dockerService.deleteDockerUntaggedManifests.and.returnValue(pending as never);
     component.deleteUntaggedManifests();
 
     dangerModalService.call();
@@ -138,7 +138,7 @@ describe('DeleteUntaggedManifestsComponent', () => {
   });
 
   it('does not toast, and stops showing it as running, when the deletion fails', () => {
-    dockerService.deleteUntaggedManifests.and.returnValue(throwError(() => new Error('boom')));
+    dockerService.deleteDockerUntaggedManifests.and.returnValue(throwError(() => new Error('boom')));
     component.deleteUntaggedManifests();
 
     dangerModalService.call();
@@ -150,7 +150,7 @@ describe('DeleteUntaggedManifestsComponent', () => {
   it('does not tell the page anything when the deletion fails', () => {
     const cleaned = jasmine.createSpy('cleaned');
     component.cleaned.subscribe(cleaned);
-    dockerService.deleteUntaggedManifests.and.returnValue(throwError(() => new Error('boom')));
+    dockerService.deleteDockerUntaggedManifests.and.returnValue(throwError(() => new Error('boom')));
     component.deleteUntaggedManifests();
 
     dangerModalService.call();
@@ -167,14 +167,14 @@ describe('DeleteUntaggedManifestsComponent', () => {
 
       expect(dangerModalService.modal.message).toContain('the image nginx');
       expect(dangerModalService.modal.message).toContain('no tag points to');
-      expect(dockerService.deleteUntaggedManifests).not.toHaveBeenCalled();
+      expect(dockerService.deleteDockerUntaggedManifests).not.toHaveBeenCalled();
     });
 
     it('limits the deletion to the image once confirmed, then toasts the counts', () => {
       component.deleteUntaggedManifests();
       dangerModalService.call();
 
-      expect(dockerService.deleteUntaggedManifests).toHaveBeenCalledOnceWith('docker-repo', 'nginx');
+      expect(dockerService.deleteDockerUntaggedManifests).toHaveBeenCalledOnceWith('docker-repo', 'nginx');
       expect(toastService.show).toHaveBeenCalledOnceWith(
         'Deleted 3 untagged manifests and 2 unused layers (4 K freed)',
         'success',
@@ -219,7 +219,7 @@ describe('DeleteUntaggedManifestsComponent', () => {
 
       expect(dangerModalService.modal.title).toBe('Delete Untagged Manifests');
       expect(dangerModalService.modal.message).toContain('the image nginx');
-      expect(dockerService.deleteUntaggedManifests).not.toHaveBeenCalled();
+      expect(dockerService.deleteDockerUntaggedManifests).not.toHaveBeenCalled();
     });
   });
 });

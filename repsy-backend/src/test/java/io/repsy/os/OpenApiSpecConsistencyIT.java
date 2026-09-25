@@ -101,7 +101,7 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
    * </ul>
    */
   private static final Set<String> PUBLIC_OPERATIONS =
-      Set.of("login", "refreshToken", "getSupportedRepoTypes", "checkSumdbSupported");
+      Set.of("login", "refreshToken", "getSupportedRepoTypes", "checkGolangSumdbSupported");
 
   /**
    * RPS-1269: the one name a path variable has for each role, across every panel controller. A

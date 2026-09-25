@@ -181,7 +181,7 @@ export class MavenService {
 
   public deleteGroup(groupName: string): Observable<DeletedItem> {
     return this.mavenArtifactControllerService
-      .deleteGroup(groupName, this.repoName)
+      .deleteMavenGroup(groupName, this.repoName)
       .pipe(map((r) => r.data as unknown as DeletedItem));
   }
 

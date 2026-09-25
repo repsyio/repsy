@@ -78,6 +78,31 @@ import org.springframework.transaction.support.TransactionTemplate;
  * other. A signature that does not verify is deleted in that transaction, which commits before the
  * failure is thrown, so a retry starts clean; a failure to find the signer's key (a key server that
  * does not answer, a key not registered yet) keeps the row.
+ *
+ * <p><b>Lock order (RPS-1352).</b> Two kinds of row lock meet here: the parked row ({@code
+ * maven_pending_signature}) and the version's row lock that {@link VersionSignatureService#lock}
+ * takes ({@code update ... set signed = signed}). Every request that needs both takes them in one
+ * order, the parked row first and the version second:
+ *
+ * <ul>
+ *   <li>{@link #claim}, in the transaction of a signature's upload: the parked row, then {@code
+ *       lockAndIsVerifyAll};
+ *   <li>{@link #reconcileFile}: the parked row in a transaction of its own, then, only when the
+ *       signature does not verify, the version ({@code forget}, {@code refreshSigned});
+ *   <li>{@link #reconcileDirectory} and {@link #verifyDirectory}: the parked rows of the directory,
+ *       ordered by path, and no version lock at all.
+ * </ul>
+ *
+ * {@link #park}, {@link #discard} and {@link #purgeOlderThan} touch parked rows only. What could
+ * break the order is a transaction that already holds the version's row and then calls in here for
+ * a parked row: the checks above run in transactions of their own, {@code REQUIRES_NEW}, that the
+ * caller waits for, so the database cannot see that wait and would not report a deadlock, the
+ * requests would just hang. The POM's registration is that caller: it calls {@link
+ * #reconcileDirectory} after it wrote the version, and stays clear only because the row it wrote
+ * has not been flushed by then (the update is flushed by the first {@code lockAndIsVerifyAll} that
+ * follows). {@code PendingSignatureLockOrderIT} forces both interleavings, and asserts that the
+ * POM's transaction holds no version lock at that point; change the order, or write the version's
+ * row earlier, and it fails.
  */
 @Slf4j
 @Component

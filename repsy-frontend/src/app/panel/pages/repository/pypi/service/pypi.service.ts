@@ -87,7 +87,7 @@ export class PypiService {
     pageSize: number,
   ): Observable<PagedData<ReleaseListItem>> {
     return this.pypiPackageControllerService
-      .listReleases(packageName, this.repoName, version || undefined, pageIndex, pageSize, [
+      .listPypiReleases(packageName, this.repoName, version || undefined, pageIndex, pageSize, [
         `${sort.column},${sort.type}`,
       ])
       .pipe(
@@ -100,12 +100,14 @@ export class PypiService {
   }
 
   public fetchRelease(packageName: string, release: string): Observable<ReleaseDetail> {
-    return this.pypiPackageControllerService.getRelease(packageName, release, this.repoName).pipe(map((r) => r.data!));
+    return this.pypiPackageControllerService
+      .getPypiRelease(packageName, release, this.repoName)
+      .pipe(map((r) => r.data!));
   }
 
   public deleteRelease(packageName: string, releaseVersion: string): Observable<void> {
     return this.pypiPackageControllerService
-      .deleteRelease(packageName, releaseVersion, this.repoName)
+      .deletePypiRelease(packageName, releaseVersion, this.repoName)
       .pipe(map(() => undefined));
   }
 }

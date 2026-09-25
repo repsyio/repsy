@@ -111,7 +111,8 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       "application/vnd.cncf.helm.chart.content.v1.tar+gzip";
   private static final String OCI_PROVENANCE_TYPE =
       "application/vnd.cncf.helm.chart.provenance.v1.prov";
-  private static final String NO_PERMISSION_TEXT = "The user has logged in but has no permissions.";
+  private static final String NO_PERMISSION_TEXT =
+      "Please log in: the credentials are missing or invalid, or the account is gone.";
   private static final Map<String, String> SUCCESS_TEXTS =
       Map.of(
           "chartsFetched", "Charts fetched.",
@@ -736,7 +737,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
   private static void expectUnauthorized(final ResultActions result) throws Exception {
     expectError(
-        result, HttpStatus.UNAUTHORIZED, "unAuthorized", "unAuthorized", NO_PERMISSION_TEXT);
+        result, HttpStatus.UNAUTHORIZED, "loginRequired", "unAuthorized", NO_PERMISSION_TEXT);
   }
 
   private static void expectChartNotFound(final ResultActions result) throws Exception {
@@ -2360,7 +2361,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       expectError(
           this.send(endpoint, repo.getName(), ghost),
           HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
+          "loginRequired",
           "unAuthorized",
           NO_PERMISSION_TEXT);
     }

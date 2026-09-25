@@ -529,7 +529,7 @@ paths:
     get:
       tags:
         - key-store-controller
-      operationId: listAllowedKeyServers
+      operationId: listMavenAllowedKeyServers
       responses:
         '200':
           description: OK
@@ -1056,7 +1056,7 @@ paths:
     get:
       tags:
         - pypi-package-controller
-      operationId: listReleases
+      operationId: listPypiReleases
       description: >-
         Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
       parameters:
@@ -1104,7 +1104,7 @@ paths:
     get:
       tags:
         - pypi-package-controller
-      operationId: getRelease
+      operationId: getPypiRelease
       parameters:
         - name: packageName
           in: path
@@ -1136,7 +1136,7 @@ paths:
     delete:
       tags:
         - pypi-package-controller
-      operationId: deleteRelease
+      operationId: deletePypiRelease
       parameters:
         - name: packageName
           in: path
@@ -2164,7 +2164,7 @@ paths:
     delete:
       tags:
         - maven-artifact-controller
-      operationId: deleteGroup
+      operationId: deleteMavenGroup
       parameters:
         - name: groupName
           in: path
@@ -2584,7 +2584,7 @@ paths:
     get:
       tags:
         - golang-module-controller
-      operationId: checkSumdbSupported
+      operationId: checkGolangSumdbSupported
       parameters:
         - name: repoName
           in: path
@@ -2727,7 +2727,7 @@ paths:
     delete:
       tags:
         - docker-image-controller
-      operationId: deleteOrphanLayers
+      operationId: deleteDockerOrphanLayers
       responses:
         '200':
           description: OK
@@ -2754,7 +2754,7 @@ paths:
     delete:
       tags:
         - docker-image-controller
-      operationId: deleteUntaggedManifests
+      operationId: deleteDockerUntaggedManifests
       description: >-
         Deletes the manifests of the repository that no tag points to, directly or through an index,
         together with their files, then deletes the layers no manifest uses any more. The manifests
@@ -2880,7 +2880,7 @@ paths:
     get:
       tags:
         - docker-image-controller
-      operationId: listTagManifests
+      operationId: listDockerTagManifests
       description: >-
         Sortable by `id`, `name`, `createdAt` (`property,direction`). The default is `id,desc`.
       parameters:
@@ -2933,7 +2933,7 @@ paths:
     get:
       tags:
         - docker-image-controller
-      operationId: getManifest
+      operationId: getDockerImageManifest
       parameters:
         - name: imageName
           in: path
@@ -2972,7 +2972,7 @@ paths:
     get:
       tags:
         - docker-image-controller
-      operationId: getTagDetail
+      operationId: getDockerImageDetail
       parameters:
         - name: imageName
           in: path
@@ -3064,7 +3064,7 @@ paths:
     delete:
       tags:
         - docker-image-controller
-      operationId: deleteTag
+      operationId: deleteDockerTag
       parameters:
         - name: imageName
           in: path
@@ -3102,7 +3102,7 @@ paths:
     get:
       tags:
         - docker-image-controller
-      operationId: getConfig
+      operationId: getDockerImageConfig
       parameters:
         - name: imageName
           in: path
@@ -4334,7 +4334,7 @@ components:
       description: >-
         The request is not authenticated: the token or credentials are missing, wrong or expired,
         or the account behind the token no longer exists. `msgId` says which
-        (`sessionExpired`: refresh the access token once and retry; `unAuthorized`,
+        (`sessionExpired`: refresh the access token once and retry; `loginRequired`,
         `accessNotAllowed`, `refreshTokenExpired`, `invalidCredentials`: the session or the
         credentials are not valid, sign in again). The panel answers with a `WWW-Authenticate:
         Bearer` challenge.

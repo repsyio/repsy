@@ -60,7 +60,7 @@ export class DeleteUntaggedManifestsComponent {
       () => {
         this.deleting = true;
         this.dockerImageControllerService
-          .deleteUntaggedManifests(this.activeRepository.repoName, this.imageName)
+          .deleteDockerUntaggedManifests(this.activeRepository.repoName, this.imageName)
           .pipe(
             finalize(() => {
               this.deleting = false;
