@@ -31,6 +31,8 @@ import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushResult;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciTagListDto;
 import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
@@ -362,11 +364,6 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
   }
 
   @Override
-  public HelmChartInfo findOrCreateChart(final HelmChartForm form, final ID repoId) {
-    return this.chartService.findOrCreate(form, repoId);
-  }
-
-  @Override
   public Optional<HelmChartInfo> findChartByNameAndVersion(
       final ProtocolContext context, final String name, final String version) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
@@ -378,23 +375,72 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
     return this.ociBlobService.findOrCreate(form, repoId);
   }
 
+  /**
+   * Writes the chart version, the manifest and the manifest file in the one transaction the caller
+   * opened (RPS-1354). The chart row is locked first ({@link ChartService#findOrCreate}), which is
+   * what makes pushes of one chart take turns (RPS-1273) and now also holds the turn until the
+   * manifest is written. Both rows are flushed before the file is written, the order RPS-1124 set
+   * for the classic upload: a row the database refuses never reaches storage, and a file that
+   * cannot be written rolls the rows back. A brand-new manifest whose file fails has its partial
+   * file removed; a manifest being replaced keeps its row, and so its file path, until the next
+   * successful push.
+   */
   @Override
-  public HelmOciManifestInfo findOrCreateManifest(final HelmOciManifestForm form, final ID repoId) {
-    return this.ociManifestService.save(form, repoId);
-  }
-
-  @Override
-  public void pushManifest(
-      final ProtocolContext context,
-      final String name,
-      final String reference,
-      final byte[] contentBytes)
+  public HelmOciManifestPushResult pushManifest(
+      final ProtocolContext context, final HelmOciManifestPushForm form, final byte[] contentBytes)
       throws IOException {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var usages =
-        this.helmStorageService.saveManifest(
-            repoInfo.getStorageKey(), name, reference, contentBytes, repoInfo.getName());
-    ProtocolContextUtils.addUsages(context, usages);
+
+    final var chart = this.chartService.findOrCreate(form.getChart(), repoInfo.getId());
+    // Looked up after the chart lock: a push that waited for another one must see the manifest
+    // that one committed, not the row as it was before the wait.
+    final var replaced =
+        this.ociManifestService
+            .findByNameAndReference(repoInfo.getId(), form.getName(), form.getReference())
+            .isPresent();
+    final var manifest =
+        this.ociManifestService.save(
+            HelmOciManifestForm.builder()
+                .chartId(chart.id())
+                .name(form.getName())
+                .reference(form.getReference())
+                .digest(form.getDigest())
+                .mediaType(form.getMediaType())
+                .content(form.getContent())
+                .build(),
+            repoInfo.getId());
+
+    try {
+      final var usages =
+          this.helmStorageService.saveManifest(
+              repoInfo.getStorageKey(),
+              form.getName(),
+              form.getReference(),
+              contentBytes,
+              repoInfo.getName());
+      return new HelmOciManifestPushResult(manifest, usages);
+    } catch (final RuntimeException e) {
+      if (!replaced) {
+        this.discardPartialManifest(repoInfo, form, e);
+      }
+      throw e;
+    }
+  }
+
+  private void discardPartialManifest(
+      final BaseRepoInfo<ID> repoInfo, final HelmOciManifestPushForm form, final Exception cause) {
+
+    try {
+      this.helmStorageService.deleteManifestFile(
+          repoInfo.getStorageKey(), form.getName(), form.getReference(), repoInfo.getName());
+    } catch (final IOException | RuntimeException e) {
+      log.debug(
+          "No partial manifest removed for {}:{}: {}",
+          form.getName(),
+          form.getReference(),
+          e.getMessage());
+      cause.addSuppressed(e);
+    }
   }
 
   @Override

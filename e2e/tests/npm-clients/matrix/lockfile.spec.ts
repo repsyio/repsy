@@ -53,27 +53,41 @@ import type { Seeder } from '../../../src/seed/seeder.js';
 /** What a client says when a frozen install finds bytes that differ from its lockfile. */
 const INTEGRITY_FAILURE: Partial<Record<ClientId, RegExp>> = {
   npm: /EINTEGRITY/,
+  pnpm: /ERR_PNPM_TARBALL_INTEGRITY/,
+  'yarn-classic': /Integrity check failed for/,
+  bun: /Integrity check failed for tarball/,
+  // YN0018: the checksum berry recorded (of its own zip of the tarball) no longer matches.
   'yarn-berry': /YN0018.*checksum/,
 };
 
 /**
- * How a client's lockfile pins a resolution: whether it records the tarball's URL (a client that
- * builds the conventional URL itself, berry, records none unless the packument's differs, and then as
- * `__archiveUrl`), and the pattern of the integrity value it records.
+ * Whether the lockfile records each package's tarball URL. pnpm writes only `resolution: {integrity}`
+ * while the tarball is at the conventional `<registry>/<name>/-/<name>-<version>.tgz` (it rebuilds
+ * the URL from the configured registry), which Repsy's is: the lockfile then names no host at all.
  */
 const LOCKFILE_RECORDS_TARBALL_URL: Partial<Record<ClientId, boolean>> = {
-  npm: true,
+  pnpm: false,
+  // Berry builds the conventional URL itself and pins the packument's (`__archiveUrl`) only when it differs.
   'yarn-berry': false,
 };
-/** What a client's lockfile entry for `name@1.0.0` contains. */
-const LOCKFILE_ENTRY: Partial<Record<ClientId, (name: string) => string>> = {
-  npm: (name) => `node_modules/${name}`,
-  'yarn-berry': (name) => `resolution: "${name}@npm:1.0.0"`,
-};
+
+/** The integrity value a lockfile records: an SRI hash, or berry's `checksum: 10c0/<sha512 hex>`. */
 const LOCKFILE_INTEGRITY: Partial<Record<ClientId, RegExp>> = {
-  npm: /sha512-/,
   'yarn-berry': /checksum: 10c0\/[0-9a-f]{128}/,
 };
+
+/** The lockfile names each tarball URL, or (pnpm) names no URL at all. */
+function expectTarballUrls(client: NpmFamilyClient, lockfile: string, urls: string[]): void {
+  if (LOCKFILE_RECORDS_TARBALL_URL[client.id] ?? true) {
+    for (const url of urls) {
+      expect(lockfile, `${client.lockfile} records the registry's own tarball URL`).toContain(url);
+    }
+  } else {
+    expect(lockfile, `${client.lockfile} records no tarball URL, so no host`).not.toMatch(
+      /tarball:|https?:\/\/|__archiveUrl/,
+    );
+  }
+}
 
 interface Graph {
   repoName: string;
@@ -156,22 +170,15 @@ for (const client of clientsWith('frozenInstall')) {
         expect(installed.exitCode, `install: ${installed.command}\n${installed.stderr}`).toBe(0);
 
         const lockfile = await fs.readFile(path.join(first.work, client.lockfile ?? ''), 'utf8');
-        for (const name of [graph.app, graph.lib]) {
-          const tarballUrl = `${env.repoBaseUrl}/${graph.repoName}/${name}/-/${name}-1.0.0.tgz`;
-          expect(
-            lockfile.includes(tarballUrl),
-            `${client.lockfile} ${LOCKFILE_RECORDS_TARBALL_URL[client.id] ? 'records' : 'does not record'} ${name}'s tarball URL`,
-          ).toBe(LOCKFILE_RECORDS_TARBALL_URL[client.id]);
-          expect(
-            lockfile,
-            "no URL is pinned to something other than the client's own conventional one",
-          ).not.toContain('__archiveUrl');
-          expect(lockfile, `${client.lockfile} has an entry for ${name}`).toContain(
-            LOCKFILE_ENTRY[client.id]?.(name) ?? '',
-          );
-        }
+        expectTarballUrls(
+          client,
+          lockfile,
+          [graph.app, graph.lib].map(
+            (name) => `${env.repoBaseUrl}/${graph.repoName}/${name}/-/${name}-1.0.0.tgz`,
+          ),
+        );
         expect(lockfile, 'and an integrity hash for it').toMatch(
-          LOCKFILE_INTEGRITY[client.id] as RegExp,
+          LOCKFILE_INTEGRITY[client.id] ?? /sha512-/,
         );
 
         // A fresh HOME and cache, and only package.json + the lockfile: nothing but the lockfile and

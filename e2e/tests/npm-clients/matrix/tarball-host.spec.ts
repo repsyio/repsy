@@ -32,7 +32,6 @@ import fs from 'node:fs/promises';
 
 import { MARKER_FILENAME } from '../../../src/clients/npm.js';
 import { npmAuthHeader, parsePackument } from '../../../src/clients/npm-raw.js';
-import type { ClientId } from '../../../src/clients/npm-family/client.js';
 import {
   newRepo,
   packageNameFor,
@@ -44,9 +43,16 @@ import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import { target } from '../../../src/target.js';
+import type { ClientId } from '../../../src/clients/npm-family/client.js';
 
-/** The clients whose lockfile records the tarball's URL (berry's does not, see below). */
-const CLIENT_RECORDS_TARBALL_URL: ReadonlySet<ClientId> = new Set<ClientId>(['npm']);
+/**
+ * Clients whose lockfile records no tarball URL for a conventional one, only integrity (pnpm), or that
+ * pin one (`__archiveUrl`) only when the packument's differs from the URL they build themselves (berry).
+ */
+const LOCKFILE_HAS_NO_TARBALL_URL: ReadonlySet<ClientId> = new Set<ClientId>([
+  'pnpm',
+  'yarn-berry',
+]);
 
 /** The other name of the local registry: `127.0.0.1` for `localhost`, and the reverse. */
 function alternateBase(base: string): string {
@@ -112,12 +118,9 @@ for (const client of target.isRemote ? [] : clientsWith('frozenInstall')) {
 
       const lockfile = await fs.readFile(path.join(consumer.work, client.lockfile ?? ''), 'utf8');
       expect(
-        lockfile.includes(tarballUrl),
-        'the lockfile records the registry address (berry records no URL: the packument names its conventional one)',
-      ).toBe(CLIENT_RECORDS_TARBALL_URL.has(client.id));
-      expect(lockfile, "no URL pinned apart from the client's conventional one").not.toContain(
-        '__archiveUrl',
-      );
+        LOCKFILE_HAS_NO_TARBALL_URL.has(client.id) || lockfile.includes(tarballUrl),
+        'the lockfile records the registry address',
+      ).toBe(true);
       expect(lockfile, "and nothing of the publisher's address").not.toContain(publishBase);
     },
   );

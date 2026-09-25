@@ -35,14 +35,19 @@ import { adminCredential } from '../../../src/clients/raw-http.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 
 /**
- * Whether a client prints the deprecation message when it installs the version. Berry does not: the
- * registry serves the message (`yarn npm info -f deprecated` shows it, `tests/npm-clients/yarn-berry`),
- * but neither `yarn add` nor `yarn install` says a word about it.
+ * Clients that leave the deprecation MESSAGE out of what an install prints. pnpm 12.6 names only the
+ * deprecated package and version (`[WARN] deprecated <name>@<version>`): its changelog lists it as a
+ * security fix (a registry-controlled message is untrusted terminal output).
  */
-const PRINTS_DEPRECATION_ON_INSTALL: Partial<Record<ClientId, boolean>> = {
-  npm: true,
-  'yarn-berry': false,
-};
+const OMITS_DEPRECATION_MESSAGE: ReadonlySet<ClientId> = new Set<ClientId>(['pnpm']);
+
+/**
+ * Clients whose `add`/`install` say nothing at all about a deprecated version (probed: bun prints only
+ * "(v1.1.0 available)"; `bun info <pkg>@<version> deprecated` shows it, see `bun/commands.spec.ts`;
+ * berry prints nothing either, `yarn npm info -f deprecated` shows it, `yarn-berry/commands.spec.ts`).
+ * The registry serves the message to every client; whether it shows it is the client's.
+ */
+const SILENT_ON_DEPRECATED: ReadonlySet<ClientId> = new Set<ClientId>(['bun', 'yarn-berry']);
 
 async function deprecatedOf(
   repoName: string,
@@ -104,10 +109,17 @@ for (const publisher of clientsWith('deprecateCmd')) {
             added.exitCode,
             `${consumerClient.label} add: ${added.command}\n${added.stderr}`,
           ).toBe(0);
+          const printed = `${added.stdout}\n${added.stderr}`;
+          const silent = SILENT_ON_DEPRECATED.has(consumerClient.id);
+          const omitsMessage = silent || OMITS_DEPRECATION_MESSAGE.has(consumerClient.id);
           expect(
-            `${added.stdout}\n${added.stderr}`.includes(message),
-            `${consumerClient.label} ${PRINTS_DEPRECATION_ON_INSTALL[consumerClient.id] ? 'prints' : 'does not print'} the deprecation message`,
-          ).toBe(PRINTS_DEPRECATION_ON_INSTALL[consumerClient.id]);
+            printed.includes(omitsMessage ? `deprecated ${name}@1.0.0` : message),
+            `${consumerClient.label} ${silent ? 'says nothing' : 'warns'} about the deprecated version`,
+          ).toBe(!silent);
+          expect(
+            printed.includes(message),
+            `${consumerClient.label} ${omitsMessage ? 'leaves out' : 'prints'} the deprecation message`,
+          ).toBe(!omitsMessage);
         }
 
         const cleared = await publisher.deprecate?.(ctx, `${name}@1.0.0`, '');

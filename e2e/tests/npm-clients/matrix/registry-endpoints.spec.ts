@@ -53,6 +53,34 @@ import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 
 /**
+ * The two totals of an `audit --json` report. npm 7+ counts `metadata.vulnerabilities.total` and
+ * `metadata.dependencies.total`; pnpm answers the npm 6 shape (`advisories`, and per-severity
+ * counts with `metadata.totalDependencies`).
+ */
+function auditSummary(json: string): { vulnerabilities: number; dependencies: number } {
+  const report = JSON.parse(json) as {
+    metadata?: {
+      vulnerabilities?: Record<string, number>;
+      dependencies?: number | { total?: number };
+      totalDependencies?: number;
+    };
+  };
+  const counts = report.metadata?.vulnerabilities ?? {};
+  const dependencies = report.metadata?.dependencies;
+  return {
+    vulnerabilities:
+      counts.total ??
+      (Object.keys(counts).length > 0
+        ? Object.values(counts).reduce((sum, count) => sum + count, 0)
+        : -1),
+    dependencies:
+      (typeof dependencies === 'object' ? dependencies.total : undefined) ??
+      report.metadata?.totalDependencies ??
+      -1,
+  };
+}
+
+/**
  * The username a client's `whoami` printed. Berry (no `--json` here) wraps its answer in its own
  * report: `➤ YN0000: <name>` and a `Done in` line.
  */
@@ -175,21 +203,19 @@ for (const client of clientsWith('searchCmd')) {
   );
 }
 
-/** What a client's report of a clean tree looks like (berry's `--json` prints nothing, so plain). */
-const AUDIT_REPORT_CHECKS: Partial<Record<ClientId, (stdout: string) => void>> = {
-  npm: (stdout) => {
-    const report = JSON.parse(stdout || '{}') as {
-      metadata?: { vulnerabilities?: { total?: number }; dependencies?: { total?: number } };
-    };
-    expect(report.metadata?.vulnerabilities?.total, 'no vulnerabilities').toBe(0);
-    expect(report.metadata?.dependencies?.total, 'the audited tree had the dependency in it').toBe(
-      1,
-    );
-  },
-  'yarn-berry': (stdout) => {
-    expect(stdout, 'no vulnerabilities').toContain('No audit suggestions');
-  },
-};
+/**
+ * A client's audit report as the two totals. Berry's report is its own text ("No audit suggestions"
+ * for a clean tree; its `--json` prints nothing at all) and has no dependency count: the wire check
+ * below is what proves it audited the tree.
+ */
+function summaryOf(
+  client: NpmFamilyClient,
+  stdout: string,
+): { vulnerabilities: number; dependencies: number } {
+  return client.id === 'yarn-berry'
+    ? { vulnerabilities: stdout.includes('No audit suggestions') ? 0 : -1, dependencies: 1 }
+    : auditSummary(stdout);
+}
 
 for (const client of clientsWith('auditCmd')) {
   test(
@@ -228,7 +254,9 @@ for (const client of clientsWith('auditCmd')) {
 
         const audited = await client.audit?.(consumer);
         expect(audited?.exitCode, `audit: ${audited?.command}\n${audited?.stderr}`).toBe(0);
-        AUDIT_REPORT_CHECKS[client.id]?.(audited?.stdout ?? '');
+        const { vulnerabilities, dependencies } = summaryOf(client, audited?.stdout ?? '{}');
+        expect(vulnerabilities, 'no vulnerabilities').toBe(0);
+        expect(dependencies, 'the audited tree had the dependency in it').toBe(1);
 
         const posts = recorder.entries.filter(
           (entry) => entry.method === 'POST' && entry.path.includes('/-/npm/v1/security/'),

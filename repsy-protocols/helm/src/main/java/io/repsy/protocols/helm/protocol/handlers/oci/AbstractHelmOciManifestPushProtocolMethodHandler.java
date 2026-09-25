@@ -27,10 +27,9 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmFacade;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
-import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
-import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
-import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushResult;
 import io.repsy.protocols.helm.shared.utils.HelmChartParser;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -52,6 +51,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -176,20 +176,21 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
             .digest(layerDigest)
             .size(layerSize)
             .build();
-    final var chartInfo = this.findOrCreateChart(repoInfo.getId(), chartForm, 1);
 
-    final var manifestForm =
-        HelmOciManifestForm.builder()
-            .chartId(chartInfo.id())
+    final var pushForm =
+        HelmOciManifestPushForm.builder()
+            .chart(chartForm)
             .name(name)
             .reference(reference)
             .digest(digest)
             .mediaType(mediaType)
             .content(manifestJson)
             .build();
-    final var manifestInfo = this.findOrCreateManifest(repoInfo.getId(), manifestForm, 1);
-
-    this.helmFacade.pushManifest(context, name, reference, contentBytes);
+    final var pushed = this.pushManifest(context, pushForm, contentBytes, 1);
+    final var manifestInfo = pushed.manifest();
+    // Reported here, once the push has committed, and not from inside the transaction: a push
+    // that lost a race is repeated, and its file would be charged once per run.
+    ProtocolContextUtils.addUsages(context, pushed.usages());
 
     if (!reference.startsWith(HelmConstants.SHA256_PREFIX)) {
       context.addProperty(ARTIFACT_NAME, metadata.getName());
@@ -215,13 +216,12 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
    * A real OCI push is two separate manifest-push requests hitting this same handler -- one by
    * digest, one by the tag reference -- and {@code handle}'s own {@code checkManifest}-by-reference
    * refusal only ever fires for the tag-referenced one (a fresh digest never already exists as its
-   * own reference). Without this, the digest-referenced request's own {@code findOrCreateChart}
-   * call would silently upsert the chart row even when the overall push is ultimately refused
-   * (RPS-1218's own upsert fix exposed this: the row's digest/size got updated by the by-digest
-   * sub-request before the by-tag sub-request's refusal ever ran). Checks the CHART's own (name,
-   * version) identity too, refusing only when it already exists with a DIFFERENT digest -- an
-   * identical re-push (the normal, successful two-step push's own second request) must stay a
-   * no-op, not a refusal.
+   * own reference). Without this, the digest-referenced request's own chart write call would
+   * silently upsert the chart row even when the overall push is ultimately refused (RPS-1218's own
+   * upsert fix exposed this: the row's digest/size got updated by the by-digest sub-request before
+   * the by-tag sub-request's refusal ever ran). Checks the CHART's own (name, version) identity
+   * too, refusing only when it already exists with a DIFFERENT digest -- an identical re-push (the
+   * normal, successful two-step push's own second request) must stay a no-op, not a refusal.
    */
   private void checkChartOverride(
       final ProtocolContext context,
@@ -333,47 +333,39 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
   }
 
   /**
-   * Runs the manifest write again when it loses a race on the row. Two first pushes of one tag both
-   * insert and the loser fails on the unique index ({@code DataIntegrityViolationException}); two
-   * pushes that override the same tag both read its {@code @Version} and the loser fails the
-   * version check at commit ({@code OptimisticLockingFailureException}, RPS-1342). The retry has to
-   * be here: the facade is the {@code @Transactional} proxy, and a retry inside its transaction
-   * would reuse the failed persistence context. The second run sees what the winner committed, so
-   * the client gets its {@code 201} instead of an error. When the row stays contended the exception
-   * reaches the error handler, which answers a 503 with {@code Retry-After}.
+   * Writes the chart version, the manifest and its file as one unit (RPS-1354), and repeats the
+   * whole unit when it loses a race on a row. Two first pushes of one tag both insert and the loser
+   * fails on the unique index ({@code DataIntegrityViolationException}); two pushes that override
+   * the same tag, or a push and a panel delete of its version, both read a row's {@code @Version}
+   * and the loser fails the version check ({@code OptimisticLockingFailureException}, RPS-1342);
+   * and the chart row lock a push now holds until its manifest is written (RPS-1273) can be one
+   * side of a deadlock with a request that takes the manifest row first ({@code
+   * PessimisticLockingFailureException}, which the database resolves by aborting one side).
+   *
+   * <p>The retry has to be here: the facade is the {@code @Transactional} proxy, and a retry inside
+   * its transaction would reuse the failed persistence context. Because the chart version row and
+   * the manifest are written in that one transaction, a run that fails leaves neither of them
+   * behind, so the repeat starts from the state the client saw and the second run sees what the
+   * winner committed. When the row stays contended the exception reaches the error handler, which
+   * answers a 503 with {@code Retry-After}, and the chart version row still is what it was: a
+   * repeated push finds nothing half done.
    */
   @SneakyThrows
-  private HelmOciManifestInfo findOrCreateManifest(
-      final ID repoId, final HelmOciManifestForm form, final int counter) {
+  private HelmOciManifestPushResult pushManifest(
+      final ProtocolContext context,
+      final HelmOciManifestPushForm form,
+      final byte[] contentBytes,
+      final int counter) {
     try {
-      return this.helmFacade.findOrCreateManifest(form, repoId);
-    } catch (final DataIntegrityViolationException | OptimisticLockingFailureException e) {
+      return this.helmFacade.pushManifest(context, form, contentBytes);
+    } catch (final DataIntegrityViolationException
+        | OptimisticLockingFailureException
+        | PessimisticLockingFailureException e) {
       if (counter == RETRY_COUNT) {
         throw e;
       }
       Thread.sleep(WAIT_RETRY * counter);
-      return this.findOrCreateManifest(repoId, form, counter + 1);
-    }
-  }
-
-  /**
-   * Runs the chart write again when it loses a race. The chart row is locked while its version is
-   * written (RPS-1273), so two pushes of one chart take turns; the version row can still be changed
-   * or deleted by a request that does not take that lock (the panel's delete), and the write then
-   * fails the version check at commit (RPS-1342). Repeated outside the facade's transaction, like
-   * {@link #findOrCreateManifest}.
-   */
-  @SneakyThrows
-  private HelmChartInfo findOrCreateChart(
-      final ID repoId, final HelmChartForm form, final int counter) {
-    try {
-      return this.helmFacade.findOrCreateChart(form, repoId);
-    } catch (final DataIntegrityViolationException | OptimisticLockingFailureException e) {
-      if (counter == RETRY_COUNT) {
-        throw e;
-      }
-      Thread.sleep(WAIT_RETRY * counter);
-      return this.findOrCreateChart(repoId, form, counter + 1);
+      return this.pushManifest(context, form, contentBytes, counter + 1);
     }
   }
 }

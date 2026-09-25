@@ -52,6 +52,8 @@ export interface WireEntry {
   npmSession?: string;
   ifNoneMatch?: string;
   ifModifiedSince?: string;
+  /** The request body as text, only when `captureRequestBody` is on (a publish's JSON document). */
+  requestBody?: string;
   status: number;
   responseEtag?: string;
   responseLastModified?: string;
@@ -72,6 +74,14 @@ export interface WireRecorder {
 export interface WireRecorderOptions {
   /** Rewrite the registry's own address to the recorder's in JSON responses (see the header). */
   rewriteTarballUrls?: boolean;
+  /**
+   * Request headers to set on what is FORWARDED (the recorded entry keeps what the client sent): e.g.
+   * `accept: 'application/json'` makes the registry answer the full packument to a client that asked
+   * for the abbreviated one, to tell what a client does with each.
+   */
+  forwardHeaders?: Record<string, string>;
+  /** Keep each request's body in `WireEntry.requestBody` (what a client PUT, e.g. a publish document). */
+  captureRequestBody?: boolean;
 }
 
 function first(value: string | string[] | undefined): string | undefined {
@@ -106,7 +116,7 @@ export async function startWireRecorder(options: WireRecorderOptions = {}): Prom
         port: upstream.port || 80,
         path: req.url,
         method: req.method,
-        headers: { ...req.headers, host: upstream.host },
+        headers: { ...req.headers, ...options.forwardHeaders, host: upstream.host },
       },
       (upstreamRes) => {
         entry.status = upstreamRes.statusCode ?? 502;
@@ -145,6 +155,13 @@ export async function startWireRecorder(options: WireRecorderOptions = {}): Prom
       entry.status = 502;
       res.destroy(err);
     });
+    if (options.captureRequestBody) {
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => {
+        entry.requestBody = Buffer.concat(chunks).toString('utf8');
+      });
+    }
     req.pipe(upstreamReq);
   });
 
