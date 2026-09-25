@@ -252,7 +252,7 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
         """
         select v.version_name, v.signed from maven_artifact_version v
           join maven_artifact a on a.id = v.artifact_id
-         where a.repo_id = ?""",
+          where a.repo_id = ?""",
         rs -> {
           signed.put(rs.getString(1), rs.getBoolean(2));
         },
@@ -454,7 +454,7 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
         this.jdbcTemplate.queryForObject(
             """
             select v.id from maven_artifact_version v join maven_artifact a on a.id = v.artifact_id
-             where a.repo_id = ?""",
+              where a.repo_id = ?""",
             UUID.class,
             repo.getId());
 
@@ -489,7 +489,7 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
         select s.file_name from maven_version_signature s
           join maven_artifact_version v on v.id = s.artifact_version_id
           join maven_artifact a on a.id = v.artifact_id
-         where a.repo_id = ? and v.version_name = ?""",
+          where a.repo_id = ? and v.version_name = ?""",
         String.class,
         repo.getId(),
         version);

@@ -260,7 +260,7 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
         """
         select v.signed from maven_artifact_version v
           join maven_artifact a on a.id = v.artifact_id
-         where a.repo_id = ? and a.artifact_name = 'lib' and v.version_name = '1.0'""",
+          where a.repo_id = ? and a.artifact_name = 'lib' and v.version_name = '1.0'""",
         Boolean.class,
         repo.getId());
   }
@@ -271,7 +271,7 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
         select s.file_name from maven_version_signature s
           join maven_artifact_version v on v.id = s.artifact_version_id
           join maven_artifact a on a.id = v.artifact_id
-         where a.repo_id = ? order by s.file_name""",
+          where a.repo_id = ? order by s.file_name""",
         String.class,
         repo.getId());
   }

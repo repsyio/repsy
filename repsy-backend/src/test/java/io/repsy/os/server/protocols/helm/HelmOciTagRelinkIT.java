@@ -193,7 +193,7 @@ class HelmOciTagRelinkIT extends AbstractIntegrationTest {
         """
         select v.version
           from helm_oci_manifest m join helm_chart_version v on v.id = m.chart_version_id
-         where m.repo_id = ? and m.name = ? and m.reference = ?
+          where m.repo_id = ? and m.name = ? and m.reference = ?
         """,
         String.class,
         repo.getId(),

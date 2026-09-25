@@ -135,7 +135,7 @@ class HelmDeleteStorageFailureIT extends AbstractIntegrationTest {
             """
             select count(*)
               from helm_chart_version v join helm_chart c on c.id = v.chart_id
-             where c.repo_id = ? and c.name = ? and v.version = ?
+              where c.repo_id = ? and c.name = ? and v.version = ?
             """,
             Integer.class,
             repo.getId(),

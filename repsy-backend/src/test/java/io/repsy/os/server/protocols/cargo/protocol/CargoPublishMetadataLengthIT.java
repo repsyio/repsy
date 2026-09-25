@@ -158,7 +158,7 @@ class CargoPublishMetadataLengthIT extends AbstractIntegrationTest {
         """
         select i.vers, i.rust_version, i.links
           from cargo_crate_index i join cargo_crate c on c.id = i.crate_id
-         where c.repo_id = ?
+          where c.repo_id = ?
         """,
         repo);
   }
@@ -168,7 +168,7 @@ class CargoPublishMetadataLengthIT extends AbstractIntegrationTest {
         """
         select m.version, m.rust_version, m.license, m.license_file, m.documentation
           from cargo_crate_meta m join cargo_crate c on c.id = m.crate_id
-         where c.repo_id = ?
+          where c.repo_id = ?
         """,
         repo);
   }
@@ -181,8 +181,8 @@ class CargoPublishMetadataLengthIT extends AbstractIntegrationTest {
         select a.author from cargo_author a
           join cargo_crate_author ca on ca.author_id = a.id
           join cargo_crate c on c.id = ca.crate_id
-         where c.repo_id = ?
-         order by a.author
+          where c.repo_id = ?
+          order by a.author
         """,
         String.class,
         repo.getId());
@@ -196,8 +196,8 @@ class CargoPublishMetadataLengthIT extends AbstractIntegrationTest {
         select a.category from cargo_category a
           join cargo_crate_category ca on ca.category_id = a.id
           join cargo_crate c on c.id = ca.crate_id
-         where c.repo_id = ?
-         order by a.category
+          where c.repo_id = ?
+          order by a.category
         """,
         String.class,
         repo.getId());

@@ -178,7 +178,7 @@ class NpmMissingMetadataIT extends AbstractIntegrationTest {
     final var manifest =
         """
         {"name":"%s","version":"%s","main":"index.js",
-         "dependencies":{"left-pad":"^1.3.0"},"scripts":{"test":"echo ok"}}
+          "dependencies":{"left-pad":"^1.3.0"},"scripts":{"test":"echo ok"}}
         """
             .formatted(name, version)
             .getBytes(StandardCharsets.UTF_8);

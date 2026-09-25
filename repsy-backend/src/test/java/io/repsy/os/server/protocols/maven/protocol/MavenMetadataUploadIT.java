@@ -229,7 +229,7 @@ class MavenMetadataUploadIT extends AbstractIntegrationTest {
             """
             select count(*) from maven_artifact_version v
               join maven_artifact a on a.id = v.artifact_id
-             where a.repo_id = ? and v.version_name = ?""",
+              where a.repo_id = ? and v.version_name = ?""",
             Long.class,
             repo.getId(),
             versionName);

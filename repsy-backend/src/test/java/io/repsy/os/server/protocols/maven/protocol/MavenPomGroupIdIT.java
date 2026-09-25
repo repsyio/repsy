@@ -250,7 +250,7 @@ class MavenPomGroupIdIT extends AbstractIntegrationTest {
         """
         select v.version_name from maven_artifact_version v
           join maven_artifact a on a.id = v.artifact_id
-         where a.repo_id = ? and a.group_name = 'com.acme' and a.artifact_name = 'lib'""",
+          where a.repo_id = ? and a.group_name = 'com.acme' and a.artifact_name = 'lib'""",
         String.class,
         repo.getId());
   }

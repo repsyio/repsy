@@ -346,9 +346,9 @@ class NpmAuditProtocolIT extends AbstractIntegrationTest {
     final var tree =
         """
         {"name":"root","version":"undefined","dependencies":{
-           ".":{"dependencies":{"express":{"version":"4.0.0","dependencies":{"lodash":{"version":"4.17.20"}}}}},
-           "packages__web":{"version":"undefined","dependencies":{"lodash":{"version":"4.17.21"}}}},
-         "dev":false,"install":[],"remove":[],"metadata":{},"requires":{}}
+            ".":{"dependencies":{"express":{"version":"4.0.0","dependencies":{"lodash":{"version":"4.17.20"}}}}},
+            "packages__web":{"version":"undefined","dependencies":{"lodash":{"version":"4.17.21"}}}},
+          "dev":false,"install":[],"remove":[],"metadata":{},"requires":{}}
         """;
 
     final var response = this.plain(AUDITS, repo, tree);
@@ -389,9 +389,9 @@ class NpmAuditProtocolIT extends AbstractIntegrationTest {
     final var tree =
         """
         {"name":"app","version":"1.0.0","requires":{"lodash":"^4.17.0"},"dependencies":{
-           "lodash":{"version":"4.17.20"},
-           "jest":{"version":"27.0.0","dev":true,"dependencies":{"lodash":{"version":"4.17.20","dev":true}}}},
-         "install":[],"remove":[],"metadata":{"npm_version":"6.14.0"}}
+            "lodash":{"version":"4.17.20"},
+            "jest":{"version":"27.0.0","dev":true,"dependencies":{"lodash":{"version":"4.17.20","dev":true}}}},
+          "install":[],"remove":[],"metadata":{"npm_version":"6.14.0"}}
         """;
 
     final var response = this.gzipped(QUICK, repo, tree);

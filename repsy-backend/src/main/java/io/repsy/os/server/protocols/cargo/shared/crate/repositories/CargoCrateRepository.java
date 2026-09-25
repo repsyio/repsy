@@ -55,7 +55,7 @@ public interface CargoCrateRepository extends JpaRepository<CargoCrate, UUID> {
           """
           insert into "public"."cargo_crate"
               ("id", "repo_id", "name", "original_name", "max_version", "total_downloads",
-               "description", "homepage", "repository", "created_at", "has_lib", "last_updated_at")
+                "description", "homepage", "repository", "created_at", "has_lib", "last_updated_at")
             values (:id, :repoId, :name, :originalName, :maxVersion, 0,
                     :description, :homepage, :repository, :now, :hasLib, :now)
             on conflict do nothing

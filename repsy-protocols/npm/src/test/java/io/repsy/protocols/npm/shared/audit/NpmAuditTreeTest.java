@@ -58,14 +58,14 @@ class NpmAuditTreeTest {
             json(
                 """
                 {"name":"app","version":"1.0.0","requires":{"a":"^1.0.0"},
-                 "dependencies":{
-                   "a":{"version":"1.0.0","requires":{"lodash":"^4.0.0"},
+                  "dependencies":{
+                    "a":{"version":"1.0.0","requires":{"lodash":"^4.0.0"},
                         "dependencies":{"lodash":{"version":"4.17.20"}}},
-                   "b":{"version":"2.0.0","dev":true},
-                   "c":{"version":"3.0.0","optional":true,"bundled":true},
-                   "lodash":{"version":"4.17.21"}
-                 },
-                 "install":[],"remove":[],"metadata":{}}
+                    "b":{"version":"2.0.0","dev":true},
+                    "c":{"version":"3.0.0","optional":true,"bundled":true},
+                    "lodash":{"version":"4.17.21"}
+                  },
+                  "install":[],"remove":[],"metadata":{}}
                 """));
 
     assertThat(paths(tree)).containsExactly("a", "b", "c", "lodash", "a>lodash");
@@ -84,9 +84,9 @@ class NpmAuditTreeTest {
             json(
                 """
                 {"dependencies":{
-                   "a":{"version":"1.0.0","dependencies":{"b":{"version":"1.0.0","dev":true}}},
-                   "c":{"version":"1.0.0","dev":true},
-                   "d":{"version":"1.0.0","optional":true}}}
+                    "a":{"version":"1.0.0","dependencies":{"b":{"version":"1.0.0","dev":true}}},
+                    "c":{"version":"1.0.0","dev":true},
+                    "d":{"version":"1.0.0","optional":true}}}
                 """));
 
     assertThat(tree.dependencies()).isEqualTo(2);
@@ -104,9 +104,9 @@ class NpmAuditTreeTest {
             json(
                 """
                 {"name":"root","version":"undefined","dependencies":{
-                   ".":{"dependencies":{"a":{"version":"1.0.0","dependencies":{"b":{"version":"2.0.0"}}}}},
-                   "packages__x":{"version":"undefined","dependencies":{"a":{"version":"1.0.0"}}}},
-                 "dev":false,"install":[],"remove":[],"metadata":{},"requires":{}}
+                    ".":{"dependencies":{"a":{"version":"1.0.0","dependencies":{"b":{"version":"2.0.0"}}}}},
+                    "packages__x":{"version":"undefined","dependencies":{"a":{"version":"1.0.0"}}}},
+                  "dev":false,"install":[],"remove":[],"metadata":{},"requires":{}}
                 """));
 
     assertThat(paths(tree))
@@ -122,7 +122,7 @@ class NpmAuditTreeTest {
             json(
                 """
                 {"dependencies":{"a":"1.0.0","b":{"version":7},"c":{"version":"1.0.0","dependencies":"x"},
-                                 "d":{"dependencies":{"e":{"version":"2.0.0"}}}}}
+                                  "d":{"dependencies":{"e":{"version":"2.0.0"}}}}}
                 """));
 
     assertThat(paths(tree)).containsExactly("c", "d>e");

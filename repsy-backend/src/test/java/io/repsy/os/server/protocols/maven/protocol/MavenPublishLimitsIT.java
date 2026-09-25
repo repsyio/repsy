@@ -219,7 +219,7 @@ class MavenPublishLimitsIT extends AbstractIntegrationTest {
             """
             select a.group_name, a.packaging, a.latest, v.packaging as version_packaging
               from maven_artifact a join maven_artifact_version v on v.artifact_id = a.id
-             where a.repo_id = ?""",
+              where a.repo_id = ?""",
             repo.getId());
     assertThat(row)
         .containsEntry("group_name", group)
@@ -273,9 +273,9 @@ class MavenPublishLimitsIT extends AbstractIntegrationTest {
         this.jdbcTemplate.queryForMap(
             """
             select v.id, v.name, v.url, v.organization, v.source_code_url,
-                   v.parent_artifact_group, v.parent_artifact_name, v.parent_artifact_version
+                    v.parent_artifact_group, v.parent_artifact_name, v.parent_artifact_version
               from maven_artifact_version v join maven_artifact a on a.id = v.artifact_id
-             where a.repo_id = ?""",
+              where a.repo_id = ?""",
             repo.getId());
     assertThat(version)
         .containsEntry("name", null)
