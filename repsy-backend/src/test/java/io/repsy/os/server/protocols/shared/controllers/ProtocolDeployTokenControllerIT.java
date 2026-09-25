@@ -36,6 +36,7 @@ import io.repsy.os.shared.token.utils.TokenFactory;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
@@ -706,6 +707,66 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var row = it.tokensOf(repo).getFirst();
       assertThat(row.getExpirationDate()).isEqualTo(past);
       assertThat(row.getTokenDurationDay()).isEqualTo(1);
+    }
+
+    /**
+     * RPS-1435: a deploy token lives 365 days at most, and the API says so too (the panel form
+     * already did). The limit is a calendar day, as in the panel.
+     */
+    @Test
+    @DisplayName("returns 400 deployTokenExpirationTooLate for a date after today plus 365 days")
+    void expirationBeyondTheMaximumIsRejected() throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      final var tooLate = Instant.now().plus(800, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MICROS);
+
+      expectError(
+          it.perform(
+              post(tokensUrl(repo))
+                  .header(AUTHORIZATION, it.adminBearerToken())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"name\":\"late\",\"expirationDate\":\"%s\"}".formatted(tooLate))),
+          HttpStatus.BAD_REQUEST,
+          "deployTokenExpirationTooLate",
+          "deployTokenExpirationTooLate",
+          "A deploy token can expire in 365 days at most.");
+
+      assertThat(it.tokensOf(repo)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("rejects the first day past the maximum and accepts the last day, to its end")
+    void expirationIsComparedByCalendarDay() throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      final var lastDay =
+          Instant.now().plus(365, ChronoUnit.DAYS).atZone(ZoneOffset.UTC).toLocalDate();
+      final var endOfLastDay =
+          lastDay.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().minusSeconds(1);
+      final var startOfNextDay = lastDay.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+
+      expectSuccess(
+          it.perform(
+              post(tokensUrl(repo))
+                  .header(AUTHORIZATION, it.adminBearerToken())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      "{\"name\":\"last\",\"expirationDate\":\"%s\"}".formatted(endOfLastDay))),
+          "tokenCreated");
+      assertThat(it.tokensOf(repo).getFirst().getTokenDurationDay()).isEqualTo(365);
+
+      expectError(
+          it.perform(
+              post(tokensUrl(repo))
+                  .header(AUTHORIZATION, it.adminBearerToken())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      "{\"name\":\"next\",\"expirationDate\":\"%s\"}".formatted(startOfNextDay))),
+          HttpStatus.BAD_REQUEST,
+          "deployTokenExpirationTooLate",
+          "deployTokenExpirationTooLate",
+          "A deploy token can expire in 365 days at most.");
+      assertThat(it.tokensOf(repo)).hasSize(1);
     }
 
     @ParameterizedTest(name = "{0}")

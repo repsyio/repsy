@@ -4865,6 +4865,9 @@ components:
         expirationDate:
           type: string
           format: date-time
+          description: >-
+            When the token stops working. At most 365 days ahead (by UTC calendar day), otherwise the
+            answer is 400 `deployTokenExpirationTooLate`. Defaults to 365 days from now.
       required:
         - name
     RestResponseTokenInfo:
