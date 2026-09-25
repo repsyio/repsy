@@ -24,7 +24,12 @@ import { RepoType } from '../../../src/api/panel-api.js';
 import { Toasts } from '../../../src/ui/pages/components.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
-import { ScanSection, badgeText, securityBadgeIn } from '../../../src/ui/pages/security.js';
+import {
+  ScanSection,
+  SecurityModal,
+  badgeText,
+  securityBadgeIn,
+} from '../../../src/ui/pages/security.js';
 import {
   POLL_STEP,
   SCANNER_TAG,
@@ -64,6 +69,8 @@ test.describe('SEC-01 failed scans and re-scans', { tag: SCANNER_TAG }, () => {
 
     await expect(section.status).toHaveText('Failed');
     await expect(section.rescanNote).toHaveText('Failed');
+    // The scanner's reason is shown, next to the Re-scan action (RPS-1339).
+    await expect(section.failureReason).toHaveText(FAIL_MESSAGE);
     await expect(section.pollingIndicator).toHaveCount(0);
     await expect(section.headerBadge()).toHaveCount(0);
     await expect(section.clean).toHaveCount(0);
@@ -71,6 +78,15 @@ test.describe('SEC-01 failed scans and re-scans', { tag: SCANNER_TAG }, () => {
     // A failed scan can be repeated.
     await expect(section.rescanButton).toBeEnabled();
     await expect(section.historyItem(scan.id!)).toBeVisible();
+
+    // The version's security modal (its badge on the versions list) says why as well.
+    const versions = pages.versions(pkg);
+    await versions.goto();
+    await securityBadgeIn(versions.row(pkg)).click();
+    const modal = new SecurityModal(adminPage, 'version');
+    await modal.expectOpen();
+    await expect(modal.failureReason).toHaveText(FAIL_MESSAGE);
+    await modal.closeViaBackdrop();
 
     const list = pages.list();
     await list.goto();
@@ -109,6 +125,9 @@ test.describe('SEC-01 failed scans and re-scans', { tag: SCANNER_TAG }, () => {
     await adminPage.goto(`${detail.path()}#security`);
     await detail.expectLoaded();
     await expect(section.status).toHaveText('Failed');
+    // The reason names the refusal, and is the backend's own wording: no scanner address in it.
+    await expect(section.failureReason).toHaveText(/503/);
+    expect(await section.failureReason.textContent()).not.toMatch(/http|scanner-stub|8090/i);
     await expect(section.headerBadge()).toHaveCount(0);
     await expect(section.findingRows()).toHaveCount(0);
   });
@@ -142,6 +161,7 @@ test.describe('SEC-01 failed scans and re-scans', { tag: SCANNER_TAG }, () => {
     await expect(section.headerBadge()).toHaveAttribute('data-severity', 'HIGH');
     await expect(section.findingsCount).toHaveText('1 finding');
     await expect(section.rescanNote).toHaveCount(0);
+    await expect(section.failureReason).toHaveCount(0);
     // Both scans are in the history, and the scanner was asked twice.
     await expect(section.history.locator('[data-testid^="scan-history-item-"]')).toHaveCount(2);
     await expect(section.historyItem(failed.id!)).toBeVisible();
@@ -149,6 +169,46 @@ test.describe('SEC-01 failed scans and re-scans', { tag: SCANNER_TAG }, () => {
     expect(scans.map((scan) => scan.status)).toEqual(['COMPLETED', 'FAILED']);
     expect(scans[0].scannerVersion).toBe(SCANNER_VERSION);
     expect(await scanner.calls(pkg.name)).toHaveLength(2);
+  });
+
+  test('a failure reason that carries scanner internals is shown without them, on one bounded line', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+    panelApi,
+    scanner,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.NPM);
+    const pkg = await seedPackage(repo, {
+      name: scanPackageName('npm', seeder.runId, 'fail'),
+    });
+    await newestFinishedScan(panelApi, repo.name, pkg);
+    const detail = protocolPages(adminPage, DESCRIPTORS.npm, repo.name).detail(pkg);
+    const section = new ScanSection(adminPage);
+
+    // The next scan fails with a message the way a crashing scanner would write it: a private URL and
+    // address, a file path, a stack trace on the following lines, and far more text than fits a line.
+    await scanner.script(pkg.name, {
+      outcome: 'failed',
+      errorMessage:
+        'trivy crashed: cannot open /var/lib/trivy/db/trivy.db, is http://10.1.2.3:9000/db down? ' +
+        'x'.repeat(400) +
+        '\n\tat aquasecurity.trivy.Scanner.run(scanner.go:42)',
+    });
+    await adminPage.goto(`${detail.path()}#security`);
+    await detail.expectLoaded();
+    await section.rescanButton.click();
+    // The first failure is on the page already: the second scan is the sync point.
+    const rescan = await newestFinishedScan(panelApi, repo.name, pkg, 2);
+    await expect(section.historyItem(rescan.id!)).toBeVisible(POLL_STEP);
+    await section.historyItem(rescan.id!).getByTestId('row-select').click();
+
+    // The API answers with the bounded text, and so does the panel.
+    const stored = rescan.errorMessage!;
+    expect(stored.length).toBeLessThanOrEqual(200);
+    expect(stored).toContain('trivy crashed: cannot open [redacted], is [redacted]');
+    expect(stored).not.toMatch(/\/var\/lib|10\.1\.2\.3|9000|scanner\.go|at aquasecurity/);
+    await expect(section.failureReason).toHaveText(stored);
   });
 
   test('Re-scan of a clean version shows Rescanning with the old result until the new scan completes', async ({

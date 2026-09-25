@@ -6970,6 +6970,12 @@ components:
           type: string
           format: date-time
           nullable: true
+        errorMessage:
+          description: >-
+            Why the version's newest scan failed, as one short line with URLs, addresses and file
+            paths removed; null unless that scan has status FAILED (or no reason was recorded).
+          type: string
+          nullable: true
         criticalCount:
           type: integer
           format: int32
