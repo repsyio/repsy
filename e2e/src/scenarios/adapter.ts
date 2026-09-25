@@ -28,7 +28,7 @@
  * repo) and stays entirely inside `clients/maven.ts`/`docker-compose.runners.yml`; npm needs no
  * such thing (its test packages declare no dependencies, so there is nothing third-party to cache).
  */
-import type { Scenario } from './types.js';
+import type { Outcome, Scenario } from './types.js';
 import type { SeedResult, World } from './world.js';
 
 /**
@@ -121,4 +121,17 @@ export interface ProtocolAdapter<F = unknown> {
    * and asserts `expectNothingStored` for real. Keep it for the next such bug.
    */
   knownPublishSideEffect?(scenario: Scenario): string | undefined;
+
+  /**
+   * A real client that exits 0 for a request the server refused (RPS-1330: yarn classic prints
+   * "Published." for a publish answered with 401). Returning a reason for a scenario's side and refused `outcome`
+   * makes the loop assert exactly that (the client exits 0) instead of "a refused request fails the
+   * client", so the quirk is pinned, not hidden and not a red test. The raw outcome, `expectNothingStored`
+   * and the content checks are unaffected.
+   */
+  knownClientExitDisagreement?(
+    scenario: Scenario,
+    side: 'publish' | 'consume',
+    outcome: Outcome,
+  ): string | undefined;
 }

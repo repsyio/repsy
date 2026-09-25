@@ -54,6 +54,9 @@ const PLATFORM_FIELDS = ['os', 'cpu', 'libc', 'peerDependenciesMeta', 'funding']
 /** Whether a client installs an optional dependency whose `os` excludes linux (`win32` here). */
 const INSTALLS_WRONG_PLATFORM_OPTIONAL: Partial<Record<ClientId, boolean>> = {
   npm: false,
+  // Yarn 1 asks for the abbreviated document too (`Accept: application/vnd.npm.install-v1+json`, see
+  // wire.spec.ts), and still skips the mismatched optional dependency: probed, not assumed.
+  'yarn-classic': false,
 };
 
 for (const client of clientsWith('publish')) {

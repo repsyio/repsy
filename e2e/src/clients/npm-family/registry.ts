@@ -34,8 +34,9 @@ import {
 } from './client.js';
 import { sealedEnv } from './config.js';
 import { npmClient } from './npm-client.js';
+import { yarnClassicClient } from './yarn-classic-client.js';
 
-export const ENABLED_CLIENTS: readonly NpmFamilyClient[] = [npmClient];
+export const ENABLED_CLIENTS: readonly NpmFamilyClient[] = [npmClient, yarnClassicClient];
 
 /** The enabled clients that can do what a cell needs. */
 export function clientsWith(capability: keyof Capabilities): NpmFamilyClient[] {

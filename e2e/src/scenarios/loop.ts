@@ -46,6 +46,12 @@
  * and were asserted for real, only the "nothing changed" comparison becomes an expected failure when
  * the adapter names one.
  *
+ * `adapter.knownClientExitDisagreement` (RPS-1330) is the odd one out: it is for a real client that
+ * exits 0 for a request the server refused (yarn classic prints "Published." for a publish answered
+ * with 401). It replaces the usual "the client's exit code agrees with the outcome" check for that
+ * scenario, side and outcome with the pinned quirk (the client exits 0); the raw outcome above it is
+ * still the probed HTTP status, and `expectNothingStored` still proves the refusal was real.
+ *
  * Remote hardening (plan section "Execution targets", "Remote specifics"): on a `remote` target,
  * `@local-only` scenarios are skipped, and `@negative` scenarios run serially, each reserving a slot
  * from a `RemoteAuthBudget` (one per protocol, scoped to this function's closure) first, so their
@@ -79,8 +85,22 @@ function expectClientAgrees(
   adapter: ProtocolAdapter,
   result: AdapterResult,
   expected: Outcome,
+  scenario: Scenario,
+  side: 'publish' | 'consume',
   what: string,
 ): void {
+  const quirk =
+    expected === 'ok' ? undefined : adapter.knownClientExitDisagreement?.(scenario, side, expected);
+  if (quirk) {
+    // A documented client quirk (RPS-1330): the refusal is real (the raw outcome above), the client
+    // says success anyway. Pinned as it is, so a client that starts failing the request shows here.
+    expect(
+      result.clientExitCode,
+      `${quirk}; the real ${adapter.client.name} ${what} exited ${result.clientExitCode} for ` +
+        `"${expected}" (http ${result.httpStatus}; ${result.command})`,
+    ).toBe(0);
+    return;
+  }
   const shouldSucceed = expected === 'ok';
   expect(
     result.clientExitCode === 0,
@@ -123,7 +143,14 @@ export function registerPublishConsumeLoop<F>(adapter: ProtocolAdapter<F>): void
 
     const published = await adapter.publish(w);
     expectOutcome(adapter, published, expectation.publish);
-    expectClientAgrees(adapter, published, expectation.publish, adapter.client.publishVerb);
+    expectClientAgrees(
+      adapter,
+      published,
+      expectation.publish,
+      scenario,
+      'publish',
+      adapter.client.publishVerb,
+    );
     if (before !== undefined) {
       const knownSideEffect = adapter.knownPublishSideEffect?.(scenario);
       if (knownSideEffect) {
@@ -143,7 +170,14 @@ export function registerPublishConsumeLoop<F>(adapter: ProtocolAdapter<F>): void
       test.fail(true, knownFailure);
     }
 
-    expectClientAgrees(adapter, resolved, expectation.consume, adapter.client.consumeVerb);
+    expectClientAgrees(
+      adapter,
+      resolved,
+      expectation.consume,
+      scenario,
+      'consume',
+      adapter.client.consumeVerb,
+    );
 
     if (expectation.consume === 'ok') {
       expectResolvedContent(w, published, resolved);

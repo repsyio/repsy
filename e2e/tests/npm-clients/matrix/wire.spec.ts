@@ -59,6 +59,12 @@ const IDENTITY: Partial<
   Record<ClientId, { accept: RegExp; userAgent: RegExp; npmCommand?: string }>
 > = {
   npm: { accept: /^application\/json$/, userAgent: /^npm\/11\.\d+\.\d+ /, npmCommand: 'install' },
+  // Yarn 1 asks for the ABBREVIATED packument (so RPS-1356 is what it reads), names itself with its own
+  // version and Node's, sends no `npm-command`, and no conditional-request header on a first fetch.
+  'yarn-classic': {
+    accept: /^application\/vnd\.npm\.install-v1\+json; q=1\.0, application\/json; q=0\.8, \*\/\*$/,
+    userAgent: /^yarn\/1\.22\.22 npm\/\? node\/v24\.\d+\.\d+ linux /,
+  },
 };
 
 /** The `Authorization` scheme each credential kind is sent with (`_authToken` vs `_auth`). */
