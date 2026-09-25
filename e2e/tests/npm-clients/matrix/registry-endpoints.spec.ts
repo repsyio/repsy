@@ -51,6 +51,34 @@ import { adminCredential } from '../../../src/clients/raw-http.js';
 import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 
+/**
+ * The two totals of an `audit --json` report. npm 7+ counts `metadata.vulnerabilities.total` and
+ * `metadata.dependencies.total`; pnpm answers the npm 6 shape (`advisories`, and per-severity
+ * counts with `metadata.totalDependencies`).
+ */
+function auditSummary(json: string): { vulnerabilities: number; dependencies: number } {
+  const report = JSON.parse(json) as {
+    metadata?: {
+      vulnerabilities?: Record<string, number>;
+      dependencies?: number | { total?: number };
+      totalDependencies?: number;
+    };
+  };
+  const counts = report.metadata?.vulnerabilities ?? {};
+  const dependencies = report.metadata?.dependencies;
+  return {
+    vulnerabilities:
+      counts.total ??
+      (Object.keys(counts).length > 0
+        ? Object.values(counts).reduce((sum, count) => sum + count, 0)
+        : -1),
+    dependencies:
+      (typeof dependencies === 'object' ? dependencies.total : undefined) ??
+      report.metadata?.totalDependencies ??
+      -1,
+  };
+}
+
 for (const client of clientsWith('whoamiCmd')) {
   test(
     `${client.label} whoami names the credential's user`,
@@ -199,14 +227,9 @@ for (const client of clientsWith('auditCmd')) {
 
         const audited = await client.audit?.(consumer);
         expect(audited?.exitCode, `audit: ${audited?.command}\n${audited?.stderr}`).toBe(0);
-        const report = JSON.parse(audited?.stdout ?? '{}') as {
-          metadata?: { vulnerabilities?: { total?: number }; dependencies?: { total?: number } };
-        };
-        expect(report.metadata?.vulnerabilities?.total, 'no vulnerabilities').toBe(0);
-        expect(
-          report.metadata?.dependencies?.total,
-          'the audited tree had the dependency in it',
-        ).toBe(1);
+        const { vulnerabilities, dependencies } = auditSummary(audited?.stdout ?? '{}');
+        expect(vulnerabilities, 'no vulnerabilities').toBe(0);
+        expect(dependencies, 'the audited tree had the dependency in it').toBe(1);
 
         const posts = recorder.entries.filter(
           (entry) => entry.method === 'POST' && entry.path.includes('/-/npm/v1/security/'),

@@ -185,6 +185,7 @@ e2e/
       unpublish.spec.ts         # real `npm unpublish` (RPS-1289): one version (unscoped/scoped), the only version, a whole package
     npm-clients/
       npm/publish-consume.spec.ts   # registerPublishConsumeLoop(npmFamilyAdapter(npmClient)): the catalog through the npm-family harness
+      pnpm/*.spec.ts            # pnpm: the catalog, `pnpm -r publish` (workspace: rewrite), native-command wire proof, resolution / minimumReleaseAge
       versions.spec.ts          # --version of every installed client == its pin; config renderers read back by pnpm/yarn
       sealed-network.spec.ts    # the network seal: a misconfigured registry fails fast for all five clients
       matrix/*.spec.ts          # lockfile, dist-tags, deprecate, view, registry-endpoints (whoami/ping/search/audit), scoped-routing, tarball-host, abbreviated-metadata, wire
@@ -873,6 +874,7 @@ src/clients/npm-family/
 src/packages/npm-family/   # the mustache templates (header-less, triple-mustache everywhere)
 tests/npm-clients/
   npm/publish-consume.spec.ts   # the 13-scenario catalog through the new harness: `npm[npm] > <scenario>`
+  pnpm/*.spec.ts                # pnpm: catalog, workspace publish, commands (H-1/H-2), resolution
   versions.spec.ts              # --version of every installed client == its pin; config renderers read back by the client
   sealed-network.spec.ts        # the network seal, proven for all five clients
   matrix/*.spec.ts              # one file per matrix row, iterating clientsWith(...)
@@ -972,6 +974,106 @@ depends on a public package).
 
 Not asserted as fixed, still open: RPS-1343 (a qualifier-only search matches everything), RPS-1344
 (`size`/`from` are not clamped), RPS-1345 (audit findings query performance).
+
+### pnpm (RPS-1330, PR 2)
+
+`src/clients/npm-family/pnpm-client.ts`, pnpm **12.6.0** (one major on purpose), tag `@pnpm`, joined
+`ENABLED_CLIENTS`, so every matrix cell above also runs for pnpm (41 `@pnpm` tests in all, 9 of them
+pnpm-only). Its own specs are `tests/npm-clients/pnpm/{publish-consume,commands,workspace-publish,
+resolution}.spec.ts`.
+
+**Configuration.** pnpm 11+ reads only the registry and the auth keys from `.npmrc`; the rendered
+`$HOME/.npmrc` still carries those (a deploy token `_authToken` goes out as `Bearer`, a password `_auth`
+as `Basic`, on every request including the tarball GET). Everything else is a `PNPM_CONFIG_*` variable
+set in `prepare()`, not a `pnpm-workspace.yaml` (a package rendered under a workspace root it is not a
+member of behaves differently): the store and state directories inside the isolated HOME,
+`FETCH_RETRIES=0` (default back-off on a refused connection is 70 s), `UPDATE_NOTIFIER=false` and
+`MINIMUM_RELEASE_AGE=0`. Both of the last two are probed behaviour, not taste:
+
+- with the update notifier on, every `pnpm add`/`install` sends a stray `GET /<repo>/pnpm` (the
+  configured registry is asked for a newer **pnpm**; 404 in Repsy), and it would sit inside every
+  wire-recorder count and the "every request to repo B succeeded" check of `scoped-routing`;
+- `minimumReleaseAge` defaults to **1 day**: `pnpm add` of a package published seconds ago writes it to
+  `minimumReleaseAgeExclude` in `pnpm-workspace.yaml` (and the lockfile), and a `pnpm install
+--frozen-lockfile` in a clean directory with only `package.json` + `pnpm-lock.yaml` then **fails**
+  (`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`). That is pnpm's supply-chain policy, not a Repsy problem;
+  the policy has its own cell (`resolution.spec.ts`), and is off in the other cells.
+
+**H-1 / H-2 (which commands are native): all of them.** pnpm 12 is a native binary and runs every
+registry command itself; nothing is delegated to `npm`, although an `npm` is on the sealed PATH. Every
+request of `publish`, `dist-tag`, `deprecate`/`undeprecate`, `view`, `whoami`, `ping`, `search`,
+`audit`, `unpublish`, `login` and `logout` carries `User-Agent: pnpm/12.6.0 npm/? node/? linux x64`
+(`commands.spec.ts` asserts it for each, on the wire recorder). Only `edit`, `profile`, `token` and
+`xmas` answer "Not implemented in pnpm. Use the npm CLI directly". So the plan's `delegatesToNpm` never
+applies to this pnpm, and `Capabilities` has no such field: every capability is a real pnpm cell.
+
+| command                    | what it sends to `/<repo>`                                                                          |
+| -------------------------- | --------------------------------------------------------------------------------------------------- |
+| `publish <tgz>` / `<dir>`  | `PUT /<pkg>` with `npm-command: publish` (a project directory is packed by pnpm itself)             |
+| `view <pkg> --json`        | `GET /<pkg>` (`Accept: application/json`)                                                           |
+| `whoami`                   | `GET /-/whoami`                                                                                     |
+| `ping`                     | `GET /-/ping?write=true`                                                                            |
+| `search <text> --json`     | `GET /-/v1/search?text=<text>` (no `size`)                                                          |
+| `dist-tag ls / add / rm`   | `GET /-/package/<pkg>/dist-tags` / `PUT .../dist-tags/<tag>` / `GET` then `DELETE .../<tag>`        |
+| `deprecate`, `undeprecate` | `GET /<pkg>` then `PUT /<pkg>` (a read-modify-write of the packument)                               |
+| `audit --json`             | `POST /-/npm/v1/security/advisories/bulk`, needs a `pnpm-lock.yaml`; answers the npm 6 report shape |
+| `unpublish <pkg>@<ver>`    | `GET`, `PUT /<pkg>/-rev/undefined`, and a `DELETE` of the tarball (below)                           |
+| `login`                    | `POST /-/v1/login` (web login): 404, and without a terminal it cannot prompt (below)                |
+| `logout`                   | `DELETE /-/user/token/<token>`: 404, and pnpm fails the command (below)                             |
+
+**pnpm column of the matrix** (every cell is a real pnpm run; "pass" is asserted, see the specs):
+
+| Row                                           | pnpm cell                                       | Notes                                                                                                                                                                                                                              |
+| --------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| catalog loop (13 scenarios)                   | pass, no override                               | `npm[pnpm] > <scenario>`; `--force` for the republish scenarios, like npm                                                                                                                                                          |
+| 5b dependency graph                           | pass                                            | pnpm links only direct dependencies into `node_modules`; a transitive one is read from `node_modules/.pnpm/<name>@<ver>.../node_modules/<name>` (`readInstalledFile`)                                                              |
+| 5c lockfile + frozen install                  | pass, `@smoke`                                  | **`pnpm-lock.yaml` records no `tarball:` for a Repsy package**, only `resolution: {integrity}`: the tarball is at the conventional `<registry>/<name>/-/<name>-<ver>.tgz`, which pnpm rebuilds (the plan's prediction, confirmed)  |
+| 5d frozen install after an override republish | pass (`ERR_PNPM_TARBALL_INTEGRITY`)             | nothing installed                                                                                                                                                                                                                  |
+| 6 dist-tags                                   | pass                                            | native `pnpm dist-tag`; `rm latest` and a tag on a missing version are refused (non-zero)                                                                                                                                          |
+| 7 deprecate                                   | pass, one difference                            | native `deprecate`/`undeprecate`. pnpm 12.6 prints `[WARN] deprecated <pkg>@<ver>` **without the message** (its changelog: a registry-controlled message is untrusted terminal output); pinned per client in `deprecate.spec.ts`   |
+| 9 view / info                                 | pass                                            | `time` is ISO UTC and now; `dist.tarball` is the registry address; RPS-1357 pin holds for pnpm-published packages too (`_attachments`)                                                                                             |
+| 2 whoami, ping, search, 10 audit              | pass (RPS-1329)                                 | audit: pnpm answers `metadata.vulnerabilities.{info,low,...}` and `metadata.totalDependencies` (npm 6 shape), the spec reads both shapes                                                                                           |
+| 16 two repos, two scopes                      | pass                                            | each token only ever goes to its own repository, tarball GETs included                                                                                                                                                             |
+| 17 `dist.tarball` host                        | pass (RPS-1333)                                 | published via `127.0.0.1`, consumed via `localhost` on a private repo; the lockfile has no host at all                                                                                                                             |
+| 18 abbreviated packument                      | RPS-1356 pin; pnpm skips the win32 optional dep | **pnpm reads the abbreviated document** (H-9, unlike npm 11.19), yet does not install an `os: ["win32"]` optional dependency on linux (H-15 refuted for pnpm too)                                                                  |
+| 19 wire trace                                 | pass; RPS-1358, RPS-1359 pins                   | `Accept: application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*`, `User-Agent: pnpm/12.6.0 npm/? node/? linux x64`, no `npm-command` on install (`publish` on publish), Bearer for a token, Basic for a password |
+| 11 workspaces                                 | pass                                            | below                                                                                                                                                                                                                              |
+| 8 unpublish, 2b login                         | pass / pin                                      | below                                                                                                                                                                                                                              |
+
+**Workspaces (`workspace-publish.spec.ts`).** `pnpm -r publish` needs one `pnpm install` first (it refuses
+to resolve a `workspace:` range of a dependency it has not linked). A `a-app -> m-lib -> z-base` workspace
+(alphabetical order is the reverse of dependency order) is published in dependency order, `base, lib, app`
+(the recorded PUTs); the stored packument carries `^1.2.3` for `workspace:^`, `~1.2.3` for `workspace:~`
+and `1.2.3` for `workspace:*`, and no `workspace:` anywhere; a consumer installs the whole graph from the
+registry alone; a second `-r publish` GETs each packument, prints "no new packages", sends no PUT.
+
+**Resolution (`resolution.spec.ts`).** `^1.0.0` picks the newest 1.x, `@next` the tag, `pnpm update`
+moves a locked dependency. pnpm 12 resolves a range to the newest version that is **not deprecated**, from
+the `deprecated` field of the abbreviated packument; an exact deprecated version still installs.
+`minimumReleaseAge` needs publish times, which the abbreviated packument has none of (nor has the public
+registry's), so pnpm asks for the full packument too (a second `GET` with `Accept: application/json`); a
+strict 5-minute policy refuses a package published seconds ago and its message names the exact publish time
+Repsy served, the non-strict default installs it and records the exclusion.
+
+**`unpublish`, `login`, `logout`.** `pnpm unpublish <pkg>@<ver>` works: the version leaves the packument and
+its tarball is 404. pnpm has no `_rev` to send (a Repsy packument has none), so the PUT is
+`/<pkg>/-rev/undefined`; it then also sends a `DELETE /<pkg>/-/<file>.tgz/-rev/undefined` **without the
+repository path** (pnpm keeps only the registry's origin for this URL), a harmless 404, not asserted.
+`pnpm login` first POSTs the web login `/-/v1/login` (404 in Repsy) and, with no terminal, stops with
+`ERR_PNPM_LOGIN_NON_INTERACTIVE`; the prompt path needs a TTY the harness has no way to give (P3, as the
+plan said). `pnpm logout` sends `DELETE /-/user/token/<token>`, gets 404 and **exits 1**
+(`ERR_PNPM_LOGOUT_FAILED`), and the token keeps working (RPS-1361).
+
+**Backend candidates found here** (new; not filed yet, the parent files them and replaces the `NCn` keys):
+
+- **RPS-1360**: after `npm/pnpm deprecate <pkg>@<ver> ""` the packument still serves `"deprecated": ""`. The
+  existing deprecate cell tolerates that (`[undefined, '']`), but pnpm 12 treats a version that has the field
+  at all as deprecated, so a range keeps skipping the un-deprecated version (`resolution.spec.ts`).
+  Serving no field is what npm's own semantics ask for.
+- **RPS-1361**: no `DELETE /-/user/token/<token>` (token revocation): `pnpm logout` fails, and a deploy token can
+  not be revoked from a client (`commands.spec.ts`).
+
+Still open and only observed, not asserted as fixed: RPS-1356, 1357, 1358, 1359, 1343, 1344, 1345.
 
 ## Cargo runner
 

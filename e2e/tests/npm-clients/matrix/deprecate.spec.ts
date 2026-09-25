@@ -22,6 +22,7 @@
  * empty message clears it.
  */
 import { rawGetPackument } from '../../../src/clients/npm-raw.js';
+import type { ClientId } from '../../../src/clients/npm-family/client.js';
 import {
   newRepo,
   packageNameFor,
@@ -32,6 +33,13 @@ import {
 import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
+
+/**
+ * Clients that leave the deprecation MESSAGE out of what an install prints. pnpm 12.6 names only the
+ * deprecated package and version (`[WARN] deprecated <name>@<version>`): its changelog lists it as a
+ * security fix (a registry-controlled message is untrusted terminal output).
+ */
+const OMITS_DEPRECATION_MESSAGE: ReadonlySet<ClientId> = new Set<ClientId>(['pnpm']);
 
 async function deprecatedOf(
   repoName: string,
@@ -93,10 +101,15 @@ for (const publisher of clientsWith('deprecateCmd')) {
             added.exitCode,
             `${consumerClient.label} add: ${added.command}\n${added.stderr}`,
           ).toBe(0);
+          const printed = `${added.stdout}\n${added.stderr}`;
+          const omitsMessage = OMITS_DEPRECATION_MESSAGE.has(consumerClient.id);
+          expect(printed, `${consumerClient.label} warns about the deprecated version`).toContain(
+            omitsMessage ? `deprecated ${name}@1.0.0` : message,
+          );
           expect(
-            `${added.stdout}\n${added.stderr}`,
-            `${consumerClient.label} prints the deprecation message`,
-          ).toContain(message);
+            printed.includes(message),
+            `${consumerClient.label} ${omitsMessage ? 'leaves out' : 'prints'} the deprecation message`,
+          ).toBe(!omitsMessage);
         }
 
         const cleared = await publisher.deprecate?.(ctx, `${name}@1.0.0`, '');
