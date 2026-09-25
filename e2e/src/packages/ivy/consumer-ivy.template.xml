@@ -16,9 +16,10 @@
 -->
 <!--
   Rendered by clients/ivy.ts (mustache) into a per-test work directory. The consumer module: it
-  declares only the dependency line the panel shows (`<dependency org name rev/>`), plus the
-  configuration mapping a dependency on a Maven artifact needs (`conf`, left out to send the panel's
-  bare line as it is). `<conf name="default"/>` is the configuration `ivy:retrieve` copies.
+  declares only one dependency: `dependencyLine` verbatim (the line the panel shows, RPS-1395), or
+  `<dependency org name rev/>` plus the configuration mapping a dependency on a Maven artifact needs
+  (`conf`, left out to send a bare line as it is). `<conf name="default"/>` is the configuration
+  `ivy:retrieve` copies.
 -->
 <ivy-module version="2.0">
   <info organisation="io.repsy.e2e" module="consumer"/>
@@ -26,6 +27,6 @@
     <conf name="default"/>
   </configurations>
   <dependencies>
-    <dependency org="{{{groupId}}}" name="{{{module}}}" rev="{{{version}}}"{{#conf}} conf="{{{conf}}}"{{/conf}}{{^transitive}} transitive="false"{{/transitive}}/>
+    {{#dependencyLine}}{{{dependencyLine}}}{{/dependencyLine}}{{^dependencyLine}}<dependency org="{{{groupId}}}" name="{{{module}}}" rev="{{{version}}}"{{#conf}} conf="{{{conf}}}"{{/conf}}{{^transitive}} transitive="false"{{/transitive}}/>{{/dependencyLine}}
   </dependencies>
 </ivy-module>

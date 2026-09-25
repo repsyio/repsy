@@ -191,7 +191,7 @@ e2e/
       gradle-locking-kotlin.spec.ts  # RPS-133: the same for the Kotlin DSL
       sbt.spec.ts               # RPS-134: registerPublishConsumeLoop(sbtAdapter) + the sbt extras
       ivy.spec.ts               # RPS-135: registerPublishConsumeLoop(ivyAdapter), a real `ant` with ivy:publish and ivy:retrieve
-      ivy-client.spec.ts        # RPS-135: IV1-IV8 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, RPS-1331/1368/1370 pins)
+      ivy-client.spec.ts        # RPS-135: IV1-IV8 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete, RPS-1368/1370 pins)
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
@@ -828,9 +828,11 @@ seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
   `latest.integration` resolves 2.0-SNAPSHOT and `[1.0,1.2)` resolves 1.1. No other client of this
   repository can do the same: see RPS-1369 below.
 - Resolving reads the POM, so a consumer needs `conf="default->default"` on its dependency (or
-  `defaultconf`). The panel's version page shows the bare `<dependency org name rev/>`, whose default
-  configuration mapping also asks for the `sources` and `javadoc` artifacts, which do not exist, and
-  Ivy fails with "FAILED DOWNLOADS" (pinned in `ivy-client.spec.ts`; `retrieve` copies to `lib/`).
+  `defaultconf`). A bare `<dependency org name rev/>` has a default configuration mapping that also asks
+  for the `sources` and `javadoc` artifacts, which do not exist, and Ivy fails with "FAILED DOWNLOADS".
+  The panel's version page therefore shows the line with `conf="default->default"` (RPS-1395):
+  `ivy-client.spec.ts` retrieves with that line exactly as the panel shows it (`dependencyLine`), and
+  keeps the bare line as the control that still fails (`retrieve` copies to `lib/`).
 - `ivy:makepom` writes the module's dependencies as optional unless it is given
   `<mapping conf="default" scope="compile"/>`; only a mapped dependency is resolved transitively.
 - `publishivy="true"` (Ivy's default) makes Ivy also send its own ivy file, as `ivy-<revision>.xml`
@@ -840,7 +842,9 @@ seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
 - `overwrite="false"` (`ivy:publish`'s default) makes Ivy send a HEAD first and refuse when it is
   answered 200; Repsy answers 200 for any Maven path (RPS-1368), so even the first publish of a release
   is refused with "destination file exists and overwrite == false".
-- Version deletes: the panel's delete of one of two Ivy-published versions is RPS-1331 (below).
+- Version deletes: the panel's delete of one of two Ivy-published versions removes that version and
+  keeps the other although Ivy sends no artifact-level `maven-metadata.xml` (RPS-1331, fixed; it used to
+  answer 404 after the files were gone and leave the database row).
 
 Repsy stores the `maven-metadata.xml` a client uploads and never generates one, and Ivy uploads none,
 so an artifact published by Ivy has no `<versions>` list: Maven `LATEST`/`RELEASE` and version ranges,
@@ -854,7 +858,7 @@ exact file set (IV1, `@smoke`), Ivy resolving what `mvn deploy` published (a rel
 through its timestamped files, IV2) and `mvn dependency:get` resolving what Ivy published (IV3), a
 dependency through the POM, an optional one and `transitive="false"` (IV4), the dynamic revisions
 above (IV5), an unknown module (IV6), and the first-configuration pitfalls above (IV8: no realm, another
-realm, `publishivy="true"`, the bare dependency line). A `test.fail` pins each of the following, all found
+realm, `publishivy="true"`, the dependency line with and without its `conf`). A `test.fail` pins each of the following, all found
 live while building this suite, and each is removed when its ticket lands:
 
 | Pin                                                      | Ticket   | What happens                                                                                                                                                 |
@@ -862,7 +866,6 @@ live while building this suite, and each is removed when its ticket lands:
 | `snapshot-redeploy-no-override` (`expectByProtocol.ivy`) | RPS-1328 | `allowOverride: false` refuses Ivy's literal `-SNAPSHOT` redeploy (403), while Maven's timestamped redeploy passes. Pinned as `forbidden`, not as a decision |
 | `ivy:publish` with its own default, `overwrite="false"`  | RPS-1368 | the Maven HEAD handler answers 200 for a file that does not exist, so Ivy refuses even the FIRST publish of a release (IV7)                                  |
 | the panel detail of an Ivy SNAPSHOT                      | RPS-1370 | 404 `itemNotFound`: it reads the version-level metadata Ivy never sends. The list works                                                                      |
-| deleting one of two Ivy-published versions in the panel  | RPS-1331 | 404 after the files are gone, the database row stays (no artifact-level metadata)                                                                            |
 
 Not covered: an Ivy-native (non-Maven) layout, which Repsy cannot serve (a descriptor named
 `<artifact>-<revision>.ivy` is a valid Maven file name and is stored, but nothing registers it), the

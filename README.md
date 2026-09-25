@@ -735,8 +735,9 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
   `HEAD` with `200` for any Maven path (RPS-1368), so without it Ivy stops with "destination file exists
   and overwrite == false". Whether a version may be deployed again is still decided by Repsy.
 - **Reading:** the same `ivysettings.xml` resolves dependencies. A dependency on an artifact published
-  like this uses the `default` configuration (`conf="default->default"`); the default `*` also asks for
-  the `sources` and `javadoc` artifacts that the artifact does not have.
+  like this uses the `default` configuration (`conf="default->default"`), as the dependency line on a
+  version's page in the panel does; the default `*` also asks for the `sources` and `javadoc` artifacts
+  that the artifact does not have.
 - **No `maven-metadata.xml`:** Repsy stores the `maven-metadata.xml` a client uploads but never
   generates one. An Ivy, sbt or raw `PUT` publish has none, so Maven `LATEST` and version ranges, and
   Gradle/sbt dynamic versions, do not resolve for such artifacts. Ivy itself falls back to the

@@ -417,7 +417,12 @@ test.describe('Maven version detail', { tag: '@packages' }, () => {
       ['gradle-groovy', 'Gradle Groovy DSL', 'Gradle Groovy DSL'], // content: see the RPS-1261 test below
       ['gradle-kotlin', 'Gradle Kotlin DSL', `implementation("${group}:${artifact}:${version}")`],
       ['sbt', 'Scala SBT', `libraryDependencies += "${group}" % "${artifact}" % "${version}"`],
-      ['ivy', 'Apache Ivy', `<dependency org="${group}" name="${artifact}" rev="${version}" />`],
+      [
+        'ivy',
+        'Apache Ivy',
+        // RPS-1395: with Ivy's default configuration mapping a bare line also asks for sources/javadoc.
+        `<dependency org="${group}" name="${artifact}" rev="${version}" conf="default->default" />`,
+      ],
       [
         'grape',
         'Groovy Grape',

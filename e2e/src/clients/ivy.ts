@@ -87,8 +87,11 @@ export interface IvyOptions {
    *  written to the POM as optional. Defaults to `true`. */
   mapDependencies?: boolean;
   /** `resolve` only: the consumer dependency's `conf`. Defaults to `default->default`; `null` sends
-   *  the panel's bare `<dependency org name rev/>` as it is. */
+   *  a bare `<dependency org name rev/>` as it is. */
   conf?: string | null;
+  /** `resolve` only: the whole `<dependency .../>` element, verbatim (the line the panel shows);
+   *  `conf` and `transitive` are then not used. */
+  dependencyLine?: string;
   /** `resolve` only: `false` resolves the module alone, not its dependencies. Defaults to `true`. */
   transitive?: boolean;
 }
@@ -261,7 +264,7 @@ export interface ResolveRun extends AdapterResult {
 
 /**
  * Resolves `world.consumeTarget` with the real Ivy client, in a project of its own: only the Repsy
- * resolver and the dependency line the panel shows, whose `ivy:retrieve` copies the resolved jars into
+ * resolver and a dependency line (the panel's, when `dependencyLine` is given), whose `ivy:retrieve` copies the resolved jars into
  * `lib/`. `consumeTarget.version` may be a dynamic revision (`1.+`, `latest.release`, a range).
  */
 export async function resolveWithIvy(world: World, options: IvyOptions = {}): Promise<ResolveRun> {
@@ -281,6 +284,7 @@ export async function resolveWithIvy(world: World, options: IvyOptions = {}): Pr
     version,
     conf: options.conf === undefined ? 'default->default' : options.conf,
     transitive: options.transitive ?? true,
+    dependencyLine: options.dependencyLine ?? null,
   });
   await renderTemplate('build', path.join(ivy.work, 'build.xml'), {
     module: artifactId,
