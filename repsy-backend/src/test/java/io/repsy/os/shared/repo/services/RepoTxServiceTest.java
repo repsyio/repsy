@@ -30,6 +30,7 @@ import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.os.generated.model.RepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
 import io.repsy.os.shared.repo.events.PgpVerifyAllSignaturesToggledEvent;
 import io.repsy.os.shared.repo.mappers.RepoConverter;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
@@ -530,6 +531,36 @@ class RepoTxServiceTest {
     }
 
     @Test
+    @DisplayName("toggling the key-server lookup publishes the key-sources event (RPS-1334)")
+    void togglingTheLookupPublishesTheKeySourcesEvent() {
+      final var repo = this.storedRepoOfType(RepoType.MAVEN);
+
+      RepoTxServiceTest.this.service.updateSettings(
+          repo.getId(), RepoSettingsForm.builder().pgpKeyServerLookupEnabled(false).build());
+      RepoTxServiceTest.this.service.updateSettings(
+          repo.getId(), RepoSettingsForm.builder().pgpKeyServerLookupEnabled(true).build());
+
+      verify(RepoTxServiceTest.this.eventPublisher, times(2))
+          .publishEvent(new PgpKeySourcesChangedEvent(repo.getId()));
+      verify(RepoTxServiceTest.this.eventPublisher, never())
+          .publishEvent(any(PgpVerifyAllSignaturesToggledEvent.class));
+    }
+
+    @Test
+    @DisplayName("a PUT that leaves the key-server lookup as it is, or out, publishes nothing")
+    void anUnchangedLookupPublishesNothing() {
+      final var repo = this.storedRepoOfType(RepoType.MAVEN);
+
+      RepoTxServiceTest.this.service.updateSettings(
+          repo.getId(), RepoSettingsForm.builder().pgpKeyServerLookupEnabled(true).build());
+      RepoTxServiceTest.this.service.updateSettings(
+          repo.getId(), RepoSettingsForm.builder().privateRepo(true).build());
+
+      verify(RepoTxServiceTest.this.eventPublisher, never())
+          .publishEvent(any(PgpKeySourcesChangedEvent.class));
+    }
+
+    @Test
     @DisplayName("a PUT that leaves verify-all as it is, or out, publishes nothing (RPS-1316)")
     void anUnchangedVerifyAllPublishesNothing() {
       final var repo = this.storedRepoOfType(RepoType.MAVEN);
@@ -544,7 +575,12 @@ class RepoTxServiceTest {
               .pgpKeyServerLookupEnabled(false)
               .build());
 
-      verifyNoInteractions(RepoTxServiceTest.this.eventPublisher);
+      // The lookup was switched off by the second PUT, which concerns the key sources (RPS-1334),
+      // not verify-all.
+      verify(RepoTxServiceTest.this.eventPublisher, never())
+          .publishEvent(any(PgpVerifyAllSignaturesToggledEvent.class));
+      verify(RepoTxServiceTest.this.eventPublisher)
+          .publishEvent(new PgpKeySourcesChangedEvent(repo.getId()));
     }
 
     @Test

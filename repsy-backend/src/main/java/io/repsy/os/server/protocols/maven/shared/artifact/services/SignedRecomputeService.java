@@ -17,7 +17,9 @@ package io.repsy.os.server.protocols.maven.shared.artifact.services;
 
 import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
+import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
 import io.repsy.os.shared.repo.events.PgpVerifyAllSignaturesToggledEvent;
+import io.repsy.os.shared.repo.repositories.RepoRepository;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -58,6 +60,15 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * turned on the recomputation verifies it, one file at a time and under the lock of its version, by
  * the same verifier and key rules as an upload, so that the toggle alone does not turn an honest
  * publisher's versions unsigned ({@link VersionSignatureService#recompute}, RPS-1323).
+ *
+ * <p>It also runs when the places a signature's key is looked up change, for a repo that verifies
+ * every signature ({@link #onKeySourcesChanged}, RPS-1334).
+ *
+ * <p>The queue is in memory (RPS-1334): a run that is waiting or going when the process stops is
+ * lost, and nothing starts it again at startup. This is deliberate, a persisted marker would need a
+ * migration in both dialects for a restart in the middle of a run, which is rare. After such a
+ * restart the versions can be left as the setting or the key sources before the run had them:
+ * toggle {@code pgpVerifyAllSignaturesEnabled} off and on again to run it again.
  */
 @Slf4j
 @Service
@@ -66,6 +77,7 @@ public class SignedRecomputeService {
   private static final UUID BEFORE_THE_FIRST = new UUID(0L, 0L);
 
   private final ArtifactVersionRepository artifactVersionRepository;
+  private final RepoRepository repoRepository;
   private final VersionSignatureService versionSignatureService;
   private final Executor executor;
   private final int batchSize;
@@ -75,11 +87,13 @@ public class SignedRecomputeService {
 
   public SignedRecomputeService(
       final ArtifactVersionRepository artifactVersionRepository,
+      final RepoRepository repoRepository,
       final VersionSignatureService versionSignatureService,
       @Qualifier(SignedRecomputeExecutorConfig.BEAN_NAME) final Executor executor,
       @Value("${repsy.maven.signed-recompute.batch-size:200}") final int batchSize) {
 
     this.artifactVersionRepository = artifactVersionRepository;
+    this.repoRepository = repoRepository;
     this.versionSignatureService = versionSignatureService;
     this.executor = executor;
     this.batchSize = Math.max(1, batchSize);
@@ -93,7 +107,57 @@ public class SignedRecomputeService {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onToggled(final PgpVerifyAllSignaturesToggledEvent event) {
 
+    this.queue(event.repoId(), "toggle the setting again to start it");
+  }
+
+  /**
+   * Queues the recomputation of a repo whose key sources changed (a public key or a key-server host
+   * registered or deleted, or the key-server lookup toggled, RPS-1334), once that is committed, but
+   * only if the repo verifies every signature: what such a repo counts as signed depends on which
+   * keys its stored {@code .asc} files verify with. A repo that does not counts the signature of
+   * its POM, which was verified when it was uploaded, and a change of the key sources does not
+   * verify it again, so there is nothing to recompute for it. The setting is read here, committed,
+   * and the run reads it again for every version under that version's lock, so a toggle that
+   * follows is still applied by its own rule.
+   *
+   * <p>It never throws into the request that changed the sources, which has committed by now: a
+   * failed read of the setting or a full queue is logged, and the change can be repeated. It is
+   * queued like a toggle is, on the same executor and once per repo however many changes are
+   * waiting.
+   *
+   * <p>What it does not do: it does not unsign a version by the removal of a key. A signature that
+   * was verified is recorded and stays recorded when its key is gone or cannot be found ({@link
+   * VersionSignatureService#recompute}: only a signature that is found not to verify is forgotten),
+   * so deleting a key changes nothing for the versions it signed, and what the recomputation adds
+   * are the versions whose signatures verify with a key that was just added. What a revocation
+   * should mean is a product question of its own.
+   */
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void onKeySourcesChanged(final PgpKeySourcesChangedEvent event) {
+
     final var repoId = event.repoId();
+
+    try {
+      if (!this.repoRepository.findPgpVerifyAllSignaturesEnabledById(repoId).orElse(false)) {
+        log.debug(
+            "Maven repo {} does not verify every signature: its key sources are not used", repoId);
+
+        return;
+      }
+    } catch (final RuntimeException e) {
+      log.error(
+          "Could not read whether Maven repo {} verifies every signature: its versions were not"
+              + " recomputed after its key sources changed",
+          repoId,
+          e);
+
+      return;
+    }
+
+    this.queue(repoId, "change a key again or toggle the setting to start it");
+  }
+
+  private void queue(final UUID repoId, final String howToRetry) {
 
     if (!this.queued.add(repoId)) {
       log.debug("A recomputation for Maven repo {} is already waiting", repoId);
@@ -108,8 +172,9 @@ public class SignedRecomputeService {
 
       log.error(
           "The queue of signed recomputations is full: the versions of Maven repo {} were not"
-              + " recomputed, toggle the setting again to start it",
+              + " recomputed, {}",
           repoId,
+          howToRetry,
           e);
     }
   }

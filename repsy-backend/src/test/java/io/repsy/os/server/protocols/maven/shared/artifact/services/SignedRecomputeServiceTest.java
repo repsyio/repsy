@@ -28,9 +28,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
+import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
 import io.repsy.os.shared.repo.events.PgpVerifyAllSignaturesToggledEvent;
+import io.repsy.os.shared.repo.repositories.RepoRepository;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +52,7 @@ class SignedRecomputeServiceTest {
   private static final UUID BEFORE_THE_FIRST = new UUID(0L, 0L);
 
   @Mock ArtifactVersionRepository artifactVersionRepository;
+  @Mock RepoRepository repoRepository;
   @Mock VersionSignatureService versionSignatureService;
 
   private SignedRecomputeService service;
@@ -63,7 +67,11 @@ class SignedRecomputeServiceTest {
   void setUp() {
     this.service =
         new SignedRecomputeService(
-            this.artifactVersionRepository, this.versionSignatureService, this::submit, 2);
+            this.artifactVersionRepository,
+            this.repoRepository,
+            this.versionSignatureService,
+            this::submit,
+            2);
   }
 
   private void submit(final Runnable job) {
@@ -230,12 +238,104 @@ class SignedRecomputeServiceTest {
     assertThat(this.queue).hasSize(1);
   }
 
+  private void verifyAllIs(final boolean enabled) {
+    when(this.repoRepository.findPgpVerifyAllSignaturesEnabledById(this.repoId))
+        .thenReturn(Optional.of(enabled));
+  }
+
+  @Test
+  @DisplayName("a key change on a repo that verifies every signature queues its recomputation")
+  void aKeyChangeOfAVerifyAllRepoIsQueued() {
+    this.verifyAllIs(true);
+    this.pageAfter(BEFORE_THE_FIRST, ids(1));
+
+    this.service.onKeySourcesChanged(new PgpKeySourcesChangedEvent(this.repoId));
+
+    // Handed to the executor, not run on the thread that committed the change.
+    assertThat(this.queue).hasSize(1);
+    verify(this.versionSignatureService, never()).recompute(any());
+
+    this.runQueued();
+
+    verify(this.versionSignatureService).recompute(ids(1).getFirst());
+  }
+
+  @Test
+  @DisplayName("a key change on a repo that does not verify every signature recomputes nothing")
+  void aKeyChangeOfAFlagOffRepoIsIgnored() {
+    this.verifyAllIs(false);
+
+    this.service.onKeySourcesChanged(new PgpKeySourcesChangedEvent(this.repoId));
+
+    assertThat(this.queue).isEmpty();
+    verifyNoInteractions(this.versionSignatureService, this.artifactVersionRepository);
+  }
+
+  @Test
+  @DisplayName("a key change of a repo that is gone recomputes nothing")
+  void aKeyChangeOfAMissingRepoIsIgnored() {
+    when(this.repoRepository.findPgpVerifyAllSignaturesEnabledById(this.repoId))
+        .thenReturn(Optional.empty());
+
+    this.service.onKeySourcesChanged(new PgpKeySourcesChangedEvent(this.repoId));
+
+    assertThat(this.queue).isEmpty();
+  }
+
+  @Test
+  @DisplayName("key changes and a toggle of one repo share the one waiting run")
+  void keyChangesAndAToggleAreQueuedOnce() {
+    this.verifyAllIs(true);
+
+    this.service.onKeySourcesChanged(new PgpKeySourcesChangedEvent(this.repoId));
+    this.service.onKeySourcesChanged(new PgpKeySourcesChangedEvent(this.repoId));
+    this.service.onToggled(new PgpVerifyAllSignaturesToggledEvent(this.repoId));
+
+    assertThat(this.queue).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("a full queue does not throw into the request that changed a key")
+  void aFullQueueDoesNotFailAKeyChange() {
+    this.verifyAllIs(true);
+    this.full = true;
+
+    assertThatCode(
+            () -> this.service.onKeySourcesChanged(new PgpKeySourcesChangedEvent(this.repoId)))
+        .doesNotThrowAnyException();
+
+    verifyNoInteractions(this.versionSignatureService, this.artifactVersionRepository);
+
+    // The repo is not stuck as waiting: the next change is queued once there is room again.
+    this.full = false;
+    this.service.onKeySourcesChanged(new PgpKeySourcesChangedEvent(this.repoId));
+
+    assertThat(this.queue).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("a setting that cannot be read does not throw into the request, and queues nothing")
+  void anUnreadableSettingDoesNotFailAKeyChange() {
+    when(this.repoRepository.findPgpVerifyAllSignaturesEnabledById(this.repoId))
+        .thenThrow(new IllegalStateException("database is down"));
+
+    assertThatCode(
+            () -> this.service.onKeySourcesChanged(new PgpKeySourcesChangedEvent(this.repoId)))
+        .doesNotThrowAnyException();
+
+    assertThat(this.queue).isEmpty();
+  }
+
   @Test
   @DisplayName("a batch size below one is read as one")
   void aBatchSizeBelowOneIsOne() {
     final var single =
         new SignedRecomputeService(
-            this.artifactVersionRepository, this.versionSignatureService, this::submit, 0);
+            this.artifactVersionRepository,
+            this.repoRepository,
+            this.versionSignatureService,
+            this::submit,
+            0);
     final var all = ids(2);
     this.pageAfter(BEFORE_THE_FIRST, all.subList(0, 1));
     this.pageAfter(all.get(0), all.subList(1, 2));

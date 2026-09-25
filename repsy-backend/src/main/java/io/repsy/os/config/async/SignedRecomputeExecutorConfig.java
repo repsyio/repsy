@@ -24,14 +24,16 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * The executor of the recomputation of {@code signed} that follows a toggle of a Maven repo's
- * {@code pgpVerifyAllSignaturesEnabled} setting ({@code SignedRecomputeService}, RPS-1323). It is
- * not the {@code maintenanceTaskExecutor}: that one runs a job on the calling thread when its queue
- * is full, which for a recompute would be the request that committed the toggle, and a recompute
- * walks and verifies every version of a repo.
+ * {@code pgpVerifyAllSignaturesEnabled} setting, or a change of its key sources when it verifies
+ * every signature ({@code SignedRecomputeService}, RPS-1323, RPS-1334). It is not the {@code
+ * maintenanceTaskExecutor}: that one runs a job on the calling thread when its queue is full, which
+ * for a recompute would be the request that committed the toggle, and a recompute walks and
+ * verifies every version of a repo.
  *
  * <p>A full queue rejects the job instead ({@link ThreadPoolExecutor.AbortPolicy}); the service
- * logs it and the toggle can be repeated. That takes as many repos with a waiting recompute as the
- * queue holds, and the service runs a repo once however many toggles are waiting.
+ * logs it and the toggle or the key change can be repeated, so nothing is thrown into the request
+ * that committed it. That takes as many repos with a waiting recompute as the queue holds, and the
+ * service runs a repo once however many toggles are waiting.
  */
 @Configuration
 public class SignedRecomputeExecutorConfig {

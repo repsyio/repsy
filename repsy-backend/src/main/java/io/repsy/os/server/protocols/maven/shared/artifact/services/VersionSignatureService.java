@@ -197,6 +197,12 @@ public class VersionSignatureService {
    * any more (they were replaced while the setting was off) is forgotten; when the key cannot be
    * found the record is left as it is, so an outage of a key server cannot unsign a version.
    *
+   * <p>That is also why deleting a registered key or a key-server host does not unsign the versions
+   * it verified (RPS-1334): the recomputation that follows the deletion finds the key gone, which
+   * is the same as not finding it, and leaves the record. Only what does not verify against a key
+   * that is found is forgotten. A registered key that is added makes the versions signed by it
+   * signed, by the same recomputation. What a revocation should do is a separate product question.
+   *
    * <p>Without the setting only the POM's signature counts, and a version that has none recorded
    * has the stored {@code .pom.asc} files verified (a snapshot signed before RPS-1188 has no row,
    * V0023 backfilled the releases only).

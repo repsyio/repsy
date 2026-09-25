@@ -314,6 +314,16 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * of the previous ones is forgotten. Whether the version is signed is recomputed either way. A
    * file of a version that is not registered yet (a jar before its POM) is left to the POM's
    * registration.
+   *
+   * <p>Known window, accepted (RPS-1335): whether the repo verifies every signature is taken from
+   * {@code repoInfo}, which is from the start of the request, and a repo for which it says no
+   * returns before any lock or query. A toggle-on that commits while such a file is being uploaded
+   * starts its recomputation, and if that has already passed the file's version, the version keeps
+   * a {@code signed} that was computed without the new file until the next upload into it or the
+   * next toggle. It is bounded (one version per upload that raced the toggle), heals itself, and
+   * needs an upload and a toggle within the same moment. Closing it needs the setting read for
+   * every signable file of a flag-off repo, which is the query per file that RPS-1179 removed; a
+   * plain {@code mvn deploy} uploads many of them.
    */
   private void refreshSignedForFile(
       final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {
@@ -329,6 +339,12 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     this.updateSignedForFile(repoInfo, storagePath, recorded);
   }
 
+  /**
+   * From the setting as {@code repoInfo} has it, so a request that began before a toggle is decided
+   * by the old value. When that says on, {@link #updateSignedForFile} reads the setting again under
+   * the version's lock; when it says off nothing is read, and that is the accepted window of {@link
+   * #refreshSignedForFile} (RPS-1335).
+   */
   private boolean isSignableInVerifyAllRepo(
       final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {
 
