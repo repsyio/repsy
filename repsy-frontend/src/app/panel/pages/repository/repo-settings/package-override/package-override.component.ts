@@ -45,6 +45,11 @@ export class PackageOverrideComponent implements OnInit {
     private readonly toastService: ToastService,
   ) {}
 
+  /** The Maven rule has an exception the shared text does not tell: a SNAPSHOT can always be deployed again. */
+  public get isMaven(): boolean {
+    return this.repoType === RepoType.MAVEN;
+  }
+
   ngOnInit(): void {
     this.allowOverride = this.parentForm.get('allowOverride')?.value;
   }

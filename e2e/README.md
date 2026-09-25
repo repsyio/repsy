@@ -191,7 +191,7 @@ e2e/
       gradle-locking-kotlin.spec.ts  # RPS-133: the same for the Kotlin DSL
       sbt.spec.ts               # RPS-134: registerPublishConsumeLoop(sbtAdapter) + the sbt extras
       ivy.spec.ts               # RPS-135: registerPublishConsumeLoop(ivyAdapter), a real `ant` with ivy:publish and ivy:retrieve
-      ivy-client.spec.ts        # RPS-135: IV1-IV8 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete, RPS-1370 pin)
+      ivy-client.spec.ts        # RPS-135: IV1-IV8 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete)
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
@@ -475,11 +475,15 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
   (`maven-metadata.xml.asc`, which no official client writes but Maven Central serves): it is
   stored unparsed, judged only by its directory and not verified (RPS-1185); it used to answer
   `400 malformedMetadataFile`.
-- **`allowOverride: false`** refuses re-uploading a file that already exists
-  (`403 artifactOverrideIsProhibited`) and never judges metadata. A normal SNAPSHOT redeploy writes
-  new timestamped files and re-uploads the metadata, so it **succeeds** under `allowOverride: false`
-  (`snapshot-redeploy-no-override`: real client exit 0, consumer resolves buildNumber 2). Only a name
-  that already exists is an override, and a real client never sends one twice.
+- **`allowOverride: false`** refuses re-uploading a file of a release or of a timestamped build that
+  already exists (`403 artifactOverrideIsProhibited`) and never judges metadata. A normal SNAPSHOT
+  redeploy writes new timestamped files and re-uploads the metadata, so it **succeeds** under
+  `allowOverride: false` (`snapshot-redeploy-no-override`: real client exit 0, consumer resolves
+  buildNumber 2). A non-unique snapshot (sbt, Ivy: the literal `a-<base>-SNAPSHOT.pom/.jar`, their
+  checksums and classifier jars) is not an override either (RPS-1328): the redeploy is accepted,
+  under the same scenario, and the consumer resolves the second publish's jar. `snapshots: false`
+  still refuses it, like any snapshot. A real client never sends a file of an existing timestamped
+  build or of a release twice; that is pinned with raw PUTs in `upload-rules.spec.ts`.
 - **A snapshot-directory file named for another artifact or version** (`lib-2.0-SNAPSHOT.jar`,
   `other-1.0-SNAPSHOT.jar`, `lib-1.0-SNAPSHOTX.jar` in `g/lib/1.0-SNAPSHOT/`) is refused with
   `400 invalidArtifactPath` and stores nothing: the file name must start with the directory's
@@ -523,10 +527,9 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
 The adapter's raw publish probe (what pins the exact status) is a PUT of the deploy's first file: the
 release POM for a RELEASE, a fresh timestamped POM (`a-<base>-<now>-9000nn.pom`, a build number no real
 deploy reaches) for a SNAPSHOT. It is not the literal `a-<base>-SNAPSHOT.pom`: `mvn` and Gradle never
-send that name, and it is judged differently (with `allowOverride: false` it is refused as soon as
-the version exists, because that rule looks the version up in the database for a POM). sbt and Ivy do
-send it, so their adapters' probes do too (`literalSnapshot`, see "Maven runner"); that is why their
-`snapshot-redeploy-no-override` is `forbidden` (RPS-1328).
+send that name. sbt and Ivy do send it, so their adapters' probes do too (`literalSnapshot`, see
+"Maven runner"); `allowOverride: false` accepts it (RPS-1328), so their
+`snapshot-redeploy-no-override` shares the Maven expectation.
 
 ### Nothing stored
 
@@ -770,14 +773,12 @@ a dozen parallel workers on a busy machine run out of first (the suite then take
 `scenarios/sbt-extras.ts` adds what the catalog cannot say: the exact file set of a publish and its
 checksums, `+publish` for Scala 2.13 and 3 (two artifacts, and a Scala 3 build resolves the `_3` one),
 the credential coming from `~/.sbt/.credentials`, and what the panel shows of an sbt publish. A
-`test.fail` pins each of the following, all found live while building this suite, and each is removed
-when its ticket lands:
+`test.fail` pins the following, found live while building this suite, and is removed when its ticket
+lands:
 
-| Pin                                                      | Ticket   | What happens                                                                                                                                                 |
-| -------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `snapshot-redeploy-no-override` (`expectByProtocol.sbt`) | RPS-1328 | `allowOverride: false` refuses sbt's literal `-SNAPSHOT` redeploy (403), while Maven's timestamped redeploy passes. Pinned as `forbidden`, not as a decision |
-| the panel detail of an sbt SNAPSHOT                      | RPS-1370 | 404 `itemNotFound`: it reads the version-level metadata sbt never sends. The list works                                                                      |
-| `latest.release` resolving an sbt library                | RPS-1369 | the server generates no `maven-metadata.xml`, so a dynamic revision finds nothing                                                                            |
+| Pin                                       | Ticket   | What happens                                                                      |
+| ----------------------------------------- | -------- | --------------------------------------------------------------------------------- |
+| `latest.release` resolving an sbt library | RPS-1369 | the server generates no `maven-metadata.xml`, so a dynamic revision finds nothing |
 
 Not covered: `publishSigned` (sbt-pgp, RPS-1316 covers signing with `mvn`
 and Gradle), `sbtPlugin := true` publishing, `publishLocal`, sbt 2.x (RPS-1327).
@@ -821,7 +822,8 @@ seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
   replaces them in place, so `ivy` is in `snapshot-deploy`/`snapshot-redeploy`, and
   `afterSuccessfulRoundTrip` asserts the literal jar is the resolved one (`expectLiteralSnapshotStored`,
   shared with sbt) and that the stored jar, POM and checksums are what Ivy built (`clients/ivy-checks.ts`).
-  The same file names are why `snapshot-redeploy-no-override` is `forbidden` for Ivy (RPS-1328, below).
+  The same file names are why `allowOverride: false` had to leave a non-unique snapshot alone for
+  `snapshot-redeploy-no-override` to hold for Ivy (RPS-1328).
 - Dynamic revisions work through the directory listing: Ivy looks for the artifact's
   `maven-metadata.xml` (Repsy has none), then reads the HTML listing of the artifact directory. With 1.0, 1.1, 1.2, 1.10 and 2.0-SNAPSHOT
   published, `1.+` and `latest.release` resolve 1.10 (numeric order, a SNAPSHOT is not a release),
@@ -860,13 +862,8 @@ exact file set (IV1, `@smoke`), Ivy resolving what `mvn deploy` published (a rel
 through its timestamped files, IV2) and `mvn dependency:get` resolving what Ivy published (IV3), a
 dependency through the POM, an optional one and `transitive="false"` (IV4), the dynamic revisions
 above (IV5), an unknown module (IV6), and the first-configuration pitfalls above (IV8: no realm, another
-realm, `publishivy="true"`, the dependency line with and without its `conf`). A `test.fail` pins each of the following, all found
-live while building this suite, and each is removed when its ticket lands:
-
-| Pin                                                      | Ticket   | What happens                                                                                                                                                 |
-| -------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `snapshot-redeploy-no-override` (`expectByProtocol.ivy`) | RPS-1328 | `allowOverride: false` refuses Ivy's literal `-SNAPSHOT` redeploy (403), while Maven's timestamped redeploy passes. Pinned as `forbidden`, not as a decision |
-| the panel detail of an Ivy SNAPSHOT                      | RPS-1370 | 404 `itemNotFound`: it reads the version-level metadata Ivy never sends. The list works                                                                      |
+realm, `publishivy="true"`, the dependency line with and without its `conf`). No `test.fail` pin is
+left in this suite.
 
 Not covered: an Ivy-native (non-Maven) layout, which Repsy cannot serve (a descriptor named
 `<artifact>-<revision>.ivy` is a valid Maven file name and is stored, but nothing registers it), the

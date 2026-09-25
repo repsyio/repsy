@@ -37,9 +37,11 @@
  *    new timestamped files (buildNumber + 1) on every deploy and re-uploads the two metadata files,
  *    and the server neither counts a new timestamped file as an existing one nor ever judges
  *    metadata for override (`snapshot-redeploy-no-override`: publish and consume both succeed).
- *    Only re-uploading a file that already exists (the same timestamped name) is an override; that
- *    is pinned at the protocol level in `tests/maven/upload-rules.spec.ts`, since a real client
- *    never does it.
+ *    sbt and Ivy publish a SNAPSHOT non-uniquely, under the literal `a-<base>-SNAPSHOT.*` names, and
+ *    send them again on every redeploy; that is no override either (RPS-1328), so the same scenario
+ *    holds for them and the consumer resolves the second publish's jar. Only re-uploading a file of
+ *    an existing timestamped build, or of a release, is an override; that is pinned at the protocol
+ *    level in `tests/maven/upload-rules.spec.ts`, since no real client does it.
  *  - `reuseCoordinates` marks the scenarios about a redeploy: the fixture pre-publishes (admin,
  *    permissive defaults) the same coordinate the scenario's own publish targets, and only then
  *    applies the scenario's `repo` settings. Every other pre-publish lands on a separate coordinate.
@@ -321,13 +323,11 @@ export const SCENARIOS: readonly Scenario[] = [
     reuseCoordinates: true,
     protocols: MAVEN_CLIENTS,
     // Pinned: succeeds. Maven writes new timestamped files, so nothing existing is overridden, and
-    // metadata is never judged for override -- see the file-level comment. sbt and Ivy: refused, 403
-    // ("artifactOverrideIsProhibited"). Both publish a SNAPSHOT non-uniquely, under the literal
-    // `a-<base>-SNAPSHOT.*` names, so their redeploy re-uploads files that exist and IS an override.
-    // Pinned as it is today, not as a decision: RPS-1328 exempts those files from `allowOverride`,
-    // and removes these overrides.
+    // metadata is never judged for override -- see the file-level comment. sbt and Ivy publish a
+    // SNAPSHOT non-uniquely, under the literal `a-<base>-SNAPSHOT.*` names, so their redeploy sends
+    // files that exist again; `allowOverride` leaves a non-unique snapshot alone (RPS-1328), so it
+    // succeeds too, and the consumer resolves the second publish's jar.
     expect: { publish: 'ok', consume: 'ok' },
-    expectByProtocol: { sbt: { publish: 'forbidden' }, ivy: { publish: 'forbidden' } },
   },
   {
     id: 'redeploy-snapshots-off',

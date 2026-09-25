@@ -22,9 +22,13 @@
  * `catalog.ts`; every expectation here was probed against a running instance first
  * (RPS-1174/RPS-1176).
  *
- *  - `allowOverride: false` refuses re-uploading a file that exists (403 `artifactOverrideIsProhibited`)
- *    but never judges metadata (nor its checksums), and a SNAPSHOT redeploy only ever writes new
- *    timestamped files, which is why `snapshot-redeploy-no-override` succeeds.
+ *  - `allowOverride: false` refuses re-uploading a file of a release or of a timestamped build that
+ *    exists (403 `artifactOverrideIsProhibited`) but never judges metadata (nor its checksums), and
+ *    a Maven SNAPSHOT redeploy only ever writes new timestamped files, which is why
+ *    `snapshot-redeploy-no-override` succeeds. A non-unique snapshot, the literal
+ *    `a-<base>-SNAPSHOT.pom/.jar` (+ checksums, classifier jars) that sbt and Ivy send every time,
+ *    is no override either: it is accepted again and again (RPS-1328), while `snapshots: false`
+ *    still refuses it.
  *  - A switched-off version kind (`snapshots: false` / `releases: false`) refuses artifact files of
  *    that kind, new version or existing (403 `snapshotVersionsAreProhibited` /
  *    `releaseVersionsAreProhibited`), and refuses the version-level snapshot metadata by its
@@ -233,6 +237,78 @@ test.describe('maven upload rules (raw HTTP)', () => {
         200,
         undefined,
         'version-level metadata checksum again',
+      );
+    },
+  );
+
+  test(
+    'allowOverride:false lets a literal -SNAPSHOT be deployed again, not a timestamped build or a release',
+    { tag: ['@settings', '@snapshot'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder);
+      await seedBothKinds(layout);
+      await seeder.setSettings(layout.repoName, {
+        privateRepo: true,
+        allowOverride: false,
+        releases: true,
+        snapshots: true,
+      });
+      const dir = versionDir(layout.groupId, ARTIFACT_ID, SNAPSHOT);
+      const literal = `${dir}/${ARTIFACT_ID}-1.0-SNAPSHOT`;
+      const admin = adminCredential();
+
+      // What sbt and Ivy send, twice: the version is registered after the first POM, the files
+      // exist after the first round, and the second round replaces them.
+      const round = (n: number): [string, string, string][] => [
+        [`${literal}.pom`, minimalPom(layout.groupId, ARTIFACT_ID, SNAPSHOT), OCTET],
+        [`${literal}.jar`, `literal jar ${n}`, OCTET],
+        [`${literal}.jar.sha1`, `sha1 ${n}`, TEXT],
+        [`${literal}-sources.jar`, `sources ${n}`, OCTET],
+      ];
+      for (const n of [1, 2]) {
+        for (const file of round(n)) {
+          expectPut(await layout.put(...file), 200, undefined, `literal round ${n} ${file[0]}`);
+        }
+      }
+      const jar = await rawGet(layout.repoName, admin, `${literal}.jar`);
+      expect(jar.status).toBe(200);
+      expect(jar.body.toString(), 'the second round replaced the jar').toBe('literal jar 2');
+
+      // A timestamped build and a release stay immutable.
+      const override = 'artifactOverrideIsProhibited';
+      const [firstPom, firstJar] = snapshotDeployFiles(layout, FIRST_BUILD);
+      expectPut(await layout.put(...firstPom), 403, override, 'existing timestamped pom');
+      expectPut(await layout.put(...firstJar), 403, override, 'existing timestamped jar');
+      const releaseDir = versionDir(layout.groupId, ARTIFACT_ID, RELEASE);
+      expectPut(
+        await layout.put(
+          `${releaseDir}/${ARTIFACT_ID}-${RELEASE}.pom`,
+          minimalPom(layout.groupId, ARTIFACT_ID, RELEASE),
+          OCTET,
+        ),
+        403,
+        override,
+        'existing release pom',
+      );
+      expectPut(
+        await layout.put(`${releaseDir}/${ARTIFACT_ID}-${RELEASE}.jar`, 'other', OCTET),
+        403,
+        override,
+        'existing release jar',
+      );
+
+      // The switch of the kind still decides (RPS-1174).
+      await seeder.setSettings(layout.repoName, {
+        privateRepo: true,
+        allowOverride: false,
+        releases: true,
+        snapshots: false,
+      });
+      expectPut(
+        await layout.put(...round(3)[1]),
+        403,
+        'snapshotVersionsAreProhibited',
+        'literal jar with snapshots off',
       );
     },
   );

@@ -143,4 +143,32 @@ describe('PackageOverrideComponent template', () => {
     expect(el.textContent).toContain('Allow: users can upload the same version again and overwrite it.');
     expect(el.textContent).toContain('Deny: uploading the same version again is blocked.');
   });
+
+  const providers = () => [
+    { provide: ProtocolRepoControllerService, useValue: {} },
+    { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+  ];
+
+  it('tells a Maven repository that a SNAPSHOT can always be deployed again (RPS-1328)', async () => {
+    const { el } = await renderComponent(PackageOverrideComponent, providers(), {
+      repoName: REPO,
+      repoType: RepoType.MAVEN,
+      parentForm: releaseAwareParentForm({ allowOverride: false }),
+    });
+    const note = el.querySelector('[data-testid="settings-override-maven-note"]');
+
+    expect(note?.textContent).toContain('a SNAPSHOT can always be deployed again');
+    expect(note?.textContent).toContain('timestamped SNAPSHOT builds cannot be replaced');
+    expect(el.textContent).not.toContain('will be blocked');
+  });
+
+  it('keeps the Maven note off every other repository type (RPS-1328)', async () => {
+    const { el } = await renderComponent(PackageOverrideComponent, providers(), {
+      repoName: REPO,
+      repoType: RepoType.NPM,
+      parentForm: generalParentForm({ allowOverride: false }),
+    });
+
+    expect(el.querySelector('[data-testid="settings-override-maven-note"]')).toBeNull();
+  });
 });

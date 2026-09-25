@@ -26,6 +26,11 @@
             : 'Users cannot upload the same version twice.'
         }}
       </p>
+      @if (isMaven) {
+        <p data-testid="settings-override-maven-note" class="text-[#9FA0A0]">
+          Maven: releases and timestamped SNAPSHOT builds cannot be replaced; a SNAPSHOT can always be deployed again.
+        </p>
+      }
     </div>
   </div>
 </section>
