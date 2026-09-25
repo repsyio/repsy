@@ -249,6 +249,11 @@ panel API. Edit that file for any API change; there is no other copy. Both sides
   populated data is tested on legacy data at the previous version: see `DockerManifestMigrationScenario`
   (`V0024DockerContentAddressedManifestsTest` on H2, `DockerManifestMigrationIT` on PostgreSQL, which
   owns its container instead of extending `AbstractIntegrationTest`).
+- A Docker image (`docker_image`) exists while it stores a manifest. A manifest push creates it in the
+  same transaction that saves the manifest (`ImageTxService.findOrCreateImage`, an insert that skips an
+  existing row), so a push that fails leaves no image behind; what the tags and untagged manifests reach
+  is one recursive walk over the index edges, in `UntaggedManifestFinder` and in the recursive CTEs of
+  `ImageRepository` and `LayerRepository`, and they must agree (`DockerUntaggedManifestCleanupIT`).
 - Hibernate does not validate the entity mappings (`ddl-auto: none`), so
   `EntitySchemaAnnotationIT` and `H2EntitySchemaAnnotationIT` compare every entity of the
   metamodel with `information_schema` (`EntityColumnSchemaChecks`). A new entity or column is

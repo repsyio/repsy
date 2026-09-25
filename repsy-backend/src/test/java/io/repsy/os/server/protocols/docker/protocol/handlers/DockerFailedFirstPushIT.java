@@ -20,8 +20,10 @@ import static io.repsy.os.server.protocols.docker.protocol.handlers.DockerWire.i
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
@@ -74,6 +76,8 @@ class DockerFailedFirstPushIT extends AbstractIntegrationTest {
   @Autowired private RepoTxService repoTxService;
   @Autowired private DockerStorageService dockerStorageService;
   @MockitoBean private UsageUpdateService usageUpdateService;
+  // The same overrides as DockerImageDeleteRaceIT, so the two share one Spring context.
+  @MockitoSpyBean private ImageTxService imageTxService;
   @MockitoSpyBean private ManifestTxService manifestTxService;
 
   private final List<UUID> createdRepoIds = new ArrayList<>();
@@ -220,6 +224,7 @@ class DockerFailedFirstPushIT extends AbstractIntegrationTest {
     final var failed = this.wire.putImage(repo, IMAGE, "latest", imageManifest("layer-one"));
 
     assertThat(failed.getStatus()).as(failed.getContentAsString()).isGreaterThanOrEqualTo(500);
+    verify(this.imageTxService).findOrCreateImage(repo.getId(), IMAGE);
     assertThat(this.imageNames(repo)).as("no image without a manifest").isEmpty();
 
     final var retried = this.wire.putImage(repo, IMAGE, "latest", imageManifest("layer-one"));
