@@ -56,9 +56,15 @@ public abstract class AbstractRubyGemYankHandler implements ProtocolMethodHandle
     return List.of(HttpMethod.DELETE);
   }
 
+  /**
+   * Yank is a WRITE, like Cargo's yank and NuGet's unlist: it only unpublishes a version from the
+   * index and keeps the {@code .gem} file (RPS-1238), so whoever may push may yank. A read-write
+   * deploy token, which is what the panel's Ruby snippet has {@code gem yank} use, and a USER-role
+   * account are therefore allowed; a read-only token is not (RPS-1317).
+   */
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.MANAGE, "writeOperation", true);
+    return Map.of("permission", Permission.WRITE, "writeOperation", true);
   }
 
   @Override
