@@ -31,12 +31,6 @@ import org.springframework.stereotype.Repository;
 @NullMarked
 public interface ArtifactRepository extends JpaRepository<Artifact, UUID> {
 
-  @Query(
-      """
-          select a.groupName from Artifact a where a.repo.id = :repoId
-          """)
-  List<String> findGroupNamesByRepoId(UUID repoId);
-
   long countByRepoIdAndGroupName(UUID repoId, String groupName);
 
   /**

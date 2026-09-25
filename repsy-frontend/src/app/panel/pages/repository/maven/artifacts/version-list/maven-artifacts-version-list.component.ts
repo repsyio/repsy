@@ -43,6 +43,7 @@ import { Sort } from '../../../../../shared/dto/sort';
 import { SecurityService } from '../../../../security/service/security.service';
 import { MavenConfigComponent } from '../../config/maven-config.component';
 import { MavenService } from '../../service/maven.service';
+import { showVersionDeleteDialog } from '../../util/version-delete-warning.util';
 
 @Component({
   selector: 'app-maven-artifacts-list',
@@ -147,29 +148,33 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
   public deleteVersion(version: ArtifactVersionListItem) {
     const versionCount = this.versions.length;
 
-    this.dangerModalService.show('Delete Version', 'Delete', () => {
-      this.loading = true;
-      this.mavenService
-        .deleteVersion(this.groupName, this.artifactName, version.versionName)
-        .pipe(
-          finalize(() => {
-            this.loading = false;
-          }),
-        )
-        .subscribe({
-          next: () => {
-            if (versionCount - 1 === 0) {
-              this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
-                this.toastService.show('Version deleted successfully', 'success');
-              });
-            } else {
-              this.refreshPage();
-              this.toastService.show('Version deleted successfully', 'success');
-            }
-          },
-          error: () => {},
-        });
+    this.mavenService.getVersionDeleteWarning(this.groupName, this.artifactName).subscribe((warning) => {
+      showVersionDeleteDialog(this.dangerModalService, warning, () => this.confirmDeleteVersion(version, versionCount));
     });
+  }
+
+  private confirmDeleteVersion(version: ArtifactVersionListItem, versionCount: number) {
+    this.loading = true;
+    this.mavenService
+      .deleteVersion(this.groupName, this.artifactName, version.versionName)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: () => {
+          if (versionCount - 1 === 0) {
+            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+              this.toastService.show('Version deleted successfully', 'success');
+            });
+          } else {
+            this.refreshPage();
+            this.toastService.show('Version deleted successfully', 'success');
+          }
+        },
+        error: () => {},
+      });
   }
 
   private fetchArtifactVersions(): void {
