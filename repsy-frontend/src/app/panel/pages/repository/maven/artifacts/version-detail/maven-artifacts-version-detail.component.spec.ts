@@ -127,7 +127,9 @@ describe('MavenArtifactsVersionDetailComponent', () => {
       expect(component.gradleDependencyHtml).toBe("implementation 'org.acme:lib:1.2.3'");
       expect(component.gradleKotlinDependencyHtml).toBe('implementation("org.acme:lib:1.2.3")');
       expect(component.sbtDependencyHtml).toBe('libraryDependencies += "org.acme" % "lib" % "1.2.3"');
-      expect(component.ivyDependencyHtml).toBe('<dependency org="org.acme" name="lib" rev="1.2.3" />');
+      expect(component.ivyDependencyHtml).toBe(
+        '<dependency org="org.acme" name="lib" rev="1.2.3" conf="default->default" />',
+      );
       expect(component.groovyDependencyHtml).toBe(
         "@Grapes(\n  @Grab(group='org.acme', module='lib', version='1.2.3')\n)",
       );

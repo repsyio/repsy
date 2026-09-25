@@ -27,8 +27,11 @@
  *    directory listing, since Ivy sends (and Repsy generates) no `maven-metadata.xml`;
  *  - IV6/IV7: an unknown module, and Ivy's own `overwrite="false"` (RPS-1368);
  *  - IV8: the ways a first configuration goes wrong: no realm on the credential, `publishivy="true"`,
- *    and the panel's dependency line without a `conf`;
- *  - the panel's version detail of an Ivy SNAPSHOT (RPS-1370) and version delete (RPS-1331).
+ *    and a dependency line without a `conf`, next to the panel's own line (with its `conf`, RPS-1395)
+ *    used as it is;
+ *  - the panel's version detail of an Ivy SNAPSHOT (RPS-1370, still a known gap) and its version
+ *    delete (RPS-1331, fixed: it removes the version and keeps the other, with no artifact-level
+ *    maven-metadata.xml).
  *
  * Like the sbt extras (`scenarios/sbt-extras.ts`) and the dotted-artifactId test in
  * `publish-consume.spec.ts`, each test builds its `World` by hand, since a coordinate other than the
@@ -405,18 +408,23 @@ test.describe('ivy first-configuration pitfalls', () => {
     expect(ivyFile.msgId).toBe('invalidArtifactPath');
   });
 
-  test("ivy > the panel's bare dependency line asks for the sources and javadoc artifacts, which are not there", async ({
+  test("ivy > the panel's dependency line, used as it is, retrieves the artifact, and needs its conf", async ({
     seeder,
   }) => {
-    const { world } = await newWorld(seeder, 'bare-dependency');
+    const { world, groupId, artifactId, version } = await newWorld(seeder, 'panel-dependency');
     await publishOk(world);
 
+    // RPS-1395: exactly what the version detail's "Apache Ivy" block shows.
+    const dependencyLine = `<dependency org="${groupId}" name="${artifactId}" rev="${version}" conf="default->default" />`;
+    const shown = await resolveWithIvy(world, { dependencyLine });
+    expect(shown.clientExitCode, `ant retrieve: ${shown.command}`).toBe(0);
+    expect(shown.retrieved).toEqual([`${artifactId}-${version}.jar`]);
+
+    // Without a conf, Ivy's default mapping also asks for the sources and javadoc artifacts, which
+    // are not there: that is why the panel's line carries one.
     const bare = await resolveWithIvy(world, { conf: null });
     expect(bare.clientExitCode, `ant retrieve: ${bare.command}`).not.toBe(0);
     expect(output(bare)).toMatch(/FAILED\s+\] .*\((javadoc|source)\)/);
-
-    const mapped = await resolveWithIvy(world, { conf: 'default->default' });
-    expect(mapped.clientExitCode, `ant retrieve: ${mapped.command}`).toBe(0);
   });
 });
 
@@ -448,12 +456,8 @@ test('ivy > deleting one of two Ivy-published versions in the panel removes it a
   seeder,
   panelApi,
 }) => {
-  // RPS-1331: with no artifact-level maven-metadata.xml (Ivy never sends one) the delete moves the
-  // files to the trash, then answers 404 and leaves the database row behind.
-  test.fail(
-    true,
-    'RPS-1331: the version delete answers 404 after the files are gone when there is no maven-metadata.xml',
-  );
+  // RPS-1331: Ivy never sends an artifact-level maven-metadata.xml, and the delete used to move the
+  // files to the trash, answer 404 and leave the database row behind.
   const { world, repoName, groupId, artifactId, version } = await newWorld(seeder, 'delete');
   const second = uniqueVersion('release');
   for (const v of [version, second]) {
@@ -468,10 +472,22 @@ test('ivy > deleting one of two Ivy-published versions in the panel removes it a
     second,
   ]);
   const admin = adminCredential();
+  const metadataPath = `${artifactDir(groupId, artifactId)}/maven-metadata.xml`;
+  expect((await rawGet(repoName, admin, metadataPath)).status, 'Ivy sends no metadata').toBe(404);
   const dir = versionDir(groupId, artifactId, version);
   expect((await rawGet(repoName, admin, `${dir}/${artifactId}-${version}.jar`)).status).toBe(404);
+  expect((await rawGet(repoName, admin, `${dir}/${artifactId}-${version}.pom`)).status).toBe(404);
   const keptDir = versionDir(groupId, artifactId, second);
   expect((await rawGet(repoName, admin, `${keptDir}/${artifactId}-${second}.jar`)).status).toBe(
     200,
   );
+  expect((await rawGet(repoName, admin, `${keptDir}/${artifactId}-${second}.pom`)).status).toBe(
+    200,
+  );
+  expect((await rawGet(repoName, admin, metadataPath)).status, 'no metadata is generated').toBe(
+    404,
+  );
+
+  const info = await panelApi.getMavenArtifactVersion(repoName, groupId, artifactId, second);
+  expect(info.versionName).toBe(second);
 });
