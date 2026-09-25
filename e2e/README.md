@@ -72,7 +72,8 @@ e2e/
   docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
   docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
-  runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle and gpg; see "Adding a protocol adapter" below
+  runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle/sbt and gpg; see "Adding a protocol adapter" below
+  runners/sbt-warmup/          # the throwaway sbt project maven.Dockerfile builds once to prime the sbt caches (RPS-134)
   runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
   runners/npm-clients.Dockerfile  # + pinned pnpm, yarn classic, yarn berry (npm --prefix /opt/clients/<name>) and bun (copied from oven/bun); see "npm-family clients"
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
@@ -110,6 +111,7 @@ e2e/
       gradle-extras.ts          # registerGradleExtras(dsl): the Gradle-only checks (module metadata, gradle.properties credential), RPS-133
       gradle-locking.ts         # registerGradleLocking(dsl): dependency locking against Repsy (RPS-133)
       gradle-plugin-extras.ts   # registerGradlePluginExtras(dsl): legacy eachPlugin route, missing plugin marker, no Plugin Portal fallback
+      sbt-extras.ts             # registerSbtExtras(): the sbt-only checks (file set, cross-build, .credentials, defaults, panel), RPS-134
     ui/                        # the panel UI suite's plumbing (fixtures, session seeding, page objects) -- see "UI suite"
     clients/
       stack.ts                  # findRepsyContainer()/dockerExec()/logLinesContaining(): docker exec + docker logs against the local stack's Repsy container ("Stack runner")
@@ -130,6 +132,9 @@ e2e/
       gradle-consumer.ts         # GradleConsumer: one project + Gradle home for several runs, for dependency locking (RPS-133)
       gradle-plugin.ts           # the Gradle client as a plugin consumer: publish a plugin, apply it from pluginManagement (RPS-133)
       gradle-plugin-adapter.ts   # gradlePluginAdapter(dsl): the same loop with a plugin as the artifact (`gradle-plugin-groovy`, `gradle-plugin-kotlin`)
+      sbt.ts                     # the sbt client: publish()/resolve()/seedPublish() with a Scala project (RPS-134)
+      sbt-adapter.ts             # sbtAdapter: the ProtocolAdapter registerPublishConsumeLoop takes (`sbt`)
+      sbt-checks.ts              # expectLiteralSnapshotStored: what an sbt SNAPSHOT publish leaves (literal names, no metadata)
       cargo-raw.ts                 # cargo-specific raw PUT/GET (publish/config.json/sparse-index/download), body builder
       cargo.ts                     # the cargo client + cargoAdapter: publish()/resolve()/seedPublish(), cargo package/publish/fetch
       nuget-raw.ts                  # nuget-specific raw PUT/GET (publish/versions/download/registration/service-index), buildNupkg (fflate)
@@ -509,9 +514,11 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
 
 The adapter's raw publish probe (what pins the exact status) is a PUT of the deploy's first file: the
 release POM for a RELEASE, a fresh timestamped POM (`a-<base>-<now>-9000nn.pom`, a build number no real
-deploy reaches) for a SNAPSHOT. It is not the literal `a-<base>-SNAPSHOT.pom`: a real client never
-sends that name, and it is judged differently (with `allowOverride: false` it is refused as soon as
-the version exists, because that rule looks the version up in the database for a POM).
+deploy reaches) for a SNAPSHOT. It is not the literal `a-<base>-SNAPSHOT.pom`: `mvn` and Gradle never
+send that name, and it is judged differently (with `allowOverride: false` it is refused as soon as
+the version exists, because that rule looks the version up in the database for a POM). sbt does send
+it, so the sbt adapter's probe does too (`literalSnapshot`, see "Maven runner"); that is why sbt's
+`snapshot-redeploy-no-override` is `forbidden` (RPS-1328).
 
 ### Nothing stored
 
@@ -575,8 +582,9 @@ five worked examples.
 
 `runners/maven.Dockerfile` adds a pinned Eclipse Temurin JDK and Apache Maven (build args
 `TEMURIN_VERSION`, `MAVEN_VERSION`), a pinned Gradle (`GRADLE_VERSION`, with its published
-`GRADLE_SHA256`, checked at build time) and `gpg` (Debian's GnuPG 2.2, no key server tooling) to
-the harness image; the last two are only for `gpg-signed-deploy.spec.ts` (below). `clients/maven.ts` renders
+`GRADLE_SHA256`, checked at build time), a pinned sbt (`SBT_VERSION`, `SBT_SHA256`, RPS-134) and `gpg`
+(Debian's GnuPG 2.2, no key server tooling) to the harness image; `gpg` is only for
+`gpg-signed-deploy.spec.ts` (below). `clients/maven.ts` renders
 `src/packages/maven/{pom,settings}.template.xml` into a per-invocation isolated work directory
 (`clients/exec.ts`) and runs the real `mvn` binary:
 
@@ -698,6 +706,71 @@ templates, guarded by a lock file and a ready marker so one worker warms and the
 it into each run's own `GRADLE_USER_HOME`. The warm-up resolves nothing, so no run can find a Repsy
 artifact there, and nothing a run writes reaches the shared copy. Both specs still raise the per-test
 timeout to 6 minutes, for a machine that is busy with something else.
+
+**The sbt client (`sbt.spec.ts`, RPS-134).** A third real client of the same Maven repository, with a
+wire behaviour of its own. `clients/sbt.ts` renders `src/packages/sbt/*.template.*` (a tiny Scala
+project) into an isolated work directory and runs the real `sbt` launcher; `sbtAdapter`
+(`clients/sbt-adapter.ts`) hands it to the same `registerPublishConsumeLoop`: one more protocol key,
+`sbt`, creating `RepoType.MAVEN` repos, and the catalog's Maven-repository scenarios (`MAVEN_CLIENTS`)
+run for it. sbt 1.x only; sbt 2.x rewrote its SNAPSHOT publishing and is RPS-1327. What sbt does, seen
+on the wire (a fake server logging every request, then this suite):
+
+- The artifactId carries the Scala binary version, `lib_2.13` or `lib_3`, so the adapter's
+  `packageName` is the artifactId sbt publishes (`sbt-<scenario>_2.13`) and every helper that builds a
+  path from the world's coordinates (`repoTree`, `expectNothingStored`, the probes) points at the real
+  files. The build's `name` is that without the suffix.
+- Every file is followed by a `.sha1` and a `.md5`: the POM first, then the jar, then (when the project
+  publishes them) the sources and Scaladoc jars. All PUTs are `Content-Type: application/octet-stream`.
+  The templates switch the sources and Scaladoc jars off (a Scaladoc run is a compile); the file-set test
+  switches them on.
+- sbt sends NO `maven-metadata.xml`, at either level. A SNAPSHOT is published NON-uniquely, under the
+  literal names `lib_2.13-1.0-SNAPSHOT.pom/.jar`, with no timestamps. Coursier resolves it through the
+  literal name. So `sbt` is in `snapshot-deploy`/`snapshot-redeploy`, and `afterSuccessfulRoundTrip`
+  (`clients/sbt-checks.ts`) asserts the literal jar is the resolved one and that no version-level
+  metadata exists, instead of Maven's metadata walk.
+- The first request of a publish is answered 401 with Repsy's `WWW-Authenticate: Basic realm="Repsy
+Managed Repository"`, and sbt then sends the credential: its `Credentials(realm, host, user,
+password)` has to name that realm and the repository's host. Coursier (the resolver) sends it the same way.
+- Like `mvn`, sbt hides the HTTP status behind its exit code, so the `Outcome` is the raw probe of
+  `clients/maven.ts`, with sbt's exit code as evidence; the probe sends the LITERAL `-SNAPSHOT` POM
+  (`rawPublishCheck`'s `literalSnapshot`), which is the file sbt itself sends.
+
+The build sets `publishConfiguration.overwrite` to `true`, so the server's own `allowOverride` rule
+decides a redeploy (sbt's default is `true` for a SNAPSHOT and `false` for a release, see RPS-1368
+below). The consumer declares only the Repsy repository, with `autoScalaLibrary` and
+`managedScalaInstance` off, so it needs nothing else from the network and cannot find the library
+anywhere but Repsy.
+
+Provisioning: sbt's launcher and cache are big and slow to fetch, so the image primes them once at
+build time (`runners/sbt-warmup`, `+update +compile +package +makePom` for Scala 2.13.18 and 3.3.8):
+the launcher's boot directory and Coursier's cache live in `/opt/sbt-cache`. Each run gets its own
+`HOME`, `user.home`, Ivy home, global base and temp directory, and shares only the boot directory
+(read for the sbt jars) and, for a publish, the Coursier cache (read for the Scala library and
+compiler); a resolve gets an empty Coursier cache of its own. Neither holds a test artifact: every test
+publishes to a repository of its own. Keep `SBT_VERSION`, `SCALA_213` and `SCALA_3` in `clients/sbt.ts`
+equal to `maven.Dockerfile` and `runners/sbt-warmup`. sbt's boot socket is a unix domain socket in
+`<tmp>/.sbt/`, whose path must stay under about 100 characters, which is why the temp directory is a
+short `mkdtemp` and not under the work directory (the longest scenario id would overflow it). Every run
+also passes `-J-XX:+UseSerialGC -J-XX:TieredStopAtLevel=1`: a run lives for seconds, and on this
+project's templates the two flags took a publish from 35-45 s to about 15 s of CPU time, which is what
+a dozen parallel workers on a busy machine run out of first (the suite then takes about 4 minutes).
+
+`scenarios/sbt-extras.ts` adds what the catalog cannot say: the exact file set of a publish and its
+checksums, `+publish` for Scala 2.13 and 3 (two artifacts, and a Scala 3 build resolves the `_3` one),
+the credential coming from `~/.sbt/.credentials`, and what the panel shows of an sbt publish. A
+`test.fail` pins each of the following, all found live while building this suite, and each is removed
+when its ticket lands:
+
+| Pin                                                      | Ticket   | What happens                                                                                                                                                 |
+| -------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `snapshot-redeploy-no-override` (`expectByProtocol.sbt`) | RPS-1328 | `allowOverride: false` refuses sbt's literal `-SNAPSHOT` redeploy (403), while Maven's timestamped redeploy passes. Pinned as `forbidden`, not as a decision |
+| a release published with sbt's own defaults              | RPS-1368 | the Maven HEAD handler answers 200 for a file that does not exist, so sbt (overwrite off for a release) refuses even the FIRST publish                       |
+| the panel detail of an sbt SNAPSHOT                      | RPS-1370 | 404 `itemNotFound`: it reads the version-level metadata sbt never sends. The list works                                                                      |
+| deleting one of two sbt versions in the panel            | RPS-1331 | 404 after the files are gone, the database row stays (no artifact-level metadata)                                                                            |
+| `latest.release` resolving an sbt library                | RPS-1369 | the server generates no `maven-metadata.xml`, so a dynamic revision finds nothing                                                                            |
+
+Not covered: Ivy-style layout (RPS-135), `publishSigned` (sbt-pgp, RPS-1316 covers signing with `mvn`
+and Gradle), `sbtPlugin := true` publishing, `publishLocal`, sbt 2.x (RPS-1327).
 
 ```bash
 ./run.sh test --protocol maven

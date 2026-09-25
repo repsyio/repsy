@@ -132,11 +132,11 @@
 import type { Scenario } from './types.js';
 
 /**
- * The protocol keys that talk to a Maven repository: `mvn` itself and the Gradle client in both build
- * file languages (RPS-133). A scenario about Maven repository rules (release/snapshot switches,
+ * The protocol keys that talk to a Maven repository: `mvn` itself, the Gradle client in both build
+ * file languages (RPS-133) and sbt (RPS-134). A scenario about Maven repository rules (release/snapshot switches,
  * SNAPSHOT deploys) lists these instead of `'maven'` alone.
  */
-const MAVEN_CLIENTS = ['maven', 'gradle-groovy', 'gradle-kotlin'];
+const MAVEN_CLIENTS = ['maven', 'gradle-groovy', 'gradle-kotlin', 'sbt'];
 
 /**
  * `MAVEN_CLIENTS` plus the Gradle plugin flow (RPS-133), which applies a published plugin from a Maven
@@ -321,8 +321,13 @@ export const SCENARIOS: readonly Scenario[] = [
     reuseCoordinates: true,
     protocols: MAVEN_CLIENTS,
     // Pinned: succeeds. Maven writes new timestamped files, so nothing existing is overridden, and
-    // metadata is never judged for override -- see the file-level comment.
+    // metadata is never judged for override -- see the file-level comment. sbt: refused, 403
+    // ("artifactOverrideIsProhibited"). sbt publishes a SNAPSHOT non-uniquely, under the literal
+    // `a-<base>-SNAPSHOT.*` names, so its redeploy re-uploads files that exist and IS an override.
+    // Pinned as it is today, not as a decision: RPS-1328 exempts those files from `allowOverride`,
+    // and removes this override.
     expect: { publish: 'ok', consume: 'ok' },
+    expectByProtocol: { sbt: { publish: 'forbidden' } },
   },
   {
     id: 'redeploy-snapshots-off',
