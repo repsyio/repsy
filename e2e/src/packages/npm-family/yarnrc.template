@@ -1,0 +1,4 @@
+{{#bindings}}
+"{{{registryKey}}}" "{{{registryUrl}}}"
+{{/bindings}}
+disable-self-update-check true
