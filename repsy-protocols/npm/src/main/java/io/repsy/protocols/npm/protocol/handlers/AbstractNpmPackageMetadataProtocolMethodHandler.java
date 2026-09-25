@@ -24,6 +24,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.shared.utils.ExtractPath;
+import io.repsy.protocols.npm.shared.utils.PackageUtils;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,6 +39,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
@@ -45,6 +47,8 @@ public abstract class AbstractNpmPackageMetadataProtocolMethodHandler
     implements ProtocolMethodHandler {
 
   private static final Pattern METADATA_PATTERN = Pattern.compile("^/(.+?)$");
+  private static final MediaType ABBREVIATED_METADATA_TYPE =
+      MediaType.parseMediaType("application/vnd.npm.install-v1+json");
 
   private final PathParser basePathParser;
   private final NpmProtocolFacade npmProtocolFacade;
@@ -120,7 +124,23 @@ public abstract class AbstractNpmPackageMetadataProtocolMethodHandler
           this.npmProtocolFacade.getPackageMetadata(
               protocolContext, pathVars.scopeName(), pathVars.packageName(), acceptHeader);
 
-      return ResponseEntity.ok(metadata);
+      // The abbreviated and the full document share one address, so what a cache may reuse depends
+      // on Accept, and each has its own entity tag. A conditional request that still holds the
+      // current document is answered with 304 by Spring, from the ETag and Last-Modified set here
+      // (RPS-1359).
+      final var abbreviated = PackageUtils.isRequestedAbbreviatedMetadata(acceptHeader);
+      final var builder =
+          ResponseEntity.ok()
+              .contentType(abbreviated ? ABBREVIATED_METADATA_TYPE : MediaType.APPLICATION_JSON)
+              .eTag(PackageUtils.computeEtag(metadata))
+              .varyBy(HttpHeaders.ACCEPT);
+      final var lastModified = PackageUtils.lastModifiedOf(metadata);
+
+      if (lastModified != null) {
+        builder.lastModified(lastModified);
+      }
+
+      return builder.body(metadata);
 
     } catch (final UnAuthorizedException e) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

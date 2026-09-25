@@ -172,12 +172,15 @@ public class HelmChartService implements ChartService<UUID> {
     this.deleteVersion(repoId, name, version);
   }
 
+  @Override
+  @Transactional
+  public void lockChart(final UUID repoId, final String name) {
+    this.lockExistingChart(repoId, name);
+  }
+
   @Transactional
   public void deleteVersion(final UUID repoId, final String name, final String version) {
-    final var chart =
-        this.helmChartRepository
-            .findByRepoIdAndName(repoId, name)
-            .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+    final var chart = this.lockExistingChart(repoId, name);
     final var chartVersion =
         this.helmChartVersionRepository
             .findByChartAndVersion(chart, version)
@@ -190,10 +193,7 @@ public class HelmChartService implements ChartService<UUID> {
 
   @Transactional
   public void deleteChart(final UUID repoId, final String name) {
-    final var chart =
-        this.helmChartRepository
-            .findByRepoIdAndName(repoId, name)
-            .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+    final var chart = this.lockExistingChart(repoId, name);
     this.helmChartVersionRepository.deleteAllByChart(chart);
     this.helmChartRepository.delete(chart);
   }
@@ -201,6 +201,19 @@ public class HelmChartService implements ChartService<UUID> {
   @Override
   public boolean existsByRepoIdAndDigest(final UUID repoId, final String digest) {
     return this.helmChartVersionRepository.existsByChartRepoIdAndDigest(repoId, digest);
+  }
+
+  /**
+   * Locks the chart row of a delete. A push locks the chart row first and the version and manifest
+   * rows after it, so a delete that took the version (or the manifests) first and the chart last
+   * could wait on a push that waits on it, a deadlock the database resolves by failing one of them
+   * (RPS-1365). Taking the chart first makes the delete wait for a running push and then see what
+   * it committed.
+   */
+  private HelmChart lockExistingChart(final UUID repoId, final String name) {
+    return this.helmChartRepository
+        .findWithLockByRepoIdAndName(repoId, name)
+        .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
   }
 
   /**

@@ -30,6 +30,8 @@ public final class NpmConstants {
   public static final String MODIFIED = "modified";
   public static final String HAS_SHRINKWRAP = "_hasShrinkwrap";
   public static final String ATTACHMENTS = "_attachments";
+  public static final String FROM = "_from";
+  public static final String RESOLVED = "_resolved";
   public static final String MAINTAINERS = "maintainers";
   public static final String CONTRIBUTORS = "contributors";
   public static final String AUTHOR = "author";

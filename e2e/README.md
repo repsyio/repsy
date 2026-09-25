@@ -72,7 +72,8 @@ e2e/
   docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
   docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
-  runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle and gpg; see "Adding a protocol adapter" below
+  runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle/sbt and gpg; see "Adding a protocol adapter" below
+  runners/sbt-warmup/          # the throwaway sbt project maven.Dockerfile builds once to prime the sbt caches (RPS-134)
   runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
   runners/npm-clients.Dockerfile  # + pinned pnpm, yarn classic, yarn berry (npm --prefix /opt/clients/<name>) and bun (copied from oven/bun); see "npm-family clients"
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
@@ -110,6 +111,7 @@ e2e/
       gradle-extras.ts          # registerGradleExtras(dsl): the Gradle-only checks (module metadata, gradle.properties credential), RPS-133
       gradle-locking.ts         # registerGradleLocking(dsl): dependency locking against Repsy (RPS-133)
       gradle-plugin-extras.ts   # registerGradlePluginExtras(dsl): legacy eachPlugin route, missing plugin marker, no Plugin Portal fallback
+      sbt-extras.ts             # registerSbtExtras(): the sbt-only checks (file set, cross-build, .credentials, defaults, panel), RPS-134
     ui/                        # the panel UI suite's plumbing (fixtures, session seeding, page objects) -- see "UI suite"
     clients/
       stack.ts                  # findRepsyContainer()/dockerExec()/logLinesContaining(): docker exec + docker logs against the local stack's Repsy container ("Stack runner")
@@ -130,6 +132,9 @@ e2e/
       gradle-consumer.ts         # GradleConsumer: one project + Gradle home for several runs, for dependency locking (RPS-133)
       gradle-plugin.ts           # the Gradle client as a plugin consumer: publish a plugin, apply it from pluginManagement (RPS-133)
       gradle-plugin-adapter.ts   # gradlePluginAdapter(dsl): the same loop with a plugin as the artifact (`gradle-plugin-groovy`, `gradle-plugin-kotlin`)
+      sbt.ts                     # the sbt client: publish()/resolve()/seedPublish() with a Scala project (RPS-134)
+      sbt-adapter.ts             # sbtAdapter: the ProtocolAdapter registerPublishConsumeLoop takes (`sbt`)
+      sbt-checks.ts              # expectLiteralSnapshotStored: what an sbt SNAPSHOT publish leaves (literal names, no metadata)
       cargo-raw.ts                 # cargo-specific raw PUT/GET (publish/config.json/sparse-index/download), body builder
       cargo.ts                     # the cargo client + cargoAdapter: publish()/resolve()/seedPublish(), cargo package/publish/fetch
       nuget-raw.ts                  # nuget-specific raw PUT/GET (publish/versions/download/registration/service-index), buildNupkg (fflate)
@@ -182,6 +187,7 @@ e2e/
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
+      packument-read.spec.ts    # raw-HTTP reads: abbreviated packument, no publish-only fields, HEAD, ETag/304/gzip, undeprecate, tarball header (RPS-1356..1360, 1363)
       unpublish.spec.ts         # real `npm unpublish` (RPS-1289): one version (unscoped/scoped), the only version, a whole package
     npm-clients/
       npm/publish-consume.spec.ts   # registerPublishConsumeLoop(npmFamilyAdapter(npmClient)): the catalog through the npm-family harness
@@ -508,9 +514,11 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
 
 The adapter's raw publish probe (what pins the exact status) is a PUT of the deploy's first file: the
 release POM for a RELEASE, a fresh timestamped POM (`a-<base>-<now>-9000nn.pom`, a build number no real
-deploy reaches) for a SNAPSHOT. It is not the literal `a-<base>-SNAPSHOT.pom`: a real client never
-sends that name, and it is judged differently (with `allowOverride: false` it is refused as soon as
-the version exists, because that rule looks the version up in the database for a POM).
+deploy reaches) for a SNAPSHOT. It is not the literal `a-<base>-SNAPSHOT.pom`: `mvn` and Gradle never
+send that name, and it is judged differently (with `allowOverride: false` it is refused as soon as
+the version exists, because that rule looks the version up in the database for a POM). sbt does send
+it, so the sbt adapter's probe does too (`literalSnapshot`, see "Maven runner"); that is why sbt's
+`snapshot-redeploy-no-override` is `forbidden` (RPS-1328).
 
 ### Nothing stored
 
@@ -574,8 +582,9 @@ five worked examples.
 
 `runners/maven.Dockerfile` adds a pinned Eclipse Temurin JDK and Apache Maven (build args
 `TEMURIN_VERSION`, `MAVEN_VERSION`), a pinned Gradle (`GRADLE_VERSION`, with its published
-`GRADLE_SHA256`, checked at build time) and `gpg` (Debian's GnuPG 2.2, no key server tooling) to
-the harness image; the last two are only for `gpg-signed-deploy.spec.ts` (below). `clients/maven.ts` renders
+`GRADLE_SHA256`, checked at build time), a pinned sbt (`SBT_VERSION`, `SBT_SHA256`, RPS-134) and `gpg`
+(Debian's GnuPG 2.2, no key server tooling) to the harness image; `gpg` is only for
+`gpg-signed-deploy.spec.ts` (below). `clients/maven.ts` renders
 `src/packages/maven/{pom,settings}.template.xml` into a per-invocation isolated work directory
 (`clients/exec.ts`) and runs the real `mvn` binary:
 
@@ -697,6 +706,71 @@ templates, guarded by a lock file and a ready marker so one worker warms and the
 it into each run's own `GRADLE_USER_HOME`. The warm-up resolves nothing, so no run can find a Repsy
 artifact there, and nothing a run writes reaches the shared copy. Both specs still raise the per-test
 timeout to 6 minutes, for a machine that is busy with something else.
+
+**The sbt client (`sbt.spec.ts`, RPS-134).** A third real client of the same Maven repository, with a
+wire behaviour of its own. `clients/sbt.ts` renders `src/packages/sbt/*.template.*` (a tiny Scala
+project) into an isolated work directory and runs the real `sbt` launcher; `sbtAdapter`
+(`clients/sbt-adapter.ts`) hands it to the same `registerPublishConsumeLoop`: one more protocol key,
+`sbt`, creating `RepoType.MAVEN` repos, and the catalog's Maven-repository scenarios (`MAVEN_CLIENTS`)
+run for it. sbt 1.x only; sbt 2.x rewrote its SNAPSHOT publishing and is RPS-1327. What sbt does, seen
+on the wire (a fake server logging every request, then this suite):
+
+- The artifactId carries the Scala binary version, `lib_2.13` or `lib_3`, so the adapter's
+  `packageName` is the artifactId sbt publishes (`sbt-<scenario>_2.13`) and every helper that builds a
+  path from the world's coordinates (`repoTree`, `expectNothingStored`, the probes) points at the real
+  files. The build's `name` is that without the suffix.
+- Every file is followed by a `.sha1` and a `.md5`: the POM first, then the jar, then (when the project
+  publishes them) the sources and Scaladoc jars. All PUTs are `Content-Type: application/octet-stream`.
+  The templates switch the sources and Scaladoc jars off (a Scaladoc run is a compile); the file-set test
+  switches them on.
+- sbt sends NO `maven-metadata.xml`, at either level. A SNAPSHOT is published NON-uniquely, under the
+  literal names `lib_2.13-1.0-SNAPSHOT.pom/.jar`, with no timestamps. Coursier resolves it through the
+  literal name. So `sbt` is in `snapshot-deploy`/`snapshot-redeploy`, and `afterSuccessfulRoundTrip`
+  (`clients/sbt-checks.ts`) asserts the literal jar is the resolved one and that no version-level
+  metadata exists, instead of Maven's metadata walk.
+- The first request of a publish is answered 401 with Repsy's `WWW-Authenticate: Basic realm="Repsy
+Managed Repository"`, and sbt then sends the credential: its `Credentials(realm, host, user,
+password)` has to name that realm and the repository's host. Coursier (the resolver) sends it the same way.
+- Like `mvn`, sbt hides the HTTP status behind its exit code, so the `Outcome` is the raw probe of
+  `clients/maven.ts`, with sbt's exit code as evidence; the probe sends the LITERAL `-SNAPSHOT` POM
+  (`rawPublishCheck`'s `literalSnapshot`), which is the file sbt itself sends.
+
+The build sets `publishConfiguration.overwrite` to `true`, so the server's own `allowOverride` rule
+decides a redeploy (sbt's default is `true` for a SNAPSHOT and `false` for a release, see RPS-1368
+below). The consumer declares only the Repsy repository, with `autoScalaLibrary` and
+`managedScalaInstance` off, so it needs nothing else from the network and cannot find the library
+anywhere but Repsy.
+
+Provisioning: sbt's launcher and cache are big and slow to fetch, so the image primes them once at
+build time (`runners/sbt-warmup`, `+update +compile +package +makePom` for Scala 2.13.18 and 3.3.8):
+the launcher's boot directory and Coursier's cache live in `/opt/sbt-cache`. Each run gets its own
+`HOME`, `user.home`, Ivy home, global base and temp directory, and shares only the boot directory
+(read for the sbt jars) and, for a publish, the Coursier cache (read for the Scala library and
+compiler); a resolve gets an empty Coursier cache of its own. Neither holds a test artifact: every test
+publishes to a repository of its own. Keep `SBT_VERSION`, `SCALA_213` and `SCALA_3` in `clients/sbt.ts`
+equal to `maven.Dockerfile` and `runners/sbt-warmup`. sbt's boot socket is a unix domain socket in
+`<tmp>/.sbt/`, whose path must stay under about 100 characters, which is why the temp directory is a
+short `mkdtemp` and not under the work directory (the longest scenario id would overflow it). Every run
+also passes `-J-XX:+UseSerialGC -J-XX:TieredStopAtLevel=1`: a run lives for seconds, and on this
+project's templates the two flags took a publish from 35-45 s to about 15 s of CPU time, which is what
+a dozen parallel workers on a busy machine run out of first (the suite then takes about 4 minutes).
+
+`scenarios/sbt-extras.ts` adds what the catalog cannot say: the exact file set of a publish and its
+checksums, `+publish` for Scala 2.13 and 3 (two artifacts, and a Scala 3 build resolves the `_3` one),
+the credential coming from `~/.sbt/.credentials`, and what the panel shows of an sbt publish. A
+`test.fail` pins each of the following, all found live while building this suite, and each is removed
+when its ticket lands:
+
+| Pin                                                      | Ticket   | What happens                                                                                                                                                 |
+| -------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `snapshot-redeploy-no-override` (`expectByProtocol.sbt`) | RPS-1328 | `allowOverride: false` refuses sbt's literal `-SNAPSHOT` redeploy (403), while Maven's timestamped redeploy passes. Pinned as `forbidden`, not as a decision |
+| a release published with sbt's own defaults              | RPS-1368 | the Maven HEAD handler answers 200 for a file that does not exist, so sbt (overwrite off for a release) refuses even the FIRST publish                       |
+| the panel detail of an sbt SNAPSHOT                      | RPS-1370 | 404 `itemNotFound`: it reads the version-level metadata sbt never sends. The list works                                                                      |
+| deleting one of two sbt versions in the panel            | RPS-1331 | 404 after the files are gone, the database row stays (no artifact-level metadata)                                                                            |
+| `latest.release` resolving an sbt library                | RPS-1369 | the server generates no `maven-metadata.xml`, so a dynamic revision finds nothing                                                                            |
+
+Not covered: Ivy-style layout (RPS-135), `publishSigned` (sbt-pgp, RPS-1316 covers signing with `mvn`
+and Gradle), `sbtPlugin := true` publishing, `publishLocal`, sbt 2.x (RPS-1327).
 
 ```bash
 ./run.sh test --protocol maven
@@ -940,8 +1014,8 @@ berry each answered `whoami` from the stack) and are covered by their own PRs.
 | 10 audit                                      | `matrix/registry-endpoints.spec.ts`           | pass (RPS-1329)                                   | N/A: `yarn audit` always asks registry.yarnpkg.com (`@not-applicable` cell)                                                                    | exit 0, no vulnerabilities, and the recorder sees `POST /-/npm/v1/security/advisories/bulk` answered 200; the scanner is off, no Trivy involved | N/A for this cell (`bun audit --json` is the bare advisory map); `bun/commands.spec.ts`: exit 0, `{}`, one bulk POST answered 200    | pass (`yarn npm audit`, advisories/bulk): "No audit suggestions"                                                                                                                 |
 | 16 two repos, two scopes                      | `matrix/scoped-routing.spec.ts`               | pass                                              | pass (needs always-auth, the client default)                                                                                                   | the recorder proves token A only ever goes to repo A and token B to repo B, tarball GETs included                                               | pass with `[install.scopes]` (matrix) and `.npmrc` scopes (`bun/config.spec.ts`)                                                     | pass (`npmScopes`, with `npmPublishRegistry` for publishing)                                                                                                                     |
 | 17 `dist.tarball` host                        | `matrix/tarball-host.spec.ts` (`@local-only`) | pass (RPS-1333)                                   | pass (RPS-1333)                                                                                                                                | published via `127.0.0.1`, consumed via `localhost` on a private repo: installs, and every read names `REPO_BASE_URL`                           | pass (RPS-1333); bun sends credentials to another tarball origin anyway (pinned in `bun/config.spec.ts`)                             | pass (RPS-1333)                                                                                                                                                                  |
-| 18 abbreviated packument                      | `matrix/abbreviated-metadata.spec.ts`         | RPS-1356 pin; npm skips a mismatched optional dep | RPS-1356 pin; yarn asks for the abbreviated document and still skips the mismatched optional dep                                               | see below                                                                                                                                       | RPS-1356 pin: bun INSTALLS the `os:["win32"]` optional dep (it reads the abbreviated document)                                       | RPS-1356 pin; berry sends no `Accept`, reads the full packument and skips the mismatched optional dep                                                                            |
-| 19 wire trace                                 | `matrix/wire.spec.ts`                         | pass; RPS-1358, RPS-1359 pins                     | pass; RPS-1358, RPS-1359 pins; asks for the abbreviated packument, no `npm-command`                                                            | Accept, Authorization scheme (Bearer for a token, Basic for a password), User-Agent, `npm-command`                                              | pass; RPS-1358, RPS-1359 pins; abbreviated `Accept`, `Bun/1.3.14`, no `npm-command`                                                  | pass; no `Accept`, User-Agent `got (...)`, no `npm-command`; RPS-1358, RPS-1359 pins                                                                                             |
+| 18 abbreviated packument                      | `matrix/abbreviated-metadata.spec.ts`         | RPS-1356 fix; npm skips a mismatched optional dep | RPS-1356 fix; yarn asks for the abbreviated document and still skips the mismatched optional dep                                               | see below                                                                                                                                       | RPS-1356 fix: bun INSTALLS the `os:["win32"]` optional dep (it reads the abbreviated document)                                       | RPS-1356 fix; berry sends no `Accept`, reads the full packument and skips the mismatched optional dep                                                                            |
+| 19 wire trace                                 | `matrix/wire.spec.ts`                         | pass; RPS-1358, RPS-1359 fix                      | pass; RPS-1358, RPS-1359 fix; asks for the abbreviated packument, no `npm-command`                                                             | Accept, Authorization scheme (Bearer for a token, Basic for a password), User-Agent, `npm-command`                                              | pass; RPS-1358, RPS-1359 fix; abbreviated `Accept`, `Bun/1.3.14`, no `npm-command`                                                   | pass; no `Accept`, User-Agent `got (...)`, no `npm-command`; RPS-1358, RPS-1359 fix                                                                                              |
 | workspaces (11), login (2b), `unpublish` (8)  | --                                            | not in this PR                                    | N/A: no `workspace:` protocol, `yarn login` needs a TTY, no unpublish command                                                                  | 8 is `tests/npm/unpublish.spec.ts`; 11 comes with the pnpm/yarn/bun PRs, 2b is optional                                                         | pass (`bun/commands.spec.ts`): `workspace:`/`catalog:` rewritten; login N/A                                                          | 11: pass (`workspace:^` -> `^1.2.3`, `yarn-berry/workspaces.spec.ts`); 2b: not covered (interactive, `--web-login` hangs); 8: no command                                         |
 
 N/A by design: proxy/remote passthrough (row 12: OS has no npm proxy repository, so no fixture ever
@@ -963,23 +1037,35 @@ depends on a public package).
 
 ### Backend candidates found (npm baseline; file a ticket for each, then replace the placeholder)
 
-- **RPS-1356**: the abbreviated packument (`Accept: application/vnd.npm.install-v1+json`) drops
+- **RPS-1356 (fixed)**: the abbreviated packument (`Accept: application/vnd.npm.install-v1+json`) dropped
   `os`, `cpu`, `libc`, `peerDependenciesMeta` and `funding` (the full one, the control, has all of them).
   `AbstractNpmStorageService.createAbbreviatedMetadata` copies a fixed field list. Pinned in
   `matrix/abbreviated-metadata.spec.ts`. npm 11.19 does not read this document; the alternative clients
   do (their PRs decide the user-visible effect).
-- **RPS-1357**: the full packument carries `_attachments` -- the base64 body of the **most recent
+- **RPS-1357 (fixed)**: the full packument carried `_attachments` -- the base64 body of the **most recent
   publish's tarball** -- and npm's `_from`/`_resolved` (the publisher's local tarball path) in every
   read; the public registry serves none of them. A packument grows by its latest tarball on every
   read and leaks the publisher's file system paths. Pinned in `matrix/view.spec.ts`.
-- **RPS-1358**: npm `HEAD` answers 200 for any path of an existing repository, including a
+- **RPS-1358 (fixed)**: npm `HEAD` answered 200 for any path of an existing repository, including a
   package that does not exist (`GET` of it is 404). Pinned in `matrix/wire.spec.ts` (the same class as the
   PyPI/Ruby HEAD findings; B6 of the plan).
-- **RPS-1359**: a packument answers with no `ETag`, no `Last-Modified`, no `Vary: Accept` (the
+- **RPS-1359 (fixed)**: a packument answered with no `ETag`, no `Last-Modified`, no `Vary: Accept` (the
   abbreviated and the full document share one URL) and no compression, so a client cannot revalidate its
   metadata cache. Pinned in `matrix/wire.spec.ts` (B8 of the plan).
 
-Not asserted as fixed, still open: RPS-1343 (a qualifier-only search matches everything), RPS-1344
+**The read side is fixed since** (RPS-1356, 1357, 1358, 1359, 1360, 1363; the pins above were flipped, and
+`tests/npm/packument-read.spec.ts` proves each at the wire with the headers the clients hide): the abbreviated
+packument copies `os`, `cpu`, `libc`, `peerDependenciesMeta`, `hasInstallScript`, `funding` and
+`acceptDependencies`; `_attachments`, `_from` and `_resolved` are neither stored nor served; `HEAD` of a package
+or tarball that does not exist is 404 (the repo itself and `/-/...` endpoints stay 200); the packument carries a
+weak `ETag` (of the document served, one per `Accept` variant), a `Last-Modified` (`time.modified`) and
+`Vary: Accept`, answers a conditional `GET` with 304, and the protocol port compresses JSON of 1 KB or more
+for a client that sends `Accept-Encoding: gzip` (`server.compression`, `SERVER_COMPRESSION_ENABLED=false` turns
+it off; the panel port is untouched); undeprecating (`deprecate pkg@x ""`) removes the `deprecated` field; a
+tarball download is `Content-Disposition: attachment; filename="<name>-<version>.tgz"`. The wire recorder
+(`wire-recorder.ts`) unpacks a gzip packument before it rewrites the tarball URLs.
+
+Still open: RPS-1343 (a qualifier-only search matches everything), RPS-1344
 (`size`/`from` are not clamped), RPS-1345 (audit findings query performance).
 
 ### pnpm (RPS-1330, PR 2)
@@ -1042,8 +1128,8 @@ applies to this pnpm, and `Capabilities` has no such field: every capability is 
 | 2 whoami, ping, search, 10 audit              | pass (RPS-1329)                                 | audit: pnpm answers `metadata.vulnerabilities.{info,low,...}` and `metadata.totalDependencies` (npm 6 shape), the spec reads both shapes                                                                                           |
 | 16 two repos, two scopes                      | pass                                            | each token only ever goes to its own repository, tarball GETs included                                                                                                                                                             |
 | 17 `dist.tarball` host                        | pass (RPS-1333)                                 | published via `127.0.0.1`, consumed via `localhost` on a private repo; the lockfile has no host at all                                                                                                                             |
-| 18 abbreviated packument                      | RPS-1356 pin; pnpm skips the win32 optional dep | **pnpm reads the abbreviated document** (H-9, unlike npm 11.19), yet does not install an `os: ["win32"]` optional dependency on linux (H-15 refuted for pnpm too)                                                                  |
-| 19 wire trace                                 | pass; RPS-1358, RPS-1359 pins                   | `Accept: application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*`, `User-Agent: pnpm/12.6.0 npm/? node/? linux x64`, no `npm-command` on install (`publish` on publish), Bearer for a token, Basic for a password |
+| 18 abbreviated packument                      | RPS-1356 fix; pnpm skips the win32 optional dep | **pnpm reads the abbreviated document** (H-9, unlike npm 11.19), yet does not install an `os: ["win32"]` optional dependency on linux (H-15 refuted for pnpm too)                                                                  |
+| 19 wire trace                                 | pass; RPS-1358, RPS-1359 fix                    | `Accept: application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*`, `User-Agent: pnpm/12.6.0 npm/? node/? linux x64`, no `npm-command` on install (`publish` on publish), Bearer for a token, Basic for a password |
 | 11 workspaces                                 | pass                                            | below                                                                                                                                                                                                                              |
 | 8 unpublish, 2b login                         | pass / pin                                      | below                                                                                                                                                                                                                              |
 
@@ -1073,14 +1159,14 @@ plan said). `pnpm logout` sends `DELETE /-/user/token/<token>`, gets 404 and **e
 
 **Backend candidates found here** (new; not filed yet, the parent files them and replaces the `NCn` keys):
 
-- **RPS-1360**: after `npm/pnpm deprecate <pkg>@<ver> ""` the packument still serves `"deprecated": ""`. The
+- **RPS-1360 (fixed)**: after `npm/pnpm deprecate <pkg>@<ver> ""` the packument still served `"deprecated": ""`. The
   existing deprecate cell tolerates that (`[undefined, '']`), but pnpm 12 treats a version that has the field
   at all as deprecated, so a range keeps skipping the un-deprecated version (`resolution.spec.ts`).
   Serving no field is what npm's own semantics ask for.
 - **RPS-1361**: no `DELETE /-/user/token/<token>` (token revocation): `pnpm logout` fails, and a deploy token can
   not be revoked from a client (`commands.spec.ts`).
 
-Still open and only observed, not asserted as fixed: RPS-1356, 1357, 1358, 1359, 1343, 1344, 1345.
+Still open and only observed, not asserted as fixed: RPS-1343, 1344, 1345 (RPS-1356 to 1360 are fixed).
 
 ### Yarn classic (1.22.22, RPS-1330 PR 3)
 
@@ -1216,10 +1302,10 @@ workspace version`, before any request) and then rewrites `workspace:^` to `^1.2
 - `bun add`/`bun install` say nothing about a deprecated version (H-19 refuted for bun): only `bun info
 <pkg>@<version> deprecated` shows the message. `matrix/deprecate.spec.ts` pins that per client
   (`SILENT_ON_DEPRECATED`).
-- **RPS-1356 has a user-visible effect on bun**: bun resolves from the abbreviated packument, which lacks
-  `os`/`cpu`, so it installs an `os:["win32"]` optional dependency on linux (H-15 confirmed for bun). The
+- **RPS-1356 had a user-visible effect on bun (fixed)**: bun resolves from the abbreviated packument, which
+  lacked `os`/`cpu`, so it installed an `os:["win32"]` optional dependency on linux (H-15 confirmed for bun). The
   same install with the request rewritten to the full packument (`wire-recorder.ts` `forwardHeaders`)
-  skips it: `bun/config.spec.ts` proves the cause, `matrix/abbreviated-metadata.spec.ts` pins the effect.
+  skipped it; now both skip it (`bun/config.spec.ts`, `matrix/abbreviated-metadata.spec.ts`).
 - `bun.lock` stores the absolute tarball URL and the `sha512` integrity of each package (H-13); a frozen
   install from it alone, in a fresh HOME and an empty cache, works; after an override republish it fails with
   `error: Integrity check failed for tarball: <name>` and installs nothing.
@@ -1232,8 +1318,8 @@ workspace version`, before any request) and then rewrites `workspace:^` to `^1.2
 found` in text mode).
 - `bun info --json` shows `dist.tarball` (the registry address, RPS-1333), `versions` and the latest
   manifest; `dist-tags`, `time` (ISO UTC and now) and `deprecated` are properties (`bun info <pkg> time
---json`). A bun publisher's manifest has no `_resolved`, but the packument still carries `_attachments`
-  (RPS-1357).
+--json`). A bun publisher's manifest has no `_resolved`, and the packument no longer keeps `_attachments`
+  (RPS-1357, fixed).
 
 | Cell                                                   | bun result                                                                                                                           |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -1248,13 +1334,13 @@ found` in text mode).
 | 11 workspace publish                                   | pass (`bun/commands.spec.ts`): the rewrites above                                                                                    |
 | 16 two repos, two scopes                               | pass with `[install.scopes]` (matrix) and with `.npmrc` scopes (`bun/config.spec.ts`): token A only to repo A, tarball GETs included |
 | 17 `dist.tarball` host                                 | pass (RPS-1333); plus the pin that bun sends credentials to another origin                                                           |
-| 18 abbreviated packument                               | RPS-1356 pin: bun installs the `os:["win32"]` optional dependency                                                                    |
-| 19 wire trace                                          | pass: abbreviated `Accept`, `Bun/1.3.14`, Bearer/Basic on packument and tarball; RPS-1358/1359 pins                                  |
+| 18 abbreviated packument                               | RPS-1356 fix: bun skips the `os:["win32"]` optional dependency                                                                       |
+| 19 wire trace                                          | pass: abbreviated `Accept`, `Bun/1.3.14`, Bearer/Basic on packument and tarball; RPS-1358/1359 fix                                   |
 
-New backend finding from bun: **RPS-1363**, the tarball download is
-answered `Content-Disposition: inline;filename=f.txt` (a fixed made-up name, presumably Spring's
+Backend finding from bun, **RPS-1363 (fixed)**: the tarball download was
+answered `Content-Disposition: inline;filename=f.txt` (a fixed made-up name, Spring's
 reflected-file-download guard) instead of `<name>-<version>.tgz`; seen on every tarball request in
-`bun add --verbose`, pinned raw in `bun/commands.spec.ts`. Low severity: no client depends on it.
+`bun add --verbose`, asserted raw in `bun/commands.spec.ts` (now `attachment; filename="<name>-<version>.tgz"`). No client depended on it.
 
 Harness note found while doing this: `sealedEnv()` is documented as an allow-list that never carries the
 runner's own environment, but `exec.ts`'s `run()` calls `execa` with its default `extendEnv: true`, so the

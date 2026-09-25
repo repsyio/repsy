@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @NullMarked
@@ -227,6 +230,10 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
   public void deleteChart(final ProtocolContext context, final String name, final String version)
       throws IOException {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    // The chart first, as a push takes it (RPS-1365), and before the version and its manifests are
+    // read: what a push that was running commits is then part of what is deleted.
+    this.chartService.lockChart(repoInfo.getId(), name);
+
     final var chartInfo =
         this.chartService.findByRepoIdAndNameAndVersion(repoInfo.getId(), name, version);
 
@@ -410,6 +417,9 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
                 .build(),
             repoInfo.getId());
 
+    // What a replaced manifest's file held, to be put back when the transaction does not commit.
+    final var previous = replaced ? this.readManifestFile(repoInfo, form) : null;
+
     try {
       final var usages =
           this.helmStorageService.saveManifest(
@@ -418,12 +428,116 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
               form.getReference(),
               contentBytes,
               repoInfo.getName());
+      this.undoManifestFileUnlessCommitted(repoInfo, form, contentBytes, previous, replaced);
       return new HelmOciManifestPushResult(manifest, usages);
     } catch (final RuntimeException e) {
       if (!replaced) {
         this.discardPartialManifest(repoInfo, form, e);
       }
       throw e;
+    }
+  }
+
+  /**
+   * The file is the last write of the unit, so everything that fails before the commit rolls the
+   * rows back without a file to undo. What can still fail is the commit itself (a lost connection,
+   * a serialization failure at commit): the rows are then rolled back and the file, already
+   * written, holds bytes no row describes (RPS-1366). This hook runs once the transaction is over
+   * and, when it rolled back, removes the file of a new manifest or puts back the bytes a replaced
+   * one had.
+   *
+   * <p>It runs after the database locks are released, so a later push of the same manifest may
+   * already have written the file. The file is therefore touched only while it still holds the
+   * bytes this unit wrote. When the outcome is unknown (the commit failed with a transaction
+   * exception that says nothing about whether it took effect) the file is kept: a file no row
+   * refers to is harmless, a missing one for a row that did commit is not.
+   */
+  private void undoManifestFileUnlessCommitted(
+      final BaseRepoInfo<ID> repoInfo,
+      final HelmOciManifestPushForm form,
+      final byte[] written,
+      final byte @Nullable [] previous,
+      final boolean replaced) {
+
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      return;
+    }
+
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCompletion(final int status) {
+            if (status == STATUS_COMMITTED) {
+              return;
+            }
+
+            if (status != STATUS_ROLLED_BACK) {
+              log.warn(
+                  "The outcome of the push of manifest {}:{} is unknown, its file is kept",
+                  form.getName(),
+                  form.getReference());
+              return;
+            }
+
+            AbstractHelmProtocolTxFacade.this.undoManifestFile(
+                repoInfo, form, written, previous, replaced);
+          }
+        });
+  }
+
+  private void undoManifestFile(
+      final BaseRepoInfo<ID> repoInfo,
+      final HelmOciManifestPushForm form,
+      final byte[] written,
+      final byte @Nullable [] previous,
+      final boolean replaced) {
+
+    try {
+      final var current = this.readManifestFile(repoInfo, form);
+      if (current == null || !Arrays.equals(current, written)) {
+        // Removed, or already written again by a later push: not ours to touch.
+        return;
+      }
+
+      if (previous != null) {
+        this.helmStorageService.saveManifest(
+            repoInfo.getStorageKey(),
+            form.getName(),
+            form.getReference(),
+            previous,
+            repoInfo.getName());
+      } else if (!replaced) {
+        this.helmStorageService.deleteManifestFile(
+            repoInfo.getStorageKey(), form.getName(), form.getReference(), repoInfo.getName());
+      }
+    } catch (final IOException | RuntimeException e) {
+      log.warn(
+          "The file of manifest {}:{} of a push that did not commit could not be undone: {}",
+          form.getName(),
+          form.getReference(),
+          e.getMessage());
+    }
+  }
+
+  private byte @Nullable [] readManifestFile(
+      final BaseRepoInfo<ID> repoInfo, final HelmOciManifestPushForm form) {
+
+    try {
+      final var resource =
+          this.helmStorageService.getManifest(
+              repoInfo.getStorageKey(), form.getName(), form.getReference(), repoInfo.getName());
+      if (resource.isEmpty() || !resource.get().exists()) {
+        return null;
+      }
+
+      return resource.get().getContentAsByteArray();
+    } catch (final IOException | RuntimeException e) {
+      log.debug(
+          "The file of manifest {}:{} could not be read: {}",
+          form.getName(),
+          form.getReference(),
+          e.getMessage());
+      return null;
     }
   }
 

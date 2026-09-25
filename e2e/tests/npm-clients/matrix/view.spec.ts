@@ -21,15 +21,13 @@
  * NOW, not a shifted local time: pnpm's `minimumReleaseAge` and berry's `npmMinimalAgeGate` trust it)
  * -- and pins what the served document also carries:
  *
- * RPS-1357: the full packument carries `_attachments`, the base64 body of the most recent
- * publish's tarball, and the `_from`/`_resolved` fields npm's `publish <tarball>` adds (a local path
- * of the publisher's machine), in every read. The public registry's packument has none of them. A
- * package's packument therefore grows by its latest tarball's size on every read, and leaks the
- * publisher's file system paths. Observed live on the published version below, asserted as it is so a
- * fix shows up as one flipped line.
+ * RPS-1357 (fixed): the full packument used to carry `_attachments`, the base64 body of the most
+ * recent publish's tarball, and the `_from`/`_resolved` fields npm's `publish <tarball>` adds (a
+ * local path of the publisher's machine), in every read, so a package's packument grew by its latest
+ * tarball's size on every read and leaked the publisher's file system paths. None of them is kept or
+ * served now, like the public registry's packument.
  */
 import { rawGetPackument } from '../../../src/clients/npm-raw.js';
-import type { ClientId } from '../../../src/clients/npm-family/client.js';
 import {
   newRepo,
   packageNameFor,
@@ -46,8 +44,6 @@ const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 // A wrong time zone (the JVM's, with a literal Z) would be off by hours; a remote target's clock is
 // not ours to compare with, so there the bound is off.
 const MAX_CLOCK_SKEW_MS = target.isRemote ? Number.POSITIVE_INFINITY : 5 * 60 * 1000;
-/** The clients whose `publish <tarball>` puts the tarball's local path in the version manifest. */
-const LEAKS_LOCAL_TARBALL_PATH: ReadonlySet<ClientId> = new Set<ClientId>(['npm']);
 
 for (const client of clientsWith('viewCmd')) {
   test(
@@ -96,24 +92,29 @@ for (const client of clientsWith('viewCmd')) {
         'the publish time is now',
       ).toBeLessThan(MAX_CLOCK_SKEW_MS);
 
-      // RPS-1357: what the served full packument also carries.
+      // RPS-1357: what the served full packument no longer carries.
       const raw = await rawGetPackument(repo.name, adminCredential(), name);
       const served = JSON.parse(raw.body.toString('utf8')) as {
-        _attachments?: Record<string, { data?: string; length?: number }>;
+        _attachments?: unknown;
+        _from?: unknown;
+        _resolved?: unknown;
         versions: Record<string, Record<string, unknown>>;
       };
-      expect(
-        Object.keys(served._attachments ?? {}),
-        "RPS-1357: the packument carries the latest publish's tarball as _attachments",
-      ).toEqual([`${name}-1.0.0.tgz`]);
-      expect(served._attachments?.[`${name}-1.0.0.tgz`]?.data).toBe(
-        published.tarball.bytes.toString('base64'),
+      expect(served._attachments, "RPS-1357: no copy of the latest publish's tarball").toBe(
+        undefined,
       );
-      // `npm publish <tarball>` adds `_from`/`_resolved` (the tarball's local path) to the manifest.
+      expect(served._from ?? served._resolved, 'RPS-1357: no publisher path at the top').toBe(
+        undefined,
+      );
+      const version = served.versions['1.0.0'] ?? {};
       expect(
-        String(served.versions['1.0.0']?._resolved ?? '').includes(published.tarball.file),
-        "RPS-1357: npm's _resolved (the publisher's local tarball path) is served",
-      ).toBe(LEAKS_LOCAL_TARBALL_PATH.has(client.id));
+        version._from ?? version._resolved,
+        "RPS-1357: npm's _from/_resolved (the publisher's local tarball path) is not served",
+      ).toBe(undefined);
+      expect(
+        raw.body.toString('utf8'),
+        'the tarball is not in the packument, base64 or otherwise',
+      ).not.toContain(published.tarball.bytes.toString('base64'));
     },
   );
 }

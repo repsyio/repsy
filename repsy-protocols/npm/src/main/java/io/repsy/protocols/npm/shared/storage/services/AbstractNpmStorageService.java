@@ -60,6 +60,19 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
   private static final ObjectMapper METADATA_MAPPER = new ObjectMapper();
 
+  /** What the abbreviated document carries of a version when the version has it. */
+  private static final List<String> ABBREVIATED_OPTIONAL_FIELDS =
+      List.of(
+          NpmConstants.DEPRECATED,
+          NpmConstants.HAS_SHRINKWRAP,
+          "os",
+          "cpu",
+          "libc",
+          "peerDependenciesMeta",
+          "hasInstallScript",
+          "funding",
+          "acceptDependencies");
+
   private final StorageStrategy storageStrategy;
 
   @Override
@@ -187,6 +200,10 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
     final var tarballBytes = Base64.decodeBase64(data);
 
     PackageUtils.updateDistFields(metadata, versionName, tarballBytes);
+
+    // The tarball is written on its own below: the packument keeps neither its base64 copy nor the
+    // publisher's local paths (RPS-1357).
+    PackageUtils.removePublishOnlyFields(metadata);
 
     final BaseUsages tarballUsages;
     try (final var byteArrayInputStream = new ByteArrayInputStream(tarballBytes)) {
@@ -713,7 +730,15 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
     for (final var deprecation : deprecations) {
       final var version = (Map<String, Object>) versions.get(deprecation.getFirst());
 
-      if (version != null) {
+      if (version == null) {
+        continue;
+      }
+
+      // An empty message undeprecates: the field goes, an empty one left behind still reads as
+      // deprecated to a client that only looks for it (RPS-1360).
+      if (deprecation.getSecond().isEmpty()) {
+        version.remove(NpmConstants.DEPRECATED);
+      } else {
         version.put(NpmConstants.DEPRECATED, deprecation.getSecond());
       }
     }
@@ -800,7 +825,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
       final var fullMetadata = PackageUtils.readMetadataFromResource(resource);
 
-      this.rewriteTarballUrls(fullMetadata, repoName);
+      this.prepareForServing(fullMetadata, repoName);
 
       return isAbbreviated ? this.createAbbreviatedMetadata(fullMetadata) : fullMetadata;
 
@@ -831,9 +856,22 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
             : this.rebuildIfPackageExists(
                 repoId, repoName, snapshot, new ItemNotFoundException("itemNotFound"));
 
-    this.rewriteTarballUrls(metadata, repoName);
+    this.prepareForServing(metadata, repoName);
 
     return isAbbreviated ? this.createAbbreviatedMetadata(metadata) : metadata;
+  }
+
+  /**
+   * What is read from storage or rebuilt is served as it is, but for what a packument must not
+   * carry however it got stored: the fields of a publish that were kept by an earlier version of
+   * the registry (RPS-1357), an empty {@code deprecated} (RPS-1360), and the tarball addresses of
+   * another host (RPS-1333).
+   */
+  private void prepareForServing(final Map<String, Object> metadata, final String repoName) {
+
+    PackageUtils.removePublishOnlyFields(metadata);
+    PackageUtils.removeEmptyDeprecations(metadata);
+    this.rewriteTarballUrls(metadata, repoName);
   }
 
   /** Rebuilds the metadata of a package the rows know, and otherwise fails as the read did. */
@@ -871,47 +909,51 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
     final var abbreviatedVersions = new LinkedHashMap<String, Object>();
     final var versions = (Map<String, Object>) fullMetadata.get(NpmConstants.VERSIONS);
-    final var emptyHashMap = new HashMap<String, Object>();
 
     if (versions != null) {
       for (final var entry : versions.entrySet()) {
-        final var version = (Map<String, Object>) entry.getValue();
-        final var abbreviatedVersion = new LinkedHashMap<String, Object>();
-
-        // Required fields
-        abbreviatedVersion.put("name", version.get("name"));
-        abbreviatedVersion.put("version", version.get("version"));
-        abbreviatedVersion.put("dist", version.get("dist"));
-
-        // Optional fields that have no default value
-        if (version.get(NpmConstants.DEPRECATED) != null) {
-          abbreviatedVersion.put(NpmConstants.DEPRECATED, version.get(NpmConstants.DEPRECATED));
-        }
-        if (version.get(NpmConstants.HAS_SHRINKWRAP) != null) {
-          abbreviatedVersion.put(
-              NpmConstants.HAS_SHRINKWRAP, version.get(NpmConstants.HAS_SHRINKWRAP));
-        }
-
-        // Optional fields that have default values
-        abbreviatedVersion.put("dependencies", version.getOrDefault("dependencies", emptyHashMap));
-        abbreviatedVersion.put(
-            "devDependencies", version.getOrDefault("devDependencies", emptyHashMap));
-        abbreviatedVersion.put(
-            "optionalDependencies", version.getOrDefault("optionalDependencies", emptyHashMap));
-        abbreviatedVersion.put(
-            "peerDependencies", version.getOrDefault("peerDependencies", emptyHashMap));
-        abbreviatedVersion.put(
-            "bundleDependencies", version.getOrDefault("bundleDependencies", new ArrayList<>()));
-        abbreviatedVersion.put("bin", version.getOrDefault("bin", emptyHashMap));
-        abbreviatedVersion.put("directories", version.getOrDefault("directories", emptyHashMap));
-        abbreviatedVersion.put("engines", version.getOrDefault("engines", emptyHashMap));
-
-        abbreviatedVersions.put(entry.getKey(), abbreviatedVersion);
+        abbreviatedVersions.put(
+            entry.getKey(), abbreviateVersion((Map<String, Object>) entry.getValue()));
       }
     }
 
     abbreviatedMetadata.put(NpmConstants.VERSIONS, abbreviatedVersions);
     return abbreviatedMetadata;
+  }
+
+  private static Map<String, Object> abbreviateVersion(final Map<String, Object> version) {
+
+    final var emptyHashMap = new HashMap<String, Object>();
+    final var abbreviatedVersion = new LinkedHashMap<String, Object>();
+
+    // Required fields
+    abbreviatedVersion.put("name", version.get("name"));
+    abbreviatedVersion.put("version", version.get("version"));
+    abbreviatedVersion.put("dist", version.get("dist"));
+
+    // Optional fields that have no default value: what a client decides on before it has the
+    // tarball, such as where a version installs and which peers are optional (RPS-1356)
+    for (final var field : ABBREVIATED_OPTIONAL_FIELDS) {
+      if (version.get(field) != null) {
+        abbreviatedVersion.put(field, version.get(field));
+      }
+    }
+
+    // Optional fields that have default values
+    abbreviatedVersion.put("dependencies", version.getOrDefault("dependencies", emptyHashMap));
+    abbreviatedVersion.put(
+        "devDependencies", version.getOrDefault("devDependencies", emptyHashMap));
+    abbreviatedVersion.put(
+        "optionalDependencies", version.getOrDefault("optionalDependencies", emptyHashMap));
+    abbreviatedVersion.put(
+        "peerDependencies", version.getOrDefault("peerDependencies", emptyHashMap));
+    abbreviatedVersion.put(
+        "bundleDependencies", version.getOrDefault("bundleDependencies", new ArrayList<>()));
+    abbreviatedVersion.put("bin", version.getOrDefault("bin", emptyHashMap));
+    abbreviatedVersion.put("directories", version.getOrDefault("directories", emptyHashMap));
+    abbreviatedVersion.put("engines", version.getOrDefault("engines", emptyHashMap));
+
+    return abbreviatedVersion;
   }
 
   @Override

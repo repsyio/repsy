@@ -57,6 +57,8 @@ const REPO_TYPE_BY_PROTOCOL: Record<string, RepoType> = {
   // A Gradle plugin published to and applied from a Maven repo (RPS-133), one adapter per language.
   'gradle-plugin-groovy': RepoType.MAVEN,
   'gradle-plugin-kotlin': RepoType.MAVEN,
+  // The sbt client (RPS-134): publishes to and resolves from an ordinary Maven repo.
+  sbt: RepoType.MAVEN,
   npm: RepoType.NPM,
   pypi: RepoType.PYPI,
   docker: RepoType.DOCKER,
