@@ -19,7 +19,7 @@
  * `/security` page (severity distribution, scan list, filters) and the dashboard's Security Overview.
  *
  * Both cover the whole instance, and other tests scan in parallel, so every test here works on ONE
- * repo of its own: `/security` filters by the repo name (the backend matches it exactly), and the
+ * repo of its own: `/security` filters by the repo name (a case-insensitive contains match), and the
  * dashboard number is compared with what the backend itself says instead of a fixed value.
  */
 import { RepoType } from '../../../src/api/panel-api.js';
@@ -108,6 +108,58 @@ test.describe('SEC-01 the /security page and the dashboard', { tag: SCANNER_TAG 
     await expect(section.status).toHaveText('Completed');
     await expect(section.bodyBadge(Severity.HIGH)).toHaveText(/High\s*2/);
     await expect(section.bodyBadge(Severity.MEDIUM)).toHaveText(/Medium\s*1/);
+  });
+
+  test('/security finds a repo by part of its name in any case, and takes % and _ literally', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+    panelApi,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.NPM);
+    const high = await seedPackage(repo, {
+      name: scanPackageName('npm', seeder.runId, 'vuln-high'),
+    });
+    const scan = await newestFinishedScan(panelApi, repo.name, high);
+    const security = new SecurityPage(adminPage);
+    // The run id is unique to this test, so a fragment of it belongs to this repo alone.
+    const fragment = seeder.runId;
+    const hasNoMatch = async (text: string): Promise<void> => {
+      await security.search(text);
+      await expect(security.empty).toHaveText('No vulnerability scans match these filters.');
+    };
+
+    await security.goto();
+
+    // Part of the name, then the same in upper and mixed case: the scan is listed each time.
+    for (const term of [fragment, fragment.toUpperCase(), `E2e-${fragment}`]) {
+      await security.search('no-such-repo');
+      await expect(security.empty).toBeVisible();
+      await security.search(term);
+      await expect(security.rows()).toHaveCount(1, SCAN_TIMEOUT);
+      await expect(security.artifactOf(scan.id!)).toHaveText(`${repo.name} / ${high.name}`);
+    }
+    await security.search(repo.name.toUpperCase());
+    await expect(security.row(scan.id!)).toBeVisible();
+
+    // % and _ are text, not wildcards: the repo's name has neither, so a term that a wildcard would
+    // let match it finds nothing.
+    await hasNoMatch(`${fragment}%npm`);
+    await hasNoMatch(`${fragment}_npm`);
+    await hasNoMatch(`${fragment.slice(0, 2)}_${fragment.slice(3)}`);
+    await hasNoMatch('%');
+
+    // The summary endpoint reads the name the same way: its counts are those of the repo the term
+    // finds (vuln-high: 2 high + 1 medium), whatever the case, and nothing for a wildcard term.
+    const counts = (summary: Awaited<ReturnType<typeof panelApi.securityScansSummary>>) =>
+      [summary.criticalCount, summary.highCount, summary.mediumCount].map((n) => n ?? 0);
+    expect(counts(await panelApi.securityScansSummary({ repoName: fragment }))).toEqual([0, 2, 1]);
+    expect(
+      counts(await panelApi.securityScansSummary({ repoName: fragment.toUpperCase() })),
+    ).toEqual([0, 2, 1]);
+    expect(counts(await panelApi.securityScansSummary({ repoName: `${fragment}%npm` }))).toEqual([
+      0, 0, 0,
+    ]);
   });
 
   test("the severity distribution is the backend's summary of every scanned version, this repo included", async ({

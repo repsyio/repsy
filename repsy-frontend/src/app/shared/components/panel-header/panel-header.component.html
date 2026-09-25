@@ -57,9 +57,10 @@
         <!-- Profile Dropdown -->
         <div class="relative">
           <button
+            #profileToggle
             data-testid="header-avatar"
             class="group flex items-center justify-center gap-2 text-[#9FA0A0]"
-            (click)="toggleProfileDropdown($event)"
+            (click)="toggleProfileDropdown()"
           >
             <app-profile-avatar [email]="email" [size]="45" [fallbackChar]="username?.[0]?.toUpperCase() ?? '?'" />
             <svg

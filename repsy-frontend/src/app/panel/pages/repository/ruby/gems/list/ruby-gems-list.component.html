@@ -109,7 +109,6 @@
                   data-testid="row-latest-link"
                   class="group text-secondary-500 flex w-max max-w-full min-w-0 gap-2 text-[14px]"
                   [routerLink]="'/' + activeRepo.repoName + '/' + gem.name + '/' + gem.latest"
-                  (click)="$event.stopPropagation()"
                 >
                   <app-tooltip truncate class="group-hover:underline" [text]="gem.latest" [textHover]="gem.latest" />
                   <svg
@@ -217,7 +216,6 @@
                       data-testid="row-latest-link"
                       class="group text-secondary-500 flex items-center gap-1 text-right text-sm break-all hover:underline"
                       [routerLink]="'/' + activeRepo.repoName + '/' + gem.name + '/' + gem.latest"
-                      (click)="$event.stopPropagation()"
                     >
                       {{ gem.latest }}
                       <svg

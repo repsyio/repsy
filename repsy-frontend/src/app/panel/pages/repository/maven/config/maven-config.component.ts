@@ -52,7 +52,84 @@ export class MavenConfigComponent implements OnInit, OnChanges {
   }
 
   private updateMarkdown(): void {
-    this.markdown = this.getAuthMarkdown();
+    this.markdown = this.getAuthMarkdown() + this.getIvyMarkdown();
+  }
+
+  // The host part of the repository URL, for Ivy's <credentials host="...">: Ivy matches it against the
+  // host of the request without the port, so `http://localhost:9090` gives `localhost`.
+  private repoHost(): string {
+    try {
+      return new URL(environment.repoBaseUrl).hostname;
+    } catch {
+      return environment.repoBaseUrl;
+    }
+  }
+
+  // The Apache Ivy setup (RPS-1332): what was proven against a real Repsy with Ivy 2.5.3 and Ant 1.10.
+  private getIvyMarkdown(): string {
+    const password = this.deployToken ? 'YOUR_DEPLOY_TOKEN' : 'YOUR_PASSWORD';
+    const tokenNote = this.deployToken ? '\nWith a deploy token the username can be empty (`username=""`).\n' : '';
+    return `
+
+### Apache Ivy
+
+For [Apache Ivy](https://ant.apache.org/ivy/), configure an \`ibiblio\` resolver in Maven-compatible mode
+and the credentials in your \`ivysettings.xml\`;
+
+\`\`\`xml
+<ivysettings>
+  <settings defaultResolver="repsy"/>
+  <credentials host="${this.repoHost()}"
+               realm="Repsy Managed Repository"
+               username="${this.username}"
+               passwd="${password}"/>
+  <resolvers>
+    <ibiblio name="repsy" m2compatible="true" root="${environment.repoBaseUrl}/${this.repoName}/"/>
+  </resolvers>
+</ivysettings>
+\`\`\`
+
+Ivy looks credentials up by host and realm, so keep \`realm="Repsy Managed Repository"\` exactly as it is,
+without it Ivy sends no credentials and Repsy refuses the request.
+${tokenNote}
+To publish, list a POM next to the jar in your \`ivy.xml\` (a version shows up in Repsy only when its POM is
+uploaded);
+
+\`\`\`xml
+<ivy-module version="2.0">
+  <info organisation="com.example" module="my-lib" revision="1.0.0"/>
+  <configurations>
+    <conf name="default"/>
+  </configurations>
+  <publications>
+    <artifact name="my-lib" type="jar" ext="jar" conf="default"/>
+    <artifact name="my-lib" type="pom" ext="pom" conf="default"/>
+  </publications>
+</ivy-module>
+\`\`\`
+
+Then build that POM with \`ivy:makepom\` and publish with \`publishivy="false"\`, otherwise Ivy uploads its own
+ivy file onto the POM path and Repsy refuses it with \`400 invalidArtifactPath\`. \`overwrite="true"\` is needed as well:
+Ivy checks with a HEAD request whether a file exists and Repsy answers that with \`200\` even for a missing file
+(without it Ivy stops with "destination file exists and overwrite == false"); Repsy itself decides whether a
+version can be redeployed;
+
+\`\`\`xml
+<project name="my-lib" xmlns:ivy="antlib:org.apache.ivy.ant">
+  <target name="publish">
+    <ivy:settings file="ivysettings.xml"/>
+    <ivy:resolve file="ivy.xml"/>
+    <ivy:makepom ivyfile="ivy.xml" pomfile="build/my-lib.pom"/>
+    <ivy:publish resolver="repsy" pubrevision="1.0.0" publishivy="false" overwrite="true">
+      <artifacts pattern="build/[artifact].[ext]"/>
+    </ivy:publish>
+  </target>
+</project>
+\`\`\`
+
+Repsy does not generate a \`maven-metadata.xml\` for what a client uploads, so Maven \`LATEST\` and version ranges
+do not resolve for artifacts published this way. Ivy falls back to the directory listing, but prefer fixed versions.
+`;
   }
 
   private getAuthMarkdown(): string {
