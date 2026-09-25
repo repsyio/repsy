@@ -41,6 +41,9 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
+import jakarta.persistence.LockTimeoutException;
+import jakarta.persistence.OptimisticLockException;
+import jakarta.persistence.PessimisticLockException;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
@@ -54,9 +57,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.core.MethodParameter;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.CannotSerializeTransactionException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -453,8 +460,84 @@ class ErrorHandlerTest {
         new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
 
     assertThat(
-            handler.handleException(
+            handler.handleOptimisticLockFailure(
                 new OptimisticLockingFailureException("stale"), new MockHttpServletRequest(), null))
+        .isNull();
+  }
+
+  @Test
+  @DisplayName("answers 409 concurrentModification for a raw JPA optimistic-lock exception")
+  void rawOptimisticLockFailure() throws Exception {
+    this.mockMvc
+        .perform(get("/lock/optimistic-jpa"))
+        .andExpect(status().isConflict())
+        .andExpect(header().doesNotExist(HttpHeaders.RETRY_AFTER))
+        .andExpect(jsonPath("$.msgId").value("concurrentModification"));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(
+      strings = {
+        "cannot-acquire-lock",
+        "deadlock-loser",
+        "cannot-serialize",
+        "pessimistic-plain",
+        "pessimistic-jpa",
+        "lock-timeout-jpa"
+      })
+  @DisplayName("answers 503 resourceBusy with Retry-After for a lock that could not be taken")
+  void lockUnavailable(final String kind) throws Exception {
+    this.mockMvc
+        .perform(get("/lock/{kind}", kind))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "1"))
+        .andExpect(jsonPath("$.msgId").value("resourceBusy"))
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(
+            jsonPath("$.text")
+                .value("The item is in use by another request. Please try again shortly."))
+        .andExpect(jsonPath("$.data").doesNotExist());
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"cannot-acquire-lock", "deadlock-loser", "pessimistic-jpa"})
+  @DisplayName("answers a lock failure on the OCI endpoints with the same 503 and Retry-After")
+  void lockUnavailableOnOciEndpoint(final String kind) throws Exception {
+    final var path = "/v2/repo/app/manifests/lock/" + kind;
+
+    this.mockMvc
+        .perform(get(path).servletPath(path))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "1"))
+        .andExpect(jsonPath("$.msgId").value("resourceBusy"));
+  }
+
+  @Test
+  @DisplayName("logs a lock failure as a warning, not as an error")
+  void lockUnavailableIsLoggedAsWarning() throws Exception {
+    this.mockMvc
+        .perform(get("/lock/cannot-acquire-lock"))
+        .andExpect(status().isServiceUnavailable());
+
+    assertThat(this.logEvents.list)
+        .filteredOn(event -> event.getLevel().isGreaterOrEqual(Level.WARN))
+        .extracting(ILoggingEvent::getLevel)
+        .containsExactly(Level.WARN);
+  }
+
+  @Test
+  @DisplayName("does not render a lock failure when no servlet response is available")
+  void lockFailuresWithoutResponse() {
+    final var handler =
+        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var request = new MockHttpServletRequest();
+
+    assertThat(
+            handler.handleLockUnavailable(new CannotAcquireLockException("timeout"), request, null))
+        .isNull();
+    assertThat(
+            handler.handleOptimisticLockFailure(
+                new OptimisticLockException("stale"), request, null))
         .isNull();
   }
 
@@ -734,6 +817,29 @@ class ErrorHandlerTest {
     @GetMapping("/v2/repo/app/manifests/latest")
     String ociOptimisticLock() {
       throw new ObjectOptimisticLockingFailureException(Object.class, "id");
+    }
+
+    @GetMapping("/lock/{kind}")
+    String lockFailure(@PathVariable final String kind) {
+      throw lockException(kind);
+    }
+
+    @GetMapping("/v2/repo/app/manifests/lock/{kind}")
+    String ociLockFailure(@PathVariable final String kind) {
+      throw lockException(kind);
+    }
+
+    private static RuntimeException lockException(final String kind) {
+      return switch (kind) {
+        case "optimistic-jpa" -> new OptimisticLockException("stale");
+        case "cannot-acquire-lock" -> new CannotAcquireLockException("lock wait timeout");
+        case "deadlock-loser" -> new DeadlockLoserDataAccessException("deadlock", null);
+        case "cannot-serialize" -> new CannotSerializeTransactionException("serialization failure");
+        case "pessimistic-plain" -> new PessimisticLockingFailureException("lock failure");
+        case "pessimistic-jpa" -> new PessimisticLockException("lock failure");
+        case "lock-timeout-jpa" -> new LockTimeoutException("lock timeout");
+        case null, default -> throw new IllegalArgumentException(kind);
+      };
     }
 
     @GetMapping("/db/duplicate-key")

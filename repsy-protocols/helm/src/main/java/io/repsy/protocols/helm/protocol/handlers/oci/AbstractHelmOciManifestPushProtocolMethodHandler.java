@@ -51,6 +51,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -331,12 +332,22 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     return HelmConstants.SHA256_PREFIX + HexFormat.of().formatHex(md.digest(contentBytes));
   }
 
+  /**
+   * Runs the manifest write again when it loses a race on the row. Two first pushes of one tag both
+   * insert and the loser fails on the unique index ({@code DataIntegrityViolationException}); two
+   * pushes that override the same tag both read its {@code @Version} and the loser fails the
+   * version check at commit ({@code OptimisticLockingFailureException}, RPS-1342). The retry has to
+   * be here: the facade is the {@code @Transactional} proxy, and a retry inside its transaction
+   * would reuse the failed persistence context. The second run sees what the winner committed, so
+   * the client gets its {@code 201} instead of an error. When the row stays contended the exception
+   * reaches the error handler, which answers a 503 with {@code Retry-After}.
+   */
   @SneakyThrows
   private HelmOciManifestInfo findOrCreateManifest(
       final ID repoId, final HelmOciManifestForm form, final int counter) {
     try {
       return this.helmFacade.findOrCreateManifest(form, repoId);
-    } catch (final DataIntegrityViolationException e) {
+    } catch (final DataIntegrityViolationException | OptimisticLockingFailureException e) {
       if (counter == RETRY_COUNT) {
         throw e;
       }
@@ -345,12 +356,19 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     }
   }
 
+  /**
+   * Runs the chart write again when it loses a race. The chart row is locked while its version is
+   * written (RPS-1273), so two pushes of one chart take turns; the version row can still be changed
+   * or deleted by a request that does not take that lock (the panel's delete), and the write then
+   * fails the version check at commit (RPS-1342). Repeated outside the facade's transaction, like
+   * {@link #findOrCreateManifest}.
+   */
   @SneakyThrows
   private HelmChartInfo findOrCreateChart(
       final ID repoId, final HelmChartForm form, final int counter) {
     try {
       return this.helmFacade.findOrCreateChart(form, repoId);
-    } catch (final DataIntegrityViolationException e) {
+    } catch (final DataIntegrityViolationException | OptimisticLockingFailureException e) {
       if (counter == RETRY_COUNT) {
         throw e;
       }
