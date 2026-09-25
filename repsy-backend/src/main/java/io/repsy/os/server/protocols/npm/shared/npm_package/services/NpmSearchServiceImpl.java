@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Value;
@@ -81,13 +82,13 @@ public class NpmSearchServiceImpl implements NpmSearchService<UUID> {
   public NpmSearchResult search(final BaseRepoInfo<UUID> repoInfo, final NpmSearchQuery asked) {
     final var now = Instant.now();
 
-    // What is insecure comes from the vulnerability scan, so a repository that is not scanned has
-    // nothing insecure, exactly as its npm audit reports no advisory.
-    if (!repoInfo.isSecurityScanEnabled() && Boolean.TRUE.equals(asked.insecure())) {
+    final var effective = effectiveQuery(repoInfo, asked);
+
+    if (effective.isEmpty()) {
       return NpmSearchResult.empty(now);
     }
 
-    final var query = repoInfo.isSecurityScanEnabled() ? asked : asked.withInsecure(null);
+    final var query = effective.get();
 
     final var candidates =
         this.candidateRepository.find(repoInfo.getStorageKey(), query, this.maxCandidates);
@@ -131,6 +132,25 @@ public class NpmSearchServiceImpl implements NpmSearchService<UUID> {
     }
 
     return NpmSearchResult.of(page, total, best, maintainersByName, now);
+  }
+
+  /**
+   * What is insecure comes from the vulnerability scan, so a repository that is not scanned has
+   * nothing insecure, exactly as its npm audit reports no advisory: {@code is:insecure} matches
+   * nothing there, and {@code not:insecure} is no filter.
+   *
+   * @return The query to run, or empty when it can match nothing
+   */
+  private static Optional<NpmSearchQuery> effectiveQuery(
+      final BaseRepoInfo<UUID> repoInfo, final NpmSearchQuery asked) {
+
+    if (repoInfo.isSecurityScanEnabled()) {
+      return Optional.of(asked);
+    }
+
+    return Boolean.TRUE.equals(asked.insecure())
+        ? Optional.empty()
+        : Optional.of(asked.withInsecure(null));
   }
 
   private Map<UUID, List<String>> keywordsByVersion(final List<NpmSearchCandidate> candidates) {
