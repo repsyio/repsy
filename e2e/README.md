@@ -191,7 +191,7 @@ e2e/
       gradle-locking-kotlin.spec.ts  # RPS-133: the same for the Kotlin DSL
       sbt.spec.ts               # RPS-134: registerPublishConsumeLoop(sbtAdapter) + the sbt extras
       ivy.spec.ts               # RPS-135: registerPublishConsumeLoop(ivyAdapter), a real `ant` with ivy:publish and ivy:retrieve
-      ivy-client.spec.ts        # RPS-135: IV1-IV8 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete, RPS-1368 pin)
+      ivy-client.spec.ts        # RPS-135: IV1-IV8 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete)
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
@@ -750,10 +750,11 @@ on the wire (a fake server logging every request, then this suite):
   (`rawPublishCheck`'s `literalSnapshot`), which is the file sbt itself sends.
 
 The build sets `publishConfiguration.overwrite` to `true`, so the server's own `allowOverride` rule
-decides a redeploy (sbt's default is `true` for a SNAPSHOT and `false` for a release, see RPS-1368
-below). The consumer declares only the Repsy repository, with `autoScalaLibrary` and
-`managedScalaInstance` off, so it needs nothing else from the network and cannot find the library
-anywhere but Repsy.
+decides a redeploy (sbt's own default is `true` for a SNAPSHOT and `false` for a release; the
+defaults test in `scenarios/sbt-extras.ts` covers it: sbt asks with a `HEAD` whether the file exists,
+and Repsy answers 404 for a missing one and 200 for a stored one, RPS-1368). The consumer declares
+only the Repsy repository, with `autoScalaLibrary` and `managedScalaInstance` off, so it needs
+nothing else from the network and cannot find the library anywhere but Repsy.
 
 Provisioning: sbt's launcher and cache are big and slow to fetch, so the image primes them once at
 build time (`runners/sbt-warmup`, `+update +compile +package +makePom` for Scala 2.13.18 and 3.3.8):
@@ -772,13 +773,12 @@ a dozen parallel workers on a busy machine run out of first (the suite then take
 `scenarios/sbt-extras.ts` adds what the catalog cannot say: the exact file set of a publish and its
 checksums, `+publish` for Scala 2.13 and 3 (two artifacts, and a Scala 3 build resolves the `_3` one),
 the credential coming from `~/.sbt/.credentials`, and what the panel shows of an sbt publish. A
-`test.fail` pins each of the following, all found live while building this suite, and each is removed
-when its ticket lands:
+`test.fail` pins the following, found live while building this suite, and is removed when its ticket
+lands:
 
-| Pin                                         | Ticket   | What happens                                                                                                                           |
-| ------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| a release published with sbt's own defaults | RPS-1368 | the Maven HEAD handler answers 200 for a file that does not exist, so sbt (overwrite off for a release) refuses even the FIRST publish |
-| `latest.release` resolving an sbt library   | RPS-1369 | the server generates no `maven-metadata.xml`, so a dynamic revision finds nothing                                                      |
+| Pin                                       | Ticket   | What happens                                                                      |
+| ----------------------------------------- | -------- | --------------------------------------------------------------------------------- |
+| `latest.release` resolving an sbt library | RPS-1369 | the server generates no `maven-metadata.xml`, so a dynamic revision finds nothing |
 
 Not covered: `publishSigned` (sbt-pgp, RPS-1316 covers signing with `mvn`
 and Gradle), `sbtPlugin := true` publishing, `publishLocal`, sbt 2.x (RPS-1327).
@@ -797,9 +797,9 @@ run for it. Keep `ANT_VERSION` and `IVY_VERSION` in `clients/ivy.ts` equal to `m
 test compares them with what the image runs). Every run has its own `HOME`, Ivy user directory and
 cache, and the one resolver is Repsy's (no default or public chain), so nothing reaches Maven Central
 and a resolve never finds what a publish fetched. The credential is only written into the run's
-`ivysettings.xml`, never argv. The build sets `overwrite="true"` (below), so the server's own
-`allowOverride` rule decides a redeploy, and, like `mvn`, Gradle and sbt, Ivy hides the HTTP status
-behind its exit code, so the `Outcome` is the raw probe of `clients/maven.ts` (with the LITERAL
+`ivysettings.xml`, never argv. The build sets `overwrite="true"` by default (the README's snippet
+leaves Ivy's own default, `false`, which IV7 covers), so the server's own `allowOverride` rule
+decides a redeploy, and, like `mvn`, Gradle and sbt, Ivy hides the HTTP status behind its exit code, so the `Outcome` is the raw probe of `clients/maven.ts` (with the LITERAL
 `-SNAPSHOT` POM, which is the file Ivy sends), with Ant's exit code as evidence. The setup is the one
 the README and the panel's Maven configuration dialog document (RPS-1332): an `ibiblio` resolver with
 `m2compatible="true"`, `<credentials realm="Repsy">`, the POM `ivy:makepom` writes
@@ -829,12 +829,13 @@ seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
   published, `1.+` and `latest.release` resolve 1.10 (numeric order, a SNAPSHOT is not a release),
   `latest.integration` resolves 2.0-SNAPSHOT and `[1.0,1.2)` resolves 1.1. No other client of this
   repository can do the same: see RPS-1369 below.
-- Resolving reads the POM, so a consumer needs `conf="default->default"` on its dependency (or
-  `defaultconf`). A bare `<dependency org name rev/>` has a default configuration mapping that also asks
-  for the `sources` and `javadoc` artifacts, which do not exist, and Ivy fails with "FAILED DOWNLOADS".
-  The panel's version page therefore shows the line with `conf="default->default"` (RPS-1395):
-  `ivy-client.spec.ts` retrieves with that line exactly as the panel shows it (`dependencyLine`), and
-  keeps the bare line as the control that still fails (`retrieve` copies to `lib/`).
+- Resolving reads the POM. A bare `<dependency org name rev/>` has a default configuration mapping that
+  also looks for the `sources` and `javadoc` artifacts, which do not exist. Ivy locates an artifact with
+  a HEAD: while Repsy answered 200 for any path it then failed with "FAILED DOWNLOADS"; since it answers
+  404 (RPS-1368) Ivy skips them and the bare line resolves too. The panel's version page still shows the
+  line with `conf="default->default"` (RPS-1395), which asks for the jar only: `ivy-client.spec.ts`
+  retrieves with that line exactly as the panel shows it (`dependencyLine`) and with the bare one
+  (`retrieve` copies to `lib/`).
 - `ivy:makepom` writes the module's dependencies as optional unless it is given
   `<mapping conf="default" scope="compile"/>`; only a mapped dependency is resolved transitively.
 - `publishivy="true"` (Ivy's default) makes Ivy also send its own ivy file, as `ivy-<revision>.xml`
@@ -842,8 +843,9 @@ seen on the wire and confirmed live (Ant 1.10.15, Ivy 2.5.3):
   the POM stay stored and registered. (The first version of the README and the panel's dialog said the
   ivy file went "onto the POM path"; corrected with this suite, RPS-1332.)
 - `overwrite="false"` (`ivy:publish`'s default) makes Ivy send a HEAD first and refuse when it is
-  answered 200; Repsy answers 200 for any Maven path (RPS-1368), so even the first publish of a release
-  is refused with "destination file exists and overwrite == false".
+  answered 200. Repsy answers a HEAD like the GET of the same path (404 for a missing file, RPS-1368),
+  so the default publishes a release once and then refuses to replace it with "destination file exists
+  and overwrite == false"; `overwrite="true"` is only needed to publish a SNAPSHOT again.
 - Version deletes: the panel's delete of one of two Ivy-published versions removes that version and
   keeps the other although Ivy sends no artifact-level `maven-metadata.xml` (RPS-1331, fixed; it used to
   answer 404 after the files were gone and leave the database row).
@@ -860,12 +862,8 @@ exact file set (IV1, `@smoke`), Ivy resolving what `mvn deploy` published (a rel
 through its timestamped files, IV2) and `mvn dependency:get` resolving what Ivy published (IV3), a
 dependency through the POM, an optional one and `transitive="false"` (IV4), the dynamic revisions
 above (IV5), an unknown module (IV6), and the first-configuration pitfalls above (IV8: no realm, another
-realm, `publishivy="true"`, the dependency line with and without its `conf`). A `test.fail` pins each of the following, all found
-live while building this suite, and each is removed when its ticket lands:
-
-| Pin                                                     | Ticket   | What happens                                                                                                                |
-| ------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `ivy:publish` with its own default, `overwrite="false"` | RPS-1368 | the Maven HEAD handler answers 200 for a file that does not exist, so Ivy refuses even the FIRST publish of a release (IV7) |
+realm, `publishivy="true"`, the dependency line with and without its `conf`). No `test.fail` pin is
+left in this suite.
 
 Not covered: an Ivy-native (non-Maven) layout, which Repsy cannot serve (a descriptor named
 `<artifact>-<revision>.ivy` is a valid Maven file name and is stored, but nothing registers it), the

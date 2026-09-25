@@ -40,6 +40,7 @@
 import { zipSync } from 'fflate';
 
 import { env } from '../env.js';
+import { withBackoff429 } from '../scenarios/remote-throttle.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import {
   adminCredential,
@@ -127,6 +128,40 @@ export async function rawGet(
     const bytes = Buffer.from(await res.arrayBuffer());
     return { status: res.status, msgId: msgIdOf(bytes), body: bytes };
   });
+}
+
+/** What a raw `HEAD` shows: the status and the headers a client such as Ivy or sbt reads (RPS-1368). */
+export interface RawHeadResponse {
+  status: number;
+  /** `Content-Length`, or `null` when the server sent none. */
+  contentLength: number | null;
+  contentType: string | null;
+  /** The bytes a HEAD carried, which must be none. */
+  bodyLength: number;
+}
+
+/** A raw `HEAD`: answered like the `GET` of the same path, without the body (RPS-1368). */
+export async function rawHead(
+  repoName: string,
+  credential: MaterializedCredential,
+  relPath: string,
+): Promise<RawHeadResponse> {
+  let last: RawHeadResponse | undefined;
+  await withBackoff429(async () => {
+    const res = await fetch(url(repoName, relPath), {
+      method: 'HEAD',
+      headers: authHeader(credential),
+    });
+    const length = res.headers.get('content-length');
+    last = {
+      status: res.status,
+      contentLength: length === null ? null : Number(length),
+      contentType: res.headers.get('content-type'),
+      bodyLength: (await res.arrayBuffer()).byteLength,
+    };
+    return res.status;
+  });
+  return last as unknown as RawHeadResponse;
 }
 
 /** The entries of a directory listing page (`../` excluded); sub-directories end in `/`. */

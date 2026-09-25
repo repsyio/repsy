@@ -80,12 +80,21 @@ describe('MavenConfigComponent Apache Ivy snippet (RPS-1332)', () => {
 
     expect(component.markdown).toContain('<artifact name="my-lib" type="pom" ext="pom" conf="default"/>');
     expect(component.markdown).toContain('<ivy:makepom ivyfile="ivy.xml" pomfile="build/my-lib.pom"/>');
-    expect(component.markdown).toContain(
-      '<ivy:publish resolver="repsy" pubrevision="1.0.0" publishivy="false" overwrite="true">',
-    );
+    expect(component.markdown).toContain('<ivy:publish resolver="repsy" pubrevision="1.0.0" publishivy="false">');
     expect(component.markdown).toContain('400 invalidArtifactPath');
     expect(component.markdown).toContain('as `ivy-<revision>.xml`');
     expect(component.markdown).not.toContain('onto the POM path');
+  });
+
+  it('leaves overwrite at Ivy default and says when to set it', () => {
+    component.ngOnInit();
+
+    const ivy = component.markdown.substring(component.markdown.indexOf('### Apache Ivy'));
+
+    expect(ivy).not.toContain('overwrite="true">');
+    expect(ivy).toContain("Ivy's `overwrite` defaults to `false`");
+    expect(ivy.replace(/\s+/g, ' ')).toContain('set `overwrite="true"` on `ivy:publish` to republish a SNAPSHOT');
+    expect(ivy).not.toContain('answers that with `200`');
   });
 
   it('tells a module with dependencies to map its configuration to a POM scope', () => {

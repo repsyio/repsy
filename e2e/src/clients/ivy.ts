@@ -74,8 +74,9 @@ export interface IvyDependency {
 }
 
 export interface IvyOptions {
-  /** `ivy:publish`'s `overwrite`: `true` sends the file whatever exists, `false` makes the client
-   *  ask with a HEAD request first (see RPS-1368). Defaults to `true`. */
+  /** `ivy:publish`'s `overwrite`: `true` sends the file whatever exists, `false` (Ivy's own default,
+   *  and what the README documents) makes the client ask with a HEAD request first. The harness
+   *  defaults to `true`, so that the server's own `allowOverride` rule decides a redeploy. */
   overwrite?: boolean;
   /** `ivy:publish`'s `publishivy`: also send Ivy's own ivy file, which Repsy refuses. Defaults to `false`. */
   publishIvy?: boolean;

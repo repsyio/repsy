@@ -736,7 +736,7 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
       <ivy:settings file="ivysettings.xml"/>
       <ivy:resolve file="ivy.xml"/>
       <ivy:makepom ivyfile="ivy.xml" pomfile="build/my-lib.pom"/>
-      <ivy:publish resolver="repsy" pubrevision="1.0.0" publishivy="false" overwrite="true">
+      <ivy:publish resolver="repsy" pubrevision="1.0.0" publishivy="false">
         <artifacts pattern="build/[artifact].[ext]"/>
       </ivy:publish>
     </target>
@@ -751,13 +751,14 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
   `<mapping conf="default" scope="compile"/>` (a child element of the task). Without a mapping every
   dependency is written to the POM as `<optional>true</optional>`, and a consumer does not resolve it
   transitively.
-- **`overwrite="true"`:** Ivy first asks with a `HEAD` request whether a file exists, and Repsy answers
-  `HEAD` with `200` for any Maven path (RPS-1368), so without it Ivy stops with "destination file exists
-  and overwrite == false". Whether a version may be deployed again is still decided by Repsy.
+- **Republishing:** Ivy's `overwrite` defaults to `false`, so Ivy itself refuses to publish over a file
+  that already exists ("destination file exists and overwrite == false"). Set `overwrite="true"` on
+  `ivy:publish` to republish a SNAPSHOT; for a release, Repsy's *Allow override* setting still decides.
 - **Reading:** the same `ivysettings.xml` resolves dependencies. A dependency on an artifact published
-  like this uses the `default` configuration (`conf="default->default"`), as the dependency line on a
-  version's page in the panel does; the default `*` also asks for the `sources` and `javadoc` artifacts
-  that the artifact does not have.
+  like this can use the `default` configuration (`conf="default->default"`), as the dependency line on a
+  version's page in the panel does, which asks for the jar only; a dependency without a `conf` resolves
+  as well, because Repsy answers `404` for the `sources` and `javadoc` artifacts the artifact does not
+  have and Ivy then skips them.
 - **No `maven-metadata.xml`:** Repsy stores the `maven-metadata.xml` a client uploads but never
   generates one. An Ivy, sbt or raw `PUT` publish has none, so Maven `LATEST` and version ranges, and
   Gradle/sbt dynamic versions, do not resolve for such artifacts. Ivy itself falls back to the
