@@ -69,6 +69,11 @@ const IDENTITY: Partial<
     accept: /^application\/vnd\.npm\.install-v1\+json; q=1\.0, application\/json; q=0\.8, \*\/\*$/,
     userAgent: /^yarn\/1\.22\.22 npm\/\? node\/v24\.\d+\.\d+ linux /,
   },
+  // bun asks for the ABBREVIATED packument on an install (H-11), with the rest of the range as a fallback.
+  bun: {
+    accept: /^application\/vnd\.npm\.install-v1\+json; q=1\.0, application\/json; q=0\.8, \*\/\*$/,
+    userAgent: /^Bun\/1\.3\.\d+$/,
+  },
 };
 
 /** The `Authorization` scheme each credential kind is sent with (`_authToken` vs `_auth`). */

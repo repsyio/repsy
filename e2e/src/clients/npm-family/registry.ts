@@ -33,6 +33,7 @@ import {
   type NpmFamilyClient,
 } from './client.js';
 import { sealedEnv } from './config.js';
+import { bunClient } from './bun-client.js';
 import { npmClient } from './npm-client.js';
 import { pnpmClient } from './pnpm-client.js';
 import { yarnClassicClient } from './yarn-classic-client.js';
@@ -41,6 +42,7 @@ export const ENABLED_CLIENTS: readonly NpmFamilyClient[] = [
   npmClient,
   pnpmClient,
   yarnClassicClient,
+  bunClient,
 ];
 
 /** The enabled clients that can do what a cell needs. */

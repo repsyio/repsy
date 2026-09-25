@@ -41,6 +41,13 @@ import { expect, test } from '../../../src/scenarios/fixtures.js';
  */
 const OMITS_DEPRECATION_MESSAGE: ReadonlySet<ClientId> = new Set<ClientId>(['pnpm']);
 
+/**
+ * Clients whose `add`/`install` say nothing at all about a deprecated version (probed: bun prints only
+ * "(v1.1.0 available)"; `bun info <pkg>@<version> deprecated` shows it, see `bun/commands.spec.ts`).
+ * The registry serves the message to every client; whether it shows it is the client's.
+ */
+const SILENT_ON_DEPRECATED: ReadonlySet<ClientId> = new Set<ClientId>(['bun']);
+
 async function deprecatedOf(
   repoName: string,
   packageName: string,
@@ -102,10 +109,12 @@ for (const publisher of clientsWith('deprecateCmd')) {
             `${consumerClient.label} add: ${added.command}\n${added.stderr}`,
           ).toBe(0);
           const printed = `${added.stdout}\n${added.stderr}`;
-          const omitsMessage = OMITS_DEPRECATION_MESSAGE.has(consumerClient.id);
-          expect(printed, `${consumerClient.label} warns about the deprecated version`).toContain(
-            omitsMessage ? `deprecated ${name}@1.0.0` : message,
-          );
+          const silent = SILENT_ON_DEPRECATED.has(consumerClient.id);
+          const omitsMessage = silent || OMITS_DEPRECATION_MESSAGE.has(consumerClient.id);
+          expect(
+            printed.includes(omitsMessage ? `deprecated ${name}@1.0.0` : message),
+            `${consumerClient.label} ${silent ? 'says nothing' : 'warns'} about the deprecated version`,
+          ).toBe(!silent);
           expect(
             printed.includes(message),
             `${consumerClient.label} ${omitsMessage ? 'leaves out' : 'prints'} the deprecation message`,

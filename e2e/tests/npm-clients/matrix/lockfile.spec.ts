@@ -55,6 +55,7 @@ const INTEGRITY_FAILURE: Partial<Record<ClientId, RegExp>> = {
   npm: /EINTEGRITY/,
   pnpm: /ERR_PNPM_TARBALL_INTEGRITY/,
   'yarn-classic': /Integrity check failed for/,
+  bun: /Integrity check failed for tarball/,
 };
 
 /**
