@@ -57,6 +57,12 @@ public interface RepoRepository extends JpaRepository<Repo, UUID> {
   @Query("select r.diskUsage from Repo r where r.id = :repoId")
   @NonNull Optional<Long> findDiskUsageByIdForUpdate(@NonNull UUID repoId);
 
+  /**
+   * The committed value of the repo's {@code pgpVerifyAllSignaturesEnabled}, empty if it is gone.
+   */
+  @Query("select r.pgpVerifyAllSignaturesEnabled from Repo r where r.id = :repoId")
+  @NonNull Optional<Boolean> findPgpVerifyAllSignaturesEnabledById(@NonNull UUID repoId);
+
   @NonNull Optional<Repo> findByNameAndType(@NonNull String name, @NonNull RepoType type);
 
   Optional<Repo> findByName(@NonNull String name);

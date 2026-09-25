@@ -19,9 +19,12 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
@@ -31,6 +34,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactV
 import io.repsy.os.server.protocols.maven.shared.artifact.services.SignedRecomputeService;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.VersionSignatureService;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -59,7 +63,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * RPS-1316: turning {@code pgpVerifyAllSignaturesEnabled} on or off recomputes {@code signed} of
+ * RPS-1334: a change of the key sources (a public key registered or deleted, the key-server lookup
+ * toggled) starts the same recomputation, for a repo that verifies every signature and for no
+ * other.
+ *
+ * <p>RPS-1316: turning {@code pgpVerifyAllSignaturesEnabled} on or off recomputes {@code signed} of
  * every version of the repo in the background, by the rule of the setting it has then, and a change
  * that is rolled back starts nothing.
  *
@@ -80,6 +88,7 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
   @MockitoSpyBean private SignedRecomputeService signedRecomputeService;
 
   @Autowired private RepoTxService repoTxService;
+  @Autowired private KeyStoreService keyStoreService;
   @Autowired private MavenStorageService mavenStorageService;
   @Autowired private PlatformTransactionManager transactionManager;
   @Autowired private ObjectMapper objectMapper;
@@ -516,5 +525,172 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
     assertThat(this.repoRepository.findByName(repo.getName()).orElseThrow())
         .extracting(Repo::isPgpVerifyAllSignaturesEnabled)
         .isEqualTo(false);
+  }
+
+  private UUID registerPublicKeyAndGetId(final Repo repo, final User admin) throws Exception {
+    this.registerPublicKey(repo, admin);
+
+    return this.jdbcTemplate.queryForObject(
+        "select id from pgp_public_key where repo_id = ?", UUID.class, repo.getId());
+  }
+
+  private void deletePublicKey(final Repo repo, final User admin, final UUID keyId)
+      throws Exception {
+    final var status =
+        this.mockMvc
+            .perform(
+                delete("/api/mvn/key-stores/" + repo.getName() + "/public-keys/" + keyId)
+                    .with(apiPort())
+                    .header(AUTHORIZATION, this.bearerTokenFor(admin)))
+            .andReturn()
+            .getResponse()
+            .getStatus();
+
+    assertThat(status).as("delete public key").isEqualTo(200);
+  }
+
+  private void putKeyServerLookup(final Repo repo, final User admin, final boolean enabled)
+      throws Exception {
+    final var status =
+        this.mockMvc
+            .perform(
+                put("/api/repos/" + repo.getName() + "/settings")
+                    .with(apiPort())
+                    .header(AUTHORIZATION, this.bearerTokenFor(admin))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"pgpKeyServerLookupEnabled\":" + enabled + "}"))
+            .andReturn()
+            .getResponse()
+            .getStatus();
+
+    assertThat(status).as("PUT settings").isEqualTo(200);
+  }
+
+  /** The versions were uploaded while the setting was off, with the signatures of one key. */
+  private void uploadSignedVersion(final Repo repo, final User admin, final String version)
+      throws Exception {
+    this.uploadPom(repo, admin, version);
+    this.uploadPomSignature(repo, admin, version);
+    this.uploadJar(repo, admin, version);
+    this.uploadJarSignature(repo, admin, version);
+  }
+
+  @Test
+  @DisplayName("registering the key of a stored signature signs the version, on a verify-all repo")
+  void registeringAKeySignsTheVersionsItVerifies() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    final var keyId = this.registerPublicKeyAndGetId(repo, admin);
+    this.putKeyServerLookupOff(repo, admin);
+    // Stored while the setting is off: the jar's signature is stored as sent.
+    this.uploadSignedVersion(repo, admin, "1.0");
+    // The key goes, still with the setting off: nothing is recomputed for such a repo.
+    this.deletePublicKey(repo, admin, keyId);
+    this.putVerifyAll(repo, admin, true);
+    // The toggle finds no key for the jar's signature, so the version does not count as signed.
+    this.awaitSigned(repo, Map.of("1.0", false));
+    clearInvocations(this.signedRecomputeService);
+
+    this.registerPublicKey(repo, admin);
+
+    this.awaitSigned(repo, Map.of("1.0", true));
+    assertThat(this.signedFileNames(repo, "1.0"))
+        .containsExactlyInAnyOrder("lib-1.0.pom", "lib-1.0.jar");
+  }
+
+  @Test
+  @DisplayName("deleting a key recomputes the repo and does not unsign what it verified before")
+  void deletingAKeyRecomputesButDoesNotUnsign() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    final var keyId = this.registerPublicKeyAndGetId(repo, admin);
+    this.putKeyServerLookupOff(repo, admin);
+    this.uploadSignedVersion(repo, admin, "1.0");
+    this.putVerifyAll(repo, admin, true);
+    this.awaitSigned(repo, Map.of("1.0", true));
+    verify(this.signedRecomputeService, timeout(RECOMPUTE_TIMEOUT.toMillis()))
+        .recomputeRepo(repo.getId());
+    clearInvocations(this.signedRecomputeService);
+
+    this.deletePublicKey(repo, admin, keyId);
+
+    verify(this.signedRecomputeService, timeout(RECOMPUTE_TIMEOUT.toMillis()))
+        .recomputeRepo(repo.getId());
+    // The signatures were verified and recorded; the key being gone is not a reason to forget them.
+    await()
+        .during(Duration.ofMillis(300))
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(() -> assertThat(this.signedByVersion(repo)).isEqualTo(Map.of("1.0", true)));
+    assertThat(this.signedFileNames(repo, "1.0"))
+        .containsExactlyInAnyOrder("lib-1.0.pom", "lib-1.0.jar");
+  }
+
+  @Test
+  @DisplayName("toggling the key-server lookup recomputes a verify-all repo, and only that")
+  void togglingTheLookupRecomputesAVerifyAllRepo() throws Exception {
+    final var flagOn = this.mavenRepo();
+    final var flagOff = this.mavenRepo();
+    final var admin = this.admin();
+    this.putVerifyAll(flagOn, admin, true);
+    clearInvocations(this.signedRecomputeService);
+
+    this.putKeyServerLookup(flagOn, admin, false);
+    this.putKeyServerLookup(flagOff, admin, false);
+
+    verify(this.signedRecomputeService, timeout(RECOMPUTE_TIMEOUT.toMillis()))
+        .recomputeRepo(flagOn.getId());
+    verify(this.signedRecomputeService, timeout(RECOMPUTE_TIMEOUT.toMillis()))
+        .onKeySourcesChanged(
+            new io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent(flagOff.getId()));
+    await()
+        .during(Duration.ofMillis(500))
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(
+            () -> verify(this.signedRecomputeService, never()).recomputeRepo(flagOff.getId()));
+  }
+
+  @Test
+  @DisplayName(
+      "registering a key on a repo that does not verify every signature recomputes nothing")
+  void registeringAKeyOnAFlagOffRepoRecomputesNothing() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+
+    this.registerPublicKey(repo, admin);
+
+    verify(this.signedRecomputeService, timeout(RECOMPUTE_TIMEOUT.toMillis()))
+        .onKeySourcesChanged(any());
+    await()
+        .during(Duration.ofMillis(500))
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(() -> verify(this.signedRecomputeService, never()).recomputeRepo(any()));
+  }
+
+  @Test
+  @DisplayName("a key registration that rolls back recomputes nothing")
+  void aRolledBackKeyChangeRecomputesNothing() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    this.putVerifyAll(repo, admin, true);
+    verify(this.signedRecomputeService, timeout(RECOMPUTE_TIMEOUT.toMillis()))
+        .recomputeRepo(repo.getId());
+    clearInvocations(this.signedRecomputeService);
+
+    new TransactionTemplate(this.transactionManager)
+        .executeWithoutResult(
+            status -> {
+              this.keyStoreService.createPublicKey(
+                  this.repoTxService.getRepo(repo.getId()),
+                  io.repsy.os.generated.model.PgpPublicKeyForm.builder()
+                      .armoredKey(KEYS.armoredPublicKey())
+                      .build());
+              status.setRollbackOnly();
+            });
+
+    await()
+        .during(Duration.ofMillis(500))
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(
+            () -> verify(this.signedRecomputeService, never()).onKeySourcesChanged(any()));
   }
 }

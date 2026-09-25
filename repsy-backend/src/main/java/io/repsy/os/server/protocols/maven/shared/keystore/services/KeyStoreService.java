@@ -31,6 +31,7 @@ import io.repsy.os.server.protocols.maven.shared.keystore.repositories.AllowedKe
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.KeyStoreRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.PgpPublicKeyRepository;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import java.util.List;
 import java.util.Locale;
@@ -39,6 +40,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -61,6 +63,7 @@ public class KeyStoreService {
   private final RepoRepository repoRepository;
   private final PgpPublicKeyRepository pgpPublicKeyRepository;
   private final ArtifactConverter artifactConverter;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
   public void create(final RepoInfo repoInfo, final KeyStoreForm form) {
@@ -89,6 +92,7 @@ public class KeyStoreService {
     keyStore.setAllowedKeyserver(allowedKeyserver);
 
     this.keyStoreRepository.save(keyStore);
+    this.publishKeySourcesChanged(repoInfo);
   }
 
   @Transactional
@@ -100,6 +104,7 @@ public class KeyStoreService {
             .orElseThrow(() -> new ItemNotFoundException("keyStoreNotFound"));
 
     this.keyStoreRepository.delete(keyStore);
+    this.publishKeySourcesChanged(repoInfo);
   }
 
   public Page<io.repsy.os.generated.model.KeyStoreItem> findAll(
@@ -155,6 +160,7 @@ public class KeyStoreService {
     pgpPublicKey.setArmoredKey(form.getArmoredKey());
 
     final var saved = this.pgpPublicKeyRepository.saveAndFlush(pgpPublicKey);
+    this.publishKeySourcesChanged(repoInfo);
 
     return this.artifactConverter.toPgpPublicKeyItemDto(saved);
   }
@@ -168,6 +174,7 @@ public class KeyStoreService {
             .orElseThrow(() -> new ItemNotFoundException("pgpPublicKeyNotFound"));
 
     this.pgpPublicKeyRepository.delete(pgpPublicKey);
+    this.publishKeySourcesChanged(repoInfo);
   }
 
   public Page<PgpPublicKeyItem> findAllPublicKeys(
@@ -204,6 +211,19 @@ public class KeyStoreService {
                     .displayName(aks.getDisplayName())
                     .build())
         .toList();
+  }
+
+  /**
+   * A key or a key-server host of the repo was registered or deleted. Both are per repo (a key is
+   * unique on (repo, fingerprint), a key store row belongs to one repo), so exactly one repo is
+   * concerned, whatever else has the same key. Handled after this transaction commits: the versions
+   * of the repo are recomputed in the background if it verifies every signature (RPS-1334, {@code
+   * SignedRecomputeService#onKeySourcesChanged}). Deleting a key does not unsign a version whose
+   * signature was verified with it: see {@code VersionSignatureService#recompute}.
+   */
+  private void publishKeySourcesChanged(final RepoInfo repoInfo) {
+
+    this.eventPublisher.publishEvent(new PgpKeySourcesChangedEvent(repoInfo.getStorageKey()));
   }
 
   private boolean hasWellKnownHosts(final String url) {

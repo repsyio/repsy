@@ -24,6 +24,7 @@ import io.repsy.os.generated.model.RepoSettingsInfo;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
 import io.repsy.os.shared.repo.events.PgpVerifyAllSignaturesToggledEvent;
 import io.repsy.os.shared.repo.mappers.RepoConverter;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
@@ -158,6 +159,7 @@ public class RepoTxService {
     this.rejectPgpSettingsForUnsupportedType(repo, settings);
 
     final var verifyAllBefore = repo.isPgpVerifyAllSignaturesEnabled();
+    final var keyServerLookupBefore = repo.isPgpKeyServerLookupEnabled();
 
     applyIfPresent(settings.getPrivateRepo(), repo::setPrivateRepo);
     if (OVERRIDE_SUPPORTED_TYPES.contains(repo.getType())) {
@@ -176,6 +178,12 @@ public class RepoTxService {
     // new setting in the background, and a rolled back change starts nothing (RPS-1316).
     if (repo.isPgpVerifyAllSignaturesEnabled() != verifyAllBefore) {
       this.eventPublisher.publishEvent(new PgpVerifyAllSignaturesToggledEvent(repo.getId()));
+    }
+
+    // Whether a stored signature verifies depends on the key servers being asked too. The listener
+    // recomputes only a repo that verifies every signature (RPS-1334).
+    if (repo.isPgpKeyServerLookupEnabled() != keyServerLookupBefore) {
+      this.eventPublisher.publishEvent(new PgpKeySourcesChangedEvent(repo.getId()));
     }
   }
 
