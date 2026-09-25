@@ -35,7 +35,7 @@
  *    <v>.tgz` (under registry.yarnpkg.com unless a `.yarnrc` names the registry) and an attachment
  *    named `@scope/name-<v>.tgz`; the registry stores its own conventional URL and serves it
  *    (RPS-1333), and the scoped install works.
- *  - `@tag`: `yarn tag add` fails although the registry applied the tag (candidate (NC9)).
+ *  - `@tag`: `yarn tag add` fails although the registry applied the tag (RPS-1362).
  *  - `@lockfile`: `yarn.lock` `resolved` is the registry's tarball URL plus the sha1 as a fragment.
  *  - `@publish`: `yarn publish` with no tarball argument, and the `.yarnrc` registry source.
  *  - `@not-applicable`: `yarn audit` always asks registry.yarnpkg.com, and yarn 1 has no `whoami`.
@@ -371,7 +371,7 @@ for (const config of SCOPED_PUBLISH_CONFIGS) {
 }
 
 test(
-  'yarn-classic tag add fails although the registry applied the tag (NC9)',
+  'yarn-classic tag add fails although the registry applied the tag (RPS-1362)',
   { tag: [client.tag, '@tag'] },
   async ({ seeder }) => {
     const repo = await newRepo(seeder);
@@ -398,7 +398,7 @@ test(
       body: '"1.0.0"',
     });
     expect(put.status, 'PUT dist-tags/<tag>').toBe(200);
-    expect(await put.text(), 'candidate (NC9): the answer has no body, so no "ok"').toBe('');
+    expect(await put.text(), 'RPS-1362: the answer has no body, so no "ok"').toBe('');
   },
 );
 

@@ -42,7 +42,7 @@ import { expect, test } from '../../../src/scenarios/fixtures.js';
  * The exit code of a client's `dist-tag add` (0 unless listed). Yarn 1's `tag add` exits 1
  * ("Couldn't add tag") although the registry applied the tag: it only accepts an answer with an `ok`
  * field in its body, and `PUT /-/package/<pkg>/dist-tags/<tag>` answers 200 with an empty body
- * (candidate (NC9)). The tag IS set, which the step below asserts on the registry either way.
+ * (RPS-1362). The tag IS set, which the step below asserts on the registry either way.
  */
 const TAG_ADD_EXIT: Partial<Record<ClientId, number>> = { 'yarn-classic': 1 };
 
@@ -95,7 +95,7 @@ for (const client of clientsWith('distTagCmd')) {
       const moved = await distTag.add(ctx, `${name}@1.1.0`, 'beta');
       expect(
         moved.exitCode,
-        `dist-tag add: ${moved.command}\n${moved.stderr} (candidate (NC9) for a non-zero exit)`,
+        `dist-tag add: ${moved.command}\n${moved.stderr} (RPS-1362 for a non-zero exit)`,
       ).toBe(TAG_ADD_EXIT[client.id] ?? 0);
       expect(await distTagsOf(repo.name, name)).toEqual({ beta: '1.1.0', latest: '1.1.0' });
 

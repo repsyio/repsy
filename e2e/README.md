@@ -925,7 +925,7 @@ berry each answered `whoami` from the stack) and are covered by their own PRs.
 | 5b dependency graph                           | `matrix/lockfile.spec.ts`                     | pass                                              | pass                                                                                                                                           | app -> lib, both in one private repo, read-only token consumer                                                                                  |
 | 5c lockfile + frozen install                  | `matrix/lockfile.spec.ts`                     | pass, `@smoke`                                    | pass, `@smoke`; `yarn.lock` `resolved` is the registry URL plus `#<sha1>`                                                                      | `package-lock.json` names the registry's own tarball URLs and integrity; `npm ci` in a fresh HOME works                                         |
 | 5d frozen install after an override republish | `matrix/lockfile.spec.ts`                     | pass (`EINTEGRITY`)                               | pass (`Integrity check failed for`)                                                                                                            | packument `integrity` is recomputed from the stored bytes, so `allowOverride` breaks every lockfile that recorded the version                   |
-| 6 dist-tags                                   | `matrix/dist-tags.spec.ts`                    | pass                                              | pass; `yarn tag add` exits 1 though the tag is set (candidate NC9, pinned)                                                                     | first publish under `--tag beta` also sets `latest`; add/ls/rm; `rm latest` and a tag on a missing version are refused                          |
+| 6 dist-tags                                   | `matrix/dist-tags.spec.ts`                    | pass                                              | pass; `yarn tag add` exits 1 though the tag is set (RPS-1362, pinned)                                                                     | first publish under `--tag beta` also sets `latest`; add/ls/rm; `rm latest` and a tag on a missing version are refused                          |
 | 7 deprecate                                   | `matrix/deprecate.spec.ts`                    | pass                                              | publisher N/A (no command); as consumer: pass, the message is printed as a `warning`                                                           | served in the full and the abbreviated packument, printed on install (`npm warn deprecated`), cleared by an empty message                       |
 | 9 view / info                                 | `matrix/view.spec.ts`                         | pass                                              | pass (`yarn info --json`, one `{"type":"inspect","data":...}` line)                                                                            | `dist.tarball` is the registry address (RPS-1333); `time` is ISO UTC and is now (B5 would show here on a non-UTC stack); RPS-1357 pin           |
 | 2 whoami                                      | `matrix/registry-endpoints.spec.ts`           | pass (RPS-1329)                                   | N/A (no command)                                                                                                                               | `admin` for the password, the deploy token's own generated username for a token; anonymous is 401 with a Basic challenge even on a public repo  |
@@ -1042,7 +1042,7 @@ q=1.0, application/json; q=0.8, */*`, `User-Agent: yarn/1.22.22 npm/? node/v24.x
   npm 11.19 (H-9 is confirmed here). It still skips a `win32`-only optional dependency on linux (H-15
   refuted for yarn 1 too: the tarball's own manifest decides, and `yarn.lock` records no `os`).
   `yarn info` asks for the full document.
-- **`yarn tag add` reports failure although the tag is set (candidate NC9)**, pinned in
+- **`yarn tag add` reports failure although the tag is set (RPS-1362)**, pinned in
   `matrix/dist-tags.spec.ts` (`TAG_ADD_EXIT`) and `@tag`: `PUT /-/package/<pkg>/dist-tags/<tag>` answers
   200 with an EMPTY body; yarn 1 only accepts an answer whose body has an `ok` field, prints "Couldn't
   add tag" and exits 1. `tag list` and `tag remove` work; `tag rm latest` and a tag on a missing version
@@ -1060,7 +1060,7 @@ for yarn 1 (abbreviated). H-14 confirmed. H-15 refuted. H-16/17 fixed by RPS-133
 pre-flight): yarn 1 has none, the request always reaches the server. H-19 confirmed (a `warning` line on
 `add`).
 
-**Candidates found here** (for a ticket; not asserted as fixed): **NC9**, the empty dist-tag `PUT`
+**Backend gap found here** (filed, not asserted as fixed): **RPS-1362**, the empty dist-tag `PUT`
 answer above. Open backend tickets this client meets, asserted as observed: RPS-1356 (`matrix/
 abbreviated-metadata.spec.ts`, and yarn asks for that document), RPS-1357 (`matrix/view.spec.ts`; yarn
 adds no `_resolved`), RPS-1358 and RPS-1359 (`matrix/wire.spec.ts`).
