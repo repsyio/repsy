@@ -14,12 +14,14 @@
 /// limitations under the License.
 
 import { HttpErrorResponse } from '@angular/common/http';
+import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
 import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
+import { renderComponent } from '../../repository/testing/render-spec-helpers';
 import { ProfileService } from '../service/profile.service';
 import { DeleteAccountComponent } from './delete-account.component';
 
@@ -88,5 +90,27 @@ describe('DeleteAccountComponent', () => {
     expect(authService.logOut).not.toHaveBeenCalled();
     expect(router.navigateByUrl).not.toHaveBeenCalled();
     expect(component.loading).toBeFalse();
+  });
+});
+
+describe('DeleteAccountComponent template', () => {
+  // RPS-1427: only the user row and its refresh tokens go; repositories, packages and deploy tokens stay.
+  it('says what is deleted and what is kept, not that all data is deleted', async () => {
+    const { el } = await renderComponent(
+      DeleteAccountComponent,
+      [
+        { provide: ProfileService, useValue: {} },
+        { provide: ToastService, useValue: {} },
+        { provide: AuthService, useValue: {} },
+        { provide: DangerModalService, useValue: {} },
+      ],
+      {},
+    );
+
+    const text = el.textContent.replace(/\s+/g, ' ');
+    expect(text).toContain('Your user account and its sign-in sessions are deleted.');
+    expect(text).toContain('Repositories, packages and deploy tokens are kept.');
+    expect(text).not.toContain('All your data will be permanently deleted');
+    TestBed.resetTestingModule();
   });
 });
