@@ -25,10 +25,12 @@
  *    POM without the makepom mapping lists;
  *  - IV5: dynamic revisions (`1.+`, `latest.release`, `latest.integration`, a range) resolved through the
  *    directory listing, since Ivy sends (and Repsy generates) no `maven-metadata.xml`;
- *  - IV6/IV7: an unknown module, and Ivy's own `overwrite="false"` (RPS-1368);
+ *  - IV6/IV7: an unknown module, and Ivy's own default `overwrite="false"` (a first release publish
+ *    goes through, a second is refused by Ivy, RPS-1368);
  *  - IV8: the ways a first configuration goes wrong: no realm on the credential, `publishivy="true"`,
- *    and a dependency line without a `conf`, next to the panel's own line (with its `conf`, RPS-1395)
- *    used as it is;
+ *    and a dependency line without a `conf` (which resolves since RPS-1368, before it failed on the
+ *    missing sources and javadoc), next to the panel's own line (with its `conf`, RPS-1395) used as
+ *    it is;
  *  - the panel's version detail of an Ivy SNAPSHOT (RPS-1370, still a known gap) and its version
  *    delete (RPS-1331, fixed: it removes the version and keeps the other, with no artifact-level
  *    maven-metadata.xml).
@@ -331,14 +333,10 @@ test('ivy > a module Repsy does not have is an unresolved dependency', async ({ 
 test("ivy > Ivy's own overwrite=false lets a release publish once and then refuses to replace it", async ({
   seeder,
 }) => {
-  // RPS-1368: the Maven HEAD handler answers 200 for a file that does not exist, so Ivy (whose
-  // overwrite=false asks with a HEAD first) refuses even the FIRST publish ("destination file exists
-  // and overwrite == false"). Remove the next line when that is fixed; the assertions below are then
-  // the whole contract.
-  test.fail(
-    true,
-    'RPS-1368: HEAD answers 200 for a missing file, so Ivy refuses a first publish with overwrite=false',
-  );
+  // RPS-1368/RPS-1394: overwrite="false" is Ivy's own default, and what the README and the panel's
+  // snippet leave it at. Ivy asks with a HEAD whether the file exists: Repsy answers 404 for a
+  // missing one, so the first publish goes through, and 200 for the stored one, so the second is
+  // refused by Ivy itself ("destination file exists and overwrite == false").
   const { world, repoName } = await newWorld(seeder, 'no-overwrite');
   const options: IvyOptions = { overwrite: false };
 
@@ -408,7 +406,7 @@ test.describe('ivy first-configuration pitfalls', () => {
     expect(ivyFile.msgId).toBe('invalidArtifactPath');
   });
 
-  test("ivy > the panel's dependency line, used as it is, retrieves the artifact, and needs its conf", async ({
+  test("ivy > the panel's dependency line, used as it is, retrieves the artifact, and a bare line does too", async ({
     seeder,
   }) => {
     const { world, groupId, artifactId, version } = await newWorld(seeder, 'panel-dependency');
@@ -420,11 +418,13 @@ test.describe('ivy first-configuration pitfalls', () => {
     expect(shown.clientExitCode, `ant retrieve: ${shown.command}`).toBe(0);
     expect(shown.retrieved).toEqual([`${artifactId}-${version}.jar`]);
 
-    // Without a conf, Ivy's default mapping also asks for the sources and javadoc artifacts, which
-    // are not there: that is why the panel's line carries one.
+    // Without a conf, Ivy's default mapping also looks for the sources and javadoc artifacts, which
+    // are not there. Ivy locates an artifact with a HEAD: while Repsy answered 200 for any path it
+    // then failed downloading them ("FAILED DOWNLOADS"), now the 404 (RPS-1368) makes it skip them.
     const bare = await resolveWithIvy(world, { conf: null });
-    expect(bare.clientExitCode, `ant retrieve: ${bare.command}`).not.toBe(0);
-    expect(output(bare)).toMatch(/FAILED\s+\] .*\((javadoc|source)\)/);
+    expect(bare.clientExitCode, `ant retrieve: ${bare.command}`).toBe(0);
+    expect(bare.retrieved).toEqual([`${artifactId}-${version}.jar`]);
+    expect(output(bare)).not.toMatch(/FAILED/);
   });
 });
 

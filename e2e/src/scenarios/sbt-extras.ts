@@ -37,6 +37,7 @@ import { uniqueVersion } from '../clients/maven-adapter.js';
 import {
   adminCredential,
   rawGet,
+  rawHead,
   repoTree,
   sha256Hex,
   versionDir,
@@ -153,6 +154,14 @@ export function registerSbtExtras(): void {
         expect(pom).toContain(`<artifactId>${artifactId}</artifactId>`);
         expect(pom).toContain(`<version>${version}</version>`);
 
+        // RPS-1368: the HEAD sbt asks with is answered like the GET (a real Tomcat, so the length
+        // header is what a client sees, unlike MockMvc), and 404 for what sbt never sent.
+        const head = await rawHead(repoName, admin, `${stem}.jar`);
+        expect(head.status, `HEAD ${stem}.jar`).toBe(200);
+        expect(head.contentLength, 'HEAD carries the length of the jar').toBe(jar.body.length);
+        expect(head.bodyLength, 'HEAD carries no body').toBe(0);
+        expect((await rawHead(repoName, admin, `${stem}-nope.jar`)).status).toBe(404);
+
         for (const path of [
           `${dir}/maven-metadata.xml`,
           `${artifactDir(groupId, artifactId)}/maven-metadata.xml`,
@@ -224,13 +233,9 @@ export function registerSbtExtras(): void {
     test("sbt > a release publishes with sbt's own defaults, and sbt then refuses to replace it", async ({
       seeder,
     }) => {
-      // RPS-1368: the Maven HEAD handler answers 200 for a file that does not exist, so sbt (whose
-      // publishConfiguration.overwrite is false for a release) refuses even the FIRST publish. Remove
-      // the next line when that is fixed; the assertions below are then the whole contract.
-      test.fail(
-        true,
-        'RPS-1368: HEAD answers 200 for a missing file, so sbt refuses a first release publish',
-      );
+      // RPS-1368: sbt (whose publishConfiguration.overwrite is false for a release) asks with a HEAD
+      // whether the file exists. Repsy answers 404 for a missing one, so the first publish goes
+      // through, and 200 for the stored one, so the second is refused by sbt itself.
       const { world, repoName } = await adminWorld(seeder, 'defaults');
       const options: SbtOptions = { overwrite: false };
 
