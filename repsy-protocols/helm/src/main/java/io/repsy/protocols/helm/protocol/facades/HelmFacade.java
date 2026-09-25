@@ -111,7 +111,9 @@ public interface HelmFacade<ID> {
    * (RPS-1354), in a single transaction: the version row is written first, then the manifest row,
    * both flushed, and the file last. A failure anywhere rolls the rows back, so a manifest push
    * that does not succeed leaves the chart version row, the tag and the storage as they were. A
-   * brand-new manifest whose file cannot be written also has its partial file removed.
+   * brand-new manifest whose file cannot be written also has its partial file removed, and a
+   * transaction that rolls back after the file was written (a failing commit) has the file removed,
+   * or the bytes of the replaced manifest put back (RPS-1366).
    *
    * <p>A push that loses a race on a row fails with {@code DataIntegrityViolationException} or
    * {@code OptimisticLockingFailureException}, and the whole unit is then safe to repeat. The
