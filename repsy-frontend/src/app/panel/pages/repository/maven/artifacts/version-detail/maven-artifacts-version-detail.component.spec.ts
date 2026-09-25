@@ -32,7 +32,11 @@ import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { renderComponent } from '../../../testing/render-spec-helpers';
 import { DeletedItem } from '../../dto/deleted-item';
 import { MavenService } from '../../service/maven.service';
-import { MavenArtifactsVersionDetailComponent } from './maven-artifacts-version-detail.component';
+import {
+  formatDevelopers,
+  formatLicenses,
+  MavenArtifactsVersionDetailComponent,
+} from './maven-artifacts-version-detail.component';
 
 const REPO = 'maven-repo';
 const VERSION = {
@@ -257,11 +261,11 @@ describe('MavenArtifactsVersionDetailComponent', () => {
 });
 
 describe('MavenArtifactsVersionDetailComponent template', () => {
-  async function render() {
+  async function render(version: ArtifactVersionInfo = VERSION) {
     const mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['fetchArtifactVersion'], {
       repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO, { canManage: true })),
     });
-    mavenService.fetchArtifactVersion.and.returnValue(of(VERSION));
+    mavenService.fetchArtifactVersion.and.returnValue(of(version));
 
     @Component({ selector: 'app-security-scan-section', standalone: true, template: '' })
     class SecurityScanSectionStubComponent {
@@ -317,5 +321,70 @@ describe('MavenArtifactsVersionDetailComponent template', () => {
 </repositories>`);
     // The dependency snippet itself is unchanged.
     expect(copied(fixture, 'pkg-detail-install')).toContain('<artifactId>lib</artifactId>');
+  });
+  // RPS-1425: the licenses and developers are lists of objects; the page used to print them as "[object Object]".
+  describe('licenses and developers (RPS-1425)', () => {
+    const text = (fixture: Awaited<ReturnType<typeof render>>, testId: string): string =>
+      (fixture.nativeElement as HTMLElement).querySelector(`[data-testid="${testId}"]`)?.textContent?.trim() ?? '';
+
+    it('shows every license and developer as readable text, sorted, without "[object Object]"', async () => {
+      const fixture = await render({
+        ...VERSION,
+        licenses: [
+          { name: 'MIT License', url: 'https://opensource.org/licenses/MIT' },
+          { name: 'Apache License 2.0', url: 'https://www.apache.org/licenses/LICENSE-2.0' },
+        ],
+        developers: [{ name: 'Zoe Zed', email: 'zoe@example.org' }, { name: 'Ann Alpha' }],
+      });
+
+      expect(text(fixture, 'pkg-detail-meta-licenses')).toBe('Licenses: Apache License 2.0, MIT License');
+      expect(text(fixture, 'pkg-detail-meta-developers')).toBe('Developers: Ann Alpha, Zoe Zed <zoe@example.org>');
+      const page = (fixture.nativeElement as HTMLElement).textContent;
+      expect(page).not.toContain('[object Object]');
+    });
+
+    it('shows a dash when the version has no licenses or developers, or the API sends none', async () => {
+      for (const version of [{ ...VERSION, licenses: [], developers: [] }, VERSION]) {
+        const fixture = await render(version);
+
+        expect(text(fixture, 'pkg-detail-meta-licenses')).toBe('Licenses: -');
+        expect(text(fixture, 'pkg-detail-meta-developers')).toBe('Developers: -');
+        TestBed.resetTestingModule();
+      }
+    });
+
+    it('does not render the URL of a license as a link', async () => {
+      const fixture = await render({ ...VERSION, licenses: [{ url: 'javascript:alert(1)' }] });
+
+      const licenses = fixture.nativeElement.querySelector('[data-testid="pkg-detail-meta-licenses"]') as HTMLElement;
+      expect(licenses.querySelector('a')).toBeNull();
+    });
+  });
+});
+
+describe('formatLicenses and formatDevelopers (RPS-1425)', () => {
+  it('names a license by its name, falls back to its URL, and skips an empty entry', () => {
+    expect(
+      formatLicenses([
+        { url: 'https://b.example/license' },
+        { name: ' ' },
+        { name: 'BSD' },
+        {},
+        { name: 'Apache', url: 'x' },
+      ]),
+    ).toBe('Apache, BSD, https://b.example/license');
+  });
+
+  it('writes a developer as "name <email>", or just the one of the two that is there', () => {
+    expect(
+      formatDevelopers([{ email: 'only@example.org' }, { name: 'Bob', email: 'bob@example.org' }, { name: 'Al' }, {}]),
+    ).toBe('Al, Bob <bob@example.org>, only@example.org');
+  });
+
+  it('is a dash for nothing at all', () => {
+    for (const none of [undefined, null, []]) {
+      expect(formatLicenses(none)).toBe('-');
+      expect(formatDevelopers(none)).toBe('-');
+    }
   });
 });

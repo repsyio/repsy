@@ -27,7 +27,19 @@ import type { Page } from '@playwright/test';
 import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
-import { groupPath, rawGet, repoTree, versionDir } from '../../../src/clients/maven-raw.js';
+import {
+  artifactDir,
+  artifactMetadataXml,
+  buildJar,
+  groupPath,
+  minimalPom,
+  rawGet,
+  rawPut,
+  repoTree,
+  splitPackageName,
+  versionDir,
+} from '../../../src/clients/maven-raw.js';
+import { defaultPackageName } from '../../../src/seed/packages/shared.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { registerPackageScenarios, rowKeys } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
@@ -568,6 +580,72 @@ test.describe('Maven version detail', { tag: '@packages' }, () => {
     await expect(detail.byId('pkg-detail-meta-artifact')).toContainText(
       `${artifact} (${pkg.version})`,
     );
+  });
+
+  // RPS-1425: the licenses and developers are lists of objects in the API, and the page used to print
+  // them with the default string conversion, so the POM's own values read "[object Object]".
+  test('PKG-maven-07 the version detail lists the POM licenses and developers as text (RPS-1425)', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    const name = defaultPackageName('maven', seeder.runId);
+    const version = '1.0.0';
+    const [groupId, artifactId] = splitPackageName(name);
+    const base = `${versionDir(groupId, artifactId, version)}/${artifactId}-${version}`;
+    const pom = minimalPom(
+      groupId,
+      artifactId,
+      version,
+      '  <licenses>\n' +
+        '    <license><name>The MIT License</name><url>https://opensource.org/licenses/MIT</url></license>\n' +
+        '    <license><name>Apache License, Version 2.0</name><url>https://www.apache.org/licenses/LICENSE-2.0</url></license>\n' +
+        '  </licenses>\n' +
+        '  <developers>\n' +
+        '    <developer><name>Zoe Zed</name><email>zoe@example.org</email></developer>\n' +
+        '    <developer><name>Ann Alpha</name></developer>\n' +
+        '  </developers>\n',
+    );
+    const admin = adminCredential();
+    for (const [path, body, type] of [
+      [`${base}.jar`, buildJar({ groupId, artifactId, version }), 'application/octet-stream'],
+      [`${base}.pom`, pom, 'application/octet-stream'],
+      [
+        `${artifactDir(groupId, artifactId)}/maven-metadata.xml`,
+        artifactMetadataXml({ groupId, artifactId, versions: [version] }),
+        'application/xml',
+      ],
+    ] as const) {
+      const res = await rawPut(repo.name, admin, path, body, type);
+      expect(res.status, `PUT ${path}`).toBeLessThan(300);
+    }
+
+    const detail = protocolPages(adminPage, maven, repo.name).detail({ name, version });
+    await detail.goto();
+
+    // Sorted, so the line does not depend on the order the server sends the rows in; a developer
+    // without an email is just the name.
+    await expect(detail.byId('pkg-detail-meta-licenses')).toContainText(
+      'Apache License, Version 2.0, The MIT License',
+    );
+    await expect(detail.byId('pkg-detail-meta-developers')).toContainText(
+      'Ann Alpha, Zoe Zed <zoe@example.org>',
+    );
+    await expect(detail.byId('pkg-detail-metadata')).not.toContainText('[object Object]');
+  });
+
+  // The other side: a POM that declares neither shows a dash, not an empty value or "undefined".
+  test('PKG-maven-07 the version detail of a POM without licenses and developers shows a dash (RPS-1425)', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    const pkg = await seedPackage(repo);
+    const detail = protocolPages(adminPage, maven, repo.name).detail(pkg);
+    await detail.goto();
+    await expect(detail.byId('pkg-detail-meta-licenses')).toHaveText(/^\s*Licenses:\s*-\s*$/);
+    await expect(detail.byId('pkg-detail-meta-developers')).toHaveText(/^\s*Developers:\s*-\s*$/);
   });
 
   // RPS-1261 (3): the "Gradle Groovy DSL" block used to be bound to the Groovy Grape snippet, so the

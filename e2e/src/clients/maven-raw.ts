@@ -214,8 +214,17 @@ export async function repoTree(
   return Object.fromEntries(Object.entries(tree).sort(([a], [b]) => a.localeCompare(b)));
 }
 
-/** A just-valid POM for a raw seed: the server reads it to register the artifact version. */
-export function minimalPom(groupId: string, artifactId: string, version: string): string {
+/**
+ * A just-valid POM for a raw seed: the server reads it to register the artifact version. `extraXml` is
+ * spliced in before `</project>` (for example a `<licenses>` or `<developers>` block), and is the
+ * caller's own, already well-formed XML.
+ */
+export function minimalPom(
+  groupId: string,
+  artifactId: string,
+  version: string,
+  extraXml = '',
+): string {
   return (
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<project xmlns="http://maven.apache.org/POM/4.0.0">\n' +
@@ -224,6 +233,7 @@ export function minimalPom(groupId: string, artifactId: string, version: string)
     `  <artifactId>${artifactId}</artifactId>\n` +
     `  <version>${version}</version>\n` +
     '  <packaging>jar</packaging>\n' +
+    extraXml +
     '</project>\n'
   );
 }
