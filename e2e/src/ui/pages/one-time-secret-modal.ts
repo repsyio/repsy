@@ -83,9 +83,9 @@ export class OneTimeSecretModal {
   }
 
   /**
-   * Clicks the eye and waits until the input is a plain text field. The eye is a Font Awesome glyph
-   * (`<i class="fa-solid fa-eye">`) and the suite's network allow-list blocks the Font Awesome CDN, so
-   * the button has no box and a real click is refused as "not visible": the click event is dispatched.
+   * Clicks the eye and waits until the input is a plain text field. The click event is dispatched:
+   * this predates RPS-1402, when the eye was a Font Awesome glyph from a CDN the suite blocks, so the
+   * button had no box and a real click was refused as "not visible". The icon is bundled now.
    */
   async reveal(): Promise<void> {
     await this.toggle.dispatchEvent('click');
