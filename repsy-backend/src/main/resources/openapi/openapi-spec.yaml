@@ -4202,6 +4202,9 @@ paths:
         - name: repoName
           in: query
           required: false
+          description: >-
+            Only the scans of the repositories whose name contains this text, case-insensitive, with
+            `%`, `_` and `\` taken literally. Every repository matches when blank.
           schema:
             type: string
         - "$ref": "#/components/parameters/Page"
@@ -4220,7 +4223,7 @@ paths:
           "$ref": "#/components/responses/Unauthorized"
         '403':
           "$ref": "#/components/responses/Forbidden"
-      summary: List vulnerability scans across all repositories, filterable by severity/repoType/repoName
+      summary: List vulnerability scans across all repositories, filterable by severity/repoType/repoName (a case-insensitive contains match)
   "/api/security/scans/summary":
     get:
       tags:
@@ -4235,6 +4238,9 @@ paths:
         - name: repoName
           in: query
           required: false
+          description: >-
+            Only the repositories whose name contains this text, case-insensitive, with `%`, `_` and
+            `\` taken literally, the same match as the scans list. Every repository matches when blank.
           schema:
             type: string
       responses:
