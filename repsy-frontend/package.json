@@ -30,7 +30,7 @@
     "@angular/platform-browser": "^21.2.23",
     "@angular/platform-browser-dynamic": "^21.2.23",
     "@angular/router": "^21.2.23",
-    "@stripe/stripe-js": "^8.11.0",
+    "@stripe/stripe-js": "^9.16.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/typography": "^0.5.20",
     "chart.js": "^4.5.1",
