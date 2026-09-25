@@ -43,6 +43,13 @@ public interface NpmProtocolFacade {
       ProtocolContext context, @Nullable String scopeName, String packageName, String filename)
       throws IOException;
 
+  /** Whether {@link #getTarball} would find the file, which is what a {@code HEAD} answers. */
+  boolean tarballExists(
+      ProtocolContext context, @Nullable String scopeName, String packageName, String filename);
+
+  /** Whether the package is published in the repo, which is what a {@code HEAD} answers. */
+  boolean packageExists(ProtocolContext context, @Nullable String scopeName, String packageName);
+
   Map<String, Object> getPackageMetadata(
       ProtocolContext context, @Nullable String scopeName, String packageName, String acceptHeader)
       throws IOException;

@@ -18,14 +18,20 @@ package io.repsy.protocols.npm.shared.utils;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.security.DigestOutputStream;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
@@ -43,6 +49,7 @@ import tools.jackson.databind.ObjectMapper;
 @UtilityClass
 @NullMarked
 public final class PackageUtils {
+  private static final ObjectMapper ETAG_MAPPER = new ObjectMapper();
   private static final String TARBALL_EXTENSION = "tgz";
   private static final String ABBREVIATED_METADATA_HEADER_VALUE =
       "application/vnd.npm.install-v1+json";
@@ -379,17 +386,133 @@ public final class PackageUtils {
     return packageName + "-" + versionName + "." + TARBALL_EXTENSION;
   }
 
+  /**
+   * Whether the {@code Accept} header asks for the abbreviated install document rather than the
+   * full packument: it lists {@code application/vnd.npm.install-v1+json} with a quality above zero
+   * that is not lower than that of {@code application/json}. So {@code pnpm}'s {@code
+   * application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8} is abbreviated at any
+   * position of the list, a client that prefers {@code application/json} is served the full one,
+   * and an explicit {@code q=0} refuses the abbreviated document.
+   */
   public static boolean isRequestedAbbreviatedMetadata(final String acceptHeader) {
 
-    final var headers = acceptHeader.split(";", -1);
+    var abbreviated = 0.0;
+    var full = 0.0;
 
-    for (final var header : headers) {
-      if (header.trim().equals(ABBREVIATED_METADATA_HEADER_VALUE)) {
-        return true;
+    for (final var entry : acceptHeader.split(",", -1)) {
+      final var parts = entry.split(";", -1);
+      final var mediaType = parts[0].trim();
+      final var quality = qualityOf(parts);
+
+      if (mediaType.equalsIgnoreCase(ABBREVIATED_METADATA_HEADER_VALUE)) {
+        abbreviated = Math.max(abbreviated, quality);
+      } else if (mediaType.equalsIgnoreCase("application/json")) {
+        full = Math.max(full, quality);
       }
     }
 
-    return false;
+    return abbreviated > 0 && abbreviated >= full;
+  }
+
+  /** The {@code q} parameter of an {@code Accept} entry (1 when it has none or a broken one). */
+  private static double qualityOf(final String[] entryParts) {
+
+    for (var i = 1; i < entryParts.length; i++) {
+      final var parameter = entryParts[i].trim();
+
+      if (parameter.regionMatches(true, 0, "q=", 0, 2)) {
+        try {
+          return Double.parseDouble(parameter.substring(2).trim());
+        } catch (final NumberFormatException _) {
+          return 1.0;
+        }
+      }
+    }
+
+    return 1.0;
+  }
+
+  /**
+   * Removes what a publish carries that a packument does not keep: the {@code _attachments} (the
+   * base64 tarball of the publish), and the {@code _from} and {@code _resolved} that {@code npm
+   * publish <tarball>} adds to the manifest (the publisher's own file path), at the top and in
+   * every version. The public registry serves none of them (RPS-1357).
+   */
+  public static void removePublishOnlyFields(final Map<String, Object> metadata) {
+
+    metadata.remove(NpmConstants.ATTACHMENTS);
+    metadata.remove(NpmConstants.FROM);
+    metadata.remove(NpmConstants.RESOLVED);
+
+    if (metadata.get(NpmConstants.VERSIONS) instanceof final Map<?, ?> versions) {
+      for (final var version : versions.values()) {
+        if (version instanceof final Map<?, ?> versionMetadata) {
+          versionMetadata.remove(NpmConstants.FROM);
+          versionMetadata.remove(NpmConstants.RESOLVED);
+        }
+      }
+    }
+  }
+
+  /**
+   * Removes the {@code deprecated} of every version that has an empty one: that is what {@code npm
+   * deprecate pkg@x ""} used to store, and the registry's own meaning of an empty message is "no
+   * longer deprecated". A client that finds the field at all (pnpm) treats the version as
+   * deprecated (RPS-1360).
+   */
+  public static void removeEmptyDeprecations(final Map<String, Object> metadata) {
+
+    if (metadata.get(NpmConstants.VERSIONS) instanceof final Map<?, ?> versions) {
+      for (final var version : versions.values()) {
+        if (version instanceof final Map<?, ?> versionMetadata
+            && "".equals(versionMetadata.get(NpmConstants.DEPRECATED))) {
+          versionMetadata.remove(NpmConstants.DEPRECATED);
+        }
+      }
+    }
+  }
+
+  /**
+   * A weak entity tag of the document: the SHA-256 of its JSON, so it differs between the
+   * abbreviated and the full document, and between two addresses of one registry (the {@code
+   * dist.tarball} of every version is in it). It is weak because the same document is also sent
+   * compressed, which is another representation of it (and the container does not compress an
+   * answer that has a strong tag, whereas a weak one is what a conditional request needs anyway).
+   */
+  public static String computeEtag(final Map<String, Object> metadata) {
+
+    final var digest = DigestUtils.getSha256Digest();
+
+    try (final var out = new DigestOutputStream(OutputStream.nullOutputStream(), digest)) {
+      ETAG_MAPPER.writeValue(out, metadata);
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
+
+    return "W/\"" + HexFormat.of().formatHex(digest.digest()) + "\"";
+  }
+
+  /**
+   * When the package last changed: the {@code time.modified} of the full packument, or the {@code
+   * modified} of the abbreviated one. {@code null} when there is none, or it is not a date.
+   */
+  public static @Nullable Instant lastModifiedOf(final Map<String, Object> metadata) {
+
+    var modified = metadata.get(NpmConstants.MODIFIED);
+
+    if (modified == null && metadata.get("time") instanceof final Map<?, ?> time) {
+      modified = time.get(NpmConstants.MODIFIED);
+    }
+
+    if (modified instanceof final String text) {
+      try {
+        return Instant.parse(text);
+      } catch (final DateTimeParseException _) {
+        return null;
+      }
+    }
+
+    return null;
   }
 
   /**

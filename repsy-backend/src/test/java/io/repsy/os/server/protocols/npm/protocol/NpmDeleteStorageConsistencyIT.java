@@ -820,7 +820,9 @@ class NpmDeleteStorageConsistencyIT extends AbstractIntegrationTest {
 
     assertThat(restored.getStatus()).isEqualTo(200);
     assertThat(this.storedDeprecationMessage(repo, name, "1.0.0")).isEmpty();
-    assertThat(this.metadataDeprecation(repo, name, "1.0.0")).isEqualTo("");
+    assertThat(this.metadataDeprecation(repo, name, "1.0.0"))
+        .as("an empty message removes the field (RPS-1360)")
+        .isNull();
   }
 
   @Test

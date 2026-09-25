@@ -260,7 +260,8 @@ class AbstractNpmStorageServiceRemovalTest {
   }
 
   @Test
-  @DisplayName("deprecating sets the message on the stored metadata and keeps every version")
+  @DisplayName(
+      "deprecating sets the message on the stored metadata, an empty one removes it (RPS-1360)")
   void deprecatingPatchesTheStoredMetadata() throws Exception {
     this.metadataIsStored();
     when(this.storageStrategy.write(eq(REPO_NAME), at(METADATA_FILE), any()))
@@ -275,7 +276,7 @@ class AbstractNpmStorageServiceRemovalTest {
 
     assertThat(growth).isEqualTo(23L);
     final var written = this.written();
-    assertThat(written).contains("\"deprecated\":\"old\"").contains("\"deprecated\":\"\"");
+    assertThat(written).contains("\"deprecated\":\"old\"").doesNotContain("\"deprecated\":\"\"");
     assertThat(written).contains("\"1.2.0\"").doesNotContain("9.9.9");
     assertThat(written).doesNotContain("\"modified\":\"then\"");
   }

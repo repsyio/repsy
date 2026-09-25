@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import java.net.URISyntaxException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,6 +30,8 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.data.util.Pair;
 
 @DisplayName("PackageUtils")
@@ -550,6 +553,168 @@ class PackageUtilsTest {
       assertThatThrownBy(
               () -> PackageUtils.findUnpublishedVersion(this.packument("1.0.0"), new HashMap<>()))
           .isInstanceOf(BadRequestException.class);
+    }
+  }
+
+  @Nested
+  @DisplayName("isRequestedAbbreviatedMetadata (RPS-1359)")
+  class AbbreviatedAccept {
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = {
+          "application/vnd.npm.install-v1+json",
+          "application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8",
+          "application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*",
+          "application/vnd.npm.install-v1+json, application/json",
+          "application/json, application/vnd.npm.install-v1+json",
+          "application/json;q=0.8, application/vnd.npm.install-v1+json",
+          "application/json;q=0.5,application/vnd.npm.install-v1+json;q=0.9",
+          "Application/Vnd.Npm.Install-V1+Json"
+        })
+    @DisplayName("is asked for when the abbreviated type is the one preferred, at any position")
+    void asked(final String accept) {
+      assertThat(PackageUtils.isRequestedAbbreviatedMetadata(accept)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = {
+          "",
+          "*/*",
+          "application/json",
+          "application/json; q=1.0, application/vnd.npm.install-v1+json; q=0.8",
+          "application/vnd.npm.install-v1+json; q=0",
+          "application/vnd.npm.install-v1+json-other",
+          "text/html"
+        })
+    @DisplayName("is not when the full document is preferred, or the abbreviated one is refused")
+    void notAsked(final String accept) {
+      assertThat(PackageUtils.isRequestedAbbreviatedMetadata(accept)).isFalse();
+    }
+
+    @Test
+    @DisplayName("a broken quality counts as 1")
+    void brokenQuality() {
+      assertThat(
+              PackageUtils.isRequestedAbbreviatedMetadata(
+                  "application/vnd.npm.install-v1+json; q=x, application/json; q=0.9"))
+          .isTrue();
+    }
+  }
+
+  @Nested
+  @DisplayName("entity tag and modification time (RPS-1359)")
+  class Validators {
+
+    private Map<String, Object> packument(final String modified) {
+      final var time = new HashMap<String, Object>();
+      time.put("modified", modified);
+
+      final var packument = new HashMap<String, Object>();
+      packument.put("name", "demo");
+      packument.put("time", time);
+
+      return packument;
+    }
+
+    @Test
+    @DisplayName("the etag is a quoted weak tag that follows the content")
+    void etagFollowsTheContent() {
+      final var first = PackageUtils.computeEtag(this.packument("2026-01-01T00:00:00.000Z"));
+
+      assertThat(first).matches("W/\"[0-9a-f]{64}\"");
+      assertThat(PackageUtils.computeEtag(this.packument("2026-01-01T00:00:00.000Z")))
+          .isEqualTo(first);
+      assertThat(PackageUtils.computeEtag(this.packument("2026-01-02T00:00:00.000Z")))
+          .isNotEqualTo(first);
+    }
+
+    @Test
+    @DisplayName("the modification time is time.modified of the full document")
+    void lastModifiedOfTheFullDocument() {
+      assertThat(PackageUtils.lastModifiedOf(this.packument("2026-03-04T05:06:07.089Z")))
+          .isEqualTo(Instant.parse("2026-03-04T05:06:07.089Z"));
+    }
+
+    @Test
+    @DisplayName("the modification time is modified of the abbreviated document")
+    void lastModifiedOfTheAbbreviatedDocument() {
+      assertThat(PackageUtils.lastModifiedOf(Map.of("modified", "2026-03-04T05:06:07.089Z")))
+          .isEqualTo(Instant.parse("2026-03-04T05:06:07.089Z"));
+    }
+
+    @Test
+    @DisplayName("there is none when the document has no usable one")
+    void noLastModified() {
+      assertThat(PackageUtils.lastModifiedOf(Map.of("name", "demo"))).isNull();
+      assertThat(PackageUtils.lastModifiedOf(this.packument("yesterday"))).isNull();
+      assertThat(PackageUtils.lastModifiedOf(Map.of("time", Map.of("modified", 5)))).isNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("removePublishOnlyFields and removeEmptyDeprecations (RPS-1357, RPS-1360)")
+  class Cleanup {
+
+    private Map<String, Object> packument() {
+      final var version = new HashMap<String, Object>();
+      version.put("name", "demo");
+      version.put("_from", "file:/x");
+      version.put("_resolved", "/x/demo.tgz");
+      version.put("deprecated", "");
+
+      final var other = new HashMap<String, Object>();
+      other.put("deprecated", "still deprecated");
+
+      final var packument = new HashMap<String, Object>();
+      packument.put("_attachments", Map.of("demo.tgz", Map.of("data", "AAAA")));
+      packument.put("_from", "file:/x");
+      packument.put("_resolved", "/x/demo.tgz");
+      packument.put("readme", "kept");
+      packument.put("versions", new HashMap<>(Map.of("1.0.0", version, "2.0.0", other)));
+
+      return packument;
+    }
+
+    @Test
+    @DisplayName("removes the publish-only fields at the top and in every version, nothing else")
+    @SuppressWarnings("unchecked")
+    void removesPublishOnlyFields() {
+      final var packument = this.packument();
+
+      PackageUtils.removePublishOnlyFields(packument);
+
+      assertThat(packument).doesNotContainKeys("_attachments", "_from", "_resolved");
+      assertThat(packument).containsEntry("readme", "kept");
+      final var versions = (Map<String, Map<String, Object>>) packument.get("versions");
+      assertThat(versions.get("1.0.0"))
+          .doesNotContainKeys("_from", "_resolved")
+          .containsEntry("name", "demo");
+    }
+
+    @Test
+    @DisplayName("removes an empty deprecated only")
+    @SuppressWarnings("unchecked")
+    void removesEmptyDeprecations() {
+      final var packument = this.packument();
+
+      PackageUtils.removeEmptyDeprecations(packument);
+
+      final var versions = (Map<String, Map<String, Object>>) packument.get("versions");
+      assertThat(versions.get("1.0.0")).doesNotContainKey("deprecated");
+      assertThat(versions.get("2.0.0")).containsEntry("deprecated", "still deprecated");
+    }
+
+    @Test
+    @DisplayName("copes with a document that has no versions")
+    void noVersions() {
+      final var packument = new HashMap<String, Object>(Map.of("name", "demo"));
+
+      PackageUtils.removePublishOnlyFields(packument);
+      PackageUtils.removeEmptyDeprecations(packument);
+
+      assertThat(packument).containsOnlyKeys("name");
     }
   }
 }

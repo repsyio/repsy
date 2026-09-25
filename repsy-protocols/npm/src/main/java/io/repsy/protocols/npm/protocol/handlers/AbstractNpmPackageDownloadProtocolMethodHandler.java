@@ -34,6 +34,8 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -91,6 +93,14 @@ public abstract class AbstractNpmPackageDownloadProtocolMethodHandler
     };
   }
 
+  /**
+   * The file name without the scope that a client may put before it ({@code @scope/name-1.tgz}).
+   */
+  private static String bareFilename(final String filename) {
+
+    return filename.substring(filename.lastIndexOf('/') + 1);
+  }
+
   @Override
   public ResponseEntity<Object> handle(
       final ProtocolContext protocolContext,
@@ -114,7 +124,15 @@ public abstract class AbstractNpmPackageDownloadProtocolMethodHandler
           this.npmProtocolFacade.getTarball(
               protocolContext, pathVars.scopeName(), pathVars.packageName(), filename);
 
-      return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).body(resource);
+      // Without a header of its own Spring names the download "f.txt" and shows it inline (an
+      // answer to the reflected-file-download attack, which never applies to a tarball): a browser
+      // or a download tool would save the tarball under that name (RPS-1363).
+      return ResponseEntity.ok()
+          .contentType(MediaType.APPLICATION_OCTET_STREAM)
+          .header(
+              HttpHeaders.CONTENT_DISPOSITION,
+              ContentDisposition.attachment().filename(bareFilename(filename)).build().toString())
+          .body(resource);
 
     } catch (final UnAuthorizedException e) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

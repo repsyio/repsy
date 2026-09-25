@@ -151,6 +151,37 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   }
 
   @Override
+  public boolean tarballExists(
+      final ProtocolContext context,
+      @Nullable final String scopeName,
+      final String packageName,
+      final String filename) {
+
+    try {
+      this.getTarball(context, scopeName, packageName, filename);
+
+      return true;
+    } catch (final ItemNotFoundException | IOException _) {
+      return false;
+    }
+  }
+
+  @Override
+  public boolean packageExists(
+      final ProtocolContext context, @Nullable final String scopeName, final String packageName) {
+
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+
+    try {
+      this.npmPackageService.getPackage(repoInfo.getStorageKey(), scopeName, packageName);
+
+      return true;
+    } catch (final ItemNotFoundException _) {
+      return false;
+    }
+  }
+
+  @Override
   public Map<String, Object> getPackageMetadata(
       final ProtocolContext context,
       @Nullable final String scopeName,

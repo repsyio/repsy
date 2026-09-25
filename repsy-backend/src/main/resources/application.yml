@@ -65,6 +65,15 @@ server:
     connection-timeout: 120000
     max-part-count: 50
   forward-headers-strategy: native
+  # The npm packument of a package with many versions is megabytes of JSON, and a client asks for
+  # it on every install (RPS-1359). Only JSON is compressed, and only what is worth the effort; the
+  # tarballs, blobs and other files of the protocols are never touched. This applies to the main
+  # (protocol) port; the panel port is served uncompressed. SERVER_COMPRESSION_ENABLED=false turns
+  # it off, for a reverse proxy that compresses already.
+  compression:
+    enabled: ${SERVER_COMPRESSION_ENABLED:true}
+    mime-types: application/json,application/vnd.npm.install-v1+json
+    min-response-size: 1KB
 
 multiport:
   main-port: ${server.port}

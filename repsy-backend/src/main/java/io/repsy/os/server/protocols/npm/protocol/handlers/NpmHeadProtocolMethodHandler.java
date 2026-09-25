@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.npm.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
+import io.repsy.os.server.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.handlers.AbstractNpmHeadProtocolMethodHandler;
 import org.jspecify.annotations.NullMarked;
@@ -28,8 +29,9 @@ public class NpmHeadProtocolMethodHandler extends AbstractNpmHeadProtocolMethodH
 
   public NpmHeadProtocolMethodHandler(
       @Qualifier("osNpmPathParser") final PathParser pathParser,
+      final NpmProtocolFacade npmProtocolFacade,
       final NpmProtocolProvider provider) {
 
-    super(pathParser, provider);
+    super(pathParser, npmProtocolFacade, provider);
   }
 }

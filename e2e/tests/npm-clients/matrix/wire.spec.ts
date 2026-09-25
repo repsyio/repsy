@@ -22,14 +22,15 @@
  * `_auth` is `Basic`), the client's own identification, and that its tarball fetch carries the
  * credential too.
  *
- * RPS-1359: the packument answers with no `ETag`, no `Last-Modified` and no `Vary: Accept`
- * (the abbreviated and the full document share one URL), so a client cannot revalidate its metadata
- * cache with a conditional request and a shared cache cannot tell the two documents apart; and no
- * compression. Observed live and asserted as it is.
+ * RPS-1359 (fixed): the packument answers with a weak `ETag` (of the document served, so the
+ * abbreviated and the full one, which share one URL, have one each), a `Last-Modified` and
+ * `Vary: Accept`, so a client can revalidate its metadata cache with a conditional request (304) and a
+ * shared cache can tell the two documents apart. Large ones are compressed (`tests/npm/
+ * packument-read.spec.ts` proves the conditional requests and the compression at the wire).
  *
- * RPS-1358: npm `HEAD` answers 200 for ANY path of an existing repository, including a
- * package that does not exist (the same class as the PyPI and Ruby HEAD findings); a `GET` of the
- * same path is 404.
+ * RPS-1358 (fixed): npm `HEAD` used to answer 200 for ANY path of an existing repository, including a
+ * package that does not exist (the same class as the PyPI and Ruby HEAD findings); it is 404 now, like
+ * the `GET` of the same path.
  */
 import { MARKER_FILENAME } from '../../../src/clients/npm.js';
 import { npmAuthHeader } from '../../../src/clients/npm-raw.js';
@@ -146,13 +147,11 @@ for (const client of clientsWith('frozenInstall')) {
           expect(packument?.ifNoneMatch, 'a first fetch is unconditional').toBeUndefined();
           expect(packument?.status).toBe(200);
 
-          // RPS-1359: nothing to revalidate with, nothing to key a cache on.
-          expect(packument?.responseEtag, 'RPS-1359: no ETag').toBeUndefined();
-          expect(packument?.responseLastModified, 'RPS-1359: no Last-Modified').toBeUndefined();
-          expect(packument?.responseVary ?? '', 'RPS-1359: no Vary: Accept').not.toMatch(
-            /accept\b/i,
-          );
-          expect(packument?.responseContentEncoding, 'RPS-1359: not compressed').toBeUndefined();
+          // RPS-1359: something to revalidate with, and to key a cache on (weak: the same document
+          // is also sent compressed).
+          expect(packument?.responseEtag, 'RPS-1359: an ETag').toMatch(/^W\/"[0-9a-f]{64}"$/);
+          expect(packument?.responseLastModified, 'RPS-1359: a Last-Modified').toBeTruthy();
+          expect(packument?.responseVary ?? '', 'RPS-1359: Vary: Accept').toMatch(/accept\b/i);
         } finally {
           await recorder.stop();
         }
@@ -162,7 +161,7 @@ for (const client of clientsWith('frozenInstall')) {
 }
 
 test(
-  'HEAD answers 200 for a package that does not exist (raw)',
+  'HEAD answers 404 for a package that does not exist, like GET (raw): RPS-1358',
   {
     tag: ['@npm', '@wire'],
   },
@@ -175,10 +174,10 @@ test(
     expect(get.status, 'GET of a package that does not exist').toBe(404);
 
     const head = await fetch(missing, { method: 'HEAD', headers });
-    expect(head.status, 'RPS-1358: HEAD of the same path is 200').toBe(200);
+    expect(head.status, 'RPS-1358: HEAD of the same path is 404 too').toBe(404);
 
     // Control: a repository that does not exist is 404 for HEAD as well, so the answer is per
-    // repository and never per package.
+    // package, not a blanket one per repository.
     const noRepo = await fetch(`${env.repoBaseUrl}/e2e-${seeder.runId}-norepo/x`, {
       method: 'HEAD',
       headers,
