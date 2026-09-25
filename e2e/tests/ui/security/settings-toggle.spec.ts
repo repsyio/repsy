@@ -63,7 +63,7 @@ test.describe('SEC-02c Vulnerability Scanning setting', { tag: MOCKED }, () => {
       await expect(scanning.root).toBeVisible();
       await expect(scanning.root).toContainText('Vulnerability Scanning');
       await scanning.expectChecked(true);
-      await expect(scanning.label).toHaveText('Allow');
+      await expect(scanning.label).toHaveText('On');
       await expect(scanning.root).toContainText('Every push triggers a vulnerability scan.');
     });
   }

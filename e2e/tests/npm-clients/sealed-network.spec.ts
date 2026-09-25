@@ -35,10 +35,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { isolatedWorkDir, run } from '../../src/clients/exec.js';
+import { isolatedWorkDir } from '../../src/clients/exec.js';
 import { CLIENT_BINARIES, type ClientId } from '../../src/clients/npm-family/client.js';
 import {
   DEAD_PROXY_URL,
+  runSealed,
   sealedEnv,
   writeYarnBerryRc,
 } from '../../src/clients/npm-family/config.js';
@@ -111,7 +112,7 @@ test.describe('network seal: a misconfigured registry fails fast, never reaching
         await sealCase.setUp?.(home, work);
 
         const started = Date.now();
-        const result = await run(CLIENT_BINARIES[client.id], sealCase.args, {
+        const result = await runSealed(CLIENT_BINARIES[client.id], sealCase.args, {
           cwd: work,
           env: sealedEnv(home, sealCase.extraEnv),
           timeoutMs: 60_000,

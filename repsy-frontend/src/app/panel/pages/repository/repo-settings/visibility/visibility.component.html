@@ -16,13 +16,14 @@
 
     <div class="text-[13px]">
       <p class="text-[#FDFDFD]">
-        Public: anyone can read the repository without signing in. Private: access is limited to authorized users.<br />
+        Public: anyone can read the repository without signing in. Private: signing in is required, and every signed-in
+        user can read and write it.<br />
       </p>
       <p data-testid="settings-visibility-hint" class="text-[#9FA0A0]">
         {{
           this.parentForm.get('privateRepository').value
             ? 'Turn it on to make the repository public.'
-            : 'Turn it off to restrict access to authorized users.'
+            : 'Turn it off to require signing in.'
         }}
       </p>
     </div>

@@ -143,9 +143,7 @@ test.describe('Repository settings: visibility', { tag: SETTINGS }, () => {
 
     await settings.visibility.expectChecked(true);
     await expect(settings.visibility.root).not.toContainText('only authorized users can access');
-    await expect(settings.visibility.hint).toHaveText(
-      'Turn it off to restrict access to authorized users.',
-    );
+    await expect(settings.visibility.hint).toHaveText('Turn it off to require signing in.');
 
     await settings.visibility.flip();
     await settings.shell.toasts.expectSuccess('Repository visibility has changed as private');
