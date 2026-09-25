@@ -37,4 +37,20 @@ class DockerAuthChallengeTest {
             "Bearer realm=\"https://registry.example.com/v2/token\","
                 + "service=\"repsy\",scope=\"repository:*:pull\"");
   }
+
+  /** RPS-1434: a token that was issued for less tells the client which scope to ask for. */
+  @Test
+  @DisplayName("names the scope to ask for and the insufficient_scope error")
+  void insufficientScopeNamesTheScope() {
+    final var request = new MockHttpServletRequest("DELETE", "/v2/repo/app/manifests/latest");
+    request.setScheme("https");
+    request.setServerName("registry.example.com");
+    request.setServerPort(443);
+
+    assertThat(DockerAuthChallenge.insufficientScope(request, "repository:repo/app:delete"))
+        .isEqualTo(
+            "Bearer realm=\"https://registry.example.com/v2/token\","
+                + "service=\"repsy\",scope=\"repository:repo/app:delete\","
+                + "error=\"insufficient_scope\"");
+  }
 }

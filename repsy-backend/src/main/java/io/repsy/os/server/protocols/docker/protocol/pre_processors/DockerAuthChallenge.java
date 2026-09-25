@@ -40,4 +40,19 @@ final class DockerAuthChallenge {
     return "Bearer realm=\"%s/v2/token\",service=\"repsy\",scope=\"repository:*:pull\""
         .formatted(RequestBaseUrlUtils.resolveBaseUrl(request));
   }
+
+  /**
+   * Builds the challenge for a request whose token was valid but not issued for the operation, so
+   * that the client asks {@code /v2/token} again for {@code scope} (the distribution spec's {@code
+   * insufficient_scope}) instead of retrying with the same token.
+   *
+   * @param request The rejected request
+   * @param scope The scope the operation needs, for example {@code repository:repo/app:delete}
+   * @return The {@code WWW-Authenticate} header value
+   */
+  static String insufficientScope(final HttpServletRequest request, final String scope) {
+
+    return "Bearer realm=\"%s/v2/token\",service=\"repsy\",scope=\"%s\",error=\"insufficient_scope\""
+        .formatted(RequestBaseUrlUtils.resolveBaseUrl(request), scope);
+  }
 }

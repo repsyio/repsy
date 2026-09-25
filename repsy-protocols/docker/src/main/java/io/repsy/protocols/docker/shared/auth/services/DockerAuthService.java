@@ -16,6 +16,7 @@
 package io.repsy.protocols.docker.shared.auth.services;
 
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.util.List;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
@@ -30,5 +31,14 @@ public interface DockerAuthService<ID> {
 
   String createAnonymousUser();
 
-  String authenticateUserDockerCli(String authHeader);
+  /**
+   * Exchanges Basic credentials for a token.
+   *
+   * @param authHeader The Basic {@code Authorization} header
+   * @param grants What the client asked for, as {@link
+   *     io.repsy.protocols.docker.protocol.parser.DockerScopes#parseGrants} reads it. The token
+   *     records them, so a request it authorizes can be checked against them (RPS-1434). The
+   *     exchange itself is not refused for a scope: authorization stays per request.
+   */
+  String authenticateUserDockerCli(String authHeader, List<String> grants);
 }

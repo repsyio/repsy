@@ -27,6 +27,7 @@ import io.repsy.os.shared.constants.ErrorConstants;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -829,5 +830,49 @@ class JwtUtilsTest {
     assertThat(first).isNotEqualTo(second);
     assertThat(deployFirst).isNotEqualTo(deploySecond);
     assertThat(JWT.decode(first).getId()).isNotBlank();
+  }
+
+  /** RPS-1434: the grants a Docker token was issued for travel in the token and are read back. */
+  @Test
+  @DisplayName("extractAccess reads back the grants a protocol token was created with")
+  void extractAccessRoundTrip() {
+    final var token =
+        this.jwtUtils.createProtocolToken(
+            UUID.randomUUID(),
+            "testuser",
+            Duration.ofMinutes(15),
+            List.of("repo/app:pull,push", "repo/lib:delete"));
+
+    assertThat(this.jwtUtils.extractAccess("Bearer " + token, TokenRealm.PROTOCOL))
+        .containsExactly("repo/app:pull,push", "repo/lib:delete");
+  }
+
+  @Test
+  @DisplayName(
+      "extractAccess tells a token asked for nothing (empty) from one without grants (null)")
+  void extractAccessEmptyIsNotMissing() {
+    final var asked =
+        this.jwtUtils.createProtocolToken(
+            UUID.randomUUID(), "testuser", Duration.ofMinutes(15), List.<String>of());
+    final var plain =
+        this.jwtUtils.createProtocolToken(UUID.randomUUID(), "testuser", Duration.ofMinutes(15));
+
+    assertThat(this.jwtUtils.extractAccess("Bearer " + asked, TokenRealm.PROTOCOL)).isEmpty();
+    assertThat(this.jwtUtils.extractAccess("Bearer " + plain, TokenRealm.PROTOCOL)).isNull();
+  }
+
+  @Test
+  @DisplayName("extractAccess refuses a token with a bad signature, so grants cannot be forged")
+  void extractAccessRejectsForgedToken() {
+    final var forged =
+        JWT.create()
+            .withSubject(UUID.randomUUID().toString())
+            .withAudience(TokenRealm.PROTOCOL.getAudience())
+            .withClaim("access", List.of("repo/app:delete"))
+            .withExpiresAt(Instant.now().plus(Duration.ofMinutes(5)))
+            .sign(Algorithm.HMAC512("another-secret-another-secret-00"));
+
+    assertThatThrownBy(() -> this.jwtUtils.extractAccess("Bearer " + forged, TokenRealm.PROTOCOL))
+        .isInstanceOf(UnAuthorizedException.class);
   }
 }

@@ -47,6 +47,7 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.nio.charset.StandardCharsets;
 import java.time.temporal.TemporalAmount;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -153,8 +154,10 @@ class DockerAuthComponentTest {
     void dockerLogin() {
       final var component = DockerAuthComponentTest.this.authComponent;
 
-      assertUnauthorized(() -> component.authenticateUserDockerCli(basicAuth("ghost", "x")));
-      assertUnauthorized(() -> component.authenticateUserDockerCli(basicAuth(USERNAME, "wrong")));
+      assertUnauthorized(
+          () -> component.authenticateUserDockerCli(basicAuth("ghost", "x"), List.of()));
+      assertUnauthorized(
+          () -> component.authenticateUserDockerCli(basicAuth(USERNAME, "wrong"), List.of()));
       verify(DockerAuthComponentTest.this.userTxService, never()).getUserByUsername(anyString());
     }
 
@@ -166,12 +169,97 @@ class DockerAuthComponentTest {
       final var noSeparator =
           "Basic " + Base64.getEncoder().encodeToString("ghost".getBytes(StandardCharsets.UTF_8));
 
-      assertUnauthorized(() -> component.authenticateUserDockerCli(noSeparator));
-      assertUnauthorized(() -> component.authenticateUserDockerCli(basicAuth("", "x")));
-      assertUnauthorized(() -> component.authenticateUserDockerCli("Bearer signed.jwt.token"));
+      assertUnauthorized(() -> component.authenticateUserDockerCli(noSeparator, List.of()));
+      assertUnauthorized(() -> component.authenticateUserDockerCli(basicAuth("", "x"), List.of()));
+      assertUnauthorized(
+          () -> component.authenticateUserDockerCli("Bearer signed.jwt.token", List.of()));
       verify(DockerAuthComponentTest.this.userTxService, never()).getUserByUsername(anyString());
       verify(DockerAuthComponentTest.this.userTxService, never())
           .getUserByUsernameOptional(anyString());
+    }
+  }
+
+  /**
+   * RPS-1434: a token from {@code /v2/token} that was asked for {@code pull} only must not delete,
+   * for an administrator either. A token without recorded grants keeps the role-based decision.
+   */
+  @Nested
+  @DisplayName("authorizeGrantedAccess checks the scope a token was issued for")
+  class GrantedAccess {
+
+    private static final String BEARER = "Bearer signed.jwt.token";
+    private static final String NAME = "images/app";
+
+    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+
+    private final DockerAuthComponent component =
+        new DockerAuthComponent(
+            DockerAuthComponentTest.this.userTxService,
+            this.jwtUtils,
+            Mockito.mock(DeployTokenService.class),
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+
+    private void issuedFor(final List<String> grants) {
+      when(this.jwtUtils.extractAccess(BEARER, TokenRealm.PROTOCOL)).thenReturn(grants);
+    }
+
+    @Test
+    @DisplayName("refuses a delete with a token issued for pull or push,pull")
+    void refusesDeleteWithoutDeleteAction() {
+      this.issuedFor(List.of("images/app:pull"));
+      assertUnauthorized(
+          () -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.MANAGE));
+
+      this.issuedFor(List.of("images/app:push,pull"));
+      assertUnauthorized(
+          () -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.MANAGE));
+
+      this.issuedFor(List.of());
+      assertUnauthorized(
+          () -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.MANAGE));
+    }
+
+    @Test
+    @DisplayName("refuses a delete with a token issued for another image")
+    void refusesDeleteForAnotherImage() {
+      this.issuedFor(List.of("images/other:delete"));
+
+      assertUnauthorized(
+          () -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.MANAGE));
+    }
+
+    @Test
+    @DisplayName("allows a delete with a token issued for delete or *")
+    void allowsDeleteWithDeleteAction() {
+      this.issuedFor(List.of("images/app:push,pull,delete"));
+      assertThatCode(() -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.MANAGE))
+          .doesNotThrowAnyException();
+
+      this.issuedFor(List.of("images/lib:pull", "images/app:*"));
+      assertThatCode(() -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.MANAGE))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("leaves reads and writes to the role check, whatever the token was issued for")
+    void readAndWriteAreNotScopeChecked() {
+      this.issuedFor(List.of("images/app:pull"));
+
+      assertThatCode(() -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.READ))
+          .doesNotThrowAnyException();
+      assertThatCode(() -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.WRITE))
+          .doesNotThrowAnyException();
+      verify(this.jwtUtils, never()).extractAccess(anyString(), any(TokenRealm.class));
+    }
+
+    @Test
+    @DisplayName("keeps the role-based decision for a token that records no grants")
+    void tokenWithoutGrantsKeepsRoleBasedDecision() {
+      when(this.jwtUtils.extractAccess(BEARER, TokenRealm.PROTOCOL)).thenReturn(null);
+
+      assertThatCode(() -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.MANAGE))
+          .doesNotThrowAnyException();
     }
   }
 

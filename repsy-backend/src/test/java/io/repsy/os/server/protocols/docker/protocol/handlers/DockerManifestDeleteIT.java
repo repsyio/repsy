@@ -188,13 +188,18 @@ class DockerManifestDeleteIT extends AbstractIntegrationTest {
    */
   private String bearerFromTokenEndpoint(final String username, final String password)
       throws Exception {
+    return this.bearerFromTokenEndpoint(username, password, "repository:x/app:delete");
+  }
+
+  private String bearerFromTokenEndpoint(
+      final String username, final String password, final String scope) throws Exception {
 
     final var response =
         this.mockMvc
             .perform(
                 post("/v2/token")
                     .header(AUTHORIZATION, basicAuth(username, password))
-                    .param("scope", "repository:x/app:delete")
+                    .param("scope", scope)
                     .with(protocolPort()))
             .andReturn()
             .getResponse();
@@ -607,7 +612,12 @@ class DockerManifestDeleteIT extends AbstractIntegrationTest {
     final var repo = this.dockerRepo();
     final var manifest = this.push(repo, IMAGE, "latest", "layer-one");
     final var admin = this.createUser(uniqueUsername("admin"), UserRole.ADMIN);
-    final var token = this.bearerFromTokenEndpoint(admin.getUsername(), VALID_PASSWORD);
+    // RPS-1434: a token deletes only what it was issued the delete scope for.
+    final var token =
+        this.bearerFromTokenEndpoint(
+            admin.getUsername(),
+            VALID_PASSWORD,
+            "repository:%s/%s:delete".formatted(repo.getName(), IMAGE));
 
     final var response = this.deleteReference(repo, IMAGE, sha256(bytes(manifest)), token);
 

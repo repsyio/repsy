@@ -31,10 +31,12 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.TemporalAmount;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -50,6 +52,7 @@ public class JwtUtils {
   private static final @NonNull String CLAIM_TOKEN_VERSION = "token_version";
   private static final @NonNull String CLAIM_TOKEN_FAMILY = "token_family";
   private static final @NonNull String CLAIM_PATH = "path";
+  private static final @NonNull String CLAIM_ACCESS = "access";
   private static final @NonNull String TOKEN_TYPE_REFRESH = "refresh";
   private static final @NonNull Pattern SLASHES = Pattern.compile("/{2,}");
   private static final int SECRET_BYTE_LENGTH = 32;
@@ -172,6 +175,27 @@ public class JwtUtils {
         .withSubject(userId.toString())
         .withAudience(TokenRealm.PROTOCOL.getAudience())
         .withClaim(CLAIM_USERNAME, username)
+        .withExpiresAt(Instant.now().plus(timeoutDuration))
+        .sign(Algorithm.HMAC512(this.secret));
+  }
+
+  /**
+   * Creates a protocol token that records what the client asked for when it exchanged its
+   * credentials, as {@code /v2/token} does for Docker (RPS-1434). The grants are strings the
+   * protocol reads back with {@link #extractAccess}; an empty list is a token that was asked for
+   * nothing, which is not the same as a token without the claim.
+   */
+  public @NonNull String createProtocolToken(
+      final @NonNull UUID userId,
+      final @NonNull String username,
+      final @NonNull TemporalAmount timeoutDuration,
+      final @NonNull List<String> access) {
+    return JWT.create()
+        .withJWTId(UUID.randomUUID().toString())
+        .withSubject(userId.toString())
+        .withAudience(TokenRealm.PROTOCOL.getAudience())
+        .withClaim(CLAIM_USERNAME, username)
+        .withClaim(CLAIM_ACCESS, access)
         .withExpiresAt(Instant.now().plus(timeoutDuration))
         .sign(Algorithm.HMAC512(this.secret));
   }
@@ -429,6 +453,26 @@ public class JwtUtils {
 
     return new ProtocolTokenClaims(
         subjectAsUuid(decodedJWT), authenticationTypeOf(decodedJWT), expiresAt);
+  }
+
+  /**
+   * Reads the grants a protocol token was issued with (see {@link #createProtocolToken(UUID,
+   * String, TemporalAmount, List)}).
+   *
+   * @return The grants, or {@code null} for a token that carries none, which is any token that did
+   *     not come from an exchange that records them
+   */
+  public @Nullable List<String> extractAccess(
+      final @NonNull String authHeader, final @NonNull TokenRealm realm) {
+    final var claim = this.verifyAndDecode(this.getToken(authHeader), realm).getClaim(CLAIM_ACCESS);
+
+    if (claim.isMissing() || claim.isNull()) {
+      return null;
+    }
+
+    final var access = claim.asList(String.class);
+
+    return access != null ? access : List.of();
   }
 
   public void verify(final @NonNull String authHeader, final @NonNull TokenRealm realm) {

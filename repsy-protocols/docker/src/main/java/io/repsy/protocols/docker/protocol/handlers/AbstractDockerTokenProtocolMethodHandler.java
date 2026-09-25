@@ -26,6 +26,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.parser.DockerScopeParser;
+import io.repsy.protocols.docker.protocol.parser.DockerScopes;
 import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.auth.dtos.LoginResponse;
@@ -116,10 +117,12 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
     try {
       final var authHeader = request.getHeader(AUTHORIZATION);
       final var scope = request.getParameter("scope");
+      final var grants = DockerScopes.parseGrants(request.getParameterValues("scope"));
 
       final var formCredentials = readPasswordGrantCredentials(request);
       if (authHeader == null && formCredentials != null) {
-        final var sessionToken = this.authService.authenticateUserDockerCli(formCredentials);
+        final var sessionToken =
+            this.authService.authenticateUserDockerCli(formCredentials, grants);
         return ResponseEntity.ok(this.createLoginResponse(sessionToken));
       }
 
@@ -127,7 +130,7 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
         return this.handleUnauthenticatedRequest(scope);
       }
 
-      final var sessionToken = this.authService.authenticateUserDockerCli(authHeader);
+      final var sessionToken = this.authService.authenticateUserDockerCli(authHeader, grants);
       final var loginResponse = this.createLoginResponse(sessionToken);
 
       return ResponseEntity.ok(loginResponse);

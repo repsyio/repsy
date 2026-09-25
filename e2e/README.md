@@ -2142,7 +2142,9 @@ only that tag (the manifest stays pullable by digest); an unknown tag or digest 
 `MANIFEST_UNKNOWN`, an unknown image `404` `NAME_UNKNOWN`, a malformed reference `400`; a deleted
 manifest can be pushed again; and both need MANAGE (an admin), so a deploy token (read-write or
 read-only) is `401` with a Bearer challenge at the request hop and an anonymous caller is refused at
-the token hop even on a public repo; and that even a PUBLIC repo still
+the token hop even on a public repo, and an admin's token asked for `pull` or `push,pull` cannot delete
+(`401` `UNAUTHORIZED`, a challenge naming `scope="repository:<repo>/<image>:delete"` with
+`error="insufficient_scope"`, **RPS-1434**); and that even a PUBLIC repo still
 needs real credentials to WRITE, refused at the token hop with no OCI body at all (distinct from an
 operation-hop 401's Bearer challenge + OCI envelope).
 

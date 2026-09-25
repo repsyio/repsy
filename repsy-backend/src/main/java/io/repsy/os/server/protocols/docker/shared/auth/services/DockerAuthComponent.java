@@ -33,10 +33,12 @@ import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.docker.protocol.parser.DockerScopes;
 import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -81,7 +83,7 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
   }
 
   @Override
-  public String authenticateUserDockerCli(final String authHeader) {
+  public String authenticateUserDockerCli(final String authHeader, final List<String> grants) {
 
     if (!isBasicToken(authHeader)) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
@@ -90,7 +92,7 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     final var credentials = this.getBasicAuthCredentials(removeBasicPrefix(authHeader));
 
     return this.authenticateWithDeployToken(credentials)
-        .or(() -> this.authenticateWithUsernamePassword(credentials))
+        .or(() -> this.authenticateWithUsernamePassword(credentials, grants))
         .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
   }
 
@@ -118,13 +120,14 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     return credentials;
   }
 
-  private Optional<String> authenticateWithUsernamePassword(final Credentials credentials) {
+  private Optional<String> authenticateWithUsernamePassword(
+      final Credentials credentials, final List<String> grants) {
 
     final var userInfo = this.authenticateWithPassword(credentials);
 
     final var token =
         this.jwtUtils.createProtocolToken(
-            userInfo.getId(), userInfo.getUsername(), TIMEOUT_ACCESS_TOKEN);
+            userInfo.getId(), userInfo.getUsername(), TIMEOUT_ACCESS_TOKEN, grants);
 
     return Optional.of(token);
   }
@@ -151,6 +154,30 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
             AuthenticationType.DEPLOY_TOKEN);
 
     return Optional.of(token);
+  }
+
+  /**
+   * Checks that a token from {@code /v2/token} was issued for the operation it is used for, on top
+   * of the role check {@link #handleBearerAuth} did (RPS-1434). Only a delete needs it: a token
+   * asked for {@code pull} or {@code push,pull} does not delete, even for an administrator. A token
+   * that records no grants (a deploy-token or scanner token, or one minted by another protocol's
+   * login) keeps the role-based decision.
+   *
+   * @param name The image, as {@code <repo>/<image>}
+   * @throws UnAuthorizedException if the token was not issued for the {@code delete} action of it
+   */
+  public void authorizeGrantedAccess(
+      final String authHeader, final String name, final Permission permission) {
+
+    if (permission != Permission.MANAGE) {
+      return;
+    }
+
+    final var grants = this.jwtUtils.extractAccess(authHeader, TokenRealm.PROTOCOL);
+
+    if (grants != null && !DockerScopes.allowsDelete(grants, name)) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
   }
 
   /**
