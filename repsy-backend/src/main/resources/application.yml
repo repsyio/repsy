@@ -10,7 +10,8 @@ spring:
   # defaults inside DB_URL's own default, so setting only one of them (e.g. DB_HOST alone) once the
   # Docker image gained its own DB_URL default (RPS-1173) would have silently switched the image to
   # H2 instead of PostgreSQL, with no error. A flat default removes that trap. Set DB_URL directly
-  # to point at a different host/port/database.
+  # to point at a different host/port/database. LegacyDatabaseVariablesWarning logs a WARN at startup
+  # when any of them is still set (RPS-1423).
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/repsy}
     username: ${DB_USERNAME:repsy}
