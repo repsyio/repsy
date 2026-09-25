@@ -32,18 +32,31 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 public class NpmStorageService extends AbstractNpmStorageService {
 
   private final int repoPort;
+  private final @Nullable String publicUrl;
 
   public NpmStorageService(
       @Qualifier("osStorageStrategyNpm") final StorageStrategy storageStrategy,
-      @Value("${server.port:9090}") final int repoPort) {
+      @Value("${server.port:9090}") final int repoPort,
+      @Value("${repsy.npm.public-url:}") final String publicUrl) {
 
     super(storageStrategy);
 
     this.repoPort = repoPort;
+    this.publicUrl = publicUrl.isBlank() ? null : publicUrl.strip().replaceAll("/+$", "");
   }
 
+  /**
+   * The configured public URL ({@code repsy.npm.public-url}, {@code REPO_BASE_URL}) when there is
+   * one: it is the only way to name an address the request cannot show, such as a path prefix a
+   * reverse proxy strips or a proxy that does not send {@code X-Forwarded-*}. Otherwise the address
+   * of the request.
+   */
   @Override
   protected @Nullable String registryBaseUrl() {
+
+    if (this.publicUrl != null) {
+      return this.publicUrl;
+    }
 
     if (RequestContextHolder.getRequestAttributes()
         instanceof final ServletRequestAttributes attributes) {
@@ -54,10 +67,10 @@ public class NpmStorageService extends AbstractNpmStorageService {
   }
 
   /**
-   * The address the registry answers at, for the {@code dist.tarball} of a rebuilt version. A
-   * request to the registry port already carries it. The panel is served on another port, so for a
-   * request there the registry port takes the panel's place, unless something in front of the
-   * server (a reverse proxy) rewrites the port: then what the client sees is all there is to go by.
+   * The address the registry answers at, for the {@code dist.tarball} of a version. A request to
+   * the registry port already carries it. The panel is served on another port, so for a request
+   * there the registry port takes the panel's place, unless something in front of the server (a
+   * reverse proxy) rewrites the port: then what the client sees is all there is to go by.
    */
   static String registryBaseUrl(final HttpServletRequest request, final int repoPort) {
 

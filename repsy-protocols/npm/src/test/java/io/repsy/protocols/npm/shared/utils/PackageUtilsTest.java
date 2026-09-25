@@ -127,6 +127,109 @@ class PackageUtilsTest {
   }
 
   @Nested
+  @DisplayName("buildTarballUrl and rewriteTarballUrls (RPS-1333)")
+  class TarballUrls {
+
+    private static Map<String, Object> packument(final Map<String, Object> versions) {
+      final var packument = new HashMap<String, Object>();
+      packument.put(NpmConstants.NAME, "demo");
+      packument.put(NpmConstants.VERSIONS, versions);
+
+      return packument;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String tarballOfVersion(
+        final Map<String, Object> packument, final String versionName) {
+      final var versions = (Map<String, Object>) packument.get(NpmConstants.VERSIONS);
+
+      return tarballOf((Map<String, Object>) versions.get(versionName));
+    }
+
+    @Test
+    @DisplayName("builds the URL of an unscoped package")
+    void buildsUnscopedUrl() {
+      assertThat(PackageUtils.buildTarballUrl("http://h:9090", "myrepo", "demo", "1.0.0"))
+          .isEqualTo("http://h:9090/myrepo/demo/-/demo-1.0.0.tgz");
+    }
+
+    @Test
+    @DisplayName("builds the URL of a scoped package with the scope in the path only")
+    void buildsScopedUrl() {
+      assertThat(PackageUtils.buildTarballUrl("https://h", "myrepo", "@foo/demo", "1.0.0"))
+          .isEqualTo("https://h/myrepo/@foo/demo/-/demo-1.0.0.tgz");
+    }
+
+    @Test
+    @DisplayName("keeps a path prefix of the base and drops its trailing slashes")
+    void keepsPrefixAndDropsTrailingSlash() {
+      assertThat(PackageUtils.buildTarballUrl("https://h/ctx//", "myrepo", "demo", "1.0.0"))
+          .isEqualTo("https://h/ctx/myrepo/demo/-/demo-1.0.0.tgz");
+    }
+
+    @Test
+    @DisplayName("points every version at the base, whichever host and scheme it had")
+    void rewritesEveryVersion() {
+      final var packument =
+          packument(
+              Map.of(
+                  "1.0.0",
+                      versionWithTarball("demo", "1.0.0", "http://a:9090/r/demo/-/demo-1.0.0.tgz"),
+                  "2.0.0",
+                      versionWithTarball(
+                          "demo", "2.0.0", "http://b/x/y/demo/-/@s/demo-2.0.0.tgz")));
+
+      PackageUtils.rewriteTarballUrls(packument, "https://repo.test", "myrepo");
+
+      assertThat(tarballOfVersion(packument, "1.0.0"))
+          .isEqualTo("https://repo.test/myrepo/demo/-/demo-1.0.0.tgz");
+      assertThat(tarballOfVersion(packument, "2.0.0"))
+          .isEqualTo("https://repo.test/myrepo/demo/-/demo-2.0.0.tgz");
+    }
+
+    @Test
+    @DisplayName("a version without a name of its own takes the package's")
+    void versionTakesThePackageName() {
+      final var version = versionWithTarball("demo", "1.0.0", "http://a/r/demo/-/demo-1.0.0.tgz");
+      version.remove("name");
+      final var packument = packument(Map.of("1.0.0", version));
+
+      PackageUtils.rewriteTarballUrls(packument, "https://repo.test", "myrepo");
+
+      assertThat(tarballOfVersion(packument, "1.0.0"))
+          .isEqualTo("https://repo.test/myrepo/demo/-/demo-1.0.0.tgz");
+    }
+
+    @Test
+    @DisplayName("leaves a version without a dist, or a dist without a tarball, as it is")
+    void leavesVersionsWithoutTarball() {
+      final var noDist = new HashMap<String, Object>(Map.of("name", "demo", "version", "1.0.0"));
+      final var noTarball =
+          new HashMap<String, Object>(
+              Map.of("name", "demo", "version", "2.0.0", "dist", new HashMap<String, Object>()));
+      final var packument = packument(Map.of("1.0.0", noDist, "2.0.0", noTarball));
+
+      PackageUtils.rewriteTarballUrls(packument, "https://repo.test", "myrepo");
+
+      assertThat(noDist).doesNotContainKey("dist");
+      assertThat(noTarball.get("dist")).isEqualTo(Map.of());
+    }
+
+    @Test
+    @DisplayName("does nothing to a packument without versions, or with malformed ones")
+    void toleratesMalformedPackuments() {
+      final var noVersions = new HashMap<String, Object>(Map.of("name", "demo"));
+      final var malformed = packument(Map.of("1.0.0", "not a map"));
+
+      PackageUtils.rewriteTarballUrls(noVersions, "https://repo.test", "myrepo");
+      PackageUtils.rewriteTarballUrls(malformed, "https://repo.test", "myrepo");
+
+      assertThat(noVersions).containsOnlyKeys("name");
+      assertThat(malformed.get(NpmConstants.VERSIONS)).isEqualTo(Map.of("1.0.0", "not a map"));
+    }
+  }
+
+  @Nested
   @DisplayName("liftFieldsToTopLevel (RPS-1211)")
   class LiftFieldsToTopLevel {
 

@@ -510,9 +510,10 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
   /**
    * The address clients reach the registry at (scheme, host and port, without the repo), from which
-   * the {@code dist.tarball} of a rebuilt version follows. The database does not keep it, and it
-   * depends on how a client got here, so it is up to the deployment: {@code null} (the default)
-   * leaves {@code dist.tarball} out of a rebuilt version.
+   * the {@code dist.tarball} of every version served or published follows. The database does not
+   * keep it, and it depends on how a client got here, so it is up to the deployment: {@code null}
+   * (the default) leaves {@code dist.tarball} out of a rebuilt version and as stored in every
+   * other.
    */
   protected @Nullable String registryBaseUrl() {
 
@@ -723,20 +724,53 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
   }
 
   /**
-   * Rewrites the freshly published version's {@code dist.tarball}, once the repo name is known.
+   * Sets the freshly published version's {@code dist.tarball}, once the repo name is known.
    *
-   * <p>Delegates to {@link PackageUtils#fixTarballUrl(Map)}, which normalizes only the filename
-   * after {@code /-/} and otherwise leaves the client-computed URL untouched. {@code repoName} is
-   * unused on Repsy OS: the URL npm computes there already carries the correct (and only) repo
-   * segment. The parameter, and this seam, exist so a subclass that serves a URL layout where the
-   * repo name is not already part of the client's path (for example a multi-tenant registry) can
-   * override just this method instead of reintroducing a positional splice into the shared {@link
-   * PackageUtils}.
+   * <p>When the registry knows its own address ({@link #registryBaseUrl()}) the URL is computed
+   * from it, not taken from the client: libnpmpublish and yarn classic write {@code http://} for an
+   * HTTPS registry, and the publisher may have reached the registry under an address the consumers
+   * cannot. Otherwise it delegates to {@link PackageUtils#fixTarballUrl(Map)}, which normalizes
+   * only the filename after {@code /-/} and leaves the client-computed URL untouched.
+   *
+   * <p>This is also the seam for a subclass that serves a URL layout of its own (for example a
+   * multi-tenant registry): it can override just this method, and {@link #rewriteTarballUrls(Map,
+   * String)} for what is read.
    */
   protected void fixTarballUrl(final Map<String, Object> version, final String repoName)
       throws URISyntaxException {
 
+    final var base = this.registryBaseUrl();
+
+    if (base != null
+        && !base.isBlank()
+        && version.get("dist") instanceof final Map<?, ?> dist
+        && version.get(NpmConstants.NAME) instanceof final String fullName
+        && version.get("version") instanceof final String versionName) {
+      ((Map<String, Object>) dist)
+          .put(
+              NpmConstants.TARBALL,
+              PackageUtils.buildTarballUrl(base, repoName, fullName, versionName));
+
+      return;
+    }
+
     PackageUtils.fixTarballUrl(version);
+  }
+
+  /**
+   * Points the {@code dist.tarball} of every version at the address the registry is reached at, on
+   * every read: what was stored is the publisher's view of it (or a stale one, after a change of
+   * host), and a client that finds the tarball on another origin than the registry either cannot
+   * fetch it or fetches it without its credentials. Nothing is changed when the registry does not
+   * know its address, which is the case outside of a request.
+   */
+  protected void rewriteTarballUrls(final Map<String, Object> metadata, final String repoName) {
+
+    final var base = this.registryBaseUrl();
+
+    if (base != null && !base.isBlank()) {
+      PackageUtils.rewriteTarballUrls(metadata, base, repoName);
+    }
   }
 
   private Resource getResource(final StoragePath storagePath, final String repoName) {
@@ -766,6 +800,8 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
       final var fullMetadata = PackageUtils.readMetadataFromResource(resource);
 
+      this.rewriteTarballUrls(fullMetadata, repoName);
+
       return isAbbreviated ? this.createAbbreviatedMetadata(fullMetadata) : fullMetadata;
 
     } catch (final NoSuchFileException _) {
@@ -794,6 +830,8 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
             ? stored
             : this.rebuildIfPackageExists(
                 repoId, repoName, snapshot, new ItemNotFoundException("itemNotFound"));
+
+    this.rewriteTarballUrls(metadata, repoName);
 
     return isAbbreviated ? this.createAbbreviatedMetadata(metadata) : metadata;
   }

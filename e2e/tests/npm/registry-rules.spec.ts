@@ -28,13 +28,13 @@
  *  - A malformed/invalid semver version string is refused with 400 `invalidPackageVersion`
  *    (`PackageUtils.extractVersionNameFromPayload`, before anything is read from the payload beyond
  *    the version name) and stores nothing.
- *  - RPS-1205 (fixed): a packument's own `dist.tarball` (rewritten by `PackageUtils.fixTarballUrl`
- *    at publish time) and the tarball's real, canonical stored path
+ *  - RPS-1205 (fixed): a packument's own `dist.tarball` (computed by the registry, RPS-1333) and the tarball's real, canonical stored path
  *    (`<packagePath>/-/<tarballFilename>`) are fetched and compared directly, live -- both now serve
  *    the same, real bytes; `fixTarballUrl` used to splice the repo name into the path at an offset
  *    that assumed a cloud, multi-tenant URL shape Repsy OS does not have.
  */
 import { RepoType } from '../../src/api/panel-api.js';
+import { env } from '../../src/env.js';
 import {
   adminCredential,
   buildPublishDocument,
@@ -272,6 +272,45 @@ test.describe('npm registry rules (raw HTTP)', () => {
         sha256Hex(viaDistTarball.body),
         'dist.tarball serves exactly what was published, same as the canonical path',
       ).toBe(sha256Hex(bytes));
+    },
+  );
+
+  test(
+    'RPS-1333 (fixed): dist.tarball is the registry address, not the one the publisher sent',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'tarball-host');
+      const admin = adminCredential();
+      const version = npmAdapter.version('release');
+      const bytes = fakeTarball('rps-1333');
+
+      // What libnpmpublish sends for an HTTPS registry reached under another address: a foreign
+      // host and an `http://` scheme.
+      const doc = buildPublishDocument({
+        repoName: layout.repoName,
+        packageName: layout.packageName,
+        version,
+        tarballBytes: bytes,
+        tarballUrl: `http://publisher.invalid:9090/${tarballPath(layout.packageName, version)}`,
+      });
+      expectPut(
+        await rawPublish(layout.repoName, admin, layout.packageName, doc),
+        200,
+        undefined,
+        'publish',
+      );
+
+      const packument = await rawGetPackument(layout.repoName, admin, layout.packageName);
+      expect(packument.status, 'GET packument').toBe(200);
+      const served = parsePackument(packument.body).versions[version]?.dist?.tarball;
+
+      expect(served, 'the registry names itself, whatever the publisher sent').toBe(
+        `${env.repoBaseUrl}/${layout.repoName}/${tarballPath(layout.packageName, version)}`,
+      );
+
+      const viaDistTarball = await rawGetTarballByUrl(served as string, admin);
+      expect(viaDistTarball.status, `dist.tarball ("${served}") is servable`).toBe(200);
+      expect(sha256Hex(viaDistTarball.body)).toBe(sha256Hex(bytes));
     },
   );
 });

@@ -37,11 +37,10 @@
  *    segments, not one escaped one. `tarballFilename` never carries the scope
  *    (`PackageUtils.getTarballFilename(packageName, version)` is given the bare name), matching real
  *    npm's own convention (`@scope/name` -> `.../-/name-version.tgz`).
- *  - `PackageUtils.fixTarballUrl` (RPS-1205) rewrites the *stored* `dist.tarball` at publish time by
- *    splicing the repo name into the path at a fixed offset that assumes a different (cloud,
- *    multi-tenant) URL shape than Repsy OS's `/<repoName>/<packagePath>/-/<file>`; on OS this always
- *    produces a wrong path. `rawGetTarballByUrl` fetches that (likely broken) URL exactly as a real
- *    npm client would, so a test can compare it against `rawGetTarballCanonical`'s real status.
+ *  - `dist.tarball` (RPS-1333) is the registry's own address, computed at publish and again on every
+ *    packument read from `REPO_BASE_URL` (or the request), never what the publisher sent.
+ *    `rawGetTarballByUrl` fetches the served URL exactly as a real npm client would, so a test can
+ *    compare it against `rawGetTarballCanonical`'s real status.
  *
  * The override rule (`AbstractNpmProtocolFacade.publish`): a version that already exists is refused
  * with `403 packageVersionAlreadyExists` when `allowOverride` is off; a NEW version of an existing
@@ -151,10 +150,14 @@ export function buildPublishDocument(opts: {
   tarballBytes: Buffer;
   tag?: string;
   description?: string;
+  /** The `dist.tarball` the publisher claims, as a client behind another address would send it. */
+  tarballUrl?: string;
 }): Record<string, unknown> {
   const tag = opts.tag ?? 'latest';
   const filename = tarballFilename(opts.packageName, opts.version);
-  const tarball = new URL(tarballPath(opts.packageName, opts.version), repoUrl(opts.repoName)).href;
+  const tarball =
+    opts.tarballUrl ??
+    new URL(tarballPath(opts.packageName, opts.version), repoUrl(opts.repoName)).href;
   const shasum = createHash('sha1').update(opts.tarballBytes).digest('hex');
   const integrity = `sha512-${createHash('sha512').update(opts.tarballBytes).digest('base64')}`;
   const description = opts.description ?? `e2e ${opts.packageName}@${opts.version}`;
@@ -252,7 +255,7 @@ export async function rawGetTarballCanonical(
 }
 
 /**
- * Raw `GET` of an absolute URL (a packument's own `dist.tarball`, likely broken by RPS-1205), with
+ * Raw `GET` of an absolute URL (a packument's own `dist.tarball`), with
  * the same credential a real npm client's follow-up tarball fetch would use.
  */
 export async function rawGetTarballByUrl(
