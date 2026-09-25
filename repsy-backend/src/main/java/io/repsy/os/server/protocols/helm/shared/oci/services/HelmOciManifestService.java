@@ -40,6 +40,11 @@ public class HelmOciManifestService implements OciManifestService<UUID> {
 
   private final HelmOciManifestRepository helmOciManifestRepository;
 
+  /**
+   * Writes the manifest and flushes, so a lost race (the unique index, the {@code @Version} check)
+   * fails here, and takes the chart version row written earlier in the same transaction with it,
+   * before the caller goes on to write the manifest file (RPS-1354).
+   */
   @Override
   @Transactional
   public HelmOciManifestInfo save(final HelmOciManifestForm form, final UUID repoId) {
@@ -51,11 +56,12 @@ public class HelmOciManifestService implements OciManifestService<UUID> {
               existing.setDigest(form.getDigest());
               existing.setMediaType(form.getMediaType());
               existing.setContent(form.getContent());
-              return this.toDetail(this.helmOciManifestRepository.save(existing));
+              return this.toDetail(this.helmOciManifestRepository.saveAndFlush(existing));
             })
         .orElseGet(
             () ->
-                this.toDetail(this.helmOciManifestRepository.save(this.buildEntity(form, repoId))));
+                this.toDetail(
+                    this.helmOciManifestRepository.saveAndFlush(this.buildEntity(form, repoId))));
   }
 
   @Override

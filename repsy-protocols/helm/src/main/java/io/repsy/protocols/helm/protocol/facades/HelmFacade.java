@@ -16,13 +16,13 @@
 package io.repsy.protocols.helm.protocol.facades;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.index.dtos.HelmIndexDto;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
-import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushResult;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciTagListDto;
 import java.io.IOException;
 import java.io.InputStream;
@@ -90,27 +90,39 @@ public interface HelmFacade<ID> {
   HelmOciManifestInfo getManifest(ProtocolContext context, String name, String reference)
       throws IOException;
 
-  HelmChartInfo findOrCreateChart(HelmChartForm form, ID repoId);
-
   /**
-   * Looks up an existing chart by its actual (name, version) identity -- the pair {@link
-   * HelmChartForm}/{@code findOrCreateChart} key on -- as opposed to {@link #checkManifest}, which
-   * looks up by the OCI manifest's own reference (a tag OR a digest). A real OCI push is two
-   * separate manifest-push requests (one by digest, one by the tag reference, both routed through
-   * the same handler), and only the tag-referenced one is ever checked against {@code
-   * checkManifest}'s own by-reference lookup for an override refusal -- the digest-referenced one
-   * always looks "new" to that check (a fresh digest never already exists as its own reference), so
-   * it is never gated by it. This lookup exists so the override check can also run against the
-   * CHART's own identity, closing that gap for both push sub-requests (RPS-1218).
+   * Looks up an existing chart by its actual (name, version) identity -- the pair a chart push keys
+   * on -- as opposed to {@link #checkManifest}, which looks up by the OCI manifest's own reference
+   * (a tag OR a digest). A real OCI push is two separate manifest-push requests (one by digest, one
+   * by the tag reference, both routed through the same handler), and only the tag-referenced one is
+   * ever checked against {@code checkManifest}'s own by-reference lookup for an override refusal --
+   * the digest-referenced one always looks "new" to that check (a fresh digest never already exists
+   * as its own reference), so it is never gated by it. This lookup exists so the override check can
+   * also run against the CHART's own identity, closing that gap for both push sub-requests
+   * (RPS-1218).
    */
   Optional<HelmChartInfo> findChartByNameAndVersion(
       ProtocolContext context, String name, String version);
 
   HelmOciBlobInfo findOrCreateBlob(HelmOciBlobForm form, ID repoId);
 
-  HelmOciManifestInfo findOrCreateManifest(HelmOciManifestForm form, ID repoId);
-
-  void pushManifest(ProtocolContext context, String name, String reference, byte[] contentBytes)
+  /**
+   * Writes the chart version, the manifest that points at it and the manifest file as one unit
+   * (RPS-1354), in a single transaction: the version row is written first, then the manifest row,
+   * both flushed, and the file last. A failure anywhere rolls the rows back, so a manifest push
+   * that does not succeed leaves the chart version row, the tag and the storage as they were. A
+   * brand-new manifest whose file cannot be written also has its partial file removed.
+   *
+   * <p>A push that loses a race on a row fails with {@code DataIntegrityViolationException} or
+   * {@code OptimisticLockingFailureException}, and the whole unit is then safe to repeat. The
+   * repeat belongs to the caller: it has to run outside this transaction, because the failed
+   * persistence context cannot be reused.
+   *
+   * @return the committed manifest and the bytes its file added, to be reported once the call has
+   *     returned
+   */
+  HelmOciManifestPushResult pushManifest(
+      ProtocolContext context, HelmOciManifestPushForm form, byte[] contentBytes)
       throws IOException;
 
   HelmOciTagListDto listTags(ProtocolContext context, String name);

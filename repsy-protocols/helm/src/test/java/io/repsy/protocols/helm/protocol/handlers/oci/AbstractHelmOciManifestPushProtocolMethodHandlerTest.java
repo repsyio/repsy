@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -29,13 +30,13 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmFacade;
-import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
-import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
-import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushResult;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
@@ -61,6 +62,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -79,7 +83,6 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
   @Mock private PathParser basePathParser;
   @Mock private HelmFacade<UUID> facade;
   @Mock private HelmProtocolProvider provider;
-  @Mock private HelmChartInfo chartInfo;
   @Mock private HelmOciManifestInfo manifestInfo;
 
   private AbstractHelmOciManifestPushProtocolMethodHandler<UUID> handler;
@@ -132,25 +135,96 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
   void acceptsMatchingName() throws Exception {
     final var context = context("/payments/manifests/1.0.0");
     this.stubChartLayer("payments", "1.0.0");
-    when(this.chartInfo.id()).thenReturn(UUID.randomUUID());
-    when(this.manifestInfo.digest()).thenReturn("sha256:" + "b".repeat(64));
-    when(this.facade.findOrCreateChart(any(HelmChartForm.class), eq(REPO_ID)))
-        .thenReturn(this.chartInfo);
-    when(this.facade.findOrCreateManifest(any(HelmOciManifestForm.class), eq(REPO_ID)))
-        .thenReturn(this.manifestInfo);
+    this.stubPush();
 
     final var response = this.push(context);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-    final var chartForm = ArgumentCaptor.forClass(HelmChartForm.class);
-    verify(this.facade).findOrCreateChart(chartForm.capture(), eq(REPO_ID));
-    assertThat(chartForm.getValue().getName()).isEqualTo("payments");
-    assertThat(chartForm.getValue().getVersion()).isEqualTo("1.0.0");
-    final var manifestForm = ArgumentCaptor.forClass(HelmOciManifestForm.class);
-    verify(this.facade).findOrCreateManifest(manifestForm.capture(), eq(REPO_ID));
-    assertThat(manifestForm.getValue().getName()).isEqualTo("payments");
-    assertThat(manifestForm.getValue().getReference()).isEqualTo("1.0.0");
-    verify(this.facade).pushManifest(eq(context), eq("payments"), eq("1.0.0"), any(byte[].class));
+    final var form = ArgumentCaptor.forClass(HelmOciManifestPushForm.class);
+    verify(this.facade).pushManifest(eq(context), form.capture(), any(byte[].class));
+    assertThat(form.getValue().getChart().getName()).isEqualTo("payments");
+    assertThat(form.getValue().getChart().getVersion()).isEqualTo("1.0.0");
+    assertThat(form.getValue().getName()).isEqualTo("payments");
+    assertThat(form.getValue().getReference()).isEqualTo("1.0.0");
+  }
+
+  @Test
+  @DisplayName("reports the manifest file's usage once, after the push has succeeded")
+  void reportsUsagesOnce() throws Exception {
+    final var context = context("/payments/manifests/1.0.0");
+    this.stubChartLayer("payments", "1.0.0");
+    when(this.manifestInfo.digest()).thenReturn("sha256:" + "b".repeat(64));
+    when(this.facade.pushManifest(eq(context), any(HelmOciManifestPushForm.class), any()))
+        .thenThrow(new OptimisticLockingFailureException("lost"))
+        .thenReturn(new HelmOciManifestPushResult(this.manifestInfo, BaseUsages.ofDisk(7)));
+
+    this.push(context);
+
+    final BaseUsages usages = context.getProperty("usages");
+    assertThat(usages.getDiskUsage()).isEqualTo(7);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("retriedFailures")
+  @DisplayName("repeats the whole chart, manifest and file write when it loses a race (RPS-1354)")
+  void retriesTheWholePairOnALostRace(final RuntimeException failure) throws Exception {
+    final var context = context("/payments/manifests/1.0.0");
+    this.stubChartLayer("payments", "1.0.0");
+    when(this.manifestInfo.digest()).thenReturn("sha256:" + "b".repeat(64));
+    when(this.facade.pushManifest(eq(context), any(HelmOciManifestPushForm.class), any()))
+        .thenThrow(failure)
+        .thenThrow(failure)
+        .thenReturn(new HelmOciManifestPushResult(this.manifestInfo, BaseUsages.ofDisk(0)));
+
+    final var response = this.push(context);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    verify(this.facade, times(3))
+        .pushManifest(eq(context), any(HelmOciManifestPushForm.class), any());
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("retriedFailures")
+  @DisplayName("gives up after three runs and lets the failure reach the error handler")
+  void givesUpAfterThreeRuns(final RuntimeException failure) throws Exception {
+    final var context = context("/payments/manifests/1.0.0");
+    this.stubChartLayer("payments", "1.0.0");
+    when(this.facade.pushManifest(eq(context), any(HelmOciManifestPushForm.class), any()))
+        .thenThrow(failure);
+
+    assertThatThrownBy(() -> this.push(context)).isSameAs(failure);
+
+    verify(this.facade, times(3))
+        .pushManifest(eq(context), any(HelmOciManifestPushForm.class), any());
+    assertThat((BaseUsages) context.getProperty("usages")).as("nothing was charged").isNull();
+  }
+
+  @Test
+  @DisplayName("does not repeat a failure that is not a lost race")
+  void doesNotRetryOtherFailures() throws Exception {
+    final var context = context("/payments/manifests/1.0.0");
+    this.stubChartLayer("payments", "1.0.0");
+    final var failure = new IllegalStateException("disk full");
+    when(this.facade.pushManifest(eq(context), any(HelmOciManifestPushForm.class), any()))
+        .thenThrow(failure);
+
+    assertThatThrownBy(() -> this.push(context)).isSameAs(failure);
+
+    verify(this.facade, times(1))
+        .pushManifest(eq(context), any(HelmOciManifestPushForm.class), any());
+  }
+
+  static Stream<RuntimeException> retriedFailures() {
+    return Stream.of(
+        new DataIntegrityViolationException("unique index"),
+        new OptimisticLockingFailureException("version check"),
+        new CannotAcquireLockException("deadlock"));
+  }
+
+  private void stubPush() throws IOException {
+    when(this.manifestInfo.digest()).thenReturn("sha256:" + "b".repeat(64));
+    when(this.facade.pushManifest(any(ProtocolContext.class), any(), any()))
+        .thenReturn(new HelmOciManifestPushResult(this.manifestInfo, BaseUsages.ofDisk(0)));
   }
 
   @Test
@@ -202,21 +276,16 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
             + "x".repeat(HelmConstants.MAX_OCI_MEDIA_TYPE_LENGTH - "application/".length());
     final var context = context("/" + name + "/manifests/" + reference);
     this.stubChartLayer(name, "1.0.0");
-    when(this.chartInfo.id()).thenReturn(UUID.randomUUID());
-    when(this.manifestInfo.digest()).thenReturn("sha256:" + "b".repeat(64));
-    when(this.facade.findOrCreateChart(any(HelmChartForm.class), eq(REPO_ID)))
-        .thenReturn(this.chartInfo);
-    when(this.facade.findOrCreateManifest(any(HelmOciManifestForm.class), eq(REPO_ID)))
-        .thenReturn(this.manifestInfo);
+    this.stubPush();
 
     final var response = this.push(context, layer("\"" + LAYER_DIGEST + "\"", "10"), mediaType);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-    final var manifestForm = ArgumentCaptor.forClass(HelmOciManifestForm.class);
-    verify(this.facade).findOrCreateManifest(manifestForm.capture(), eq(REPO_ID));
-    assertThat(manifestForm.getValue().getName()).isEqualTo(name);
-    assertThat(manifestForm.getValue().getReference()).isEqualTo(reference);
-    assertThat(manifestForm.getValue().getMediaType()).isEqualTo(mediaType);
+    final var form = ArgumentCaptor.forClass(HelmOciManifestPushForm.class);
+    verify(this.facade).pushManifest(eq(context), form.capture(), any(byte[].class));
+    assertThat(form.getValue().getName()).isEqualTo(name);
+    assertThat(form.getValue().getReference()).isEqualTo(reference);
+    assertThat(form.getValue().getMediaType()).isEqualTo(mediaType);
   }
 
   @Test

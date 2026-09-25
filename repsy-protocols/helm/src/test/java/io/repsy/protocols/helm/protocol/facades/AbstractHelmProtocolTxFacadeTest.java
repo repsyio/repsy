@@ -25,6 +25,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
@@ -39,7 +40,9 @@ import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesServi
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService.DeletedChart;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
 import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
@@ -61,9 +64,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractHelmProtocolTxFacade OCI blob uploads")
@@ -495,35 +501,152 @@ class AbstractHelmProtocolTxFacadeTest {
   }
 
   @Nested
-  @DisplayName("pushManifest()")
+  @DisplayName("pushManifest() (RPS-1354)")
   class PushManifest {
 
-    @Test
-    @DisplayName("reports the bytes the manifest file added, so the manifest is charged")
-    void chargesTheManifestFile() throws Exception {
-      final var content = "{}".getBytes(StandardCharsets.UTF_8);
-      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.saveManifest(
-              REPO_ID, "payments", "1.0.0", content, REPO_NAME))
-          .thenReturn(BaseUsages.ofDisk(content.length));
+    private final byte[] content = "{}".getBytes(StandardCharsets.UTF_8);
+    private final UUID chartId = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
+    private final HelmOciManifestInfo manifestInfo = mock(HelmOciManifestInfo.class);
 
-      AbstractHelmProtocolTxFacadeTest.this.facade.pushManifest(
-          AbstractHelmProtocolTxFacadeTest.this.context, "payments", "1.0.0", content);
+    private HelmOciManifestPushForm form() {
+      return HelmOciManifestPushForm.builder()
+          .chart(HelmChartForm.builder().name("payments").version("1.0.0").digest(DIGEST).build())
+          .name("payments")
+          .reference("1.0.0")
+          .digest("sha256:" + "b".repeat(64))
+          .mediaType("application/vnd.oci.image.manifest.v1+json")
+          .content("{}")
+          .build();
+    }
 
-      assertThat(AbstractHelmProtocolTxFacadeTest.this.reportedUsage()).isEqualTo(content.length);
+    private void rowsAreWritten(final boolean manifestExists) {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      when(it.chartInfo.id()).thenReturn(this.chartId);
+      when(it.chartService.findOrCreate(any(HelmChartForm.class), eq(REPO_ID)))
+          .thenReturn(it.chartInfo);
+      when(it.ociManifestService.findByNameAndReference(REPO_ID, "payments", "1.0.0"))
+          .thenReturn(manifestExists ? Optional.of(this.manifestInfo) : Optional.empty());
+      when(it.ociManifestService.save(any(HelmOciManifestForm.class), eq(REPO_ID)))
+          .thenReturn(this.manifestInfo);
+    }
+
+    private void fileWriteFails(final RuntimeException failure) {
+      doThrow(failure)
+          .when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService)
+          .saveManifest(REPO_ID, "payments", "1.0.0", this.content, REPO_NAME);
     }
 
     @Test
-    @DisplayName("reports only the difference when a manifest of the same reference is replaced")
-    void chargesOnlyTheDifferenceOnOverwrite() throws Exception {
-      final var content = "{\"a\":1}".getBytes(StandardCharsets.UTF_8);
-      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.saveManifest(
-              REPO_ID, "payments", "latest", content, REPO_NAME))
+    @DisplayName("writes the chart version, then the manifest that points at it, then the file")
+    void writesTheChartTheManifestAndTheFileInThatOrder() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      this.rowsAreWritten(false);
+      when(it.helmStorageService.saveManifest(
+              REPO_ID, "payments", "1.0.0", this.content, REPO_NAME))
+          .thenReturn(BaseUsages.ofDisk(this.content.length));
+
+      final var result = it.facade.pushManifest(it.context, this.form(), this.content);
+
+      assertThat(result.manifest()).isSameAs(this.manifestInfo);
+      final var order = inOrder(it.chartService, it.ociManifestService, it.helmStorageService);
+      order.verify(it.chartService).findOrCreate(any(HelmChartForm.class), eq(REPO_ID));
+      final var manifestForm = ArgumentCaptor.forClass(HelmOciManifestForm.class);
+      order.verify(it.ociManifestService).save(manifestForm.capture(), eq(REPO_ID));
+      assertThat(manifestForm.getValue().getChartId()).isEqualTo(this.chartId);
+      order
+          .verify(it.helmStorageService)
+          .saveManifest(REPO_ID, "payments", "1.0.0", this.content, REPO_NAME);
+    }
+
+    @Test
+    @DisplayName("hands the bytes the manifest file added back instead of charging them itself")
+    void returnsTheUsagesWithoutChargingThem() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      this.rowsAreWritten(true);
+      when(it.helmStorageService.saveManifest(
+              REPO_ID, "payments", "1.0.0", this.content, REPO_NAME))
           .thenReturn(BaseUsages.ofDisk(3));
 
-      AbstractHelmProtocolTxFacadeTest.this.facade.pushManifest(
-          AbstractHelmProtocolTxFacadeTest.this.context, "payments", "latest", content);
+      final var result = it.facade.pushManifest(it.context, this.form(), this.content);
 
-      assertThat(AbstractHelmProtocolTxFacadeTest.this.reportedUsage()).isEqualTo(3);
+      assertThat(result.usages().getDiskUsage()).isEqualTo(3);
+      assertThat((BaseUsages) it.context.getProperty("usages"))
+          .as("the caller charges it once the transaction has committed")
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("removes the partial file of a new manifest whose file cannot be written")
+    void removesThePartialFileOfANewManifest() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      this.rowsAreWritten(false);
+      final var failure = new IllegalStateException("disk full");
+      this.fileWriteFails(failure);
+
+      assertThatThrownBy(() -> it.facade.pushManifest(it.context, this.form(), this.content))
+          .isSameAs(failure);
+
+      verify(it.helmStorageService).deleteManifestFile(REPO_ID, "payments", "1.0.0", REPO_NAME);
+    }
+
+    @Test
+    @DisplayName("leaves the file of a replaced manifest alone when the new one cannot be written")
+    void leavesTheFileOfAReplacedManifest() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      this.rowsAreWritten(true);
+      final var failure = new IllegalStateException("disk full");
+      this.fileWriteFails(failure);
+
+      assertThatThrownBy(() -> it.facade.pushManifest(it.context, this.form(), this.content))
+          .isSameAs(failure);
+
+      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("still reports the write failure when the partial file cannot be removed")
+    void reportsTheWriteFailureWhenCleanupFails() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      this.rowsAreWritten(false);
+      final var failure = new IllegalStateException("disk full");
+      this.fileWriteFails(failure);
+      when(it.helmStorageService.deleteManifestFile(REPO_ID, "payments", "1.0.0", REPO_NAME))
+          .thenThrow(new IOException("no such file"));
+
+      assertThatThrownBy(() -> it.facade.pushManifest(it.context, this.form(), this.content))
+          .isSameAs(failure)
+          .satisfies(e -> assertThat(e.getSuppressed()).hasSize(1));
+    }
+
+    @Test
+    @DisplayName("never writes the file when the rows are refused")
+    void neverWritesTheFileWhenTheManifestRowIsRefused() {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      final var lost = new OptimisticLockingFailureException("lost");
+      when(it.chartInfo.id()).thenReturn(this.chartId);
+      when(it.chartService.findOrCreate(any(HelmChartForm.class), eq(REPO_ID)))
+          .thenReturn(it.chartInfo);
+      when(it.ociManifestService.findByNameAndReference(REPO_ID, "payments", "1.0.0"))
+          .thenReturn(Optional.empty());
+      when(it.ociManifestService.save(any(HelmOciManifestForm.class), eq(REPO_ID))).thenThrow(lost);
+
+      assertThatThrownBy(() -> it.facade.pushManifest(it.context, this.form(), this.content))
+          .isSameAs(lost);
+
+      verifyNoInteractions(it.helmStorageService);
+    }
+
+    @Test
+    @DisplayName("writes neither the manifest nor the file when the chart version is refused")
+    void writesNothingWhenTheChartRowIsRefused() {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      final var lost = new DataIntegrityViolationException("unique index");
+      when(it.chartService.findOrCreate(any(HelmChartForm.class), eq(REPO_ID))).thenThrow(lost);
+
+      assertThatThrownBy(() -> it.facade.pushManifest(it.context, this.form(), this.content))
+          .isSameAs(lost);
+
+      verifyNoInteractions(it.ociManifestService, it.helmStorageService);
     }
   }
 

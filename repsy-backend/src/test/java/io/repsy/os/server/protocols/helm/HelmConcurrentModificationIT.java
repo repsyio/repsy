@@ -22,6 +22,9 @@ import static io.repsy.os.server.protocols.helm.HelmChartFixtures.UPLOAD_PATH;
 import static io.repsy.os.server.protocols.helm.HelmChartFixtures.chart;
 import static io.repsy.os.server.protocols.helm.HelmChartFixtures.digest;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -55,9 +58,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -67,6 +72,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -128,7 +134,7 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
   @MockitoBean private UsageUpdateService usageUpdateService;
 
   @Autowired private RepoTxService repoTxService;
-  @Autowired private HelmStorageService helmStorageService;
+  @MockitoSpyBean private HelmStorageService helmStorageService;
 
   /**
    * Wraps the manifest, chart version and blob repositories in a proxy that calls through and then
@@ -185,6 +191,12 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
 
   /** How many rows the current test has bumped, the proof that its race was forced. */
   private AtomicInteger bumps = new AtomicInteger();
+
+  /**
+   * How many times the current test's push has run its chart, manifest and file write: each run
+   * reads the chart's version row once, and only once.
+   */
+  private final AtomicInteger runs = new AtomicInteger();
 
   private final List<UUID> createdRepoIds = new ArrayList<>();
   private final List<UUID> createdUserIds = new ArrayList<>();
@@ -322,8 +334,13 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
     final var bumps = new AtomicInteger();
     this.bumps = bumps;
 
+    this.runs.set(0);
+
     AFTER_READ.set(
         called -> {
+          if (called.equals(VERSION_READ)) {
+            this.runs.incrementAndGet();
+          }
           if (called.equals(method)
               && reads.incrementAndGet() >= afterReads
               && bumps.get() < times) {
@@ -385,7 +402,8 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
         .as("the registry error format, not the panel envelope")
         .contains("\"errors\"", "concurrentModification")
         .doesNotContain("\"msgId\"");
-    assertThat(this.bumps).as("three runs of the save").hasValue(3);
+    assertThat(this.runs).as("three runs of the chart, manifest and file write").hasValue(3);
+    assertThat(this.bumps).as("the race was forced on every run").hasValueGreaterThanOrEqualTo(3);
     assertThat(this.manifestDigest(repo, name, "1.0.0"))
         .as("the tag still points at the manifest it had")
         .isEqualTo(seeded);
@@ -430,6 +448,111 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
                 name))
         .as("the version row describes the override")
         .isEqualTo(digest("SHA-256", override));
+  }
+
+  /** The digest the chart's version row carries, or null when there is no such row. */
+  private @Nullable String chartDigest(final Repo repo, final String name) {
+    return this.jdbcTemplate
+        .queryForList(
+            """
+            select v.digest from helm_chart_version v
+              join helm_chart c on c.id = v.chart_id
+            where c.repo_id = ? and c.name = ?
+            """,
+            String.class,
+            repo.getId(),
+            name)
+        .stream()
+        .findFirst()
+        .orElse(null);
+  }
+
+  @Test
+  @DisplayName("a push answered 503 leaves the chart version row as it was (RPS-1354)")
+  void manifestVersionRaceThatNeverEndsLeavesTheChartRowUntouched() throws Exception {
+    final var repo = this.overridableHelmRepo();
+    final var name = "race-pair-503";
+    final var token = this.protocolToken();
+    final var original = chart(name, "1.0.0", "original", null);
+    assertThat(this.pushOci(repo, name, "1.0.0", original, token).getStatus())
+        .as("the seed")
+        .isEqualTo(201);
+    final var seeded = this.manifestDigest(repo, name, "1.0.0");
+    final var override = chart(name, "1.0.0", "override", null);
+    this.bumpAfterRead(MANIFEST_READ, BUMP_MANIFEST, repo, 2, Integer.MAX_VALUE);
+
+    assertThat(this.pushOci(repo, name, "1.0.0", override, token).getStatus()).isEqualTo(503);
+
+    assertThat(this.manifestDigest(repo, name, "1.0.0"))
+        .as("the tag still points at the manifest it had")
+        .isEqualTo(seeded);
+    assertThat(this.chartDigest(repo, name))
+        .as("and so does the chart version row: the pair is not half applied")
+        .isEqualTo(digest("SHA-256", original));
+
+    AFTER_READ.set(null);
+
+    assertThat(this.pushOci(repo, name, "1.0.0", override, token).getStatus())
+        .as("the same push repeated without contention")
+        .isEqualTo(201);
+    assertThat(this.chartDigest(repo, name)).isEqualTo(digest("SHA-256", override));
+    assertThat(this.manifestDigest(repo, name, "1.0.0")).isNotEqualTo(seeded);
+  }
+
+  @Test
+  @DisplayName("an override whose manifest file cannot be stored changes neither row (RPS-1354)")
+  void overrideWhoseManifestFileFailsChangesNoRow() throws Exception {
+    final var repo = this.overridableHelmRepo();
+    final var name = "race-pair-file";
+    final var token = this.protocolToken();
+    final var original = chart(name, "1.0.0", "original", null);
+    assertThat(this.pushOci(repo, name, "1.0.0", original, token).getStatus())
+        .as("the seed")
+        .isEqualTo(201);
+    final var seeded = this.manifestDigest(repo, name, "1.0.0");
+    final var override = chart(name, "1.0.0", "override", null);
+    doThrow(new IllegalStateException("disk full"))
+        .when(this.helmStorageService)
+        .saveManifest(any(UUID.class), anyString(), anyString(), any(byte[].class), anyString());
+
+    assertThat(this.pushOci(repo, name, "1.0.0", override, token).getStatus())
+        .as("the push fails")
+        .isGreaterThanOrEqualTo(500);
+
+    assertThat(this.manifestDigest(repo, name, "1.0.0"))
+        .as("the tag still points at the manifest it had")
+        .isEqualTo(seeded);
+    assertThat(this.chartDigest(repo, name))
+        .as("the chart version row describes the chart it had")
+        .isEqualTo(digest("SHA-256", original));
+  }
+
+  @Test
+  @DisplayName("a first push whose manifest file cannot be stored leaves no row, and can be redone")
+  void firstPushWhoseManifestFileFailsLeavesNothing() throws Exception {
+    final var repo = this.overridableHelmRepo();
+    final var name = "race-pair-first";
+    final var token = this.protocolToken();
+    final var content = chart(name, "1.0.0", "first", null);
+    doThrow(new IllegalStateException("disk full"))
+        .when(this.helmStorageService)
+        .saveManifest(any(UUID.class), anyString(), anyString(), any(byte[].class), anyString());
+
+    assertThat(this.pushOci(repo, name, "1.0.0", content, token).getStatus())
+        .as("the push fails")
+        .isGreaterThanOrEqualTo(500);
+
+    assertThat(this.chartDigest(repo, name)).as("no chart version row").isNull();
+    assertThat(this.rows("helm_chart", repo)).as("no chart row").isZero();
+    assertThat(this.rows("helm_oci_manifest", repo)).as("no manifest row").isZero();
+
+    Mockito.reset(this.helmStorageService);
+
+    assertThat(this.pushOci(repo, name, "1.0.0", content, token).getStatus())
+        .as("the same push repeated once the storage works")
+        .isEqualTo(201);
+    assertThat(this.chartDigest(repo, name)).isEqualTo(digest("SHA-256", content));
+    assertThat(this.rows("helm_oci_manifest", repo)).isEqualTo(1);
   }
 
   @Test
