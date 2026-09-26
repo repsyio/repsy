@@ -80,6 +80,7 @@ import {
 } from './cargo-raw.js';
 import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
+import { randomPadding } from './padding.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.resolve(__dirname, '../packages/cargo');
@@ -115,11 +116,14 @@ export async function renderCargoConfig(work: string, repoName: string): Promise
   });
 }
 
-/** Renders the tiny publishable crate (Cargo.toml, src/lib.rs, a fresh random marker file). */
-async function renderCrate(
+/** Renders the tiny publishable crate (Cargo.toml, src/lib.rs, a fresh random marker file). `padBytes`
+ *  adds a file of random bytes (`e2e-padding.bin`, `padding.ts`) for the size-limit leg (RPS-1482), which
+ *  renders the crate itself to publish it over the limit. */
+export async function renderCrate(
   work: string,
   crate: string,
   version: string,
+  padBytes?: number,
 ): Promise<{ marker: string }> {
   await renderTemplate('Cargo.template.toml', path.join(work, 'Cargo.toml'), {
     crateName: crate,
@@ -130,6 +134,9 @@ async function renderCrate(
   await renderTemplate('lib.template.rs', path.join(srcDir, 'lib.rs'), {});
   const marker = randomUUID();
   await fs.writeFile(path.join(work, MARKER_FILENAME), marker, 'utf8');
+  if (padBytes !== undefined) {
+    await fs.writeFile(path.join(work, 'e2e-padding.bin'), randomPadding(padBytes));
+  }
   return { marker };
 }
 
@@ -177,7 +184,7 @@ async function readPackagedCrate(work: string, crate: string, version: string): 
  * enough to produce one (an auth failure refuses the client BEFORE it packages anything -- the
  * preflight index query cargo runs happens first, see this file's header). `--no-verify` skips
  * building the crate to "verify" it, which needs `rustc` and a linker; a build is the toolchain's
- * concern, not the registry's, and the runner image ships no gcc.
+ * concern, not the registry's, and only `cargo install` (install-add.spec.ts) needs the gcc the runner image carries.
  */
 async function packageCrate(work: string, home: string, label: string): Promise<void> {
   const result = await run('cargo', ['package', '--no-verify', '--offline'], {
@@ -434,3 +441,88 @@ export const cargoAdapter: ProtocolAdapter<CargoFingerprint> = {
   expectNothingStored,
   afterSuccessfulRoundTrip,
 };
+
+// --- RPS-1486: `cargo install` / `cargo add` / `cargo login`, the commands the panel advertises ---
+
+/** What `renderInstallableCrate` renders (`Cargo.install.template.toml`). */
+export interface InstallableCrate {
+  crate: string;
+  version: string;
+  /** A `[[bin]]` crate (`src/main.rs` prints the marker), otherwise a `[lib]` one (`src/lib.rs`
+   *  returns its own version from `version()`). */
+  bin?: boolean;
+  /** Feature names, each declared empty (`name = []`). */
+  features?: readonly string[];
+  /** Repsy-registry dependencies (`registry = "repsy"`), `req` a Cargo version requirement. */
+  deps?: readonly { name: string; req: string }[];
+}
+
+/**
+ * Renders a crate whose sources really compile (unlike `renderCrate`'s, packaged with `--no-verify`):
+ * `cargo install` builds it. A bin crate prints `marker=<uuid>` and, when it has a dependency, that
+ * dependency's `version()` as `dep=<version>` (the dependency is a `renderInstallableCrate` lib).
+ */
+export async function renderInstallableCrate(
+  work: string,
+  crate: InstallableCrate,
+): Promise<{ marker: string }> {
+  await renderTemplate('Cargo.install.template.toml', path.join(work, 'Cargo.toml'), {
+    crateName: crate.crate,
+    version: crate.version,
+    bin: crate.bin === true,
+    features: crate.features ?? [],
+    deps: crate.deps ?? [],
+  });
+  const marker = randomUUID();
+  const srcDir = path.join(work, 'src');
+  await fs.mkdir(srcDir, { recursive: true });
+  if (crate.bin === true) {
+    await renderTemplate('main.template.rs', path.join(srcDir, 'main.rs'), {
+      marker,
+      dep: crate.deps?.[0]?.name ?? false,
+    });
+  } else {
+    await renderTemplate('version-lib.template.rs', path.join(srcDir, 'lib.rs'), {
+      version: crate.version,
+    });
+  }
+  return { marker };
+}
+
+/**
+ * The environment of a user who followed the panel's Cargo page literally: no `CARGO_HOME` (so
+ * `$HOME/.cargo`, where the page says the config file goes), no `CARGO_REGISTRIES_REPSY_TOKEN` unless
+ * `token` is given, and the allow-list of `clientEnv` (RPS-1446).
+ */
+export function cargoPanelEnv(home: string, token?: string): NodeJS.ProcessEnv {
+  return clientEnv(
+    home,
+    {
+      CARGO_TERM_COLOR: 'never',
+      CARGO_NET_RETRY: '0',
+      ...(token !== undefined ? { CARGO_REGISTRIES_REPSY_TOKEN: token } : {}),
+    },
+    ['RUSTUP_HOME'],
+  );
+}
+
+/**
+ * `$HOME/.cargo/config.toml` exactly as the panel's Cargo page tells a user to write it
+ * (`cargo-config.component.ts`: `[registries] repsy = { index = "sparse+<repo url>" }` and, for a
+ * private repo, `[registry] global-credential-providers = ["cargo:token"]`). `credentialProviders`
+ * false is the "Public repo (download only): Skip the [registry] section" variant.
+ */
+export async function renderPanelCargoConfig(
+  home: string,
+  repoName: string,
+  credentialProviders = true,
+): Promise<string> {
+  const cargoDir = path.join(home, '.cargo');
+  await fs.mkdir(cargoDir, { recursive: true });
+  const file = path.join(cargoDir, 'config.toml');
+  await renderTemplate('panel-config.template.toml', file, {
+    registryUrl: `${env.repoBaseUrl}/${repoName}/`,
+    credentialProviders,
+  });
+  return file;
+}

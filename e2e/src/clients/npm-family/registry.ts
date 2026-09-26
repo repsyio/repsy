@@ -34,6 +34,7 @@ import {
 } from './client.js';
 import { runSealed, sealedEnv } from './config.js';
 import { bunClient } from './bun-client.js';
+import { denoClient } from './deno-client.js';
 import { npmClient } from './npm-client.js';
 import { pnpmClient } from './pnpm-client.js';
 import { yarnBerryClient } from './yarn-berry-client.js';
@@ -45,6 +46,8 @@ export const ENABLED_CLIENTS: readonly NpmFamilyClient[] = [
   yarnClassicClient,
   bunClient,
   yarnBerryClient,
+  // Consume-only, every capability off: its own cells are tests/npm-clients/deno/ (deno-client.ts).
+  denoClient,
 ];
 
 /** The enabled clients that can do what a cell needs. */
@@ -65,6 +68,7 @@ export const INSTALLED_CLIENTS: readonly InstalledClient[] = [
   { id: 'yarn-classic', label: 'yarn-classic', tag: '@yarn-classic' },
   { id: 'yarn-berry', label: 'yarn-berry', tag: '@yarn-berry' },
   { id: 'bun', label: 'bun', tag: '@bun' },
+  { id: 'deno', label: 'deno', tag: '@deno' },
 ];
 
 /** `<binary> --version` of an installed client, by its absolute path, in the sealed environment. */

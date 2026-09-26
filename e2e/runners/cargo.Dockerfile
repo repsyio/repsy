@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# 1.98.1: latest stable per the Rust blog (2026-09-03), `-slim-bookworm` so no gcc/build-essential
-# lands in the final image -- this harness's crates are dependency-free and every client command runs
-# with `--no-verify` (see clients/cargo.ts), so nothing here ever needs to actually compile Rust code,
-# only package/publish/fetch. bookworm matches the final stage's own node:24-bookworm-slim base libc.
+# 1.98.1: latest stable per the Rust blog (2026-09-03), `-slim-bookworm` (no gcc/build-essential; the
+# final stage installs just `gcc` + `libc6-dev`, see below) -- this harness's crates are dependency-free
+# and every publish/fetch runs with `--no-verify` (see clients/cargo.ts); only `cargo install` of a
+# binary crate (tests/cargo/install-add.spec.ts) compiles Rust code. bookworm matches the final stage's own node:24-bookworm-slim base libc.
 # A named build stage (not the final image), only used below as a `COPY --from` source for the
 # toolchain directories -- a normal build-time reference, not a Docker Compose sibling-service
 # dependency (see the comment right before the final `FROM` for why that distinction matters here).
@@ -44,6 +44,13 @@ COPY runners/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
 # --- cargo-specific layers ---
+
+# A C compiler driver and libc headers: rustc links every binary through `cc`. Only `cargo install`
+# of a binary crate (tests/cargo/install-add.spec.ts, RPS-1486) builds anything: everything else here
+# is dependency-free and runs with `--no-verify`, so nothing else needs it.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # /usr/local/cargo/bin/{cargo,rustc} in the official image are rustup proxies that resolve the real
 # toolchain via RUSTUP_HOME at run time -- copying both directories (not just the proxies) is what

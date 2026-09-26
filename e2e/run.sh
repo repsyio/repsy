@@ -63,8 +63,8 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--force]
-  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls]
+  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--upgrade] [--force]
+  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--upgrade]
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
@@ -110,6 +110,17 @@ generated into e2e/.tls/<project> (docker-compose.stack-tls.yml). With the switc
 client trust that CA in its own way. Give "test" the same switch as "up" (REPSY_E2E_TLS=1). The ui runner
 is left out. See README.md "TLS stack".
 
+--limits (or REPSY_E2E_LIMITS=1) is the fourth overlay: Repsy starts with tiny upload size limits, 64 KiB for a
+PyPI/Helm/NuGet upload, a gem, a crate and a Go module zip (docker-compose.stack-limits.yml), for the @limits
+specs of the pypi, helm, nuget, ruby, cargo, golang and api runners: an over-limit push gets a 413. No other
+suite may run there. See README.md "Size-limit leg".
+
+--upgrade (or REPSY_E2E_UPGRADE=1) is the upgrade-path overlay (docker-compose.stack-upgrade.yml, RPS-1487): "local up"
+starts the PREVIOUS release on a fresh volume (the tag in src/upgrade/previous-release.ts, or
+REPSY_E2E_UPGRADE_FROM=<tag>) and builds the image under test
+(REPSY_IMAGE when set, else repsy-os-e2e:<project tag>) without starting it; tests/stack/upgrade.spec.ts
+then recreates the container on that image. See README.md "Upgrade path".
+
 Parallel stacks (README.md "Parallel stacks"): the stack is the compose project --project NAME
 (default repsy-e2e) with its host ports moved up by --port-offset N (default 0: panel API 8080, repo
 protocols 9090, stub scanner 8090). Two checkouts that run stacks at the same time each need their
@@ -129,6 +140,8 @@ OVERLAYS=(
   "scanner|--scanner|REPSY_E2E_SCANNER|docker-compose.stack-scanner.yml"
   "throttle|--throttle|REPSY_E2E_THROTTLE|docker-compose.stack-throttle.yml"
   "tls|--tls|REPSY_E2E_TLS|docker-compose.stack-tls.yml"
+  "limits|--limits|REPSY_E2E_LIMITS|docker-compose.stack-limits.yml"
+  "upgrade|--upgrade|REPSY_E2E_UPGRADE|docker-compose.stack-upgrade.yml"
 )
 
 # Field $2 (1 name, 2 flag, 3 env switch, 4 file) of the overlay row $1.
@@ -449,6 +462,41 @@ ensure_runner_dirs() {
   mkdir -p test-results playwright-report
 }
 
+# The previous release's image for the upgrade overlay: the published image of the tag REPSY_E2E_UPGRADE_FROM,
+# else of PREVIOUS_RELEASE in src/upgrade/previous-release.ts (the one place that names it, README.md "Upgrade
+# path": bump it after each release).
+upgrade_from_image() {
+  local tag="${REPSY_E2E_UPGRADE_FROM:-}"
+  if [ -z "$tag" ]; then
+    tag="$(sed -n "s/^export const PREVIOUS_RELEASE = '\([^']*\)';.*/\1/p" src/upgrade/previous-release.ts)"
+  fi
+  if [ -z "$tag" ]; then
+    echo "Cannot read PREVIOUS_RELEASE from src/upgrade/previous-release.ts" >&2
+    exit 1
+  fi
+  printf 'repo.repsy.io/repsy/os/repsy:%s' "$tag"
+}
+
+# "local up --upgrade": the image under test is prepared but not started (REPSY_IMAGE as it is, or built
+# under repsy-os-e2e:$REPSY_E2E_IMAGE_TAG), and the stack starts on the PREVIOUS release's image, on fresh
+# volumes, with the overlay's old-style environment. tests/stack/upgrade.spec.ts recreates the container on
+# the image under test (it reads REPSY_IMAGE, or that tag, too).
+up_upgrade_stack() {
+  local from_image target_image
+  from_image="$(upgrade_from_image)"
+  target_image="${REPSY_IMAGE:-repsy-os-e2e:$REPSY_E2E_IMAGE_TAG}"
+  if [ -z "${REPSY_IMAGE:-}" ]; then
+    # REPSY_IMAGE must not rename the build: the image under test keeps its own tag.
+    docker compose "${STACK_ARGS[@]}" build repsy
+  fi
+  if ! docker pull "$from_image"; then
+    echo "Cannot pull the previous release $from_image (no network, or the tag is not published): the upgrade leg needs it." >&2
+    exit 1
+  fi
+  echo "Upgrade leg: starting $from_image; tests/stack/upgrade.spec.ts recreates it on $target_image"
+  REPSY_IMAGE="$from_image" docker compose "${STACK_ARGS[@]}" up -d --wait --no-build
+}
+
 cmd_local_up() {
   parse_stack_flags up "$@"
   require_admin_password
@@ -469,7 +517,9 @@ cmd_local_up() {
   # changed, and a changed source is never missed (an mtime check would miss e.g. a branch switch
   # or a core submodule bump). Not with REPSY_IMAGE: that names a published image to test as it is,
   # and `--build` would replace it with a local build under the same tag.
-  if [ -n "${REPSY_IMAGE:-}" ]; then
+  if overlay_active upgrade; then
+    up_upgrade_stack
+  elif [ -n "${REPSY_IMAGE:-}" ]; then
     docker compose "${STACK_ARGS[@]}" up -d --wait
   else
     docker compose "${STACK_ARGS[@]}" up -d --wait --build
@@ -486,6 +536,12 @@ cmd_local_up() {
   fi
   if overlay_active throttle; then
     echo "Throttle overlay on: 3 failed password checks per 10 s per client; run REPSY_E2E_THROTTLE=1 ./run.sh test --protocol stack,ui --grep @throttle (the ui runner last: AUTH-11 locks the docker gateway's bucket)"
+  fi
+  if overlay_active limits; then
+    echo "Limits overlay on: uploads over 64 KiB are refused (413); run REPSY_E2E_LIMITS=1 ./run.sh test --protocol pypi,helm,nuget,ruby,cargo,golang,api --grep @limits, one runner per call"
+  fi
+  if overlay_active upgrade; then
+    echo "Upgrade overlay on: run REPSY_E2E_UPGRADE=1 ./run.sh test --protocol stack --grep @upgrade (the stack ends on the image under test)"
   fi
   if overlay_active scanner; then
     echo "Scanner enabled: run the @scanner specs with REPSY_UI_OPT_IN=scanner (or REPSY_E2E_SCANNER=1) ./run.sh test --protocol ui --grep @scanner"

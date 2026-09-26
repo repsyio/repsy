@@ -110,6 +110,7 @@ import { boundedSemverVersion, slugify } from '../scenarios/coordinates.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import { withBackoff429 } from '../scenarios/remote-throttle.js';
+import { randomPadding } from './padding.js';
 import {
   adminCredential,
   authHeader,
@@ -303,6 +304,9 @@ export async function buildModuleZip(opts: {
    *  `hello.go` imports the dependency's package so a consumer that imports THIS module really
    *  needs the dependency to build (`DepMarkers()` reports the dependencies' own `Marker`s). */
   requires?: readonly GoRequire[];
+  /** Bytes of random padding stored in `e2e-padding.bin`, for the size-limit leg (RPS-1482,
+   *  `padding.ts`). */
+  padBytes?: number;
 }): Promise<BuiltGoModule> {
   const marker = opts.marker ?? randomUUID();
   const prefix = `${opts.modulePath}@${opts.version}/`;
@@ -325,6 +329,9 @@ export async function buildModuleZip(opts: {
     [`${prefix}hello.go`]: new TextEncoder().encode(helloText),
     [`${prefix}e2e-marker.txt`]: new TextEncoder().encode(markerText),
   };
+  if (opts.padBytes !== undefined) {
+    entries[`${prefix}e2e-padding.bin`] = randomPadding(opts.padBytes);
+  }
 
   const bytes = Buffer.from(zipSync(entries, { level: 0 }));
   const goMod = Buffer.from(goModText, 'utf8');

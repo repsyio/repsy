@@ -87,6 +87,7 @@ import { zipSync } from 'fflate';
 import { env } from '../env.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
+import { randomPadding } from './padding.js';
 import {
   adminCredential,
   authHeader,
@@ -272,6 +273,9 @@ export function buildNupkg(opts: {
   dependencies?: NuspecDependency[];
   /** Target frameworks that get an EMPTY `<group targetFramework="..."/>` ("no dependencies there"). */
   emptyGroups?: string[];
+  /** Bytes of random padding stored in `content/e2e-padding.bin`, for the size-limit leg (RPS-1482,
+   *  `padding.ts`). */
+  padBytes?: number;
 }): Buffer {
   const marker = opts.marker ?? `e2e ${opts.packageId}@${opts.version}`;
   const nuspec =
@@ -286,13 +290,14 @@ export function buildNupkg(opts: {
     '  </metadata>\n' +
     '</package>\n';
 
-  const zipped = zipSync(
-    {
-      [`${opts.packageId}.nuspec`]: new TextEncoder().encode(nuspec),
-      'content/e2e-marker.txt': new TextEncoder().encode(marker),
-    },
-    { level: 0 },
-  );
+  const entries: Record<string, Uint8Array> = {
+    [`${opts.packageId}.nuspec`]: new TextEncoder().encode(nuspec),
+    'content/e2e-marker.txt': new TextEncoder().encode(marker),
+  };
+  if (opts.padBytes !== undefined) {
+    entries['content/e2e-padding.bin'] = randomPadding(opts.padBytes);
+  }
+  const zipped = zipSync(entries, { level: 0 });
   return Buffer.from(zipped);
 }
 

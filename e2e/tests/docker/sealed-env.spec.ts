@@ -15,7 +15,7 @@
 ///
 
 /**
- * The crane (docker) client's environment is an allow-list.
+ * The crane, skopeo, regctl and oras (docker) clients' environments are an allow-list.
  * (RPS-1446, modelled on `tests/npm-clients/sealed-env.spec.ts`.) Every client of this suite runs in
  * an allow-list environment (`clientEnv`, `src/clients/client-env.ts`), never the runner's own:
  * `REPSY_ADMIN_PASSWORD` and the rest of the harness's variables must not reach the client, its
@@ -27,6 +27,9 @@ import { test } from '@playwright/test';
 
 import { craneEnv } from '../../src/clients/docker.js';
 import { isolatedWorkDir } from '../../src/clients/exec.js';
+import { orasEnv } from '../../src/clients/docker-oras.js';
+import { regctlEnv } from '../../src/clients/docker-regctl.js';
+import { skopeoEnv } from '../../src/clients/docker-skopeo.js';
 import { expectSealed, probeEnv } from '../../src/clients/env-probe.js';
 
 test(
@@ -36,5 +39,35 @@ test(
     const { home, work } = await isolatedWorkDir('docker-sealed-env');
     const seen = await probeEnv(craneEnv(home), work, 'docker-sealed-env');
     expectSealed(seen, home, ['DOCKER_CONFIG']);
+  },
+);
+
+test(
+  'docker > no runner variable reaches skopeo, its REGISTRY_AUTH_FILE does',
+  { tag: ['@sealed-env', '@skopeo'] },
+  async () => {
+    const { home, work } = await isolatedWorkDir('docker-skopeo-sealed-env');
+    const seen = await probeEnv(skopeoEnv(home), work, 'docker-skopeo-sealed-env');
+    expectSealed(seen, home, ['REGISTRY_AUTH_FILE']);
+  },
+);
+
+test(
+  'docker > no runner variable reaches regctl, its REGCTL_CONFIG does',
+  { tag: ['@sealed-env', '@regctl'] },
+  async () => {
+    const { home, work } = await isolatedWorkDir('docker-regctl-sealed-env');
+    const seen = await probeEnv(regctlEnv(home), work, 'docker-regctl-sealed-env');
+    expectSealed(seen, home, ['REGCTL_CONFIG']);
+  },
+);
+
+test(
+  'docker > no runner variable reaches oras (its credentials are a --registry-config file, not the environment)',
+  { tag: ['@sealed-env', '@oras'] },
+  async () => {
+    const { home, work } = await isolatedWorkDir('docker-oras-sealed-env');
+    const seen = await probeEnv(orasEnv(home), work, 'docker-oras-sealed-env');
+    expectSealed(seen, home);
   },
 );

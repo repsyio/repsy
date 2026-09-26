@@ -146,6 +146,8 @@ services:
         YARN_CLASSIC_VERSION: '1.22.22'
         YARN_BERRY_VERSION: '4.18.1'
         BUN_VERSION: '1.3.14'
+        # `docker pull denoland/deno:bin-2.9.7` (the `bin-<version>` tags hold just the binary).
+        DENO_VERSION: '2.9.7'
     environment:
       <<: *runner-environment
     volumes:
@@ -202,6 +204,16 @@ services:
       dockerfile: runners/docker.Dockerfile
       args:
         CRANE_VERSION: 'v0.22.1'
+        # RPS-1478 part B: the second and third client of this runner (runners/docker.Dockerfile).
+        GO_VERSION: '1.27.1'
+        SKOPEO_VERSION: 'v1.24.1'
+        REGCTL_VERSION: 'v0.11.6'
+        REGCTL_SHA256_AMD64: '8e0e62a497fcdb8048d18aa927a139613176ba0531f412bc541044e28f9856bd'
+        REGCTL_SHA256_ARM64: 'a9b71a3ee79b2d1dbbd7d51fd5e8fa214722c192864235d3d8764463c751a1ff'
+        # RPS-1478 part C: oras, the OCI artifact client.
+        ORAS_VERSION: 'v1.3.4'
+        ORAS_SHA256_AMD64: 'f27adb935022d94df8dc77719c322dda592c78a0d57a6f7dcdd8d900b248c454'
+        ORAS_SHA256_ARM64: '15702c6e3a4a56a8bd8ac5c17efdbcab56d9bada661ccbcf017f5b10c1d89399'
     environment:
       <<: *runner-environment
     volumes:
@@ -247,6 +259,7 @@ services:
         PYTHON_VERSION: '3.14.7'
         PIP_VERSION: '26.2.1'
         TWINE_VERSION: '7.0.0'
+        UV_VERSION: '0.12.19'
     environment:
       <<: *runner-environment
     volumes:
@@ -329,6 +342,8 @@ services:
       REPSY_E2E_SCANNER_PORT: ${REPSY_E2E_SCANNER_PORT:-8090}
       REPSY_E2E_IMAGE_TAG: ${REPSY_E2E_IMAGE_TAG:-local}
       REPSY_IMAGE: ${REPSY_IMAGE:-}
+      # The release the upgrade leg started from (tests/stack/upgrade.spec.ts, RPS-1487); empty: PREVIOUS_RELEASE.
+      REPSY_E2E_UPGRADE_FROM: ${REPSY_E2E_UPGRADE_FROM:-}
       REPSY_E2E_HOST_DIR: ${REPSY_E2E_HOST_DIR:-${PWD}}
       # The spec restarts and recreates the one Repsy container of its stack, so it never runs in parallel.
       REPSY_E2E_WORKERS: '1'

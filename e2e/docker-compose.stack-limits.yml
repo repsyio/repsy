@@ -1,0 +1,42 @@
+# Copyright 2026 the original author or authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# OPT-IN overlay that gives the e2e stack tiny upload size limits (RPS-1482): 64 KiB for a PyPI, Helm
+# or NuGet upload (the multipart limit), a gem, a crate and a Go module zip, instead of the defaults of
+# 100-500 MB (docker-compose.stack.yml leaves them alone). With it, the 413 a real client gets for an
+# over-limit push is proven end to end through Tomcat and the multiport listeners, with a real twine,
+# `dotnet nuget push`, `helm cm-push`, `gem push`, `cargo publish` and curl, which the backend's own
+# ITs (MockMvc, no real request stream) cannot do (tests/<protocol>/size-limits.spec.ts, @limits).
+#
+# It is never part of the default stack: it changes nothing unless it is passed as an extra -f, which
+# `./run.sh local up --limits` (or REPSY_E2E_LIMITS=1) does, on top of the postgres or the H2 stack:
+#
+#   docker compose -f docker-compose.stack.yml -f docker-compose.stack-limits.yml up -d --wait
+#
+# No other suite may run against it: any package bigger than 64 KiB is refused there (the maven
+# limits are hardcoded and npm has none, so those two are not part of this overlay). Give "down" the
+# same flags as "up". See README.md "Size-limit leg".
+services:
+  repsy:
+    environment:
+      # PyPI (`twine upload`), Helm (`helm cm-push`) and NuGet (`dotnet nuget push`) send the package as
+      # a multipart file. The request limit stays above the file limit, so the file limit is what
+      # trips (a request limit at or below it would answer for the whole request instead).
+      MULTIPART_MAX_FILE_SIZE: 64KB
+      MULTIPART_MAX_REQUEST_SIZE: 256KB
+      # The raw request body of `gem push`, the length-prefixed crate inside `cargo publish`'s own
+      # wire format and the `.zip` a Go module upload PUTs: none of them is multipart.
+      RUBY_MAX_GEM_SIZE: 64KB
+      CARGO_MAX_CRATE_SIZE: 64KB
+      GO_MAX_MODULE_ZIP_SIZE: 64KB

@@ -23,9 +23,9 @@
  * suite's own builder produced and reads back the NAMES that arrived (`src/clients/env-probe.ts`).
  * No stack is needed: nothing here talks to Repsy.
  */
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-import { cargoEnv } from '../../src/clients/cargo.js';
+import { cargoEnv, cargoPanelEnv } from '../../src/clients/cargo.js';
 import { isolatedWorkDir } from '../../src/clients/exec.js';
 import { expectSealed, probeEnv } from '../../src/clients/env-probe.js';
 
@@ -45,5 +45,19 @@ test(
       'cargo-sealed-env',
     );
     expectSealed(seen, home, ['CARGO_HOME', 'CARGO_REGISTRIES_REPSY_TOKEN']);
+  },
+);
+
+test(
+  'cargo > the panel-style environment (default CARGO_HOME, RPS-1486) is sealed too',
+  { tag: ['@sealed-env'] },
+  async () => {
+    const { home, work } = await isolatedWorkDir('cargo-panel-sealed-env');
+    const seen = await probeEnv(cargoPanelEnv(home, 'sealed-env-secret'), work, 'cargo-panel-env');
+    expectSealed(seen, home, ['CARGO_REGISTRIES_REPSY_TOKEN']);
+    expect(
+      Object.keys(seen),
+      'CARGO_HOME stays unset: cargo uses $HOME/.cargo, as the panel says',
+    ).not.toContain('CARGO_HOME');
   },
 );

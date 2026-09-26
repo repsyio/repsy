@@ -230,3 +230,84 @@ export async function buildImage(opts: {
 
   return { dir: opts.dir, ...content };
 }
+
+export interface BuiltIndex {
+  /** The OCI layout directory: every child's blobs, the index manifest, an `index.json` naming the index. */
+  dir: string;
+  indexBytes: Buffer;
+  /** `sha256:<hex>`. */
+  indexDigest: string;
+  indexMediaType: string;
+  children: { os: string; arch: string; content: ImageContent }[];
+}
+
+/**
+ * A multi-platform layout (an image index / manifest list over one hand-built image per platform),
+ * for the real clients that copy whole indexes (`skopeo copy --all`, `regctl image copy`). Each
+ * child gets its own layer marker (`<marker>-<arch>`), so no two children share a digest; the
+ * layout's `index.json` names the INDEX, not a child, like a real multi-arch layout.
+ */
+export async function buildIndexImage(opts: {
+  dir: string;
+  marker: string;
+  platforms: { os: string; arch: string }[];
+  family?: MediaTypeFamily;
+}): Promise<BuiltIndex> {
+  const children = opts.platforms.map(({ os, arch }) => ({
+    os,
+    arch,
+    content: buildImageContent({
+      marker: `${opts.marker}-${arch}`,
+      family: opts.family,
+      os,
+      arch,
+    }),
+  }));
+
+  const blobsDir = path.join(opts.dir, 'blobs', 'sha256');
+  await fs.mkdir(blobsDir, { recursive: true });
+  const write = (digest: string, bytes: Buffer) =>
+    fs.writeFile(path.join(blobsDir, digest.slice('sha256:'.length)), bytes);
+  for (const { content } of children) {
+    await write(content.configDigest, content.configBytes);
+    await write(content.layerDigest, content.layerBytes);
+    await write(content.manifestDigest, content.manifestBytes);
+  }
+
+  const indexMediaType =
+    opts.family === 'oci'
+      ? 'application/vnd.oci.image.index.v1+json'
+      : 'application/vnd.docker.distribution.manifest.list.v2+json';
+  const indexBytes = Buffer.from(
+    JSON.stringify({
+      schemaVersion: 2,
+      mediaType: indexMediaType,
+      manifests: children.map(({ os, arch, content }) => ({
+        mediaType: content.manifestMediaType,
+        digest: content.manifestDigest,
+        size: content.manifestBytes.length,
+        platform: { architecture: arch, os },
+      })),
+    }),
+    'utf8',
+  );
+  const indexDigest = sha256(indexBytes);
+  await write(indexDigest, indexBytes);
+
+  await fs.writeFile(
+    path.join(opts.dir, 'oci-layout'),
+    JSON.stringify({ imageLayoutVersion: '1.0.0' }),
+    'utf8',
+  );
+  await fs.writeFile(
+    path.join(opts.dir, 'index.json'),
+    JSON.stringify({
+      schemaVersion: 2,
+      mediaType: 'application/vnd.oci.image.index.v1+json',
+      manifests: [{ mediaType: indexMediaType, digest: indexDigest, size: indexBytes.length }],
+    }),
+    'utf8',
+  );
+
+  return { dir: opts.dir, indexBytes, indexDigest, indexMediaType, children };
+}
