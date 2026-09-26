@@ -34,8 +34,10 @@
  *    of B 1.1.0 only: per-version dependency lines are honoured), with the published sha256 of every gem
  *    in the lock's CHECKSUMS.
  *  - `gem install` of A installs the same graph. `quick/Marshal.4.8/*.gemspec.rz` is a stub that carries
- *    no dependencies and no platform (see the report of this story), so `gem dependency --remote`
- *    prints no dependency lines; that is deliberately NOT pinned here.
+ *    no dependencies (see the report of this story), so `gem dependency --remote` prints no dependency
+ *    lines; that is deliberately NOT pinned here. It does carry the platform of a platform gem, and
+ *    resolves a multi-segment platform such as `x86_64-linux` (RPS-1553, fixed): `gem install` of a platform
+ *    gem, directly and as a dependency, is the last test of this file.
  *  - A yanked B version is skipped by a fresh resolution (RPS-1235). A lock that already names a
  *    yanked version cannot be installed on a fresh machine: Bundler looks locked versions up in the
  *    same compact index, which omits yanked versions, exactly as it does against rubygems.org.
@@ -44,6 +46,7 @@
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 import { RepoType } from '../../src/api/panel-api.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
@@ -57,6 +60,7 @@ import {
   infoRelPath,
   parseInfo,
   rawGet,
+  rawHead,
   rawPublish,
   rawYank,
 } from '../../src/clients/ruby-raw.js';
@@ -250,6 +254,35 @@ async function infoLines(repoName: string, credential: MaterializedCredential, g
   const res = await rawGet(repoName, credential, infoRelPath(gem));
   expect(res.status, `GET /info/${gem}`).toBe(200);
   return parseInfo(res.body);
+}
+
+/** `gem install` of `gemName` from the Repsy repo only (never rubygems.org); what got installed is read back. */
+async function gemInstall(
+  label: string,
+  repoName: string,
+  gemName: string,
+  extraArgs: string[] = [],
+) {
+  const ws = await isolatedWorkDir(label);
+  const result = await run(
+    'gem',
+    [
+      'install',
+      '--clear-sources',
+      '--source',
+      repoUrl(repoName),
+      gemName,
+      '--no-document',
+      '--verbose',
+      ...extraArgs,
+    ],
+    { cwd: ws.work, env: gemEnv(ws.home, {}), timeoutMs: CLIENT_TIMEOUT_MS, label },
+  );
+  const installed = await fs
+    .readdir(path.join(ws.home, 'gems', 'gems'))
+    .then((names) => names.sort())
+    .catch(() => []);
+  return { ...result, installed };
 }
 
 test.describe('ruby > transitive resolution (RPS-1479)', () => {
@@ -576,5 +609,47 @@ test.describe('ruby > transitive resolution (RPS-1479)', () => {
     const depLock = await readLock(withDep.work);
     expect(depLock.specs[c].dependencies).toEqual({ [b]: '= 1.0.0' });
     expect(depLock.specs[b].version).toBe('1.0.0');
+  });
+
+  test('gem install of a multi-segment platform gem works directly and as a dependency (RPS-1553)', async ({
+    seeder,
+  }) => {
+    const platform = await localPlatform();
+    const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
+    const a = `e2e_${seeder.runId}_gi_a`;
+    const b = `e2e_${seeder.runId}_gi_b`;
+    const c = `e2e_${seeder.runId}_gi_c`;
+    // B: a pure 1.0.0 and, of the higher 1.5.0, a platform gem only. A needs B ~> 1.0 (so the
+    // platform gem is the one `gem install` must fetch); C is a platform gem of its own.
+    await publishGem(repo.name, b, '1.0.0');
+    await publishGem(repo.name, b, '1.5.0', [], platform);
+    await publishGem(repo.name, a, '1.0.0', [{ name: b, requirement: '~> 1.0' }]);
+    await publishGem(repo.name, c, '1.0.0', [], platform);
+
+    // A platform of another OS the runner is not: only the route and the bytes are probed for it.
+    await publishGem(repo.name, c, '2.0.0', [], 'arm64-darwin');
+
+    // The gemspec route answers for a multi-segment platform, and the gemspec carries it.
+    for (const [version, p] of [
+      ['1.0.0', platform],
+      ['2.0.0', 'arm64-darwin'],
+    ]) {
+      const rel = `quick/Marshal.4.8/${c}-${version}-${p}.gemspec.rz`;
+      const res = await rawGet(repo.name, {}, rel);
+      expect(res.status, `GET ${rel}`).toBe(200);
+      expect(zlib.inflateSync(res.body).toString('latin1'), `${p} in the gemspec`).toContain(p);
+      expect((await rawHead(repo.name, {}, rel)).status, `HEAD ${rel}`).toBe(200);
+    }
+
+    const direct = await gemInstall('ruby-platform-gem-install', repo.name, c);
+    expect(direct.exitCode, `gem install ${c}: ${direct.stderr}`).toBe(0);
+    expect(direct.installed).toEqual([`${c}-1.0.0-${platform}`]);
+
+    const asDependency = await gemInstall('ruby-platform-gem-install-dep', repo.name, a);
+    expect(asDependency.exitCode, `gem install ${a}: ${asDependency.stderr}`).toBe(0);
+    expect(asDependency.installed, 'B ~> 1.0 resolves to the platform 1.5.0').toEqual([
+      `${a}-1.0.0`,
+      `${b}-1.5.0-${platform}`,
+    ]);
   });
 });

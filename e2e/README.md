@@ -4313,9 +4313,11 @@ same graph. Probed live: `/info` lists runtime dependencies only (`<b>:~> 1.0`, 
 does not have it installed (Bundler looks locked versions up in the compact index, which omits yanked
 versions, as against rubygems.org), although the `.gem` file itself stays downloadable (RPS-1238). Not
 pinned, because they look like backend gaps: `quick/Marshal.4.8/*.gemspec.rz` is a stub without
-dependencies or platform and 404s for a multi-segment platform such as `x86_64-linux`, so `gem install`
-of a platform gem fails and `gem dependency --remote` prints no dependency lines; and `RubyMarshalWriter.dumpDependencies`
-(the legacy `/api/v1/dependencies`) has no route.
+dependencies, so `gem dependency --remote` prints no dependency lines; and `RubyMarshalWriter.dumpDependencies`
+(the legacy `/api/v1/dependencies`) has no route. The gemspec of a platform gem is resolved against the
+stored rows and carries its platform (RPS-1553, fixed): a `gem install` of a platform gem for the runner's
+own platform succeeds directly and as a dependency, and `GET`/`HEAD` of the `.gemspec.rz` of a
+multi-segment platform (`x86_64-linux`, `arm64-darwin`) answer 200.
 
 ## Stack overlays
 
