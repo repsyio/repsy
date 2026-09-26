@@ -77,6 +77,10 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * either: a client that stored its own metadata is never answered the digest of a file it was not
    * served. A signature ({@code .asc}) and the version-level metadata of a {@code SNAPSHOT} are not
    * generated, and an artifact or group that is not registered stays a 404.
+   *
+   * <p>A stored file wins even when it lacks something registered later: the upload of a POM keeps
+   * the stored artifact-level file complete with the versions (RPS-1437) and the stored group-level
+   * file complete with the plugins (RPS-1457).
    */
   @Override
   public Resource download(final ProtocolContext context) {
@@ -196,7 +200,10 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    *
    * <p>A POM that registers a version also adds it to the stored artifact-level {@code
    * maven-metadata.xml} when the file lacks it and the usage of that rewrite is added to the POM's;
-   * that step never fails the upload (RPS-1437, see {@code reconcileStoredMetadata}).
+   * that step never fails the upload (RPS-1437, see {@code reconcileStoredMetadata}). The POM of a
+   * plugin (packaging {@code maven-plugin}) also adds the plugins of its group that the stored
+   * group-level file lacks to that file, with the same guarantees (RPS-1457, see {@code
+   * reconcileStoredGroupMetadata}).
    *
    * <p>What is left to fail after the store is the registration itself (a repo or a signed version
    * deleted meanwhile, a database error). The usage is set on the context whether it succeeds or
@@ -246,9 +253,9 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
     final var isNewRegisteredFile = this.isNewRegisteredFile(repoInfo, storagePath);
 
-    final var afterUploadUsage = this.store(repoInfo.getName(), storagePath, inputStream, content);
+    final var stored = this.store(repoInfo.getName(), storagePath, inputStream, content);
 
-    this.register(context, repoInfo, storagePath, afterUploadUsage, isNewRegisteredFile);
+    this.register(context, repoInfo, storagePath, stored, isNewRegisteredFile);
 
     final var gav = ArtifactUtils.getGavByFile(storagePath);
 
@@ -298,8 +305,10 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       final ProtocolContext context,
       final BaseRepoInfo<ID> repoInfo,
       final StoragePath storagePath,
-      final BaseUsages usage,
+      final Stored stored,
       final boolean isNewRegisteredFile) {
+
+    final var usage = stored.usage();
 
     try {
       final var resource = this.mavenStorageService.getResource(repoInfo.getName(), storagePath);
@@ -314,10 +323,11 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     }
 
     if (ArtifactUtils.isPomToParse(storagePath)) {
-      context.addProperty(
-          USAGES,
-          BaseUsages.ofDisk(
-              usage.getDiskUsage() + this.reconcileStoredMetadata(repoInfo, storagePath)));
+      final var reconciled =
+          this.reconcileStoredMetadata(repoInfo, storagePath)
+              + (stored.plugin() ? this.reconcileStoredGroupMetadata(repoInfo, storagePath) : 0L);
+
+      context.addProperty(USAGES, BaseUsages.ofDisk(usage.getDiskUsage() + reconciled));
 
       return;
     }
@@ -345,33 +355,97 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
   private long reconcileStoredMetadata(
       final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath) {
 
+    return this.bestEffort(
+        repoInfo,
+        storagePath,
+        "the version of",
+        () -> {
+          final var gav = ArtifactUtils.getGavByFile(storagePath);
+
+          if (gav == null) {
+            return 0L;
+          }
+
+          return this.mavenStorageService.addVersionsToMetadata(
+              repoInfo,
+              gav.getGroupId(),
+              gav.getArtifactId(),
+              () ->
+                  this.artifactService
+                      .getRegisteredVersions(repoInfo, gav.getGroupId(), gav.getArtifactId())
+                      .stream()
+                      .map(RegisteredVersion::versionName)
+                      .toList());
+        });
+  }
+
+  /**
+   * Adds the plugins that the group-level {@code maven-metadata.xml} a client stored earlier does
+   * not list to it, when the POM that has just registered is one of a plugin (RPS-1457). Maven
+   * stores that file with each plugin it deploys, but Gradle, Apache Ivy, sbt and a raw PUT send
+   * none, so without this the stored file keeps answering {@code mvn prefix:goal} for the plugins
+   * Maven listed and the plugin of another client is not found. A group that has no stored file is
+   * answered from the registered plugins (RPS-1438) and is never asked for them here. Every plugin
+   * of the group the file lacks is added, not only this one, so a plugin that was registered while
+   * the file was not there to be changed is added with the next one.
+   *
+   * <p>The plugin is added with the prefix the repository derives from its artifactId. A plugin
+   * that sets its own {@code goalPrefix} and is published by {@code mvn deploy} into a group whose
+   * file is stored already is added here first (Maven sends the POM before it reads the file it
+   * merges its entry into), so that file ends up with its entry under the derived prefix too, next
+   * to the one Maven merges in: harmless, {@code mvn prefix:goal} finds the plugin by either.
+   *
+   * <p>It is best effort in the way {@link #reconcileStoredMetadata} is.
+   *
+   * @return the change of the disk usage the rewrite caused, {@code 0} when there was none
+   */
+  private long reconcileStoredGroupMetadata(
+      final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath) {
+
+    return this.bestEffort(
+        repoInfo,
+        storagePath,
+        "the plugins of",
+        () -> {
+          final var gav = ArtifactUtils.getGavByFile(storagePath);
+
+          if (gav == null) {
+            return 0L;
+          }
+
+          return this.mavenStorageService.addPluginsToGroupMetadata(
+              repoInfo,
+              gav.getGroupId(),
+              () -> this.artifactService.getRegisteredPlugins(repoInfo, gav.getGroupId()));
+        });
+  }
+
+  /** A rewrite of a stored metadata file that is logged and counted as {@code 0} if it fails. */
+  private long bestEffort(
+      final BaseRepoInfo<ID> repoInfo,
+      final StoragePath storagePath,
+      final String what,
+      final MetadataRewrite rewrite) {
+
     try {
-      final var gav = ArtifactUtils.getGavByFile(storagePath);
-
-      if (gav == null) {
-        return 0L;
-      }
-
-      return this.mavenStorageService.addVersionsToMetadata(
-          repoInfo,
-          gav.getGroupId(),
-          gav.getArtifactId(),
-          () ->
-              this.artifactService
-                  .getRegisteredVersions(repoInfo, gav.getGroupId(), gav.getArtifactId())
-                  .stream()
-                  .map(RegisteredVersion::versionName)
-                  .toList());
+      return rewrite.run();
     } catch (final RuntimeException | IOException e) {
       log.warn(
-          "Adding the version of {} to the stored maven-metadata.xml of repo {} failed, the file is"
-              + " left as it is: {}",
+          "Adding {} {} to the stored maven-metadata.xml of repo {} failed, the file is left as it"
+              + " is: {}",
+          what,
           storagePath.getRelativePath().getPath(),
           repoInfo.getName(),
           e.toString());
 
       return 0L;
     }
+  }
+
+  @FunctionalInterface
+  private interface MetadataRewrite {
+
+    long run() throws IOException;
   }
 
   /** Removes a file this request has just stored, answering whether it is gone. */
@@ -400,8 +474,14 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     }
   }
 
+  /**
+   * What a store left behind: the usage of the file, and whether it is the POM of a plugin (only a
+   * POM that is parsed before it is stored can be told to be one).
+   */
+  private record Stored(BaseUsages usage, boolean plugin) {}
+
   /** Stores what the client sent, from the buffer if the facade already had to read it whole. */
-  private BaseUsages store(
+  private Stored store(
       final String repoName,
       final StoragePath storagePath,
       final InputStream inputStream,
@@ -409,15 +489,18 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       throws IOException {
 
     if (content != null) {
-      return this.mavenStorageService.writeInputStreamToPath(
-          storagePath, new ByteArrayInputStream(content), repoName);
+      return new Stored(
+          this.mavenStorageService.writeInputStreamToPath(
+              storagePath, new ByteArrayInputStream(content), repoName),
+          false);
     }
 
     if (ArtifactUtils.isPomToParse(storagePath)) {
       return this.writeValidatedPom(repoName, storagePath, inputStream);
     }
 
-    return this.mavenStorageService.writeInputStreamToPath(storagePath, inputStream, repoName);
+    return new Stored(
+        this.mavenStorageService.writeInputStreamToPath(storagePath, inputStream, repoName), false);
   }
 
   /**
@@ -432,7 +515,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * {@code pomGroupIdMismatch} before it is stored (RPS-1193), and so is one whose packaging is
    * longer than its column, with {@code pomPackagingTooLong} (RPS-1138).
    */
-  private BaseUsages writeValidatedPom(
+  private Stored writeValidatedPom(
       final String repoName, final StoragePath storagePath, final InputStream inputStream)
       throws IOException {
 
@@ -447,7 +530,9 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       MavenPublishLimits.checkPackaging(model);
 
       try (final var pomStream = pom.openStream()) {
-        return this.mavenStorageService.writeInputStreamToPath(storagePath, pomStream, repoName);
+        return new Stored(
+            this.mavenStorageService.writeInputStreamToPath(storagePath, pomStream, repoName),
+            ArtifactUtils.artifactIsPlugin(model));
       }
     } catch (final EntryTooLargeException e) {
       throw new BadRequestException("pomFileTooLarge");

@@ -17,8 +17,8 @@
 <!--
   Rendered by clients/maven-plugin.ts into a work directory next to src/main/java/.../HelloMojo.java:
   a one-goal Maven plugin (`hello:hi`, prefix taken from the artifactId `hello-maven-plugin` the way
-  Maven does) that only logs a marker. The jar and this POM are what the spec then uploads by hand,
-  the files Gradle, sbt or Ivy would send: no group-level maven-metadata.xml among them (RPS-1438).
+  Maven does; a second plugin of the group is `bye:hi`) that only logs a marker. The jar and this POM
+  are what the spec then uploads by hand, the files Gradle, sbt or Ivy would send: no group-level maven-metadata.xml among them (RPS-1438).
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -29,7 +29,7 @@
   <artifactId>{{artifactId}}</artifactId>
   <version>{{version}}</version>
   <packaging>maven-plugin</packaging>
-  <name>Hello Maven Plugin</name>
+  <name>{{name}}</name>
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
