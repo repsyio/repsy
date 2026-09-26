@@ -417,6 +417,13 @@ This is the first release after `v26.08.4`. Read this section before you upgrade
 - **Sessions:** everybody signs in to the web UI again once after the upgrade; a web UI session now ends after 24
   hours at most; changing a password or username ends that user's `docker login`, `npm login` and `cargo login`
   tokens at once. (RPS-916, RPS-972, RPS-1552)
+- **The panel API no longer allows any origin by default.** With `APP_ALLOWED_ORIGINS` unset, Repsy used to answer
+  browser requests from any origin and allow credentials; unset now means same-origin only and the API sends no CORS
+  headers. The Docker image as normally run (web UI and API on one origin, `API_BASE_URL` empty) is not affected. If the
+  web UI is served from another origin than the API (a separately hosted web UI, `API_BASE_URL` pointing at another
+  host, or the Angular dev server), set `APP_ALLOWED_ORIGINS` to a comma-separated list of the exact origins of the web
+  UI, for example `https://panel.example.com`; only those origins are then allowed. `mvn spring-boot:run` allows
+  `http://localhost:4200` through the `dev` profile. (RPS-1590)
 - **Browser security headers:** the repository port (9090) sends no CORS headers any more, so a web page that reads
   packages from it cross-origin stops working. The panel gets `X-Frame-Options: DENY` (it cannot be embedded in a
   frame), `Referrer-Policy` and a `Content-Security-Policy`; every response gets `X-Content-Type-Options: nosniff`.
@@ -469,7 +476,7 @@ This is the first release after `v26.08.4`. Read this section before you upgrade
 - The upgrade jobs (Docker manifest rename, NuGet version move) log their progress at `INFO`, which the default log
   level (`WARN`) hides; set `LOGGING_LEVEL_IO_REPSY=INFO` to follow them.
 
-<!-- Maintainer, before publishing the release notes: (1) RPS-1615 replaces the password reset with verify-once-and-upgrade-to-BCrypt-on-login; when it merges, remove the "Every user password is reset" item and the reset section under Upgrading. (2) RPS-1590 makes an unset APP_ALLOWED_ORIGINS same-origin only; add an item under "Browser security headers" when it merges. (3) Re-check commits merged after the audit (main 7ed2c6839, 2026-09-26). -->
+<!-- Maintainer, before publishing the release notes: (1) RPS-1615 replaces the password reset with verify-once-and-upgrade-to-BCrypt-on-login; when it merges, remove the "Every user password is reset" item and the reset section under Upgrading. (2) Re-check commits merged after the audit (main 7ed2c6839, 2026-09-26). -->
 
 ## Upgrading
 
