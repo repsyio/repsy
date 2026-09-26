@@ -54,6 +54,7 @@ import https from 'node:https';
 import type { AddressInfo } from 'node:net';
 
 import { env } from '../env.js';
+import { repoPath } from '../repo-url.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 
 export interface ShimTraceEntry {
@@ -165,12 +166,12 @@ export async function goProxyUrlFor(
   credential: MaterializedCredential,
 ): Promise<{ proxyUrl: string; certFile?: string }> {
   if (!needsTlsShim(credential)) {
-    return { proxyUrl: `${withCredentials(env.repoBaseUrl, credential)}/${repoName}` };
+    return { proxyUrl: `${withCredentials(env.repoBaseUrl, credential)}/${repoPath(repoName)}` };
   }
 
   const shim = await ensureTlsShim();
   return {
-    proxyUrl: `${withCredentials(shim.baseUrl, credential)}/${repoName}`,
+    proxyUrl: `${withCredentials(shim.baseUrl, credential)}/${repoPath(repoName)}`,
     certFile: process.env.REPSY_E2E_TLS_CERT,
   };
 }

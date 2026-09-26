@@ -38,6 +38,9 @@ x-runner-environment: &runner-environment
   REPSY_ADMIN_USERNAME: ${REPSY_ADMIN_USERNAME:-admin}
   REPSY_ADMIN_PASSWORD: ${REPSY_ADMIN_PASSWORD:?Set REPSY_ADMIN_PASSWORD in e2e/.env}
   REPSY_TARGET: ${REPSY_TARGET:-local}
+  # Owner-scoped URLs (README.md "Repository URLs"): unset on Repsy OS.
+  REPSY_REPO_OWNER: ${REPSY_REPO_OWNER:-}
+  REPSY_E2E_URL_SCHEME: ${REPSY_E2E_URL_SCHEME:-}
   REPSY_E2E_RUN_ID: ${REPSY_E2E_RUN_ID:-}
   # A module that supplies the panel backend instead of the built-in Repsy OS one (README.md "Targets"):
   # a path the runner can read, or a package name. Empty: the built-in backend.

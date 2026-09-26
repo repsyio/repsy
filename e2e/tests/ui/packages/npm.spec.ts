@@ -21,7 +21,7 @@
  * version detail.
  */
 import { RepoType } from '../../../src/api/panel-api.js';
-import { env } from '../../../src/env.js';
+import { repoUrl } from '../../../src/repo-url.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { buildPublishDocument, buildTarball, rawPublish } from '../../../src/clients/npm-raw.js';
 import type { SeededPackage } from '../../../src/seed/packages.js';
@@ -122,7 +122,7 @@ test.describe('npm scopes', { tag: '@packages' }, () => {
     await expect(tildeDetail.installText).toContainText(`npm install ${unscoped.name}`);
 
     // RPS-1288 (6): the registry line of the repo sits next to the install command, scoped for a scoped package.
-    const registry = `${env.repoBaseUrl}/${repo.name}/`;
+    const registry = repoUrl(repo.name, '');
     await expect(tildeDetail.snippet('npmrc')).toContainText(`registry=${registry}`);
     await expect(tildeDetail.snippet('npmrc')).not.toContainText(':registry=');
     const scopedDetail = pages.detail(scoped);

@@ -51,6 +51,7 @@ import type { Locator, Page } from '@playwright/test';
 
 import { RepoType } from '../api/panel-api.js';
 import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { PackageRef, SeededPackage } from '../seed/packages.js';
 import { expect, test } from './package-fixtures.js';
 import {
@@ -798,7 +799,7 @@ export function registerPackageScenarios(
         await list.configureButton.click();
         await expect(modal.root).toBeVisible();
         await expect(modal.title).toHaveText(configure.title);
-        for (const text of configure.contains(repo.name, `${env.repoBaseUrl}/${repo.name}`)) {
+        for (const text of configure.contains(repo.name, repoUrl(repo.name))) {
           await expect(modal.root).toContainText(text);
         }
         if (configure.passwordMarker) {

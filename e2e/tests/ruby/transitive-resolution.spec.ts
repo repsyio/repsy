@@ -60,7 +60,7 @@ import {
   rawPublish,
   rawYank,
 } from '../../src/clients/ruby-raw.js';
-import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { MaterializedCredential } from '../../src/scenarios/world.js';
 
@@ -180,7 +180,7 @@ async function bundle(
   if (opts.gems) {
     // The Repsy repo is the ONLY source: a dependency can only come from Repsy's own /info.
     const gemfile =
-      `source "${env.repoBaseUrl}/${repoName}" do\n` +
+      `source "${repoUrl(repoName)}" do\n` +
       opts.gems.map((name) => `  gem "${name}"\n`).join('') +
       'end\n';
     await fs.writeFile(path.join(ws.work, 'Gemfile'), gemfile, 'utf8');
@@ -483,7 +483,7 @@ test.describe('ruby > transitive resolution (RPS-1479)', () => {
   test('gem install of A alone installs B and C, and skips a yanked B', async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
     const { a, b, c } = await publishGraph(repo.name, seeder.runId);
-    const source = `${env.repoBaseUrl}/${repo.name}`;
+    const source = repoUrl(repo.name);
 
     const install = async (label: string) => {
       const ws = await isolatedWorkDir(label);

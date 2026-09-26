@@ -75,6 +75,7 @@ import {
 } from '../../src/clients/docker-raw.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { env } from '../../src/env.js';
+import { repoPath } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 
 const OCI_MANIFEST = 'application/vnd.oci.image.manifest.v1+json';
@@ -240,7 +241,7 @@ test(
     // pull: by tag and by digest, the file is identical.
     for (const [what, pullRef] of [
       ['tag', ref],
-      ['digest', `${registryHost()}/${repoName}/${image}@${digest}`],
+      ['digest', `${registryHost()}/${repoPath(repoName)}/${image}@${digest}`],
     ] as const) {
       const out = path.join(session.work, `pulled-${what}`);
       const pulled = await session.run(
@@ -264,7 +265,7 @@ test(
         ...session.common,
         '--output',
         blobOut,
-        `${registryHost()}/${repoName}/${image}@${layer.digest}`,
+        `${registryHost()}/${repoPath(repoName)}/${image}@${layer.digest}`,
       ],
       'or1-blob-fetch',
     );
@@ -387,7 +388,7 @@ test(
       'crane',
       [
         'manifest',
-        `${registryHost()}/${repoName}/${image}:${referrersTag(subject)}`,
+        `${registryHost()}/${repoPath(repoName)}/${image}:${referrersTag(subject)}`,
         ...CRANE_INSECURE,
       ],
       {
@@ -665,7 +666,7 @@ test(
       'sig.json',
       'application/json',
     );
-    const sbomRef = `${registryHost()}/${repoName}/${image}@${sbom}`;
+    const sbomRef = `${registryHost()}/${repoPath(repoName)}/${image}@${sbom}`;
     const plain = await session.run(
       ['manifest', 'delete', ...session.common, '--force', sbomRef],
       'or5-delete-referrer',
@@ -852,8 +853,11 @@ test(
     );
     expect(pushed.exitCode, `oras push: ${pushed.stderr}`).toBe(0);
     for (const [what, args] of [
-      ['repo tags', ['repo', 'tags', ...session.common, `${registryHost()}/${repoName}/${image}`]],
-      ['repo ls', ['repo', 'ls', ...session.common, `${registryHost()}/${repoName}`]],
+      [
+        'repo tags',
+        ['repo', 'tags', ...session.common, `${registryHost()}/${repoPath(repoName)}/${image}`],
+      ],
+      ['repo ls', ['repo', 'ls', ...session.common, `${registryHost()}/${repoPath(repoName)}`]],
     ] as const) {
       const result = await session.run([...args], `or7-${what}`);
       expect(

@@ -38,6 +38,13 @@
  * cache of their own and are here because the story names them and a real client is the proof that counts.
  *
  * Each spec file calls {@link registerCredentialInvalidation} once, with its protocol's adapter.
+ *
+ * RPS-1552 adds {@link registerLoginTokenInvalidation}: the same events seen through the token a client KEEPS
+ * after logging in (a Docker `/v2/token` JWT, the token `npm login` stores, the Cargo `/me` token). Those
+ * protocol JWTs carry the user's `token_version` (`tv` claim), so a password change ends them at once; before
+ * that they outlived the change until they expired (30 minutes, npm 90 days). A real Docker client always
+ * exchanges its Basic credentials again, so the stale token is only visible to a client that holds one:
+ * the probes here are raw HTTP with the stored token, and for npm the real `npm publish` sends it as `_authToken`.
  */
 import { createPanelBackend } from '../api/backend-registry.js';
 import { RepoType } from '../api/panel-api.js';
@@ -64,50 +71,55 @@ export interface CredentialInvalidationProtocol<F = unknown> {
   isStored(repoName: string, packageName: string, version: string): Promise<boolean>;
 }
 
+interface Setup {
+  /** Deploys `version` as `credential` with the real client; the client exiting 0 is asserted. */
+  accepted(credential: MaterializedCredential, version: string): Promise<void>;
+  /** Deploys `version` as `credential`: refused with a 401, a failing client, and nothing stored. */
+  refused(credential: MaterializedCredential, version: string): Promise<void>;
+}
+
+function deploySetup<F>(
+  protocol: Pick<CredentialInvalidationProtocol<F>, 'adapter' | 'isStored'>,
+  repoName: string,
+  packageName: string,
+): Setup {
+  const { adapter } = protocol;
+  const worldWith = (cred: MaterializedCredential, version: string): World => ({
+    scenario: SCENARIO,
+    protocol: adapter.protocol,
+    repoName,
+    credential: cred,
+    publishTarget: { packageName, version },
+    consumeTarget: { packageName, version },
+  });
+
+  return {
+    accepted: async (cred, version) => {
+      // seedPublish throws unless the client exited 0
+      await adapter.seedPublish(worldWith(cred, version));
+      expect(
+        await protocol.isStored(repoName, packageName, version),
+        `${version} deployed by ${cred.username} should be stored`,
+      ).toBe(true);
+    },
+    refused: async (cred, version) => {
+      const result = await adapter.publish(worldWith(cred, version));
+      const context = `${adapter.client.name} ${adapter.client.publishVerb} of ${version} as ${cred.username}: ${result.command}`;
+      expect(result.httpStatus, `raw probe, ${context}`).toBe(401);
+      expect(result.outcome, context).toBe('unauthorized');
+      expect(result.clientExitCode, `real client, ${context}`).not.toBe(0);
+      expect(
+        await protocol.isStored(repoName, packageName, version),
+        `${version} must not be stored after a refused deploy`,
+      ).toBe(false);
+    },
+  };
+}
+
 export function registerCredentialInvalidation<F>(
   protocol: CredentialInvalidationProtocol<F>,
 ): void {
   const { adapter } = protocol;
-
-  interface Setup {
-    /** Deploys `version` as `credential` with the real client; the client exiting 0 is asserted. */
-    accepted(credential: MaterializedCredential, version: string): Promise<void>;
-    /** Deploys `version` as `credential`: refused with a 401, a failing client, and nothing stored. */
-    refused(credential: MaterializedCredential, version: string): Promise<void>;
-  }
-
-  function setupFor(repoName: string, packageName: string): Setup {
-    const worldWith = (cred: MaterializedCredential, version: string): World => ({
-      scenario: SCENARIO,
-      protocol: adapter.protocol,
-      repoName,
-      credential: cred,
-      publishTarget: { packageName, version },
-      consumeTarget: { packageName, version },
-    });
-
-    return {
-      accepted: async (cred, version) => {
-        // seedPublish throws unless the client exited 0
-        await adapter.seedPublish(worldWith(cred, version));
-        expect(
-          await protocol.isStored(repoName, packageName, version),
-          `${version} deployed by ${cred.username} should be stored`,
-        ).toBe(true);
-      },
-      refused: async (cred, version) => {
-        const result = await adapter.publish(worldWith(cred, version));
-        const context = `${adapter.client.name} ${adapter.client.publishVerb} of ${version} as ${cred.username}: ${result.command}`;
-        expect(result.httpStatus, `raw probe, ${context}`).toBe(401);
-        expect(result.outcome, context).toBe('unauthorized');
-        expect(result.clientExitCode, `real client, ${context}`).not.toBe(0);
-        expect(
-          await protocol.isStored(repoName, packageName, version),
-          `${version} must not be stored after a refused deploy`,
-        ).toBe(false);
-      },
-    };
-  }
 
   test.describe(`${adapter.protocol} credential invalidation (${adapter.client.name}, RPS-1481)`, () => {
     test(
@@ -118,7 +130,7 @@ export function registerCredentialInvalidation<F>(
         const user = await seeder.createUser();
         const oldCredential = passwordCredential(user.username, user.password);
         const packageName = adapter.packageName(seeder.runId, SCENARIO);
-        const { accepted, refused } = setupFor(repo.name, packageName);
+        const { accepted, refused } = deploySetup(protocol, repo.name, packageName);
 
         const first = adapter.version('release');
         const second = adapter.version('release');
@@ -145,7 +157,7 @@ export function registerCredentialInvalidation<F>(
       const user = await seeder.createUser();
       const credential = passwordCredential(user.username, user.password);
       const packageName = adapter.packageName(seeder.runId, SCENARIO);
-      const { accepted, refused } = setupFor(repo.name, packageName);
+      const { accepted, refused } = deploySetup(protocol, repo.name, packageName);
 
       await accepted(credential, adapter.version('release'));
 
@@ -159,7 +171,7 @@ export function registerCredentialInvalidation<F>(
       const token = await seeder.createToken(repo.name, { readOnly: false });
       const credential = tokenCredential(token.username, token.token);
       const packageName = adapter.packageName(seeder.runId, SCENARIO);
-      const { accepted, refused } = setupFor(repo.name, packageName);
+      const { accepted, refused } = deploySetup(protocol, repo.name, packageName);
 
       await accepted(credential, adapter.version('release'));
 
@@ -175,7 +187,7 @@ export function registerCredentialInvalidation<F>(
       const token = await seeder.createToken(repo.name, { readOnly: false });
       const oldCredential = tokenCredential(token.username, token.token);
       const packageName = adapter.packageName(seeder.runId, SCENARIO);
-      const { accepted, refused } = setupFor(repo.name, packageName);
+      const { accepted, refused } = deploySetup(protocol, repo.name, packageName);
 
       await accepted(oldCredential, adapter.version('release'));
 
@@ -184,6 +196,142 @@ export function registerCredentialInvalidation<F>(
       await refused(oldCredential, adapter.version('release'));
       await accepted(tokenCredential(token.username, rotated), adapter.version('release'));
     });
+  });
+}
+
+/** What a protocol's login hands the client to keep, and how to use it once more (RPS-1552). */
+export interface LoginTokenProtocol<F = unknown> {
+  /** Names the tests: `docker`, `npm`, `cargo`. */
+  name: string;
+  repoType: RepoType;
+  /** The login exchange: a user's password (or a deploy token's secret) in, the token the client keeps out. */
+  login(repoName: string, username: string, secret: string): Promise<string>;
+  /** One raw request that needs the token: `401` when the server no longer accepts it, anything else when it does. */
+  probe(repoName: string, token: string): Promise<{ status: number; body: Buffer }>;
+  /**
+   * Optional: the real client publishes with the login token (npm: `_authToken`), so the refusal is
+   * proved with the tool as well as with the raw probe.
+   */
+  realClient?: Pick<CredentialInvalidationProtocol<F>, 'adapter' | 'isStored'>;
+}
+
+export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F>): void {
+  const { name } = protocol;
+
+  async function accepted(repoName: string, token: string, context: string): Promise<void> {
+    const res = await protocol.probe(repoName, token);
+    expect(res.status, `${context}: ${res.body.toString('utf8')}`).not.toBe(401);
+  }
+
+  /** A 401 that says the session is over (`sessionExpired`, "Session expired."), in every protocol's own envelope. */
+  async function endedSession(repoName: string, token: string, context: string): Promise<void> {
+    const res = await protocol.probe(repoName, token);
+    expect(res.status, `${context}: ${res.body.toString('utf8')}`).toBe(401);
+    expect(res.body.toString('utf8'), context).toContain('Session expired');
+  }
+
+  test.describe(`${name} login token invalidation (RPS-1552)`, () => {
+    test(
+      'a changed password ends the login token at once and a new login works',
+      { tag: ['@smoke'] },
+      async ({ seeder }) => {
+        const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
+        const user = await seeder.createUser();
+        const token = await protocol.login(repo.name, user.username, user.password);
+
+        // Used twice first: what ends is a token that worked, not one that never did.
+        await accepted(repo.name, token, 'the login token before the change');
+        await accepted(repo.name, token, 'the login token, again');
+
+        const userApi = await createPanelBackend();
+        await userApi.login(user.username, user.password);
+        const newPassword = `${user.password}${NEW_PASSWORD_SUFFIX}`;
+        await userApi.changeOwnPassword(newPassword);
+
+        await endedSession(repo.name, token, 'the login token after the password change');
+
+        const fresh = await protocol.login(repo.name, user.username, newPassword);
+        await accepted(repo.name, fresh, 'the token of a login with the new password');
+      },
+    );
+
+    test('an admin password reset ends the login token at once', async ({ seeder, panelApi }) => {
+      const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
+      const user = await seeder.createUser();
+      const token = await protocol.login(repo.name, user.username, user.password);
+      await accepted(repo.name, token, 'the login token before the reset');
+
+      // The admin's own session (`panelApi`); the reset answers the generated password as the envelope's data.
+      const reset = await panelApi.rawRequest(
+        'POST',
+        `/api/users/${user.id}/actions/reset-password`,
+      );
+      expect(reset.status, `reset-password: ${JSON.stringify(reset.body)}`).toBe(200);
+      const generated = String(reset.body.data);
+
+      await endedSession(repo.name, token, 'the login token after the admin reset');
+      const fresh = await protocol.login(repo.name, user.username, generated);
+      await accepted(repo.name, fresh, 'the token of a login with the generated password');
+    });
+
+    test('a password change of another user leaves the login token alone', async ({ seeder }) => {
+      const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
+      const user = await seeder.createUser();
+      const other = await seeder.createUser();
+      const token = await protocol.login(repo.name, user.username, user.password);
+
+      const otherApi = await createPanelBackend();
+      await otherApi.login(other.username, other.password);
+      await otherApi.changeOwnPassword(`${other.password}${NEW_PASSWORD_SUFFIX}`);
+
+      await accepted(repo.name, token, 'the login token after ANOTHER user changed the password');
+    });
+
+    test('a deploy-token JWT is not tied to any user and survives a password change', async ({
+      seeder,
+    }) => {
+      const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
+      const user = await seeder.createUser();
+      const deployToken = await seeder.createToken(repo.name, { readOnly: false });
+      const jwt = await protocol.login(repo.name, deployToken.username, deployToken.token);
+      await accepted(repo.name, jwt, 'the deploy-token JWT before the change');
+
+      const userApi = await createPanelBackend();
+      await userApi.login(user.username, user.password);
+      await userApi.changeOwnPassword(`${user.password}${NEW_PASSWORD_SUFFIX}`);
+
+      await accepted(repo.name, jwt, 'the deploy-token JWT after a user changed the password');
+    });
+
+    const { realClient } = protocol;
+    if (realClient) {
+      test(`a changed password ends the login token the real ${realClient.adapter.client.name} publishes with`, async ({
+        seeder,
+      }) => {
+        const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
+        const user = await seeder.createUser();
+        const packageName = realClient.adapter.packageName(seeder.runId, SCENARIO);
+        const { accepted: deployed, refused } = deploySetup(realClient, repo.name, packageName);
+        const token = await protocol.login(repo.name, user.username, user.password);
+        const asLoginToken = (jwt: string): MaterializedCredential => ({
+          transport: 'basic',
+          username: user.username,
+          password: jwt,
+          kind: 'token',
+        });
+
+        await deployed(asLoginToken(token), realClient.adapter.version('release'));
+
+        const userApi = await createPanelBackend();
+        await userApi.login(user.username, user.password);
+        const newPassword = `${user.password}${NEW_PASSWORD_SUFFIX}`;
+        await userApi.changeOwnPassword(newPassword);
+
+        await refused(asLoginToken(token), realClient.adapter.version('release'));
+        const fresh = await protocol.login(repo.name, user.username, newPassword);
+        await deployed(asLoginToken(fresh), realClient.adapter.version('release'));
+      });
+    }
   });
 }
 

@@ -56,7 +56,7 @@ import {
   rawGet,
   sha256Hex,
 } from '../../src/clients/ruby-raw.js';
-import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import { seedPackage } from '../../src/seed/packages.js';
 import type { Seeder } from '../../src/seed/seeder.js';
@@ -144,18 +144,14 @@ async function pushGem(names: Names, built: BuiltGem): Promise<void> {
   const { home, work } = await isolatedWorkDir(`ruby-panel-push-${built.version}`);
   const file = path.join(work, built.filename);
   await fs.writeFile(file, built.bytes);
-  const pushed = await run(
-    'gem',
-    ['push', file, '--host', `${env.repoBaseUrl}/${names.repoName}`],
-    {
-      cwd: work,
-      env: gemEnv(home, credential),
-      timeoutMs: 60_000,
-      redact: [credential.password ?? ''],
-      label: `ruby-panel-push-${built.version}`,
-      input: '',
-    },
-  );
+  const pushed = await run('gem', ['push', file, '--host', repoUrl(names.repoName)], {
+    cwd: work,
+    env: gemEnv(home, credential),
+    timeoutMs: 60_000,
+    redact: [credential.password ?? ''],
+    label: `ruby-panel-push-${built.version}`,
+    input: '',
+  });
   expect(pushed.exitCode, `gem push ${built.filename}: ${pushed.command}`).toBe(0);
 }
 
@@ -172,7 +168,7 @@ async function gemYank(names: Names, version: string, platform?: string): Promis
       version,
       ...(platform === undefined ? [] : ['--platform', platform]),
       '--host',
-      `${env.repoBaseUrl}/${names.repoName}`,
+      repoUrl(names.repoName),
     ],
     {
       cwd: work,

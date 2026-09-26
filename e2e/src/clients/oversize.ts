@@ -36,7 +36,7 @@ import type { Scenario } from '../scenarios/types.js';
 import type { Coordinates, MaterializedCredential, World } from '../scenarios/world.js';
 import { renderCrate, cargoEnv, renderCargoConfig } from './cargo.js';
 import { buildPublishBody, rawPublish as rawCargoPublish } from './cargo-raw.js';
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import { isolatedWorkDir, run } from './exec.js';
 import { gemEnv } from './ruby.js';
 import { buildGem, rawPublish as rawRubyPublish } from './ruby-raw.js';
@@ -255,18 +255,14 @@ export async function pushRuby(
   const gemFile = path.join(work, built.filename);
   await fs.writeFile(gemFile, built.bytes);
 
-  const result = await run(
-    'gem',
-    ['push', gemFile, '--host', `${env.repoBaseUrl}/${world.repoName}`],
-    {
-      cwd: work,
-      env: gemEnv(home, world.credential),
-      timeoutMs: TIMEOUT_MS,
-      redact: secretsOf(world.credential),
-      label,
-      input: '',
-    },
-  );
+  const result = await run('gem', ['push', gemFile, '--host', repoUrl(world.repoName)], {
+    cwd: work,
+    env: gemEnv(home, world.credential),
+    timeoutMs: TIMEOUT_MS,
+    redact: secretsOf(world.credential),
+    label,
+    input: '',
+  });
   const replay = await rawRubyPublish(world.repoName, world.credential, built.bytes);
   return {
     exitCode: result.exitCode,

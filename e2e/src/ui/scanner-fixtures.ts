@@ -32,6 +32,7 @@ import type { PackageProtocol, PackageRef, SeededPackage } from '../seed/package
 import { ScannerStubClient, type RecordedCall } from '../stubs/scanner/client.ts';
 import type { PanelBackend, VulnerabilityScanInfo } from '../api/panel-backend.js';
 import { optedIn } from './session.js';
+import { repoPath } from '../repo-url.js';
 
 export { ScannerStubClient };
 export const SCANNER_TAG = '@scanner';
@@ -159,7 +160,7 @@ export function expectSubmitted(
   if (protocol === 'docker') {
     expect(call.fileName).toBeNull();
     expect(call.dockerImageReference).toMatch(
-      new RegExp(`/${repoName}/${pkg.name}:${pkg.version}$`),
+      new RegExp(`/${repoPath(repoName)}/${pkg.name}:${pkg.version}$`),
     );
   } else {
     expect(call.fileName).toBeTruthy();

@@ -39,7 +39,7 @@
  */
 import { zipSync } from 'fflate';
 
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import { withBackoff429 } from '../scenarios/remote-throttle.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import {
@@ -93,7 +93,7 @@ export function snapshotTimestamp(at: Date = new Date()): string {
 }
 
 function url(repoName: string, relPath: string): string {
-  return `${env.repoBaseUrl}/${repoName}/${relPath}`;
+  return repoUrl(repoName, relPath);
 }
 
 /**

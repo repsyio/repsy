@@ -27,7 +27,9 @@ const PAGE = { size: 10, number: 0, totalElements: 1, totalPages: 1 };
 const ENVELOPE = { msgId: 'packagesFetched', type: 'SUCCESS', text: 'ok' };
 
 function packages(item: Record<string, unknown>, extra: Record<string, unknown> = {}) {
-  return { ...ENVELOPE, ...extra, data: { content: [item], page: PAGE } };
+  // A copy: the "fractional integer" test mutates `page.size`, and a shared object would hand its 1.5 to
+  // every test that runs after it in the same worker.
+  return { ...ENVELOPE, ...extra, data: { content: [item], page: { ...PAGE } } };
 }
 
 const ITEM = {

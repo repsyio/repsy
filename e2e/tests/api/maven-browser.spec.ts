@@ -27,7 +27,8 @@
  * half (the browser page and its download button) is `tests/ui/packages/maven.spec.ts`.
  */
 import { RepoType } from '../../src/api/panel-api.js';
-import { adminBearer, apiUrl, edgeRequest, repoUrl } from '../../src/clients/edge-raw.js';
+import { adminBearer, apiUrl, edgeRequest } from '../../src/clients/edge-raw.js';
+import { repoUrl } from '../../src/repo-url.js';
 import {
   adminCredential,
   artifactDir,
@@ -106,7 +107,7 @@ async function downloadToken(
 }
 
 const wire = (repoName: string, path: string, token: string, init: { method?: string } = {}) =>
-  edgeRequest(repoUrl(`/${repoName}/${path}?downloadToken=${encodeURIComponent(token)}`), init);
+  edgeRequest(repoUrl(repoName, `${path}?downloadToken=${encodeURIComponent(token)}`), init);
 
 test.describe('the contents of a Maven repo', { tag: ['@smoke'] }, () => {
   test('lists the directories and files the deploy stored, with their sizes', async ({
@@ -170,11 +171,11 @@ test.describe('the download token', { tag: ['@smoke'] }, () => {
     const setup = await setUp(seeder);
     const token = await downloadToken(setup, setup.jarPath);
 
-    const anonymous = await edgeRequest(repoUrl(`/${setup.repo.name}/${setup.jarPath}`));
+    const anonymous = await edgeRequest(repoUrl(setup.repo.name, setup.jarPath));
     expect(anonymous.status).toBe(401);
 
     const res = await fetch(
-      repoUrl(`/${setup.repo.name}/${setup.jarPath}?downloadToken=${encodeURIComponent(token)}`),
+      repoUrl(setup.repo.name, `${setup.jarPath}?downloadToken=${encodeURIComponent(token)}`),
     );
     const bytes = Buffer.from(await res.arrayBuffer());
     const stored = await rawGet(setup.repo.name, adminCredential(), setup.jarPath);
@@ -240,7 +241,7 @@ test.describe('the download token', { tag: ['@smoke'] }, () => {
     const before = await repoTree(setup.repo.name);
 
     const overwrite = await edgeRequest(
-      repoUrl(`/${setup.repo.name}/${setup.jarPath}?downloadToken=${encodeURIComponent(token)}`),
+      repoUrl(setup.repo.name, `${setup.jarPath}?downloadToken=${encodeURIComponent(token)}`),
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/octet-stream' },
@@ -269,7 +270,7 @@ test.describe('the download token', { tag: ['@smoke'] }, () => {
       expect(res.status, path).toBe(401);
     }
 
-    const onWire = await edgeRequest(repoUrl(`/${setup.repo.name}/${setup.jarPath}`), {
+    const onWire = await edgeRequest(repoUrl(setup.repo.name, setup.jarPath), {
       headers: asBearer,
     });
     expect(onWire.status).toBe(401);

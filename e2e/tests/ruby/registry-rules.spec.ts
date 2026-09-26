@@ -75,6 +75,7 @@ import {
   type RawResponse,
 } from '../../src/clients/ruby-raw.js';
 import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
 
@@ -604,7 +605,7 @@ test.describe('ruby registry rules (raw HTTP)', () => {
     async () => {
       expect(bundleHostKey('localhost')).toBe('BUNDLE_LOCALHOST');
       expect(bundleHostKey('127.0.0.1')).toBe('BUNDLE_127__0__0__1');
-      expect(publishUrl('e2e-x')).toBe(`${env.repoBaseUrl}/e2e-x/api/v1/gems`);
+      expect(publishUrl('e2e-x')).toBe(repoUrl('e2e-x', 'api/v1/gems'));
     },
   );
 

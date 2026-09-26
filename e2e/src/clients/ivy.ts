@@ -42,7 +42,7 @@ import { fileURLToPath } from 'node:url';
 
 import mustache from 'mustache';
 
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { AdapterResult } from '../scenarios/adapter.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
@@ -151,7 +151,7 @@ function settingsView(
 ): Record<string, unknown> {
   return {
     cacheDir: path.join(work, 'ivy-cache'),
-    repoUrl: `${env.repoBaseUrl}/${repoName}`,
+    repoUrl: repoUrl(repoName),
     hasCredential: credential.transport === 'basic',
     host: repoHost(),
     realm: realm ?? undefined,

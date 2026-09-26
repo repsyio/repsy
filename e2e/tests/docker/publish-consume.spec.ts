@@ -46,6 +46,7 @@ import { expect, test } from '../../src/scenarios/fixtures.js';
 import { registerPublishConsumeLoop } from '../../src/scenarios/loop.js';
 import type { Scenario } from '../../src/scenarios/types.js';
 import type { Coordinates, World } from '../../src/scenarios/world.js';
+import { repoPath } from '../../src/repo-url.js';
 
 registerPublishConsumeLoop(dockerAdapter);
 
@@ -214,7 +215,7 @@ test(
 
     const { home: home2, work: work2 } = await isolatedWorkDir(`docker-d3-pull-${seeder.runId}`);
     await renderDockerConfig(home2, credential);
-    const pullByDigestRef = `${registryHost()}/${repo.name}/${image}@sha256:${published.contentSha256}`;
+    const pullByDigestRef = `${registryHost()}/${repoPath(repo.name)}/${image}@sha256:${published.contentSha256}`;
     const pullResult = await run(
       'crane',
       ['pull', '--format=oci', pullByDigestRef, path.join(work2, 'pulled')],

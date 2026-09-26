@@ -42,7 +42,7 @@ import { fileURLToPath } from 'node:url';
 
 import mustache from 'mustache';
 
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { AdapterResult } from '../scenarios/adapter.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
@@ -358,7 +358,7 @@ async function publishWithGradle(world: World, options: GradleOptions): Promise<
   await renderGradleTemplate(dsl, 'publish', path.join(gradle.work, buildFileName(dsl)), {
     groupId,
     version,
-    repoUrl: `${env.repoBaseUrl}/${world.repoName}`,
+    repoUrl: repoUrl(world.repoName),
     hasCredential: world.credential.transport === 'basic',
   });
 
@@ -422,7 +422,7 @@ export async function resolve(world: World, options: GradleOptions): Promise<Ada
     artifactId: `${artifactId}-consumer`,
   });
   await renderGradleTemplate(dsl, 'consumer', path.join(gradle.work, buildFileName(dsl)), {
-    repoUrl: `${env.repoBaseUrl}/${world.repoName}`,
+    repoUrl: repoUrl(world.repoName),
     hasCredential: world.credential.transport === 'basic',
     coordinates: `${groupId}:${artifactId}:${version}`,
   });

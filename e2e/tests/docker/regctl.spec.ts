@@ -24,10 +24,12 @@
  *    manifest and blobs. regctl asks for a blob mount first and logs the fallback Repsy answers it with
  *    (`202` + an upload session, RA5) as a WARN on stderr, then uploads the bytes.
  *  - RC3 deletes: `regctl tag delete` removes the TAG only (a sibling tag and the manifest by digest
- *    stay), `regctl manifest delete` needs a digest and removes the manifest with every tag; both
- *    first ask for `push,pull`, get ONE `401 insufficient_scope` naming `repository:<repo>/<image>:delete`
- *    and are accepted on the second request (the "older crane" round trip of `crane-delete.spec.ts`,
- *    RPS-1434/RPS-1440). A read-write deploy token is refused at both and nothing goes.
+ *    stay), `regctl manifest delete` needs a digest and removes the manifest with every tag; the
+ *    unauthenticated DELETE is challenged with `scope="repository:<repo>/<image>:delete"` (RPS-1588),
+ *    which regctl merges with its own `push,pull` into ONE token request, so the delete is accepted
+ *    with no `insufficient_scope` round trip (before RPS-1588 the challenge named a constant scope, and
+ *    regctl needed that round trip, RPS-1434/RPS-1440). A read-write deploy token is refused at both
+ *    and nothing goes.
  *  - RC4 sha512 (RPS-1244): an image whose manifest is addressed by its sha512 digest copies in by that
  *    digest, is served under it (`Docker-Content-Digest: sha512:...`) and `regctl manifest head`
  *    reports it.
@@ -58,6 +60,7 @@ import {
 } from '../../src/clients/docker-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { MaterializedCredential } from '../../src/scenarios/world.js';
+import { repoPath } from '../../src/repo-url.js';
 
 type RegctlSession = ClientSession & { push(ref: string, marker: string): Promise<string> };
 
@@ -158,7 +161,7 @@ test(
 );
 
 test(
-  'docker > regctl deletes after one insufficient_scope challenge, tag delete keeps the manifest, a deploy token is refused (RC3)',
+  'docker > regctl deletes with the scope the first challenge names, tag delete keeps the manifest, a deploy token is refused (RC3)',
   { tag: ['@regctl', '@auth'] },
   async ({ seeder }) => {
     const repoName = await newDockerRepo(seeder);
@@ -192,17 +195,23 @@ test(
       200,
     );
 
-    // The admin, by tag: -v debug shows the round trip (push,pull first, then the challenged delete).
+    // The admin, by tag: -v debug shows the challenge naming the delete scope (RPS-1588) and no
+    // insufficient_scope round trip after it.
     const tagDelete = await session.run(
       ['-v', 'debug', 'tag', 'delete', imageRef(repoName, image, 'v2')],
       'rc3-tag-delete',
     );
     expect(tagDelete.exitCode, `regctl tag delete: ${tagDelete.stderr}`).toBe(0);
     expect(tagDelete.stderr, 'asks push,pull first').toContain(
-      `scope=repository:${repoName}/${image}:pull,push`,
+      `scope=repository:${repoPath(repoName)}/${image}:pull,push`,
     );
-    expect(tagDelete.stderr, 'the registry names the delete scope').toMatch(
-      new RegExp(`error:insufficient_scope[^\\n]*scope:repository:${repoName}/${image}:delete`),
+    expect(tagDelete.stderr, 'the challenge of the DELETE names the delete scope').toMatch(
+      new RegExp(
+        `Auth request parsed[^\\n]*scope:repository:${repoPath(repoName)}/${image}:delete`,
+      ),
+    );
+    expect(tagDelete.stderr, 'no insufficient_scope round trip is needed').not.toContain(
+      'insufficient_scope',
     );
     expect((await rawHeadManifest(repoName, admin, image, 'v2')).status, 'v2 is gone').toBe(404);
     expect(

@@ -51,7 +51,7 @@
 import { createHash } from 'node:crypto';
 import zlib from 'node:zlib';
 
-import { env } from '../env.js';
+import { repoUrl as repositoryUrl } from '../repo-url.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import { buildTar } from './docker-image.js';
 import {
@@ -108,7 +108,7 @@ export function tarballPath(packageName: string, version: string): string {
 }
 
 function repoUrl(repoName: string): string {
-  return `${env.repoBaseUrl}/${repoName}/`;
+  return repositoryUrl(repoName, '');
 }
 
 function packagePutGetUrl(repoName: string, packageName: string): string {

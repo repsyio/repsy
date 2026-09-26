@@ -521,15 +521,42 @@ test.describe('the Docker panel API against what crane pushed', () => {
       404,
       'imageNotFound',
     );
-    // A manifest reference that is neither a tag nor a digest of the image: 404 (the message id names a tag
-    // even for a digest, so only the status and the error schema are pinned).
-    for (const reference of ['no-such-tag', sha256('no such manifest')]) {
-      expectContract(
+    // The tags of an image that does not exist: 404 `imageNotFound` like every other image route, not an
+    // empty page (RPS-1579).
+    expectFailure(
+      'listDockerImageTags',
+      await callOperation('listDockerImageTags', missingImage),
+      404,
+      'imageNotFound',
+    );
+    // The manifest route names what is missing: the image, the tag, or the digest the image does not store.
+    expectFailure(
+      'getDockerImageManifest',
+      await callOperation(
         'getDockerImageManifest',
-        await callOperation('getDockerImageManifest', values(session, image, { reference })),
-        404,
-      );
-    }
+        values(session, 'no-such-image', { reference: 'v1' }),
+      ),
+      404,
+      'imageNotFound',
+    );
+    expectFailure(
+      'getDockerImageManifest',
+      await callOperation(
+        'getDockerImageManifest',
+        values(session, image, { reference: 'no-such-tag' }),
+      ),
+      404,
+      'tagNotFound',
+    );
+    expectFailure(
+      'getDockerImageManifest',
+      await callOperation(
+        'getDockerImageManifest',
+        values(session, image, { reference: sha256('no such manifest') }),
+      ),
+      404,
+      'manifestNotFound',
+    );
 
     // A delete of a tag or an image that does not exist deleted nothing: the image has its one tag and
     // still pulls (the shape of RPS-1573 for Maven: a delete of a missing item must not cascade).
