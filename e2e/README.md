@@ -4352,15 +4352,14 @@ operations of the protocol BY `operationId` (`src/api/contract-checks.ts`: the p
 - **Coverage.** Each spec names the operations it calls and a test compares them to the spec's own list under the
   protocol's path prefix (`expectCovers`), so a new route is a red test until a case exists for it.
 
-**Proposed findings** (each is a `test.fixme` in `tests/maven/panel-api.spec.ts`, asserting the correct behaviour, with
-a placeholder comment instead of a ticket key because none exists yet; the filing PR turns it into `test.fail()` with
-the key or removes it):
+**Known bugs** (each is a `test.fail()` with its ticket in `tests/maven/panel-api.spec.ts`: the test asserts the correct
+behaviour, passes while the bug is there and goes red when it is fixed; the fix removes the `test.fail()` in the same PR):
 
-- P1: every success body carries `"errorCode": null`, and every `RestResponse*` schema declares `errorCode` as a
+- RPS-1574: every success body carries `"errorCode": null`, and every `RestResponse*` schema declares `errorCode` as a
   `string`. It is the same mismatch on every operation, so `contractProblems` leaves out exactly that one violation
   (`isKnownErrorCodeNull`, unit-tested) and validates the rest of the body in full; `{ strict: true }` shows it. The fix
   (a nullable `errorCode` in the spec, or no field) removes the filter.
-- P2: `DELETE /api/mvn/artifacts/{repo}/{group}/{artifact}` for an artifact that does not exist deletes the whole GROUP
+- RPS-1573: `DELETE /api/mvn/artifacts/{repo}/{group}/{artifact}` for an artifact that does not exist deletes the whole GROUP
   (files and rows) and answers 200 `data: GROUP` when the group holds exactly one artifact: `deleteArtifact` asks
   `hasOnlyOneArtifact(group)` before it checks the artifact exists (the same shape as RPS-1190, which fixed it for
   versions). With two artifacts it answers 404 as it should.

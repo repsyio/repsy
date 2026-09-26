@@ -436,7 +436,7 @@ test.describe('the Maven panel API against what mvn deploy stored', () => {
     expect(toolResolved.clientExitCode, toolResolved.command).toBe(0);
     expect(toolResolved.contentSha256).toBe(d.jars.get('tool')?.get(version));
     // (Deleting 'lib' a second time is left out on purpose: with 'tool' the only artifact left it takes
-    // the whole group with it, proposed finding P2 below.)
+    // the whole group with it, RPS-1573 below.)
 
     // Now the group.
     const group = await callOperation('deleteMavenGroup', {
@@ -462,12 +462,13 @@ test.describe('the Maven panel API against what mvn deploy stored', () => {
   });
 });
 
-// Proposed findings, not yet tickets (README.md "Panel API contract specs"). Each test asserts what the
-// spec or the operation's own contract says and is skipped until the finding is filed and fixed.
-test.describe('proposed findings of the Maven panel API', () => {
-  test.fixme('P1: every success body carries errorCode: null, the spec declares a string', async ({
+// Known bugs, each a `test.fail()` with its ticket: the test asserts the correct behaviour, passes while the bug
+// is there and goes red when it is fixed, and the fix removes the `test.fail()` call in the same PR.
+test.describe('known bugs of the Maven panel API', () => {
+  test('RPS-1574: every success body carries errorCode: null, the spec declares a string', async ({
     seeder,
   }) => {
+    test.fail(true, 'RPS-1574: errorCode is null on every success body, the schema says string');
     const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
     const res = await callOperation('listMavenGroups', { repoName: repo.name });
     expect(
@@ -476,9 +477,10 @@ test.describe('proposed findings of the Maven panel API', () => {
     ).toEqual([]);
   });
 
-  test.fixme('P2: deleting an artifact that does not exist deletes the whole group when it holds one artifact', async ({
+  test('RPS-1573: deleting an artifact that does not exist deletes the whole group when it holds one artifact', async ({
     seeder,
   }) => {
+    test.fail(true, 'RPS-1573: the delete answers 200 and removes the group instead of a 404');
     const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
     const pkg = await seedPackage(repo, seeder, {});
     const [groupId] = pkg.name.split(':') as [string];
