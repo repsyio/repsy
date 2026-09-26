@@ -37,6 +37,7 @@ import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.dtos.ProtocolTokenClaims;
+import io.repsy.os.shared.auth.dtos.ProtocolUserClaims;
 import io.repsy.os.shared.auth.services.RevokedProtocolTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
@@ -231,8 +232,8 @@ class NpmAuthComponentImplTest {
   void whoamiUserJwt() {
     when(this.jwtUtils.extractAuthenticationType("Bearer jwt", TokenRealm.PROTOCOL))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
-    when(this.jwtUtils.verifyAndExtractUsername("Bearer jwt", TokenRealm.PROTOCOL))
-        .thenReturn(USERNAME);
+    when(this.jwtUtils.extractProtocolUserClaims("Bearer jwt"))
+        .thenReturn(new ProtocolUserClaims(USERNAME, null));
     when(this.userTxService.getAuthenticatedUserByUsername(USERNAME))
         .thenReturn(UserInfo.builder().id(UUID.randomUUID()).username(USERNAME).build());
 
@@ -301,12 +302,50 @@ class NpmAuthComponentImplTest {
   void whoamiDeletedUser() {
     when(this.jwtUtils.extractAuthenticationType("Bearer jwt", TokenRealm.PROTOCOL))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
-    when(this.jwtUtils.verifyAndExtractUsername("Bearer jwt", TokenRealm.PROTOCOL))
-        .thenReturn("ghost");
+    when(this.jwtUtils.extractProtocolUserClaims("Bearer jwt"))
+        .thenReturn(new ProtocolUserClaims("ghost", null));
     when(this.userTxService.getAuthenticatedUserByUsername("ghost"))
         .thenThrow(new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
 
     assertUnauthorized(() -> this.authComponent.resolveUsername(this.repo, "Bearer jwt"));
+  }
+
+  /** RPS-1552: the login token records the user's token version, and a stale one is refused. */
+  @Test
+  @DisplayName("authenticateRepoUser mints the login token with the version of the user")
+  void loginTokenCarriesTheTokenVersion() {
+    final var userId = UUID.randomUUID();
+    when(this.userTxService.getUserByUsernameOptional(USERNAME))
+        .thenReturn(
+            Optional.of(
+                UserInfo.builder()
+                    .id(userId)
+                    .username(USERNAME)
+                    .hash(PASSWORD_HASH)
+                    .role(UserRole.USER)
+                    .tokenVersion(6)
+                    .build()));
+    when(this.jwtUtils.createProtocolToken(userId, USERNAME, Period.ofDays(90), 6))
+        .thenReturn("versioned-jwt");
+
+    assertThat(this.authComponent.authenticateRepoUser(this.repo, USERNAME, PASSWORD))
+        .isEqualTo("versioned-jwt");
+  }
+
+  @Test
+  @DisplayName("resolveUsername refuses the JWT of a user whose token version moved on")
+  void whoamiRefusesAStaleVersion() {
+    when(this.jwtUtils.extractAuthenticationType("Bearer jwt", TokenRealm.PROTOCOL))
+        .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+    when(this.jwtUtils.extractProtocolUserClaims("Bearer jwt"))
+        .thenReturn(new ProtocolUserClaims(USERNAME, 1));
+    when(this.userTxService.getAuthenticatedUserByUsername(USERNAME))
+        .thenReturn(
+            UserInfo.builder().id(UUID.randomUUID()).username(USERNAME).tokenVersion(2).build());
+
+    assertThatThrownBy(() -> this.authComponent.resolveUsername(this.repo, "Bearer jwt"))
+        .isExactlyInstanceOf(UnAuthorizedException.class)
+        .hasMessage(ErrorConstants.SESSION_EXPIRED);
   }
 
   private DeployTokenInfo whoamiTokenById(final String username) {
@@ -327,8 +366,8 @@ class NpmAuthComponentImplTest {
     final var id = UUID.randomUUID();
     when(this.jwtUtils.extractAuthenticationType("Bearer " + jwt, TokenRealm.PROTOCOL))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
-    when(this.jwtUtils.verifyAndExtractUsername("Bearer " + jwt, TokenRealm.PROTOCOL))
-        .thenReturn(USERNAME);
+    when(this.jwtUtils.extractProtocolUserClaims("Bearer " + jwt))
+        .thenReturn(new ProtocolUserClaims(USERNAME, null));
     when(this.userTxService.getAuthenticatedUserByUsername(USERNAME))
         .thenReturn(UserInfo.builder().id(id).username(USERNAME).build());
     return id;

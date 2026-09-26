@@ -35,6 +35,7 @@ import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
 import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.dtos.ProtocolUserClaims;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
@@ -82,8 +83,8 @@ class CargoAuthPreProcessorTest {
   CargoAuthPreProcessorTest() {
     when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
-    when(this.jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
-        .thenReturn("ghost");
+    when(this.jwtUtils.extractProtocolUserClaims(anyString()))
+        .thenReturn(new ProtocolUserClaims("ghost", null));
   }
 
   private static ProtocolContext contextOf(final boolean privateRepo) {
@@ -149,6 +150,6 @@ class CargoAuthPreProcessorTest {
     final var result = this.process(false, Permission.READ, false);
 
     assertThat(result.isEmpty()).isTrue();
-    verify(this.jwtUtils, never()).verifyAndExtractUsername(anyString(), any(TokenRealm.class));
+    verify(this.jwtUtils, never()).extractProtocolUserClaims(anyString());
   }
 }

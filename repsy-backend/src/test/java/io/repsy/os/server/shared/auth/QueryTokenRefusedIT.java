@@ -86,7 +86,7 @@ class QueryTokenRefusedIT extends AbstractIntegrationTest {
 
   private String protocolJwt(final User user) {
     return this.jwtUtils.createProtocolToken(
-        user.getId(), user.getUsername(), Duration.ofMinutes(30));
+        user.getId(), user.getUsername(), Duration.ofMinutes(30), user.getTokenVersion());
   }
 
   /** A deploy token as a package manager holds it: the username and the secret. */

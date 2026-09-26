@@ -31,6 +31,7 @@ import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.dtos.ProtocolUserClaims;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
@@ -102,8 +103,8 @@ class HelmAuthComponentTest {
   void userNoLongerExists() {
     when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
-    when(this.jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
-        .thenReturn("ghost");
+    when(this.jwtUtils.extractProtocolUserClaims(anyString()))
+        .thenReturn(new ProtocolUserClaims("ghost", null));
     // A real UserTxService over an empty repository: the lookup itself is under test.
     final var component =
         new HelmAuthComponent(

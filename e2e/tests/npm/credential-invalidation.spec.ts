@@ -21,20 +21,48 @@
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import { npmAdapter } from '../../src/clients/npm.js';
-import { adminCredential, parsePackument, rawGetPackument } from '../../src/clients/npm-raw.js';
-import { registerCredentialInvalidation } from '../../src/scenarios/credential-invalidation.js';
+import {
+  adminCredential,
+  parsePackument,
+  rawGetPackument,
+  rawLogin,
+  rawRequestPath,
+} from '../../src/clients/npm-raw.js';
+import {
+  registerCredentialInvalidation,
+  registerLoginTokenInvalidation,
+} from '../../src/scenarios/credential-invalidation.js';
 
-registerCredentialInvalidation({
-  adapter: npmAdapter,
+const isStored = async (repoName: string, packageName: string, version: string) => {
+  const res = await rawGetPackument(repoName, adminCredential(), packageName);
+  if (res.status === 404) {
+    return false;
+  }
+  if (res.status !== 200) {
+    throw new Error(`GET packument of ${packageName} as admin answered ${res.status}`);
+  }
+  return version in parsePackument(res.body).versions;
+};
+
+registerCredentialInvalidation({ adapter: npmAdapter, repoType: RepoType.NPM, isStored });
+
+// RPS-1552: the token `npm login` stores (a 90 day JWT) ends with a password change. The real `npm publish`
+// sends it as `_authToken`, so the refusal is proved with the tool as well as with a raw request.
+registerLoginTokenInvalidation({
+  name: 'npm',
   repoType: RepoType.NPM,
-  isStored: async (repoName, packageName, version) => {
-    const res = await rawGetPackument(repoName, adminCredential(), packageName);
-    if (res.status === 404) {
-      return false;
+  login: async (repoName, username, secret) => {
+    const res = await rawLogin(repoName, username, secret);
+    if (!res.token) {
+      throw new Error(
+        `npm login for ${username} answered ${res.status}: ${res.response.body.toString('utf8')}`,
+      );
     }
-    if (res.status !== 200) {
-      throw new Error(`GET packument of ${packageName} as admin answered ${res.status}`);
-    }
-    return version in parsePackument(res.body).versions;
+    return res.token;
   },
+  probe: (repoName, token) =>
+    rawRequestPath(repoName, 'GET', 'no-such-package-rps1552', {
+      Authorization: `Bearer ${token}`,
+    }),
+  realClient: { adapter: npmAdapter, isStored },
 });

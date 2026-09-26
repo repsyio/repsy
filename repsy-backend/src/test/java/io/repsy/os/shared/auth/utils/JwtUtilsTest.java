@@ -485,7 +485,8 @@ class JwtUtilsTest {
         this.jwtUtils.createRefreshToken(
             UUID.randomUUID(), "testuser", Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
     final var protocolToken =
-        this.jwtUtils.createProtocolToken(UUID.randomUUID(), "testuser", Duration.ofMinutes(15));
+        this.jwtUtils.createProtocolToken(
+            UUID.randomUUID(), "testuser", Duration.ofMinutes(15), TOKEN_VERSION);
     final var expiredToken =
         this.jwtUtils.createSessionAccessToken(
             UUID.randomUUID(), "testuser", Duration.ofSeconds(-1), SESSION_START, TOKEN_VERSION);
@@ -541,7 +542,8 @@ class JwtUtilsTest {
     final var userId = UUID.randomUUID();
     final var header =
         AuthUtils.AUTH_BEARER
-            + this.jwtUtils.createProtocolToken(userId, "testuser", Duration.ofMinutes(15));
+            + this.jwtUtils.createProtocolToken(
+                userId, "testuser", Duration.ofMinutes(15), TOKEN_VERSION);
 
     assertThat(this.jwtUtils.verifyAndExtractUsername(header, TokenRealm.PROTOCOL))
         .isEqualTo("testuser");
@@ -731,7 +733,8 @@ class JwtUtilsTest {
     final var tokens =
         new String[] {
           this.jwtUtils.createPanelAccessToken(repoId, "testuser", Duration.ofMinutes(1)),
-          this.jwtUtils.createProtocolToken(repoId, "testuser", Duration.ofMinutes(1)),
+          this.jwtUtils.createProtocolToken(
+              repoId, "testuser", Duration.ofMinutes(1), TOKEN_VERSION),
           this.jwtUtils.createRepoScopedToken(repoId, "repo:pull", Duration.ofMinutes(1)),
           this.jwtUtils.createRefreshToken(
               repoId, "testuser", Duration.ofMinutes(1), SESSION_START, TOKEN_VERSION),
@@ -765,7 +768,8 @@ class JwtUtilsTest {
   void verifyProtocolTokenOfAUser() {
     final var userId = UUID.randomUUID();
     final var before = Instant.now().truncatedTo(ChronoUnit.SECONDS);
-    final var token = this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(90));
+    final var token =
+        this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(90), TOKEN_VERSION);
 
     final var claims = this.jwtUtils.verifyProtocolToken(token);
 
@@ -795,7 +799,8 @@ class JwtUtilsTest {
   void verifyProtocolTokenRefuses() {
     final var userId = UUID.randomUUID();
     final var panel = this.jwtUtils.createPanelAccessToken(userId, "alice", Duration.ofMinutes(5));
-    final var expired = this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(-1));
+    final var expired =
+        this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(-1), TOKEN_VERSION);
     final var neverExpires =
         JWT.create()
             .withSubject(userId.toString())
@@ -818,8 +823,10 @@ class JwtUtilsTest {
   void protocolTokensAreUnique() {
     final var userId = UUID.randomUUID();
 
-    final var first = this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(90));
-    final var second = this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(90));
+    final var first =
+        this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(90), TOKEN_VERSION);
+    final var second =
+        this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(90), TOKEN_VERSION);
     final var deployFirst =
         this.jwtUtils.createProtocolToken(
             userId, "alice", Duration.ofDays(90), AuthenticationType.DEPLOY_TOKEN);
@@ -841,6 +848,7 @@ class JwtUtilsTest {
             UUID.randomUUID(),
             "testuser",
             Duration.ofMinutes(15),
+            TOKEN_VERSION,
             List.of("repo/app:pull,push", "repo/lib:delete"));
 
     assertThat(this.jwtUtils.extractAccess("Bearer " + token, TokenRealm.PROTOCOL))
@@ -853,9 +861,14 @@ class JwtUtilsTest {
   void extractAccessEmptyIsNotMissing() {
     final var asked =
         this.jwtUtils.createProtocolToken(
-            UUID.randomUUID(), "testuser", Duration.ofMinutes(15), List.<String>of());
+            UUID.randomUUID(),
+            "testuser",
+            Duration.ofMinutes(15),
+            TOKEN_VERSION,
+            List.<String>of());
     final var plain =
-        this.jwtUtils.createProtocolToken(UUID.randomUUID(), "testuser", Duration.ofMinutes(15));
+        this.jwtUtils.createProtocolToken(
+            UUID.randomUUID(), "testuser", Duration.ofMinutes(15), TOKEN_VERSION);
 
     assertThat(this.jwtUtils.extractAccess("Bearer " + asked, TokenRealm.PROTOCOL)).isEmpty();
     assertThat(this.jwtUtils.extractAccess("Bearer " + plain, TokenRealm.PROTOCOL)).isNull();
@@ -873,6 +886,91 @@ class JwtUtilsTest {
             .sign(Algorithm.HMAC512("another-secret-another-secret-00"));
 
     assertThatThrownBy(() -> this.jwtUtils.extractAccess("Bearer " + forged, TokenRealm.PROTOCOL))
+        .isInstanceOf(UnAuthorizedException.class);
+  }
+
+  /**
+   * RPS-1552: a token minted for a user carries the user's token version as the {@code tv} claim.
+   */
+  @Test
+  @DisplayName("extractProtocolUserClaims reads back the username and the token version")
+  void extractProtocolUserClaimsRoundTrip() {
+    final var plain =
+        this.jwtUtils.createProtocolToken(UUID.randomUUID(), "alice", Duration.ofDays(1), 7);
+    final var withGrants =
+        this.jwtUtils.createProtocolToken(
+            UUID.randomUUID(), "alice", Duration.ofMinutes(30), 3, List.of("repo/app:pull"));
+
+    final var plainClaims = this.jwtUtils.extractProtocolUserClaims("Bearer " + plain);
+    final var grantClaims = this.jwtUtils.extractProtocolUserClaims("Bearer " + withGrants);
+
+    assertThat(plainClaims.username()).isEqualTo("alice");
+    assertThat(plainClaims.tokenVersion()).isEqualTo(7);
+    assertThat(grantClaims.tokenVersion()).isEqualTo(3);
+    assertThat(JWT.decode(plain).getClaim("tv").asInt()).isEqualTo(7);
+    assertThat(this.jwtUtils.extractAccess("Bearer " + withGrants, TokenRealm.PROTOCOL))
+        .containsExactly("repo/app:pull");
+  }
+
+  @Test
+  @DisplayName("extractProtocolUserClaims of a token without the claim has no version (grace)")
+  void extractProtocolUserClaimsWithoutTheClaim() {
+    final var claimless =
+        JWT.create()
+            .withJWTId(UUID.randomUUID().toString())
+            .withSubject(UUID.randomUUID().toString())
+            .withAudience(TokenRealm.PROTOCOL.getAudience())
+            .withClaim("username", "alice")
+            .withExpiresAt(Instant.now().plus(Duration.ofMinutes(5)))
+            .sign(Algorithm.HMAC512(TEST_SECRET));
+
+    final var claims = this.jwtUtils.extractProtocolUserClaims("Bearer " + claimless);
+
+    assertThat(claims.username()).isEqualTo("alice");
+    assertThat(claims.tokenVersion()).isNull();
+  }
+
+  @Test
+  @DisplayName("an anonymous or deploy-token protocol token carries no tv claim")
+  void tokensWithoutAUserCarryNoVersion() {
+    for (final var type :
+        new AuthenticationType[] {AuthenticationType.ANONYMOUS, AuthenticationType.DEPLOY_TOKEN}) {
+      final var token =
+          this.jwtUtils.createProtocolToken(UUID.randomUUID(), "x", Duration.ofMinutes(5), type);
+
+      assertThat(JWT.decode(token).getClaim("tv").isMissing()).isTrue();
+    }
+    assertThat(
+            JWT.decode(
+                    this.jwtUtils.createRepoScopedToken(
+                        UUID.randomUUID(), "repo:pull", Duration.ofMinutes(5)))
+                .getClaim("tv")
+                .isMissing())
+        .isTrue();
+  }
+
+  @Test
+  @DisplayName("extractProtocolUserClaims refuses a panel token, an expired token and a forged one")
+  void extractProtocolUserClaimsRefuses() {
+    final var panel =
+        this.jwtUtils.createPanelAccessToken(UUID.randomUUID(), "alice", Duration.ofMinutes(5));
+    final var expired =
+        this.jwtUtils.createProtocolToken(UUID.randomUUID(), "alice", Duration.ofDays(-1), 1);
+    final var forged =
+        JWT.create()
+            .withSubject(UUID.randomUUID().toString())
+            .withAudience(TokenRealm.PROTOCOL.getAudience())
+            .withClaim("username", "alice")
+            .withClaim("tv", 5)
+            .withExpiresAt(Instant.now().plus(Duration.ofMinutes(5)))
+            .sign(Algorithm.HMAC512("another-secret-another-secret-00"));
+
+    assertThatThrownBy(() -> this.jwtUtils.extractProtocolUserClaims("Bearer " + panel))
+        .isInstanceOf(UnAuthorizedException.class);
+    assertThatThrownBy(() -> this.jwtUtils.extractProtocolUserClaims("Bearer " + expired))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessage("sessionExpired");
+    assertThatThrownBy(() -> this.jwtUtils.extractProtocolUserClaims("Bearer " + forged))
         .isInstanceOf(UnAuthorizedException.class);
   }
 }
