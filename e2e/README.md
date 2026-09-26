@@ -5949,7 +5949,7 @@ reason (`test.describe.configure({ retries: 1 })`, the one place of the `api` pr
 - **A real scan, directly**: a tarball that bundles `lodash@4.17.20` ends COMPLETED, every finding has the fields of
   `ScannerFinding` in the service's order, and `CVE-2021-23337` is HIGH, fixed in 4.17.21.
 - **A real scan through Repsy, npm**: the same tarball published to an npm repository; the panel's
-  `listVersionScans` shows a COMPLETED scan (HIGH, scanner `trivy`, not the stub's version) whose findings hold that CVE.
+  `listVersionScans` shows a COMPLETED scan (HIGH, scanner `trivy`, its `major.minor.patch` version) whose findings hold that CVE.
 - **A real scan through Repsy, Docker, by reference**: an image pushed with raw HTTP whose one layer holds
   `app/node_modules/lodash/package.json`; the scanner pulls it from `repsy:9090/<repo>/<image>:<tag>` with the
   registry token the backend gives it, and the same CVE is in the panel.
@@ -5960,8 +5960,9 @@ What the probes showed (Trivy 0.66.0), so the spec is built the way it is:
   **not lockfiles**: a `package-lock.json` in the tarball that pins `lodash@4.17.20` finds nothing (COMPLETED, no findings),
   and neither does a `package.json` that only declares the dependency. So the npm scan sees a vulnerable dependency
   only when the package bundles it.
-- Trivy's JSON has no `Trivy` object, which is where the scanner reads `scannerVersion` from, so a real scan reports
-  `scannerVersion: null` (the panel omits it) and `scannerName: trivy`. The spec asserts only that it is not the stub's version.
+- Trivy's JSON has no `Trivy` object, so the scanner reads `scannerVersion` from the binary instead (`trivy version --format json`,
+  once, cached; RPS-1578). A real scan reports the Trivy release (`0.66.0`, the `TRIVY_VERSION` of the scanner Dockerfile) and
+  `scannerName: trivy`; the spec asserts a `major.minor.patch` version that is not the stub's.
 
 The trivy leg of the nightly runs this spec (`api` runner, `--grep @trivy`, the step "Check the opt-in specs ran"
 fails it when the spec skipped) and takes 45 minutes at most: the scanner image is built on the runner (a Maven build,
