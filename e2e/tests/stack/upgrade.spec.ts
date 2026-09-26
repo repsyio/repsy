@@ -257,7 +257,7 @@ async function expectEverythingConsumable(
 
 test.describe.serial(
   'upgrade path from the previous release (RPS-1487)',
-  { tag: ['@local-only', '@upgrade'] },
+  { tag: ['@local-only', '@upgrade', '@cloud-skip'] },
   () => {
     test.skip(
       !optedIn('upgrade'),

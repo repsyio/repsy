@@ -88,6 +88,11 @@ export class Seeder {
     public readonly runId: string,
   ) {}
 
+  /** The backend this seeder creates its data through (RPS-1498: the credential hooks live on it). */
+  get backend(): PanelBackend {
+    return this.api;
+  }
+
   /**
    * The next unique repo name for this test (`e2e-<runid>-<type>-<n>`), NOT created and NOT tracked.
    * For flows where the UI creates the repo (the create-repository modal): type the reserved name

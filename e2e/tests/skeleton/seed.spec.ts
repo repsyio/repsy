@@ -17,7 +17,8 @@
 /**
  * Proves the skeleton end to end: log in as admin, seed a user, a private Maven repo and three
  * deploy tokens (read-write, read-only, already-expired) through the panel API, confirm they exist,
- * then confirm cleanup removes them. A second test pins the real HTTP status a raw protocol-port
+ * then confirm cleanup removes them. A target that allows fewer tokens per repo seeds only the first
+ * `min(3, target.maxDeployTokensPerRepo)` of them, in that order (Repsy Cloud's FREE plan: one, RPS-1498). A second test pins the real HTTP status a raw protocol-port
  * request gets with an expired vs. a valid token, probed against a running instance beforehand
  * (see the os-panel-backend.ts and seeder.ts comments for the endpoints and payload shapes verified this
  * way).
@@ -25,6 +26,7 @@
 import { RepoType } from '../../src/api/panel-api.js';
 import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
+import { target } from '../../src/target.js';
 
 const UNAUTHORIZED = 401;
 const OK = 200;
@@ -45,12 +47,20 @@ test(
   async ({ seeder, panelApi }) => {
     const user = await seeder.createUser();
     const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
-    const rwToken = await seeder.createToken(repo.name, { readOnly: false });
-    const roToken = await seeder.createToken(repo.name, { readOnly: true });
-    const expiredToken = await seeder.createToken(repo.name, {
-      readOnly: false,
-      expirationDate: new Date(Date.now() - ONE_DAY_MS),
-    });
+    const tokenCount = Math.min(3, target.maxDeployTokensPerRepo);
+    const seedTokens = [
+      () => seeder.createToken(repo.name, { readOnly: false }),
+      () => seeder.createToken(repo.name, { readOnly: true }),
+      () =>
+        seeder.createToken(repo.name, {
+          readOnly: false,
+          expirationDate: new Date(Date.now() - ONE_DAY_MS),
+        }),
+    ].slice(0, tokenCount);
+    const seededTokens = [];
+    for (const seedToken of seedTokens) {
+      seededTokens.push(await seedToken());
+    }
 
     const usersBefore = await panelApi.listUsers({ size: 100 });
     expect(usersBefore.some((u) => u.id === user.id)).toBe(true);
@@ -60,9 +70,8 @@ test(
 
     const tokensBefore = await panelApi.listDeployTokens(repo.name);
     const tokenIdsBefore = tokensBefore.map((t) => t.id);
-    expect(tokenIdsBefore).toEqual(
-      expect.arrayContaining([rwToken.id, roToken.id, expiredToken.id]),
-    );
+    expect(seededTokens).toHaveLength(tokenCount);
+    expect(tokenIdsBefore).toEqual(expect.arrayContaining(seededTokens.map((t) => t.id)));
 
     await seeder.cleanup();
 
@@ -78,6 +87,11 @@ test(
   'an expired deploy token is refused on the repo port, a read-write token is not',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
+    // eslint-disable-next-line playwright/no-skipped-test -- a target that cannot seed this (Repsy Cloud) skips it
+    test.skip(
+      !target.supportsExpiredTokenSeed || target.maxDeployTokensPerRepo < 2,
+      'needs an expired and a valid token in one repo, seeded with a past expiration date',
+    );
     const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
     const rwToken = await seeder.createToken(repo.name, { readOnly: false });
     const expiredToken = await seeder.createToken(repo.name, {

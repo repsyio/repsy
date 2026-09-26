@@ -45,6 +45,9 @@ import type { TokenInfo } from './generated/models/TokenInfo.js';
 import type { UserResponse } from './generated/models/UserResponse.js';
 import type { VulnerabilityFindingInfo } from './generated/models/VulnerabilityFindingInfo.js';
 import type { VulnerabilityScanInfo } from './generated/models/VulnerabilityScanInfo.js';
+import type { ExpectationOverlay } from '../scenarios/types.js';
+import type { MaterializedCredential } from '../scenarios/world.js';
+import type { Seeder } from '../seed/seeder.js';
 
 export type {
   ArtifactVersionInfo,
@@ -159,6 +162,19 @@ export function isUnsupportedPanelOperation(err: unknown): err is UnsupportedPan
   return err instanceof UnsupportedPanelOperation;
 }
 
+/**
+ * What a backend needs to seed one credential of a scenario (RPS-1498): the repo it is for and the
+ * `seeder` that tracks every entity it creates, so the test's cleanup removes them.
+ */
+export interface CredentialSeedContext {
+  seeder: Seeder;
+  repoName: string;
+  repoType: RepoType;
+}
+
+/** Which half of a scenario a known gap is about: its publish (with everything before it) or its consume. */
+export type ScenarioSide = 'publish' | 'consume';
+
 /** One page of a repo's deploy tokens, read straight off the JSON envelope. */
 export interface DeployTokenPage {
   content: DeployTokenInfoListItem[];
@@ -178,6 +194,31 @@ export interface PanelBackend {
     path: string,
     body?: unknown,
   ): Promise<{ status: number; body: { data?: unknown } }>;
+
+  // Target-specific credentials, expectations and known gaps (RPS-1498) --------------------------
+  //
+  // `fixtures.ts` asks the backend for the two credentials that differ per product, after the
+  // capability check of `target.ts` (`supportsUserRole`/`supportsRepoUsers`, `expiredTokenStrategy`)
+  // did not already skip the scenario. A backend that cannot seed one throws
+  // `UnsupportedPanelOperation`, which the fixture turns into `test.skip` with the reason.
+
+  /** The `user-password` credential: an account (OS: a `USER`) or a collaborator of `ctx.repoName` (Cloud). */
+  seedUserCredential(ctx: CredentialSeedContext): Promise<MaterializedCredential>;
+  /** The `token-expired` credential: a deploy token of `ctx.repoName` that no longer authenticates. */
+  seedExpiredTokenCredential(ctx: CredentialSeedContext): Promise<MaterializedCredential>;
+  /**
+   * Outcomes this target pins over the catalog's, so a difference of Repsy Cloud never goes into
+   * `catalog.ts` (`expectationFor`, `scenarios/types.ts`). Absent: the catalog's, as on every OS run.
+   */
+  readonly expectByTarget?: ExpectationOverlay;
+  /**
+   * A known, already-filed gap of this target for one scenario of a protocol: a reason string (name
+   * the Jira key) when the scenario is expected to fail on that `side`, `undefined` otherwise. The
+   * loop consults it before the adapter's own `known*` hooks and marks the test `test.fail`, so a gap
+   * that starts passing FAILS the run ("Expected to fail, but passed"): fix it and delete the entry in
+   * the same change as the bump that fixed it. Absent: no gaps, as on every OS run.
+   */
+  knownGap?(protocol: string, scenarioId: string, side: ScenarioSide): string | undefined;
 
   // Users -----------------------------------------------------------------------------------------
 
