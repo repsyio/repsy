@@ -69,7 +69,7 @@ import org.springframework.beans.factory.annotation.Value;
  * gone answers 200 instead of 500) and the stale {@code maven-metadata.xml.asc} cleanup on a
  * metadata rewrite.
  */
-@DisplayName("Maven artifact deletion safety (RPS-1190, RPS-1197, RPS-1349)")
+@DisplayName("Maven artifact deletion safety (RPS-1190, RPS-1197, RPS-1349, RPS-1573)")
 class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
 
   @Autowired private RepoTxService repoTxService;
@@ -736,5 +736,94 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
     assertThat(nestedMetadata.resolve("maven-metadata.xml")).as("nested metadata").exists();
     assertThat(nestedMetadata.resolve("maven-metadata.xml.sha1")).as("nested checksum").exists();
     this.assertArtifactExists(nestedGroup, "gamma");
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // RPS-1573: deleting an artifact or a group that is not there must not cascade.
+  // ---------------------------------------------------------------------------------------------
+
+  @Test
+  @DisplayName(
+      "an artifact name that does not exist answers 404 and leaves the group intact, even when it"
+          + " holds exactly one artifact")
+  void missingArtifactIsRefusedWithoutDeletingTheOnlyArtifactOfTheGroup() throws Exception {
+    final var group = "io.repsy.ghostart";
+    this.seedArtifact(group, "real", "1.0");
+
+    this.mockMvc
+        .perform(
+            delete("/api/mvn/artifacts/{repo}/{group}/{artifact}", this.repoName, group, "ghost")
+                .header(AUTHORIZATION, this.bearerToken())
+                .with(apiPort()))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.msgId").value("artifactNotFound"));
+
+    this.assertArtifactExists(group, "real");
+    this.assertVersionExists(group, "real", "1.0");
+  }
+
+  @Test
+  @DisplayName(
+      "an artifact name that does not exist answers 404 and deletes nothing when the group has"
+          + " several artifacts")
+  void missingArtifactIsRefusedInAGroupWithSiblings() throws Exception {
+    final var group = "io.repsy.ghostsib";
+    this.seedArtifact(group, "alpha", "1.0");
+    this.seedArtifact(group, "beta", "1.0");
+
+    this.mockMvc
+        .perform(
+            delete("/api/mvn/artifacts/{repo}/{group}/{artifact}", this.repoName, group, "ghost")
+                .header(AUTHORIZATION, this.bearerToken())
+                .with(apiPort()))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.msgId").value("artifactNotFound"));
+
+    this.assertArtifactExists(group, "alpha");
+    this.assertArtifactExists(group, "beta");
+  }
+
+  @Test
+  @DisplayName("a group that holds no artifact answers 404 groupNotFound and deletes nothing")
+  void missingGroupIsRefused() throws Exception {
+    this.seedArtifact("io.repsy.realgroup", "real", "1.0");
+
+    this.mockMvc
+        .perform(
+            delete("/api/mvn/artifacts/{repo}/{group}", this.repoName, "io.repsy.ghostgroup")
+                .header(AUTHORIZATION, this.bearerToken())
+                .with(apiPort()))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.msgId").value("groupNotFound"));
+
+    this.assertArtifactExists("io.repsy.realgroup", "real");
+  }
+
+  @Test
+  @DisplayName(
+      "deleting the only real artifact of a group still removes the group (RPS-1348), and the"
+          + " group is then a 404")
+  void deletingTheOnlyRealArtifactStillRemovesTheGroup() throws Exception {
+    final var group = "io.repsy.lastart";
+    this.seedArtifact(group, "real", "1.0");
+
+    this.mockMvc
+        .perform(
+            delete("/api/mvn/artifacts/{repo}/{group}/{artifact}", this.repoName, group, "real")
+                .header(AUTHORIZATION, this.bearerToken())
+                .with(apiPort()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.msgId").value("artifactDeleted"))
+        .andExpect(jsonPath("$.data").value("GROUP"));
+
+    this.assertArtifactGone(group, "real");
+
+    this.mockMvc
+        .perform(
+            delete("/api/mvn/artifacts/{repo}/{group}", this.repoName, group)
+                .header(AUTHORIZATION, this.bearerToken())
+                .with(apiPort()))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.msgId").value("groupNotFound"));
   }
 }

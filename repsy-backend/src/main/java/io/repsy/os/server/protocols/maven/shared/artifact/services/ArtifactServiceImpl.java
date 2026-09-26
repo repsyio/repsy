@@ -509,6 +509,38 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     }
   }
 
+  /**
+   * Confirms the artifact exists, without mutating anything. Called before an artifact delete
+   * reaches {@code hasOnlyOneArtifact}: an artifact name that does not exist in a group holding
+   * exactly one artifact used to be routed into deleting the whole group (RPS-1573, the same shape
+   * as RPS-1190 for versions).
+   *
+   * @throws ItemNotFoundException {@code artifactNotFound}
+   */
+  public void requireArtifact(
+      final UUID repoId, final String groupName, final String artifactName) {
+
+    if (this.artifactRepository
+        .findByRepoIdAndGroupNameAndArtifactName(repoId, groupName, artifactName)
+        .isEmpty()) {
+      throw new ItemNotFoundException(ERR_ARTIFACT_NOT_FOUND);
+    }
+  }
+
+  /**
+   * Confirms the group holds at least one artifact, without mutating anything. A group has no row
+   * of its own, so a group that is not there is one without artifacts, and deleting it is a 404
+   * like every other delete of something missing (RPS-1573).
+   *
+   * @throws ItemNotFoundException {@code groupNotFound}
+   */
+  public void requireGroup(final UUID repoId, final String groupName) {
+
+    if (this.artifactRepository.countByRepoIdAndGroupName(repoId, groupName) == 0) {
+      throw new ItemNotFoundException("groupNotFound");
+    }
+  }
+
   @Transactional
   public void deleteArtifact(final UUID repoId, final String groupName, final String artifactName) {
 

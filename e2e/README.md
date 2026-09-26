@@ -4526,10 +4526,6 @@ behaviour, passes while the bug is there and goes red when it is fixed; the fix 
   `string`. It is the same mismatch on every operation, so `contractProblems` leaves out exactly that one violation
   (`isKnownErrorCodeNull`, unit-tested) and validates the rest of the body in full; `{ strict: true }` shows it. The fix
   (a nullable `errorCode` in the spec, or no field) removes the filter.
-- RPS-1573: `DELETE /api/mvn/artifacts/{repo}/{group}/{artifact}` for an artifact that does not exist deletes the whole GROUP
-  (files and rows) and answers 200 `data: GROUP` when the group holds exactly one artifact: `deleteArtifact` asks
-  `hasOnlyOneArtifact(group)` before it checks the artifact exists (the same shape as RPS-1190, which fixed it for
-  versions). With two artifacts it answers 404 as it should.
 
 ```bash
 ./run.sh test --protocol maven,npm,pypi --grep "panel API"
@@ -4560,7 +4556,8 @@ same `expectCovers`). What is specific to them:
   version from `index.yaml`, the classic download and the OCI manifest (tag and digest) answer 404, `helm pull` and
   `helm show chart` fail, and the sibling version pulls the bytes helm built.
 - **Deleting something that is not there** is a 404 that deletes nothing (a single-tag image, a single-version chart
-  stay complete), so neither protocol has the RPS-1573 cascade Maven has.
+  stay complete). Maven had a cascade here (RPS-1573: a missing artifact of a group with one artifact deleted the group)
+  and answers 404 now, for a missing artifact and for a group without artifacts.
 - **Paging**: `listDockerImages`, `listDockerImageTags` and `searchHelmCharts` run `expectPagingSweep`; the version list of a
   chart is not paged.
 

@@ -435,8 +435,34 @@ test.describe('the Maven panel API against what mvn deploy stored', () => {
     const toolResolved = await mvn.resolve(world(d, 'tool', version));
     expect(toolResolved.clientExitCode, toolResolved.command).toBe(0);
     expect(toolResolved.contentSha256).toBe(d.jars.get('tool')?.get(version));
-    // (Deleting 'lib' a second time is left out on purpose: with 'tool' the only artifact left it takes
-    // the whole group with it, RPS-1573 below.)
+    // Deleting 'lib' a second time is a 404 that deletes nothing, although 'tool' is now the only artifact of
+    // the group: the check that the artifact exists comes before the "last artifact takes the group" cascade
+    // (RPS-1573).
+    expectFailure(
+      'deleteMavenArtifact',
+      await callOperation('deleteMavenArtifact', artifactValues(d, 'lib')),
+      404,
+      'artifactNotFound',
+    );
+    expect(
+      expectContract(
+        'getMavenGroupSummary',
+        await callOperation('getMavenGroupSummary', { repoName: d.repoName, groupName: d.groupId }),
+      ),
+      'the group and its last artifact survive the delete of a missing one',
+    ).toEqual({ groupName: d.groupId, artifactCount: 1, versionCount: 1 });
+    const toolStill = await mvn.resolve(world(d, 'tool', version));
+    expect(toolStill.clientExitCode, toolStill.command).toBe(0);
+    // A group that holds no artifact is a 404 as well, not a 200 that deleted nothing.
+    expectFailure(
+      'deleteMavenGroup',
+      await callOperation('deleteMavenGroup', {
+        repoName: d.repoName,
+        groupName: `${d.groupId}.nosuchgroup`,
+      }),
+      404,
+      'groupNotFound',
+    );
 
     // Now the group.
     const group = await callOperation('deleteMavenGroup', {
@@ -459,6 +485,13 @@ test.describe('the Maven panel API against what mvn deploy stored', () => {
       await callOperation('listMavenGroups', { repoName: d.repoName }),
     ) as { content: unknown[] };
     expect(rows.content).toEqual([]);
+    // And the group that is gone is a 404 when it is deleted again.
+    expectFailure(
+      'deleteMavenGroup',
+      await callOperation('deleteMavenGroup', { repoName: d.repoName, groupName: d.groupId }),
+      404,
+      'groupNotFound',
+    );
   });
 });
 
@@ -475,27 +508,5 @@ test.describe('known bugs of the Maven panel API', () => {
       contractProblems('listMavenGroups', 200, res.json, { strict: true }),
       'the body matches the schema exactly',
     ).toEqual([]);
-  });
-
-  test('RPS-1573: deleting an artifact that does not exist deletes the whole group when it holds one artifact', async ({
-    seeder,
-  }) => {
-    test.fail(true, 'RPS-1573: the delete answers 200 and removes the group instead of a 404');
-    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
-    const pkg = await seedPackage(repo, seeder, {});
-    const [groupId] = pkg.name.split(':') as [string];
-
-    const res = await callOperation('deleteMavenArtifact', {
-      repoName: repo.name,
-      groupName: groupId,
-      artifactName: 'no-such-artifact',
-    });
-
-    expectFailure('deleteMavenArtifact', res, 404, 'artifactNotFound');
-    const summary = await callOperation('getMavenGroupSummary', {
-      repoName: repo.name,
-      groupName: groupId,
-    });
-    expect(expectContract('getMavenGroupSummary', summary)).toMatchObject({ artifactCount: 1 });
   });
 });

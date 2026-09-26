@@ -1420,6 +1420,33 @@ class ArtifactServiceImplTest {
   }
 
   @Test
+  @DisplayName("requireArtifact refuses an artifact that has no row and accepts one that has")
+  void requireArtifactRefusesAMissingArtifact() {
+    final var id = UUID.randomUUID();
+    this.stubArtifact(id);
+
+    assertThatCode(() -> this.artifactService.requireArtifact(id, "com.acme", "lib"))
+        .doesNotThrowAnyException();
+    assertThatThrownBy(() -> this.artifactService.requireArtifact(id, "com.acme", "ghost"))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("artifactNotFound");
+  }
+
+  @Test
+  @DisplayName("requireGroup refuses a group without artifacts and accepts one that has some")
+  void requireGroupRefusesAGroupWithoutArtifacts() {
+    final var id = UUID.randomUUID();
+    when(this.artifactRepository.countByRepoIdAndGroupName(id, "com.acme")).thenReturn(2L);
+    when(this.artifactRepository.countByRepoIdAndGroupName(id, "com.ghost")).thenReturn(0L);
+
+    assertThatCode(() -> this.artifactService.requireGroup(id, "com.acme"))
+        .doesNotThrowAnyException();
+    assertThatThrownBy(() -> this.artifactService.requireGroup(id, "com.ghost"))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("groupNotFound");
+  }
+
+  @Test
   @DisplayName("deleting a version, an artifact or a group drops the signatures parked under it")
   void deletingDropsTheParkedSignatures() {
     final var id = UUID.randomUUID();
