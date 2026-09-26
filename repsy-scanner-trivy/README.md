@@ -28,17 +28,21 @@ A scan covers what the submitted artifact **contains**; it does not resolve what
 
 - **Files (Maven, npm, PyPI).** The service unpacks a `.tgz`/`.tar.gz` or a wheel (`.whl`) into a temporary
   directory (any other file, such as a jar, is scanned as it is) and runs `trivy rootfs --format json` on it.
-  `rootfs` runs Trivy's analyzers for *installed* packages: `node_modules/*/package.json`, jars (nested jars
-  included), Python `.dist-info` metadata. The analyzers for lock files (`package-lock.json`, `yarn.lock`,
-  `pnpm-lock.yaml`) and for dependency resolution (a `pom.xml`) only run under `trivy fs`, which this service does
-  not use.
-- **What follows.** An npm tarball is scanned for the packages it bundles, not for its `dependencies`; a thin jar
-  is scanned as itself, not for the dependencies of its POM; a wheel is scanned for its own metadata, not for its
-  `Requires-Dist`. A package that declares vulnerable dependencies without bundling them is scanned clean.
+  `rootfs` runs Trivy's analyzers for *installed* packages: the package's own metadata files (`package/package.json`
+  for npm, `package/PKG-INFO` or `*.dist-info` for PyPI), bundled packages in `node_modules/*/package.json`, nested
+  jars in archives. The analyzers for lock files (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`) and for
+  dependency resolution (a `pom.xml`) only run under `trivy fs`, which this service does not use.
+- **What follows.** An npm tarball is scanned for its own package and the packages it bundles, not for its declared
+  `dependencies` or `devDependencies` (lock files are ignored); a thin jar is scanned as itself, not for the
+  dependencies of its POM; a wheel is scanned for its own metadata, not for its declared `Requires-Dist`. A package
+  that declares vulnerable dependencies without bundling them is scanned clean.
+- **Gaps.** A scan only sees versions that were pushed while scanning was enabled and not turned off in the repo
+  settings. Findings are frozen at the time of the scan and do not update when the vulnerability database learns a new
+  advisory. An audit searches only the repository it is aimed at, so versions installed from elsewhere (or in Cloud,
+  proxied packages) are not scanned.
 - **Docker.** An image is not uploaded: the service runs `trivy image` on the reference it is given and pulls the
   image itself, so all its layers are scanned.
-- **`npm audit`.** The application answers `npm audit` from the findings of these scans, so it reports an advisory
-  only for a package and version that a scanned tarball of that repository bundled (see the root
+- **`npm audit`.** The application answers `npm audit` from the findings of these scans (see the root
   [README](../README.md#auditing-npm-packages)).
 
 ## Local build & run
