@@ -194,7 +194,8 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
    * A deploy token reads and writes, and never manages: a Docker request that needs {@link
    * Permission#MANAGE} (deleting a manifest, RPS-1216) is refused for it, whether or not the token
    * is read-only, so a CI's credential cannot delete what it pushed. The panel offers the same
-   * operations to users who manage the repo only.
+   * operations to users who manage the repo only. {@code ProtocolAuthService} now refuses MANAGE
+   * for every protocol (RPS-1424); this override stays as defence in depth for the delete route.
    */
   @Override
   public void authorizeTokenRequestTokenId(

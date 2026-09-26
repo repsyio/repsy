@@ -24,7 +24,6 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.shared.utils.ExtractPath;
-import io.repsy.protocols.npm.shared.utils.NpmRevPath;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -93,7 +92,7 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
 
       final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
 
-      if (!isPublishDeprecateOrUnpublish(relativePath)) {
+      if (!isPublishOrDeprecate(relativePath)) {
         return Optional.empty();
       }
       return parsedPathOpt;
@@ -102,24 +101,16 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
 
   /**
    * Must match the package pattern and not be login or dist-tags. A path with {@code /-rev/} is
-   * only the packument of an unpublish ({@code /<package>/-rev/<rev>}), never a tarball's; every
-   * other path is a publish or a deprecate.
+   * part of an unpublish, which removes stored files and needs {@link Permission#MANAGE}: its
+   * packument PUT belongs to {@link AbstractNpmPackageUnpublishProtocolMethodHandler}, so this
+   * handler, which keeps {@link Permission#WRITE}, never matches it (RPS-1424).
    */
-  private static boolean isPublishDeprecateOrUnpublish(final String relativePath) {
+  private static boolean isPublishOrDeprecate(final String relativePath) {
 
-    if (!PACKAGE_PATTERN.matcher(relativePath).matches()
-        || relativePath.contains("/-/user/") // Not login
-        || relativePath.contains("dist-tags")) { // Not dist-tags
-      return false;
-    }
-
-    if (!relativePath.contains(REV_MARKER)) {
-      return true;
-    }
-
-    return NpmRevPath.parse(relativePath)
-        .filter(path -> path.tarballFilename() == null)
-        .isPresent();
+    return PACKAGE_PATTERN.matcher(relativePath).matches()
+        && !relativePath.contains("/-/user/") // Not login
+        && !relativePath.contains("dist-tags") // Not dist-tags
+        && !relativePath.contains(REV_MARKER); // Not an unpublish
   }
 
   @Override
@@ -144,25 +135,11 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
           this.objectMapper.readValue(
               request.getInputStream(), new TypeReference<Map<String, Object>>() {});
 
-      final var revPath = NpmRevPath.parse(relativePath);
-      final @Nullable String scopeName;
-      final String packageName;
+      final var pathVars = ExtractPath.extractPathVars(packagePath);
+      final @Nullable String scopeName = pathVars.scopeName();
+      final String packageName = pathVars.packageName();
 
-      if (revPath.isPresent()) {
-        // Unpublish version: the package is what precedes /-rev/<rev>, not the whole path
-        scopeName = revPath.get().scopeName();
-        packageName = revPath.get().packageName();
-
-        this.npmProtocolFacade.unPublishPackageVersion(
-            protocolContext, scopeName, packageName, payload);
-      } else {
-        // Publish or deprecate
-        final var pathVars = ExtractPath.extractPathVars(packagePath);
-        scopeName = pathVars.scopeName();
-        packageName = pathVars.packageName();
-
-        this.npmProtocolFacade.publishOrDeprecate(protocolContext, scopeName, packageName, payload);
-      }
+      this.npmProtocolFacade.publishOrDeprecate(protocolContext, scopeName, packageName, payload);
 
       return ResponseEntity.ok()
           .contentType(MediaType.APPLICATION_JSON)

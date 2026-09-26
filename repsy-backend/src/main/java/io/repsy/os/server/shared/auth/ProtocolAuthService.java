@@ -357,6 +357,11 @@ public class ProtocolAuthService {
       final @NonNull UUID tokenId,
       final @NonNull Permission permission) {
 
+    // A deploy token never manages, whatever its read-only flag says (RPS-1424).
+    if (permission == Permission.MANAGE) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
     final var deployTokenInfo = this.deployTokenService.findByRepoIdAndTokenId(repoId, tokenId);
 
     if (deployTokenInfo.isEmpty()) {
@@ -392,8 +397,18 @@ public class ProtocolAuthService {
     this.deployTokenService.updateLastUsedTime(deployTokenInfo.getId());
   }
 
+  /**
+   * A deploy token reads and writes, and never manages: a request that needs {@link
+   * Permission#MANAGE} (removing stored files, for example {@code npm unpublish}, RPS-1424) is
+   * refused for it, read-only or not, so a CI's credential cannot delete what it published. The
+   * panel offers those operations to admins only.
+   */
   private void authorizeDeployToken(
       final @NonNull DeployTokenInfo deployTokenInfo, final @NonNull Permission permission) {
+
+    if (permission == Permission.MANAGE) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
 
     if (this.isWritePermissionRequired(permission) && deployTokenInfo.isReadOnly()) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);

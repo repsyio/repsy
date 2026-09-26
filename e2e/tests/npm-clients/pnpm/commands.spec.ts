@@ -42,6 +42,7 @@ import {
   rawRequestPath,
 } from '../../../src/clients/npm-raw.js';
 import {
+  adminBinding,
   newRepo,
   packageNameFor,
   publishPackage,
@@ -156,7 +157,7 @@ test(
 );
 
 test(
-  'pnpm unpublish removes a version (native; a `-rev/undefined` PUT)',
+  'pnpm unpublish removes a version for an admin (native; a `-rev/undefined` PUT)',
   {
     tag: ['@pnpm', '@commands', '@unpublish'],
   },
@@ -164,11 +165,10 @@ test(
     const repo = await newRepo(seeder);
     const recorder = await startWireRecorder();
     try {
-      const writer = {
-        ...(await tokenBinding(seeder, repo.name, { readOnly: false })),
-        baseUrl: recorder.baseUrl,
-      };
-      const ctx = await pnpmClient.prepare('unpublish', [writer]);
+      // Unpublishing removes stored files, so it needs the ADMIN role; a deploy token never can
+      // (RPS-1424, below).
+      const admin = adminBinding(repo.name, { baseUrl: recorder.baseUrl });
+      const ctx = await pnpmClient.prepare('unpublish', [admin]);
       const name = packageNameFor(seeder, 'gone');
       for (const version of ['1.0.0', '1.1.0']) {
         const published = await publishPackage(pnpmClient, ctx, { packageName: name, version });
@@ -200,6 +200,36 @@ test(
     } finally {
       await recorder.stop();
     }
+  },
+);
+
+test(
+  'pnpm unpublish is refused for a read-write deploy token, and the version stays (RPS-1424)',
+  {
+    tag: ['@pnpm', '@commands', '@unpublish', '@negative'],
+  },
+  async ({ seeder }) => {
+    const repo = await newRepo(seeder);
+    const writer = await tokenBinding(seeder, repo.name, { readOnly: false });
+    const ctx = await pnpmClient.prepare('unpublish-token', [writer]);
+    const name = packageNameFor(seeder, 'kept');
+    for (const version of ['1.0.0', '1.1.0']) {
+      const published = await publishPackage(pnpmClient, ctx, { packageName: name, version });
+      expect(published.result.exitCode).toBe(0);
+    }
+
+    // Publishing, deprecating and re-tagging stay WRITE; removing a version needs MANAGE.
+    const unpublished = await runPnpm(ctx, 'pnpm-unpublish-token', ['unpublish', `${name}@1.1.0`]);
+    expect(unpublished.exitCode, `${unpublished.command}\n${unpublished.stderr}`).not.toBe(0);
+
+    const packument = await rawGetPackument(repo.name, adminCredential(), name);
+    expect(
+      Object.keys((JSON.parse(packument.body.toString('utf8')) as { versions: object }).versions),
+    ).toEqual(['1.0.0', '1.1.0']);
+    const tarball = await fetch(`${env.repoBaseUrl}/${repo.name}/${name}/-/${name}-1.1.0.tgz`, {
+      headers: npmAuthHeader(adminCredential()),
+    });
+    expect(tarball.status, 'the version is still downloadable').toBe(200);
   },
 );
 

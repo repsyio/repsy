@@ -403,8 +403,8 @@ test.describe('helm registry rules (raw HTTP)', () => {
   });
 
   test(
-    'R14: DELETE removes a chart from both the classic index and, for an OCI-pushed chart, the ' +
-      'manifest too',
+    'R14: DELETE (admin only, never a deploy token) removes a chart from both the classic ' +
+      'index and, for an OCI-pushed chart, the manifest too',
     { tag: ['@settings'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'delete');
@@ -428,6 +428,22 @@ test.describe('helm registry rules (raw HTTP)', () => {
       };
       const roDelete = await rawDeleteChart(layout.repoName, roCred, layout.chart, '0.1.0');
       expect(roDelete.status, 'a read-only token cannot delete').toBe(401);
+
+      // RPS-1424: removing a chart's files needs MANAGE (the ADMIN role, as in the panel); a
+      // deploy token never has it, read/write or not. A push stays a WRITE.
+      const rw = await seeder.createToken(layout.repoName, { readOnly: false });
+      const rwCred = {
+        transport: 'basic' as const,
+        username: rw.username,
+        password: rw.token,
+        kind: 'token' as const,
+      };
+      const rwDelete = await rawDeleteChart(layout.repoName, rwCred, layout.chart, '0.1.0');
+      expect(rwDelete.status, 'a read-write token cannot delete either').toBe(401);
+      expect(
+        (await rawDownloadChart(layout.repoName, admin, layout.chart, '0.1.0')).status,
+        'the refused delete left the chart',
+      ).toBe(200);
 
       const del = await rawDeleteChart(layout.repoName, admin, layout.chart, '0.1.0');
       expect(del.status).toBe(200);
