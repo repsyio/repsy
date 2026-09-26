@@ -34,6 +34,9 @@
  * when the scanner starts (readiness holds until that is done, bounded here by `READY_TIMEOUT_MS`). A
  * red run whose failure message mentions the download ("failed to download", "OCI artifact error",
  * "unexpected status code") is ghcr.io / mirror.gcr.io not answering, not a Repsy fault (README).
+ * That is why this spec retries once (`test.describe.configure` below, RPS-1595) in every environment,
+ * although the api project itself never retries: it is one of the two places of the suite that wait on
+ * the internet (the other is Maven Central for the maven project). REPSY_E2E_RETRIES does not apply here.
  */
 import zlib from 'node:zlib';
 
@@ -82,7 +85,7 @@ test.describe('the real repsy-scanner-trivy', { tag: ['@trivy'] }, () => {
     !optedIn('trivy'),
     'opt-in: needs the real scanner (./run.sh local up --trivy); run with REPSY_E2E_TRIVY=1 ./run.sh test (README "Real scanner stack")',
   );
-  test.describe.configure({ timeout: 360_000 });
+  test.describe.configure({ timeout: 360_000, retries: 1 });
 
   test.beforeAll(async () => {
     test.setTimeout(READY_TIMEOUT_MS + 30_000);

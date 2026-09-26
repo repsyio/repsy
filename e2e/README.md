@@ -4119,6 +4119,19 @@ previous release already has both, the accounts and the layout parts of the spec
 `REPSY_E2E_UPGRADE_FROM=<tag>` (the nightly's `upgrade_from` input) overrides it for one run. `local up
 --upgrade` pulls it first and stops with a clear message when it cannot (no network, tag not published).
 
+**After a release** (releases are cut by hand, by pushing a `v*` tag that `release.yml` builds, and no checklist in the
+repository lists steps, so this is the list): once `repo.repsy.io/repsy/os/repsy:<new tag>` is pullable,
+
+1. set `PREVIOUS_RELEASE` in `src/upgrade/previous-release.ts` to the new tag (no `v`);
+2. read the spec's per-release expectations again (`tests/stack/upgrade.spec.ts`): `PREVIOUS_SCHEMA_VERSION`, the V0017 password
+   reset and V0024 Docker manifest expectations only hold for a previous release that predates those migrations, and the count
+   of applied migrations changes;
+3. run `gh workflow run e2e-nightly.yml -f suite=upgrade` and read both legs.
+
+Skipping it does not turn a leg red: they keep upgrading from the old tag, which proves the path from a release that fewer and
+fewer installations still run. Doing step 1 without step 2 does: a tag that already contains V0017 and V0024 leaves the
+accounts and layout tests with nothing to migrate.
+
 What `--upgrade` does (`docker-compose.stack-upgrade.yml`, an overlay row like the others, "Stack overlays"):
 `run.sh` prepares the image under test (`REPSY_IMAGE` as it is, else built as `repsy-os-e2e:<project tag>`,
 not started) and starts the previous release from the stack files, whose ports, healthcheck and volumes
@@ -4719,13 +4732,13 @@ passwords can log in; the backend still refuses to boot with an `ADMIN_INITIAL_P
 the complexity rule, and one over 72 bytes). The `ui` project runs a worker-scoped preflight
 (`assertAdminCredentialsUsableInUi`) that fails every test with a message saying exactly that. `e2e/.env.example` documents it next to the `REPSY_UI_*` variables.
 
-| Variable              | Default                                            | Effect                                                                                         |
-| --------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `REPSY_UI_BASE_URL`   | `REPSY_API_BASE_URL`, else `http://localhost:8080` | Playwright `baseURL`                                                                           |
-| `REPSY_UI_WORKERS`    | `4` (compose)                                      | Playwright `workers`; config-wide, so only the `ui` service sets it                            |
-| `REPSY_UI_NO_SANDBOX` | unset                                              | `1` = `chromiumSandbox: false`, see "Chromium sandbox" below                                   |
-| `REPSY_UI_OPT_IN`     | unset                                              | comma list of opt-in suites (also `REPSY_E2E_OPT_IN`); `optedIn('throttle')`, "Stack overlays" |
-| `CI`                  | unset                                              | forwarded to the `ui` service only: `retries: 1`, `forbidOnly`, `trace: on-first-retry`        |
+| Variable              | Default                                            | Effect                                                                                                         |
+| --------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `REPSY_UI_BASE_URL`   | `REPSY_API_BASE_URL`, else `http://localhost:8080` | Playwright `baseURL`                                                                                           |
+| `REPSY_UI_WORKERS`    | `4` (compose)                                      | Playwright `workers`; config-wide, so only the `ui` service sets it                                            |
+| `REPSY_UI_NO_SANDBOX` | unset                                              | `1` = `chromiumSandbox: false`, see "Chromium sandbox" below                                                   |
+| `REPSY_UI_OPT_IN`     | unset                                              | comma list of opt-in suites (also `REPSY_E2E_OPT_IN`); `optedIn('throttle')`, "Stack overlays"                 |
+| `CI`                  | unset                                              | forwarded to every runner: `forbidOnly`; the `ui` project also `retries: 1` and `trace: on-first-retry` ("CI") |
 
 Where things land (all under the existing bind mounts): `test-results/` holds, per failed test, the
 trace (`trace.zip`; open it with `pnpm exec playwright show-trace <path>` on the host), the failure
@@ -5569,7 +5582,10 @@ starting: its first scan retries (5 attempts, 5 s doubling) and then ends FAILED
 whose failure reads `scan failed: trivy exited with code 1: ... FATAL ... failed to download vulnerability DB: OCI
 artifact error ... connection refused / unexpected status code / toomanyrequests` is the registry not answering (a
 network hiccup or a rate limit), not a Repsy fault: run the leg again. `TRIVY_DB_REPOSITORY` and
-`TRIVY_JAVA_DB_REPOSITORY` of the scanner point it at a mirror.**
+`TRIVY_JAVA_DB_REPOSITORY` of the scanner point it at a mirror** (the overlay passes both through from the environment of
+`local up`, and keeps the scanner's own defaults when they are unset; the nightly reads the repository variables
+`E2E_TRIVY_DB_REPOSITORY` and `E2E_TRIVY_JAVA_DB_REPOSITORY`, "CI"). The contract spec retries once for exactly this
+reason (`test.describe.configure({ retries: 1 })`, the one place of the `api` project that does).
 
 `tests/api/trivy-contract.spec.ts` (`@trivy`, opt-in `trivy`, the `api` runner, 10 tests):
 
@@ -5691,8 +5707,8 @@ gh run watch                                               # follow the run star
 
 `suite=ui` with `protocol=maven` selects nothing and fails the plan job with a message. A scheduled
 run is always "everything". `h2_full` names the runner of the `h2-full` leg and applies whatever `protocol`
-says; without it the leg takes tonight's runner of the rotation and `protocol` filters it like any other. Only one run is active at a time (`concurrency: e2e-nightly`, no
-cancelling): a second one waits.
+says; without it the leg takes tonight's runner of the rotation and `protocol` filters it like any other. Only one run is active at a time: see
+"Concurrency" below.
 
 ### What runs
 
@@ -5702,7 +5718,7 @@ cancelling): a second one waits.
 | `ui`         | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                                   | 60 min  |
 | `wire`       | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                                                       | 150 min |
 | `h2`         | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                                       | 90 min  |
-| `h2-full`    | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another                                 | 60 min  |
+| `h2-full`    | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another                                 | 90 min  |
 | `scanner`    | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite                    | 60 min  |
 | `throttle`   | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                                   | 30 min  |
 | `limits`     | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                                     | 60 min  |
@@ -5717,11 +5733,12 @@ others. Every leg does the same: load the image, `./run.sh local up [--h2]` (wit
 <runner>` per runner, `./run.sh sweep --all --dry-run` as a **leak check**, a job summary, the
 artifacts, and `./run.sh local down`. The leg fails when a runner fails, **or** when the leak check
 lists an `e2e-*` repository or user that a run left behind (the dry run always exits 0, so the step
-greps its `[dry-run] would delete` lines). `CI=true` reaches the `ui` runner alone (`retries: 1`,
-`forbidOnly`, `trace: on-first-retry`); the protocol runners never retry. A test that only passes on its retry
-does not fail the leg, but it is visible twice: the step "Flag the tests that needed a retry" turns every
-`*-retry*` directory of `test-results/` into a `Flaky test` warning annotation on the run, and the job summary
-lists it as a flake candidate. Give each one a ticket; it is not a pass to ignore.
+greps its `[dry-run] would delete` lines). `CI=true` reaches EVERY runner (`docker-compose.runners.yml`), which gives
+each one `forbidOnly` (a stray `test.only` fails the run instead of silently narrowing it); whether a project also
+retries is decided per project ("Retries and flaky tests" below). A test that only passes on its retry does not fail
+the leg, but it is visible twice: the step "Flag the tests that needed a retry" turns every such test into a `Flaky
+test` warning annotation on the run, and the job summary lists it as a flake candidate. Give each one a ticket; it is
+not a pass to ignore.
 
 A leg's default `--grep` can be replaced for single runners: the plan job's `RUNNER_GREP` (`{"stack": ""}` on
 `h2`) makes that runner take another pattern, `""` meaning its whole catalog. The `grep` input, when given,
@@ -5758,13 +5775,76 @@ ran no test, and lists the other skips as notices.
 Each runner gets its own `run.sh test` invocation because every invocation overwrites `test-results/`
 and `playwright-report/` (see "Running"); the workflow copies each runner's output aside first.
 
+### Retries and flaky tests (RPS-1595)
+
+Retries are per Playwright project (`retriesFor()` in `playwright.config.ts`), and `CI` reaches every runner:
+
+| Where                                                 | Retries under `CI` | Why                                                                                                                                                                         |
+| ----------------------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ui`                                                  | 1                  | a browser: render and network timing; the trace is kept on the first retry (`trace: on-first-retry`)                                                                        |
+| `maven`                                               | 1                  | the one protocol runner that waits on the internet: plugin resolution from Maven Central on a cold `maven_m2_shared` volume                                                 |
+| `tests/api/trivy-contract.spec.ts` (the `api` runner) | 1, also outside CI | Trivy downloads its vulnerability databases from ghcr.io; the spec's own `test.describe.configure({ retries: 1 })`                                                          |
+| `stack`                                               | never              | a retried `test.describe.serial` (`upgrade.spec.ts`) runs `beforeAll` again on an already upgraded container and `persistence.spec.ts` restarts the container mid-retry     |
+| every other runner                                    | 0                  | the protocol suites are sealed from the network by design, so a failure is a Repsy fault or a client race and must be a ticket (RPS-1355 was found that way), not a warning |
+
+Two switches, so the packaged harness serves other targets without a fork (RPS-1512, Repsy Cloud against DEV):
+`REPSY_E2E_RETRIES=<n>` sets the count of every project but `stack` (`0` turns the `ui` and `maven` retry off under `CI`
+too; the trivy spec keeps its own), and `REPSY_TARGET=remote` (a shared instance, where network flakes are real) makes every
+project but `stack` retry once under `CI`. `test.fail()` is unchanged by all of this: a pin that fails as expected passes on
+its first attempt (no retry), and one that unexpectedly passes is retried and reported failed only if it passes again, which
+is the "the fix landed, remove the pin" signal.
+
+A retry that passes leaves no trace in `junit.xml` (it reports the test as passed) and no `<test>-retry1` directory unless the
+attempt wrote something (the `ui` runner's trace does; a `maven` or `api` test does not), so the config also writes
+`test-results/results.json` (the json reporter) and the nightly reads the tests whose status is `flaky` from it, for the
+warning annotations, the "retried" column of the job summary and the artifact `<runner>/results.json`.
+
+**Rule: a `Flaky test` annotation becomes a ticket by the next working day**, naming the leg, the runner and the test. The
+retry is there so one network hiccup does not turn a leg red, not so a flake can stay; a summary nobody opens is how the
+`USR-01` flake of 25 Sep stayed unticketed. A test that failed on its retry too is a plain failure and is listed as such.
+
+### Concurrency (one run at a time)
+
+The workflow has `concurrency: { group: e2e-nightly, cancel-in-progress: false }`, which GitHub applies as: one run of the
+group in progress, at most ONE more pending, and a newer arrival **cancels the pending one** (the running one is never
+cancelled). So two manual dispatches in a row while a run is in progress cancel the one in between (the second wins, the first
+shows "cancelled"), and a manual run that is in progress at 01:23 UTC delays the scheduled nightly until it finishes (and a
+schedule that arrives behind a running dispatch and a pending one cancels the pending one). Dispatch one run, wait for it
+(`gh run watch`), then dispatch the next; use `-f suite=` to run only the legs you care about, `all` takes about an hour.
+
+### Trivy database mirror and cache (RPS-1600)
+
+The `trivy` leg downloads about 1.4 GB of vulnerability databases from ghcr.io on a shared runner egress, where
+`toomanyrequests` is common. The overlay passes `TRIVY_DB_REPOSITORY` and `TRIVY_JAVA_DB_REPOSITORY` through to the scanner
+(unset or empty: the scanner's own defaults, ghcr.io then mirror.gcr.io), and the workflow's "Start the stack" step sets them
+from the repository variables `E2E_TRIVY_DB_REPOSITORY` and `E2E_TRIVY_JAVA_DB_REPOSITORY` (Settings, Secrets and variables,
+Actions, Variables): comma lists of OCI repositories, tried in order, for example a private mirror of
+`ghcr.io/aquasecurity/trivy-db:2` and `ghcr.io/aquasecurity/trivy-java-db:1`. Nothing is set today.
+
+There is deliberately no `actions/cache` step for the `trivy-cache` volume: Trivy's `metadata.json` carries
+`NextUpdate = UpdatedAt + 24 h` (probed on 26 Sep: `UpdatedAt 12:58:40Z`, `NextUpdate` the next day, same time) and it downloads
+again once that has passed, so a cache keyed by week is stale at every nightly and would only save the download on a second run
+of the same day. A cache keyed by day would need the runner to export the docker volume to a directory and back, owned by the
+scanner's uid, for a benefit of one download a day; the mirror variable is the fix that helps. Revisit it if the mirror is not enough.
+
+### The tls leg and RPS-1559
+
+The `tls` leg goes red by design when RPS-1559 (the SSL connectors miss `EncodedSolidusHandling.DECODE`, the connection timeout
+and response compression) is fixed: its one `@smoke` pin, `tests/npm/publish-consume.spec.ts` "scoped package real client
+round trip" (`test.fail(optedIn('tls'), 'RPS-1559: ...')`), then "expected to fail but passed". The fix PR removes every
+`RPS-1559` pin (`grep -rn RPS-1559 e2e/tests`, 14 of them: `tests/npm` `publish-consume`, `packument-read` (4),
+`unpublish` (2), and `tests/npm-clients` `matrix/scoped-routing`, `bun/config`, `bun/commands`, `yarn-berry/install-modes` (2),
+`yarn-classic/publish-consume` (2)) and the notes about them in "TLS stack" above. Only the `publish-consume` one is
+`@smoke`, so it is the one that turns the leg red; the others turn a full run of their runner on a TLS stack red.
+
 ### Reading the result
 
 - **Job summary** (the run page, one section per leg): a table per runner with tests, passed, failed,
   skipped, time and retried tests, built from `junit.xml`, the names of the failing tests, the tests that
   needed a retry, the leak check outcome and whether Chromium's sandbox was on.
 - **Artifacts** (run page, "Artifacts"):
-  - `e2e-<leg>-results` (14 days): `<runner>/junit.xml`, `<runner>/playwright-report/` (the HTML report,
+  - `e2e-<leg>-results` (14 days): `<runner>/junit.xml`, `<runner>/results.json` (the json report: which tests retried),
+    `<runner>/playwright-report/` (the HTML report,
     open `index.html` after unzipping, or `pnpm exec playwright show-report <dir>`) and
     `<runner>/test-results/` (per failed test: `trace.zip`, screenshot and, for the `ui` runner, the video;
     `pnpm exec playwright show-trace <trace.zip>`).
@@ -5786,7 +5866,7 @@ The workflow only calls `run.sh`; nothing in it is CI-specific. From `e2e/`, wit
 for p in skeleton maven npm npm-clients cargo nuget docker helm pypi golang ruby stack; do ./run.sh test --target ci --protocol "$p"; done
 ./run.sh sweep --all --dry-run                             # the leak check: it must print no "would delete" line
 ./run.sh local down
-CI=true ./run.sh test --protocol ui --grep @smoke          # with the CI retry/trace behaviour of the ui runner
+CI=true ./run.sh test --protocol ui --grep @smoke          # with the CI behaviour: forbidOnly, and the ui project's retry and trace
 ```
 
 The `h2` leg is the same with `./run.sh local up --h2` and `--grep @smoke` on every runner (and `ui`, and no
@@ -5801,8 +5881,10 @@ no change in the workflow). To run against an image you already built, set `REPS
   the Repsy JVM, PostgreSQL and `REPSY_UI_WORKERS` (4) Chromiums. The runner runs the ui container with
   `network_mode: host` and `ipc: host`, as it does locally, so a runner that forbids either (some
   container-based or rootless runners) cannot run it.
-- The jobs use `runs-on: ${{ vars.E2E_RUNNER || 'ubuntu-latest' }}` (the same GitHub-hosted image
-  `release.yml` uses). Set the repository variable `E2E_RUNNER` (Settings, Secrets and variables,
+- The jobs use `runs-on: ${{ vars.E2E_RUNNER || 'ubuntu-24.04' }}` (the plan job `ubuntu-24.04`), not
+  `ubuntu-latest`, which moves to Ubuntu 26 on 2026-10-19 (RPS-1600): the Chromium sandbox probe, the Docker version
+  and the docker socket's gid of the `stack` runner all change with the image, so the pin moves on purpose, in a PR of
+  its own, after a manual `suite=all` run on the new one (`release.yml` still uses `ubuntu-latest`). Set the repository variable `E2E_RUNNER` (Settings, Secrets and variables,
   Actions, Variables) to another label, for example a larger WarpBuild size than the `warp-ubuntu-latest-x64-2x` that
   `pr-checks.yml` uses (2 vCPU is too small for the `ui` leg), without editing the workflow.
 - Images come from Docker Hub (`postgres:18`, the `node`, `maven`, `rust`, ... bases of the runner
@@ -5834,7 +5916,7 @@ of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays o
   new stack shape gets its own row there.
 - **H2 gets one full catalog a night**, not all ten: a protocol's whole catalog meets H2 every ten nights
   (`h2-full`), its `@smoke` subset every night (`h2`).
-- **The `ui` runner is the only one that retries**, so a flaky protocol test fails its leg outright.
+- **Only `ui`, `maven` and the trivy contract spec retry** ("Retries and flaky tests"), so a flaky test of any other runner fails its leg outright, on purpose.
 
 ## Panel API facts this step verified against a running instance
 

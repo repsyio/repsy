@@ -20,7 +20,8 @@
 #
 # Unlike the stub it needs the network: Trivy downloads its vulnerability database (ghcr.io, with a
 # mirror.gcr.io fallback) on the first scan, and the scanner does so at start-up too. The cache is a
-# named volume of the compose project, so `down` + `up` reuses it; `down -v` drops it.
+# named volume of the compose project, so `down` + `up` reuses it; `down -v` drops it. TRIVY_DB_REPOSITORY and
+# TRIVY_JAVA_DB_REPOSITORY (in the invoking environment) point the downloads at a mirror (RPS-1600).
 #
 # It is an alternative to the stub overlay, never combined with it (both publish the scanner port and
 # both set the backend's scanner URL; run.sh refuses the pair):
@@ -43,6 +44,13 @@ services:
       # A scan that has to download the vulnerability database first (up to 5 attempts with a growing
       # delay inside the scanner) must not hit the scanner's own 300 s limit.
       TRIVY_TIMEOUT_SECONDS: '600'
+      # Where Trivy downloads its vulnerability databases from (RPS-1600): comma lists of OCI repositories,
+      # tried in order. The defaults are the scanner's own (repsy-scanner-trivy application.yml), so an
+      # unset or empty variable changes nothing; set them to a mirror on a network where ghcr.io answers
+      # `toomanyrequests` (the nightly reads the repository variables E2E_TRIVY_DB_REPOSITORY and
+      # E2E_TRIVY_JAVA_DB_REPOSITORY, README.md "CI"). Keep the two defaults equal to the scanner's.
+      TRIVY_DB_REPOSITORY: ${TRIVY_DB_REPOSITORY:-ghcr.io/aquasecurity/trivy-db:2,mirror.gcr.io/aquasec/trivy-db:2}
+      TRIVY_JAVA_DB_REPOSITORY: ${TRIVY_JAVA_DB_REPOSITORY:-ghcr.io/aquasecurity/trivy-java-db:1,mirror.gcr.io/aquasec/trivy-java-db:1}
     volumes:
       - trivy-cache:/home/appuser/.cache/trivy
     # Readiness, not /health: the scanner holds readiness while it downloads the vulnerability databases
