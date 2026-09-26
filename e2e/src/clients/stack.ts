@@ -83,3 +83,233 @@ export async function logLinesContaining(container: string, needle: string): Pro
   const result = await run('docker', ['logs', container], { cwd: '/tmp', label: 'docker-logs' });
   return `${result.stdout}\n${result.stderr}`.split('\n').filter((line) => line.includes(needle));
 }
+
+// ---------------------------------------------------------------------------------------------------
+// Restart and recreate (RPS-1476). tests/stack/persistence.spec.ts uses these to prove what survives a
+// restart of the Repsy container and a recreate of it on the same volumes, and tests/stack/upgrade
+// (RPS-1487) recreates it on another image. They only ever touch the one "repsy" container of the
+// project `REPSY_E2E_STACK_PROJECT` (never postgres, never another stack), and only on a stack this
+// harness owns: every caller skips on a remote target first.
+//
+// Whatever the container does on the way, the harness's own session is gone: a restart with
+// `OS_APP_JWT_SECRET` unset regenerates the secret, so the admin JWT a `PanelApi` holds answers 401
+// afterwards. Call `PanelApi.login()` again before the next panel call (a Basic-auth protocol client is
+// not affected, it authenticates per request).
+// ---------------------------------------------------------------------------------------------------
+
+const HEALTH_TIMEOUT_MS = 180_000;
+const HEALTH_INTERVAL_MS = 1_000;
+
+/** The compose files a stack was started from and the directory they live in (as the HOST sees it). */
+export interface ComposeFiles {
+  /** Absolute paths, in the order compose merges them (`-f` order). */
+  files: string[];
+  workingDir: string;
+}
+
+async function docker(args: readonly string[], label: string, timeoutMs = 60_000) {
+  const result = await run('docker', args, { cwd: '/tmp', label, timeoutMs });
+  if (result.exitCode !== 0) {
+    throw new Error(`${result.command} failed (exit ${result.exitCode}): ${result.stderr.trim()}`);
+  }
+  return result.stdout.trim();
+}
+
+/**
+ * The compose files the running `repsy` container was created from, read off the labels compose puts on
+ * it (`com.docker.compose.project.config_files` and `.working_dir`). They are absolute host paths, which
+ * the stack runner can read because docker-compose.runners.yml mounts `REPSY_E2E_HOST_DIR` (the e2e
+ * directory) read-only at the same path. Take this BEFORE an overlay recreate: after it the labels
+ * name the overlay too.
+ */
+export async function currentComposeFiles(container?: string): Promise<ComposeFiles> {
+  const id = container ?? (await findRepsyContainer());
+  const out = await docker(
+    [
+      'inspect',
+      '--format',
+      '{{index .Config.Labels "com.docker.compose.project.config_files"}}|' +
+        '{{index .Config.Labels "com.docker.compose.project.working_dir"}}',
+      id,
+    ],
+    'docker-inspect-labels',
+  );
+  const [configFiles, workingDir] = out.split('|');
+  const files = (configFiles ?? '').split(',').filter((file) => file !== '');
+  if (files.length === 0 || !workingDir) {
+    throw new Error(
+      `The container ${id} carries no compose config_files/working_dir labels: ${out}`,
+    );
+  }
+  return { files, workingDir };
+}
+
+/** `docker inspect` of the container's start time (changes on every restart/recreate) and health. */
+async function stateOf(container: string): Promise<{ startedAt: string; health: string }> {
+  const out = await docker(
+    [
+      'inspect',
+      '--format',
+      '{{.State.StartedAt}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}',
+      container,
+    ],
+    'docker-inspect-state',
+  );
+  const [startedAt, health] = out.split('|');
+  return { startedAt: startedAt ?? '', health: health ?? '' };
+}
+
+/**
+ * Waits until `container` has started again after `previousStartedAt` and its healthcheck (the SPA's
+ * static root, docker-compose.stack.yml) reports healthy. `docker restart` returns as soon as the
+ * process is started, and the health status of the previous run can still be readable for an instant, so
+ * the start time is compared too.
+ */
+export async function waitHealthy(
+  container: string,
+  previousStartedAt?: string,
+  timeoutMs = HEALTH_TIMEOUT_MS,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let last = '';
+  while (Date.now() < deadline) {
+    const state = await stateOf(container);
+    last = `${state.health} (started ${state.startedAt})`;
+    if (state.health === 'healthy' && state.startedAt !== previousStartedAt) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, HEALTH_INTERVAL_MS));
+  }
+  throw new Error(`Repsy container ${container} is not healthy after ${timeoutMs} ms: ${last}`);
+}
+
+/**
+ * `docker restart` of the Repsy container (SIGTERM, then SIGKILL after `stopTimeoutSeconds`, default
+ * Docker's 10 s), then waits for it to be healthy again. The container, its anonymous volumes and its
+ * environment are unchanged. Returns the container id.
+ */
+export async function restartRepsy(stopTimeoutSeconds = 10): Promise<string> {
+  const container = await findRepsyContainer();
+  const before = await stateOf(container);
+  await docker(
+    ['restart', '--time', String(stopTimeoutSeconds), container],
+    'docker-restart',
+    stopTimeoutSeconds * 1_000 + 60_000,
+  );
+  await waitHealthy(container, before.startedAt);
+  return container;
+}
+
+/**
+ * `docker kill --signal KILL` then `docker start`: the process gets no chance to shut down (no shutdown
+ * hook, no flush of the H2 file database), as after an OOM kill or a power cut. Same container, same
+ * volumes. Waits for the container to be healthy again and returns its id.
+ */
+export async function crashRepsy(): Promise<string> {
+  const container = await findRepsyContainer();
+  const before = await stateOf(container);
+  await docker(['kill', '--signal', 'KILL', container], 'docker-kill');
+  await docker(['start', container], 'docker-start');
+  await waitHealthy(container, before.startedAt);
+  return container;
+}
+
+export interface RecreateOptions {
+  /**
+   * Variables the stack files interpolate, set for this recreate only: `{ REPSY_E2E_JWT_SECRET: '...' }`
+   * for docker-compose.stack-jwt.yml, `{ REPSY_IMAGE: 'repo.repsy.io/repsy/os/repsy:26.08.4' }` for another
+   * image (RPS-1487). Anything not given is what the runner's own environment says, exactly what
+   * `run.sh local up` used: the ports, the image tag, `REPSY_ADMIN_PASSWORD`.
+   */
+  env?: Record<string, string>;
+  /** Overlay files (paths relative to the stack's working directory, or absolute) merged after `files`. */
+  extraFiles?: readonly string[];
+  /**
+   * The files to start from. Default: the ones the running container was created from
+   * (`currentComposeFiles`). Pass the files taken before an overlay recreate to go back to the plain stack.
+   */
+  files?: ComposeFiles;
+}
+
+/**
+ * Recreates the Repsy container: `docker compose -p <project> -f ... up -d --no-deps --no-build
+ * --force-recreate --wait repsy`, from the compose files the container was created from (plus the
+ * overlays in `extraFiles`). The old container is removed and a new one created, with the same
+ * project, image tag and ports, and the anonymous volumes of the old one carried over (`/app/data`,
+ * where the H2 file database and the storage live): what `docker compose up` after an image pull does
+ * in a real deployment. It does not build, and it leaves postgres and the volumes alone. Returns the new
+ * container id.
+ *
+ * The overlay stays in effect for the new container's labels: to undo it, recreate again with the
+ * `ComposeFiles` you took before (see `restoreStack`).
+ */
+export async function recreateRepsy(options: RecreateOptions = {}): Promise<string> {
+  const previous = await findRepsyContainer();
+  const base = options.files ?? (await currentComposeFiles(previous));
+  const extra = (options.extraFiles ?? []).map((file) =>
+    file.startsWith('/') ? file : `${base.workingDir}/${file}`,
+  );
+  const fileArgs = [...base.files, ...extra].flatMap((file) => ['-f', file]);
+  const result = await run(
+    'docker',
+    [
+      'compose',
+      '-p',
+      STACK_PROJECT,
+      '--project-directory',
+      base.workingDir,
+      ...fileArgs,
+      'up',
+      '--detach',
+      '--no-deps',
+      '--no-build',
+      '--force-recreate',
+      '--wait',
+      '--wait-timeout',
+      String(HEALTH_TIMEOUT_MS / 1_000),
+      'repsy',
+    ],
+    {
+      cwd: '/tmp',
+      env: options.env ?? {},
+      // The runner's own environment carries what the stack files interpolate (ports, image tag,
+      // REPSY_ADMIN_PASSWORD); `env` only adds to it.
+      extendEnv: true,
+      timeoutMs: HEALTH_TIMEOUT_MS + 60_000,
+      label: 'docker-compose-recreate',
+    },
+  );
+  if (result.exitCode !== 0) {
+    throw new Error(`${result.command} failed (exit ${result.exitCode}): ${result.stderr.trim()}`);
+  }
+  const container = await findRepsyContainer();
+  if (container === previous) {
+    throw new Error(`docker compose kept the container ${previous}: it was not recreated`);
+  }
+  return container;
+}
+
+/** Recreates the Repsy container from `original` (`currentComposeFiles`), dropping any overlay and env. */
+export async function restoreStack(original: ComposeFiles): Promise<string> {
+  return recreateRepsy({ files: original });
+}
+
+/**
+ * How `/app/data` is mounted in the Repsy container: `volume:<name>` (Docker's anonymous volume, the
+ * image's `VOLUME /app/data`, or a named one) or `bind:<host path>`; `undefined` when nothing is mounted
+ * there, which means the data lives in the container's own layer and dies with it (RPS-1401). A recreate
+ * that keeps the data gives the same string before and after.
+ */
+export async function dataMount(container?: string): Promise<string | undefined> {
+  const id = container ?? (await findRepsyContainer());
+  const out = await docker(
+    [
+      'inspect',
+      '--format',
+      '{{range .Mounts}}{{if eq .Destination "/app/data"}}{{.Type}}:{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}{{end}}{{end}}',
+      id,
+    ],
+    'docker-inspect-mounts',
+  );
+  return out === '' ? undefined : out;
+}

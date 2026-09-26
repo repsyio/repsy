@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The stack runner: the harness itself (see base.Dockerfile) plus the static `docker` CLI, copied in
-# from the official docker-cli image (a named build stage, only a `COPY --from` source, the same
+# The stack runner: the harness itself (see base.Dockerfile) plus the static `docker` CLI and its compose
+# plugin, copied in from the official docker-cli image (a named build stage, only a `COPY --from` source, the same
 # "copy the tool, not the whole image" approach as docker.Dockerfile's crane). Its first layers
 # repeat base.Dockerfile's on purpose, for the reason every protocol runner's header gives.
 #
@@ -25,7 +25,11 @@
 # the protocol runners do not do this: a socket is root on the host, so the runner is only run
 # against a local stack the harness owns (the specs skip themselves on a remote target).
 ARG DOCKER_CLI_VERSION=29.8.1
+# crane, copied the way docker.Dockerfile does it (a named stage, only a `COPY --from` source).
+ARG CRANE_VERSION=v0.22.1
 FROM docker:${DOCKER_CLI_VERSION}-cli AS docker-cli
+
+FROM gcr.io/go-containerregistry/crane:${CRANE_VERSION} AS crane
 
 FROM node:24-bookworm-slim
 
@@ -46,6 +50,44 @@ RUN chmod +x ./entrypoint.sh
 # --- stack-specific layers ---
 
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
-RUN chmod a+rx /usr/local/bin/docker && docker --version
+# The compose plugin ships in the same image. tests/stack/persistence.spec.ts recreates the Repsy
+# container with it (`docker compose up --force-recreate`, clients/stack.ts `recreateRepsy`).
+COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
+RUN chmod a+rx /usr/local/bin/docker /usr/local/libexec/docker/cli-plugins/docker-compose \
+    && docker --version && docker compose version
+
+# Real package clients for the persistence spec (tests/stack/persistence.spec.ts, RPS-1476): a pinned
+# Temurin JDK and Maven (the same download as maven.Dockerfile; keep the versions equal, runners.yml
+# pins both), crane (docker.Dockerfile's copy) and npm, which comes with node. The stack runner drives
+# the same adapters as the protocol runners, so a package is published and consumed by the real tool.
+ARG TEMURIN_VERSION=21
+ARG MAVEN_VERSION=3.9.9
+ENV JAVA_HOME="/opt/java/temurin"
+ENV MAVEN_HOME="/opt/maven"
+ENV PATH="${JAVA_HOME}/bin:${MAVEN_HOME}/bin:${PATH}"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /opt/java \
+    && curl -fsSL "https://api.adoptium.net/v3/binary/latest/${TEMURIN_VERSION}/ga/linux/x64/jdk/hotspot/normal/eclipse?project=jdk" \
+    | tar -xzC /opt/java \
+    && mv /opt/java/jdk-* "${JAVA_HOME}"
+
+RUN curl -fsSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
+    | tar -xzC /opt \
+    && mv "/opt/apache-maven-${MAVEN_VERSION}" "${MAVEN_HOME}" \
+    && chmod -R a+rX "${JAVA_HOME}" "${MAVEN_HOME}"
+
+COPY --from=crane /ko-app/crane /usr/local/bin/crane
+RUN chmod a+rx /usr/local/bin/crane
+
+# Maven's shared, third-party-only cache (clients/maven.ts): a named volume is mounted here at runtime,
+# owned openly in the image so a fresh volume is writable by the host uid (see maven.Dockerfile).
+RUN mkdir -p /app/.maven-shared-m2 && chmod 777 /app/.maven-shared-m2
+
+RUN java --version && mvn --version && crane version && npm --version
 
 CMD ["./entrypoint.sh", "stack"]
