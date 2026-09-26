@@ -4318,7 +4318,7 @@ runner's trust variables; uv and deno get them through `clientEnv`/`sealedEnv` l
 Whichever adapter comes next needs its own TLS setting decided in that file (or in its own client env), and a run of its
 `@smoke` (and full catalog) on a TLS stack recorded under "Runs of this part".
 
-**Runs of this part** (own stack, offset 200, image of main, `REPSY_E2E_TLS=1`): `@smoke` skeleton 21, maven 20, npm 5
+**Runs of this part** (own stack, offset 200, image of main, `REPSY_E2E_TLS=1`): `@smoke` skeleton 21, maven 23, npm 5
 (+1 expected failure), npm-clients 11, cargo 12, nuget 12, docker 8, helm 7, pypi 7, golang 10 + 1 skipped (the shim case),
 ruby 7, api 277: all green, none retried (run as the nightly leg runs them, then its opt-in check). The full catalogs on the same stack (not part of the nightly leg, run once for this part):
 maven 238 passed and 1 skipped, cargo 49, nuget 51, helm 63, ruby 51, golang 48 and 1 skipped, npm-clients 208 (the 13 RPS-1559
