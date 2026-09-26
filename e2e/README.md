@@ -5486,6 +5486,8 @@ alternative to `--scanner`, never combined with it (`run.sh` refuses the pair): 
 (`REPSY_E2E_SCANNER_PORT`, 8090 + offset) and set the backend's scanner URL. The `@scanner` specs need the stub's
 `/control` API and do not run on it.
 
+The scanner scans what an artifact contains, bundled only: it runs `trivy rootfs`, which reads installed packages and not lock files or declared dependencies, so a spec that expects a finding must bundle the vulnerable package (README "Vulnerability Scanning" in the repository root, "What a scan covers").
+
 ```bash
 export REPSY_E2E_PROJECT=rps-1484 REPSY_E2E_PORT_OFFSET=900   # optional, "Parallel stacks"
 ./run.sh local up --trivy          # about 3 minutes on a cold cache (network needed, see below)
