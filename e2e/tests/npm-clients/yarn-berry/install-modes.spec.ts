@@ -278,10 +278,6 @@ test.describe('yarn berry settings', () => {
     'without npmAlwaysAuth a SCOPED read still sends the credential (H-7)',
     { tag: [TAG, '@config'] },
     async ({ seeder }) => {
-      test.fail(
-        optedIn('tls'),
-        'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
-      );
       const repo = await newRepo(seeder);
       const scope = `@e2e-${seeder.runId}`;
       const scoped = packageNameFor(seeder, 'best-effort', true);
@@ -381,10 +377,6 @@ test.describe('yarn berry tarball URLs in the lockfile (H-9)', () => {
     "the lockfile records no __archiveUrl at the registry's own address, scoped packages included",
     { tag: [TAG, '@lockfile', '@archive-url'] },
     async ({ seeder }) => {
-      test.fail(
-        optedIn('tls'),
-        'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
-      );
       const graph = await graphRepo(seeder, 'archive');
       const scope = `@e2e-${seeder.runId}`;
       const scoped = packageNameFor(seeder, 'archived', true);

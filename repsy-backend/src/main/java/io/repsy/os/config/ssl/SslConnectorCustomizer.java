@@ -15,9 +15,9 @@
  */
 package io.repsy.os.config.ssl;
 
+import io.repsy.libs.multiport.configs.RepsyConnectorSettings;
 import io.repsy.os.config.ssl.RepsySslProperties.PortSslProperties;
 import java.util.ArrayList;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.connector.Connector;
 import org.apache.coyote.http11.Http11NioProtocol;
@@ -25,8 +25,10 @@ import org.apache.tomcat.util.net.SSLHostConfig;
 import org.apache.tomcat.util.net.SSLHostConfigCertificate;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
+import org.springframework.boot.web.server.autoconfigure.ServerProperties;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -35,24 +37,36 @@ import org.springframework.stereotype.Component;
 @NullMarked
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE - 10)
-@RequiredArgsConstructor
 public class SslConnectorCustomizer
     implements WebServerFactoryCustomizer<TomcatServletWebServerFactory> {
 
   private static final String FILE_PREFIX = "file:";
 
   private final RepsySslProperties sslProperties;
+  private final ServerProperties serverProperties;
+  private final int connectionTimeout;
+
+  public SslConnectorCustomizer(
+      final RepsySslProperties sslProperties,
+      final ServerProperties serverProperties,
+      @Value("${multiport.tomcat.connection-timeout:120000}") final int connectionTimeout) {
+    this.sslProperties = sslProperties;
+    this.serverProperties = serverProperties;
+    this.connectionTimeout = connectionTimeout;
+  }
 
   @Override
   public void customize(final TomcatServletWebServerFactory factory) {
     final var connectors = new ArrayList<Connector>();
 
+    // Like the plain ports they mirror (see the comment on server.compression in application.yml),
+    // the repo (protocol) listener compresses and the panel API listener does not.
     if (this.sslProperties.api().enabled()) {
-      connectors.add(this.createSslConnector(this.sslProperties.api()));
+      connectors.add(this.createSslConnector(this.sslProperties.api(), false));
     }
 
     if (this.sslProperties.repo().enabled()) {
-      connectors.add(this.createSslConnector(this.sslProperties.repo()));
+      connectors.add(this.createSslConnector(this.sslProperties.repo(), true));
     }
 
     if (!connectors.isEmpty()) {
@@ -60,7 +74,7 @@ public class SslConnectorCustomizer
     }
   }
 
-  private Connector createSslConnector(final PortSslProperties props) {
+  private Connector createSslConnector(final PortSslProperties props, final boolean compress) {
     log.warn(
         "Creating SSL connector — port: {}, keyStore: {}, keyStoreType: {}, keyAlias: {}",
         props.port(),
@@ -71,6 +85,12 @@ public class SslConnectorCustomizer
     connector.setScheme("https");
     connector.setSecure(true);
     connector.setPort(props.port());
+    // Spring Boot's own customizers only ever reach the primary connector (RPS-1559): without the
+    // encoded slash setting Tomcat refuses every scoped npm package (@scope%2Fname) over TLS.
+    RepsyConnectorSettings.apply(
+        connector,
+        this.connectionTimeout,
+        compress ? this.serverProperties.getCompression() : null);
 
     final var protocol = (Http11NioProtocol) connector.getProtocolHandler();
     protocol.setSSLEnabled(true);

@@ -69,8 +69,9 @@ server:
   # The npm packument of a package with many versions is megabytes of JSON, and a client asks for
   # it on every install (RPS-1359). Only JSON is compressed, and only what is worth the effort; the
   # tarballs, blobs and other files of the protocols are never touched. This applies to the main
-  # (protocol) port; the panel port is served uncompressed. SERVER_COMPRESSION_ENABLED=false turns
-  # it off, for a reverse proxy that compresses already.
+  # (protocol) port and to its HTTPS listener (REPO_SSL_*, RPS-1559); the panel port and its HTTPS
+  # listener are served uncompressed. SERVER_COMPRESSION_ENABLED=false turns it off, for a reverse
+  # proxy that compresses already.
   compression:
     enabled: ${SERVER_COMPRESSION_ENABLED:true}
     mime-types: application/json,application/vnd.npm.install-v1+json
