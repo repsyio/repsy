@@ -303,6 +303,36 @@ export async function rawGetIndex(
   });
 }
 
+/**
+ * `GET .../me` with `credential` (Cargo's login: a password or a deploy token in, a token out; a
+ * token in, a renewed one out). Answers the token the client keeps when it is `200`.
+ */
+export async function rawMe(
+  repoName: string,
+  credential: MaterializedCredential,
+): Promise<{ status: number; token?: string; response: RawResponse }> {
+  const response = await rawRequest(`${repoUrl(repoName)}me`, {
+    headers: cargoAuthHeader(credential),
+  });
+  let token: string | undefined;
+  if (response.status === 200) {
+    const parsed = JSON.parse(response.body.toString('utf8')) as { token?: unknown };
+    token = typeof parsed.token === 'string' ? parsed.token : undefined;
+  }
+  return { status: response.status, token, response };
+}
+
+/** Raw `GET` of a crate's sparse-index entry with a login token as a `Bearer` value (RPS-1552). */
+export async function rawGetIndexWithBearer(
+  repoName: string,
+  name: string,
+  token: string,
+): Promise<RawResponse> {
+  return rawRequest(`${repoUrl(repoName)}${indexPath(name)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 /** Raw `GET` of a crate's `.crate` bytes at its canonical download path. */
 export async function rawDownload(
   repoName: string,

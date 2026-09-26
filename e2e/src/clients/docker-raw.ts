@@ -433,6 +433,20 @@ export async function rawStartUpload(
   };
 }
 
+/** `POST /v2/<repo>/<image>/blobs/uploads/` with a token the caller already holds (no token hop):
+ *  the probe of what a stored `/v2/token` JWT still opens (RPS-1552). `202` for a live token, `401`
+ *  for one the server no longer accepts. Writes nothing, like `rawStartUpload`. */
+export async function rawStartUploadWithToken(
+  repoName: string,
+  image: string,
+  token: string,
+): Promise<RawResponse> {
+  return rawFetch(v2Url(`/${repoName}/${image}/blobs/uploads/`), {
+    method: 'POST',
+    headers: bearerHeader(token),
+  });
+}
+
 /**
  * Uploads one blob start-to-finish: `POST` to start, then either one `PATCH` (`mode: 'patch'`) or
  * nothing (`mode: 'monolithic'`, the default) before the final `PUT ?digest=`. Mirrors ggcr's own

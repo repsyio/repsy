@@ -1859,10 +1859,27 @@ being valid and a deploy with it must be refused at once:
 (not 403 or 404), and an admin sees nothing of the refused version stored. `--grep "credential invalidation"`
 selects them, one test per protocol carries `@smoke`.
 
-Docker is not in this suite on purpose. A Docker `/v2/token` JWT is not re-checked against the password: probed
-live, a token minted before `PUT /api/profile/password` still starts a blob upload (202) until it expires
-(`expires_in` 1800), while the old password is refused by `/v2/token` at once (401) and a deleted user's token
-is refused (401) because the user is read again. Whether that is acceptable is an open decision, so nothing pins it.
+### Login tokens (RPS-1552)
+
+A protocol JWT a user logged in with (Docker `/v2/token`, the token `npm login` stores, the Cargo `/me` token)
+carries the user's `token_version` as its `tv` claim, and every request compares it with the user row it reads
+anyway. A password change (own or an admin's reset), a username change and an admin edit that renames move the
+version on, so the token ends at once instead of when it expires (30 minutes; npm 90 days). Before RPS-1552 a
+Docker token minted before `PUT /api/profile/password` still started a blob upload (202) until it expired.
+`registerLoginTokenInvalidation` (same file) pins it per protocol with raw HTTP and the stored token, because a
+real docker client exchanges its Basic credentials again for every operation and never holds a stale one:
+
+- `tests/docker/credential-invalidation.spec.ts`: `POST blobs/uploads/` with the `/v2/token` JWT.
+- `tests/npm/credential-invalidation.spec.ts`: a read with the login token, and the real `npm publish` with it as
+  `_authToken` (refused, nothing stored, and the new login publishes).
+- `tests/cargo/credential-invalidation.spec.ts`: a sparse-index read with the `/me` token.
+
+Each runs four tests: the password change ends the token (`401`, "Session expired.", the same answer as an expired
+token and not counted against the client like a wrong password) and a new login works; an admin
+`reset-password` ends it; another user's password change leaves it alone; a deploy-token JWT is not tied to any
+user (it is checked against its token row) and survives a password change. `--grep "login token invalidation"`
+selects them. A token minted before the release that added the claim has none and is accepted until it
+expires (the backend IT `ProtocolJwtTokenVersionIT` covers that grace; the e2e stack only mints new ones).
 
 ## Cargo runner
 

@@ -16,6 +16,7 @@
 package io.repsy.os.shared.auth.utils;
 
 import com.auth0.jwt.JWT;
+import com.auth0.jwt.JWTCreator;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.exceptions.TokenExpiredException;
@@ -24,6 +25,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.dtos.PanelTokenClaims;
 import io.repsy.os.shared.auth.dtos.ProtocolTokenClaims;
+import io.repsy.os.shared.auth.dtos.ProtocolUserClaims;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.constants.ErrorConstants;
 import jakarta.annotation.PostConstruct;
@@ -50,6 +52,7 @@ public class JwtUtils {
   private static final @NonNull String CLAIM_TOKEN_TYPE = "token_type";
   private static final @NonNull String CLAIM_SESSION_START = "session_start";
   private static final @NonNull String CLAIM_TOKEN_VERSION = "token_version";
+  private static final @NonNull String CLAIM_PROTOCOL_TOKEN_VERSION = "tv";
   private static final @NonNull String CLAIM_TOKEN_FAMILY = "token_family";
   private static final @NonNull String CLAIM_PATH = "path";
   private static final @NonNull String CLAIM_ACCESS = "access";
@@ -163,43 +166,45 @@ public class JwtUtils {
   }
 
   /**
-   * Creates a protocol token. It carries a random id, so that two logins of one user in the same
-   * second get two tokens, and revoking one of them (RPS-1361) leaves the other valid.
-   */
-  public @NonNull String createProtocolToken(
-      final @NonNull UUID userId,
-      final @NonNull String username,
-      final @NonNull TemporalAmount timeoutDuration) {
-    return JWT.create()
-        .withJWTId(UUID.randomUUID().toString())
-        .withSubject(userId.toString())
-        .withAudience(TokenRealm.PROTOCOL.getAudience())
-        .withClaim(CLAIM_USERNAME, username)
-        .withExpiresAt(Instant.now().plus(timeoutDuration))
-        .sign(Algorithm.HMAC512(this.secret));
-  }
-
-  /**
-   * Creates a protocol token that records what the client asked for when it exchanged its
-   * credentials, as {@code /v2/token} does for Docker (RPS-1434). The grants are strings the
-   * protocol reads back with {@link #extractAccess}; an empty list is a token that was asked for
-   * nothing, which is not the same as a token without the claim.
+   * Creates a protocol token for a user. It carries a random id, so that two logins of one user in
+   * the same second get two tokens, and revoking one of them (RPS-1361) leaves the other valid. It
+   * carries the user's {@code tokenVersion} as the {@code tv} claim, so that the token ends when
+   * the version moves on (a password change, a username change or an admin edit, RPS-1552).
    */
   public @NonNull String createProtocolToken(
       final @NonNull UUID userId,
       final @NonNull String username,
       final @NonNull TemporalAmount timeoutDuration,
-      final @NonNull List<String> access) {
-    return JWT.create()
-        .withJWTId(UUID.randomUUID().toString())
-        .withSubject(userId.toString())
-        .withAudience(TokenRealm.PROTOCOL.getAudience())
-        .withClaim(CLAIM_USERNAME, username)
-        .withClaim(CLAIM_ACCESS, access)
-        .withExpiresAt(Instant.now().plus(timeoutDuration))
-        .sign(Algorithm.HMAC512(this.secret));
+      final int tokenVersion) {
+    return this.userProtocolToken(userId, username, timeoutDuration, tokenVersion)
+        .sign(this.algorithm());
   }
 
+  /**
+   * Creates a protocol token for a user that records what the client asked for when it exchanged
+   * its credentials, as {@code /v2/token} does for Docker (RPS-1434). The grants are strings the
+   * protocol reads back with {@link #extractAccess}; an empty list is a token that was asked for
+   * nothing, which is not the same as a token without the claim. Like every token minted for a user
+   * it carries the {@code tv} claim, see {@link #createProtocolToken(UUID, String, TemporalAmount,
+   * int)}.
+   */
+  public @NonNull String createProtocolToken(
+      final @NonNull UUID userId,
+      final @NonNull String username,
+      final @NonNull TemporalAmount timeoutDuration,
+      final int tokenVersion,
+      final @NonNull List<String> access) {
+    return this.userProtocolToken(userId, username, timeoutDuration, tokenVersion)
+        .withClaim(CLAIM_ACCESS, access)
+        .sign(this.algorithm());
+  }
+
+  /**
+   * Creates a protocol token that is not a user's login: an anonymous token, or the JWT of a deploy
+   * token, whose subject is the deploy token id. It carries no {@code tv} claim, as there is no
+   * user version to bind it to: a deploy-token JWT is checked against its token row on every
+   * request instead.
+   */
   public @NonNull String createProtocolToken(
       final @NonNull UUID userId,
       final @NonNull String username,
@@ -212,7 +217,25 @@ public class JwtUtils {
         .withClaim(CLAIM_USERNAME, username)
         .withClaim(AUTH_TYPE, authenticationType.getValue())
         .withExpiresAt(Instant.now().plus(timeoutDuration))
-        .sign(Algorithm.HMAC512(this.secret));
+        .sign(this.algorithm());
+  }
+
+  private @NonNull Algorithm algorithm() {
+    return Algorithm.HMAC512(this.secret);
+  }
+
+  private JWTCreator.@NonNull Builder userProtocolToken(
+      final @NonNull UUID userId,
+      final @NonNull String username,
+      final @NonNull TemporalAmount timeoutDuration,
+      final int tokenVersion) {
+    return JWT.create()
+        .withJWTId(UUID.randomUUID().toString())
+        .withSubject(userId.toString())
+        .withAudience(TokenRealm.PROTOCOL.getAudience())
+        .withClaim(CLAIM_USERNAME, username)
+        .withClaim(CLAIM_PROTOCOL_TOKEN_VERSION, tokenVersion)
+        .withExpiresAt(Instant.now().plus(timeoutDuration));
   }
 
   /**
@@ -396,6 +419,24 @@ public class JwtUtils {
     return tokenVersion != null ? tokenVersion : 0;
   }
 
+  /**
+   * Verifies a protocol token that a user logged in with and reads the claims that identify the
+   * user, from one decode. The caller re-reads the user by name and compares {@link
+   * ProtocolUserClaims#tokenVersion()} with the stored version (RPS-1552).
+   */
+  public @NonNull ProtocolUserClaims extractProtocolUserClaims(final @NonNull String authHeader) {
+    final var decodedJWT = this.verifyAndDecode(this.getToken(authHeader), TokenRealm.PROTOCOL);
+    final var tokenVersion = decodedJWT.getClaim(CLAIM_PROTOCOL_TOKEN_VERSION).asInt();
+
+    final var username = decodedJWT.getClaim(CLAIM_USERNAME).asString();
+
+    if (username == null) {
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+
+    return new ProtocolUserClaims(username, tokenVersion);
+  }
+
   public @NonNull RefreshTokenClaims verifyRefreshToken(final @NonNull String token) {
     final var decodedJWT = this.decode(token, "refreshTokenExpired");
 
@@ -457,7 +498,7 @@ public class JwtUtils {
 
   /**
    * Reads the grants a protocol token was issued with (see {@link #createProtocolToken(UUID,
-   * String, TemporalAmount, List)}).
+   * String, TemporalAmount, int, List)}).
    *
    * @return The grants, or {@code null} for a token that carries none, which is any token that did
    *     not come from an exchange that records them

@@ -418,10 +418,29 @@ public class ProtocolAuthService {
   private void authorizeJWTRequest(
       final @NonNull String authHeader, final @NonNull Permission permission) {
 
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
-    final var userInfo = this.userTxService.getAuthenticatedUserByUsername(username);
+    this.authorizeUser(this.authenticateJwtUser(authHeader), permission);
+  }
 
-    this.authorizeUser(userInfo, permission);
+  /**
+   * Resolves the user a protocol JWT was issued to, from the user row that is read on every request
+   * anyway. The token is bound to the user's {@code token_version} (RPS-1552): a password change, a
+   * username change or an admin edit moves the version on and ends every protocol token minted
+   * before it, like it ends the panel's tokens. A mismatch answers {@code sessionExpired} and, like
+   * an expired token, does not count against {@link AuthFailureThrottle}: the token is one Repsy
+   * issued, not a guess. A token without the claim was minted before it existed and is accepted
+   * until it expires.
+   */
+  protected @NonNull UserInfo authenticateJwtUser(final @NonNull String authHeader) {
+
+    final var claims = this.jwtUtils.extractProtocolUserClaims(authHeader);
+    final var userInfo = this.userTxService.getAuthenticatedUserByUsername(claims.username());
+    final var tokenVersion = claims.tokenVersion();
+
+    if (tokenVersion != null && tokenVersion != userInfo.getTokenVersion()) {
+      throw new UnAuthorizedException(ErrorConstants.SESSION_EXPIRED);
+    }
+
+    return userInfo;
   }
 
   protected void handleUsernamePasswordAuthentication(

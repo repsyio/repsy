@@ -88,7 +88,10 @@ public class NpmAuthComponentImpl extends ProtocolAuthService
             Credentials.builder().username(username).password(password).build());
 
     return super.jwtUtils.createProtocolToken(
-        userInfo.getId(), username, Period.ofDays(TOKEN_EXPIRATION_DAYS));
+        userInfo.getId(),
+        username,
+        Period.ofDays(TOKEN_EXPIRATION_DAYS),
+        userInfo.getTokenVersion());
   }
 
   /**
@@ -246,8 +249,7 @@ public class NpmAuthComponentImpl extends ProtocolAuthService
       }
       case ANONYMOUS, DOCKER_SCAN -> throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
       default -> {
-        final var username = this.jwtUtils.verifyAndExtractUsername(header, TokenRealm.PROTOCOL);
-        final var user = this.userTxService.getAuthenticatedUserByUsername(username);
+        final var user = this.authenticateJwtUser(header);
 
         yield new Caller(user.getId(), user.getUsername());
       }

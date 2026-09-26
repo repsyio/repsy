@@ -156,6 +156,15 @@ export class PanelApi {
   }
 
   /**
+   * `POST /api/users/{id}/actions/reset-password` as the admin this instance is logged in as
+   * (RPS-1552): the user's password becomes a generated one, which is returned.
+   */
+  async resetUserPassword(userId: string): Promise<string> {
+    const res = await this.client.userController.resetPassword({ userId });
+    return unwrap(res.data, 'resetPassword');
+  }
+
+  /**
    * One page of `GET /api/users` (RPS-1269): `q` filters by username on the server, `size` is 1-100
    * (server default 10) and `sort` defaults to `createdAt,desc`. Use `listAllUsers` to read everything.
    */
