@@ -41,6 +41,7 @@ import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
 import { currentUsername, loginSession } from '../../../src/ui/session.js';
 import type { Page } from '@playwright/test';
+import { errorToasts } from '../../../src/ui/page-errors.js';
 
 const CREDENTIALS = { tag: ['@credentials'] };
 
@@ -75,6 +76,13 @@ async function expectLoginRefused(
 }
 
 test.describe('PRO-01 change password', () => {
+  test.use({
+    allowedPageErrors: errorToasts(
+      'by design: the old password is refused at the end',
+      'Username or password is incorrect.',
+    ),
+  });
+
   test(
     'a mismatch is refused, a match asks for confirmation, and only the new password logs in',
     CREDENTIALS,
@@ -167,6 +175,14 @@ test.describe('PRO-01 change password', () => {
 });
 
 test.describe('PRO-02 change username', () => {
+  test.use({
+    allowedPageErrors: errorToasts(
+      'by design: a taken name is refused, and the old name no longer logs in',
+      'Username or password is incorrect.',
+      'Username is in use. Please try another one.',
+    ),
+  });
+
   test(
     'the page reloads as the new name and the repository URLs keep working',
     CREDENTIALS,
@@ -261,6 +277,13 @@ test.describe('PRO-02 change username', () => {
 });
 
 test.describe('PRO-03 delete account', () => {
+  test.use({
+    allowedPageErrors: errorToasts(
+      'by design: the deleted account no longer logs in',
+      'Username or password is incorrect.',
+    ),
+  });
+
   test(
     'the account is deleted, the session ends and the login fails',
     CREDENTIALS,
@@ -290,6 +313,12 @@ test.describe('PRO-03 delete account', () => {
 });
 
 test.describe('PRO-05 a refused update raises exactly one error toast (RPS-1309)', () => {
+  test.use({
+    allowedPageErrors: errorToasts(
+      'by design: the update is stubbed as refused',
+      'Stubbed refusal from the server',
+    ),
+  });
   const REFUSAL = 'Stubbed refusal from the server';
 
   /** Answers `method` on `url` with a 400 carrying `REFUSAL`; every other request passes through. */

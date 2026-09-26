@@ -32,6 +32,7 @@ import { RepoType } from '../../../src/api/panel-api.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { REPO_PAGE_SIZE, RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
+import { errorToasts } from '../../../src/ui/page-errors.js';
 
 /** axe (WCAG 2.0/2.1 A and AA) on ONE component: the whole page still carries other debt (RPS-1266). */
 async function expectNoAxeViolations(page: Page, selector: string): Promise<void> {
@@ -162,6 +163,12 @@ test.describe('Shared components: ARIA contract', { tag: '@a11y' }, () => {
   });
 
   test.describe('toasts', () => {
+    test.use({
+      allowedPageErrors: errorToasts(
+        'by design: the test stubs a 500 to raise an error toast',
+        'Server error',
+      ),
+    });
     /** Loads the repository list with the list call failing, which raises ONE error toast. */
     async function raiseErrorToast(page: Page) {
       await page.clock.install();

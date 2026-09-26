@@ -219,7 +219,13 @@ export class DockerImagesTagListComponent implements OnDestroy {
             this.fetchSummary();
           }
         },
-        error: () => {},
+        error: (error: HttpErrorResponse) => {
+          // The tag list of an image that no longer exists is a 404 since RPS-1579 (it used to be an empty page, which
+          // sent us through `fetchSummary`): the same "image is gone" case, so the same way out (RPS-1617).
+          if (error?.status === 404) {
+            this.router.navigate([`/${this.activeRepo.repoName}`]);
+          }
+        },
       });
   }
 

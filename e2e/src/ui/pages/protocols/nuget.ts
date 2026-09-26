@@ -16,7 +16,7 @@
 import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
 
 /**
- * NuGet: packages -> versions -> detail. Read from the components, not yet run in a browser (RPS-1257).
+ * NuGet: packages -> versions -> detail. Run in a browser by the package scenarios (RPS-1257).
  *
  *  - Rows are keyed by the package id. The list sorts by NAME only (`Name (A-Z)` is the default, no
  *    Newest/Oldest).

@@ -224,8 +224,8 @@ describe('UserEditModalComponent', () => {
     });
 
     it('stays open with the form unlocked when the request fails', fakeAsync(() => {
-      // The subscription has no error handler, so rxjs reports the failure asynchronously; the HTTP interceptor has
-      // already shown the toast by then.
+      // The HTTP interceptor has already shown the toast, so the modal swallows the failure instead of letting rxjs
+      // report it to the global error handler as an application error (RPS-1617).
       const unhandled: unknown[] = [];
       config.onUnhandledError = (error) => unhandled.push(error);
       userService.updateUser.and.returnValue(throwError(() => new Error('Username is taken')));
@@ -234,7 +234,7 @@ describe('UserEditModalComponent', () => {
       component.updateUser();
       tick();
 
-      expect(unhandled).toEqual([new Error('Username is taken')]);
+      expect(unhandled).toEqual([]);
       expect(toastService.show).not.toHaveBeenCalled();
       expect(updatedCount).toBe(0);
       expect(openChange).toEqual([]);

@@ -187,7 +187,12 @@ test.describe('USR-03 edit a user', () => {
     usersPage,
     seeder,
     panelApi,
+    pageErrors,
   }) => {
+    pageErrors.allowToast(
+      'Username is in use. Please try another one.',
+      'by design: a taken username is refused',
+    );
     const user = await seeder.createUser();
     const other = await seeder.createUser();
 

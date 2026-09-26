@@ -160,11 +160,11 @@ export class TokenInfoModal {
   }
 
   /**
-   * Shows or hides the secret. The click event is dispatched to the button directly: this predates
-   * RPS-1402, when the eye icon came from a CDN the suite blocks and the button had no box to click.
+   * Shows or hides the secret with a real click (the eye is a bundled remixicon glyph since RPS-1402,
+   * so the button has a box; RPS-1617).
    */
   async toggleTokenVisibility(): Promise<void> {
-    await this.tokenToggle.dispatchEvent('click');
+    await this.tokenToggle.click();
   }
 
   async close(): Promise<void> {

@@ -79,12 +79,11 @@ export class ProfilePage extends UiPage {
   }
 
   /**
-   * Clicks an eye button with a DOM click. This predates RPS-1402: the icon was a Font Awesome glyph
-   * from a CDN the suite blocks, so the button had no box and a real click was refused as "not
-   * visible". The icon is bundled now (remixicon), and the DOM click still works.
+   * Clicks an eye button with a real click (the icon is a bundled remixicon glyph since RPS-1402, so
+   * the button has a box; RPS-1617).
    */
   async toggleVisibility(toggle: Locator): Promise<void> {
-    await toggle.dispatchEvent('click');
+    await toggle.click();
   }
 
   /** Types both password fields (the confirmation defaults to the same value) and leaves them touched. */

@@ -30,6 +30,7 @@ import { countLoginRequests, LoginValidation } from '../../../src/ui/pages/login
 import { Shell } from '../../../src/ui/pages/shell.js';
 import { optedIn } from '../../../src/ui/session.js';
 import { JWT_SHAPE, NO_SESSION, storedSession } from './stored-session.js';
+import { errorToasts } from '../../../src/ui/page-errors.js';
 
 const WRONG_CREDENTIALS_TOAST = 'Username or password is incorrect.';
 
@@ -76,6 +77,13 @@ test.describe('AUTH-01 valid login', () => {
 });
 
 test.describe('AUTH-02 wrong credentials', () => {
+  test.use({
+    allowedPageErrors: errorToasts(
+      'by design: the wrong-credentials case',
+      'Username or password is incorrect.',
+    ),
+  });
+
   test(
     'a wrong password toasts the error and stays on /login',
     { tag: ['@smoke'] },
@@ -214,7 +222,12 @@ test.describe('AUTH-03 client-side validation', () => {
     test('a wrong weak password gets the invalid-credentials toast from the server, not an inline message', async ({
       page,
       seededUser,
+      pageErrors,
     }) => {
+      pageErrors.allowToast(
+        'Username or password is incorrect.',
+        'by design: the case is a refused login',
+      );
       const login = new LoginPage(page);
       const validation = new LoginValidation(login);
       const shell = new Shell(page);

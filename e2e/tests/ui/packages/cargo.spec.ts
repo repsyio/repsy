@@ -217,7 +217,12 @@ test.describe('Cargo crate pages', { tag: '@packages' }, () => {
   test('PKG-cargo-07 deleting a crate from the list removes every one of its versions', async ({
     adminPage,
     seeder,
+    pageErrors,
   }) => {
+    pageErrors.allowToast(
+      'Crate not found.',
+      'by design: the test opens the versions page of a crate it just deleted',
+    );
     const repo = await seeder.createRepo(RepoType.CARGO);
     const name = `e2e_${seeder.runId}_gone`;
     const one = await publishCrate(repo.name, name, '1.0.0');

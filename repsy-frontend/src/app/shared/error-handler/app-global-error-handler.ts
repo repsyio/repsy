@@ -33,6 +33,10 @@ export class AppGlobalErrorHandler implements ErrorHandler {
     errorForm.message = error?.message?.substring(0, this.MAX_MESSAGE_LENGTH) ?? 'unknown error';
     errorForm.stack = error?.stack?.substring(0, this.MAX_STACK_LENGTH) ?? 'N/A';
     errorForm.url = this.router?.url?.substring(0, this.MAX_URL_LENGTH) ?? 'N/A';
-    //console.error('Global error handler caught an error:', errorForm);
+    // Logged as ONE string (not an object) so the UI e2e harness can read it: it fails a test on any
+    // console error (RPS-1617). Message, stack and route only, never user data.
+    console.error(
+      `Global error handler caught an error: ${errorForm.message}\n${errorForm.stack}\n(at ${errorForm.url})`,
+    );
   }
 }
