@@ -95,25 +95,67 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
     final var packaging = this.findPackaging(repoId, groupId, artifactId, artifactVersion);
     final var extension = resolveExtension(packaging);
 
-    final var snapshot = ArtifactUtils.isSnapshot(artifactVersion);
-    final var resolvedVersion =
-        snapshot
-            ? this.resolveSnapshotBuildVersion(
-                repoId, repoName, groupId, artifactId, artifactVersion, extension)
-            : artifactVersion;
-
-    if (resolvedVersion == null) {
-      return snapshot
-          ? this.findStoredSnapshotFile(
-              repoId, repoName, groupId, artifactId, artifactVersion, extension)
-          : Optional.empty();
+    if (ArtifactUtils.isSnapshot(artifactVersion)) {
+      return this.resolveSnapshot(
+          repoId, repoName, groupId, artifactId, artifactVersion, extension);
     }
+
+    final var artifactPath = mainFilePath(groupId, artifactId, artifactVersion, extension);
+
+    return this.mavenStorageStrategy.get(StoragePath.of(repoId, artifactPath), repoName).isPresent()
+        ? Optional.of(artifactPath)
+        : Optional.empty();
+  }
+
+  private Optional<String> resolveSnapshot(
+      final UUID repoId,
+      final String repoName,
+      final String groupId,
+      final String artifactId,
+      final String artifactVersion,
+      final String extension) {
+
+    final var buildVersion =
+        this.resolveSnapshotBuildVersion(
+            repoId, repoName, groupId, artifactId, artifactVersion, extension);
+
+    if (buildVersion == null) {
+      return this.findStoredSnapshotFile(
+          repoId, repoName, groupId, artifactId, artifactVersion, extension);
+    }
+
+    final var artifactPath = mainFilePath(groupId, artifactId, buildVersion, extension);
+
+    if (this.mavenStorageStrategy.get(StoragePath.of(repoId, artifactPath), repoName).isPresent()) {
+      return Optional.of(artifactPath);
+    }
+
+    // The metadata names a build whose file is not stored (deleted by hand, partial upload,
+    // cleanup, RPS-1447). A scan is about what is stored, so it takes the newest stored main file
+    // instead of answering 404 while an older build is there.
+    final var stored =
+        this.findStoredSnapshotFile(
+            repoId, repoName, groupId, artifactId, artifactVersion, extension);
+    stored.ifPresent(
+        path ->
+            log.info(
+                "Snapshot metadata of {}:{}:{} names {}, which is not stored: scanning {} instead",
+                groupId,
+                artifactId,
+                artifactVersion,
+                artifactPath,
+                path));
+    return stored;
+  }
+
+  private static String mainFilePath(
+      final String groupId, final String artifactId, final String version, final String extension) {
 
     final var gav =
         new Gav(
             groupId,
             artifactId,
-            resolvedVersion,
+            version,
             null,
             extension,
             null,
@@ -124,11 +166,7 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
             false,
             null);
 
-    final var artifactPath = new M2GavCalculator().gavToPath(gav);
-
-    return this.mavenStorageStrategy.get(StoragePath.of(repoId, artifactPath), repoName).isPresent()
-        ? Optional.of(artifactPath)
-        : Optional.empty();
+    return new M2GavCalculator().gavToPath(gav);
   }
 
   private @Nullable String resolveSnapshotBuildVersion(
@@ -163,8 +201,9 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
   /**
    * The newest main file of a {@code SNAPSHOT} version directory, for a snapshot whose metadata
    * names no build (RPS-1420): sbt and Ivy deploy a snapshot under its literal name and upload no
-   * {@code maven-metadata.xml}, and so does a version whose metadata cannot be read. The rule is
-   * the one the panel uses for the POM, see {@link ArtifactUtils#newestSnapshotMainFileName}.
+   * {@code maven-metadata.xml}, and so does a version whose metadata cannot be read. It is also the
+   * answer when the metadata names a build whose file is not stored (RPS-1447). The rule is the one
+   * the panel uses for the POM, see {@link ArtifactUtils#newestSnapshotMainFileName}.
    */
   private Optional<String> findStoredSnapshotFile(
       final UUID repoId,

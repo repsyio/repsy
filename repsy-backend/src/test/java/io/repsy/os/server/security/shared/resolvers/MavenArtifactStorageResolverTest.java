@@ -46,10 +46,11 @@ import org.springframework.core.io.ByteArrayResource;
  * The stored snapshot metadata is only a hint for finding the build a scan is about. A corrupt one
  * must not surface as the {@code 400} that {@code ArtifactUtils.readMetadata} answers an upload
  * with (RPS-1180), and a snapshot that has no usable metadata (sbt, Ivy) resolves to the newest
- * main file stored in its version directory (RPS-1420).
+ * main file stored in its version directory (RPS-1420). So does a snapshot whose metadata names a
+ * build that is not stored (RPS-1447).
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("MavenArtifactStorageResolver snapshots (RPS-1180, RPS-1420)")
+@DisplayName("MavenArtifactStorageResolver snapshots (RPS-1180, RPS-1420, RPS-1447)")
 class MavenArtifactStorageResolverTest {
 
   private static final String METADATA_PATH = "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml";
@@ -89,6 +90,11 @@ class MavenArtifactStorageResolverTest {
   /** A stubbed storage answers a call with other arguments than stubbed as a mismatch: say it. */
   private void stubNoMetadata() {
     when(this.storageStrategy.get(pathOf(METADATA_PATH), eq("mvn"))).thenReturn(Optional.empty());
+  }
+
+  /** A path built by the GAV calculator starts with a slash, one found by listing does not. */
+  private void stubNotStored(final String path) {
+    when(this.storageStrategy.get(pathOf("/" + path), eq("mvn"))).thenReturn(Optional.empty());
   }
 
   private void stubStored(final String path, final String body) {
@@ -225,5 +231,53 @@ class MavenArtifactStorageResolverTest {
 
     assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0-SNAPSHOT"))
         .hasValue(VERSION_DIRECTORY + "lib-1.0-SNAPSHOT.war");
+  }
+
+  @Test
+  @DisplayName("a build named by the metadata but not stored falls back to the newest stored jar")
+  void namedBuildNotStoredFallsBack() {
+    final var missing = VERSION_DIRECTORY + "lib-1.0-20260921.101010-1.jar";
+    final var stored = VERSION_DIRECTORY + "lib-1.0-20260920.101010-7.jar";
+    this.stubStored(METADATA_PATH, SNAPSHOT_METADATA);
+    this.stubNotStored(missing);
+    this.stubVersionDir(
+        "lib-1.0-20260920.101010-6.jar", "lib-1.0-20260920.101010-7.jar", "lib-1.0-SNAPSHOT.pom");
+    this.stubStored(stored, "jar");
+
+    assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0-SNAPSHOT"))
+        .hasValue(stored);
+  }
+
+  @Test
+  @DisplayName("a build named by the metadata that is stored is not replaced by a newer listing")
+  void namedBuildStoredWins() {
+    final var named = VERSION_DIRECTORY + "lib-1.0-20260921.101010-1.jar";
+    this.stubStored(METADATA_PATH, SNAPSHOT_METADATA);
+    this.stubStored("/" + named, "jar");
+
+    // The M2 GAV calculator yields a leading slash on the path it builds.
+    assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0-SNAPSHOT"))
+        .hasValue("/" + named);
+    verify(this.storageStrategy, never()).listDirectoryContents(any(StoragePath.class));
+  }
+
+  @Test
+  @DisplayName("a build named by the metadata and no stored jar at all resolves to nothing")
+  void namedBuildNotStoredAndNoJar() {
+    this.stubStored(METADATA_PATH, SNAPSHOT_METADATA);
+    this.stubNotStored(VERSION_DIRECTORY + "lib-1.0-20260921.101010-1.jar");
+    this.stubVersionDir("lib-1.0-SNAPSHOT.pom", "lib-1.0-SNAPSHOT-sources.jar");
+
+    assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0-SNAPSHOT"))
+        .isEmpty();
+  }
+
+  @Test
+  @DisplayName("a release that is not stored does not fall back to another file")
+  void missingReleaseDoesNotFallBack() {
+    this.stubNotStored("com/acme/lib/1.0/lib-1.0.jar");
+
+    assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0")).isEmpty();
+    verify(this.storageStrategy, never()).listDirectoryContents(any(StoragePath.class));
   }
 }
