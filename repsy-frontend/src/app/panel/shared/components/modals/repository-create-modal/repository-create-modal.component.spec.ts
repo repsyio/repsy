@@ -14,10 +14,11 @@
 /// limitations under the License.
 ///
 
-import { TestBed } from '@angular/core/testing';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormBuilder } from '@angular/forms';
 import { Router } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 import { RepoCollectionControllerService, RepoType as ApiRepoType } from '../../../../../../generated/api';
 import { RepoType } from '../../../dto/repo/repo-type';
@@ -208,4 +209,57 @@ describe('RepositoryCreateModalComponent create', () => {
       expect(component.form.get('name')?.value).toBe('my-repo');
     });
   }
+});
+
+/**
+ * How the dashboard renders it (RPS-1459): the modal sits under the OnPush `AuthRedirectComponent`, and the
+ * answer of the create request is not an event of any template. Nothing but `FormGroup.enable()` (called by the
+ * request's `finalize`) marks the view after a refusal: this pins that the buttons come back.
+ */
+@Component({
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [RepositoryCreateModalComponent],
+  template: '<app-repository-modal [open]="true" />',
+})
+class OnPushHostComponent {}
+
+describe('RepositoryCreateModalComponent in an OnPush host (RPS-1459)', () => {
+  let fixture: ComponentFixture<OnPushHostComponent>;
+  let answer: Subject<unknown>;
+
+  const query = <T extends HTMLElement>(testId: string): T =>
+    fixture.nativeElement.querySelector(`[data-testid="${testId}"]`) as T;
+
+  beforeEach(() => {
+    answer = new Subject();
+    TestBed.configureTestingModule({
+      imports: [OnPushHostComponent],
+      providers: [
+        { provide: RepoCollectionControllerService, useValue: { createRepository: () => answer.asObservable() } },
+        { provide: Router, useValue: { navigate: () => Promise.resolve(true) } },
+        { provide: ToastService, useValue: { show: jasmine.createSpy('show') } },
+      ],
+    });
+    fixture = TestBed.createComponent(OnPushHostComponent);
+    fixture.detectChanges();
+    const name = query<HTMLInputElement>('repo-create-name');
+    name.value = 'my-repo';
+    name.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+  });
+
+  it('enables Create and Cancel again when the server refuses the repository, without another event', () => {
+    query<HTMLButtonElement>('repo-create-submit').click();
+    fixture.detectChanges();
+    expect(query<HTMLButtonElement>('repo-create-submit').disabled).toBeTrue();
+    expect(query<HTMLButtonElement>('repo-create-cancel').disabled).toBeTrue();
+
+    // A 409 (the name is taken) is the last event of the page.
+    answer.error({ status: 409 });
+    fixture.detectChanges();
+
+    expect(query<HTMLButtonElement>('repo-create-submit').disabled).toBeFalse();
+    expect(query<HTMLButtonElement>('repo-create-cancel').disabled).toBeFalse();
+  });
 });
