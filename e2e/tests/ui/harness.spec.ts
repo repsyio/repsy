@@ -263,21 +263,22 @@ test.describe('UI harness fixtures', () => {
     expect(served).toEqual([]);
   });
 
-  test('adminPage and userPage are two independent sessions', async ({
-    adminPage,
-    userPage,
-    seededUser,
-  }) => {
-    const admin = { dashboard: new DashboardPage(adminPage), shell: new Shell(adminPage) };
-    const user = { dashboard: new DashboardPage(userPage), shell: new Shell(userPage) };
+  // @cloud-skip: needs a seeded USER and the Users sidebar entry.
+  test(
+    'adminPage and userPage are two independent sessions',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage, userPage, seededUser }) => {
+      const admin = { dashboard: new DashboardPage(adminPage), shell: new Shell(adminPage) };
+      const user = { dashboard: new DashboardPage(userPage), shell: new Shell(userPage) };
 
-    await Promise.all([admin.dashboard.goto(), user.dashboard.goto()]);
+      await Promise.all([admin.dashboard.goto(), user.dashboard.goto()]);
 
-    await expect(admin.dashboard.welcomeUsername).toContainText(env.adminUsername);
-    await expect(user.dashboard.welcomeUsername).toContainText(seededUser.username);
-    // Role-based navigation: only an admin sees Users.
-    await expect(admin.shell.sidebar.users).toBeVisible();
-    await expect(user.shell.sidebar.repositories).toBeVisible();
-    await expect(user.shell.sidebar.users).toHaveCount(0);
-  });
+      await expect(admin.dashboard.welcomeUsername).toContainText(env.adminUsername);
+      await expect(user.dashboard.welcomeUsername).toContainText(seededUser.username);
+      // Role-based navigation: only an admin sees Users.
+      await expect(admin.shell.sidebar.users).toBeVisible();
+      await expect(user.shell.sidebar.repositories).toBeVisible();
+      await expect(user.shell.sidebar.users).toHaveCount(0);
+    },
+  );
 });

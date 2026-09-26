@@ -15,6 +15,7 @@
 
 import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
 import { repoPath } from '../../../repo-url.js';
+import { repoRoute } from '../../routes.js';
 
 /**
  * Docker: images -> tags -> (manifests | detail). `target.name` is the image, `target.version` the tag.
@@ -42,7 +43,7 @@ export const dockerDescriptor: ProtocolDescriptor = {
   label: 'Docker',
   levels: {
     list: {
-      path: (repo) => `/${repo}`,
+      path: (repo) => repoRoute(repo),
       rowKey: (t) => need(t, 'docker').name,
       search: { placeholder: 'image', term: (t) => t.name },
       sort: NEWEST_OLDEST,
@@ -54,7 +55,7 @@ export const dockerDescriptor: ProtocolDescriptor = {
       installBar: false,
     },
     versions: {
-      path: (repo, t) => `/${repo}/${need(t, 'docker').name}`,
+      path: (repo, t) => repoRoute(repo, need(t, 'docker').name),
       rowKey: (t) => need(t, 'docker').version,
       search: { placeholder: 'tag', term: (t) => t.version },
       sort: NEWEST_OLDEST,
@@ -68,7 +69,7 @@ export const dockerDescriptor: ProtocolDescriptor = {
     manifests: {
       path: (repo, t) => {
         const { name, version } = need(t, 'docker');
-        return `/${repo}/${name}/${version}`;
+        return repoRoute(repo, name, version);
       },
       rowKey: (t) => need(t, 'docker').version,
       search: { placeholder: 'manifest', term: (t) => t.version },
@@ -83,7 +84,7 @@ export const dockerDescriptor: ProtocolDescriptor = {
     detail: {
       path: (repo, t) => {
         const { name, version } = need(t, 'docker');
-        return `/${repo}/${name}/${version}/detail`;
+        return repoRoute(repo, name, version, 'detail');
       },
       installContains: (repo, t) => [
         `${repo}/${need(t, 'docker').name}:${need(t, 'docker').version}`,

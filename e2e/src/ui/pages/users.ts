@@ -27,6 +27,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
 import { assertNotAdmin } from '../session.js';
+import { target } from '../../target.js';
 import { UiPage } from './base.js';
 import { DesktopList, Pagination } from './components.js';
 import { OneTimeSecretModal } from './one-time-secret-modal.js';
@@ -157,6 +158,11 @@ export class UsersPage extends UiPage {
   }
 
   async goto(): Promise<void> {
+    if (!target.ui.hasUsersPage) {
+      throw new Error(
+        'This target has no Users page (target.ui.hasUsersPage): tag the test @cloud-skip.',
+      );
+    }
     // The page asks the server for the admin count next to the first list (RPS-1246); the edit and
     // delete guards depend on it, so a test starts only once it is in.
     const adminCount = this.page.waitForResponse(

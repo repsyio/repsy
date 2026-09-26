@@ -23,6 +23,7 @@ import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
 import { repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
+import { repoRoute } from '../../../src/ui/routes.js';
 import {
   asDetailPage,
   escapeRegExp,
@@ -133,7 +134,7 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
   }) => {
     const repo = await seeder.createRepo(RepoType.GOLANG);
     const mod = await seedPackage(repo);
-    await adminPage.goto(`/${repo.name}/modules/version`);
+    await adminPage.goto(repoRoute(repo.name, 'modules', 'version'));
     await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
     await protocolPages(adminPage, golang, repo.name).list().expectLoaded();
     await protocolPages(adminPage, golang, repo.name).list().expectRow(mod);

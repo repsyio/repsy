@@ -268,22 +268,24 @@ test.describe('Repository list', () => {
     await expect(repos.emptyList.root).toHaveCount(0);
   });
 
-  test('REPO-09: a USER sees the rows but no Create button and no row menu', async ({
-    userPage,
-    seeder,
-  }) => {
-    const repos = new RepositoriesPage(userPage);
-    const repo = await seeder.createRepo(RepoType.MAVEN);
-    await repos.goto();
-    await repos.search(repo.name);
+  // @cloud-skip: needs a seeded USER/ADMIN account; Repsy Cloud has no user roles (collaborators instead).
+  test(
+    'REPO-09: a USER sees the rows but no Create button and no row menu',
+    { tag: ['@cloud-skip'] },
+    async ({ userPage, seeder }) => {
+      const repos = new RepositoriesPage(userPage);
+      const repo = await seeder.createRepo(RepoType.MAVEN);
+      await repos.goto();
+      await repos.search(repo.name);
 
-    await expect(repos.row(repo.name)).toBeVisible();
-    await expect(repos.visibility(repo.name)).toHaveText('Private');
-    await expect(repos.createButton).toHaveCount(0);
-    await expect(repos.rowMenus()).toHaveCount(0);
-    await expect(repos.list.inRow(repo.name, 'row-delete')).toHaveCount(0);
-    // The toolbar itself works for a USER.
-    await expect(repos.refreshButton).toBeVisible();
-    await expect(repos.typeFilterText()).toHaveText('All');
-  });
+      await expect(repos.row(repo.name)).toBeVisible();
+      await expect(repos.visibility(repo.name)).toHaveText('Private');
+      await expect(repos.createButton).toHaveCount(0);
+      await expect(repos.rowMenus()).toHaveCount(0);
+      await expect(repos.list.inRow(repo.name, 'row-delete')).toHaveCount(0);
+      // The toolbar itself works for a USER.
+      await expect(repos.refreshButton).toBeVisible();
+      await expect(repos.typeFilterText()).toHaveText('All');
+    },
+  );
 });

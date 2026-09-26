@@ -16,6 +16,7 @@
 import type { PackageRef } from '../../../seed/packages.js';
 import { type ProtocolDescriptor, NEWEST_OLDEST, need } from './types.js';
 import { repoPath } from '../../../repo-url.js';
+import { repoRoute } from '../../routes.js';
 
 /** `group:artifact` -> [group, artifact]. */
 function coordinates(target: PackageRef | undefined): {
@@ -48,7 +49,7 @@ export const mavenDescriptor: ProtocolDescriptor = {
   label: 'Maven',
   levels: {
     list: {
-      path: (repo) => `/${repo}`,
+      path: (repo) => repoRoute(repo),
       rowKey: (t) => need(t, 'maven').name,
       search: { placeholder: 'group', term: (t) => t.name.split(':')[0] },
       sort: NEWEST_OLDEST,
@@ -64,7 +65,7 @@ export const mavenDescriptor: ProtocolDescriptor = {
       installBar: false,
     },
     sublist: {
-      path: (repo, t) => `/${repo}/${coordinates(t).group}`,
+      path: (repo, t) => repoRoute(repo, coordinates(t).group),
       rowKey: (t) => coordinates(t).artifact,
       search: { placeholder: 'artifact', term: (t) => t.name.split(':')[1] },
       sort: NEWEST_OLDEST,
@@ -79,7 +80,7 @@ export const mavenDescriptor: ProtocolDescriptor = {
     versions: {
       path: (repo, t) => {
         const c = coordinates(t);
-        return `/${repo}/${c.group}/${c.artifact}`;
+        return repoRoute(repo, c.group, c.artifact);
       },
       rowKey: (t) => coordinates(t).version,
       search: { placeholder: 'version', term: (t) => t.version },
@@ -94,7 +95,7 @@ export const mavenDescriptor: ProtocolDescriptor = {
     detail: {
       path: (repo, t) => {
         const c = coordinates(t);
-        return `/${repo}/${c.group}/${c.artifact}/${c.version}`;
+        return repoRoute(repo, c.group, c.artifact, c.version);
       },
       installContains: (_repo, t) => {
         const c = coordinates(t);
@@ -137,5 +138,5 @@ export const mavenDescriptor: ProtocolDescriptor = {
     passwordMarker: 'YOUR_PASSWORD',
     deployTokenMarker: 'YOUR_DEPLOY_TOKEN',
   },
-  extraPaths: { browser: (repo) => `/${repo}/browser` },
+  extraPaths: { browser: (repo) => repoRoute(repo, 'browser') },
 };

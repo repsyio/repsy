@@ -131,40 +131,42 @@ test.describe('Dialogs: semantics, focus and keyboard', { tag: '@a11y' }, () => 
     });
   });
 
-  test('A11Y-05: the user create, edit, reset and delete dialogs', async ({
-    adminPage,
-    seededUser,
-  }) => {
-    const users = new UsersPage(adminPage);
-    await users.goto();
-    await users.search(seededUser.username);
+  // @cloud-skip: the Users page (and its modals) exist on Repsy OS only.
+  test(
+    'A11Y-05: the user create, edit, reset and delete dialogs',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage, seededUser }) => {
+      const users = new UsersPage(adminPage);
+      await users.goto();
+      await users.search(seededUser.username);
 
-    await users.openCreateModal();
-    await expectDialogContract(adminPage, users.createModal.root, {
-      name: 'Create User',
-      opener: users.createButton,
-    });
+      await users.openCreateModal();
+      await expectDialogContract(adminPage, users.createModal.root, {
+        name: 'Create User',
+        opener: users.createButton,
+      });
 
-    // The edit item lives in a row menu that closes on choice: there is no opener to return to.
-    await users.openEdit(seededUser.username);
-    await expectDialogContract(adminPage, users.editModal.root, { name: 'Edit User' });
+      // The edit item lives in a row menu that closes on choice: there is no opener to return to.
+      await users.openEdit(seededUser.username);
+      await expectDialogContract(adminPage, users.editModal.root, { name: 'Edit User' });
 
-    // The confirmation is an alertdialog; the key button that opened it gets the focus back.
-    const keyButton = users.list.inRow(seededUser.username, 'row-reset-password');
-    await users.clickResetPassword(seededUser.username);
-    await expectDialogContract(adminPage, users.shell.dangerModal.root, {
-      name: /Reset Password/,
-      role: 'alertdialog',
-      opener: keyButton,
-    });
+      // The confirmation is an alertdialog; the key button that opened it gets the focus back.
+      const keyButton = users.list.inRow(seededUser.username, 'row-reset-password');
+      await users.clickResetPassword(seededUser.username);
+      await expectDialogContract(adminPage, users.shell.dangerModal.root, {
+        name: /Reset Password/,
+        role: 'alertdialog',
+        opener: keyButton,
+      });
 
-    // Confirming it shows the one-time secret, which is a dialog of its own. The list reloads
-    // meanwhile and re-renders the key button, so there is no element left to give the focus back to.
-    await users.resetPassword(seededUser.username);
-    await expectDialogContract(adminPage, users.resetPasswordModal.root, {
-      name: `New password for ${seededUser.username}`,
-    });
-  });
+      // Confirming it shows the one-time secret, which is a dialog of its own. The list reloads
+      // meanwhile and re-renders the key button, so there is no element left to give the focus back to.
+      await users.resetPassword(seededUser.username);
+      await expectDialogContract(adminPage, users.resetPasswordModal.root, {
+        name: `New password for ${seededUser.username}`,
+      });
+    },
+  );
 
   test('A11Y-05: the delete-repository confirmation is an alertdialog that starts on Cancel', async ({
     adminPage,
@@ -302,21 +304,26 @@ test.describe('Forms: labels, names and unique ids', { tag: '@a11y' }, () => {
     await expect(repoModal.root.getByTestId('selector-toggle')).toHaveAccessibleName(/^Type \w+/);
   });
 
-  test('A11Y-06: the create-user form is labelled', async ({ adminPage }) => {
-    const users = new UsersPage(adminPage);
-    await users.goto();
-    await users.openCreateModal();
-    expect(await idProblems(adminPage)).toEqual({ duplicates: [], brokenLabels: [] });
-    const modal = users.createModal;
-    await modal.root.getByLabel('Username *', { exact: true }).fill('by-label');
-    await expect(modal.username).toHaveValue('by-label');
-    await modal.root.getByLabel('Password *', { exact: true }).fill('Passw0rd-x');
-    await expect(modal.password).toHaveValue('Passw0rd-x');
-    await modal.root.getByLabel('Confirm Password *', { exact: true }).fill('Passw0rd-x');
-    await expect(modal.confirmPassword).toHaveValue('Passw0rd-x');
-    // The role switch is named "Role" plus its state.
-    await expect(modal.roleSwitch).toHaveAccessibleName('Role User');
-  });
+  // @cloud-skip: the Users page (and its modals) exist on Repsy OS only.
+  test(
+    'A11Y-06: the create-user form is labelled',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage }) => {
+      const users = new UsersPage(adminPage);
+      await users.goto();
+      await users.openCreateModal();
+      expect(await idProblems(adminPage)).toEqual({ duplicates: [], brokenLabels: [] });
+      const modal = users.createModal;
+      await modal.root.getByLabel('Username *', { exact: true }).fill('by-label');
+      await expect(modal.username).toHaveValue('by-label');
+      await modal.root.getByLabel('Password *', { exact: true }).fill('Passw0rd-x');
+      await expect(modal.password).toHaveValue('Passw0rd-x');
+      await modal.root.getByLabel('Confirm Password *', { exact: true }).fill('Passw0rd-x');
+      await expect(modal.confirmPassword).toHaveValue('Passw0rd-x');
+      // The role switch is named "Role" plus its state.
+      await expect(modal.roleSwitch).toHaveAccessibleName('Role User');
+    },
+  );
 
   test('A11Y-06: the login form is labelled and its eye follows the state', async ({ page }) => {
     const login = new LoginPage(page);
@@ -365,30 +372,32 @@ test.describe('Forms: labels, names and unique ids', { tag: '@a11y' }, () => {
     await expect(modal.closeButton).toHaveAccessibleName('Close dialog');
   });
 
-  test('A11Y-07: the eyes of the create-user and reset-password modals follow the state', async ({
-    adminPage,
-    seededUser,
-  }) => {
-    const users = new UsersPage(adminPage);
-    await users.goto();
-    await users.search(seededUser.username);
-    await users.openCreateModal();
-    const eye = adminPage.getByTestId('user-create-password-toggle');
-    const confirmEye = adminPage.getByTestId('user-create-confirm-password-toggle');
+  // @cloud-skip: the Users page (and its modals) exist on Repsy OS only.
+  test(
+    'A11Y-07: the eyes of the create-user and reset-password modals follow the state',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage, seededUser }) => {
+      const users = new UsersPage(adminPage);
+      await users.goto();
+      await users.search(seededUser.username);
+      await users.openCreateModal();
+      const eye = adminPage.getByTestId('user-create-password-toggle');
+      const confirmEye = adminPage.getByTestId('user-create-confirm-password-toggle');
 
-    await expect(eye).toHaveAccessibleName('Show password');
-    await expect(confirmEye).toHaveAccessibleName('Show password confirmation');
-    await eye.click();
-    await expect(eye).toHaveAccessibleName('Hide password');
-    await expect(eye).toHaveAttribute('aria-pressed', 'true');
-    await expect(confirmEye).toHaveAttribute('aria-pressed', 'false');
-    await adminPage.keyboard.press('Escape');
+      await expect(eye).toHaveAccessibleName('Show password');
+      await expect(confirmEye).toHaveAccessibleName('Show password confirmation');
+      await eye.click();
+      await expect(eye).toHaveAccessibleName('Hide password');
+      await expect(eye).toHaveAttribute('aria-pressed', 'true');
+      await expect(confirmEye).toHaveAttribute('aria-pressed', 'false');
+      await adminPage.keyboard.press('Escape');
 
-    await users.resetPassword(seededUser.username);
-    await expect(users.resetPasswordModal.toggle).toHaveAccessibleName('Show password');
-    await users.resetPasswordModal.reveal();
-    await expect(users.resetPasswordModal.toggle).toHaveAccessibleName('Hide password');
-    // The secret input is labelled, not just placed under a heading.
-    await expect(users.resetPasswordModal.value).toHaveAccessibleName('New Password');
-  });
+      await users.resetPassword(seededUser.username);
+      await expect(users.resetPasswordModal.toggle).toHaveAccessibleName('Show password');
+      await users.resetPasswordModal.reveal();
+      await expect(users.resetPasswordModal.toggle).toHaveAccessibleName('Hide password');
+      // The secret input is labelled, not just placed under a heading.
+      await expect(users.resetPasswordModal.value).toHaveAccessibleName('New Password');
+    },
+  );
 });

@@ -45,6 +45,9 @@ import { errorToasts } from '../../../src/ui/page-errors.js';
 
 const CREDENTIALS = { tag: ['@credentials'] };
 
+// Every describe below is tagged @cloud-skip: this is the OS self-service profile (`/profile`) of a seeded
+// USER. Repsy Cloud has no USER role and keeps the account at `/account` with its own page (RPS-1649).
+
 /** Logs in through the login form in a new anonymous context and lands on the dashboard. */
 async function loginThroughForm(
   openUiPage: () => Promise<Page>,
@@ -75,7 +78,7 @@ async function expectLoginRefused(
   await expect(login.submit).toBeVisible();
 }
 
-test.describe('PRO-01 change password', () => {
+test.describe('PRO-01 change password', { tag: ['@cloud-skip'] }, () => {
   test.use({
     allowedPageErrors: errorToasts(
       'by design: the old password is refused at the end',
@@ -174,7 +177,7 @@ test.describe('PRO-01 change password', () => {
   });
 });
 
-test.describe('PRO-02 change username', () => {
+test.describe('PRO-02 change username', { tag: ['@cloud-skip'] }, () => {
   test.use({
     allowedPageErrors: errorToasts(
       'by design: a taken name is refused, and the old name no longer logs in',
@@ -276,7 +279,7 @@ test.describe('PRO-02 change username', () => {
   );
 });
 
-test.describe('PRO-03 delete account', () => {
+test.describe('PRO-03 delete account', { tag: ['@cloud-skip'] }, () => {
   test.use({
     allowedPageErrors: errorToasts(
       'by design: the deleted account no longer logs in',
@@ -312,82 +315,86 @@ test.describe('PRO-03 delete account', () => {
   );
 });
 
-test.describe('PRO-05 a refused update raises exactly one error toast (RPS-1309)', () => {
-  test.use({
-    allowedPageErrors: errorToasts(
-      'by design: the update is stubbed as refused',
-      'Stubbed refusal from the server',
-    ),
-  });
-  const REFUSAL = 'Stubbed refusal from the server';
-
-  /** Answers `method` on `url` with a 400 carrying `REFUSAL`; every other request passes through. */
-  async function refuse(page: Page, url: RegExp, method: string): Promise<void> {
-    await page.route(url, async (route) => {
-      if (route.request().method() !== method) {
-        await route.fallback();
-        return;
-      }
-      await route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: JSON.stringify({ text: REFUSAL }),
-      });
+test.describe(
+  'PRO-05 a refused update raises exactly one error toast (RPS-1309)',
+  { tag: ['@cloud-skip'] },
+  () => {
+    test.use({
+      allowedPageErrors: errorToasts(
+        'by design: the update is stubbed as refused',
+        'Stubbed refusal from the server',
+      ),
     });
-  }
+    const REFUSAL = 'Stubbed refusal from the server';
 
-  /** The interceptor's toast, and nothing else: no second toast with an object printed in it. */
-  async function expectOnlyTheServersMessage(profile: ProfilePage): Promise<void> {
-    await profile.shell.toasts.expectError(REFUSAL);
-    await expect(profile.shell.toasts.error()).toHaveCount(1);
-    await expect(profile.shell.toasts.error(/object Object/)).toHaveCount(0);
-    await expect(profile.shell.toasts.success()).toHaveCount(0);
-  }
+    /** Answers `method` on `url` with a 400 carrying `REFUSAL`; every other request passes through. */
+    async function refuse(page: Page, url: RegExp, method: string): Promise<void> {
+      await page.route(url, async (route) => {
+        if (route.request().method() !== method) {
+          await route.fallback();
+          return;
+        }
+        await route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({ text: REFUSAL }),
+        });
+      });
+    }
 
-  test('a refused password change', CREDENTIALS, async ({ userPage, seededUser, seeder }) => {
-    await refuse(userPage, /\/api\/profile\/password$/, 'PUT');
-    const profile = new ProfilePage(userPage);
-    await profile.goto();
+    /** The interceptor's toast, and nothing else: no second toast with an object printed in it. */
+    async function expectOnlyTheServersMessage(profile: ProfilePage): Promise<void> {
+      await profile.shell.toasts.expectError(REFUSAL);
+      await expect(profile.shell.toasts.error()).toHaveCount(1);
+      await expect(profile.shell.toasts.error(/object Object/)).toHaveCount(0);
+      await expect(profile.shell.toasts.success()).toHaveCount(0);
+    }
 
-    await profile.changePassword(`E2e-${seeder.runId}-New1`);
+    test('a refused password change', CREDENTIALS, async ({ userPage, seededUser, seeder }) => {
+      await refuse(userPage, /\/api\/profile\/password$/, 'PUT');
+      const profile = new ProfilePage(userPage);
+      await profile.goto();
 
-    await expectOnlyTheServersMessage(profile);
-    // The form is usable again and the session untouched.
-    await expect(profile.newPassword).toBeEnabled();
-    expect(await currentUsername(userPage)).toBe(seededUser.username);
-  });
+      await profile.changePassword(`E2e-${seeder.runId}-New1`);
 
-  test('a refused username change', CREDENTIALS, async ({ userPage, seededUser, seeder }) => {
-    await refuse(userPage, /\/api\/profile\/username$/, 'PUT');
-    const profile = new ProfilePage(userPage);
-    await profile.goto();
+      await expectOnlyTheServersMessage(profile);
+      // The form is usable again and the session untouched.
+      await expect(profile.newPassword).toBeEnabled();
+      expect(await currentUsername(userPage)).toBe(seededUser.username);
+    });
 
-    await profile.submitUsernameChange(seeder.reserveUsername());
-    await profile.shell.dangerModal.confirm();
+    test('a refused username change', CREDENTIALS, async ({ userPage, seededUser, seeder }) => {
+      await refuse(userPage, /\/api\/profile\/username$/, 'PUT');
+      const profile = new ProfilePage(userPage);
+      await profile.goto();
 
-    await expectOnlyTheServersMessage(profile);
-    await expect(profile.username).toBeEnabled();
-    expect(await currentUsername(userPage)).toBe(seededUser.username);
-    await expect(userPage).toHaveURL(/\/profile$/);
-  });
+      await profile.submitUsernameChange(seeder.reserveUsername());
+      await profile.shell.dangerModal.confirm();
 
-  test('a refused account deletion', CREDENTIALS, async ({ userPage, seededUser, panelApi }) => {
-    await refuse(userPage, /\/api\/profile$/, 'DELETE');
-    const profile = new ProfilePage(userPage);
-    await profile.goto();
+      await expectOnlyTheServersMessage(profile);
+      await expect(profile.username).toBeEnabled();
+      expect(await currentUsername(userPage)).toBe(seededUser.username);
+      await expect(userPage).toHaveURL(/\/profile$/);
+    });
 
-    await profile.requestAccountDeletion();
-    await profile.shell.dangerModal.confirm();
+    test('a refused account deletion', CREDENTIALS, async ({ userPage, seededUser, panelApi }) => {
+      await refuse(userPage, /\/api\/profile$/, 'DELETE');
+      const profile = new ProfilePage(userPage);
+      await profile.goto();
 
-    await expectOnlyTheServersMessage(profile);
-    // Still signed in, still on the page, the account still exists.
-    await expect(userPage).toHaveURL(/\/profile$/);
-    expect(await currentUsername(userPage)).toBe(seededUser.username);
-    expect(await panelApi.listUsers({ q: seededUser.username })).toHaveLength(1);
-  });
-});
+      await profile.requestAccountDeletion();
+      await profile.shell.dangerModal.confirm();
 
-test.describe('PRO-04 header Profile link (RPS-1264)', () => {
+      await expectOnlyTheServersMessage(profile);
+      // Still signed in, still on the page, the account still exists.
+      await expect(userPage).toHaveURL(/\/profile$/);
+      expect(await currentUsername(userPage)).toBe(seededUser.username);
+      expect(await panelApi.listUsers({ q: seededUser.username })).toHaveLength(1);
+    });
+  },
+);
+
+test.describe('PRO-04 header Profile link (RPS-1264)', { tag: ['@cloud-skip'] }, () => {
   // A router link: no document load (the SPA keeps its state, the splash does not come back) and the
   // dropdown closes. It used to be a raw relative `href`, i.e. a full reload of the whole app.
   const origins = [

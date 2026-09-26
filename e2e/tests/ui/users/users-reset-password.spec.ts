@@ -29,7 +29,8 @@ import { Shell } from '../../../src/ui/pages/shell.js';
 /** What the panel's own login form accepts (login.component.ts): the generated password must match. */
 const LOGIN_PASSWORD = /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=\S+$).{6,50}$/;
 
-test.describe('USR-04 reset password', () => {
+// @cloud-skip: the admin Users page exists on Repsy OS only (`target.ui.hasUsersPage`).
+test.describe('USR-04 reset password', { tag: ['@cloud-skip'] }, () => {
   test('the one-time modal shows the new password; it logs in and the old one does not', async ({
     usersPage,
     seededUser,

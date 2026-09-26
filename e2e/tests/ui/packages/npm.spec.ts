@@ -26,6 +26,7 @@ import { adminCredential } from '../../../src/clients/raw-http.js';
 import { buildPublishDocument, buildTarball, rawPublish } from '../../../src/clients/npm-raw.js';
 import type { SeededPackage } from '../../../src/seed/packages.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
+import { repoRoute } from '../../../src/ui/routes.js';
 import { registerPackageScenarios } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 import { rowKeys } from '../../../src/ui/package-scenarios.js';
@@ -109,7 +110,7 @@ test.describe('npm scopes', { tag: '@packages' }, () => {
 
     // The unscoped package is under ~, on its own page and its own versions and detail routes.
     const tilde = pages.sublist(unscoped);
-    expect(tilde.path()).toBe(`/${repo.name}/~`);
+    expect(tilde.path()).toBe(repoRoute(repo.name, '~'));
     await tilde.goto();
     await tilde.expectRow(unscoped);
     await tilde.expectNoRow(scoped);

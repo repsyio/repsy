@@ -30,6 +30,7 @@ import type { Locator } from '@playwright/test';
 import { RepoType } from '../../../src/api/panel-api.js';
 import { scanPage } from '../../../src/ui/a11y.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
+import { repoRoute } from '../../../src/ui/routes.js';
 import { DESCRIPTORS, pageOf, type ProtocolListPage } from '../../../src/ui/pages/protocol.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 
@@ -191,7 +192,7 @@ test.describe('Phone-width cards (390x844)', { tag: '@a11y' }, () => {
 
     await toggleOf(upper).tap();
     await expect(menuOf(upper)).toBeVisible();
-    await expect(adminPage).toHaveURL((url) => url.pathname === `/${repo.name}`);
+    await expect(adminPage).toHaveURL((url) => url.pathname === repoRoute(repo.name));
     const release = await pullNextCardUnder(menuOf(upper));
     await expectMenuOnTop(menuOf(upper));
     await release();

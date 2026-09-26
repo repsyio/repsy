@@ -129,182 +129,186 @@ test.describe('Deploy tokens: create', { tag: SETTINGS }, () => {
     },
   );
 
-  test('TOK-02 a Read Only token with a custom username and a near expiry, and the expiry colours', async ({
-    adminPage,
-    seeder,
-    panelApi,
-  }) => {
-    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
-    const settings = new RepoSettingsPage(adminPage, repo.name);
-    const { tokens } = settings;
+  // @cloud-skip: seeds two tokens, one past-dated; the Cloud FREE plan holds one token per repo and takes no past
+  // expiration date (`maxDeployTokensPerRepo`, `supportsExpiredTokenSeed`).
+  test(
+    'TOK-02 a Read Only token with a custom username and a near expiry, and the expiry colours',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage, seeder, panelApi }) => {
+      const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+      const settings = new RepoSettingsPage(adminPage, repo.name);
+      const { tokens } = settings;
 
-    // Two tokens the UI cannot make: one already expired, one far from expiring.
-    const expired = await seeder.createToken(repo.name, {
-      name: 'tok-expired',
-      expirationDate: new Date(Date.now() - ONE_DAY_MS),
-    });
-    const distant = await seeder.createToken(repo.name, {
-      name: 'tok-distant',
-      expirationDate: new Date(Date.now() + 30 * ONE_DAY_MS),
-    });
-    await settings.goto();
+      // Two tokens the UI cannot make: one already expired, one far from expiring.
+      const expired = await seeder.createToken(repo.name, {
+        name: 'tok-expired',
+        expirationDate: new Date(Date.now() - ONE_DAY_MS),
+      });
+      const distant = await seeder.createToken(repo.name, {
+        name: 'tok-distant',
+        expirationDate: new Date(Date.now() + 30 * ONE_DAY_MS),
+      });
+      await settings.goto();
 
-    // The near one: a custom username, Read Only, three days out (inside the 7-day warning window).
-    const name = 'tok-ro-soon';
-    const username = `ro-${seeder.runId}`;
-    const expirationDate = utcDate(3);
-    await tokens.openCreateModal();
-    await tokens.createModal.create({ name, username, readOnly: true, expirationDate });
+      // The near one: a custom username, Read Only, three days out (inside the 7-day warning window).
+      const name = 'tok-ro-soon';
+      const username = `ro-${seeder.runId}`;
+      const expirationDate = utcDate(3);
+      await tokens.openCreateModal();
+      await tokens.createModal.create({ name, username, readOnly: true, expirationDate });
 
-    await settings.shell.toasts.expectSuccess('Deploy token created successfully.');
-    const shown = await tokens.infoModal.values();
-    expect(shown.username).toBe(username);
-    await tokens.infoModal.close();
+      await settings.shell.toasts.expectSuccess('Deploy token created successfully.');
+      const shown = await tokens.infoModal.values();
+      expect(shown.username).toBe(username);
+      await tokens.infoModal.close();
 
-    await tokens.expectRowCount(3);
-    await expect(tokens.cell(name, 'row-permission')).toHaveText('R/O');
-    await tokens.expectCellText(name, 'row-username', username);
-    await expect(tokens.cell(expired.name, 'row-permission')).toHaveText('R/W');
+      await tokens.expectRowCount(3);
+      await expect(tokens.cell(name, 'row-permission')).toHaveText('R/O');
+      await tokens.expectCellText(name, 'row-username', username);
+      await expect(tokens.cell(expired.name, 'row-permission')).toHaveText('R/W');
 
-    // Warning inside 7 days, error once past, neither for a token that is far off.
-    await expect(tokens.cell(name, 'row-expires')).toHaveClass(EXPIRES_WARNING_CLASS);
-    await expect(tokens.cell(name, 'row-expires')).not.toHaveClass(EXPIRES_ERROR_CLASS);
-    await expect(tokens.cell(expired.name, 'row-expires')).toHaveClass(EXPIRES_ERROR_CLASS);
-    await expect(tokens.cell(expired.name, 'row-expires')).not.toHaveClass(EXPIRES_WARNING_CLASS);
-    await expect(tokens.cell(distant.name, 'row-expires')).not.toHaveClass(EXPIRES_WARNING_CLASS);
-    await expect(tokens.cell(distant.name, 'row-expires')).not.toHaveClass(EXPIRES_ERROR_CLASS);
+      // Warning inside 7 days, error once past, neither for a token that is far off.
+      await expect(tokens.cell(name, 'row-expires')).toHaveClass(EXPIRES_WARNING_CLASS);
+      await expect(tokens.cell(name, 'row-expires')).not.toHaveClass(EXPIRES_ERROR_CLASS);
+      await expect(tokens.cell(expired.name, 'row-expires')).toHaveClass(EXPIRES_ERROR_CLASS);
+      await expect(tokens.cell(expired.name, 'row-expires')).not.toHaveClass(EXPIRES_WARNING_CLASS);
+      await expect(tokens.cell(distant.name, 'row-expires')).not.toHaveClass(EXPIRES_WARNING_CLASS);
+      await expect(tokens.cell(distant.name, 'row-expires')).not.toHaveClass(EXPIRES_ERROR_CLASS);
 
-    // The server kept the username, the access type and the chosen day.
-    const stored = (await panelApi.listDeployTokens(repo.name)).find((t) => t.name === name);
-    expect(stored).toMatchObject({ username, readOnly: true });
-    expect(stored?.expirationDate?.slice(0, 10)).toBe(expirationDate);
-  });
+      // The server kept the username, the access type and the chosen day.
+      const stored = (await panelApi.listDeployTokens(repo.name)).find((t) => t.name === name);
+      expect(stored).toMatchObject({ username, readOnly: true });
+      expect(stored?.expirationDate?.slice(0, 10)).toBe(expirationDate);
+    },
+  );
 });
 
 test.describe('Deploy tokens: rotate, revoke and paging', { tag: SETTINGS }, () => {
-  test('TOK-03 rotate shows a new token and kills the old one; revoke removes the row; page size is 3', async ({
-    adminPage,
-    seeder,
-    panelApi,
-  }) => {
-    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
-    const created: SeededToken[] = [];
-    for (const name of ['tok-a', 'tok-b', 'tok-c', 'tok-d']) {
-      created.push(await seeder.createToken(repo.name, { name }));
-    }
-    const settings = new RepoSettingsPage(adminPage, repo.name);
-    const { tokens } = settings;
-    await settings.goto();
+  // @cloud-skip: seeds four tokens in one repo (`maxDeployTokensPerRepo` is 1 on the Cloud FREE plan).
+  test(
+    'TOK-03 rotate shows a new token and kills the old one; revoke removes the row; page size is 3',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage, seeder, panelApi }) => {
+      const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+      const created: SeededToken[] = [];
+      for (const name of ['tok-a', 'tok-b', 'tok-c', 'tok-d']) {
+        created.push(await seeder.createToken(repo.name, { name }));
+      }
+      const settings = new RepoSettingsPage(adminPage, repo.name);
+      const { tokens } = settings;
+      await settings.goto();
 
-    // Four tokens, three per page.
-    await tokens.expectRowCount(3);
-    await expect(tokens.pagination.root).toBeVisible();
-    await expect(tokens.numberedButton(2)).toBeVisible();
-    await expect(tokens.numberedButton(3)).toHaveCount(0);
-    const firstPage = await tokens.rowNames();
-    await tokens.numberedButton(2).click();
-    await expect.poll(() => tokens.rowNames()).toHaveLength(1);
-    const secondPage = await tokens.rowNames();
-    expect([...firstPage, ...secondPage].sort()).toEqual(['tok-a', 'tok-b', 'tok-c', 'tok-d']);
-    await tokens.numberedButton(1).click();
-    await expect.poll(() => tokens.rowNames()).toEqual(firstPage);
+      // Four tokens, three per page.
+      await tokens.expectRowCount(3);
+      await expect(tokens.pagination.root).toBeVisible();
+      await expect(tokens.numberedButton(2)).toBeVisible();
+      await expect(tokens.numberedButton(3)).toHaveCount(0);
+      const firstPage = await tokens.rowNames();
+      await tokens.numberedButton(2).click();
+      await expect.poll(() => tokens.rowNames()).toHaveLength(1);
+      const secondPage = await tokens.rowNames();
+      expect([...firstPage, ...secondPage].sort()).toEqual(['tok-a', 'tok-b', 'tok-c', 'tok-d']);
+      await tokens.numberedButton(1).click();
+      await expect.poll(() => tokens.rowNames()).toEqual(firstPage);
 
-    // Rotate one token: cancel first (nothing changes), then confirm.
-    const rotated = seededByName(created, firstPage[0]);
-    await tokens.rotateButton(rotated.name).click();
-    await settings.shell.dangerModal.expectOpen('Rotate Deploy Token');
-    await settings.shell.dangerModal.cancel();
-    await settings.shell.dangerModal.expectClosed();
-    await tokens.infoModal.expectClosed();
-    expect(await repoRootStatus(repo.name, rotated)).toBe(200);
+      // Rotate one token: cancel first (nothing changes), then confirm.
+      const rotated = seededByName(created, firstPage[0]);
+      await tokens.rotateButton(rotated.name).click();
+      await settings.shell.dangerModal.expectOpen('Rotate Deploy Token');
+      await settings.shell.dangerModal.cancel();
+      await settings.shell.dangerModal.expectClosed();
+      await tokens.infoModal.expectClosed();
+      expect(await repoRootStatus(repo.name, rotated)).toBe(200);
 
-    await tokens.rotateButton(rotated.name).click();
-    await settings.shell.dangerModal.expectOpen('Rotate Deploy Token');
-    await settings.shell.dangerModal.confirm();
-    await settings.shell.toasts.expectSuccess('Deploy token rotated successfully');
-    const fresh = await tokens.infoModal.values();
-    expect(fresh.username).toBe(rotated.username);
-    expect(fresh.token).not.toBe('');
-    expect(fresh.token).not.toBe(rotated.token);
-    await tokens.infoModal.close();
+      await tokens.rotateButton(rotated.name).click();
+      await settings.shell.dangerModal.expectOpen('Rotate Deploy Token');
+      await settings.shell.dangerModal.confirm();
+      await settings.shell.toasts.expectSuccess('Deploy token rotated successfully');
+      const fresh = await tokens.infoModal.values();
+      expect(fresh.username).toBe(rotated.username);
+      expect(fresh.token).not.toBe('');
+      expect(fresh.token).not.toBe(rotated.token);
+      await tokens.infoModal.close();
 
-    // The new secret works on the repo port, the old one no longer does.
-    expect(await repoRootStatus(repo.name, fresh)).toBe(200);
-    expect(await repoRootStatus(repo.name, rotated)).toBe(401);
-    // Still the same four tokens.
-    expect(await panelApi.listDeployTokens(repo.name)).toHaveLength(4);
+      // The new secret works on the repo port, the old one no longer does.
+      expect(await repoRootStatus(repo.name, fresh)).toBe(200);
+      expect(await repoRootStatus(repo.name, rotated)).toBe(401);
+      // Still the same four tokens.
+      expect(await panelApi.listDeployTokens(repo.name)).toHaveLength(4);
 
-    // Revoke another token on page 1: cancel first, then confirm; the fourth token moves up, so the
-    // three that are left fit on one page and the pagination goes away.
-    const revoked = seededByName(created, firstPage[1]);
-    await tokens.revokeButton(revoked.name).click();
-    await settings.shell.dangerModal.expectOpen('Delete Deploy Token');
-    await settings.shell.dangerModal.cancel();
-    await settings.shell.dangerModal.expectClosed();
-    await expect(tokens.row(revoked.name)).toBeVisible();
-    expect(await panelApi.listDeployTokens(repo.name)).toHaveLength(4);
+      // Revoke another token on page 1: cancel first, then confirm; the fourth token moves up, so the
+      // three that are left fit on one page and the pagination goes away.
+      const revoked = seededByName(created, firstPage[1]);
+      await tokens.revokeButton(revoked.name).click();
+      await settings.shell.dangerModal.expectOpen('Delete Deploy Token');
+      await settings.shell.dangerModal.cancel();
+      await settings.shell.dangerModal.expectClosed();
+      await expect(tokens.row(revoked.name)).toBeVisible();
+      expect(await panelApi.listDeployTokens(repo.name)).toHaveLength(4);
 
-    await tokens.revokeButton(revoked.name).click();
-    await settings.shell.dangerModal.expectOpen('Delete Deploy Token');
-    await settings.shell.dangerModal.confirm();
-    await settings.shell.toasts.expectSuccess('Deploy token revoked successfully');
-    await expect(tokens.row(revoked.name)).toHaveCount(0);
-    await tokens.expectRowCount(3);
-    await expect(tokens.pagination.root).toBeHidden();
-    await expect
-      .poll(async () => (await panelApi.listDeployTokens(repo.name)).map((t) => t.name).sort())
-      .toEqual(['tok-a', 'tok-b', 'tok-c', 'tok-d'].filter((n) => n !== revoked.name));
-    expect(await repoRootStatus(repo.name, revoked)).toBe(401);
-  });
+      await tokens.revokeButton(revoked.name).click();
+      await settings.shell.dangerModal.expectOpen('Delete Deploy Token');
+      await settings.shell.dangerModal.confirm();
+      await settings.shell.toasts.expectSuccess('Deploy token revoked successfully');
+      await expect(tokens.row(revoked.name)).toHaveCount(0);
+      await tokens.expectRowCount(3);
+      await expect(tokens.pagination.root).toBeHidden();
+      await expect
+        .poll(async () => (await panelApi.listDeployTokens(repo.name)).map((t) => t.name).sort())
+        .toEqual(['tok-a', 'tok-b', 'tok-c', 'tok-d'].filter((n) => n !== revoked.name));
+      expect(await repoRootStatus(repo.name, revoked)).toBe(401);
+    },
+  );
 
   // RPS-1285. Revoking the only token on page 2 used to refetch page 2 (past the end, an empty list)
   // and, in the same tick, page 1: whichever answer landed LAST won, so a slow empty page-2 answer
   // left "Your list is empty" over three tokens. It is now one chained request for the page that is
   // left. The page-2 delay below is what made the old order certain; it stays as the regression
   // guard: a page-2 request after the revoke would be slow, and wins if it is sent.
-  test('TOK-03 revoking the last token on page 2 shows the remaining tokens from a single list request (RPS-1285)', async ({
-    adminPage,
-    seeder,
-  }) => {
-    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
-    for (const name of ['tok-a', 'tok-b', 'tok-c', 'tok-d']) {
-      await seeder.createToken(repo.name, { name });
-    }
-    const settings = new RepoSettingsPage(adminPage, repo.name);
-    const { tokens } = settings;
-    await settings.goto();
-    await tokens.numberedButton(2).click();
-    await expect.poll(() => tokens.rowNames()).toHaveLength(1);
-
-    // From here on the list is watched, and a request for the (soon empty) second page is slowed down.
-    const listPages: (string | null)[] = [];
-    adminPage.on('request', (request) => {
-      const url = new URL(request.url());
-      if (isTokenListRequest(url, repo.name, 0) || isTokenListRequest(url, repo.name, 1)) {
-        listPages.push(url.searchParams.get('page'));
+  test(
+    'TOK-03 revoking the last token on page 2 shows the remaining tokens from a single list request (RPS-1285)',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage, seeder }) => {
+      const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+      for (const name of ['tok-a', 'tok-b', 'tok-c', 'tok-d']) {
+        await seeder.createToken(repo.name, { name });
       }
-    });
-    const isSecondPageRequest = (url: URL) => isTokenListRequest(url, repo.name, 1);
-    await adminPage.route(isSecondPageRequest, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
-      await route.continue();
-    });
+      const settings = new RepoSettingsPage(adminPage, repo.name);
+      const { tokens } = settings;
+      await settings.goto();
+      await tokens.numberedButton(2).click();
+      await expect.poll(() => tokens.rowNames()).toHaveLength(1);
 
-    const [lastName] = await tokens.rowNames();
-    await tokens.revokeButton(lastName).click();
-    await settings.shell.dangerModal.confirm();
-    await settings.shell.toasts.expectSuccess('Deploy token revoked successfully');
+      // From here on the list is watched, and a request for the (soon empty) second page is slowed down.
+      const listPages: (string | null)[] = [];
+      adminPage.on('request', (request) => {
+        const url = new URL(request.url());
+        if (isTokenListRequest(url, repo.name, 0) || isTokenListRequest(url, repo.name, 1)) {
+          listPages.push(url.searchParams.get('page'));
+        }
+      });
+      const isSecondPageRequest = (url: URL) => isTokenListRequest(url, repo.name, 1);
+      await adminPage.route(isSecondPageRequest, async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 1_500));
+        await route.continue();
+      });
 
-    // Long enough for the slowed page-2 answer to have arrived, had it been requested, and for the
-    // browser to paint whatever came last.
-    await new Promise((resolve) => setTimeout(resolve, 2_000));
-    await adminPage.evaluate(
-      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-    );
-    await tokens.expectRowCount(3);
-    await expect(tokens.empty).toHaveCount(0);
-    expect(listPages).toEqual(['0']);
-  });
+      const [lastName] = await tokens.rowNames();
+      await tokens.revokeButton(lastName).click();
+      await settings.shell.dangerModal.confirm();
+      await settings.shell.toasts.expectSuccess('Deploy token revoked successfully');
+
+      // Long enough for the slowed page-2 answer to have arrived, had it been requested, and for the
+      // browser to paint whatever came last.
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+      await adminPage.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+      );
+      await tokens.expectRowCount(3);
+      await expect(tokens.empty).toHaveCount(0);
+      expect(listPages).toEqual(['0']);
+    },
+  );
 });
 
 test.describe('Deploy tokens: on the repo port', { tag: SETTINGS }, () => {
@@ -441,42 +445,44 @@ test.describe('Deploy tokens: the create form', { tag: SETTINGS }, () => {
 });
 
 test.describe('Deploy tokens: long names', { tag: SETTINGS }, () => {
-  test('TOK-06 two long names that differ only at the end stay distinguishable: full text in the row, clipped by CSS (RPS-1267)', async ({
-    adminPage,
-    seeder,
-  }) => {
-    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
-    const base = `tok-long-${seeder.runId}-`.padEnd(70, 'x');
-    const names = [`${base}a`, `${base}b`];
-    for (const name of names) {
-      await seeder.createToken(repo.name, { name });
-    }
-    const settings = new RepoSettingsPage(adminPage, repo.name);
-    const { tokens } = settings;
-    await settings.goto();
-    await tokens.expectRowCount(2);
+  // @cloud-skip: seeds two tokens in one repo (`maxDeployTokensPerRepo` is 1 on the Cloud FREE plan).
+  test(
+    'TOK-06 two long names that differ only at the end stay distinguishable: full text in the row, clipped by CSS (RPS-1267)',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage, seeder }) => {
+      const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+      const base = `tok-long-${seeder.runId}-`.padEnd(70, 'x');
+      const names = [`${base}a`, `${base}b`];
+      for (const name of names) {
+        await seeder.createToken(repo.name, { name });
+      }
+      const settings = new RepoSettingsPage(adminPage, repo.name);
+      const { tokens } = settings;
+      await settings.goto();
+      await tokens.expectRowCount(2);
 
-    for (const name of names) {
-      // The DOM carries the whole name (the old cell cut it to ten characters and a "..."), so the
-      // two rows differ in their text, not only in a hover popup.
-      await expect(tokens.cell(name, 'row-name').getByTestId('tooltip-text')).toHaveText(name);
-    }
-    // The browser clips it (CSS), the cell does not grow the page.
-    const label = tokens.cell(names[0], 'row-name').getByTestId('tooltip-text');
-    const clipped = await label.evaluate((element) => ({
-      overflowing: element.scrollWidth > element.clientWidth,
-      ellipsis: getComputedStyle(element).textOverflow,
-    }));
-    expect(clipped).toEqual({ overflowing: true, ellipsis: 'ellipsis' });
-    const pageOverflow = await adminPage.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(pageOverflow).toBeLessThanOrEqual(0);
+      for (const name of names) {
+        // The DOM carries the whole name (the old cell cut it to ten characters and a "..."), so the
+        // two rows differ in their text, not only in a hover popup.
+        await expect(tokens.cell(name, 'row-name').getByTestId('tooltip-text')).toHaveText(name);
+      }
+      // The browser clips it (CSS), the cell does not grow the page.
+      const label = tokens.cell(names[0], 'row-name').getByTestId('tooltip-text');
+      const clipped = await label.evaluate((element) => ({
+        overflowing: element.scrollWidth > element.clientWidth,
+        ellipsis: getComputedStyle(element).textOverflow,
+      }));
+      expect(clipped).toEqual({ overflowing: true, ellipsis: 'ellipsis' });
+      const pageOverflow = await adminPage.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(pageOverflow).toBeLessThanOrEqual(0);
 
-    // Hovering a clipped name still shows it in full.
-    await tokens.cell(names[1], 'row-name').hover();
-    await expect(tokens.cell(names[1], 'row-name').getByTestId('tooltip-popup')).toHaveText(
-      names[1],
-    );
-  });
+      // Hovering a clipped name still shows it in full.
+      await tokens.cell(names[1], 'row-name').hover();
+      await expect(tokens.cell(names[1], 'row-name').getByTestId('tooltip-popup')).toHaveText(
+        names[1],
+      );
+    },
+  );
 });

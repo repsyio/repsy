@@ -28,6 +28,7 @@ import { rawGetManifest } from '../../../src/clients/docker-raw.js';
 import { adminCredential, minimalPom, rawPut, versionDir } from '../../../src/clients/maven-raw.js';
 import { DESCRIPTION_MAX_TEXT, bulleted } from '../../../src/ui/credential-messages.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
+import { repoRoute } from '../../../src/ui/routes.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
 import { RepoSettingsReadback } from '../../../src/ui/pages/repo-settings/readback.js';
 
@@ -85,7 +86,7 @@ test.describe('Repository settings: rename and description', { tag: SETTINGS }, 
 
     // A fresh page load of the old address finds nothing (a same-session navigation could still
     // hit the SPA's cached repo lookup, so this reloads on purpose).
-    await adminPage.goto(`/${repo.name}/settings`);
+    await adminPage.goto(repoRoute(repo.name, 'settings'));
     await expect(adminPage.getByTestId('not-found')).toBeVisible();
     await expect(renamed.root).toHaveCount(0);
   });

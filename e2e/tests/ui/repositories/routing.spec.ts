@@ -20,6 +20,7 @@
  */
 import { RepoType } from '../../../src/api/panel-api.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
+import { repoRoute } from '../../../src/ui/routes.js';
 
 test.describe('Repository routing', () => {
   test(
@@ -43,10 +44,10 @@ test.describe('Repository routing', () => {
       await expect(adminPage).toHaveURL('/');
       await expect(adminPage.getByTestId('welcome-card')).toBeVisible();
 
-      await adminPage.goto(`/${repo.name}`);
+      await adminPage.goto(repoRoute(repo.name));
       await expect(adminPage.getByTestId('breadcrumb-current')).toContainText(repo.name);
       await expect(adminPage).toHaveTitle('repsy | Maven Groups');
-      await expect(adminPage).toHaveURL(`/${repo.name}`);
+      await expect(adminPage).toHaveURL(repoRoute(repo.name));
       await expect(adminPage.getByTestId('pkg-toolbar')).toBeVisible();
       await expect(adminPage.getByTestId('not-found')).toHaveCount(0);
     },
@@ -78,7 +79,7 @@ test.describe('Repository routing', () => {
   }) => {
     const repo = await seeder.createRepo(RepoType.NPM);
 
-    await adminPage.goto(`/${repo.name}`);
+    await adminPage.goto(repoRoute(repo.name));
 
     await expect(adminPage.getByTestId('breadcrumb-current')).toContainText(repo.name);
     await expect(adminPage).toHaveTitle(/^repsy \| Npm|^repsy \| NPM/i);

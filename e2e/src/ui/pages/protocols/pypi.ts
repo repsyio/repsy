@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
+import { repoRoute } from '../../routes.js';
 
 /**
  * PyPI: packages -> versions ("releases") -> detail.
@@ -30,7 +31,7 @@ export const pypiDescriptor: ProtocolDescriptor = {
   label: 'PyPI',
   levels: {
     list: {
-      path: (repo) => `/${repo}`,
+      path: (repo) => repoRoute(repo),
       rowKey: (t) => need(t, 'pypi').name,
       search: { placeholder: 'package', term: (t) => t.name },
       sort: NEWEST_OLDEST,
@@ -45,7 +46,7 @@ export const pypiDescriptor: ProtocolDescriptor = {
       installBar: false,
     },
     versions: {
-      path: (repo, t) => `/${repo}/${need(t, 'pypi').name}`,
+      path: (repo, t) => repoRoute(repo, need(t, 'pypi').name),
       rowKey: (t) => need(t, 'pypi').version,
       search: { placeholder: 'version', term: (t) => t.version },
       sort: NEWEST_OLDEST,
@@ -59,7 +60,7 @@ export const pypiDescriptor: ProtocolDescriptor = {
     detail: {
       path: (repo, t) => {
         const { name, version } = need(t, 'pypi');
-        return `/${repo}/${name}/${version}`;
+        return repoRoute(repo, name, version);
       },
       installContains: (repo, t) => [
         `pip install ${need(t, 'pypi').name}==${need(t, 'pypi').version}`,

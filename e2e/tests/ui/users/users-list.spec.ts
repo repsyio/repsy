@@ -25,7 +25,8 @@ import { expect, test } from '../../../src/ui/users-fixtures.js';
 
 const PAGE_SIZE = 10;
 
-test.describe('USR-06 users list', () => {
+// @cloud-skip: the admin Users page exists on Repsy OS only (`target.ui.hasUsersPage`).
+test.describe('USR-06 users list', { tag: ['@cloud-skip'] }, () => {
   // 11 users: one more than a page.
   test('search, pagination and refresh with more than one page of users', async ({
     usersPage,

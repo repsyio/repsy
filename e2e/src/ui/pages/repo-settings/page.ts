@@ -23,6 +23,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
 import { UiPage } from '../base.js';
+import { repoRoute } from '../../routes.js';
 import { Shell } from '../shell.js';
 import {
   DeleteRepoSection,
@@ -77,7 +78,7 @@ export class RepoSettingsPage extends UiPage {
 
   /** `/<repo>/settings`. */
   get path(): string {
-    return `/${this.repoName}/settings`;
+    return repoRoute(this.repoName, 'settings');
   }
 
   async goto(): Promise<void> {

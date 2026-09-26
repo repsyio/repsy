@@ -69,115 +69,119 @@ test.describe('Mobile viewport', () => {
     await expect(new Shell(adminPage).header.burger).toBeHidden();
   });
 
-  test('NAV-02: the burger opens the mobile sidebar, its links work and it closes', async ({
-    openUiPage,
-    adminSession,
-  }) => {
-    const page = await openUiPage({ session: adminSession, viewport: PHONE });
-    const shell = new Shell(page);
-    const dashboard = new DashboardPage(page);
-    const repos = new RepositoriesPage(page);
-    const users = new UsersPage(page);
+  // @cloud-skip: follows the Users link of the mobile sidebar (Repsy OS only).
+  test(
+    'NAV-02: the burger opens the mobile sidebar, its links work and it closes',
+    { tag: ['@cloud-skip'] },
+    async ({ openUiPage, adminSession }) => {
+      const page = await openUiPage({ session: adminSession, viewport: PHONE });
+      const shell = new Shell(page);
+      const dashboard = new DashboardPage(page);
+      const repos = new RepositoriesPage(page);
+      const users = new UsersPage(page);
 
-    await test.step('open, and follow the Repositories link', async () => {
-      await dashboard.goto();
+      await test.step('open, and follow the Repositories link', async () => {
+        await dashboard.goto();
+        await shell.header.burger.click();
+        await expect(shell.mobileSidebar.root).toBeVisible({ timeout: 3_000 });
+        await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'true');
+        // RPS-1267: the "Search docs" box did nothing and is gone.
+        await expect(page.getByTestId('mobile-sidebar-search')).toHaveCount(0);
+        await shell.mobileSidebar.link('repositories').click();
+        await expect(page).toHaveURL(/\/repositories$/);
+        await expect(repos.title).toBeVisible();
+        await expect(shell.mobileSidebar.root).toHaveCount(0);
+        await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'false');
+      });
+
+      await test.step('a link between two pages of the same layout closes it too', async () => {
+        await shell.header.burger.click();
+        await shell.mobileSidebar.link('users').click();
+        await expect(page).toHaveURL(/\/users$/);
+        await expect(users.title).toBeVisible();
+        await expect(shell.mobileSidebar.root).toHaveCount(0);
+      });
+
+      await test.step('open again (fresh load) and follow the Users link (admin)', async () => {
+        await dashboard.goto();
+        await shell.header.burger.click();
+        await shell.mobileSidebar.link('users').click();
+        await expect(page).toHaveURL(/\/users$/);
+        await expect(users.title).toBeVisible();
+      });
+
+      await test.step('the X closes it', async () => {
+        await dashboard.goto();
+        await shell.header.burger.click();
+        await expect(shell.mobileSidebar.root).toBeVisible();
+        await shell.mobileSidebar.close.click();
+        await expect(shell.mobileSidebar.root).toHaveCount(0);
+        await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'false');
+      });
+
+      await test.step('Escape closes it, other keys (Tab) do not', async () => {
+        await shell.header.burger.click();
+        await expect(shell.mobileSidebar.root).toBeVisible();
+        await page.keyboard.press('Tab');
+        await expect(shell.mobileSidebar.root).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(shell.mobileSidebar.root).toHaveCount(0);
+        await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'false');
+      });
+
+      await test.step('the backdrop (right of the 240 px panel) closes it', async () => {
+        await shell.header.burger.click();
+        await expect(shell.mobileSidebar.root).toBeVisible();
+        await page.getByTestId('mobile-sidebar-backdrop').click({ position: { x: 360, y: 400 } });
+        await expect(shell.mobileSidebar.root).toHaveCount(0);
+      });
+    },
+  );
+
+  // @cloud-skip: runs as a seeded USER; Repsy Cloud has no USER role.
+  test(
+    'NAV-02: a USER opens the mobile sidebar without Users and Security, and logs out',
+    { tag: ['@cloud-skip'] },
+    async ({ openUiPage, seededUser }) => {
+      const session = await loginSession(seededUser.username, seededUser.password);
+      const page = await openUiPage({ session, viewport: PHONE });
+      const shell = new Shell(page);
+
+      await new DashboardPage(page).goto();
       await shell.header.burger.click();
-      await expect(shell.mobileSidebar.root).toBeVisible({ timeout: 3_000 });
-      await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'true');
-      // RPS-1267: the "Search docs" box did nothing and is gone.
-      await expect(page.getByTestId('mobile-sidebar-search')).toHaveCount(0);
-      await shell.mobileSidebar.link('repositories').click();
-      await expect(page).toHaveURL(/\/repositories$/);
-      await expect(repos.title).toBeVisible();
-      await expect(shell.mobileSidebar.root).toHaveCount(0);
-      await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'false');
-    });
+      await expect(shell.mobileSidebar.link('repositories')).toBeVisible({ timeout: 3_000 });
+      await expect(shell.mobileSidebar.link('users')).toHaveCount(0);
+      await expect(shell.mobileSidebar.link('security')).toHaveCount(0);
+      await shell.mobileSidebar.logout.click();
+      await expect(page).toHaveURL(/\/login(\?.*)?$/);
+    },
+  );
 
-    await test.step('a link between two pages of the same layout closes it too', async () => {
-      await shell.header.burger.click();
-      await shell.mobileSidebar.link('users').click();
-      await expect(page).toHaveURL(/\/users$/);
-      await expect(users.title).toBeVisible();
-      await expect(shell.mobileSidebar.root).toHaveCount(0);
-    });
+  // @cloud-skip: needs the Users page and a seeded user.
+  test(
+    'NAV-02: the repository list and the users list show cards, not the grid',
+    { tag: ['@cloud-skip'] },
+    async ({ openUiPage, adminSession, seeder, seededUser }) => {
+      const page = await openUiPage({ session: adminSession, viewport: PHONE });
+      const repo = await seeder.createRepo(RepoType.MAVEN);
 
-    await test.step('open again (fresh load) and follow the Users link (admin)', async () => {
-      await dashboard.goto();
-      await shell.header.burger.click();
-      await shell.mobileSidebar.link('users').click();
-      await expect(page).toHaveURL(/\/users$/);
-      await expect(users.title).toBeVisible();
-    });
+      const repos = new RepositoriesPage(page);
+      await repos.goto();
+      await repos.search(repo.name);
+      await expect(repos.cards).toBeVisible();
+      await expect(repos.card(repo.name)).toBeVisible();
+      await expect(repos.list.container).toBeHidden();
+      await expect(repos.row(repo.name)).toBeHidden();
 
-    await test.step('the X closes it', async () => {
-      await dashboard.goto();
-      await shell.header.burger.click();
-      await expect(shell.mobileSidebar.root).toBeVisible();
-      await shell.mobileSidebar.close.click();
-      await expect(shell.mobileSidebar.root).toHaveCount(0);
-      await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'false');
-    });
-
-    await test.step('Escape closes it, other keys (Tab) do not', async () => {
-      await shell.header.burger.click();
-      await expect(shell.mobileSidebar.root).toBeVisible();
-      await page.keyboard.press('Tab');
-      await expect(shell.mobileSidebar.root).toBeVisible();
-      await page.keyboard.press('Escape');
-      await expect(shell.mobileSidebar.root).toHaveCount(0);
-      await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'false');
-    });
-
-    await test.step('the backdrop (right of the 240 px panel) closes it', async () => {
-      await shell.header.burger.click();
-      await expect(shell.mobileSidebar.root).toBeVisible();
-      await page.getByTestId('mobile-sidebar-backdrop').click({ position: { x: 360, y: 400 } });
-      await expect(shell.mobileSidebar.root).toHaveCount(0);
-    });
-  });
-
-  test('NAV-02: a USER opens the mobile sidebar without Users and Security, and logs out', async ({
-    openUiPage,
-    seededUser,
-  }) => {
-    const session = await loginSession(seededUser.username, seededUser.password);
-    const page = await openUiPage({ session, viewport: PHONE });
-    const shell = new Shell(page);
-
-    await new DashboardPage(page).goto();
-    await shell.header.burger.click();
-    await expect(shell.mobileSidebar.link('repositories')).toBeVisible({ timeout: 3_000 });
-    await expect(shell.mobileSidebar.link('users')).toHaveCount(0);
-    await expect(shell.mobileSidebar.link('security')).toHaveCount(0);
-    await shell.mobileSidebar.logout.click();
-    await expect(page).toHaveURL(/\/login(\?.*)?$/);
-  });
-
-  test('NAV-02: the repository list and the users list show cards, not the grid', async ({
-    openUiPage,
-    adminSession,
-    seeder,
-    seededUser,
-  }) => {
-    const page = await openUiPage({ session: adminSession, viewport: PHONE });
-    const repo = await seeder.createRepo(RepoType.MAVEN);
-
-    const repos = new RepositoriesPage(page);
-    await repos.goto();
-    await repos.search(repo.name);
-    await expect(repos.cards).toBeVisible();
-    await expect(repos.card(repo.name)).toBeVisible();
-    await expect(repos.list.container).toBeHidden();
-    await expect(repos.row(repo.name)).toBeHidden();
-
-    const users = new UsersPage(page);
-    await users.goto();
-    await users.search(seededUser.username);
-    await expect(page.getByTestId('user-cards')).toBeVisible();
-    await expect(page.getByTestId(`user-card-${seededUser.username}`)).toBeVisible();
-    await expect(users.list.container).toBeHidden();
-    await expect(users.row(seededUser.username)).toBeHidden();
-  });
+      const users = new UsersPage(page);
+      await users.goto();
+      await users.search(seededUser.username);
+      await expect(page.getByTestId('user-cards')).toBeVisible();
+      await expect(page.getByTestId(`user-card-${seededUser.username}`)).toBeVisible();
+      await expect(users.list.container).toBeHidden();
+      await expect(users.row(seededUser.username)).toBeHidden();
+    },
+  );
 
   test('NAV-02: a package list and its versions show cards, not the grid', async ({
     openUiPage,

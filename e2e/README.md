@@ -200,6 +200,7 @@ e2e/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe; both tests tagged @smoke
     skeleton/backend-module.spec.ts  # RPS-1495 the panel backend registry: `REPSY_E2E_BACKEND_MODULE` picks an external backend (`fake-panel-backend.ts`, in memory, no server), also for the `panelApi`/`seeder` fixtures; `UnsupportedPanelOperation`
     skeleton/cloud-target.spec.ts    # RPS-1498 the Repsy Cloud target seam: capabilities, expectation overlay, credentials a target cannot seed, known gaps, and the real scenario loop on a fake cloud backend (`fake-cloud-panel-backend.ts`); three of its tests are skipped ON PURPOSE (they are the skip paths)
+    skeleton/ui-target.spec.ts       # RPS-1638 the UI seam (`target.ui`): route builders per target, session keys, base-URL chain, the descriptors' routes on both, and `--list` under `cloud-remote` excluding `@cloud-skip`
     skeleton/repo-settings.spec.ts  # RPS-1200 settings-PUT field-by-field matrix across RepoTypes; untagged (not smoke-sized)
     skeleton/repo-type-casing.spec.ts  # RPS-1269 repo type: /format answers upper case; type accepted in any case (query and body)
     skeleton/login-password.spec.ts  # RPS-1308 POST /api/auth/login: a wrong password of any strength is 401 invalidCredentials; malformed shapes stay 400
@@ -306,6 +307,7 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_E2E_PORT_OFFSET`       | `0`                                 | added to the stack's host ports 8080 (panel API), 9090 (repo protocols) and 8090 (stub scanner); also `--port-offset N`. "Parallel stacks"                                                                                                                                                                                                                                                                                               |
 | `REPSY_E2E_FORCE`             | _(unset)_                           | `1` lets `local up\|down` take over a project or host port held by a stack started from another checkout (same as `--force`)                                                                                                                                                                                                                                                                                                             |
 | `REPSY_UI_BASE_URL`           | _(REPSY_API_BASE_URL)_              | ui runner only: where the panel SPA is (it is served on the API port 8080, not the protocol port 9090)                                                                                                                                                                                                                                                                                                                                   |
+| `REPSY_FRONTEND_BASE_URL`     | _(unset)_                           | ui project on a `cloud-*` target only: where Repsy Cloud's panel is served (a host other than its API). `REPSY_UI_BASE_URL` wins over it; ignored on an OS target ("The UI seam")                                                                                                                                                                                                                                                        |
 | `REPSY_UI_WORKERS`            | `4` (compose)                       | ui runner only: Playwright workers (each is a Chromium, ~250-400 MB)                                                                                                                                                                                                                                                                                                                                                                     |
 | `REPSY_UI_NO_SANDBOX`         | _(unset — sandbox on)_              | ui runner only: `1` launches Chromium with `chromiumSandbox: false`, see "UI suite"                                                                                                                                                                                                                                                                                                                                                      |
 | `REPSY_E2E_OPT_IN`            | _(unset)_                           | every runner: comma list of opt-in suites (`throttle`, `scanner`, ...) read by `optedIn()` in `src/stack-overlays.ts`; `run.sh test` adds the name of every stack overlay whose switch is set, see "Stack overlays"                                                                                                                                                                                                                      |
@@ -346,21 +348,31 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 `target` (`src/target.ts`) is the capabilities of the run's `REPSY_TARGET`. What differs by product is a
 capability, so a spec or the engine asks the capability and never the target's name:
 
-| Capability                               | Repsy OS                 | Repsy Cloud (provisional, see below)                           |
-| ---------------------------------------- | ------------------------ | -------------------------------------------------------------- |
-| `kind`                                   | `os`                     | `cloud` (for an adapter hook to branch on)                     |
-| `urlScheme`                              | `repo` (`/<repo>/...`)   | `owner-repo` (`/<owner>/<repo>/...`, `src/repo-url.ts`)        |
-| `supportsUserRole`                       | yes (`USER`/`ADMIN`)     | no                                                             |
-| `supportsRepoUsers`                      | no                       | yes (collaborators of a repo)                                  |
-| `supportsExpiredTokenSeed`               | yes (past date accepted) | no (an expiration date has to be in the future)                |
-| `expiredTokenStrategy`                   | `past-date`              | `short-ttl-wait` (short lifetime, then wait); or `unsupported` |
-| `maxDeployTokensPerRepo`                 | unlimited                | 1 (FREE plan)                                                  |
-| `supportsDirectoryListing`               | yes                      | no (nothing may rely on listings)                              |
-| `supportsVersionAllowanceSettings(type)` | Maven, NuGet             | the same                                                       |
+| Capability                               | Repsy OS                              | Repsy Cloud (provisional, see below)                                  |
+| ---------------------------------------- | ------------------------------------- | --------------------------------------------------------------------- |
+| `kind`                                   | `os`                                  | `cloud` (for an adapter hook to branch on)                            |
+| `urlScheme`                              | `repo` (`/<repo>/...`)                | `owner-repo` (`/<owner>/<repo>/...`, `src/repo-url.ts`)               |
+| `supportsUserRole`                       | yes (`USER`/`ADMIN`)                  | no                                                                    |
+| `supportsRepoUsers`                      | no                                    | yes (collaborators of a repo)                                         |
+| `supportsExpiredTokenSeed`               | yes (past date accepted)              | no (an expiration date has to be in the future)                       |
+| `expiredTokenStrategy`                   | `past-date`                           | `short-ttl-wait` (short lifetime, then wait); or `unsupported`        |
+| `maxDeployTokensPerRepo`                 | unlimited                             | 1 (FREE plan)                                                         |
+| `supportsDirectoryListing`               | yes                                   | no (nothing may rely on listings)                                     |
+| `supportsVersionAllowanceSettings(type)` | Maven, NuGet                          | the same                                                              |
+| `ui.repoRoute(repo, ...segments)`        | `/<repo>/...`                         | `/<owner>/<repo>/...` (`REPSY_REPO_OWNER`, read when called)          |
+| `ui.profilePath`                         | `/profile`                            | `/account`                                                            |
+| `ui.hasUsersPage`                        | yes (`/users`)                        | no                                                                    |
+| `ui.loginField`                          | `username`                            | `usernameOrEmail`                                                     |
+| `ui.sessionStorageKeys`                  | `username`, `token`, `refresh-token`  | the same plus `email`                                                 |
+| `ui.frontendBaseUrl()`                   | `REPSY_UI_BASE_URL`, else the API URL | `REPSY_UI_BASE_URL`, else `REPSY_FRONTEND_BASE_URL`, else the API URL |
 
 The Cloud column is **provisional**: only the FREE plan limits and the future-only expiration date are
 known; the rest is a guess until RPS-1491 (a probe of Repsy Cloud DEV that pins the cloud expectation
 table) is done, and that story may change any value here.
+
+The `ui.*` rows are the panel's side of the seam (RPS-1638, "The UI seam" below): what the `ui` project's
+page objects and specs ask instead of writing a route, a storage key or a login field themselves. The Cloud
+values of those rows are read from the Repsy Cloud frontend, not yet run against it (RPS-1639, RPS-1541).
 
 The engine uses the capabilities and three hooks, so **no cloud-specific outcome ever goes into
 `catalog.ts`**:
@@ -403,6 +415,52 @@ hooks): it runs the REAL `registerPublishConsumeLoop` (with the options `{ scena
 the harness itself may pass) and `world` fixture against a fake protocol adapter. It is also the smallest
 worked example of a cloud backend module. Three of its tests are skipped on purpose, because they are the
 skip paths.
+
+### The UI seam (`target.ui`, RPS-1638)
+
+The `ui` project (`tests/ui/`, `src/ui/`, "UI suite" below) drives the panel in a browser, and Repsy Cloud has
+its own panel: another route for a repository, another one for the account page, no Users page, a login form
+that takes a `usernameOrEmail`, an `email` next to the session in `localStorage`, and a frontend host that is
+not the API host. `target.ui` (`UiCapabilities` in `src/target.ts`) is where that lives, so the same specs run
+against both while what only Repsy OS has is tagged `@cloud-skip`:
+
+- **Routes.** A page object or spec never writes `` `/${repo}` ``: it calls `repoRoute(repo, ...segments)`
+  (`src/ui/routes.ts`, the short form of `target.ui.repoRoute`), and `profileRoute()` for the account page.
+  All nine protocol descriptors (`src/ui/pages/protocols/*.ts`), the repo settings page and the shared
+  package scenarios do. A route that is the same on both (`/`, `/login`, `/repositories`, `/security`,
+  `/not-found`) stays a literal, and so does an assertion that only needs the END of a URL
+  (`toHaveURL(new RegExp(`/${repo.name}/x$`))` also matches `/<owner>/<repo>/x`). `repoRoute` reads
+  `env.repoOwner` when it is called, never at import ("Import time is not run time" above), and throws on a
+  Cloud target when `REPSY_REPO_OWNER` is unset. `urlEndsWith(path)` is the regex for `toHaveURL`.
+- **Session.** `seedSession()`, `readStoredSession()`, `setStoredSessionValue()` and `currentUsername()`
+  (`src/ui/session.ts`) use `target.ui.sessionStorageKeys`, and `loginSession()` carries the `email` of the
+  login answer when a backend returns one (`UiSession.email`). A spec that needs the stored session reads it
+  through these (`tests/ui/auth/stored-session.ts` does), not with a literal `localStorage.getItem('token')`.
+- **Login form.** `LoginPage` derives its test ids from `loginField` (`login-username` on OS,
+  `login-usernameOrEmail` on Cloud: provisional until RPS-1541 fixes the Cloud test ids).
+- **Base URL.** `uiBaseUrlFrom(process.env)` (`src/ui/base-url.ts`, no imports so `playwright.config.ts` can
+  call it without `REPSY_ADMIN_PASSWORD`) is the one place the chain lives: `REPSY_UI_BASE_URL`, then on a
+  Cloud target `REPSY_FRONTEND_BASE_URL` (the name the Cloud e2e package already uses; ignored on OS), then
+  `REPSY_API_BASE_URL`, then `http://localhost:8080`.
+- **Stub models.** `security-stubs.ts` gets every model type and enum of the panel API from `src/ui/stub-models.ts`
+  (a re-export of the OS generated client), so a consumer whose panel API differs replaces that one module
+  and not every stub (H9).
+- **`@cloud-skip` in `tests/ui/`.** Tagged, each with a one-line reason above it: everything of `users/*`
+  and `profile/*`; every test that logs in as a seeded USER (`userPage`, `seededUser`, and the two USER
+  scenarios of the shared package template); the OS login form's validation (`AUTH-03`), wrong-credentials
+  (`AUTH-02`) and throttle (`AUTH-11`) specs; the dashboard's cards and count rows; the tests that open the
+  Users page (`ERR-02`/`ERR-03` on `/users`, the a11y user dialogs, the mobile sidebar's Users link,
+  `NET-01` signed in); and the deploy-token specs that seed more than one token or a past-dated one, which
+  the Cloud FREE plan cannot (`maxDeployTokensPerRepo`, `supportsExpiredTokenSeed`). The rest, the portable
+  core, is untagged. `seededUser` also skips itself with a reason on a target without `supportsUserRole`, as
+  a net under a test somebody forgot to tag. What Repsy Cloud's panel turns out to differ in beyond this
+  is found by running the suite against it (RPS-1639), and that story adds the tags.
+- **Proof.** `tests/skeleton/ui-target.spec.ts`: the route builder per target, the session keys (a stub
+  `window` runs the real init script), the base-URL chain, every descriptor's routes under both
+  (`/<owner>` dropped equals the OS route), and a child `playwright test --project ui --list` under
+  `REPSY_TARGET=cloud-remote` with no OS variable whose `--grep-invert @cloud-skip` list is exactly the
+  untagged tests. On `cloud-remote`, `--list` shows 563 of the 709 `ui` tests without `@cloud-skip` (the OS
+  run lists 710, 564 of them untagged: `guards.spec.ts` has no `/users` route to check on Cloud).
 
 ### Panel backend (RPS-1495)
 
@@ -601,7 +659,9 @@ workspace laid out as above:
 - The `ui` runner (the only image with a browser) installs Chromium with the Playwright of the LOCKFILE that
   builds it (`ui.Dockerfile`: `playwright install chromium`), so a range edit that does not change the
   locked version changes nothing about the image; a locked version change needs `./run.sh test --protocol ui -b`.
-  The Cloud harness has no `ui` runner (the OS `ui` suite drives the OS panel).
+  The Cloud harness has no `ui` runner image of its own yet: its `ui` project (RPS-1639) lists this suite's
+  specs (`testDir` `repsy-os/e2e/tests/ui`, `grepInvert: /@cloud-skip/`, "The UI seam" above) and needs
+  a Chromium from the Playwright of the lockfile that builds it.
 - The runner images install from the harness directory's own `package.json` and `pnpm-lock.yaml`, so they
   carry 1.63.0. A Cloud layer added on top must reuse that copy, not install a second one (RPS-1507).
 
@@ -635,7 +695,8 @@ test, or behind a function (RPS-1500 moved the ones that did this).
 
 - **The consumer's config, for whole specs:** `grepInvert: /@cloud-skip/` (config-wide, as above, or on a
   project), or `--grep-invert @cloud-skip` on the command line. The tagged tests are not listed at all
-  (`skeleton` goes from 117 to 114 tests under `cloud-remote`).
+  (`skeleton` goes from 129 to 125 tests under `cloud-remote`, the `ui` project from 709 to 563: its tags are
+  in "The UI seam").
 - **The scenario loop, for catalog scenarios:** a `@cloud-skip` scenario is skipped with a reason on a
   `cloud-*` target (visible in the report), even without the config. Use the config too when a skipped row is
   noise.
@@ -5093,13 +5154,14 @@ passwords can log in; the backend still refuses to boot with an `ADMIN_INITIAL_P
 the complexity rule, and one over 72 bytes). The `ui` project runs a worker-scoped preflight
 (`assertAdminCredentialsUsableInUi`) that fails every test with a message saying exactly that. `e2e/.env.example` documents it next to the `REPSY_UI_*` variables.
 
-| Variable              | Default                                            | Effect                                                                                                         |
-| --------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `REPSY_UI_BASE_URL`   | `REPSY_API_BASE_URL`, else `http://localhost:8080` | Playwright `baseURL`                                                                                           |
-| `REPSY_UI_WORKERS`    | `4` (compose)                                      | Playwright `workers`; config-wide, so only the `ui` service sets it                                            |
-| `REPSY_UI_NO_SANDBOX` | unset                                              | `1` = `chromiumSandbox: false`, see "Chromium sandbox" below                                                   |
-| `REPSY_UI_OPT_IN`     | unset                                              | comma list of opt-in suites (also `REPSY_E2E_OPT_IN`); `optedIn('throttle')`, "Stack overlays"                 |
-| `CI`                  | unset                                              | forwarded to every runner: `forbidOnly`; the `ui` project also `retries: 1` and `trace: on-first-retry` ("CI") |
+| Variable                  | Default                                            | Effect                                                                                                                        |
+| ------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `REPSY_UI_BASE_URL`       | `REPSY_API_BASE_URL`, else `http://localhost:8080` | Playwright `baseURL`                                                                                                          |
+| `REPSY_FRONTEND_BASE_URL` | unset                                              | Repsy Cloud targets only: the panel's host, between `REPSY_UI_BASE_URL` and `REPSY_API_BASE_URL` in the chain ("The UI seam") |
+| `REPSY_UI_WORKERS`        | `4` (compose)                                      | Playwright `workers`; config-wide, so only the `ui` service sets it                                                           |
+| `REPSY_UI_NO_SANDBOX`     | unset                                              | `1` = `chromiumSandbox: false`, see "Chromium sandbox" below                                                                  |
+| `REPSY_UI_OPT_IN`         | unset                                              | comma list of opt-in suites (also `REPSY_E2E_OPT_IN`); `optedIn('throttle')`, "Stack overlays"                                |
+| `CI`                      | unset                                              | forwarded to every runner: `forbidOnly`; the `ui` project also `retries: 1` and `trace: on-first-retry` ("CI")                |
 
 Where things land (all under the existing bind mounts): `test-results/` holds, per failed test, the
 trace (`trace.zip`; open it with `pnpm exec playwright show-trace <path>` on the host), the failure

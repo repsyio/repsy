@@ -71,14 +71,19 @@ test.describe('Accessibility (axe)', { tag: '@a11y' }, () => {
     expect(summary.label).toBe('settings');
   });
 
-  test('A11Y-01: users page (admin)', async ({ adminPage, seededUser }, testInfo) => {
-    const users = new UsersPage(adminPage);
-    await users.goto();
-    await users.search(seededUser.username);
-    await expect(users.row(seededUser.username)).toBeVisible();
-    const summary = await scanPage(adminPage, testInfo, 'users');
-    expect(summary.label).toBe('users');
-  });
+  // @cloud-skip: the Users page (and its modals) exist on Repsy OS only.
+  test(
+    'A11Y-01: users page (admin)',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage, seededUser }, testInfo) => {
+      const users = new UsersPage(adminPage);
+      await users.goto();
+      await users.search(seededUser.username);
+      await expect(users.row(seededUser.username)).toBeVisible();
+      const summary = await scanPage(adminPage, testInfo, 'users');
+      expect(summary.label).toBe('users');
+    },
+  );
 
   // The page scans above cannot see an open modal: scan the dialog itself (RPS-1266, parts 2 and 3).
   test('A11Y-01: create-repository modal', async ({ adminPage }, testInfo) => {
@@ -109,35 +114,37 @@ test.describe('Accessibility (axe)', { tag: '@a11y' }, () => {
     expect(summary.label).toBe('modal-token-create');
   });
 
-  test('A11Y-01: user modals (create, delete confirmation, one-time password)', async ({
-    adminPage,
-    seededUser,
-  }, testInfo) => {
-    const users = new UsersPage(adminPage);
-    await users.goto();
-    await users.search(seededUser.username);
-    await users.openCreateModal();
-    const create = await scanPage(
-      adminPage,
-      testInfo,
-      'modal-user-create',
-      '[data-testid="user-create-modal"]',
-    );
-    expect(create.label).toBe('modal-user-create');
-    await adminPage.keyboard.press('Escape');
-    await expect(users.createModal.root).toHaveCount(0);
+  // @cloud-skip: the Users page (and its modals) exist on Repsy OS only.
+  test(
+    'A11Y-01: user modals (create, delete confirmation, one-time password)',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage, seededUser }, testInfo) => {
+      const users = new UsersPage(adminPage);
+      await users.goto();
+      await users.search(seededUser.username);
+      await users.openCreateModal();
+      const create = await scanPage(
+        adminPage,
+        testInfo,
+        'modal-user-create',
+        '[data-testid="user-create-modal"]',
+      );
+      expect(create.label).toBe('modal-user-create');
+      await adminPage.keyboard.press('Escape');
+      await expect(users.createModal.root).toHaveCount(0);
 
-    await users.clickResetPassword(seededUser.username);
-    await scanPage(adminPage, testInfo, 'modal-danger', '[data-testid="danger-modal"]');
-    await users.shell.dangerModal.confirm();
-    await users.resetPasswordModal.expectOpen();
-    await scanPage(
-      adminPage,
-      testInfo,
-      'modal-reset-password',
-      '[data-testid="user-reset-password-modal"]',
-    );
-  });
+      await users.clickResetPassword(seededUser.username);
+      await scanPage(adminPage, testInfo, 'modal-danger', '[data-testid="danger-modal"]');
+      await users.shell.dangerModal.confirm();
+      await users.resetPasswordModal.expectOpen();
+      await scanPage(
+        adminPage,
+        testInfo,
+        'modal-reset-password',
+        '[data-testid="user-reset-password-modal"]',
+      );
+    },
+  );
 
   // The package pages of every protocol, which carry the row markup of RPS-1266 part 4 and (detail
   // pages) the highlighted code blocks. The seeded package gives every level one row.

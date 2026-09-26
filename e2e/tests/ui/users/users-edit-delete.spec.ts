@@ -31,7 +31,8 @@ import { UserRole } from '../../../src/api/panel-api.js';
 import { USERNAME_TEXT, bulleted } from '../../../src/ui/credential-messages.js';
 import { expect, test } from '../../../src/ui/users-fixtures.js';
 
-test.describe('USR-03 edit a user', () => {
+// @cloud-skip: the admin Users page exists on Repsy OS only (`target.ui.hasUsersPage`).
+test.describe('USR-03 edit a user', { tag: ['@cloud-skip'] }, () => {
   test('editing the username renames the user', async ({
     usersPage,
     seededUser,
@@ -228,7 +229,8 @@ test.describe('USR-03 edit a user', () => {
   });
 });
 
-test.describe('USR-05 delete a user', () => {
+// @cloud-skip: the admin Users page exists on Repsy OS only (`target.ui.hasUsersPage`).
+test.describe('USR-05 delete a user', { tag: ['@cloud-skip'] }, () => {
   test('cancelling keeps the user, confirming deletes it', async ({
     usersPage,
     seededUser,

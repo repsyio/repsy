@@ -223,19 +223,20 @@ test.describe('Maven file browser', { tag: '@packages' }, () => {
 
   // RPS-1262 (4): the browser page used to render a Settings button disabled for a USER, where every
   // other package page removes it (`@if (canManage)`).
-  test('PKG-maven-05 a USER sees no Settings button on the file browser (RPS-1262)', async ({
-    adminPage,
-    userPage,
-    seeder,
-  }) => {
-    const repo = await seeder.createRepo(RepoType.MAVEN);
-    const pages = protocolPages(userPage, maven, repo.name);
-    await adminPage.goto(pages.extraPath('browser'));
-    await expect(adminPage.getByTestId('pkg-settings')).toBeEnabled(); // the control
-    await userPage.goto(pages.extraPath('browser'));
-    await expect(userPage.getByTestId('pkg-toolbar')).toBeVisible();
-    await expect(userPage.getByTestId('pkg-settings')).toHaveCount(0);
-  });
+  // @cloud-skip: needs a seeded USER/ADMIN account; Repsy Cloud has no user roles (collaborators instead).
+  test(
+    'PKG-maven-05 a USER sees no Settings button on the file browser (RPS-1262)',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage, userPage, seeder }) => {
+      const repo = await seeder.createRepo(RepoType.MAVEN);
+      const pages = protocolPages(userPage, maven, repo.name);
+      await adminPage.goto(pages.extraPath('browser'));
+      await expect(adminPage.getByTestId('pkg-settings')).toBeEnabled(); // the control
+      await userPage.goto(pages.extraPath('browser'));
+      await expect(userPage.getByTestId('pkg-toolbar')).toBeVisible();
+      await expect(userPage.getByTestId('pkg-settings')).toHaveCount(0);
+    },
+  );
 });
 
 test.describe('Maven group page', { tag: '@packages' }, () => {

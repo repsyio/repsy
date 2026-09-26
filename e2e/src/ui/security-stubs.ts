@@ -73,7 +73,7 @@ import {
   type VulnerabilityFindingInfo,
   type VulnerabilityScanDetail,
   type VulnerabilityScanInfo,
-} from '../api/generated/index.js';
+} from './stub-models.js';
 
 export { FixStatus, RepoType, ScanStatus, Severity };
 export type {

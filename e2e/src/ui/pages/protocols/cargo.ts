@@ -15,6 +15,7 @@
 
 import { NEWEST_OLDEST_NAME, NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
 import { repoPath } from '../../../repo-url.js';
+import { repoRoute } from '../../routes.js';
 
 /**
  * Cargo: crates -> versions -> detail. Run in a browser by the package scenarios (RPS-1257).
@@ -30,7 +31,7 @@ export const cargoDescriptor: ProtocolDescriptor = {
   label: 'Cargo',
   levels: {
     list: {
-      path: (repo) => `/${repo}`,
+      path: (repo) => repoRoute(repo),
       rowKey: (t) => need(t, 'cargo').name,
       search: { placeholder: 'crate', term: (t) => t.name },
       sort: NEWEST_OLDEST_NAME,
@@ -42,7 +43,7 @@ export const cargoDescriptor: ProtocolDescriptor = {
       installBar: false,
     },
     versions: {
-      path: (repo, t) => `/${repo}/${need(t, 'cargo').name}`,
+      path: (repo, t) => repoRoute(repo, need(t, 'cargo').name),
       rowKey: (t) => need(t, 'cargo').version,
       search: { placeholder: 'version', term: (t) => t.version },
       sort: NEWEST_OLDEST,
@@ -56,7 +57,7 @@ export const cargoDescriptor: ProtocolDescriptor = {
     detail: {
       path: (repo, t) => {
         const { name, version } = need(t, 'cargo');
-        return `/${repo}/${name}/${version}`;
+        return repoRoute(repo, name, version);
       },
       installContains: (_repo, t) => [`${need(t, 'cargo').name}@${need(t, 'cargo').version}`],
       repoUrlIn: 'snippet:cargo-config',
