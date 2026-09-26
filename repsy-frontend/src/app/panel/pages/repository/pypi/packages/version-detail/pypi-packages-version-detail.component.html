@@ -61,7 +61,13 @@
 
       <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Project Links</h2>
       <div class="group mb-8 items-center gap-2 rounded-lg bg-[#101112] p-[14px] text-[14px]">
-        <a data-testid="pkg-detail-homepage" class="flex gap-2 text-white" [href]="versionInfo.homePage">
+        <a
+          data-testid="pkg-detail-homepage"
+          class="flex gap-2 text-white"
+          [attr.href]="homePageUrl"
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+        >
           Homepage
           <svg
             class="mt-[2px] h-[14px] w-[14px] text-[#9FA0A0] group-hover:text-white"

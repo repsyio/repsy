@@ -128,6 +128,26 @@ describe('RubyGemsVersionDetailComponent', () => {
     });
   });
 
+  // RPS-1623: the homepage is publisher-written; only http(s) is a link.
+  describe('homepageUrl', () => {
+    it('is the homepage when it is http(s)', () => {
+      select();
+      component.gemVersion = { ...GEM_VERSION, homepage: 'https://rubyonrails.org' };
+
+      expect(component.homepageUrl).toBe('https://rubyonrails.org');
+    });
+
+    it('is null for data:, vbscript: and javascript: homepages, and before a gem is loaded', () => {
+      expect(component.homepageUrl).toBeNull();
+      select();
+      for (const homepage of ['data:text/html,<b>x</b>', 'vbscript:msgbox(1)', 'javascript:alert(1)']) {
+        component.gemVersion = { ...GEM_VERSION, homepage };
+
+        expect(component.homepageUrl).withContext(homepage).toBeNull();
+      }
+    });
+  });
+
   describe('deleteVersion', () => {
     beforeEach(() => select());
 

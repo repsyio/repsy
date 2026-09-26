@@ -167,6 +167,27 @@ describe('PypiPackagesVersionDetailComponent description', () => {
     expect(el.textContent).not.toContain('hello-world');
   });
 
+  // RPS-1623: the home page is publisher-written; only http(s) is a link, and it opens safely.
+  describe('the home page link', () => {
+    const homepage = (el: HTMLElement): HTMLAnchorElement => el.querySelector('[data-testid="pkg-detail-homepage"]');
+
+    it('links an http(s) home page in a new tab with a safe rel', () => {
+      const link = homepage(render('x', 'text/plain', { homePage: 'https://example.com/home' }));
+
+      expect(link.getAttribute('href')).toBe('https://example.com/home');
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer nofollow');
+    });
+
+    ['data:text/html,<b>x</b>', 'vbscript:msgbox(1)', 'javascript:alert(1)'].forEach((homePage) => {
+      it(`does not link the home page ${homePage}`, () => {
+        const link = homepage(render('x', 'text/plain', { homePage }));
+
+        expect(link.hasAttribute('href')).toBeFalse();
+      });
+    });
+  });
+
   describe('the release kind label', () => {
     const kind = (extra: Partial<ReleaseDetail>): string | undefined =>
       render(undefined, undefined, extra).querySelector('[data-testid="pkg-detail-release-kind"]')?.textContent?.trim();

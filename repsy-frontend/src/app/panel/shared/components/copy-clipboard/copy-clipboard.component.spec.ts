@@ -51,4 +51,29 @@ describe('CopyClipboardComponent', () => {
     fixture.detectChanges();
     expect(button().getAttribute('aria-label')).toBe('Copy to clipboard');
   }));
+  // RPS-1623: navigator.clipboard does not exist on a plain-HTTP install (http://<lan-ip>:8080).
+  it('copies with the execCommand fallback when navigator.clipboard is undefined', fakeAsync(() => {
+    spyOnProperty(navigator, 'clipboard', 'get').and.returnValue(undefined as unknown as Clipboard);
+    const exec = spyOn(document, 'execCommand').and.returnValue(true);
+
+    button().click();
+    flushMicrotasks();
+    fixture.detectChanges();
+
+    expect(exec).toHaveBeenCalledOnceWith('copy');
+    expect(button().getAttribute('data-copied')).toBe('true');
+    tick(1000);
+  }));
+
+  it('does not claim success when the copy failed', fakeAsync(() => {
+    spyOnProperty(navigator, 'clipboard', 'get').and.returnValue(undefined as unknown as Clipboard);
+    spyOn(document, 'execCommand').and.returnValue(false);
+
+    button().click();
+    flushMicrotasks();
+    fixture.detectChanges();
+
+    expect(button().getAttribute('data-copied')).not.toBe('true');
+    expect(button().getAttribute('aria-label')).toBe('Copy to clipboard');
+  }));
 });

@@ -16,6 +16,8 @@
 
 import { Component, Input } from '@angular/core';
 
+import { copyToClipboard } from '../../util/clipboard.util';
+
 @Component({
   selector: 'app-copy-clipboard',
   templateUrl: './copy-clipboard.component.html',
@@ -27,7 +29,12 @@ export class CopyClipboardComponent {
   public copied: boolean;
 
   copyToClipboard(text: string) {
-    navigator.clipboard.writeText(text).then(() => {
+    // The check mark shows only when the copy worked (RPS-1623): over plain HTTP there is no
+    // navigator.clipboard, and the util falls back to a hidden textarea.
+    void copyToClipboard(text).then((copied) => {
+      if (!copied) {
+        return;
+      }
       this.copied = true;
       setTimeout(() => {
         this.copied = false;

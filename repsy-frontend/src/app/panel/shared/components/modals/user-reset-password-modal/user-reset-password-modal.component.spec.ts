@@ -60,6 +60,28 @@ describe('UserResetPasswordModalComponent', () => {
 
     expect(toastService.show).toHaveBeenCalledOnceWith('Copied to clipboard', 'success');
   }));
+
+  // RPS-1623: no navigator.clipboard on a plain-HTTP install; the password is shown only once.
+  it('copies through the execCommand fallback when navigator.clipboard is undefined', fakeAsync(() => {
+    spyOnProperty(navigator, 'clipboard', 'get').and.returnValue(undefined as unknown as Clipboard);
+    const exec = spyOn(document, 'execCommand').and.returnValue(true);
+
+    component.copyToClipboard('s3cret');
+    flushMicrotasks();
+
+    expect(exec).toHaveBeenCalledOnceWith('copy');
+    expect(toastService.show).toHaveBeenCalledOnceWith('Copied to clipboard', 'success');
+  }));
+
+  it('tells the user to copy by hand, without a success toast, when no copy method works', fakeAsync(() => {
+    spyOnProperty(navigator, 'clipboard', 'get').and.returnValue(undefined as unknown as Clipboard);
+    spyOn(document, 'execCommand').and.returnValue(false);
+
+    component.copyToClipboard('s3cret');
+    flushMicrotasks();
+
+    expect(toastService.show).toHaveBeenCalledOnceWith(jasmine.stringMatching(/copy it manually/), 'error');
+  }));
 });
 
 describe('UserResetPasswordModalComponent template', () => {

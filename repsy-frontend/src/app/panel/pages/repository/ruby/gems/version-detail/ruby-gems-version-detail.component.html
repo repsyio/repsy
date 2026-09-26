@@ -84,9 +84,10 @@
               <span class="text-white">Homepage: </span>
               <a
                 class="break-all text-blue-400 hover:underline"
-                [href]="gemVersion.homepage"
+                data-testid="pkg-detail-homepage"
+                [attr.href]="homepageUrl"
                 target="_blank"
-                rel="noopener"
+                rel="noopener noreferrer nofollow"
               >
                 {{ gemVersion.homepage }}
               </a>
