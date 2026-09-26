@@ -15,6 +15,7 @@
  */
 package io.repsy.os.shared.configs;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -59,6 +60,16 @@ class CorsConfigurationRestrictedIT extends AbstractIntegrationTest {
                 .header(HttpHeaders.ORIGIN, OTHER_ORIGIN)
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
         .andExpect(status().isForbidden())
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+  }
+
+  // RPS-1514: a configured origin opens the panel API only, never the repository port.
+  @Test
+  @DisplayName("sends no CORS header on the protocol port even for the configured origin")
+  void sendsNoCorsHeaderOnProtocolPort() throws Exception {
+
+    this.mockMvc
+        .perform(get("/v2/").with(protocolPort()).header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN))
         .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
   }
 }

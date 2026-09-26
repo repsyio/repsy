@@ -268,7 +268,7 @@ e2e/
     api/
       port-separation.spec.ts   # RPS-1480 /api/** is not served on the protocol port (404 unknownPath); /v2/ and a Maven path on the api port are the SPA, not the protocol
       forwarded-headers.spec.ts # RPS-1480 X-Forwarded-Proto/Host/Port drive the Docker realm, the Cargo config.json and the PyPI simple links
-      cors-csp.spec.ts          # RPS-1480 CSP on the SPA and never on /api or the protocol port; the default (unset APP_ALLOWED_ORIGINS) CORS of the panel API
+      cors-csp.spec.ts          # RPS-1480 CSP on the SPA and never on /api or the protocol port; the default (unset APP_ALLOWED_ORIGINS) CORS of the panel API; RPS-1514 no CORS on the protocol port, nosniff/Referrer-Policy/XFO, no HSTS over http
 ```
 
 ## Setup
@@ -4188,6 +4188,9 @@ REPSY_E2E_TLS=1 ./run.sh test --protocol skeleton,api,golang,docker,npm --grep @
 ./run.sh local down --tls
 ```
 
+The overlay also sets `APP_HSTS_MAX_AGE=31536000` (RPS-1514), the opt-in HSTS header that is off on the default
+stack, so `tls-listeners.spec.ts` can pin that it is sent on the two https listeners and never on the http ones.
+
 Give `test` and `sweep` the switch (`REPSY_E2E_TLS=1`) as well as `up`: `test` cannot see the stack, so the
 switch is what makes it use the https URLs. A plain `test` against a TLS stack still reaches the http ports,
 but npm and NuGet then follow the https `REPO_BASE_URL` they name (below) without a trusted CA.
@@ -4432,16 +4435,20 @@ What it pins, as observed on the built image:
   npm's `dist.tarball` and the NuGet service index are NOT covered: the e2e stacks set `REPO_BASE_URL`,
   which those two prefer to the request, so they ignore `X-Forwarded-*` here. Pinning them needs a stack
   without `REPO_BASE_URL`.
-- **CSP and CORS** (`cors-csp.spec.ts`). The single-page app (`/`, a deep route, `/index.html`) carries
+- **CSP, CORS and the security headers** (`cors-csp.spec.ts`). The single-page app (`/`, a deep route, `/index.html`) carries
   a Content-Security-Policy with `default-src 'self'`, `object-src 'none'` and `frame-ancestors 'none'`;
-  `/api/**` and everything on the protocol port carry none. With `APP_ALLOWED_ORIGINS` unset (the
-  default; the repository README's `APP_ALLOWED_ORIGINS` row) the panel API answers a preflight from any origin with that
-  origin and `Access-Control-Allow-Credentials: true`, and a request without an `Origin` gets no CORS
-  header. The restricted-origin half (a foreign origin refused, the allowed one reflected, `connect-src`
-  naming it) needs a stack that sets the variable.
-
-Deliberately not asserted, because they are open product questions rather than contracts: what CORS
-does on the protocol port, and the absence of `X-Content-Type-Options`, `Referrer-Policy` and HSTS.
+  `/api/**` and everything on the protocol port carry none. RPS-1514: `X-Content-Type-Options: nosniff`
+  is on every response of both ports, `Referrer-Policy: strict-origin-when-cross-origin` and
+  `X-Frame-Options: DENY` on every response of the panel port (`/api/**`, errors and preflights included)
+  and not on the protocol port. `Strict-Transport-Security` is opt-in (`APP_HSTS_MAX_AGE`, off by
+  default): the default stack never sends it, and the TLS overlay sets it so `tls-listeners.spec.ts`
+  can prove it goes out on the two https listeners and on neither http one. With `APP_ALLOWED_ORIGINS`
+  unset (the default; the repository README's `APP_ALLOWED_ORIGINS` row) the panel API answers a
+  preflight from any origin with that origin and `Access-Control-Allow-Credentials: true`, and a request
+  without an `Origin` gets no CORS header; the protocol port sends no CORS header at all, for a
+  preflight or a plain request (flipping the any-origin default is RPS-1590). The restricted-origin half
+  (a foreign origin refused, the allowed one reflected, `connect-src` naming it) needs a stack that sets
+  the variable.
 
 ## Role sweep and Maven browser (RPS-1483)
 

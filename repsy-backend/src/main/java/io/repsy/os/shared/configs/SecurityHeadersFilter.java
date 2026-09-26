@@ -15,8 +15,6 @@
  */
 package io.repsy.os.shared.configs;
 
-import io.repsy.libs.multiport.configs.props.MultiPortProperties;
-import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,11 +23,20 @@ import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Sends a {@code Content-Security-Policy} (or, in report-only mode, {@code
+ * Sends the browser-facing security headers (RPS-1514): {@code X-Content-Type-Options: nosniff} on
+ * every response of both ports; on the API port also {@code Referrer-Policy:
+ * strict-origin-when-cross-origin} and {@code X-Frame-Options: DENY} (the legacy twin of the CSP's
+ * {@code frame-ancestors 'none'}) on every path, {@code /api/**} included; and, only when {@code
+ * app.hsts-max-age} is set and the request is secure, {@code Strict-Transport-Security} (see {@link
+ * AppHstsProperties} for why that is opt-in).
+ *
+ * <p>It also sends a {@code Content-Security-Policy} (or, in report-only mode, {@code
  * Content-Security-Policy-Report-Only}) header with the panel SPA and its static assets, so a
  * sanitiser bypass in the README viewer (see {@code MarkdownComponent} in the frontend) or any
  * future {@code [innerHTML]} use has a second barrier: the browser itself refuses to load or run
@@ -54,6 +61,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * operator can widen or replace the policy via {@link ContentSecurityPolicyProperties#policy()}
  * without a rebuild.
  */
+// Runs before the CORS filter, so even a CORS rejection (403) carries the headers.
+@Order(Ordered.HIGHEST_PRECEDENCE + 100)
 @Component
 @RequiredArgsConstructor
 public class SecurityHeadersFilter extends OncePerRequestFilter {
@@ -61,10 +70,15 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
   private static final @NonNull String API_PATH_PREFIX = "/api/";
   private static final @NonNull String ENFORCED_HEADER = "Content-Security-Policy";
   private static final @NonNull String REPORT_ONLY_HEADER = "Content-Security-Policy-Report-Only";
+  private static final @NonNull String CONTENT_TYPE_OPTIONS_HEADER = "X-Content-Type-Options";
+  private static final @NonNull String REFERRER_POLICY_HEADER = "Referrer-Policy";
+  private static final @NonNull String FRAME_OPTIONS_HEADER = "X-Frame-Options";
+  private static final @NonNull String HSTS_HEADER = "Strict-Transport-Security";
 
-  private final @NonNull MultiPortProperties multiPortProperties;
+  private final @NonNull ApiPortMatcher apiPortMatcher;
   private final @NonNull AppCorsProperties appCorsProperties;
   private final @NonNull ContentSecurityPolicyProperties cspProperties;
+  private final @NonNull AppHstsProperties hstsProperties;
 
   @Override
   protected void doFilterInternal(
@@ -72,6 +86,8 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
       final @NonNull HttpServletResponse response,
       final @NonNull FilterChain filterChain)
       throws ServletException, IOException {
+
+    this.setHardeningHeaders(request, response);
 
     if (this.cspProperties.enabled() && this.isSpaOrStaticRequest(request)) {
       final var headerName = this.cspProperties.reportOnly() ? REPORT_ONLY_HEADER : ENFORCED_HEADER;
@@ -81,19 +97,26 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
     filterChain.doFilter(request, response);
   }
 
-  private boolean isSpaOrStaticRequest(final @NonNull HttpServletRequest request) {
+  private void setHardeningHeaders(
+      final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response) {
 
-    return this.isApiPort(request.getLocalPort())
-        && !request.getRequestURI().startsWith(API_PATH_PREFIX);
-  }
+    // Every response of both ports: the protocol port serves user-uploaded bytes (RPS-1514).
+    response.setHeader(CONTENT_TYPE_OPTIONS_HEADER, "nosniff");
 
-  private boolean isApiPort(final int localPort) {
-
-    if (localPort == this.multiPortProperties.getPortFor(MultiPortNames.PORT_API)) {
-      return true;
+    if (this.hstsProperties.enabled() && request.isSecure()) {
+      response.setHeader(HSTS_HEADER, this.hstsProperties.headerValue());
     }
 
-    return MultiPortNames.PORT_API.equals(this.multiPortProperties.getPortAliases().get(localPort));
+    if (this.apiPortMatcher.isApiPort(request.getLocalPort())) {
+      response.setHeader(REFERRER_POLICY_HEADER, "strict-origin-when-cross-origin");
+      response.setHeader(FRAME_OPTIONS_HEADER, "DENY");
+    }
+  }
+
+  private boolean isSpaOrStaticRequest(final @NonNull HttpServletRequest request) {
+
+    return this.apiPortMatcher.isApiPort(request.getLocalPort())
+        && !request.getRequestURI().startsWith(API_PATH_PREFIX);
   }
 
   private @NonNull String resolvePolicy() {

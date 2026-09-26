@@ -95,5 +95,8 @@ services:
       REPO_SSL_ENABLED: 'true'
       REPO_SSL_KEY_STORE_PATH: file:/app/certs/keystore.p12
       REPO_SSL_KEY_STORE_PASSWORD: changeit
+      # RPS-1514: opt-in HSTS, so tls-listeners.spec.ts can prove it goes out on the two https
+      # listeners and never on the two http ones (the default stack sends none).
+      APP_HSTS_MAX_AGE: '31536000'
       # REPO_BASE_URL (the base file's) is the https URL of the repo port here, because run.sh exports
       # REPSY_REPO_BASE_URL as https for a TLS stack: the address npm and NuGet name in their URLs.
