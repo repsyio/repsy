@@ -4379,6 +4379,51 @@ Two more specs of the `api` runner (`./run.sh test --protocol api`, see "API sui
   Bearer or `?downloadToken=` on the panel API and on the protocol port. The expiry test waits 61 s and is tagged
   `@slow` (`--grep '^((?!@slow).)*$'` leaves it out).
 
+## Panel API contract specs (RPS-1483)
+
+`tests/<protocol>/panel-api.spec.ts` runs in the protocol's own runner (`--protocol maven|npm|pypi`, so it has the
+real client). Maven, npm and PyPI exist; the other protocols follow in their own PRs. Each spec publishes with the
+REAL client (`maven.seedPublish`, `npm.seedPublish`, `pypi.seedPublish`, the adapters' pre-publish), calls the panel
+operations of the protocol BY `operationId` (`src/api/contract-checks.ts`: the path template is read from
+`openapi-spec.yaml`, so a renamed route fails instead of being skipped) and checks:
+
+- **The schema.** `src/api/spec-contract.ts` validates a live body against the operation's response schema with `ajv`
+  (`ajv/dist/2020`, strict: the spec is OpenAPI 3.1, whose schemas are JSON Schema 2020-12 as they are; `int32` and
+  `int64` are registered, `ajv-formats` supplies `uuid` and `date-time`, `$ref`s of `components/schemas` and
+  `components/responses` are resolved from the file). The spec declares no `required` and no `additionalProperties`,
+  so `undeclaredProperties` walks the body along its schema and lists every property the schema does not declare;
+  `expectContract` asserts both. Errors are validated too (`expectFailure`: status, `ErrorResponse`, `msgId`).
+  `tests/api/spec-contract.spec.ts` tries the validator on bodies written out in the file (no server).
+- **The facts.** Names, versions, kinds (RELEASE/SNAPSHOT, PEP 440 pre/post/dev), the POM the wire serves, the
+  `<versions>` of `maven-metadata.xml`, the packument's versions and dist-tags, `npm deprecate` and `npm dist-tag add`
+  results, the wheel's `Summary` and `Requires-Python`, the project page's files.
+- **Paging** (`expectPagingSweep`, one list operation per protocol plus one more for npm/PyPI): `size` pages cover every
+  row once with the right `page` block, a page past the end is empty, the default size is 10, `sort` orders and `desc`
+  is the reverse of `asc`, `q` narrows, and `size=0`, `size=101`, `page=-1` and a `sort` the operation does not list are
+  400 `validationError` naming the parameter. The rows are seeded over raw HTTP; the sort values differ only in a
+  trailing number, so the order does not depend on the database collation.
+- **The wire effect of a delete.** After the panel DELETE the file answers 404, the metadata (maven-metadata.xml,
+  packument, project page) drops it, and a real `mvn dependency:get` / `npm install` / `pip download` fails, while the
+  sibling still resolves to the bytes the client built.
+- **Coverage.** Each spec names the operations it calls and a test compares them to the spec's own list under the
+  protocol's path prefix (`expectCovers`), so a new route is a red test until a case exists for it.
+
+**Known bugs** (each is a `test.fail()` with its ticket in `tests/maven/panel-api.spec.ts`: the test asserts the correct
+behaviour, passes while the bug is there and goes red when it is fixed; the fix removes the `test.fail()` in the same PR):
+
+- RPS-1574: every success body carries `"errorCode": null`, and every `RestResponse*` schema declares `errorCode` as a
+  `string`. It is the same mismatch on every operation, so `contractProblems` leaves out exactly that one violation
+  (`isKnownErrorCodeNull`, unit-tested) and validates the rest of the body in full; `{ strict: true }` shows it. The fix
+  (a nullable `errorCode` in the spec, or no field) removes the filter.
+- RPS-1573: `DELETE /api/mvn/artifacts/{repo}/{group}/{artifact}` for an artifact that does not exist deletes the whole GROUP
+  (files and rows) and answers 200 `data: GROUP` when the group holds exactly one artifact: `deleteArtifact` asks
+  `hasOnlyOneArtifact(group)` before it checks the artifact exists (the same shape as RPS-1190, which fixed it for
+  versions). With two artifacts it answers 404 as it should.
+
+```bash
+./run.sh test --protocol maven,npm,pypi --grep "panel API"
+```
+
 ## Remote hardening
 
 On a `remote` target (`target.isRemote`, see `src/target.ts`), `AUTH_THROTTLE_MAX_FAILURES` cannot

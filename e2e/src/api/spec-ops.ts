@@ -60,7 +60,7 @@ interface RawOperation {
   requestBody?: unknown;
 }
 
-function specPath(): string {
+export function specPath(): string {
   const here = dirname(fileURLToPath(import.meta.url));
   const candidates = [
     resolve(here, '../../..', SPEC_RELATIVE),

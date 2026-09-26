@@ -16,6 +16,8 @@
     "sweep": "tsx src/seed/sweep.ts"
   },
   "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "axios": "^1.13.2",
     "dotenv": "^17.2.3",
     "execa": "^9.6.0",
