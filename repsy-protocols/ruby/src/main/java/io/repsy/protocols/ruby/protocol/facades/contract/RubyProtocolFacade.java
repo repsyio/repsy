@@ -39,12 +39,23 @@ public interface RubyProtocolFacade {
   boolean gemFileExists(ProtocolContext context, String filename);
 
   /**
-   * Cheap existence check for {@code /quick/Marshal.4.8/<name>-<version>.gemspec.rz}, used by HEAD
+   * Cheap existence check for {@code /quick/Marshal.4.8/<gemspecName>.gemspec.rz}, used by HEAD
    * (RPS-1237). Mirrors {@link #getGemspec}'s own filtering: a yanked version does not count.
+   *
+   * @param gemspecName {@code <name>-<version>[-<platform>]}, the filename without {@code
+   *     .gemspec.rz}
    */
-  boolean gemspecExists(ProtocolContext context, String name, String version);
+  boolean gemspecExists(ProtocolContext context, String gemspecName);
 
-  byte[] getGemspec(ProtocolContext context, String name, String version);
+  /**
+   * The Marshal bytes of the gemspec {@code /quick/Marshal.4.8/<gemspecName>.gemspec.rz} serves,
+   * for the stored non-yanked row whose {@code .gem} filename is {@code <gemspecName>.gem}.
+   * Resolving against the stored rows, not by splitting the name, keeps a multi-segment platform
+   * such as {@code x86_64-linux} and a gem name containing {@code -<digit>} apart (RPS-1553).
+   *
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when there is none
+   */
+  byte[] getGemspec(ProtocolContext context, String gemspecName);
 
   void publishGem(ProtocolContext context, SpooledUpload gem) throws IOException;
 

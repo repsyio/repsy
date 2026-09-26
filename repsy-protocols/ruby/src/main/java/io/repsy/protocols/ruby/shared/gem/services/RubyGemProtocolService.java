@@ -45,11 +45,6 @@ public interface RubyGemProtocolService<ID> {
   boolean gemNameExists(BaseRepoInfo<ID> repoInfo, String gemName);
 
   /**
-   * Cheap existence check for a gemspec: whether the gem has a non-yanked row at {@code version}.
-   */
-  boolean hasNonYankedVersion(BaseRepoInfo<ID> repoInfo, String gemName, String version);
-
-  /**
    * Records the gem version and, while that write is still open, stores its file through {@code
    * fileWriter}.
    *

@@ -34,7 +34,6 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.zip.DeflaterOutputStream;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -45,7 +44,7 @@ import org.springframework.http.ResponseEntity;
 public abstract class AbstractRubyGemspecHandler implements ProtocolMethodHandler {
 
   private static final Pattern GEMSPEC_PATH_PATTERN =
-      Pattern.compile("^/quick/Marshal\\.4\\.8/(.+\\.gemspec\\.rz)$");
+      Pattern.compile("^/quick/Marshal\\.4\\.8/(.+)\\.gemspec\\.rz$");
 
   private final PathParser basePathParser;
   private final RubyProtocolFacade facade;
@@ -94,12 +93,8 @@ public abstract class AbstractRubyGemspecHandler implements ProtocolMethodHandle
     if (!matcher.matches()) {
       return ResponseEntity.notFound().build();
     }
-    final var parsed = parseGemspecFilename(matcher.group(1));
-    if (parsed == null) {
-      return ResponseEntity.notFound().build();
-    }
     try {
-      final var raw = this.facade.getGemspec(context, parsed[0], parsed[1]);
+      final var raw = this.facade.getGemspec(context, matcher.group(1));
       // Without a header of its own Spring names the download "f.txt" (RPS-1442).
       return ResponseEntity.ok()
           .contentType(MediaType.APPLICATION_OCTET_STREAM)
@@ -110,41 +105,6 @@ public abstract class AbstractRubyGemspecHandler implements ProtocolMethodHandle
     } catch (final Exception e) {
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
-  }
-
-  private static String @Nullable [] parseGemspecFilename(final String filename) {
-    if (!filename.endsWith(".gemspec.rz")) {
-      return null;
-    }
-    final var fullName = filename.substring(0, filename.length() - ".gemspec.rz".length());
-    final var nameEnd = findNameVersionBoundary(fullName);
-    if (nameEnd < 0) {
-      return null;
-    }
-    final var name = fullName.substring(0, nameEnd);
-    final var version = stripPlatformSuffix(fullName.substring(nameEnd + 1));
-    return new String[] {name, version};
-  }
-
-  private static int findNameVersionBoundary(final String fullName) {
-    for (var i = fullName.length() - 2; i >= 1; i--) {
-      if (isVersionBoundary(fullName, i)) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  private static boolean isVersionBoundary(final String s, final int i) {
-    return s.charAt(i) == '-' && Character.isDigit(s.charAt(i + 1));
-  }
-
-  private static String stripPlatformSuffix(final String versionWithPlatform) {
-    final var dash = versionWithPlatform.lastIndexOf('-');
-    if (dash > 0 && !Character.isDigit(versionWithPlatform.charAt(dash + 1))) {
-      return versionWithPlatform.substring(0, dash);
-    }
-    return versionWithPlatform;
   }
 
   private static byte[] deflate(final byte[] raw) {

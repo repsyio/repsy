@@ -19,6 +19,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.ruby.protocol.facades.contract.RubyProtocolFacade;
+import io.repsy.protocols.ruby.shared.gem.dtos.GemCompactEntry;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
 import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
 import io.repsy.protocols.ruby.shared.storage.services.RubyStorageService;
@@ -30,6 +31,7 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.IOException;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
@@ -64,16 +66,13 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
   }
 
   @Override
-  public byte[] getGemspec(final ProtocolContext context, final String name, final String version) {
+  public byte[] getGemspec(final ProtocolContext context, final String gemspecName) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var found =
-        this.gemService.getCompactEntriesByGemName(repoInfo, name).stream()
-            .filter(e -> !e.isYanked() && version.equals(e.getVersion()))
-            .findFirst();
-    if (found.isEmpty()) {
-      throw new ItemNotFoundException("gemVersionNotFound");
-    }
-    return RubyGemspecMarshalWriter.dumpGemspec(name, version);
+    final var entry =
+        this.findLiveGemspecEntry(repoInfo, gemspecName)
+            .orElseThrow(() -> new ItemNotFoundException("gemVersionNotFound"));
+    return RubyGemspecMarshalWriter.dumpGemspec(
+        entry.getGemName(), entry.getVersion(), entry.getPlatform());
   }
 
   @Override
@@ -117,10 +116,21 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
   }
 
   @Override
-  public boolean gemspecExists(
-      final ProtocolContext context, final String name, final String version) {
+  public boolean gemspecExists(final ProtocolContext context, final String gemspecName) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    return this.gemService.hasNonYankedVersion(repoInfo, name, version);
+    return this.findLiveGemspecEntry(repoInfo, gemspecName).isPresent();
+  }
+
+  /**
+   * The stored, non-yanked row a gemspec name stands for. The name is matched as the filename of
+   * the row's {@code .gem} ({@link RubyGemProtocolService#findByGemFilename}), the one place that
+   * knows how a name, a version and a platform are told apart.
+   */
+  private Optional<GemCompactEntry> findLiveGemspecEntry(
+      final BaseRepoInfo<ID> repoInfo, final String gemspecName) {
+    return this.gemService
+        .findByGemFilename(repoInfo, gemspecName + ".gem")
+        .filter(entry -> !entry.isYanked());
   }
 
   @Override

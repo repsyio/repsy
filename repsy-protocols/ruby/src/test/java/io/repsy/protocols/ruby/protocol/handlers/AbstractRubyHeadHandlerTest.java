@@ -36,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
@@ -121,7 +122,7 @@ class AbstractRubyHeadHandlerTest {
   void existingFilesMirrorGetHeader() throws Exception {
     when(this.facade.gemExists(any(), eq("demo.rb"))).thenReturn(true);
     when(this.facade.gemFileExists(any(), eq("demo-1.0.0.gem"))).thenReturn(true);
-    when(this.facade.gemspecExists(any(), eq("demo"), eq("1.0.0"))).thenReturn(true);
+    when(this.facade.gemspecExists(any(), eq("demo-1.0.0"))).thenReturn(true);
 
     assertThat(this.headOf("/info/demo.rb")).isEqualTo("inline");
     assertThat(this.headOf("/gems/demo-1.0.0.gem"))
@@ -209,7 +210,7 @@ class AbstractRubyHeadHandlerTest {
   @Test
   @DisplayName("/quick/Marshal.4.8/<file>.gemspec.rz answers 200 when the version resolves")
   void gemspecExisting() throws Exception {
-    when(this.facade.gemspecExists(any(), eq("demo"), eq("1.0.0"))).thenReturn(true);
+    when(this.facade.gemspecExists(any(), eq("demo-1.0.0"))).thenReturn(true);
 
     final var response =
         this.handler()
@@ -219,13 +220,37 @@ class AbstractRubyHeadHandlerTest {
                 new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    verify(this.facade).gemspecExists(any(), eq("demo"), eq("1.0.0"));
+    verify(this.facade).gemspecExists(any(), eq("demo-1.0.0"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "demo-1.0.0-java",
+        "demo-1.0.0-x86_64-linux",
+        "demo-1.0.0-arm64-darwin",
+        "demo-1.0.0-universal-darwin",
+        "foo-2fa-1.0.0-x86_64-linux",
+      })
+  @DisplayName("a gemspec of a multi-segment platform is resolved by its whole name (RPS-1553)")
+  void gemspecOfPlatformGem(final String gemspecName) throws Exception {
+    when(this.facade.gemspecExists(any(), eq(gemspecName))).thenReturn(true);
+
+    final var response =
+        this.handler()
+            .handle(
+                contextFor("/quick/Marshal.4.8/" + gemspecName + ".gemspec.rz"),
+                new MockHttpServletRequest(),
+                new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    verify(this.facade).gemspecExists(any(), eq(gemspecName));
   }
 
   @Test
   @DisplayName("/quick/Marshal.4.8/<file>.gemspec.rz answers 404 when the version does not resolve")
   void gemspecMissing() throws Exception {
-    when(this.facade.gemspecExists(any(), eq("demo"), eq("9.9.9"))).thenReturn(false);
+    when(this.facade.gemspecExists(any(), eq("demo-9.9.9"))).thenReturn(false);
 
     final var response =
         this.handler()
