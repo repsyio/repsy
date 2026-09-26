@@ -93,7 +93,7 @@ e2e/
   runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
   runners/ruby.Dockerfile      # + a pinned Ruby toolchain (ruby/gem/bundle/bundler + stdlib) copied out of the official ruby image
-  runners/stack.Dockerfile     # + the static `docker` CLI copied out of docker-cli; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
+  runners/stack.Dockerfile     # + the static `docker` CLI and its compose plugin copied out of docker-cli, a JDK + Maven, crane and npm; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
   runners/ui.Dockerfile        # + Playwright's own headless Chromium (build-time install, /ms-playwright); the "ui" runner, see "UI suite"
   runners/scanner-stub.Dockerfile  # the stub scanner of the scanner stack (src/stubs/scanner/ on node:24, no dependencies, no build)
   runners/ui-seccomp.json      # Playwright's seccomp profile, so Chromium's sandbox works as a non-root uid in Docker
@@ -124,7 +124,7 @@ e2e/
       sbt-extras.ts             # registerSbtExtras(): the sbt-only checks (file set, cross-build, .credentials, defaults, panel), RPS-134
     ui/                        # the panel UI suite's plumbing (fixtures, session seeding, page objects) -- see "UI suite"
     clients/
-      stack.ts                  # findRepsyContainer()/dockerExec()/logLinesContaining(): docker exec + docker logs against the local stack's Repsy container ("Stack runner")
+      stack.ts                  # findRepsyContainer()/dockerExec()/logLinesContaining(), restartRepsy()/crashRepsy()/recreateRepsy()/restoreStack(): docker exec, logs, restart and compose recreate of the local stack's Repsy container ("Stack runner")
       exec.ts                   # execa wrapper: isolated work dir/HOME, redacted logs, attach-on-fail, an explicit env is the child's whole env
       client-env.ts             # clientEnv(): the allow-list environment every client runs in (RPS-1446); env-probe.ts reads it back for the sealed-env specs
       raw-http.ts                # shared raw-HTTP building blocks: RawResponse, adminCredential(), authHeader(), sha256Hex, 429 backoff
@@ -234,6 +234,7 @@ e2e/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
       registry-rules.spec.ts           # raw-HTTP pins R1-R14 for BOTH modes: single-hop Basic auth, blob/manifest rules, override, tags/list, classic upload/delete/index shape
+      dependency-resolution.spec.ts    # RPS-1479 real helm dependency update/build of a chart with `dependencies:` against a Repsy repo: Chart.lock + fetched tgz, classic and OCI
     pypi/
       publish-consume.spec.ts   # registerPublishConsumeLoop(pypiAdapter) + a real pip-install and a mixed-case/dotted-name real-client test
       registry-rules.spec.ts    # raw-HTTP pins of the override/version/digest rules, root-index shape, HEAD, 307 redirect, no releases/snapshots rule
@@ -2746,6 +2747,29 @@ this exact flow end to end, real `helm` binary, real `cm-push` by repo alias —
 skipped as already-covered rather than duplicated; see the PyPI protocol-specific suite section
 below for the step 5h work that WAS added (PyPI sdist support).
 
+### Dependency resolution (RPS-1479)
+
+`tests/helm/dependency-resolution.spec.ts` proves that what Repsy serves is enough for the real `helm
+dependency update`/`build`. `buildChart` (and `writeChartDir`, an unpacked local chart) take
+`dependencies: [{ name, version, repository, alias? }]` for `Chart.yaml`; `version` is a semver range.
+Charts B (1.0.0, 1.1.0, 2.0.0, a prerelease) and A (depends on B) go into one repo and a local chart
+that names only the dependency is resolved. The tests assert `Chart.lock` (name, version, repository and
+the `digest`, which is `sha256` of the JSON of [requested, locked] dependencies) and the fetched
+`charts/<b>-<version>.tgz` (bytes equal to what Repsy stores; a `cm-push` repackages, so they are read
+back from the download route), never just an exit code. Classic (ChartMuseum): the highest B in `^1.0.0`
+from `index.yaml` with a read-only token in the `helm repo add` entry (`@alias` too), `~`, `>=`,
+interval, exact and prerelease ranges on a public repo with no repo entry at all, `build` replays the
+lock while `update` moves it (an edited `Chart.yaml` is refused), a private repo without the credential
+is a bare `401`, an unsatisfiable or missing dependency writes nothing, a locked version deleted from the
+repo cannot be rebuilt, and a chart pushed through the OCI API resolves via a classic URL (RPS-1217).
+OCI: a real `helm registry login`, then `repository: oci://<host>/<repo>` with `--plain-http` resolves
+from `tags/list` (RPS-1219) and the layer is byte-identical to the pushed file; without a login helm
+stops at "basic credential not found". `helm dependency update` does not recurse into a dependency's own
+`dependencies:` (A's are stored in A's chart and printed by `helm show chart`). Observed and not pinned
+(look like backend gaps, see the story report): the `index.yaml` entry of a chart with `dependencies:`
+carries no `dependencies` (nor `apiVersion`), and `tags/list` names the chart alone (`"name":"<chart>"`),
+not `<repo>/<chart>`.
+
 ### Backend bug candidates found while reading and confirmed live (do not fix here)
 
 - **B-H1 (filed as [RPS-1217](https://zyfera.atlassian.net/browse/RPS-1217))** — `index.yaml`
@@ -3248,6 +3272,24 @@ BEFORE any adapter code was written — H1-H4 and H12 gated the whole design.
   real `go get` succeeding is itself the correct, desired behavior; only the raw-HTTP "are these two
   DISTINCT modules" test is pinned as a candidate).
 
+### Transitive resolution (RPS-1479, `tests/golang/transitive-resolution.spec.ts`)
+
+`buildModuleZip({ requires })` (`golang-raw.ts`) writes `require` lines into a module's `go.mod` and
+a `hello.go` (`hello-deps.template.go`) that imports the dependencies, so a real `go mod tidy` in a
+consumer that imports only module A has to walk A's `go.mod` to B through what Repsy serves. Pinned,
+against the real `go` (through the TLS shim for the private-repo case): the consumer's `go.mod`
+names B at the version A's go.mod names, `// indirect` (minimal version selection: not B's `@latest`
+and not an older one), `go.sum` holds the `dirhashHash1` of the uploaded zip and go.mod of A and B,
+`go list -m all` / `-versions` report the graph and the version list, the built program runs B's
+code, the highest version anyone requires wins (both directions), and a `/v2` major-path module is a
+module of its own next to `/v1` in one repo. Probed live for a sumdb-less proxy: the existing
+`goEnv` is enough (`GOFLAGS` empty, no `-mod=mod`; `go mod tidy` writes go.mod/go.sum itself), and
+`GONOSUMDB=e2e.repsy.test` or `GOSUMDB=off` is REQUIRED: without either, `go` asks the public
+`sum.golang.org` and fails with `verifying module: ... 404 Not Found` (Repsy has no checksum
+database). A dependency's go.mod is plain `@v/<v>.mod` (`text/plain`); an unpublished one is a
+`text/plain` 404, and `go mod tidy` then exits 1 with `module lookup disabled by GOPROXY=off`
+(the harness's `,off` fallback) naming the importing chain.
+
 ## Ruby runner
 
 This is **step 4e ("ruby") — the LAST protocol adapter of step 4**: the Ruby gem (RubyGems/Bundler)
@@ -3607,6 +3649,60 @@ the test's own users are read, so no other password is ever printed. Flip check:
 <repsy> chown root:root /app/data/password-reset` (the Dockerfile bug the case guards against) makes
 all four tests fail on the owner assertion or on `touch: Permission denied`.
 
+### Restart, crash and recreate: persistence (RPS-1476)
+
+`tests/stack/persistence.spec.ts` (`@local-only`, serial) proves what outlives the Repsy container, on
+the PostgreSQL stack and on the H2 stack alike (`./run.sh local up [--h2]`, then
+`./run.sh test --protocol stack --grep persistence`; both legs are the same spec, only the H2-file
+assertion is profile specific). RPS-1401 put the default storage on the `/app/data` volume without a test
+that a package outlives its container, and the H2 file database (same volume) is the riskier half.
+
+It publishes a Maven artifact (`mvn deploy`), an npm package (`npm publish`) and a Docker image
+(`crane push`) into one repo each, with the scenario adapters' `seedPublish` (the real client, no raw
+probe), takes a deploy token per repo and a panel user, and after each event checks that every package is
+consumed again by the real client with the admin password AND with the deploy token, byte for byte, that
+the panel lists it (Maven versions, the npm latest version, the Docker image digest) and that the user and
+the admin still log in:
+
+1. control: `/app/data` is a volume (not the container layer), `STORAGE_BASE_PATH` is under it, the
+   storage holds files, and on H2 `/app/data/repsy.mv.db` exists;
+2. `docker restart` (SIGTERM): same container, everything there;
+3. recreate (`docker compose up --force-recreate`): a new container, the SAME `/app/data` volume, everything
+   there;
+4. crash (`docker kill --signal KILL`, `docker start`): nothing committed is lost;
+5. sessions: with `OS_APP_JWT_SECRET` unset (every stack file) a restart and a recreate each end a session:
+   the access token and the refresh token from before are answered 401 `accessNotAllowed`; recreated with
+   `docker-compose.stack-jwt.yml` and a secret (`REPSY_E2E_JWT_SECRET`, random per run), both stay valid
+   across a restart and a recreate, and go back to 401 when the stack is restored to no secret.
+
+The helpers are reusable (RPS-1487, the upgrade path, recreates on another image with them),
+`src/clients/stack.ts`:
+
+- `restartRepsy(stopTimeoutSeconds?)`, `crashRepsy()`: same container; wait for the healthcheck;
+- `recreateRepsy({ env, extraFiles, files })`: `docker compose -p <project> -f <files> up -d --no-deps
+--no-build --force-recreate --wait repsy`, from the compose files the container was created from (its
+  `com.docker.compose.project.config_files` label) plus overlays, with `env` added to what the stack files
+  interpolate (`REPSY_IMAGE` for another image, `REPSY_E2E_JWT_SECRET`), and returns the new container id.
+  Take `currentComposeFiles()` BEFORE an overlay recreate and pass it to `restoreStack()` (or as `files`)
+  to go back; after an overlay the labels name the overlay too. Anonymous volumes are carried over, which
+  is what makes it a recreate "on the same volume"; `dataMount()` names the volume to prove it;
+- how compose runs inside the runner: it mounts the e2e directory read-only at its HOST path
+  (`REPSY_E2E_HOST_DIR`, exported by `run.sh`), so the labels' absolute paths resolve, and forwards the
+  ports, `REPSY_E2E_IMAGE_TAG` and `REPSY_IMAGE` the stack files interpolate. `run()` with
+  `extendEnv: true` accepts `REPSY_*` variables (a harness tool, not a client).
+
+Every panel session the harness holds dies with a restart of a stack without a fixed secret, so
+`relogin()` (a fresh `PanelApi.login`) comes before any further panel call and before the seeder's cleanup;
+a Basic-auth client authenticates per request and never notices. The runner runs with
+`REPSY_E2E_WORKERS=1` (`playwright.config.ts`), never against a shared stack. The stack runner image is
+about 1.5 GB (JDK, Maven, crane, compose plugin; versions pinned in `docker-compose.runners.yml` next to
+the maven and docker runners' and to be kept equal to them).
+
+Flip checks (each made the named test fail, then reverted): `--renew-anon-volumes` on the recreate (the
+volume is another one), the secret set in the "unset" case (the token after the restart is accepted),
+`STORAGE_BASE_PATH=/home/appuser/.repsy` in the stack file (control test: the path is not under `/app/data`;
+without it the recreate test: Maven 404).
+
 ### Auth-throttle leg (RPS-1477)
 
 The auth throttle (`AuthFailureThrottle`, RPS-1092) is a CPU defence: after `AUTH_THROTTLE_MAX_FAILURES`
@@ -3777,6 +3873,53 @@ What it pins, as observed on the built image:
 
 Deliberately not asserted, because they are open product questions rather than contracts: what CORS
 does on the protocol port, and the absence of `X-Content-Type-Options`, `Referrer-Policy` and HSTS.
+
+## Role sweep and Maven browser (RPS-1483)
+
+Two more specs of the `api` runner (`./run.sh test --protocol api`, see "API suite"), both raw HTTP:
+
+- **Role sweep** (`tests/api/role-sweep.spec.ts`). The operation list is not written down: `src/api/spec-ops.ts`
+  reads `repsy-backend/src/main/resources/openapi/openapi-spec.yaml` (mounted read-only into the runners) with the
+  existing `yaml` dependency. The spec declares `403 Forbidden` on exactly the operations a plain USER may not
+  call: the `@RepoOperation(MANAGE)` routes and the `requireAdmin` ones (48 of 122 today). The sweep pins:
+  1. every operation declaring 403, called as a USER Bearer, answers `403 accessDenied`. With placeholder
+     path parameters that cannot exist (a nil UUID, `e2e-sweep-no-such-repo`) the 403 comes BEFORE the 404 on every
+     one of them, so the sweep needs no data. Bodies are valid but inert, because `PUT /api/users/{id}`,
+     `POST /api/users` and `POST /api/repos` validate the body first (an empty `{}` gets a USER a 400);
+  2. the same 48 on real data: one private repo per protocol, each with a seeded package, a deploy token, a key
+     store, a PGP key and a second user. The USER gets 403 everywhere and every repo-scoped read operation of the
+     spec, called as admin before and after (plus the run's users and repos), answers the same (`errorCode`, a
+     fresh correlation id per error, is dropped from the comparison);
+  3. an anonymous caller gets 401 on every operation that is not `security: []`, on placeholders and on real
+     private repos; the public ones (`login`, `refreshToken`, `checkGolangSumdbSupported`,
+     `getSupportedRepoTypes`) are not 401;
+  4. the reverse: every OTHER operation, called as a USER, is not 403, so a MANAGE route that forgot to document its
+     403 fails the build. `REVERSE_SKIP` holds `deleteProfile`, `updateUsername`, `updatePassword`, `login` and
+     `refreshToken` with a reason each, and a test that every entry exists in the spec.
+
+  A floor (at least 48 forbidden operations, at least 120 operations) and a check of names that must be in the set
+  (all of `/api/users*`, `createRepository`, the settings, token, key store and rename routes, and every `DELETE`
+  but `deleteProfile`) stop a parser bug from emptying the sweep.
+
+  **RPS-1558** (found by the sweep): `GET /api/mvn/groups/{repo}/{group}` (`getMavenGroupSummary`) needs no
+  credentials on a PRIVATE repo (200 with the artifact and version counts), and answers 404 rather than 401 for a
+  repo that does not exist, because `ProtocolEndpointDispatcher.addInterceptors` lacks `/api/mvn/groups/**`. The
+  operation is in `ANONYMOUS_KNOWN_GAPS`, out of the anonymous sweeps, and two `test.fail()` tests under
+  "RPS-1558" assert the correct answer (401 in both cases): they pass today and go red when the fix lands, so the
+  fix removes the entry and the two `test.fail()` calls in the same PR.
+
+  Two low observations, NOT pinned: `PUT /api/users/{id}`, `POST /api/users` and `POST /api/repos` validate the
+  body before authorization (a USER with an empty body gets 400 `validationError`, not 403, which is why the sweep
+  sends valid inert bodies), and an anonymous 401 has two `msgId`s (`loginRequired` on repo routes,
+  `missingRequestHeader` elsewhere, so the sweep asserts the status only).
+
+- **Maven browser** (`tests/api/maven-browser.spec.ts`). `GET /api/repos/{repo}/contents?path=` lists a
+  directory (names, sizes, directory flag, matched against the bytes the wire serves; `400 invalidStoragePath` for
+  `../x`, `404` for a path that is not there). `POST /api/repos/{repo}/download-token?path=` gives a one-minute
+  token that opens ONE path of ONE repo on the protocol port to a caller with no credentials: refused for another
+  path of the repo, for the same path in another repo, for a garbage token, for a `PUT` (repo unchanged), and as a
+  Bearer or `?downloadToken=` on the panel API and on the protocol port. The expiry test waits 61 s and is tagged
+  `@slow` (`--grep '^((?!@slow).)*$'` leaves it out).
 
 ## Remote hardening
 

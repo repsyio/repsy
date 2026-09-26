@@ -1,0 +1,24 @@
+# Copyright 2026 the original author or authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Overlay for either stack file (postgres or H2): gives Repsy a fixed JWT signing secret. Without it
+# (every other stack file) Repsy generates a random secret on each start, so a restart ends every panel
+# session (README.md "OS_APP_JWT_SECRET"). Not started by `run.sh`: tests/stack/persistence.spec.ts
+# recreates the Repsy container with this file added (clients/stack.ts `recreateRepsy({ extraFiles })`)
+# and REPSY_E2E_JWT_SECRET set, then restores the plain stack. A blank REPSY_E2E_JWT_SECRET is the
+# unset case (JwtUtils generates a random secret for a blank value too).
+services:
+  repsy:
+    environment:
+      OS_APP_JWT_SECRET: ${REPSY_E2E_JWT_SECRET:-}

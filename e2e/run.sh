@@ -41,6 +41,11 @@ PORT_OFFSET="${REPSY_E2E_PORT_OFFSET:-0}"
 # The compose project of the runner containers (docker-compose.runners.yml); see derive_stack_env.
 RUNNERS_PROJECT="repsy-e2e-runners"
 
+# Read by docker-compose.runners.yml's "stack" runner: this directory, mounted read-only at the same path,
+# so that runner can run `docker compose` on the stack's own files (recreateRepsy, RPS-1476).
+REPSY_E2E_HOST_DIR="$SCRIPT_DIR"
+export REPSY_E2E_HOST_DIR
+
 # Read by docker-compose.runners.yml's "user:", so a runner container writes the regenerated API
 # client and test reports as this user, not as the image's default root (see that file's comment).
 HOST_UID="$(id -u)"
