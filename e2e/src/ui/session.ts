@@ -154,14 +154,8 @@ export function assertAdminCredentialsUsableInUi(): void {
 }
 
 /**
- * Whether an opt-in suite was requested through `REPSY_UI_OPT_IN` (a comma list such as
- * `throttle,scanner`; `docker-compose.runners.yml` forwards it to the ui runner). Opt-in specs skip
- * themselves instead of being filtered out in the config: `test.skip(!optedIn('throttle'), ...)`.
+ * Whether an opt-in suite was requested (`REPSY_E2E_OPT_IN`, or the UI suite's older
+ * `REPSY_UI_OPT_IN`): see `src/stack-overlays.ts`, where it moved so that runners other than `ui` share
+ * it. Re-exported so the UI suite's imports stay as they were.
  */
-export function optedIn(name: string): boolean {
-  return (process.env.REPSY_UI_OPT_IN ?? '')
-    .split(',')
-    .map((entry) => entry.trim().toLowerCase())
-    .filter((entry) => entry.length > 0)
-    .includes(name.toLowerCase());
-}
+export { optedIn } from '../stack-overlays.js';

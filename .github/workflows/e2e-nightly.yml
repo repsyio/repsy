@@ -18,16 +18,16 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack, plus the full catalog of one rotating runner), scanner (the @scanner UI specs against the stub scanner stack) or all"
+        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack, plus the full catalog of one rotating runner), scanner (the @scanner UI specs against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack) or all"
         type: choice
-        options: [all, ui, wire, h2, scanner]
+        options: [all, ui, wire, h2, scanner, throttle]
         default: all
       protocol:
         description: "Only these runner services, comma separated (skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,golang,ruby,stack,api,ui). Empty: every runner of the chosen legs"
         type: string
         default: ""
       grep:
-        description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 leg then keeps its default, @smoke). The scanner leg ignores it and always runs @scanner"
+        description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 leg then keeps its default, @smoke). The scanner and throttle legs ignore it and always run @scanner and @throttle"
         type: string
         default: ""
       h2_full:
@@ -83,7 +83,7 @@ jobs:
           H2_FULL = os.environ["H2_FULL"].strip()
           h2_full_runner = H2_FULL or ROTATION[datetime.datetime.now(datetime.timezone.utc).toordinal() % len(ROTATION)]
           # leg -> (suite it belongs to, stack flag for run.sh local up, runners, default --grep, timeout,
-          # REPSY_UI_OPT_IN, whether the --grep input may replace the default)
+          # REPSY_E2E_OPT_IN, whether the --grep input may replace the default)
           LEGS = {
               "ui": ("ui", "", ["ui"], "", 60, "", True),
               "wire": ("wire", "", WIRE, "", 150, "", True),
@@ -96,6 +96,11 @@ jobs:
               # Never the whole ui suite there (its @mocked specs assume the scanner is off), so the
               # grep input does not apply to this leg.
               "scanner": ("scanner", "--scanner", ["ui"], "@scanner", 45, "scanner", False),
+              # The auth-throttle overlay (README.md "Auth-throttle leg"): 3 failed password checks per
+              # 10 s per client, so only the opted-in @throttle specs run there (any other suite would lock
+              # itself out). The stack runner goes first and the ui runner LAST: AUTH-11 locks the docker
+              # gateway's bucket, admin included, for the window (the step "Wait out the throttle window").
+              "throttle": ("throttle", "--throttle", ["stack", "ui"], "@throttle", 30, "throttle", False),
           }
 
           # leg -> {runner: --grep} where a runner must not take the leg's default grep ("" is the whole
@@ -239,8 +244,9 @@ jobs:
         env:
           STACK: ${{ matrix.stack }}
         # REPSY_IMAGE is set (workflow env), so run.sh starts the loaded image and does not build.
-        # $STACK is empty (PostgreSQL profile), --h2 or --scanner (PostgreSQL plus the stub scanner
-        # overlay); it is split into words so an empty value passes no argument at all.
+        # $STACK is empty (PostgreSQL profile), --h2, or an overlay flag (--scanner: PostgreSQL plus the
+        # stub scanner; --throttle: PostgreSQL with the low auth-throttle limit); it is split into words
+        # so an empty value passes no argument at all.
         run: |
           read -ra stack_args <<< "$STACK"
           ./run.sh local up "${stack_args[@]}"
@@ -285,9 +291,10 @@ jobs:
           # {runner: pattern} for the runners that must not take GREP (plan job, RUNNER_GREP); "" runs
           # the whole catalog of that runner.
           RUNNER_GREP: ${{ toJSON(matrix.runner_grep) }}
-          # The opt-in UI suites (README.md "UI suite"): `scanner` on the scanner leg, empty elsewhere.
-          # The ui runner reads it (docker-compose.runners.yml) and the @scanner specs skip without it.
-          REPSY_UI_OPT_IN: ${{ matrix.opt_in }}
+          # The opt-in suites (README.md "Stack overlays"): the name of the leg's overlay (`scanner`,
+          # `throttle`), empty elsewhere. run.sh hands it to every runner (docker-compose.runners.yml) and
+          # the specs of that overlay skip without it.
+          REPSY_E2E_OPT_IN: ${{ matrix.opt_in }}
           # Read by playwright.config.ts (retries: 1, forbidOnly, trace on first retry); run.sh
           # forwards it to the ui runner only. GitHub sets it already; explicit for the reader.
           CI: "true"
@@ -334,28 +341,43 @@ jobs:
           print(f"{flaky} retried test(s)")
           PY
 
-      # The @scanner specs skip themselves unless the opt-in reached the runner, and a skipped test
-      # is not a failure, so a broken opt-in would leave this leg green with 20 skipped tests. Fail
-      # it instead when nothing ran or anything was skipped.
-      - name: Check the scanner specs ran
-        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' && matrix.leg == 'scanner' }}
+      # The specs of an overlay (@scanner, @throttle) skip themselves unless the opt-in reached the runner,
+      # and a skipped test is not a failure, so a broken opt-in would leave the leg green with everything
+      # skipped. Fail it instead when a runner of an overlay leg ran nothing or skipped anything.
+      - name: Check the opt-in specs ran
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' && matrix.opt_in != '' }}
+        env:
+          PROTOCOLS: ${{ matrix.protocols }}
+          OPT_IN: ${{ matrix.opt_in }}
         run: |
           python3 - <<'PY'
           import os, sys
           import xml.etree.ElementTree as ET
 
-          path = os.path.join(os.environ["ARTIFACTS"], "ui", "junit.xml")
-          try:
-              cases = list(ET.parse(path).getroot().iter("testcase"))
-          except (OSError, ET.ParseError) as e:
-              print(f"::error::no readable junit.xml for the scanner leg ({e})")
-              sys.exit(1)
-          skipped = [c.get("name") for c in cases if c.find("skipped") is not None]
-          if not cases or skipped:
-              print(f"::error::the scanner leg ran {len(cases)} tests and skipped {len(skipped)}: the @scanner specs must all run (REPSY_UI_OPT_IN=scanner)")
-              sys.exit(1)
-          print(f"{len(cases)} @scanner tests ran, none skipped")
+          bad = False
+          for runner in os.environ["PROTOCOLS"].split():
+              path = os.path.join(os.environ["ARTIFACTS"], runner, "junit.xml")
+              try:
+                  cases = list(ET.parse(path).getroot().iter("testcase"))
+              except (OSError, ET.ParseError) as e:
+                  print(f"::error::no readable junit.xml for {runner} in the {os.environ['OPT_IN']} leg ({e})")
+                  bad = True
+                  continue
+              skipped = [c.get("name") for c in cases if c.find("skipped") is not None]
+              if not cases or skipped:
+                  print(f"::error::{runner} ran {len(cases)} tests and skipped {len(skipped)} in the {os.environ['OPT_IN']} leg: its @{os.environ['OPT_IN']} specs must all run (REPSY_E2E_OPT_IN={os.environ['OPT_IN']})")
+                  bad = True
+              else:
+                  print(f"{runner}: {len(cases)} @{os.environ['OPT_IN']} tests ran, none skipped")
+          sys.exit(1 if bad else 0)
           PY
+
+      # AUTH-11 (the last runner of the throttle leg) makes 30 bad logins from the docker gateway's
+      # address, which is also the address of the harness's own admin logins, so that bucket stays
+      # locked for the rest of the window (10 s). The leak check below logs in as admin: wait it out.
+      - name: Wait out the throttle window
+        if: ${{ !cancelled() && matrix.leg == 'throttle' }}
+        run: sleep 12
 
       # Fails the leg when a run left e2e-* repos or users behind. --dry-run prints
       # "[dry-run] would delete ..." for each and always exits 0, so read its output.
