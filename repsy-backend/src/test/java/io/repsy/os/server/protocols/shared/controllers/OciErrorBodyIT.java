@@ -132,7 +132,22 @@ class OciErrorBodyIT extends AbstractIntegrationTest {
         "UNAUTHORIZED",
         "Authentication is required to access this resource.",
         "unauthorizedRequest");
-    assertThat(response.getHeader(WWW_AUTHENTICATE)).startsWith("Bearer realm=");
+    assertThat(response.getHeader(WWW_AUTHENTICATE))
+        .startsWith("Bearer realm=")
+        .contains("scope=\"repository:%s/%s:pull\"".formatted(repo.getName(), IMAGE));
+  }
+
+  /** RPS-1588: the ping addresses no image, so its challenge names no scope. */
+  @Test
+  @DisplayName("Docker: the registry ping is challenged without a scope")
+  void dockerPingNamesNoScope() throws Exception {
+    final var response = this.protocol(get("/v2/"));
+
+    assertThat(response.getStatus()).isEqualTo(401);
+    assertThat(response.getHeader(WWW_AUTHENTICATE))
+        .startsWith("Bearer realm=")
+        .contains("service=\"repsy\"")
+        .doesNotContain("scope=");
   }
 
   @Test
@@ -149,6 +164,8 @@ class OciErrorBodyIT extends AbstractIntegrationTest {
         "UNAUTHORIZED",
         "The credentials are missing, invalid or expired, or they do not allow this action.",
         "unAuthorized");
+    assertThat(response.getHeader(WWW_AUTHENTICATE))
+        .contains("scope=\"repository:%s/%s:pull,push\"".formatted(repo.getName(), IMAGE));
   }
 
   // ---------------------------------------------------------------------------------------------

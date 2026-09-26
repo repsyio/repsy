@@ -30,9 +30,11 @@
  *  - Ping (`AbstractDockerRegistryCheckProtocolMethodHandler`): unauthenticated `GET /v2/` answers a
  *    bare `200`; any request WITHOUT a `Bearer ` `Authorization` header instead gets short-circuited
  *    by `DockerHeaderPreProcessor` (priority 50) into a `401` + `WWW-Authenticate: Bearer
- *    realm="<scheme>://<host[:port]>/v2/token",service="repsy",scope="repository:*:pull"` + an OCI
- *    `UNAUTHORIZED` body -- confirmed live: this is what a real client's own `GET /v2/` "ping" sees
- *    (its `scope` is a constant every real client, ggcr included, ignores in favour of its own).
+ *    realm="<scheme>://<host[:port]>/v2/token",service="repsy"` + an OCI `UNAUTHORIZED` body --
+ *    confirmed live: this is what a real client's own `GET /v2/` "ping" sees. The ping names no
+ *    image, so its challenge carries NO `scope`; a request that addresses one carries the scope it
+ *    needs, `repository:<repo>/<image>:pull` (READ), `:pull,push` (WRITE) or `:delete` (MANAGE), which
+ *    containerd, oras-go and crane copy into their token request (RPS-1588).
  *  - Token endpoint (`AbstractDockerTokenProtocolMethodHandler`/`DockerAuthComponent
  *    .handleBearerAuth`): with `Authorization: Basic`, a deploy-token lookup by the password value
  *    runs FIRST regardless of username; not found falls through to username/password. The scope is
@@ -223,7 +225,7 @@ export interface TokenResult {
  *  one to avoid the circular "probe the thing being asserted" shape). */
 export async function rawToken(
   credential: MaterializedCredential,
-  scope: string | undefined,
+  scope: string | string[] | undefined,
   opts?: { realm?: string; service?: string },
 ): Promise<TokenResult> {
   const { realm, service } =
@@ -232,8 +234,11 @@ export async function rawToken(
       : await challengeRealmAndService();
   const url = new URL(realm);
   url.searchParams.set('service', service);
-  if (scope) {
-    url.searchParams.set('scope', scope);
+  // A list is one `scope` parameter per value, as containerd and crane send them (RPS-1588).
+  for (const one of typeof scope === 'string' ? [scope] : (scope ?? [])) {
+    if (one) {
+      url.searchParams.append('scope', one);
+    }
   }
   const res = await rawFetch(url.toString(), { headers: authHeader(credential) });
   let token: string | undefined;
@@ -498,7 +503,7 @@ export const CATALOG_SCOPE = 'registry:catalog:*';
  *  the server answered with a `Bearer` challenge (a known route) or not (an unknown one). */
 export async function rawGetAnonymous(
   pathSuffix: string,
-  method: 'GET' | 'HEAD' = 'GET',
+  method: 'GET' | 'HEAD' | 'POST' | 'DELETE' = 'GET',
 ): Promise<RawResponse & { hop: 'request'; wwwAuthenticate?: string }> {
   const res = await rawFetch(v2Url(pathSuffix), { method });
   return {

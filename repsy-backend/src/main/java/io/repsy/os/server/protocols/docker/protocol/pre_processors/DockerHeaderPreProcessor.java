@@ -67,7 +67,8 @@ public class DockerHeaderPreProcessor extends ProtocolProcessor {
     }
 
     return ProcessorResult.of(
-        OciErrors.challenge(request, DockerAuthChallenge.of(request), this.resp));
+        OciErrors.challenge(
+            request, DockerAuthChallenge.of(context, request, properties), this.resp));
   }
 
   private boolean isPreProcessorNotEnabled(
