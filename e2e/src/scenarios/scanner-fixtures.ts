@@ -31,7 +31,7 @@
 import { SCENARIOS } from './catalog.js';
 import { expect, test as scenarioTest } from './fixtures.js';
 import type { Scenario } from './types.js';
-import type { PanelApi, VulnerabilityScanInfo } from '../api/panel-api.js';
+import type { PanelBackend, VulnerabilityScanInfo } from '../api/panel-backend.js';
 import { optedIn } from '../stack-overlays.js';
 import { ScannerStubClient, type RecordedCall } from '../stubs/scanner/client.ts';
 import { SCANNER_VERSION } from '../stubs/scanner/rules.ts';
@@ -92,7 +92,7 @@ export function skipUnlessScannerOptedIn(): void {
  * covers "no scan yet".
  */
 export async function finishedScan(
-  panelApi: PanelApi,
+  panelApi: PanelBackend,
   repoName: string,
   artifactName: string,
   version: string,
@@ -159,7 +159,7 @@ export interface ScannedArtifact {
  * findings. Returns the stub's record of the submit, for the protocol's own assertions.
  */
 export async function expectScanReported(
-  panelApi: PanelApi,
+  panelApi: PanelBackend,
   scanner: ScannerStubClient,
   artifact: ScannedArtifact,
 ): Promise<RecordedCall> {

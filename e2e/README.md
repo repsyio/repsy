@@ -104,7 +104,10 @@ e2e/
     env.ts                     # typed config from env/.env
     target.ts                  # capabilities derived from REPSY_TARGET
     api/
-      panel-api.ts             # hand-written wrapper around the generated client
+      panel-backend.ts         # the `PanelBackend` interface every panel operation goes through, plus `RepoType`, `UserRole`, `UserSpec`, `PanelHttpError`, `UnsupportedPanelOperation` (no runtime import of the generated client)
+      os-panel-backend.ts      # `OsPanelBackend implements PanelBackend`: hand-written wrapper around the generated client, which it imports lazily
+      backend-registry.ts      # `createPanelBackend()`: the built-in backend of `env.target`, or the module named by `REPSY_E2E_BACKEND_MODULE`
+      panel-api.ts             # compatibility re-export of panel-backend.ts (specs import `RepoType` from here); new code imports panel-backend.ts
       generated/                # `pnpm gen:api` output, git-ignored
     seed/
       run-id.ts                 # e2e-<runid>- naming, length/pattern limits
@@ -192,6 +195,7 @@ e2e/
   tests/
     ui/                         # the panel UI suite (Playwright + headless Chromium): smoke.spec.ts (@smoke) and harness.spec.ts, one folder per area from here on -- see "UI suite"
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe; both tests tagged @smoke
+    skeleton/backend-module.spec.ts  # RPS-1495 the panel backend registry: `REPSY_E2E_BACKEND_MODULE` picks an external backend (`fake-panel-backend.ts`, in memory, no server), also for the `panelApi`/`seeder` fixtures; `UnsupportedPanelOperation`
     skeleton/repo-settings.spec.ts  # RPS-1200 settings-PUT field-by-field matrix across RepoTypes; untagged (not smoke-sized)
     skeleton/repo-type-casing.spec.ts  # RPS-1269 repo type: /format answers upper case; type accepted in any case (query and body)
     skeleton/login-password.spec.ts  # RPS-1308 POST /api/auth/login: a wrong password of any strength is 401 invalidCredentials; malformed shapes stay 400
@@ -289,6 +293,7 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_ADMIN_USERNAME`        | `admin`                    |                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `REPSY_ADMIN_PASSWORD`        | _(none — required)_        | must match the target's admin password                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_TARGET`                | `local`                    | `local` \| `remote` \| `ci` — see Targets below                                                                                                                                                                                                                                                                                                                                                                                          |
+| `REPSY_E2E_BACKEND_MODULE`    | _(unset — built-in)_       | module that supplies the panel backend instead of the built-in Repsy OS one: a path the runner can read (absolute, or relative to the working directory), a `file:` URL or a package name; exports `createPanelBackend(baseUrl)`. See "Panel backend" below                                                                                                                                                                              |
 | `REPSY_E2E_RUN_ID`            | random 6-char lowercase id | shared by every runner in one `run.sh test`                                                                                                                                                                                                                                                                                                                                                                                              |
 | `REPSY_E2E_STACK`             | _(unset — postgres)_       | `local up\|down` stack profile: unset/anything but `h2` is the postgres profile, `h2` is the embedded-H2 profile; equivalent to `--h2` on the command line. Unread by `run.sh test`, which is identical against either profile — see "Stack profiles" below                                                                                                                                                                              |
 | `REPSY_E2E_PROJECT`           | `repsy-e2e`                | compose project of the local stack (`local up\|down`, `test`, `sweep`, all of which follow it); also `--project NAME`. "Parallel stacks"                                                                                                                                                                                                                                                                                                 |
@@ -317,6 +322,53 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
   `--target ci` (see "CI" below).
 - **remote** — an already-running instance the harness does not own or reset. Throttle cannot be
   tuned and nothing global is touched; later steps add a failure budget and a preflight check.
+
+### Panel backend (RPS-1495)
+
+Every panel operation the harness makes (login, repositories, settings, deploy tokens, users, the
+protocol-specific reads and deletes) goes through the `PanelBackend` interface (`src/api/panel-backend.ts`).
+The `Seeder`, the `panelApi`/`seeder` fixtures, `sweep.ts`, `src/ui/*` and the specs are typed against it,
+never against a concrete client, so a target that is not Repsy OS (Repsy Cloud) can supply the operations
+without touching any of them. The client is `OsPanelBackend` (`src/api/os-panel-backend.ts`), which imports
+the generated client (`pnpm gen:api`) lazily, on its first call: a run against another backend needs no
+`src/api/generated` at run time (the model types are type-only imports, erased at run time).
+
+`src/api/backend-registry.ts` chooses the backend when one is needed (`createPanelBackend()`):
+
+1. `REPSY_E2E_BACKEND_MODULE`, when set (an empty value counts as unset): a module, imported dynamically,
+   that exports `createPanelBackend(baseUrl: string): PanelBackend | Promise<PanelBackend>` (named, or as its
+   default export). It is passed through to every runner by `docker-compose.runners.yml`, so the module has
+   to be readable inside the runner.
+2. Otherwise the built-in backend of `env.target`. `local`, `ci` and `remote` are all Repsy OS instances, so
+   that is `OsPanelBackend`.
+
+Playwright re-imports the test files in every worker process, so the backend cannot be registered once from
+`playwright.config.ts`: a registration made there would not exist in the workers. The environment variable is
+what reaches them, and whoever needs a backend resolves it itself (`fixtures.ts`, `sweep.ts`, and the specs
+that log a second user in through `createPanelBackend()` / `loginPanel()`). Never construct `OsPanelBackend`
+directly outside the registry.
+
+Things a backend module has to know:
+
+- **`UserSpec`** (`createRepoUser`, `deleteRepoUser`): `{ username, password, role?, permissions? }`. Repsy
+  OS has an account `role` (`USER` by default, or `ADMIN`); `permissions` is the fine-grained alternative
+  for a backend that has it. `OsPanelBackend` rejects `permissions`. The shape follows RPS-1491 (the Repsy
+  Cloud panel probe) and may be refined by it.
+- **`UnsupportedPanelOperation(ticket, operation?)`**: an operation the target does not offer throws it, with
+  the Jira key that tracks the gap. A spec turns it into a known gap or a skip (`isUnsupportedPanelOperation`)
+  instead of a failure; nothing does yet, the expectation overlay is RPS-1498.
+- **`PanelHttpError`** (`status`, `body`): what a backend throws for an HTTP error status. `OsPanelBackend`
+  converts the generated client's `ApiError` into it, so specs match a status (`isPanelHttpStatus`) without
+  importing the generated client.
+- **`RepoType` and `UserRole`** are declared in `panel-backend.ts` with the generated enums' values. Specs
+  use those. The generated models a backend returns (`RepoListInfo`, `UserResponse`, ...) stay type-only
+  imports from `src/api/generated`; `src/ui/security-stubs.ts` and the UI specs that stub the OS panel API
+  remain typed against the generated models on purpose.
+
+`tests/skeleton/backend-module.spec.ts` proves it without any server: `tests/skeleton/fake-panel-backend.ts`
+is an in-memory backend, and the spec points `REPSY_E2E_BACKEND_MODULE` at it and checks the registry, the
+`seeder` and `panelApi` fixtures and `UnsupportedPanelOperation`. It is also the smallest worked example of a
+backend module.
 
 ## Stack profiles (postgres and H2)
 
@@ -684,7 +736,13 @@ five worked examples.
 7. `tests/<protocol>/publish-consume.spec.ts`: `registerPublishConsumeLoop(<protocol>Adapter);` (see
    `tests/npm/publish-consume.spec.ts`), plus any real-client test the catalog-driven loop cannot
    express (a scoped-package round trip, for npm).
-8. Restrict any scenario your adapter cannot express (or add one only it needs) via the catalog
+8. A panel call your protocol needs that the seeder and the existing specs do not have (a delete or a read
+   of the protocol's own panel API) is a method of the `PanelBackend` interface (`src/api/panel-backend.ts`),
+   implemented in `OsPanelBackend` (`src/api/os-panel-backend.ts`), never a `fetch` in a spec, and typed
+   with the models of `src/api/generated`. Another backend then has to implement it or throw
+   `UnsupportedPanelOperation` ("Panel backend" under "Targets"): `tests/skeleton/fake-panel-backend.ts`
+   fails to compile until it does, which is the reminder.
+9. Restrict any scenario your adapter cannot express (or add one only it needs) via the catalog
    entry's `protocols` field, or override its `expect` for your protocol via `expectByProtocol`
    (`scenarios/types.ts`'s `expectationFor`) when the real, probed status differs from maven's.
 
@@ -1848,12 +1906,12 @@ deploy with the credential comes first, so that the Basic-auth cache (`VerifiedP
 password and stored hash) is warm and what is proved is invalidation, not a cold miss. Then the credential stops
 being valid and a deploy with it must be refused at once:
 
-| Event                                                                  | Old credential | Replacement               |
-| ---------------------------------------------------------------------- | -------------- | ------------------------- |
-| `PUT /api/profile/password` as the user (`PanelApi.changeOwnPassword`) | refused        | the new password deploys  |
-| `DELETE /api/users/{id}` as admin                                      | refused        | none                      |
-| deploy token revoked                                                   | refused        | none                      |
-| deploy token rotated                                                   | refused        | the rotated token deploys |
+| Event                                                                      | Old credential | Replacement               |
+| -------------------------------------------------------------------------- | -------------- | ------------------------- |
+| `PUT /api/profile/password` as the user (`PanelBackend.changeOwnPassword`) | refused        | the new password deploys  |
+| `DELETE /api/users/{id}` as admin                                          | refused        | none                      |
+| deploy token revoked                                                       | refused        | none                      |
+| deploy token rotated                                                       | refused        | the rotated token deploys |
 
 "Refused" means the real client exits non-zero, the raw probe of the same credential (`adapter.publish`) answers 401
 (not 403 or 404), and an admin sees nothing of the refused version stored. `--grep "credential invalidation"`
@@ -4027,7 +4085,7 @@ The helpers are reusable (RPS-1487, the upgrade path, recreates on another image
   `extendEnv: true` accepts `REPSY_*` variables (a harness tool, not a client).
 
 Every panel session the harness holds dies with a restart of a stack without a fixed secret, so
-`relogin()` (a fresh `PanelApi.login`) comes before any further panel call and before the seeder's cleanup;
+`relogin()` (a fresh `PanelBackend.login`) comes before any further panel call and before the seeder's cleanup;
 a Basic-auth client authenticates per request and never notices. The runner runs with
 `REPSY_E2E_WORKERS=1` (`playwright.config.ts`), never against a shared stack. The stack runner image is
 about 1.5 GB (JDK, Maven, crane, compose plugin; versions pinned in `docker-compose.runners.yml` next to
@@ -4964,7 +5022,7 @@ How the tests are written, and what they had to work around:
 - **Persistence is asserted through the API.** The toggles and the selector PUT immediately and ask
   for no confirmation, so each test reads the setting back (`panelApi.getSettings`, tokens through
   `listDeployTokens`, description/usage/key stores through `RepoSettingsReadback`, which uses the
-  test's `adminSession` bearer token because `PanelApi` does not wrap those reads) and again after a
+  test's `adminSession` bearer token because `PanelBackend` does not wrap those reads) and again after a
   reload. Nothing sleeps: `expect.poll` on the API, `expect(...)` on the page.
 - **Visibility is proven on the repo port too.** SET-02 checks `GET /<repo>/` on the PROTOCOL port
   (`REPSY_REPO_BASE_URL`, not the SPA port): 401 while private, 200 anonymous once public.
@@ -5773,7 +5831,7 @@ of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays o
 
 ## Panel API facts this step verified against a running instance
 
-- `POST /api/auth/login` → `{ data: { token, refreshToken } }`; every other call in `panel-api.ts`
+- `POST /api/auth/login` → `{ data: { token, refreshToken } }`; every other call in `os-panel-backend.ts`
   sends `Authorization: Bearer <token>`. The openapi spec only lists `Authorization` as an explicit
   parameter for `user-controller` routes; `protocol-repo-controller` and
   `protocol-deploy-token-controller` routes need it too, just via an argument resolver the spec
@@ -5781,8 +5839,8 @@ of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays o
 - `POST /api/users`, `DELETE /api/users/{userId}`, `GET /api/users` (ADMIN only).
 - `POST /api/repos` (the body carries `name`, `type` (upper-case `RepoType`: `MAVEN`, `NPM`, ...),
   `privateRepo`, `description`; the answer is the created repository), `DELETE /api/repos/{repoName}`,
-  `GET /api/repos` (`type`, `q`, `page`, `size` 1-100, `sort`: the paged list; `PanelApi.listRepos` reads a
-  page, `listAllRepos` all pages), `GET /api/repos/counts` (`PanelApi.repoCounts`), `GET`/`PUT
+  `GET /api/repos` (`type`, `q`, `page`, `size` 1-100, `sort`: the paged list; `OsPanelBackend.listRepos` reads a
+  page, `listAllRepos` all pages), `GET /api/repos/counts` (`PanelBackend.repoCounts`), `GET`/`PUT
 /api/repos/{repoName}/settings`.
 - `POST /api/repos/{repoName}/deploy-tokens` (`name`, `readOnly`, `expirationDate`, `username`),
   `DELETE .../deploy-tokens/{tokenId}`, `POST .../deploy-tokens/{tokenId}/actions/rotate` (rotate; the old

@@ -19,7 +19,7 @@
  * deploy tokens (read-write, read-only, already-expired) through the panel API, confirm they exist,
  * then confirm cleanup removes them. A second test pins the real HTTP status a raw protocol-port
  * request gets with an expired vs. a valid token, probed against a running instance beforehand
- * (see the panel-api.ts and seeder.ts comments for the endpoints and payload shapes verified this
+ * (see the os-panel-backend.ts and seeder.ts comments for the endpoints and payload shapes verified this
  * way).
  */
 import { RepoType } from '../../src/api/panel-api.js';
