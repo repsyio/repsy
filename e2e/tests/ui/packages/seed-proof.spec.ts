@@ -22,6 +22,7 @@
  */
 import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
+import { repoPath } from '../../../src/repo-url.js';
 import {
   PACKAGE_PROTOCOLS,
   type PackageProtocol,
@@ -286,7 +287,7 @@ test.describe('package seeding proof', () => {
 
     const tags = pages.versions(image);
     await tags.goto();
-    await expect(tags.installBarText).toContainText(`${repo.name}/${image.name}`);
+    await expect(tags.installBarText).toContainText(`${repoPath(repo.name)}/${image.name}`);
 
     const manifests = await tags.openLink(image, 'manifests');
     await manifests.expectLoaded();

@@ -15,7 +15,7 @@
 ///
 
 /**
- * The Playwright fixtures every spec uses: an admin-authenticated `PanelApi`, a per-test `Seeder`
+ * The Playwright fixtures every spec uses: an admin-authenticated `PanelBackend`, a per-test `Seeder`
  * that cleans up after itself, and `world` — the factory that turns a `Scenario` into a ready-to-test
  * `World` (plan section "Scenario model"). `world` is a function-valued fixture (`world(scenario,
  * adapter)`), not a single resolved value, because one spec calls it once per scenario in its own
@@ -28,10 +28,13 @@
  */
 import { test as base } from '@playwright/test';
 
-import { PanelApi, RepoType } from '../api/panel-api.js';
+import { createPanelBackend } from '../api/backend-registry.js';
+import { isUnsupportedPanelOperation, type PanelBackend, RepoType } from '../api/panel-backend.js';
+import { ownerCredential } from '../clients/raw-http.js';
 import { env } from '../env.js';
 import { perTestRunId } from '../seed/run-id.js';
 import { Seeder } from '../seed/seeder.js';
+import { target, type TargetCapabilities } from '../target.js';
 import type { ProtocolAdapter } from './adapter.js';
 import type { CredentialKind, Scenario } from './types.js';
 import { expectationFor } from './types.js';
@@ -39,14 +42,8 @@ import type { Coordinates, MaterializedCredential, World } from './world.js';
 
 export type { Coordinates, World, MaterializedCredential } from './world.js';
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-const ADMIN_CREDENTIAL: MaterializedCredential = {
-  transport: 'basic',
-  username: env.adminUsername,
-  password: env.adminPassword,
-  kind: 'password',
-};
+/** The credential of the account the harness runs as (`admin` on OS, the tenant owner on Cloud). */
+const OWNER_CREDENTIAL: MaterializedCredential = ownerCredential();
 
 /** Lower-case runner/service name -> the RepoType its repos are created as. */
 const REPO_TYPE_BY_PROTOCOL: Record<string, RepoType> = {
@@ -83,21 +80,83 @@ export function repoTypeForProtocol(protocol: string): RepoType {
   return repoType;
 }
 
-async function materializeCredential(
+/**
+ * Why `kind` cannot be materialised on a target with these `capabilities`, or `undefined` when it can
+ * (RPS-1498). Decided from the capabilities alone, so a scenario is skipped before it seeds a repo.
+ */
+export function unsupportedCredentialReason(
+  kind: CredentialKind,
+  capabilities: TargetCapabilities,
+): string | undefined {
+  if (
+    kind === 'user-password' &&
+    !capabilities.supportsUserRole &&
+    !capabilities.supportsRepoUsers
+  ) {
+    return 'the target has neither user roles nor repo users, so it has no user credential to seed';
+  }
+  if (kind === 'token-expired' && capabilities.expiredTokenStrategy === 'unsupported') {
+    return 'the target has no way to seed an expired deploy token (expiredTokenStrategy: unsupported)';
+  }
+  return undefined;
+}
+
+/** The result of `tryMaterializeCredentialKind`: the credential, or why the test has to be skipped. */
+export type MaterializeResult =
+  | { credential: MaterializedCredential; skipReason?: undefined }
+  | { skipReason: string; credential?: undefined };
+
+/**
+ * Turns a `CredentialKind` into a credential that exists, or says why it cannot on this target,
+ * without skipping anything itself (`materializeCredentialKind` does that, and this stays testable
+ * outside a running test). `user-password` and `token-expired` go through the backend
+ * (`PanelBackend.seedUserCredential`/`seedExpiredTokenCredential`) because what they are differs by
+ * product; an `UnsupportedPanelOperation` from any backend call becomes a skip reason too.
+ */
+export async function tryMaterializeCredentialKind(
   seeder: Seeder,
-  scenario: Scenario,
+  kind: CredentialKind,
   repoName: string,
   repoType: RepoType,
-): Promise<MaterializedCredential> {
-  return materializeCredentialKind(seeder, scenario.credential, repoName, repoType);
+  capabilities: TargetCapabilities = target,
+): Promise<MaterializeResult> {
+  const reason = unsupportedCredentialReason(kind, capabilities);
+  if (reason !== undefined) {
+    return { skipReason: `${kind}: ${reason}` };
+  }
+  try {
+    return { credential: await seedCredential(seeder, kind, repoName, repoType) };
+  } catch (err) {
+    if (isUnsupportedPanelOperation(err)) {
+      return { skipReason: `${kind}: ${err.message}` };
+    }
+    throw err;
+  }
 }
 
 /**
  * Turns a `CredentialKind` into a credential that exists (a seeded user, a token of `repoName`...),
  * for a caller that has no `Scenario`: the manage matrix (`manage-matrix.ts`, RPS-1475) runs one
- * operation with each credential of one repo.
+ * operation with each credential of one repo. A credential the target cannot seed skips the test
+ * (`test.skip` with the reason, RPS-1498).
  */
 export async function materializeCredentialKind(
+  seeder: Seeder,
+  kind: CredentialKind,
+  repoName: string,
+  repoType: RepoType,
+  capabilities: TargetCapabilities = target,
+): Promise<MaterializedCredential> {
+  const result = await tryMaterializeCredentialKind(seeder, kind, repoName, repoType, capabilities);
+  if (result.credential === undefined) {
+    test.skip(true, result.skipReason);
+    // `test.skip` throws to end the test; this is for the type checker only.
+    throw new Error(result.skipReason);
+  }
+  return result.credential;
+}
+
+async function seedCredential(
   seeder: Seeder,
   kind: CredentialKind,
   repoName: string,
@@ -105,17 +164,10 @@ export async function materializeCredentialKind(
 ): Promise<MaterializedCredential> {
   switch (kind) {
     case 'admin-password':
-      return ADMIN_CREDENTIAL;
+      return OWNER_CREDENTIAL;
 
-    case 'user-password': {
-      const user = await seeder.createUser();
-      return {
-        transport: 'basic',
-        username: user.username,
-        password: user.password,
-        kind: 'password',
-      };
-    }
+    case 'user-password':
+      return seeder.backend.seedUserCredential({ seeder, repoName, repoType });
 
     case 'token-rw': {
       const token = await seeder.createToken(repoName, { readOnly: false });
@@ -127,13 +179,8 @@ export async function materializeCredentialKind(
       return { transport: 'basic', username: token.username, password: token.token, kind: 'token' };
     }
 
-    case 'token-expired': {
-      const token = await seeder.createToken(repoName, {
-        readOnly: false,
-        expirationDate: new Date(Date.now() - ONE_DAY_MS),
-      });
-      return { transport: 'basic', username: token.username, password: token.token, kind: 'token' };
-    }
+    case 'token-expired':
+      return seeder.backend.seedExpiredTokenCredential({ seeder, repoName, repoType });
 
     case 'token-revoked': {
       const token = await seeder.createToken(repoName, { readOnly: false });
@@ -168,17 +215,28 @@ export async function materializeCredentialKind(
 }
 
 export interface Fixtures {
-  panelApi: PanelApi;
+  panelApi: PanelBackend;
   seeder: Seeder;
   world: (scenario: Scenario, adapter: ProtocolAdapter) => Promise<World>;
 }
 
+export interface FixtureOptions {
+  /**
+   * The capabilities `world` decides with (which credentials to skip, which settings a repo type
+   * takes): the target of the run. An option so a spec can stand a fake target in
+   * (`test.use({ targetCapabilities })`, `tests/skeleton/cloud-target.spec.ts`).
+   */
+  targetCapabilities: TargetCapabilities;
+}
+
 let testSeqByWorker = 0;
 
-export const test = base.extend<Fixtures>({
+export const test = base.extend<Fixtures & FixtureOptions>({
+  targetCapabilities: [target, { option: true }],
+
   // eslint-disable-next-line no-empty-pattern
   panelApi: async ({}, use) => {
-    const api = new PanelApi(env.apiBaseUrl);
+    const api = await createPanelBackend();
     await api.login(env.adminUsername, env.adminPassword);
     await use(api);
   },
@@ -191,16 +249,27 @@ export const test = base.extend<Fixtures>({
     await seeder.cleanup();
   },
 
-  world: async ({ seeder }, use) => {
+  world: async ({ seeder, panelApi, targetCapabilities }, use) => {
     const factory = async (scenario: Scenario, adapter: ProtocolAdapter): Promise<World> => {
       const repoType = repoTypeForProtocol(adapter.protocol);
+
+      // Decided before anything is seeded: a scenario the target cannot run leaves no repo behind.
+      const skipReason = unsupportedCredentialReason(scenario.credential, targetCapabilities);
+      test.skip(skipReason !== undefined, skipReason);
+
       const repo = await seeder.createRepo(repoType, { privateRepo: scenario.repo.privateRepo });
 
-      const credential = await materializeCredential(seeder, scenario, repo.name, repoType);
+      const credential = await materializeCredentialKind(
+        seeder,
+        scenario.credential,
+        repo.name,
+        repoType,
+        targetCapabilities,
+      );
 
       const versionType = scenario.versionType ?? 'release';
       const packageName = adapter.packageName(seeder.runId, scenario);
-      const expectation = expectationFor(scenario, adapter.protocol);
+      const expectation = expectationFor(scenario, adapter.protocol, panelApi.expectByTarget);
 
       // A scenario whose own credential cannot publish but is still expected to consume
       // successfully (token-ro, anonymous-public, maven-releases-off/snapshots-off) needs something
@@ -251,7 +320,7 @@ export const test = base.extend<Fixtures>({
         // artifact has to land in storage before that restriction exists.
         const seeded = await adapter.seedPublish({
           ...world,
-          credential: ADMIN_CREDENTIAL,
+          credential: OWNER_CREDENTIAL,
           publishTarget: seedTarget,
         });
         world = { ...world, seeded };
@@ -262,7 +331,7 @@ export const test = base.extend<Fixtures>({
         allowOverride: scenario.repo.allowOverride ?? true,
         // RPS-1210: only Maven and NuGet consult releases/snapshots; the settings PUT refuses them
         // (400 releasesSnapshotsUnsupported) for every other repo type.
-        ...(supportsVersionAllowance(repoType)
+        ...(targetCapabilities.supportsVersionAllowanceSettings(repoType)
           ? {
               releases: scenario.repo.releases ?? true,
               snapshots: scenario.repo.snapshots ?? true,
@@ -276,10 +345,5 @@ export const test = base.extend<Fixtures>({
     await use(factory);
   },
 });
-
-/** The repo types whose publish path reads the `releases`/`snapshots` settings (RPS-1210). */
-function supportsVersionAllowance(repoType: RepoType): boolean {
-  return repoType === RepoType.MAVEN || repoType === RepoType.NUGET;
-}
 
 export { expect } from '@playwright/test';

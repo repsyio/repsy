@@ -32,6 +32,7 @@ import io.repsy.os.server.security.scanner.trivy.TrivyScannerProperties;
 import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
 import io.repsy.os.shared.configs.AppCorsProperties;
+import io.repsy.os.shared.configs.AppHstsProperties;
 import io.repsy.os.shared.configs.ContentSecurityPolicyProperties;
 import io.repsy.os.shared.user.PasswordResetMarkerProperties;
 import jakarta.annotation.PostConstruct;
@@ -60,6 +61,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   BasicAuthCacheProperties.class,
   AuthThrottleProperties.class,
   AppCorsProperties.class,
+  AppHstsProperties.class,
   ContentSecurityPolicyProperties.class,
   PasswordResetMarkerProperties.class,
 })

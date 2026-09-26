@@ -30,8 +30,9 @@
 import { expect, test as securityTest } from './security-fixtures.js';
 import type { PackageProtocol, PackageRef, SeededPackage } from '../seed/packages.js';
 import { ScannerStubClient, type RecordedCall } from '../stubs/scanner/client.ts';
-import type { PanelApi, VulnerabilityScanInfo } from '../api/panel-api.js';
+import type { PanelBackend, VulnerabilityScanInfo } from '../api/panel-backend.js';
 import { optedIn } from './session.js';
+import { repoPath } from '../repo-url.js';
 
 export { ScannerStubClient };
 export const SCANNER_TAG = '@scanner';
@@ -159,7 +160,7 @@ export function expectSubmitted(
   if (protocol === 'docker') {
     expect(call.fileName).toBeNull();
     expect(call.dockerImageReference).toMatch(
-      new RegExp(`/${repoName}/${pkg.name}:${pkg.version}$`),
+      new RegExp(`/${repoPath(repoName)}/${pkg.name}:${pkg.version}$`),
     );
   } else {
     expect(call.fileName).toBeTruthy();
@@ -172,7 +173,7 @@ export function expectSubmitted(
  * it. `scanCount` waits for that many scans to exist first (a re-scan adds a second one).
  */
 export async function newestFinishedScan(
-  panelApi: PanelApi,
+  panelApi: PanelBackend,
   repoName: string,
   pkg: PackageRef,
   scanCount = 1,

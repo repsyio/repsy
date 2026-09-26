@@ -44,6 +44,8 @@ import { randomUUID } from 'node:crypto';
 
 import type { Page, Route } from '@playwright/test';
 
+import type { RepoType as PanelRepoType } from '../api/panel-backend.js';
+
 import {
   FixStatus,
   RepoType,
@@ -241,7 +243,9 @@ export function findings(severities: readonly Severity[]): VulnerabilityFindingI
 }
 
 /** A row of the cross-repo scan list (`/security`). */
-export function scanInfo(overrides: Partial<VulnerabilityScanInfo> = {}): VulnerabilityScanInfo {
+export function scanInfo(
+  overrides: Omit<Partial<VulnerabilityScanInfo>, 'repoType'> & { repoType?: PanelRepoType } = {},
+): VulnerabilityScanInfo {
   return {
     id: randomUUID(),
     repoName: 'stub-repo',
@@ -256,7 +260,7 @@ export function scanInfo(overrides: Partial<VulnerabilityScanInfo> = {}): Vulner
     createdAt: '2026-09-01T10:00:00Z',
     startedAt: '2026-09-01T10:00:01Z',
     completedAt: '2026-09-01T10:00:09Z',
-    ...overrides,
+    ...(overrides as Partial<VulnerabilityScanInfo>),
   };
 }
 
@@ -270,7 +274,7 @@ export function scanInfo(overrides: Partial<VulnerabilityScanInfo> = {}): Vulner
  */
 export function stubSupportedRepoTypes(
   page: Page,
-  types: readonly RepoType[],
+  types: readonly PanelRepoType[],
 ): Promise<StubHandle> {
   const body = success<RestResponseListString>([...types]);
   return stub(page, SECURITY_PATHS.supportedRepoTypes, (route) => json(route, body));
@@ -503,7 +507,7 @@ export class ScanScript {
     repoName: string,
     artifactName: string,
     version: string,
-    repoType: RepoType,
+    repoType: PanelRepoType,
   ): VulnerabilityScanInfo {
     const worst = [...this.reportedFindings(scan)].sort(
       (a, b) => SEVERITY_RANK[a.severity!] - SEVERITY_RANK[b.severity!],
@@ -511,7 +515,7 @@ export class ScanScript {
     return {
       id: scan.id,
       repoName,
-      repoType,
+      repoType: repoType as RepoType,
       artifactName,
       artifactVersion: version,
       status: scan.status,
@@ -573,7 +577,7 @@ export async function stubVersionScans(
   page: Page,
   repoName: string,
   script: ScanScript,
-  repoType: RepoType = RepoType.NPM,
+  repoType: PanelRepoType = RepoType.NPM,
 ): Promise<VersionScansHandle> {
   const mine = (repo: string): boolean => repo === repoName;
 

@@ -15,13 +15,14 @@
 ///
 
 /**
- * Reads of the panel API that `PanelApi` (`src/api/panel-api.ts`, not owned by the settings story)
+ * Reads of the panel API that `PanelBackend` (`src/api/panel-backend.ts`, not owned by the settings story)
  * does not wrap: a repo's permissions/description, its disk usage and its Maven key stores; plus the
  * raw repo-port probe TOK-04 needs. Every method is a plain `fetch`, authenticated with the bearer
  * token of the test's `adminSession`, so the settings specs assert what a click PERSISTED through
  * the API instead of trusting the UI to show its own state back.
  */
 import { env } from '../../../env.js';
+import { repoUrl } from '../../../repo-url.js';
 
 /** The `{ data: ... }` envelope of a panel REST response. */
 interface Envelope<T> {
@@ -109,7 +110,7 @@ export async function repoRootStatus(
     const basic = Buffer.from(`${credential.username}:${credential.token}`).toString('base64');
     headers.Authorization = `Basic ${basic}`;
   }
-  const res = await fetch(`${env.repoBaseUrl}/${encodeURIComponent(repoName)}/`, { headers });
+  const res = await fetch(repoUrl(repoName, ''), { headers });
   await res.arrayBuffer();
   return res.status;
 }

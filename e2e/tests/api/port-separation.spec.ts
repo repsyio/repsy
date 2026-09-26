@@ -29,6 +29,7 @@ import { RepoType } from '../../src/api/panel-api.js';
 import { adminBearer, apiUrl, edgeRequest, repoUrl } from '../../src/clients/edge-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import { env } from '../../src/env.js';
+import { repoPath } from '../../src/repo-url.js';
 import { seedPackage } from '../../src/seed/packages.js';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
@@ -99,7 +100,7 @@ test.describe('the wire protocols are not served on the api port', { tag: ['@smo
     const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: false });
     const pkg = await seedPackage(repo, seeder);
     const [group, artifact] = pkg.name.split(':');
-    const path = `/${repo.name}/${group.replaceAll('.', '/')}/${artifact}/${pkg.version}/${artifact}-${pkg.version}.pom`;
+    const path = `/${repoPath(repo.name)}/${group.replaceAll('.', '/')}/${artifact}/${pkg.version}/${artifact}-${pkg.version}.pom`;
 
     const onRepo = await edgeRequest(repoUrl(path));
     const onApi = await edgeRequest(apiUrl(path));

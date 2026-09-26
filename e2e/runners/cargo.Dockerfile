@@ -19,8 +19,11 @@
 # A named build stage (not the final image), only used below as a `COPY --from` source for the
 # toolchain directories -- a normal build-time reference, not a Docker Compose sibling-service
 # dependency (see the comment right before the final `FROM` for why that distinction matters here).
+# The digest has no default on purpose (RPS-1597): docker-compose.runners.yml is its single source and
+# runners/bump-pins.sh keeps it (README.md "Runner images and pins"), so a build without it fails loudly.
 ARG RUST_VERSION=1.98.1
-FROM rust:${RUST_VERSION}-slim-bookworm AS rust-toolchain
+ARG RUST_IMAGE_DIGEST
+FROM rust:${RUST_VERSION}-slim-bookworm@${RUST_IMAGE_DIGEST} AS rust-toolchain
 
 # The cargo runner: the harness itself (see base.Dockerfile) plus the toolchain copied in from the
 # stage above, nothing else. Its first layers intentionally repeat base.Dockerfile's rather than

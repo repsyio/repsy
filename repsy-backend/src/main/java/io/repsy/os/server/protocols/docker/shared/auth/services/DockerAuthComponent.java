@@ -127,7 +127,11 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
 
     final var token =
         this.jwtUtils.createProtocolToken(
-            userInfo.getId(), userInfo.getUsername(), TIMEOUT_ACCESS_TOKEN, grants);
+            userInfo.getId(),
+            userInfo.getUsername(),
+            TIMEOUT_ACCESS_TOKEN,
+            userInfo.getTokenVersion(),
+            grants);
 
     return Optional.of(token);
   }

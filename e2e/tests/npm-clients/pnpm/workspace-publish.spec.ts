@@ -40,6 +40,7 @@ import { pnpmClient, publishWorkspace } from '../../../src/clients/npm-family/pn
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
+import { repoPath } from '../../../src/repo-url.js';
 
 const VERSION = '1.2.3';
 
@@ -102,7 +103,7 @@ test(
         .filter((entry) => entry.method === 'PUT')
         .map((entry) => entry.path);
       expect(puts, 'dependencies are published before their dependents').toEqual(
-        [base, lib, app].map((name) => `/${repo.name}/${name}`),
+        [base, lib, app].map((name) => `/${repoPath(repo.name)}/${name}`),
       );
       expect(
         recorder.entries.filter((entry) => entry.method === 'PUT').map((entry) => entry.status),

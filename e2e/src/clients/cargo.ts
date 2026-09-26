@@ -62,7 +62,7 @@ import { fileURLToPath } from 'node:url';
 import { expect } from '@playwright/test';
 import mustache from 'mustache';
 
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { boundedSemverVersion } from '../scenarios/coordinates.js';
 import { outcomeForStatus } from '../scenarios/types.js';
@@ -112,7 +112,7 @@ export async function renderCargoConfig(work: string, repoName: string): Promise
   const cargoDir = path.join(work, '.cargo');
   await fs.mkdir(cargoDir, { recursive: true });
   await renderTemplate('config.template.toml', path.join(cargoDir, 'config.toml'), {
-    registryUrl: `${env.repoBaseUrl}/${repoName}/`,
+    registryUrl: repoUrl(repoName, ''),
   });
 }
 
@@ -521,7 +521,7 @@ export async function renderPanelCargoConfig(
   await fs.mkdir(cargoDir, { recursive: true });
   const file = path.join(cargoDir, 'config.toml');
   await renderTemplate('panel-config.template.toml', file, {
-    registryUrl: `${env.repoBaseUrl}/${repoName}/`,
+    registryUrl: repoUrl(repoName, ''),
     credentialProviders,
   });
   return file;

@@ -22,9 +22,16 @@
 # A named build stage (not the final image), only used below as a `COPY --from` source -- a normal
 # build-time reference, not a Docker Compose sibling-service dependency (see maven.Dockerfile's header
 # for why that distinction matters here).
+#
+# Image pins (RPS-1597): the tag is for humans, the digest (the multi-arch LIST digest, so arm64 keeps
+# building) is what is pulled. The digests have no default here on purpose: docker-compose.runners.yml is
+# their single source and runners/bump-pins.sh keeps them, so a build without them fails loudly instead
+# of pulling whatever the tag points at today (README.md "Runner images and pins").
 ARG CRANE_VERSION=v0.22.1
+ARG CRANE_IMAGE_DIGEST
 ARG GO_VERSION=1.27.1
-FROM gcr.io/go-containerregistry/crane:${CRANE_VERSION} AS crane
+ARG GO_IMAGE_DIGEST
+FROM gcr.io/go-containerregistry/crane:${CRANE_VERSION}@${CRANE_IMAGE_DIGEST} AS crane
 
 # skopeo v1.24.1 (2026-09-16) and regctl v0.11.6 (2026-09-02, regclient) are the second and third
 # daemonless clients of this runner (RPS-1478 part B): they speak the same Registry HTTP API V2 wire
@@ -37,11 +44,18 @@ FROM gcr.io/go-containerregistry/crane:${CRANE_VERSION} AS crane
 # an OCI layout directory, never to a daemon or to containers-storage). Only the one binary is copied out below, the same
 # "copy the tool, not the stage" approach as crane. regctl is one release binary per arch, verified
 # against a pinned sha256 (Docker's TARGETARCH picks the file).
-FROM golang:${GO_VERSION}-bookworm AS skopeo-build
+#
+# A git tag can be moved, so the tag is only a name (RPS-1597): the clone must end on the pinned commit
+# (SKOPEO_COMMIT, `git ls-remote <repo> 'refs/tags/<tag>^{}'`), and the build is hermetic: skopeo vendors
+# every module, so -mod=vendor with no proxy and no toolchain download compiles exactly the reviewed
+# sources (a vendor/ that disagrees with go.mod fails the build instead of fetching anything).
+FROM golang:${GO_VERSION}-bookworm@${GO_IMAGE_DIGEST} AS skopeo-build
 ARG SKOPEO_VERSION=v1.24.1
+ARG SKOPEO_COMMIT
 RUN git clone --depth 1 --branch "${SKOPEO_VERSION}" https://github.com/containers/skopeo.git /src/skopeo
 WORKDIR /src/skopeo
-RUN CGO_ENABLED=0 go build -trimpath -o /out/skopeo \
+RUN test -n "${SKOPEO_COMMIT}" && test "$(git rev-parse HEAD)" = "${SKOPEO_COMMIT}" \
+ && GOFLAGS=-mod=vendor GOPROXY=off GOTOOLCHAIN=local CGO_ENABLED=0 go build -trimpath -o /out/skopeo \
       -tags "containers_image_openpgp exclude_graphdriver_btrfs exclude_graphdriver_devicemapper containers_image_docker_daemon_stub" \
       ./cmd/skopeo \
  && /out/skopeo --version | tee /out/version \

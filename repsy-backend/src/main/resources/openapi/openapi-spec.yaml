@@ -13,7 +13,8 @@ info:
 
 
     Every response body, success or failure, is the same envelope: `msgId`, `type`, `text`,
-    `errorCode` and `data`. Failures are described by `ErrorResponse`.
+    `errorCode` and `data`. Failures are described by `ErrorResponse`, whose `errorCode` is the
+    unique id of the failure; on a success `errorCode` is always `null`.
 
 
     Authenticate with the access token that `login` returns, as `Authorization: Bearer <token>`.
@@ -2615,8 +2616,6 @@ paths:
             type: string
       security: []
       responses:
-        '200':
-          description: OK
         '404':
           description: >-
             Always. This proxy does not relay checksum database requests, so the Go toolchain
@@ -4591,6 +4590,7 @@ components:
           "$ref": "#/components/schemas/NuGetDeletedItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseNuGetPackageInfo:
@@ -4604,6 +4604,7 @@ components:
           "$ref": "#/components/schemas/NuGetPackageInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseNuGetVersionInfo:
@@ -4617,6 +4618,7 @@ components:
           "$ref": "#/components/schemas/NuGetVersionInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PagedModelNuGetPackageListItem:
@@ -4639,6 +4641,7 @@ components:
           "$ref": "#/components/schemas/PagedModelNuGetPackageListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PagedModelNuGetVersionListItem:
@@ -4661,6 +4664,7 @@ components:
           "$ref": "#/components/schemas/PagedModelNuGetVersionListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     UserUpdateForm:
@@ -4687,6 +4691,7 @@ components:
           "$ref": "#/components/schemas/UserResponse"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     UserResponse:
@@ -4810,6 +4815,7 @@ components:
         data: { }
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseRepoType:
@@ -4823,6 +4829,7 @@ components:
           "$ref": "#/components/schemas/RepoType"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseString:
@@ -4836,6 +4843,7 @@ components:
           type: string
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     UpdateUsernameForm:
@@ -4868,6 +4876,7 @@ components:
           "$ref": "#/components/schemas/LoginInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PasswordForm:
@@ -4937,6 +4946,7 @@ components:
           "$ref": "#/components/schemas/TokenInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     TokenInfo:
@@ -4973,6 +4983,7 @@ components:
             "$ref": "#/components/schemas/AllowedKeyserverItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     KeyStoreForm:
@@ -5012,6 +5023,7 @@ components:
           "$ref": "#/components/schemas/KeyStoreItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PgpPublicKeyForm:
@@ -5057,6 +5069,7 @@ components:
           "$ref": "#/components/schemas/PgpPublicKeyItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RefreshTokenForm:
@@ -5142,6 +5155,7 @@ components:
           "$ref": "#/components/schemas/PagedModelUserResponse"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseTotalUsageInfo:
@@ -5155,6 +5169,7 @@ components:
           "$ref": "#/components/schemas/TotalUsageInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     TotalUsageInfo:
@@ -5235,6 +5250,7 @@ components:
           "$ref": "#/components/schemas/PagedModelRepoListInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseRepoListInfo:
@@ -5248,6 +5264,7 @@ components:
           "$ref": "#/components/schemas/RepoListInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RepoCounts:
@@ -5269,6 +5286,7 @@ components:
           "$ref": "#/components/schemas/RepoCounts"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseLong:
@@ -5283,6 +5301,7 @@ components:
           format: int64
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RepoUsageInfo:
@@ -5301,6 +5320,7 @@ components:
           "$ref": "#/components/schemas/RepoUsageInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RepoSettingsInfo:
@@ -5357,6 +5377,7 @@ components:
           "$ref": "#/components/schemas/RepoSettingsInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RepoPermissionInfo:
@@ -5394,6 +5415,7 @@ components:
           "$ref": "#/components/schemas/RepoPermissionInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     DeployTokenInfoListItem:
@@ -5440,6 +5462,7 @@ components:
           "$ref": "#/components/schemas/PagedModelDeployTokenInfoListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     ProtocolApiFacadeMavenAdapter: { }
@@ -5456,6 +5479,7 @@ components:
             "$ref": "#/components/schemas/StorageItemInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     StorageItemInfo:
@@ -5505,6 +5529,7 @@ components:
           "$ref": "#/components/schemas/PagedModelNpmPackageListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PypiPackageListItem:
@@ -5539,6 +5564,7 @@ components:
           "$ref": "#/components/schemas/PagedModelPypiPackageListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PagedModelReleaseListItem:
@@ -5577,6 +5603,7 @@ components:
           "$ref": "#/components/schemas/PagedModelReleaseListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     ReleaseClassifierInfo:
@@ -5651,6 +5678,7 @@ components:
           "$ref": "#/components/schemas/ReleaseDetail"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     ProfileInfo:
@@ -5694,6 +5722,7 @@ components:
           "$ref": "#/components/schemas/ProfileInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PackageDistributionTagListItem:
@@ -5781,6 +5810,7 @@ components:
           "$ref": "#/components/schemas/PackageVersionDetail"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PackageVersionListItem:
@@ -5813,6 +5843,7 @@ components:
           "$ref": "#/components/schemas/PagedModelPackageVersionListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PackageDistributionTagMapListItem:
@@ -5835,6 +5866,7 @@ components:
             "$ref": "#/components/schemas/PackageDistributionTagMapListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PagedModelKeyStoreItem:
@@ -5857,6 +5889,7 @@ components:
           "$ref": "#/components/schemas/PagedModelKeyStoreItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PagedModelPgpPublicKeyItem:
@@ -5879,6 +5912,7 @@ components:
           "$ref": "#/components/schemas/PagedModelPgpPublicKeyItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     ArtifactListItem:
@@ -5915,6 +5949,7 @@ components:
           "$ref": "#/components/schemas/PagedModelArtifactListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     MavenGroupSummary:
@@ -5945,6 +5980,7 @@ components:
           "$ref": "#/components/schemas/MavenGroupSummary"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     ArtifactVersionListItem:
@@ -5981,6 +6017,7 @@ components:
           "$ref": "#/components/schemas/PagedModelArtifactVersionListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     ArtifactVersionInfo:
@@ -6058,6 +6095,7 @@ components:
           "$ref": "#/components/schemas/ArtifactVersionInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     VersionDeveloperInfo:
@@ -6105,6 +6143,7 @@ components:
           "$ref": "#/components/schemas/PagedModelGoModuleListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     GoModuleVersionListItem:
@@ -6140,6 +6179,7 @@ components:
           "$ref": "#/components/schemas/PagedModelGoModuleVersionListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     GoModuleInfo:
@@ -6170,6 +6210,7 @@ components:
           "$ref": "#/components/schemas/GoModuleInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     UntaggedManifestCleanupResult:
@@ -6202,6 +6243,7 @@ components:
           "$ref": "#/components/schemas/UntaggedManifestCleanupResult"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     ImageListItem:
@@ -6253,6 +6295,7 @@ components:
           "$ref": "#/components/schemas/ImageListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PagedModelImageListItem:
@@ -6275,6 +6318,7 @@ components:
           "$ref": "#/components/schemas/PagedModelImageListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     ImageTagListItem:
@@ -6307,6 +6351,7 @@ components:
           "$ref": "#/components/schemas/PagedModelImageTagListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     ManifestListItem:
@@ -6343,6 +6388,7 @@ components:
           "$ref": "#/components/schemas/PagedModelManifestListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseTagDetail:
@@ -6356,6 +6402,7 @@ components:
           "$ref": "#/components/schemas/TagDetail"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     TagDetail:
@@ -6417,6 +6464,7 @@ components:
           "$ref": "#/components/schemas/PagedModelCrateListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     CrateInfo:
@@ -6465,6 +6513,7 @@ components:
           "$ref": "#/components/schemas/CrateInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     CrateVersionInfo:
@@ -6537,6 +6586,7 @@ components:
           "$ref": "#/components/schemas/CrateVersionInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     CrateVersionListItem:
@@ -6569,6 +6619,7 @@ components:
           "$ref": "#/components/schemas/PagedModelCrateVersionListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseDeletedItem:
@@ -6586,6 +6637,7 @@ components:
             - GROUP
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     ResponseType:
@@ -6706,6 +6758,7 @@ components:
           "$ref": "#/components/schemas/PagedModelHelmChartListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseListHelmChartVersionItem:
@@ -6721,6 +6774,7 @@ components:
             "$ref": "#/components/schemas/HelmChartVersionItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseHelmChartDetail:
@@ -6734,6 +6788,7 @@ components:
           "$ref": "#/components/schemas/HelmChartDetail"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseListString:
@@ -6749,6 +6804,7 @@ components:
             type: string
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RepoType:
@@ -6797,6 +6853,7 @@ components:
           "$ref": "#/components/schemas/PagedModelGemListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     GemVersionListItem:
@@ -6831,6 +6888,7 @@ components:
           "$ref": "#/components/schemas/PagedModelGemVersionListItem"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     GemDependencyInfo:
@@ -6886,6 +6944,7 @@ components:
           "$ref": "#/components/schemas/GemVersionInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     ScanStatus:
@@ -7117,6 +7176,7 @@ components:
           "$ref": "#/components/schemas/SecuritySummary"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     VersionSecuritySummary:
@@ -7189,6 +7249,7 @@ components:
           "$ref": "#/components/schemas/VersionSecuritySummaryMap"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PagedModelVulnerabilityScanInfo:
@@ -7211,6 +7272,7 @@ components:
           "$ref": "#/components/schemas/PagedModelVulnerabilityScanInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     PagedModelVulnerabilityFindingInfo:
@@ -7233,6 +7295,7 @@ components:
           "$ref": "#/components/schemas/PagedModelVulnerabilityFindingInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RecentScannedVersion:
@@ -7299,6 +7362,7 @@ components:
           "$ref": "#/components/schemas/RepoSecurityDetail"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     SecurityScansSummary:
@@ -7333,6 +7397,7 @@ components:
           "$ref": "#/components/schemas/SecurityScansSummary"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseVulnerabilityScanInfo:
@@ -7346,6 +7411,7 @@ components:
           "$ref": "#/components/schemas/VulnerabilityScanInfo"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseVulnerabilityScanDetail:
@@ -7359,6 +7425,7 @@ components:
           "$ref": "#/components/schemas/VulnerabilityScanDetail"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string
     RestResponseScanOverview:
@@ -7372,5 +7439,6 @@ components:
           "$ref": "#/components/schemas/ScanOverview"
         errorCode:
           type: string
+          nullable: true
         text:
           type: string

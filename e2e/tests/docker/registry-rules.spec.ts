@@ -37,6 +37,7 @@ import {
   pullScope,
   pushScope,
   rawDeleteManifest,
+  rawGetAnonymous,
   rawGetManifest,
   rawHeadBlob,
   rawHeadManifest,
@@ -46,9 +47,11 @@ import {
   rawToken,
   rawUploadBlob,
   sha256Hex,
+  v2Url,
   type RawResponse,
 } from '../../src/clients/docker-raw.js';
 import { env } from '../../src/env.js';
+import { repoPath } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
 
@@ -138,21 +141,95 @@ function expectOci(res: RawResponse, status: number, code: string | undefined): 
 }
 
 test.describe('docker registry rules (raw HTTP)', () => {
-  test("R1: the ping challenge names this instance's own token endpoint", async () => {
+  test("R1: the ping challenge names this instance's own token endpoint and no scope", async () => {
     const ping = await rawPing();
     expect(ping.status, 'GET /v2/ without auth is a 401 challenge').toBe(401);
     const oci = ociErrorOf(ping.body);
     expect(oci?.code, 'an OCI UNAUTHORIZED body').toBe('UNAUTHORIZED');
 
     const parsed = parseBearerChallenge(ping.wwwAuthenticate ?? '');
-    expect(parsed.realm, "realm names this instance's own /v2/token").toBe(
-      `${env.repoBaseUrl}/v2/token`,
-    );
+    expect(parsed.realm, "realm names this instance's own /v2/token").toBe(v2Url('/token'));
     expect(parsed.service).toBe('repsy');
-    expect(parsed.scope, 'the constant scope a real client ignores in favour of its own').toBe(
-      'repository:*:pull',
+    expect(parsed.scope, 'the ping addresses no image, so it names no scope (RPS-1588)').toBe(
+      undefined,
     );
   });
+
+  test(
+    'R1b: the challenge of a request that addresses an image names the scope that request needs',
+    { tag: ['@auth'] },
+    async ({ seeder }) => {
+      const priv = await newRepo(seeder, 'challengescope');
+      const pub = await newRepo(seeder, 'challengescopepub', { privateRepo: false });
+      const base = (layout: Layout): string => `/${repoPath(layout.repoName)}/${layout.image}`;
+      const cases: {
+        label: string;
+        layout: Layout;
+        suffix: string;
+        method: 'GET' | 'HEAD' | 'POST' | 'DELETE';
+        scope: string;
+      }[] = [
+        {
+          label: 'manifest pull, private repo',
+          layout: priv,
+          suffix: '/manifests/latest',
+          method: 'GET',
+          scope: pullScope(priv.repoName, priv.image),
+        },
+        {
+          label: 'manifest check, private repo',
+          layout: priv,
+          suffix: '/manifests/latest',
+          method: 'HEAD',
+          scope: pullScope(priv.repoName, priv.image),
+        },
+        {
+          label: 'blob check, private repo',
+          layout: priv,
+          suffix: `/blobs/sha256:${'0'.repeat(64)}`,
+          method: 'HEAD',
+          scope: pullScope(priv.repoName, priv.image),
+        },
+        {
+          label: 'manifest pull, public repo (a pull still asks for a token)',
+          layout: pub,
+          suffix: '/manifests/latest',
+          method: 'GET',
+          scope: pullScope(pub.repoName, pub.image),
+        },
+        {
+          label: 'blob upload start (a push also pulls)',
+          layout: priv,
+          suffix: '/blobs/uploads/',
+          method: 'POST',
+          scope: `repository:${repoPath(priv.repoName)}/${priv.image}:pull,push`,
+        },
+        {
+          label: 'blob upload start on a public repo',
+          layout: pub,
+          suffix: '/blobs/uploads/',
+          method: 'POST',
+          scope: `repository:${repoPath(pub.repoName)}/${pub.image}:pull,push`,
+        },
+        {
+          label: 'manifest delete',
+          layout: priv,
+          suffix: '/manifests/latest',
+          method: 'DELETE',
+          scope: deleteScope(priv.repoName, priv.image),
+        },
+      ];
+
+      for (const c of cases) {
+        const res = await rawGetAnonymous(`${base(c.layout)}${c.suffix}`, c.method);
+        expect(res.status, `${c.label}: a 401 challenge`).toBe(401);
+        const parsed = parseBearerChallenge(res.wwwAuthenticate ?? '');
+        expect(parsed.realm, `${c.label}: the token endpoint`).toBe(`${env.repoBaseUrl}/v2/token`);
+        expect(parsed.service, `${c.label}: the service`).toBe('repsy');
+        expect(parsed.scope, `${c.label}: the scope this request needs`).toBe(c.scope);
+      }
+    },
+  );
 
   test(
     'R2: the token endpoint matrix (issuance is never scope-checked)',
@@ -262,6 +339,35 @@ test.describe('docker registry rules (raw HTTP)', () => {
         'no credentials, a pull scope on a PUBLIC repo -> 200 (anonymous)',
       ).toBe(200);
       expect(noAuthPullPublic.token).toBeTruthy();
+
+      // containerd and crane send one `scope` parameter per scope, the placeholder first because `*`
+      // sorts before every letter. Every value is judged, not only the first (RPS-1588): the
+      // placeholder next to a push scope, or next to a scope of a private repo, is not anonymous.
+      const placeholder = 'repository:*:pull';
+      const noAuthPlaceholderPush = await rawToken({}, [
+        placeholder,
+        pushScope(publicLayout.repoName, publicLayout.image),
+      ]);
+      expect(
+        noAuthPlaceholderPush.status,
+        'no credentials, the placeholder then a push scope of a PUBLIC repo -> 401',
+      ).toBe(401);
+      const noAuthPlaceholderPrivate = await rawToken({}, [
+        placeholder,
+        pullScope(layout.repoName, layout.image),
+      ]);
+      expect(
+        noAuthPlaceholderPrivate.status,
+        'no credentials, the placeholder then a pull scope of a PRIVATE repo -> 401',
+      ).toBe(401);
+      const noAuthPlaceholderPublic = await rawToken({}, [
+        placeholder,
+        pullScope(publicLayout.repoName, publicLayout.image),
+      ]);
+      expect(
+        noAuthPlaceholderPublic.status,
+        'no credentials, the placeholder then a pull scope of a PUBLIC repo -> 200 (anonymous)',
+      ).toBe(200);
     },
   );
 
@@ -824,7 +930,7 @@ test.describe('docker registry rules (raw HTTP)', () => {
         expect(tooLittle.hop, `issuance is not scope-checked (${scope})`).toBe('request');
         expectOci(tooLittle, 401, 'UNAUTHORIZED');
         expect(tooLittle.wwwAuthenticate, 'the challenge names the scope to ask for').toContain(
-          `scope="repository:${layout.repoName}/${layout.image}:delete"`,
+          `scope="repository:${repoPath(layout.repoName)}/${layout.image}:delete"`,
         );
         expect(tooLittle.wwwAuthenticate).toContain('error="insufficient_scope"');
       }

@@ -558,7 +558,9 @@ class DockerManifestDeleteIT extends AbstractIntegrationTest {
     final var response = this.deleteReference(repo, IMAGE, sha256(bytes(manifest)), null);
 
     assertThat(response.getStatus()).isEqualTo(401);
-    assertThat(response.getHeader(WWW_AUTHENTICATE)).startsWith("Bearer realm=");
+    assertThat(response.getHeader(WWW_AUTHENTICATE))
+        .startsWith("Bearer realm=")
+        .contains("scope=\"repository:%s/%s:delete\"".formatted(repo.getName(), IMAGE));
     assertThat(JsonPath.<String>read(response.getContentAsString(), "$.errors[0].code"))
         .isEqualTo("UNAUTHORIZED");
     assertThat(this.wire.getManifest(repo, IMAGE, "latest").getStatus())

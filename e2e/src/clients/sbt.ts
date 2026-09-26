@@ -44,6 +44,7 @@ import { fileURLToPath } from 'node:url';
 import mustache from 'mustache';
 
 import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { AdapterResult } from '../scenarios/adapter.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
@@ -235,7 +236,7 @@ async function renderPublisher(
     version,
     scalaVersion,
     crossScalaVersions: cross.map((v) => JSON.stringify(v)).join(', '),
-    repoUrl: `${env.repoBaseUrl}/${world.repoName}`,
+    repoUrl: repoUrl(world.repoName),
     overwrite: String(options.overwrite ?? true),
     withDocs: String(options.withDocs ?? false),
     ...credentialView(world.credential, credentialVia, realm),
@@ -353,7 +354,7 @@ export async function resolve(world: World, options: SbtOptions = {}): Promise<A
     artifactBase: artifactBaseOf(artifactId),
     version,
     scalaVersion,
-    repoUrl: `${env.repoBaseUrl}/${world.repoName}`,
+    repoUrl: repoUrl(world.repoName),
     ...credentialView(world.credential, credentialVia, realm),
   });
   await renderTemplate('build', 'properties', path.join(sbt.work, 'project', 'build.properties'), {

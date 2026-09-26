@@ -34,7 +34,7 @@
  *    that assumed a cloud, multi-tenant URL shape Repsy OS does not have.
  */
 import { RepoType } from '../../src/api/panel-api.js';
-import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import {
   adminCredential,
   buildPublishDocument,
@@ -305,7 +305,7 @@ test.describe('npm registry rules (raw HTTP)', () => {
       const served = parsePackument(packument.body).versions[version]?.dist?.tarball;
 
       expect(served, 'the registry names itself, whatever the publisher sent').toBe(
-        `${env.repoBaseUrl}/${layout.repoName}/${tarballPath(layout.packageName, version)}`,
+        repoUrl(layout.repoName, tarballPath(layout.packageName, version)),
       );
 
       const viaDistTarball = await rawGetTarballByUrl(served as string, admin);

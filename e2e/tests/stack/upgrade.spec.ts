@@ -41,7 +41,8 @@
  */
 import path from 'node:path';
 
-import { ApiError, PanelApi, RepoType } from '../../src/api/panel-api.js';
+import { createPanelBackend, loginPanel } from '../../src/api/backend-registry.js';
+import { PanelHttpError, type PanelBackend, RepoType } from '../../src/api/panel-backend.js';
 import type { MaterializedCredential } from '../../src/scenarios/world.js';
 import { craneEnv, renderDockerConfig } from '../../src/clients/docker.js';
 import { buildImage } from '../../src/clients/docker-image.js';
@@ -67,6 +68,7 @@ import {
   waitForLogLines,
 } from '../../src/clients/stack.js';
 import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import { perTestRunId } from '../../src/seed/run-id.js';
 import { Seeder } from '../../src/seed/seeder.js';
@@ -98,7 +100,7 @@ interface DockerImages {
 
 let container: string;
 let seeder: Seeder;
-let panelApi: PanelApi;
+let panelApi: PanelBackend;
 let legacy: LegacyPanel;
 const packages: Package[] = [];
 let docker: DockerImages;
@@ -218,14 +220,11 @@ async function manifestFiles(): Promise<string[]> {
 async function npmTarballSha(pkg: Package, credential: MaterializedCredential): Promise<string> {
   const { repoName } = pkg.world;
   const { packageName, version } = pkg.world.publishTarget;
-  const res = await fetch(
-    `${env.repoBaseUrl}/${repoName}/${packageName}/-/${packageName}-${version}.tgz`,
-    {
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${credential.username}:${credential.password}`).toString('base64')}`,
-      },
+  const res = await fetch(repoUrl(repoName, `${packageName}/-/${packageName}-${version}.tgz`), {
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${credential.username}:${credential.password}`).toString('base64')}`,
     },
-  );
+  });
   expect(res.status, `npm tarball of ${packageName} as ${credential.kind}`).toBe(200);
   return sha256Hex(Buffer.from(await res.arrayBuffer()));
 }
@@ -258,7 +257,7 @@ async function expectEverythingConsumable(
 
 test.describe.serial(
   'upgrade path from the previous release (RPS-1487)',
-  { tag: ['@local-only', '@upgrade'] },
+  { tag: ['@local-only', '@upgrade', '@cloud-skip'] },
   () => {
     test.skip(
       !optedIn('upgrade'),
@@ -280,7 +279,7 @@ test.describe.serial(
           '(that needs the release image to be pullable: registry and network)',
       );
 
-      panelApi = new PanelApi(env.apiBaseUrl);
+      panelApi = await createPanelBackend();
       seeder = new Seeder(panelApi, perTestRunId(env.runId, 37, 1));
       legacy = new LegacyPanel(env.apiBaseUrl);
       await legacy.login(env.adminUsername, env.adminPassword);
@@ -454,7 +453,7 @@ test.describe.serial(
         [plainUser.username, plainUser.password],
       ]) {
         await expect(
-          new PanelApi(env.apiBaseUrl).login(username, password),
+          loginPanel(username, password),
           `${username} with the password of the previous release`,
         ).rejects.toMatchObject({ status: 401 });
       }
@@ -464,7 +463,7 @@ test.describe.serial(
 
       // The printed passwords work, and only they.
       for (const [username, password] of printed) {
-        const info = await new PanelApi(env.apiBaseUrl).login(username, password);
+        const info = await loginPanel(username, password);
         expect(info.token, `${username} signs in with the printed password`).toBeTruthy();
       }
 
@@ -484,12 +483,12 @@ test.describe.serial(
       expect(reset.status, 'an admin resets the user').toBe(200);
       const newPassword = reset.body.data as string;
       expect(typeof newPassword).toBe('string');
-      const info = await new PanelApi(env.apiBaseUrl).login(plainUser.username, newPassword);
+      const info = await loginPanel(plainUser.username, newPassword);
       expect(info.token, 'the plain user signs in with the password the admin got').toBeTruthy();
 
       // The harness needs its admin password back for everything that follows (and for every other runner).
       await panelApi.changeOwnPassword(env.adminPassword);
-      await new PanelApi(env.apiBaseUrl).login(env.adminUsername, env.adminPassword);
+      await loginPanel(env.adminUsername, env.adminPassword);
     });
 
     test('everything published before is consumed again with the real clients and listed by the panel', async () => {
@@ -633,10 +632,10 @@ async function migrationVersions(id: string): Promise<number[]> {
 /** Puts the admin's password back to `REPSY_ADMIN_PASSWORD` (the upgrade reset it), from the printed one. */
 async function restoreAdminPassword(): Promise<void> {
   try {
-    await new PanelApi(env.apiBaseUrl).login(env.adminUsername, env.adminPassword);
+    await loginPanel(env.adminUsername, env.adminPassword);
     return;
   } catch (err) {
-    if (!(err instanceof ApiError)) {
+    if (!(err instanceof PanelHttpError)) {
       throw err;
     }
   }
@@ -653,7 +652,7 @@ async function restoreAdminPassword(): Promise<void> {
       `the admin password was reset and no printed one was read for ${env.adminUsername}`,
     );
   }
-  const api = new PanelApi(env.apiBaseUrl);
+  const api = await createPanelBackend();
   await api.login(env.adminUsername, password);
   await api.changeOwnPassword(env.adminPassword);
 }

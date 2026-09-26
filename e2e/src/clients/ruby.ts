@@ -62,6 +62,7 @@ import { expect } from '@playwright/test';
 import mustache from 'mustache';
 
 import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
@@ -171,7 +172,7 @@ async function publishWithClient(world: World, label: string): Promise<PublishRu
   const gemFile = path.join(work, built.filename);
   await fs.writeFile(gemFile, built.bytes);
 
-  const args = ['push', gemFile, '--host', `${env.repoBaseUrl}/${world.repoName}`];
+  const args = ['push', gemFile, '--host', repoUrl(world.repoName)];
   const secrets = world.credential.password ? [world.credential.password] : [];
 
   const execResult = await run('gem', args, {
@@ -250,7 +251,7 @@ export async function resolve(world: World): Promise<AdapterResult> {
 
   const gemfileTemplate = await fs.readFile(path.join(TEMPLATES_DIR, 'Gemfile.template'), 'utf8');
   const gemfile = mustache.render(gemfileTemplate, {
-    repoUrl: `${env.repoBaseUrl}/${world.repoName}`,
+    repoUrl: repoUrl(world.repoName),
     name: packageName,
     version,
   });

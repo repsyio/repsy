@@ -47,7 +47,7 @@ import {
 import { npmClient } from '../../../src/clients/npm-family/npm-client.js';
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
-import { env } from '../../../src/env.js';
+import { repoPath, repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import { optedIn } from '../../../src/stack-overlays.js';
 import { target } from '../../../src/target.js';
@@ -220,7 +220,7 @@ test(
       expect(
         recorder.entries.slice(beforeTolerated).map((entry) => `${entry.method} ${entry.path}`),
         'a GET of the packument, and no PUT',
-      ).toEqual([`GET /${repo.name}/${name}`]);
+      ).toEqual([`GET /${repoPath(repo.name)}/${name}`]);
       expect((await storedPackument(repo.name, name)).versions['1.0.0']?.dist?.integrity).toBe(
         integrity,
       );
@@ -384,7 +384,7 @@ test(
     expect(doc.description).toBe('viewed by bun info');
     expect(doc.versions).toEqual(['1.0.0', '1.1.0']);
     expect(doc.dist.tarball, "the registry address, not the publisher's (RPS-1333)").toBe(
-      `${env.repoBaseUrl}/${repo.name}/${name}/-/${name}-1.1.0.tgz`,
+      repoUrl(repo.name, `${name}/-/${name}-1.1.0.tgz`),
     );
     expect(doc.dist.integrity).toMatch(/^sha512-/);
 
@@ -463,7 +463,7 @@ test(
         recorder.entries.map(
           (entry) => `${entry.method} ${entry.path} ${entry.authScheme} ${entry.status}`,
         ),
-      ).toEqual([`GET /${publicRepo.name}/-/whoami Bearer 401`]);
+      ).toEqual([`GET /${repoPath(publicRepo.name)}/-/whoami Bearer 401`]);
     } finally {
       await recorder.stop();
     }
@@ -509,7 +509,7 @@ test(
       expect(
         posts.map((entry) => `${entry.path} ${entry.authScheme} ${entry.status}`),
         'one bulk advisory request, to THIS repository, with the token',
-      ).toEqual([`/${repo.name}/-/npm/v1/security/advisories/bulk Bearer 200`]);
+      ).toEqual([`/${repoPath(repo.name)}/-/npm/v1/security/advisories/bulk Bearer 200`]);
 
       const text = await bunExec(consumer, 'bun-audit-text', ['audit']);
       expect(text.exitCode, `audit (text): ${text.stderr}`).toBe(0);
@@ -541,7 +541,7 @@ test(
 
     // What `bun add --verbose` shows on every tarball request, and a browser or `curl -OJ` acts on:
     // it used to be a fixed, made-up `inline;filename=f.txt` in place of `<name>-<version>.tgz`.
-    const res = await fetch(`${env.repoBaseUrl}/${repo.name}/${name}/-/${name}-1.0.0.tgz`, {
+    const res = await fetch(repoUrl(repo.name, `${name}/-/${name}-1.0.0.tgz`), {
       headers: npmAuthHeader(adminCredential()),
     });
     expect(res.status).toBe(200);

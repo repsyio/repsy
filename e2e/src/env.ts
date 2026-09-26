@@ -23,10 +23,13 @@ import 'dotenv/config';
  *  - ci:     a pipeline-started stack, same freedoms as `local`.
  *  - remote: an already-running instance the harness does not own or reset; nothing global on it
  *            (the `admin` user, the default repos) is ever touched.
+ *  - cloud-remote, cloud-local (RPS-1498): Repsy Cloud instead of Repsy OS, a deployed environment or one
+ *            started next to the harness. The harness never owns or resets either (see `target.ts`
+ *            for what differs from the OS targets).
  */
-export type RepsyTarget = 'local' | 'remote' | 'ci';
+export type RepsyTarget = 'local' | 'remote' | 'ci' | 'cloud-remote' | 'cloud-local';
 
-const TARGETS: readonly RepsyTarget[] = ['local', 'remote', 'ci'];
+const TARGETS: readonly RepsyTarget[] = ['local', 'remote', 'ci', 'cloud-remote', 'cloud-local'];
 
 export interface Env {
   apiBaseUrl: string;
@@ -37,6 +40,11 @@ export interface Env {
    */
   plainApiBaseUrl: string;
   plainRepoBaseUrl: string;
+  /**
+   * The owner segment of `owner/repo` URLs (`REPSY_REPO_OWNER`). Unset on Repsy OS, whose repositories
+   * live at `/<repo>`; read only when `target.urlScheme` is `owner-repo` (`src/repo-url.ts`).
+   */
+  repoOwner?: string;
   adminUsername: string;
   adminPassword: string;
   target: RepsyTarget;
@@ -86,6 +94,7 @@ function loadEnv(): Env {
     repoBaseUrl,
     plainApiBaseUrl: process.env.REPSY_E2E_PLAIN_API_BASE_URL || apiBaseUrl,
     plainRepoBaseUrl: process.env.REPSY_E2E_PLAIN_REPO_BASE_URL || repoBaseUrl,
+    repoOwner: process.env.REPSY_REPO_OWNER || undefined,
     adminUsername: process.env.REPSY_ADMIN_USERNAME || 'admin',
     adminPassword: required('REPSY_ADMIN_PASSWORD'),
     target: parseTarget(process.env.REPSY_TARGET),

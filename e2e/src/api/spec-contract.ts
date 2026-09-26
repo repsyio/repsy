@@ -333,30 +333,17 @@ export function specContract(): SpecContract {
 }
 
 /**
- * RPS-1574 (see README.md "Panel API contract specs"): every SUCCESS body carries
- * `"errorCode": null`, while every `RestResponse*` schema declares `errorCode: {type: string}` with no
- * null allowed. It is one and the same mismatch on all operations, so it is filtered by name, and by
- * nothing else, from what `contractProblems` reports: the rest of the body is still validated in full.
- * `contractProblems(..., { strict: true })` shows it again. When RPS-1574 is fixed (a nullable `errorCode`
- * in the spec, or the field omitted) this filter goes away in the same change, together with the
- * `test.fail()` of the RPS-1574 test in `tests/maven/panel-api.spec.ts`.
- */
-export function isKnownErrorCodeNull(violation: Violation): boolean {
-  return violation.path === '/errorCode' && violation.value === null;
-}
-
-/**
  * The problems of `body` against the declared `status` response of `operationId`, as readable lines; empty
- * when it conforms. Only the RPS-1574 mismatch above is left out, and only when `strict` is not set.
+ * when it conforms. Nothing is left out: RPS-1574 (every success body carries `"errorCode": null`) was fixed
+ * in the spec, whose `RestResponse*` schemas declare `errorCode` nullable, so a null `errorCode` conforms and
+ * a number or an undeclared value does not.
  */
 export function contractProblems(
   operationId: string,
   status: number | string,
   body: unknown,
-  options: { strict?: boolean } = {},
 ): string[] {
   return specContract()
     .violations(operationId, status, body)
-    .filter((violation) => options.strict === true || !isKnownErrorCodeNull(violation))
     .map((violation) => `${violation.path} ${violation.message}`);
 }

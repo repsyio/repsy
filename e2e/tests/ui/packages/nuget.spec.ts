@@ -22,7 +22,7 @@
 import { RepoType } from '../../../src/api/panel-api.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { buildNupkg, rawPublish, rawRelist, rawUnlist } from '../../../src/clients/nuget-raw.js';
-import { env } from '../../../src/env.js';
+import { repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { registerPackageScenarios, rowKeys } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
@@ -170,7 +170,7 @@ test.describe('NuGet package pages', { tag: '@packages' }, () => {
     const pkg = await seedPackage(repo);
     const detail = protocolPages(adminPage, nuget, repo.name).detail(pkg);
     await detail.goto();
-    const source = `${env.repoBaseUrl}/${repo.name}/v3/index.json`;
+    const source = repoUrl(repo.name, 'v3/index.json');
 
     await expect(detail.name).toHaveText(pkg.name);
     await expect(detail.byId('pkg-detail-version')).toHaveText('1.0.0');

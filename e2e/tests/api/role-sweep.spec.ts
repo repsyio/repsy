@@ -26,12 +26,17 @@
  *  3. the reverse: no other operation answers a USER 403, so a MANAGE route that forgot to declare its
  *     403 (or a read route that turned admin-only unannounced) fails here instead of going unnoticed.
  *
+ * Its static twin is `OpenApiSpecConsistencyIT.everyDocumented403IsManageOrAdmin` (RPS-1593): every
+ * documented 403 is a MANAGE route or in its literal `ADMIN_OPERATIONS`, with the same floor, in every
+ * `mvn verify`. A new `requireAdmin` route is added to both.
+ *
  * A floor on the size of the set (48 today) and a check of names that must be in it stop a parser bug
  * from emptying the sweep without a failure.
  */
 import { loadSpecOperations, requestFor, type SpecOperation } from '../../src/api/spec-ops.js';
 import { bodyFor, seedSweepWorld, snapshotWorld, valuesFor } from '../../src/api/sweep-world.js';
-import { PanelApi, RepoType } from '../../src/api/panel-api.js';
+import { createPanelBackend } from '../../src/api/backend-registry.js';
+import { RepoType } from '../../src/api/panel-api.js';
 import { adminBearer, apiUrl, edgeRequest, type EdgeResponse } from '../../src/clients/edge-raw.js';
 import { env } from '../../src/env.js';
 import { expect, test as base } from '../../src/scenarios/fixtures.js';
@@ -75,11 +80,11 @@ interface SweepUser {
 const test = base.extend<object, { sweepUser: SweepUser }>({
   sweepUser: [
     async ({}, use, workerInfo) => {
-      const admin = new PanelApi(env.apiBaseUrl);
+      const admin = await createPanelBackend();
       await admin.login(env.adminUsername, env.adminPassword);
       const seeder = new Seeder(admin, perTestRunId(env.runId, workerInfo.parallelIndex, 0));
       const user = await seeder.createUser();
-      const session = new PanelApi(env.apiBaseUrl);
+      const session = await createPanelBackend();
       const login = await session.login(user.username, user.password);
       await use({ token: login.token ?? '' });
       await seeder.cleanup();

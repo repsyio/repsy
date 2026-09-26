@@ -36,7 +36,7 @@ import * as pypi from '../../src/clients/pypi.js';
 import { pipEnv, pypiAdapter } from '../../src/clients/pypi.js';
 import { adminCredential, distName, rawGetSimplePageNoFollow } from '../../src/clients/pypi-raw.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
-import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import { registerPublishConsumeLoop } from '../../src/scenarios/loop.js';
 import type { Scenario } from '../../src/scenarios/types.js';
@@ -189,7 +189,7 @@ test(
     const noFollow = await rawGetSimplePageNoFollow(repo.name, credential, rawName);
     expect(noFollow.status, 'the raw name redirects to the normalized project page').toBe(307);
     expect(noFollow.location, 'the redirect names the normalized page').toBe(
-      `${env.repoBaseUrl}/${repo.name}/simple/${normalizedName}/`,
+      repoUrl(repo.name, `simple/${normalizedName}/`),
     );
 
     // pip itself canonicalizes the requirement name (packaging.utils.canonicalize_name) before

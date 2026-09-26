@@ -104,6 +104,37 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
       Set.of("login", "refreshToken", "getSupportedRepoTypes", "checkGolangSumdbSupported");
 
   /**
+   * RPS-1593: the operations that answer 403 to a USER because their handler calls {@code
+   * PanelAuthHelper#requireAdmin} in its body, not because of {@code @RepoOperation(MANAGE)}. That
+   * call is invisible to reflection, so the set is written out, like {@link #PUBLIC_OPERATIONS}: a
+   * new admin-only route is added here on purpose.
+   *
+   * <ul>
+   *   <li>{@code UserController}: {@code listUsers}, {@code countAdmins}, {@code createUser},
+   *       {@code updateUser}, {@code deleteUser}, {@code resetPassword}.
+   *   <li>{@code RepoCollectionController}: {@code createRepository}.
+   *   <li>{@code SecurityScanController}: {@code listSecurityScans}, {@code
+   *       getSecurityScansSummary}.
+   * </ul>
+   *
+   * The e2e role sweep ({@code e2e/tests/api/role-sweep.spec.ts}, {@code e2e/README.md} "USER-role
+   * 403 sweep") calls every operation that documents 403 as a USER, and the ones that do not, and
+   * expects 403 for the first and anything else for the second. This test is its static twin: it
+   * needs no stack, runs in every {@code mvn verify} and names the operation.
+   */
+  private static final Set<String> ADMIN_OPERATIONS =
+      Set.of(
+          "listUsers",
+          "countAdmins",
+          "createUser",
+          "updateUser",
+          "deleteUser",
+          "resetPassword",
+          "createRepository",
+          "listSecurityScans",
+          "getSecurityScansSummary");
+
+  /**
    * RPS-1269: the one name a path variable has for each role, across every panel controller. A
    * generated client names its arguments after these, so two names for one role are two spellings
    * of the same thing in every client. A new variable is added here on purpose, with its role, and
@@ -493,6 +524,83 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
 
     assertThat(manageOperations).as("operations that need MANAGE").isGreaterThan(30);
     assertNoNewFindings("MANAGE operations without a 403", findings, Map.of());
+  }
+
+  @Test
+  @DisplayName("every documented 403 belongs to a MANAGE or an admin-only operation (RPS-1593)")
+  void everyDocumented403IsManageOrAdmin() throws IOException {
+    final var doc = loadSpec();
+    final var routes = this.panelRoutes();
+    final var findings = new TreeSet<String>();
+    final var operations = specOperations(doc);
+    var forbidden = 0;
+
+    for (final var operation : operations.values()) {
+      final var codes =
+          asMap(operation.raw().get("responses")).keySet().stream()
+              .map(String::valueOf)
+              .collect(Collectors.toSet());
+
+      if (!codes.contains("403")) {
+        continue;
+      }
+
+      forbidden++;
+
+      final var handlers =
+          routes.stream().filter(route -> route.key().equals(operation.key())).toList();
+      final var manage =
+          !handlers.isEmpty()
+              && handlers.stream()
+                  .allMatch(
+                      route ->
+                          route.repoOperation() != null
+                              && route.repoOperation().permission() == Permission.MANAGE);
+
+      if (!manage && !ADMIN_OPERATIONS.contains(operation.id())) {
+        findings.add(
+            operation.key()
+                + " ("
+                + operation.id()
+                + "): documents 403 but is neither @RepoOperation(MANAGE) nor listed in"
+                + " ADMIN_OPERATIONS");
+      }
+    }
+
+    for (final var id : ADMIN_OPERATIONS) {
+      final var operation =
+          operations.values().stream().filter(candidate -> candidate.id().equals(id)).findFirst();
+
+      if (operation.isEmpty()) {
+        findings.add(id + ": listed in ADMIN_OPERATIONS but not in the spec");
+        continue;
+      }
+
+      final var codes =
+          asMap(operation.get().raw().get("responses")).keySet().stream()
+              .map(String::valueOf)
+              .collect(Collectors.toSet());
+      final var handlers =
+          routes.stream().filter(route -> route.key().equals(operation.get().key())).toList();
+
+      if (!codes.contains("403")) {
+        findings.add(id + ": admin-only but the spec does not document 403");
+      }
+      if (handlers.isEmpty()) {
+        findings.add(id + ": listed in ADMIN_OPERATIONS but no panel handler serves it");
+      }
+      if (handlers.stream()
+          .anyMatch(
+              route ->
+                  route.repoOperation() != null
+                      && route.repoOperation().permission() == Permission.MANAGE)) {
+        findings.add(id + ": listed in ADMIN_OPERATIONS but its handler is @RepoOperation(MANAGE)");
+      }
+    }
+
+    // The same floor as the e2e role sweep, so a parser bug cannot empty the check.
+    assertThat(forbidden).as("operations that document 403").isGreaterThanOrEqualTo(48);
+    assertNoNewFindings("documented 403 without MANAGE or admin", findings, Map.of());
   }
 
   @Test

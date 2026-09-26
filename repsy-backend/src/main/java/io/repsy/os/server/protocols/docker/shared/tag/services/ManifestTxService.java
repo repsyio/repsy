@@ -175,23 +175,29 @@ public class ManifestTxService implements ManifestService<UUID> {
    * Resolves a tag name or a digest (of either algorithm) to the names the manifest file may have,
    * in the order to try them: the legacy name an earlier version stored it under while the repair
    * service has not renamed it yet, then its digest.
+   *
+   * @throws ItemNotFoundException {@code imageNotFound} for an image the repo does not have, {@code
+   *     manifestNotFound} for a digest the image does not store, {@code tagNotFound} for a tag it
+   *     does not have (RPS-1579)
    */
   public List<String> findManifestFileNamesByReference(
       final UUID repoId, final String imageName, final String reference) {
 
-    final var manifest =
-        BlobDigests.startsWithDigestPrefix(reference)
-            ? this.imageRepository
-                .findByRepoIdAndName(repoId, imageName)
-                .flatMap(
-                    image ->
-                        this.manifestRepository.findByImageIdAndAnyDigest(
-                            image.getId(), DockerDigestCalculator.normalize(reference)))
-            : this.tagRepository
-                .findByImageRepoIdAndImageNameAndName(repoId, imageName, reference)
-                .map(Tag::getManifest);
+    final var image =
+        this.imageRepository
+            .findByRepoIdAndName(repoId, imageName)
+            .orElseThrow(() -> new ItemNotFoundException("imageNotFound"));
 
-    return manifest
+    if (BlobDigests.startsWithDigestPrefix(reference)) {
+      return this.manifestRepository
+          .findByImageIdAndAnyDigest(image.getId(), DockerDigestCalculator.normalize(reference))
+          .map(found -> this.fileNamesOf(repoId, imageName, found))
+          .orElseThrow(() -> new ItemNotFoundException("manifestNotFound"));
+    }
+
+    return this.tagRepository
+        .findByImageRepoIdAndImageNameAndName(repoId, imageName, reference)
+        .map(Tag::getManifest)
         .map(found -> this.fileNamesOf(repoId, imageName, found))
         .orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
   }

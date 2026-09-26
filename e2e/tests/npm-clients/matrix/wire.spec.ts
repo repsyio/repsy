@@ -46,7 +46,7 @@ import {
 import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
-import { env } from '../../../src/env.js';
+import { repoPath, repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../../src/seed/seeder.js';
 
@@ -126,11 +126,12 @@ for (const client of clientsWith('frozenInstall')) {
 
           const scheme = SCHEME[kind];
           const packumentGets = recorder.entries.filter(
-            (entry) => entry.method === 'GET' && entry.path === `/${repo.name}/${name}`,
+            (entry) => entry.method === 'GET' && entry.path === `/${repoPath(repo.name)}/${name}`,
           );
           const tarballGets = recorder.entries.filter(
             (entry) =>
-              entry.method === 'GET' && entry.path === `/${repo.name}/${name}/-/${name}-1.0.0.tgz`,
+              entry.method === 'GET' &&
+              entry.path === `/${repoPath(repo.name)}/${name}/-/${name}-1.0.0.tgz`,
           );
           expect(packumentGets, 'one packument GET').toHaveLength(1);
           expect(tarballGets, 'one tarball GET, through the recorder').toHaveLength(1);
@@ -167,7 +168,7 @@ test(
   },
   async ({ seeder }) => {
     const repo = await newRepo(seeder);
-    const missing = `${env.repoBaseUrl}/${repo.name}/${packageNameFor(seeder, 'never-published')}`;
+    const missing = repoUrl(repo.name, packageNameFor(seeder, 'never-published'));
     const headers = npmAuthHeader(adminCredential());
 
     const get = await fetch(missing, { headers });
@@ -178,7 +179,7 @@ test(
 
     // Control: a repository that does not exist is 404 for HEAD as well, so the answer is per
     // package, not a blanket one per repository.
-    const noRepo = await fetch(`${env.repoBaseUrl}/e2e-${seeder.runId}-norepo/x`, {
+    const noRepo = await fetch(repoUrl(`e2e-${seeder.runId}-norepo`, 'x'), {
       method: 'HEAD',
       headers,
     });

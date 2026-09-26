@@ -38,7 +38,13 @@ x-runner-environment: &runner-environment
   REPSY_ADMIN_USERNAME: ${REPSY_ADMIN_USERNAME:-admin}
   REPSY_ADMIN_PASSWORD: ${REPSY_ADMIN_PASSWORD:?Set REPSY_ADMIN_PASSWORD in e2e/.env}
   REPSY_TARGET: ${REPSY_TARGET:-local}
+  # Owner-scoped URLs (README.md "Repository URLs"): unset on Repsy OS.
+  REPSY_REPO_OWNER: ${REPSY_REPO_OWNER:-}
+  REPSY_E2E_URL_SCHEME: ${REPSY_E2E_URL_SCHEME:-}
   REPSY_E2E_RUN_ID: ${REPSY_E2E_RUN_ID:-}
+  # A module that supplies the panel backend instead of the built-in Repsy OS one (README.md "Targets"):
+  # a path the runner can read, or a package name. Empty: the built-in backend.
+  REPSY_E2E_BACKEND_MODULE: ${REPSY_E2E_BACKEND_MODULE:-}
   REPSY_E2E_INSECURE_REGISTRY: ${REPSY_E2E_INSECURE_REGISTRY:-}
   # Where the @scanner specs of ANY runner reach the stub scanner's /control API (the scanner overlay,
   # docker-compose.stack-scanner.yml, publishes it on loopback; every runner has the host network) and
@@ -48,6 +54,14 @@ x-runner-environment: &runner-environment
   # Comma list of opt-in suites (e.g. "throttle,scanner"): run.sh adds the name of every stack overlay
   # that is on (README.md "Stack overlays"). Read by optedIn() in src/stack-overlays.ts.
   REPSY_E2E_OPT_IN: ${REPSY_E2E_OPT_IN:-}
+  # Forwarded to EVERY runner (RPS-1595): playwright.config.ts's isCI gives each one `forbidOnly` (a stray
+  # `test.only` fails the run instead of silently narrowing it) and the ui runner its trace mode. Whether
+  # a project also retries is decided per project in that file (ui and maven, the trivy contract spec,
+  # never stack), so forwarding CI does not make every runner retry.
+  CI: ${CI:-}
+  # Overrides the retry count of every project but stack (empty: the per-project default), see
+  # playwright.config.ts and README.md "CI".
+  REPSY_E2E_RETRIES: ${REPSY_E2E_RETRIES:-}
 
 services:
   skeleton:
@@ -87,8 +101,12 @@ services:
       context: .
       dockerfile: runners/maven.Dockerfile
       args:
-        TEMURIN_VERSION: '21'
+        # Exact JDK release and its linux/x64 tarball SHA-256 (api.adoptium.net/v3/assets), Maven's SHA-512
+        # (archive.apache.org): the build fails on a mismatch. RPS-1597: bump with runners/bump-pins.sh.
+        TEMURIN_VERSION: '21.0.12.1+1'
+        TEMURIN_SHA256: 'ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94'
         MAVEN_VERSION: '3.9.9'
+        MAVEN_SHA512: 'a555254d6b53d267965a3404ecb14e53c3827c09c3b94b5678835887ab404556bfaf78dcfe03ba76fa2508649dca8531c74bca4d5846513522404d48e8c4ac8b'
         GRADLE_VERSION: '8.14.3'
         GRADLE_SHA256: 'bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531'
         ANT_VERSION: '1.10.15'
@@ -148,6 +166,9 @@ services:
         BUN_VERSION: '1.3.14'
         # `docker pull denoland/deno:bin-2.9.7` (the `bin-<version>` tags hold just the binary).
         DENO_VERSION: '2.9.7'
+        # The manifest-list digests of the two toolchain images above (RPS-1597, runners/bump-pins.sh).
+        BUN_IMAGE_DIGEST: 'sha256:9dba1a1b43ce28c9d7931bfc4eb00feb63b0114720a0277a8f939ae4dfc9db6f'
+        DENO_IMAGE_DIGEST: 'sha256:bc5aa4466e21b6d3021226a85ba2e1911f7c386254d97b9d797903ab74edace2'
     environment:
       <<: *runner-environment
     volumes:
@@ -167,6 +188,8 @@ services:
       dockerfile: runners/cargo.Dockerfile
       args:
         RUST_VERSION: '1.98.1'
+        # Manifest-list digest of rust:<RUST_VERSION>-slim-bookworm (RPS-1597, runners/bump-pins.sh).
+        RUST_IMAGE_DIGEST: 'sha256:ff521445a372125ed4f76e1453a1f8098f2d05332d1601d30db1c1f62757e730'
     environment:
       <<: *runner-environment
     volumes:
@@ -185,6 +208,8 @@ services:
       dockerfile: runners/nuget.Dockerfile
       args:
         DOTNET_SDK_VERSION: '10.0.401'
+        # Manifest-list digest of sdk:<DOTNET_SDK_VERSION>-noble (RPS-1597, runners/bump-pins.sh).
+        DOTNET_SDK_IMAGE_DIGEST: 'sha256:35d40304542c8689331f8cab17c65926cdf48fe711e289321d71924b230a7d29'
     environment:
       <<: *runner-environment
     volumes:
@@ -204,9 +229,14 @@ services:
       dockerfile: runners/docker.Dockerfile
       args:
         CRANE_VERSION: 'v0.22.1'
+        # RPS-1597: image pins are manifest-list digests, skopeo's is the commit its tag pointed at
+        # (runners/bump-pins.sh resolves them; README.md "Runner images and pins").
+        CRANE_IMAGE_DIGEST: 'sha256:1f968817b95790bed063f71175aa6b8ff879fa17064020415f3e18bb6e6a36e1'
         # RPS-1478 part B: the second and third client of this runner (runners/docker.Dockerfile).
         GO_VERSION: '1.27.1'
+        GO_IMAGE_DIGEST: 'sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195'
         SKOPEO_VERSION: 'v1.24.1'
+        SKOPEO_COMMIT: '77f3d92f861271c7cb9175afcf876017bcae9202'
         REGCTL_VERSION: 'v0.11.6'
         REGCTL_SHA256_AMD64: '8e0e62a497fcdb8048d18aa927a139613176ba0531f412bc541044e28f9856bd'
         REGCTL_SHA256_ARM64: 'a9b71a3ee79b2d1dbbd7d51fd5e8fa214722c192864235d3d8764463c751a1ff'
@@ -235,6 +265,9 @@ services:
       args:
         HELM_VERSION: 'v4.3.0'
         HELM_PUSH_VERSION: '0.11.1'
+        # The per-arch SHA-256 of helm-<HELM_VERSION>-linux-<arch>.tar.gz (RPS-1597, runners/bump-pins.sh).
+        HELM_SHA256_AMD64: '86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb'
+        HELM_SHA256_ARM64: '31c5794dd55c66a51e6b7d2e2ac7a114ae8b1de41ff1d9ba51748ac973b06a08'
     environment:
       <<: *runner-environment
     volumes:
@@ -260,6 +293,9 @@ services:
         PIP_VERSION: '26.2.1'
         TWINE_VERSION: '7.0.0'
         UV_VERSION: '0.12.19'
+        # Manifest-list digests of python:<PYTHON_VERSION>-slim-bookworm and uv:<UV_VERSION> (RPS-1597, runners/bump-pins.sh).
+        PYTHON_IMAGE_DIGEST: 'sha256:82bc3c539b8813ada9d68c63b40158fa002f7f33de9bf3312a3dfdc0620dff56'
+        UV_IMAGE_DIGEST: 'sha256:04d046b13e60d6bcec73cbc5e1cad25d680dea90c8573340950a0ac2d1aef424'
     environment:
       <<: *runner-environment
     volumes:
@@ -280,6 +316,8 @@ services:
       dockerfile: runners/golang.Dockerfile
       args:
         GO_VERSION: '1.27.1'
+        # Manifest-list digest of golang:<GO_VERSION>-bookworm, the one the docker runner builds skopeo with (RPS-1597).
+        GO_IMAGE_DIGEST: 'sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195'
     environment:
       <<: *runner-environment
     volumes:
@@ -300,6 +338,8 @@ services:
       dockerfile: runners/ruby.Dockerfile
       args:
         RUBY_VERSION: '4.0.7'
+        # Manifest-list digest of ruby:<RUBY_VERSION>-slim-bookworm (RPS-1597, runners/bump-pins.sh).
+        RUBY_IMAGE_DIGEST: 'sha256:b21bc6c2360f7b7b615ff8860f239b12b2c6634ec026712745743b0661ac14b9'
     environment:
       <<: *runner-environment
     volumes:
@@ -322,11 +362,16 @@ services:
       dockerfile: runners/stack.Dockerfile
       args:
         DOCKER_CLI_VERSION: '29.8.1'
+        DOCKER_CLI_IMAGE_DIGEST: 'sha256:018edbc908e08fcc9dbf029c812c34251e9b4719e6f71ca0e5eae2a987d014ca'
         # The persistence spec (RPS-1476) publishes with real clients: the same JDK/Maven as the maven
-        # runner and the same crane as the docker runner. Keep these equal to theirs.
-        TEMURIN_VERSION: '21'
+        # runner and the same crane as the docker runner. Keep these equal to theirs (runners/bump-pins.sh
+        # fails when a value differs between the services that repeat it).
+        TEMURIN_VERSION: '21.0.12.1+1'
+        TEMURIN_SHA256: 'ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94'
         MAVEN_VERSION: '3.9.9'
+        MAVEN_SHA512: 'a555254d6b53d267965a3404ecb14e53c3827c09c3b94b5678835887ab404556bfaf78dcfe03ba76fa2508649dca8531c74bca4d5846513522404d48e8c4ac8b'
         CRANE_VERSION: 'v0.22.1'
+        CRANE_IMAGE_DIGEST: 'sha256:1f968817b95790bed063f71175aa6b8ff879fa17064020415f3e18bb6e6a36e1'
     group_add:
       - '${DOCKER_GID:-999}'
     environment:
@@ -386,9 +431,6 @@ services:
       # publishes it on loopback; this service has the host network) and the key both sides share.
       REPSY_SCANNER_STUB_URL: ${REPSY_SCANNER_STUB_URL:-http://localhost:${REPSY_E2E_SCANNER_PORT:-8090}}
       REPSY_SCANNER_API_KEY: ${REPSY_SCANNER_API_KEY:-e2e-scanner-key}
-      # Forwarded to this service only: playwright.config.ts's isCI (retries, forbidOnly, trace mode)
-      # keys off it, and forwarding it to the protocol runners would change their behaviour.
-      CI: ${CI:-}
     volumes:
       # No shared/named cache volume: the browser is baked into the image (/ms-playwright).
       - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro

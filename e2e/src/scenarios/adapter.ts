@@ -28,6 +28,7 @@
  * repo) and stays entirely inside `clients/maven.ts`/`docker-compose.runners.yml`; npm needs no
  * such thing (its test packages declare no dependencies, so there is nothing third-party to cache).
  */
+import type { TargetCapabilities } from '../target.js';
 import type { Outcome, Scenario } from './types.js';
 import type { SeedResult, World } from './world.js';
 
@@ -108,9 +109,11 @@ export interface ProtocolAdapter<F = unknown> {
    * instead of weakening them; the earlier assertions (the publish-side pins, and the raw
    * packument/status check on the consume side) are never affected. npm's RPS-1205 (`fixTarballUrl`
    * misrewriting the tarball path on Repsy OS's single-tenant layout) is fixed, so no adapter
-   * currently implements this -- maven never had a bug here either.
+   * currently implements this -- maven never had a bug here either. `target` (RPS-1498) is the
+   * capabilities of the target under test (`target.kind`), for a bug that only one product has;
+   * a gap of the target's backend as a whole is `PanelBackend.knownGap` instead.
    */
-  knownConsumeFailure?(scenario: Scenario): string | undefined;
+  knownConsumeFailure?(scenario: Scenario, target: TargetCapabilities): string | undefined;
 
   /**
    * A known, already-filed backend bug that makes a REFUSED publish still change what is stored.
@@ -120,7 +123,7 @@ export interface ProtocolAdapter<F = unknown> {
    * storage-before-DB bug that introduced it (RPS-1124) is fixed, so every adapter leaves this out
    * and asserts `expectNothingStored` for real. Keep it for the next such bug.
    */
-  knownPublishSideEffect?(scenario: Scenario): string | undefined;
+  knownPublishSideEffect?(scenario: Scenario, target: TargetCapabilities): string | undefined;
 
   /**
    * A real client that exits 0 for a request the server refused (RPS-1330: yarn classic prints
@@ -133,5 +136,6 @@ export interface ProtocolAdapter<F = unknown> {
     scenario: Scenario,
     side: 'publish' | 'consume',
     outcome: Outcome,
+    target: TargetCapabilities,
   ): string | undefined;
 }

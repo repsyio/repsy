@@ -335,7 +335,7 @@ public abstract class AbstractIntegrationTest {
   protected String protocolBearerTokenFor(final User user) {
     return AuthUtils.AUTH_BEARER
         + this.jwtUtils.createProtocolToken(
-            user.getId(), user.getUsername(), Duration.ofMinutes(30));
+            user.getId(), user.getUsername(), Duration.ofMinutes(30), user.getTokenVersion());
   }
 
   /** Creates a fresh, non-seeded ADMIN and returns a protocol token for it. */
@@ -355,7 +355,10 @@ public abstract class AbstractIntegrationTest {
         + this.jwtUtils.createProtocolToken(
             UUID.fromString(decoded.getSubject()),
             decoded.getClaim("username").asString(),
-            Duration.ofMinutes(30));
+            Duration.ofMinutes(30),
+            decoded.getClaim("token_version").asInt() == null
+                ? 0
+                : decoded.getClaim("token_version").asInt());
   }
 
   /**

@@ -34,9 +34,10 @@ import {
   edgeRequest,
   FORWARDED_HEADERS,
   FORWARDED_ORIGIN,
-  repoUrl,
+  repoUrl as repoPortUrl,
 } from '../../src/clients/edge-raw.js';
 import { env } from '../../src/env.js';
+import { repoPath, repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import { seedPackage } from '../../src/seed/packages.js';
 
@@ -44,8 +45,8 @@ test.skip(env.target === 'remote', 'X-Forwarded-* trust is the remote instance o
 
 test.describe('the public URL follows X-Forwarded-*', { tag: ['@smoke'] }, () => {
   test('the Docker token realm', async () => {
-    const forwarded = await edgeRequest(repoUrl('/v2/'), { headers: FORWARDED_HEADERS });
-    const direct = await edgeRequest(repoUrl('/v2/'));
+    const forwarded = await edgeRequest(repoPortUrl('/v2/'), { headers: FORWARDED_HEADERS });
+    const direct = await edgeRequest(repoPortUrl('/v2/'));
 
     expect(forwarded.status).toBe(401);
     expect(forwarded.headers.get('www-authenticate')).toContain(
@@ -55,7 +56,7 @@ test.describe('the public URL follows X-Forwarded-*', { tag: ['@smoke'] }, () =>
   });
 
   test('the Docker realm takes the proto and host alone, without a port', async () => {
-    const res = await edgeRequest(repoUrl('/v2/'), {
+    const res = await edgeRequest(repoPortUrl('/v2/'), {
       headers: { 'X-Forwarded-Proto': 'https', 'X-Forwarded-Host': 'pub.e2e.test' },
     });
 
@@ -65,34 +66,34 @@ test.describe('the public URL follows X-Forwarded-*', { tag: ['@smoke'] }, () =>
   test('the Cargo config.json dl and api', async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.CARGO, { privateRepo: false });
 
-    const forwarded = await edgeRequest(repoUrl(`/${repo.name}/config.json`), {
+    const forwarded = await edgeRequest(repoUrl(repo.name, 'config.json'), {
       headers: FORWARDED_HEADERS,
     });
-    const direct = await edgeRequest(repoUrl(`/${repo.name}/config.json`));
+    const direct = await edgeRequest(repoUrl(repo.name, 'config.json'));
 
     expect(forwarded.status).toBe(200);
     expect(forwarded.json).toMatchObject({
-      dl: expect.stringContaining(`${FORWARDED_ORIGIN}/${repo.name}/`),
-      api: `${FORWARDED_ORIGIN}/${repo.name}`,
+      dl: expect.stringContaining(`${FORWARDED_ORIGIN}/${repoPath(repo.name)}/`),
+      api: `${FORWARDED_ORIGIN}/${repoPath(repo.name)}`,
     });
     expect(direct.json).toMatchObject({
-      dl: expect.stringContaining(`${env.repoBaseUrl}/${repo.name}/`),
-      api: `${env.repoBaseUrl}/${repo.name}`,
+      dl: expect.stringContaining(repoUrl(repo.name, '')),
+      api: repoUrl(repo.name),
     });
   });
 
   test('the PyPI simple page file links', async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.PYPI, { privateRepo: false });
     const pkg = await seedPackage(repo, seeder);
-    const page = `/${repo.name}/simple/${pkg.name}/`;
+    const page = `/${repoPath(repo.name)}/simple/${pkg.name}/`;
 
-    const forwarded = await edgeRequest(repoUrl(page), { headers: FORWARDED_HEADERS });
-    const direct = await edgeRequest(repoUrl(page));
+    const forwarded = await edgeRequest(repoPortUrl(page), { headers: FORWARDED_HEADERS });
+    const direct = await edgeRequest(repoPortUrl(page));
 
     expect(forwarded.status).toBe(200);
-    expect(forwarded.text).toContain(`href="${FORWARDED_ORIGIN}/${repo.name}/`);
+    expect(forwarded.text).toContain(`href="${FORWARDED_ORIGIN}/${repoPath(repo.name)}/`);
     expect(forwarded.text).not.toContain(env.repoBaseUrl);
-    expect(direct.text).toContain(`href="${env.repoBaseUrl}/${repo.name}/`);
+    expect(direct.text).toContain(`href="${repoUrl(repo.name, '')}`);
     expect(direct.text).not.toContain(FORWARDED_ORIGIN);
   });
 });

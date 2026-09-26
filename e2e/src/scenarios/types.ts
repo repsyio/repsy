@@ -120,14 +120,36 @@ export function scenariosFor(catalog: readonly Scenario[], protocol: string): Sc
 }
 
 /**
+ * The outcomes a TARGET pins over the catalog's (RPS-1498), supplied by the target's `PanelBackend`
+ * (`expectByTarget`) so a Repsy Cloud answer that differs from Repsy OS's never goes into `catalog.ts`.
+ * Keyed by scenario id, then by protocol (`adapter.protocol`, e.g. `'maven'`) or `'*'` for every
+ * protocol; only the sides named are overridden.
+ */
+export type ExpectationOverlay = Readonly<
+  Record<string, Readonly<Record<string, Partial<ScenarioExpectation>>>>
+>;
+
+/**
  * `scenario`'s expectation for `protocol`: the shared, maven-pinned `expect`, with any
  * `expectByProtocol[protocol]` override merged on top (a scenario needing no override for a given
- * protocol, which is every scenario for npm in this step, has none). The scenario loop and the
+ * protocol, which is every scenario for npm in this step, has none), then the target's `overlay`
+ * (`overlay[scenario.id]['*']`, then `overlay[scenario.id][protocol]`). The scenario loop and the
  * world fixture's "does this scenario need a pre-publish" check both read through this, never
- * `scenario.expect` directly, so a later protocol can differ without touching the shared field.
+ * `scenario.expect` directly, so a later protocol or target can differ without touching the shared
+ * field. Without an overlay (every Repsy OS run) the result is exactly what it was before RPS-1498.
  */
-export function expectationFor(scenario: Scenario, protocol: string): ScenarioExpectation {
-  return { ...scenario.expect, ...scenario.expectByProtocol?.[protocol] };
+export function expectationFor(
+  scenario: Scenario,
+  protocol: string,
+  overlay?: ExpectationOverlay,
+): ScenarioExpectation {
+  const forScenario = overlay?.[scenario.id];
+  return {
+    ...scenario.expect,
+    ...scenario.expectByProtocol?.[protocol],
+    ...forScenario?.['*'],
+    ...forScenario?.[protocol],
+  };
 }
 
 /**

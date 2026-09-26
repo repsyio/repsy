@@ -41,6 +41,7 @@ import {
 } from '../../../src/clients/npm-family/fixtures.js';
 import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { env } from '../../../src/env.js';
+import { repoPath, repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import { target } from '../../../src/target.js';
 import type { ClientId } from '../../../src/clients/npm-family/client.js';
@@ -90,12 +91,12 @@ for (const client of target.isRemote ? [] : clientsWith('frozenInstall')) {
       ).toBe(0);
 
       const reader = await tokenBinding(seeder, repo.name, { readOnly: true });
-      const registryBase = `${env.repoBaseUrl}/${repo.name}/`;
+      const registryBase = repoUrl(repo.name, '');
       const tarballUrl = `${registryBase}${name}/-/${name}-1.0.0.tgz`;
 
       // Whichever name a read comes in by, the packument names the registry's configured address.
       for (const base of [env.repoBaseUrl, publishBase]) {
-        const res = await fetch(`${base}/${repo.name}/${name}`, {
+        const res = await fetch(`${base}/${repoPath(repo.name)}/${name}`, {
           headers: npmAuthHeader(reader.credential),
         });
         expect(res.status, `GET packument via ${base}`).toBe(200);

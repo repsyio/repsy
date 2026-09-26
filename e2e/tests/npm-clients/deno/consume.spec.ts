@@ -49,7 +49,7 @@ import {
 import { npmClient } from '../../../src/clients/npm-family/npm-client.js';
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
-import { env } from '../../../src/env.js';
+import { repoPath, repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../../src/seed/seeder.js';
 
@@ -163,7 +163,7 @@ test.describe('deno dependency graph, lockfile and frozen install', () => {
       const lockfile = await fs.readFile(path.join(first.work, 'deno.lock'), 'utf8');
       for (const name of [graph.app, graph.lib]) {
         expect(lockfile, `deno.lock records the registry's own tarball URL of ${name}`).toContain(
-          `${env.repoBaseUrl}/${graph.repoName}/${name}/-/${name}-1.0.0.tgz`,
+          repoUrl(graph.repoName, `${name}/-/${name}-1.0.0.tgz`),
         );
       }
       expect(lockfile, 'and an integrity hash for it').toMatch(/"integrity": "sha512-/);
@@ -259,7 +259,8 @@ test.describe('deno minimumDependencyAge gate', () => {
         expect(`${refused.stdout}\n${refused.stderr}`).toMatch(/minimum dependency age/i);
 
         const packuments = recorder.entries.filter(
-          (entry) => entry.method === 'GET' && entry.path === `/${graph.repoName}/${graph.lib}`,
+          (entry) =>
+            entry.method === 'GET' && entry.path === `/${repoPath(graph.repoName)}/${graph.lib}`,
         );
         expect(packuments.length, 'the packument was asked for').toBeGreaterThanOrEqual(1);
         // The abbreviated document has no `time`, which the gate needs: Deno asks for anything.

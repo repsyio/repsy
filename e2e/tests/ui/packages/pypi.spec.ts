@@ -22,7 +22,7 @@
 import { RepoType } from '../../../src/api/panel-api.js';
 import { buildUploadForm, buildWheel, uploadUrl } from '../../../src/clients/pypi-raw.js';
 import { adminCredential, authHeader } from '../../../src/clients/raw-http.js';
-import { env } from '../../../src/env.js';
+import { repoUrl } from '../../../src/repo-url.js';
 import type { SeededPackage } from '../../../src/seed/packages.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { registerPackageScenarios } from '../../../src/ui/package-scenarios.js';
@@ -104,7 +104,7 @@ test.describe('PyPI release detail', { tag: '@packages' }, () => {
 
     // The exact command, index URL included: the stack's repo URL and the repo's own /simple index.
     await expect(detail.installText).toHaveText(
-      `pip install ${pkg.name}==${pkg.version} --extra-index-url ${env.repoBaseUrl}/${repo.name}/simple`,
+      `pip install ${pkg.name}==${pkg.version} --extra-index-url ${repoUrl(repo.name, 'simple')}`,
     );
     await expect(detail.byId('pkg-detail-version')).toHaveText(pkg.version);
     await expect(detail.byId('pkg-detail-published')).toContainText('Uploaded at:');

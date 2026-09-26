@@ -68,6 +68,7 @@ import {
 import { shimTraceSoFar } from '../../src/clients/golang-tls-shim.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { env } from '../../src/env.js';
+import { repoPath } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { MaterializedCredential } from '../../src/scenarios/world.js';
 
@@ -179,10 +180,10 @@ async function expectShimRequests(
   expect(requests.every((r) => r.hasAuthorization)).toBe(true);
   const paths = requests.map((r) => r.path);
   expect(paths, 'the dependency go.mod is fetched').toContain(
-    `/${repoName}/${dependency}/@v/v1.1.0.mod`,
+    `/${repoPath(repoName)}/${dependency}/@v/v1.1.0.mod`,
   );
   expect(paths, "the dependency's version list is fetched").toContain(
-    `/${repoName}/${dependency}/@v/list`,
+    `/${repoPath(repoName)}/${dependency}/@v/list`,
   );
 }
 

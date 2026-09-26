@@ -15,12 +15,12 @@
 ///
 
 import {
-  isApiErrorStatus,
-  type PanelApi,
+  isPanelHttpStatus,
+  type PanelBackend,
   type RepoSettingsForm,
   type RepoType,
   UserRole,
-} from '../api/panel-api.js';
+} from '../api/panel-backend.js';
 import { password, repoName, RUN_PREFIX, userName } from './run-id.js';
 
 const NOT_FOUND = 404;
@@ -72,7 +72,7 @@ type Tracked =
   | { kind: 'user'; id: string };
 
 /**
- * Seeds panel data through `PanelApi` for one test and cleans up exactly what it created. Every
+ * Seeds panel data through `PanelBackend` for one test and cleans up exactly what it created. Every
  * name is `e2e-<runid>-...` (see run-id.ts), and every created entity is tracked so `cleanup()` can
  * delete it in reverse order, tolerating an entity already gone (a token whose repo was deleted
  * first, or something the test itself deleted).
@@ -84,9 +84,14 @@ export class Seeder {
   private readonly tokenSeq = new Map<string, number>();
 
   constructor(
-    private readonly api: PanelApi,
+    private readonly api: PanelBackend,
     public readonly runId: string,
   ) {}
+
+  /** The backend this seeder creates its data through (RPS-1498: the credential hooks live on it). */
+  get backend(): PanelBackend {
+    return this.api;
+  }
 
   /**
    * The next unique repo name for this test (`e2e-<runid>-<type>-<n>`), NOT created and NOT tracked.
@@ -139,7 +144,7 @@ export class Seeder {
     const pwd = opts.password ?? password(this.runId);
     const role = opts.role ?? UserRole.USER;
 
-    const user = await this.api.createUser({ username, password: pwd, role });
+    const user = await this.api.createRepoUser({ username, password: pwd, role });
 
     this.created.push({ kind: 'user', id: user.id });
 
@@ -239,7 +244,7 @@ export class Seeder {
       try {
         await this.deleteTracked(entity);
       } catch (err) {
-        if (!isApiErrorStatus(err, NOT_FOUND)) {
+        if (!isPanelHttpStatus(err, NOT_FOUND)) {
           errors.push(err);
         }
       }
@@ -261,7 +266,7 @@ export class Seeder {
         await this.api.deleteRepo(entity.name);
         return;
       case 'user':
-        await this.api.deleteUser(entity.id);
+        await this.api.deleteRepoUser(entity.id);
         return;
     }
   }

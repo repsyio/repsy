@@ -47,6 +47,7 @@ import {
 } from '../../src/clients/maven-raw.js';
 import { detachedSign, generateKeyPair } from '../../src/clients/pgp.js';
 import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 
 const ARTIFACT_ID = 'signed-lib';
@@ -120,7 +121,7 @@ async function signedDeploy(
       `-Dfile=${base}.jar`,
       `-DpomFile=${base}.pom`,
       '-DrepositoryId=repsy',
-      `-Durl=${env.repoBaseUrl}/${repo.name}`,
+      `-Durl=${repoUrl(repo.name)}`,
       `-Dfiles=${attached.map((a) => a.file).join(',')}`,
       `-Dtypes=${attached.map((a) => a.type).join(',')}`,
       `-Dclassifiers=${attached.map((a) => a.classifier).join(',')}`,
@@ -147,7 +148,7 @@ async function signedDeploy(
 /** What is wrong with a finished deploy: nothing, when it ended complete and signed. */
 async function problemsOf(
   deploy: Deploy,
-  panelApi: import('../../src/api/panel-api.js').PanelApi,
+  panelApi: import('../../src/api/panel-backend.js').PanelBackend,
 ): Promise<string[]> {
   if (deploy.exitCode !== 0) {
     return [`mvn exited ${deploy.exitCode}\n${deploy.stdout.slice(-2000)}`];

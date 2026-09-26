@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
+import { repoPath } from '../../../repo-url.js';
 
 /**
  * Docker: images -> tags -> (manifests | detail). `target.name` is the image, `target.version` the tag.
@@ -112,7 +113,7 @@ export const dockerDescriptor: ProtocolDescriptor = {
     // Docker prints the registry HOST, not the repo URL, and no password placeholder at all.
     contains: (repoName, repoUrl) => [
       `docker login ${new URL(repoUrl).host}`,
-      `docker pull ${new URL(repoUrl).host}/${repoName}/`,
+      `docker pull ${new URL(repoUrl).host}/${repoPath(repoName)}/`,
     ],
     deployTokenMarker: '<repsy_deploy_token>',
   },

@@ -42,6 +42,7 @@ import type { TestInfo } from '@playwright/test';
 
 import { findRepsyContainer, logLinesContaining } from '../../src/clients/stack.js';
 import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder, SeededUser } from '../../src/seed/seeder.js';
 import { optedIn } from '../../src/stack-overlays.js';
@@ -82,7 +83,7 @@ async function basicGet(
   client?: string,
 ): Promise<Answer> {
   const basic = Buffer.from(`${credential.username}:${credential.password}`).toString('base64');
-  const res = await fetch(`${env.repoBaseUrl}/${repoName}/e2e/throttle/1.0/throttle-1.0.pom`, {
+  const res = await fetch(repoUrl(repoName, 'e2e/throttle/1.0/throttle-1.0.pom'), {
     headers: { Authorization: `Basic ${basic}`, ...withClient(client) },
   });
   return answerOf(res);
@@ -90,7 +91,7 @@ async function basicGet(
 
 /** `npm whoami`'s request with a Bearer value nobody issued. */
 async function junkBearerWhoami(repoName: string, client: string): Promise<Answer> {
-  const res = await fetch(`${env.repoBaseUrl}/${repoName}/-/whoami`, {
+  const res = await fetch(repoUrl(repoName, '-/whoami'), {
     headers: { Authorization: 'Bearer not-a-token-of-any-kind', ...withClient(client) },
   });
   return answerOf(res);
@@ -140,7 +141,7 @@ const wrong = (user: SeededUser): { username: string; password: string } => ({
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-test.describe('auth throttle on the wire', { tag: '@throttle' }, () => {
+test.describe('auth throttle on the wire', { tag: ['@throttle', '@cloud-skip'] }, () => {
   // eslint-disable-next-line playwright/no-skipped-test -- the local-only guard of every tests/stack spec
   test.skip(!target.ownsStack || target.isRemote, 'needs a stack this harness owns');
   // eslint-disable-next-line playwright/no-skipped-test -- the opt-in switch of README.md "Stack overlays"

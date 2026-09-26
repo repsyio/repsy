@@ -63,6 +63,7 @@ import {
 } from '../../../src/clients/npm-family/yarn-classic-client.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { env } from '../../../src/env.js';
+import { repoPath, repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import { optedIn } from '../../../src/stack-overlays.js';
 import { registerPublishConsumeLoop } from '../../../src/scenarios/loop.js';
@@ -108,7 +109,7 @@ test(
         ...binding,
         baseUrl: recorder.baseUrl,
       });
-      const repoEntries = () => recorder.under(`/${repo.name}/`);
+      const repoEntries = () => recorder.under(`/${repoPath(repo.name)}/`);
       const consume = async (label: string, binding: RegistryBinding, spec: string) => {
         const before = recorder.entries.length;
         const ctx = await client.prepare(label, [binding]);
@@ -128,7 +129,7 @@ test(
       );
       expect(`${noAuth.added.stdout}\n${noAuth.added.stderr}`).toMatch(couldNotFind(unscoped));
       expect(noAuth.entries.map((entry) => [entry.method, entry.path])).toEqual([
-        ['GET', `/${repo.name}/${unscoped}`],
+        ['GET', `/${repoPath(repo.name)}/${unscoped}`],
       ]);
       expect(
         noAuth.entries[0]?.authorization,
@@ -194,13 +195,13 @@ test(
     const recorder = await startWireRecorder({ rewriteTarballUrls: true });
     try {
       const host = new URL(recorder.baseUrl).host;
-      const registry = `${recorder.baseUrl}/${repo.name}/`;
+      const registry = `${recorder.baseUrl}/${repoPath(repo.name)}/`;
       const token = reader.credential.password;
       const worksOutput = /Saved 1 new dependency/;
       const cases = [
         {
           title: 'the repository path with a trailing slash (what the panel says)',
-          npmrc: `registry=${registry}\n//${host}/${repo.name}/:_authToken=${token}\n`,
+          npmrc: `registry=${registry}\n//${host}/${repoPath(repo.name)}/:_authToken=${token}\n`,
           exitCode: 0,
           output: worksOutput,
           statuses: [200, 200],
@@ -209,7 +210,7 @@ test(
         },
         {
           title: 'the same key with a registry URL without the trailing slash',
-          npmrc: `registry=${registry.slice(0, -1)}\n//${host}/${repo.name}/:_authToken=${token}\n`,
+          npmrc: `registry=${registry.slice(0, -1)}\n//${host}/${repoPath(repo.name)}/:_authToken=${token}\n`,
           exitCode: 0,
           output: worksOutput,
           statuses: [200, 200],
@@ -227,7 +228,7 @@ test(
         },
         {
           title: "another repository's key does not match either",
-          npmrc: `registry=${registry}\n//${host}/${other.name}/:_authToken=${token}\n`,
+          npmrc: `registry=${registry}\n//${host}/${repoPath(other.name)}/:_authToken=${token}\n`,
           exitCode: 1,
           output: couldNotFind(name),
           statuses: [401],
@@ -295,7 +296,7 @@ const SCOPED_PUBLISH_CONFIGS: Array<{
     setUp: async (ctx, binding) => {
       await writeYarnClassicRc(path.join(ctx.home, '.yarnrc'), [binding]);
     },
-    sentBase: (recorderBase, repoName) => `${recorderBase}/${repoName}`,
+    sentBase: (recorderBase, repoName) => `${recorderBase}/${repoPath(repoName)}`,
   },
 ];
 
@@ -333,7 +334,7 @@ for (const config of SCOPED_PUBLISH_CONFIGS) {
         expect(
           puts.map((entry) => entry.path),
           'the scoped name is one encoded path segment',
-        ).toEqual([`/${repo.name}/${scope}%2f${bare}`]);
+        ).toEqual([`/${repoPath(repo.name)}/${scope}%2f${bare}`]);
         expect(puts[0]?.status).toBe(200);
         const sent = JSON.parse(puts[0]?.requestBody ?? '{}') as {
           _attachments: Record<string, unknown>;
@@ -350,7 +351,7 @@ for (const config of SCOPED_PUBLISH_CONFIGS) {
 
         // What the registry stores and serves: its own address and the conventional file name.
         const served = await rawGetPackument(repo.name, adminCredential(), name);
-        const conventional = `${env.repoBaseUrl}/${repo.name}/${name}/-/${bare}-1.0.0.tgz`;
+        const conventional = repoUrl(repo.name, `${name}/-/${bare}-1.0.0.tgz`);
         expect(
           (
             JSON.parse(served.body.toString('utf8')) as {
@@ -401,7 +402,7 @@ test(
       stable: '1.0.0',
     });
 
-    const put = await fetch(`${env.repoBaseUrl}/${repo.name}/-/package/${name}/dist-tags/other`, {
+    const put = await fetch(repoUrl(repo.name, `-/package/${name}/dist-tags/other`), {
       method: 'PUT',
       headers: { ...npmAuthHeader(adminCredential()), 'Content-Type': 'application/json' },
       body: '"1.0.0"',
@@ -444,7 +445,7 @@ test(
     ).versions['1.0.0']?.dist;
     const lockfile = await fs.readFile(path.join(consumer.work, 'yarn.lock'), 'utf8');
     expect(lockfile).toContain(
-      `resolved "${env.repoBaseUrl}/${repo.name}/${name}/-/${name}-1.0.0.tgz#${dist?.shasum}"`,
+      `resolved "${repoUrl(repo.name, `${name}/-/${name}-1.0.0.tgz`)}#${dist?.shasum}"`,
     );
     expect(lockfile).toContain(`integrity ${dist?.integrity}`);
   },
@@ -475,7 +476,7 @@ test(
     const consumer = await client.prepare('yarnrc-con', [reader]);
     await fs.writeFile(
       path.join(consumer.home, '.npmrc'),
-      `//${new URL(env.repoBaseUrl).host}/${repo.name}/:_authToken=${reader.credential.password}\nalways-auth=true\n`,
+      `//${new URL(env.repoBaseUrl).host}/${repoPath(repo.name)}/:_authToken=${reader.credential.password}\nalways-auth=true\n`,
     );
     await writeYarnClassicRc(path.join(consumer.home, '.yarnrc'), [reader]);
     await renderConsumer(consumer.work, 'yarnrc-consumer');

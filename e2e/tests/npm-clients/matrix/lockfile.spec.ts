@@ -46,7 +46,7 @@ import {
 } from '../../../src/clients/npm-family/fixtures.js';
 import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
-import { env } from '../../../src/env.js';
+import { repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../../src/seed/seeder.js';
 
@@ -173,8 +173,8 @@ for (const client of clientsWith('frozenInstall')) {
         expectTarballUrls(
           client,
           lockfile,
-          [graph.app, graph.lib].map(
-            (name) => `${env.repoBaseUrl}/${graph.repoName}/${name}/-/${name}-1.0.0.tgz`,
+          [graph.app, graph.lib].map((name) =>
+            repoUrl(graph.repoName, `${name}/-/${name}-1.0.0.tgz`),
           ),
         );
         expect(lockfile, 'and an integrity hash for it').toMatch(

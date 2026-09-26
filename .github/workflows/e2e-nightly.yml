@@ -49,6 +49,10 @@ concurrency:
   group: e2e-nightly
   cancel-in-progress: false
 
+# Every job runs on ubuntu-24.04, not ubuntu-latest (RPS-1600): ubuntu-latest moves to Ubuntu 26 on
+# 2026-10-19, and the Chromium sandbox probe, the Docker version and the docker socket's gid of the stack
+# runner all change with the image. Move the pin (or set the repository variable E2E_RUNNER, which wins
+# for the image and e2e jobs) on purpose, in a PR of its own, after a manual `suite=all` run on the new one.
 defaults:
   run:
     shell: bash
@@ -62,7 +66,7 @@ jobs:
   # Decides which legs run, from the dispatch inputs (a scheduled run has none: everything).
   plan:
     name: Plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -95,7 +99,10 @@ jobs:
               "h2": ("h2", "--h2", WIRE + ["ui"], "@smoke", 90, "", True),
               # One full catalog on H2 per night, rotating (README.md "CI"): @smoke alone let RPS-1385 (a
               # native CTE that broke Docker on H2 while every IT passed) through.
-              "h2-full": ("h2", "--h2", [h2_full_runner], "", 60, "", True),
+              # 90 minutes, not 60 (RPS-1600): the maven catalog alone took 43.7 minutes on PostgreSQL in the
+              # first green wire run, and on H2 it also pays for the stack start and the runner build; a
+              # timeout kills the job before its summary, leak check and artifacts.
+              "h2-full": ("h2", "--h2", [h2_full_runner], "", 90, "", True),
               # The stub scanner overlay (README.md "Scanner stack"): only the opted-in @scanner specs.
               # Never the whole ui suite there (its @mocked specs assume the scanner is off), so the
               # grep input does not apply to this leg. The wire runners with @scanner specs (real npm,
@@ -187,7 +194,7 @@ jobs:
   # an artifact: three legs each rebuilding it would triple the slowest step of the run.
   image:
     name: Build Repsy image
-    runs-on: ${{ vars.E2E_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.E2E_RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -244,7 +251,7 @@ jobs:
   e2e:
     name: E2E ${{ matrix.leg }}
     needs: [plan, image]
-    runs-on: ${{ vars.E2E_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.E2E_RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: ${{ matrix.timeout }}
     strategy:
       # A red leg must not hide the result of the others.
@@ -282,6 +289,12 @@ jobs:
         id: up
         env:
           STACK: ${{ matrix.stack }}
+          # Where the trivy leg's scanner downloads its vulnerability databases from (RPS-1600): comma lists
+          # of OCI repositories, tried in order. Set the repository variables to a mirror when ghcr.io
+          # answers `toomanyrequests` to the shared runner egress; empty keeps the scanner's own default
+          # (ghcr.io, then mirror.gcr.io). No other leg reads them. See README.md "CI".
+          TRIVY_DB_REPOSITORY: ${{ vars.E2E_TRIVY_DB_REPOSITORY }}
+          TRIVY_JAVA_DB_REPOSITORY: ${{ vars.E2E_TRIVY_JAVA_DB_REPOSITORY }}
         # REPSY_IMAGE is set (workflow env), so run.sh starts the loaded image and does not build.
         # $STACK is empty (PostgreSQL profile), --h2, or an overlay flag (--scanner: PostgreSQL plus the
         # stub scanner; --throttle: PostgreSQL with the low auth-throttle limit; --limits: PostgreSQL with
@@ -339,8 +352,10 @@ jobs:
           # NAME=value words `test` needs and `up` does not (the tls leg: REPSY_E2E_TLS=1, which points the
           # runners at the https URLs and makes each client trust the CA); empty elsewhere.
           SWITCHES: ${{ matrix.switches }}
-          # Read by playwright.config.ts (retries: 1, forbidOnly, trace on first retry); run.sh
-          # forwards it to the ui runner only. GitHub sets it already; explicit for the reader.
+          # Read by playwright.config.ts: forbidOnly on every runner, and one retry (with a trace on the
+          # first one) for the ui and maven projects and the trivy contract spec only, none for the rest.
+          # docker-compose.runners.yml forwards it to every runner. GitHub sets it already; explicit for
+          # the reader.
           CI: "true"
         run: |
           for switch in $SWITCHES; do
@@ -359,6 +374,7 @@ jobs:
             cp -a test-results "$ARTIFACTS/$protocol/test-results" || true
             cp -a playwright-report "$ARTIFACTS/$protocol/playwright-report" || true
             mv "$ARTIFACTS/$protocol/test-results/junit.xml" "$ARTIFACTS/$protocol/junit.xml" || true
+            mv "$ARTIFACTS/$protocol/test-results/results.json" "$ARTIFACTS/$protocol/results.json" || true
             echo "::endgroup::"
           done
           exit "$failed"
@@ -366,25 +382,51 @@ jobs:
       # A test that only passed on its retry is a flake to ticket. The job summary lists them, but a
       # list in a summary is easy to miss, so each one also becomes a warning annotation on the run.
       # It is its own step: workflow commands are ignored in the step whose stdout is redirected into
-      # the summary. Playwright keeps a directory per retry attempt (`<test>-retry1`), and only the ui
-      # runner retries (CI reaches it alone, playwright.config.ts retries: isCI ? 1 : 0). The leg
-      # stays green: a retry is a warning, not a verdict (RPS-1485).
+      # the summary. Retries are per project (playwright.config.ts): `ui`, `maven` and the trivy contract
+      # spec of `api` retry once (CI reaches every runner, `forbidOnly` included), the rest and `stack`
+      # never do. A retry that passes leaves no `-retry1` directory unless the attempt wrote a trace or
+      # a screenshot (only the ui runner does), and junit.xml calls it passed, so the source is
+      # `results.json` (the Playwright json reporter: status "flaky"); the retry directories are read
+      # only when a runner has none. The leg stays green: a retry is a warning, not a verdict (RPS-1485).
+      # The README rule ("CI"): a `Flaky test` annotation is a ticket by the next working day.
       - name: Flag the tests that needed a retry
         if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
         run: |
           python3 - <<'PY'
-          import glob, os
+          import glob, json, os
 
           def escape(text):
               return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+          def retried(folder):
+              """(test, how it ended) for every test of the runner that ran a retry attempt."""
+              try:
+                  with open(f"{folder}results.json") as f:
+                      report = json.load(f)
+              except (OSError, ValueError):
+                  return [(os.path.basename(p), "ran a retry attempt (no results.json)")
+                          for p in sorted(glob.glob(f"{folder}test-results/*-retry[0-9]*"))]
+              found = []
+              def walk(suite, titles):
+                  titles = titles + [suite["title"]]
+                  for spec in suite.get("specs", []):
+                      for test in spec["tests"]:
+                          if any(r.get("retry", 0) > 0 for r in test["results"]):
+                              how = "passed only on a retry (flaky)" if test["status"] == "flaky" else "failed on its retry too"
+                              found.append((" > ".join(titles + [spec["title"]]), how))
+                  for child in suite.get("suites", []):
+                      walk(child, titles)
+              for suite in report["suites"]:
+                  walk(suite, [])
+              return found
 
           base = os.environ["ARTIFACTS"]
           flaky = 0
           for folder in sorted(glob.glob(f"{base}/*/")):
               runner = os.path.basename(folder.rstrip("/"))
-              for path in sorted(glob.glob(f"{folder}test-results/*-retry[0-9]*")):
+              for name, how in retried(folder):
                   flaky += 1
-                  print(f"::warning title=Flaky test::{escape(runner)}: {escape(os.path.basename(path))} ran a retry attempt (flaky test, or a failing one)")
+                  print(f"::warning title=Flaky test::{escape(runner)}: {escape(name)} {how}")
           print(f"{flaky} retried test(s)")
           PY
 
@@ -456,14 +498,36 @@ jobs:
           LEAKS: ${{ steps.leaks.outcome }}
         run: |
           python3 - >> "$GITHUB_STEP_SUMMARY" <<'PY'
-          import glob, os
+          import glob, json, os
           import xml.etree.ElementTree as ET
+
+          def retried(folder):
+              """(test, how it ended) for every test of the runner that ran a retry attempt."""
+              try:
+                  with open(f"{folder}results.json") as f:
+                      report = json.load(f)
+              except (OSError, ValueError):
+                  return [(os.path.basename(p), "ran a retry attempt (no results.json)")
+                          for p in sorted(glob.glob(f"{folder}test-results/*-retry[0-9]*"))]
+              found = []
+              def walk(suite, titles):
+                  titles = titles + [suite["title"]]
+                  for spec in suite.get("specs", []):
+                      for test in spec["tests"]:
+                          if any(r.get("retry", 0) > 0 for r in test["results"]):
+                              how = "passed only on a retry (flaky)" if test["status"] == "flaky" else "failed on its retry too"
+                              found.append((" > ".join(titles + [spec["title"]]), how))
+                  for child in suite.get("suites", []):
+                      walk(child, titles)
+              for suite in report["suites"]:
+                  walk(suite, [])
+              return found
 
           base = os.environ["ARTIFACTS"]
           print(f"### E2E `{os.environ['LEG']}`\n")
           print("| runner | tests | passed | failed | skipped | wall time (s) | retried |")
           print("| --- | ---: | ---: | ---: | ---: | ---: | ---: |")
-          failures, retried, totals = [], [], [0, 0, 0, 0]
+          failures, retried_all, totals = [], [], [0, 0, 0, 0]
           for folder in sorted(glob.glob(f"{base}/*/")):
               name = os.path.basename(folder.rstrip("/"))
               try:
@@ -480,27 +544,24 @@ jobs:
                       failures.append(f"{name}: {case.get('name')}")
                   elif case.find("skipped") is not None:
                       s += 1
-              # Playwright keeps a directory per retry attempt. A test that needed one is a flake to
-              # ticket, even when it passed the second time.
-              retries = sorted(
-                  os.path.basename(p.rstrip("/"))
-                  for p in glob.glob(f"{folder}test-results/*-retry[0-9]*")
-              )
-              retried += [f"{name}: {r}" for r in retries]
+              # A test that needed a retry is a flake to ticket, even when it passed the second time
+              # (see the step "Flag the tests that needed a retry" for where this is read from).
+              retries = retried(folder)
+              retried_all += [f"{name}: {test} ({how})" for test, how in retries]
               secs = float(root.get("time") or 0)
               print(f"| {name} | {n} | {n - f - s} | {f} | {s} | {secs:.0f} | {len(retries)} |")
               for i, v in enumerate((n, n - f - s, f, s)):
                   totals[i] += v
-          print(f"| **total** | {totals[0]} | {totals[1]} | {totals[2]} | {totals[3]} | | {len(retried)} |")
+          print(f"| **total** | {totals[0]} | {totals[1]} | {totals[2]} | {totals[3]} | | {len(retried_all)} |")
           if failures:
               print("\n**Failing tests**\n")
               for line in failures[:50]:
                   print("- " + line.replace("|", "\\|"))
               if len(failures) > 50:
                   print(f"- ... and {len(failures) - 50} more (see the junit.xml artifacts)")
-          if retried:
-              print("\n**Needed a retry (flake candidates)**\n")
-              for line in retried[:50]:
+          if retried_all:
+              print("\n**Needed a retry (flake candidates, ticket each by the next working day)**\n")
+              for line in retried_all[:50]:
                   print("- " + line)
           print("\nLeak check: " + {"success": "clean", "failure": "LEFTOVER e2e-* repos/users"}.get(
               os.environ["LEAKS"], "not run"))
