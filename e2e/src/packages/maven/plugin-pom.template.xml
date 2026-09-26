@@ -19,7 +19,9 @@
   a one-goal Maven plugin (`hello:hi`, prefix taken from the artifactId `hello-maven-plugin` the way
   maven-plugin-plugin does; a second plugin of the group is `bye:hi`, and one that sets its own
   goalPrefix, which `plugin.xml` in the jar then names, is `tl:hi`, RPS-1458) that only logs a marker. The jar and this POM
-  are what the spec then uploads by hand, the files Gradle, sbt or Ivy would send: no group-level maven-metadata.xml among them (RPS-1438).
+  are what plugin-prefix.spec.ts then uploads by hand, the files Gradle, sbt or Ivy would send: no group-level maven-metadata.xml among them (RPS-1438).
+  With `repoUrl` set (RPS-1488, maven-reactor-plugin.spec.ts) the POM also names the repository, so a real
+  `mvn deploy` uploads the jar, the POM, the artifact-level and the group-level maven-metadata.xml.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -31,6 +33,16 @@
   <version>{{version}}</version>
   <packaging>maven-plugin</packaging>
   <name>{{name}}</name>
+
+  {{#repoUrl}}
+  <distributionManagement>
+    <repository>
+      <id>repsy</id>
+      <name>Repsy e2e repository</name>
+      <url>{{repoUrl}}</url>
+    </repository>
+  </distributionManagement>
+  {{/repoUrl}}
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
