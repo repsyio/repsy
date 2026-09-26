@@ -215,10 +215,10 @@ jobs:
           STACK: ${{ matrix.stack }}
         # REPSY_IMAGE is set (workflow env), so run.sh starts the loaded image and does not build.
         # $STACK is empty (PostgreSQL profile), --h2 or --scanner (PostgreSQL plus the stub scanner
-        # overlay), deliberately unquoted.
-        # shellcheck disable=SC2086
+        # overlay); it is split into words so an empty value passes no argument at all.
         run: |
-          ./run.sh local up $STACK
+          read -ra stack_args <<< "$STACK"
+          ./run.sh local up "${stack_args[@]}"
           docker compose ls
 
       # The UI runner drives Chromium with its sandbox ON under a seccomp profile that allows user
@@ -231,7 +231,9 @@ jobs:
         if: matrix.ui
         run: |
           mkdir -p test-results playwright-report
-          export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
+          HOST_UID="$(id -u)"
+          HOST_GID="$(id -g)"
+          export HOST_UID HOST_GID
           docker compose -f docker-compose.runners.yml build ui
           if docker compose -f docker-compose.runners.yml run --rm --no-deps ui \
             node --input-type=module -e "
@@ -409,5 +411,6 @@ jobs:
         if: always()
         env:
           STACK: ${{ matrix.stack }}
-        # shellcheck disable=SC2086
-        run: ./run.sh local down $STACK
+        run: |
+          read -ra stack_args <<< "$STACK"
+          ./run.sh local down "${stack_args[@]}"
