@@ -56,6 +56,7 @@ import {
   planFor,
   type ScanPlan,
   type StubFinding,
+  type StubFindingSpec,
   type StubOutcome,
   type StubSeverity,
 } from './rules.ts';
@@ -68,8 +69,13 @@ export interface StubScript {
   queueSeconds?: number;
   runSeconds?: number;
   outcome?: StubOutcome;
-  /** What a completed scan reports (worst first is not required), e.g. `['CRITICAL', 'LOW']`. */
-  findings?: StubSeverity[];
+  /**
+   * What a completed scan reports (worst first is not required): a severity each, e.g.
+   * `['CRITICAL', 'LOW']`, or `{severity, packageName, packageVersion, cveId, description}` to say
+   * which package (and version) the finding is on, e.g. the artifact itself so that its npm audit
+   * shows it (only `severity` is required).
+   */
+  findings?: Array<StubSeverity | StubFindingSpec>;
   errorMessage?: string;
 }
 
@@ -135,6 +141,9 @@ export function resolvePlan(
   script: StubScript | undefined,
 ): ScanPlan {
   const base = planFor(artifactName, artifactVersion);
+  const specs = (script?.findings ?? []).map((finding) =>
+    typeof finding === 'string' ? { severity: finding } : finding,
+  );
   return {
     ...base,
     submitSeconds: script?.submitSeconds ?? base.submitSeconds,
@@ -142,7 +151,12 @@ export function resolvePlan(
     runSeconds: script?.runSeconds ?? base.runSeconds,
     outcome: script?.outcome ?? base.outcome,
     errorMessage: script?.errorMessage ?? base.errorMessage,
-    severities: script?.findings ? [...script.findings] : base.severities,
+    severities: script?.findings ? specs.map((spec) => spec.severity) : base.severities,
+    ...(script?.findings
+      ? {
+          overrides: specs.map(({ severity: _severity, ...rest }) => rest),
+        }
+      : {}),
   };
 }
 
@@ -202,6 +216,31 @@ function isNonNegativeNumber(value: unknown): boolean {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
+const FINDING_TEXT_FIELDS = ['packageName', 'packageVersion', 'cveId', 'description'] as const;
+
+/** A scripted finding is a severity, or an object with a `severity` and optional text fields. */
+function validateFinding(finding: unknown): void {
+  const message = `each finding must be one of ${SEVERITIES.join(', ')} or an object with a severity and optional ${FINDING_TEXT_FIELDS.join(', ')}`;
+  if (typeof finding === 'string') {
+    if (!(SEVERITIES as readonly string[]).includes(finding)) {
+      throw new HttpError(400, message);
+    }
+    return;
+  }
+  if (typeof finding !== 'object' || finding === null || Array.isArray(finding)) {
+    throw new HttpError(400, message);
+  }
+  const spec = finding as Record<string, unknown>;
+  if (!(SEVERITIES as readonly unknown[]).includes(spec.severity)) {
+    throw new HttpError(400, message);
+  }
+  for (const field of FINDING_TEXT_FIELDS) {
+    if (spec[field] !== undefined && (typeof spec[field] !== 'string' || spec[field] === '')) {
+      throw new HttpError(400, `${field} of a finding must be a non-empty string`);
+    }
+  }
+}
+
 /** Checks a `PUT /control/scripts` body, throwing a 400 that says what is wrong. */
 function parseScriptRequest(raw: string): { artifactName: string; script: StubScript } {
   let body: unknown;
@@ -226,14 +265,13 @@ function parseScriptRequest(raw: string): { artifactName: string; script: StubSc
   ) {
     throw new HttpError(400, 'outcome must be completed, failed or unavailable');
   }
-  if (
-    input.findings !== undefined &&
-    !(
-      Array.isArray(input.findings) &&
-      input.findings.every((severity) => (SEVERITIES as readonly unknown[]).includes(severity))
-    )
-  ) {
-    throw new HttpError(400, `findings must be a list of ${SEVERITIES.join(', ')}`);
+  if (input.findings !== undefined) {
+    if (!Array.isArray(input.findings)) {
+      throw new HttpError(400, `findings must be a list of ${SEVERITIES.join(', ')}`);
+    }
+    for (const finding of input.findings as unknown[]) {
+      validateFinding(finding);
+    }
   }
   if (input.errorMessage !== undefined && typeof input.errorMessage !== 'string') {
     throw new HttpError(400, 'errorMessage must be a string');
@@ -307,7 +345,7 @@ export function createScannerStub(options: StubOptions): ScannerStub {
       jobs.set(call.scanId, {
         scanId: call.scanId,
         plan,
-        findings: findingsFor(plan.severities),
+        findings: findingsFor(plan.severities, plan.overrides),
         acceptedAt: now(),
       });
     }

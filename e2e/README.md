@@ -3585,11 +3585,11 @@ differently, so each of them is an **opt-in overlay**: a compose file layered on
 PostgreSQL one or the H2 one) with one more `-f`, that changes what Repsy runs with for one nightly leg
 and is never part of the default stack.
 
-| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                              | Specs                                        |
-| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | -------------------------------------------- | -------------------------------------------- |
-| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`     | `@scanner` (ui), "Scanner stack"             |
-| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client | `@throttle` (stack, ui), "Auth-throttle leg" |
-| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443        | `@tls` (skeleton, golang), "TLS stack"       |
+| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                              | Specs                                                              |
+| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | -------------------------------------------- | ------------------------------------------------------------------ |
+| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`     | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack" |
+| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client | `@throttle` (stack, ui), "Auth-throttle leg"                       |
+| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443        | `@tls` (skeleton, golang), "TLS stack"                             |
 
 How it fits together, so a later overlay is one row:
 
@@ -4752,12 +4752,12 @@ pins the table.
 `scanner` fixture): behind the same API key, and published on loopback only, it lets a test read what the
 backend handed the scanner and override one artifact's result.
 
-| Call                                      | Effect                                                                                                                                                              |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /control/calls[?artifactName=]`      | every `POST /scan` seen: scan id, type, name, version, file name and size (or the Docker reference), accepted or refused                                            |
-| `PUT /control/scripts`                    | `{artifactName, script: {submitSeconds, queueSeconds, runSeconds, outcome, findings: [severity...], errorMessage}}`: every later scan of that exact name follows it |
-| `DELETE /control/scripts[?artifactName=]` | drops one script or all                                                                                                                                             |
-| `POST /control/reset`                     | forgets scripts, calls and jobs (a running scan then reads as "job lost"): never from a test that runs beside others                                                |
+| Call                                      | Effect                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /control/calls[?artifactName=]`      | every `POST /scan` seen: scan id, type, name, version, file name and size (or the Docker reference), accepted or refused                                                                                                                                                                                                                                  |
+| `PUT /control/scripts`                    | `{artifactName, script: {submitSeconds, queueSeconds, runSeconds, outcome, findings: [severity or {severity, packageName?, packageVersion?, cveId?, description?}...], errorMessage}}`: every later scan of that exact name follows it. A finding given as an object can name the package (and version) it is on, see "Wire clients on the scanner stack" |
+| `DELETE /control/scripts[?artifactName=]` | drops one script or all                                                                                                                                                                                                                                                                                                                                   |
+| `POST /control/reset`                     | forgets scripts, calls and jobs (a running scan then reads as "job lost"): never from a test that runs beside others                                                                                                                                                                                                                                      |
 
 Tests are independent because every name carries the test's run id, so a script or a `calls` filter only
 ever touches its own package. `SCANNER_STUB_CONTROL=disabled` turns `/control` off.
@@ -4773,6 +4773,39 @@ What `tests/ui/security-real/` covers (20 tests, all `@scanner`, nothing stubbed
 | `security-page.spec.ts` | `/security` for one repo (rows, outcomes, severity and type filters, row navigation), the distribution card equals the backend's summary, the dashboard's Security Overview equals the backend's count                                                                        |
 
 A run of the whole `@scanner` set takes about two and a half minutes with two workers.
+
+#### Wire clients on the scanner stack (RPS-1484)
+
+The `@scanner` specs are not only the ui runner's. The runners with a real client publish a package and
+read what the scanner made of it, on the same stack (`REPSY_E2E_SCANNER=1 ./run.sh local up`, then
+`REPSY_E2E_SCANNER=1 ./run.sh test --protocol <runner> --grep @scanner`; `run.sh test` gives every runner the
+opt-in, and `docker-compose.runners.yml` gives every runner the stub's control URL and key,
+`REPSY_SCANNER_STUB_URL` / `REPSY_SCANNER_API_KEY`). Their `test` is `src/scenarios/scanner-fixtures.ts`
+(the scenario suite's fixtures plus the `scanner` client, no browser); the ui runner keeps its own.
+
+| Spec                                             | Client                     | What it proves                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tests/npm-clients/matrix/audit-scanner.spec.ts` | npm, pnpm, yarn berry, bun | `lib@1.0.0` published with a scripted HIGH finding on itself, `lib@2.0.0` published clean. `audit` of a `1.0.0` consumer exits non-zero and reports the advisory (severity `high`, title `CVE-2099-7001: Prototype pollution in lib`, the finding's url, vulnerable version `1.0.0`) in the client's own report; a threshold above `high` exits 0; a `2.0.0` consumer audits clean with exit 0. Every client asks `POST /<repo>/-/npm/v1/security/advisories/bulk` (pnpm too) with its token, once per audit. npm alone also flips the repository scan setting: off reports nothing, on reports the advisory again |
+| `tests/maven/scanner.spec.ts`                    | `mvn deploy`               | one scan per deploy, of `groupId:artifactId` and the version, with the jar as the file; the panel API holds the COMPLETED scan and its findings                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `tests/pypi/scanner.spec.ts`                     | `twine upload`             | one scan of the name and version, with the wheel as the file; the panel API holds the scan and its findings                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `tests/docker/scanner.spec.ts`                   | `crane push`               | the scanner gets no file but the image reference `<registry>/<repo>/<image>:<tag>` and a registry token; the panel API holds the scan and its findings                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+
+The audit needs the stub to name the published package: Repsy matches an advisory on the finding's package
+name and version (`NpmAdvisorySourceImpl`), and the stub's own findings are made-up `stub-lib-*` packages. So
+a script's `findings` may hold `{severity, packageName, packageVersion, cveId, description}` (only the
+severity is required; the rest keep the defaults above), and the spec registers one for the exact name it
+is about to publish (`scanner.script(name, {findings: [{severity: 'HIGH', packageName: name, packageVersion:
+'1.0.0'}]})`). The finding's description is the advisory's title.
+
+Client differences the audit spec pins (probed live): `npm audit --audit-level=critical` still prints the
+high advisory but exits 0; `pnpm audit --audit-level critical` prints none; `yarn npm audit --severity
+critical` prints `No audit suggestions`; `bun audit --json --audit-level=critical` still lists the advisory
+and exits 1 (the flag only takes effect in text mode, so the spec runs bun's threshold in text mode).
+Berry's JSON report is empty, so its advisory is read from its own text report.
+
+The Docker, Maven and PyPI specs script a finding list by name (`SCRIPTED_SEVERITIES`) because the catalog's
+names carry no directive. The scanner leg of the nightly runs `ui`, `npm-clients`, `docker`, `maven` and `pypi`;
+its step "Check the opt-in specs ran" fails a runner that skipped or ran nothing.
 
 ## Running
 
@@ -4865,15 +4898,15 @@ cancelling): a second one waits.
 
 ### What runs
 
-| Job / leg  | Stack                                       | Runs                                                                                                                                                                                                        | Timeout |
-| ---------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `image`    |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                              | 40 min  |
-| `ui`       | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                   | 60 min  |
-| `wire`     | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                       | 150 min |
-| `h2`       | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                       | 90 min  |
-| `h2-full`  | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another | 60 min  |
-| `scanner`  | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--protocol ui --grep @scanner` only (20 tests, "Scanner stack" above), never the whole `ui` suite                                                                              | 45 min  |
-| `throttle` | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                   | 30 min  |
+| Job / leg  | Stack                                       | Runs                                                                                                                                                                                                                     | Timeout |
+| ---------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| `image`    |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                                           | 40 min  |
+| `ui`       | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                | 60 min  |
+| `wire`     | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                                    | 150 min |
+| `h2`       | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                    | 90 min  |
+| `h2-full`  | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another              | 60 min  |
+| `scanner`  | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite | 60 min  |
+| `throttle` | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                | 30 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
 others. Every leg does the same: load the image, `./run.sh local up [--h2]` (with `REPSY_IMAGE` set, so
