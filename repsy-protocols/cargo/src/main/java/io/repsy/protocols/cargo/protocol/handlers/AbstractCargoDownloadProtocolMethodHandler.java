@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -41,7 +42,7 @@ import org.springframework.http.ResponseEntity;
 @NullMarked
 public abstract class AbstractCargoDownloadProtocolMethodHandler implements ProtocolMethodHandler {
 
-  private static final Pattern DOWNLOAD_PATTERN =
+  static final Pattern DOWNLOAD_PATTERN =
       Pattern.compile(".*/api/v1/crates/([^/]+)/([^/]+)/download$");
 
   private final PathParser basePathParser;
@@ -101,17 +102,12 @@ public abstract class AbstractCargoDownloadProtocolMethodHandler implements Prot
 
       // The URL ends in "/download", so without a header of its own a browser or a download tool
       // saves the crate as "download" (RPS-1389). cargo itself ignores the header.
-      final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
-      final var matcher = DOWNLOAD_PATTERN.matcher(relativePath);
       final var ok = ResponseEntity.ok();
+      final var contentDisposition =
+          contentDisposition(ProtocolContextUtils.getRelativePath(context).getPath());
 
-      if (matcher.matches()) {
-        ok.header(
-            HttpHeaders.CONTENT_DISPOSITION,
-            ContentDisposition.attachment()
-                .filename(matcher.group(1) + "-" + matcher.group(2) + ".crate")
-                .build()
-                .toString());
+      if (contentDisposition != null) {
+        ok.header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition);
       }
 
       return ok.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
@@ -120,5 +116,22 @@ public abstract class AbstractCargoDownloadProtocolMethodHandler implements Prot
       log.debug("Cargo download failed: {}", e.getMessage());
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
+  }
+
+  /**
+   * The file name of the crate a download URL names, as an attachment; the {@code HEAD} of the same
+   * URL answers it too. {@code null} when the path is not a download path.
+   */
+  static @Nullable String contentDisposition(final String relativePath) {
+    final var matcher = DOWNLOAD_PATTERN.matcher(relativePath);
+
+    if (!matcher.matches()) {
+      return null;
+    }
+
+    return ContentDisposition.attachment()
+        .filename(matcher.group(1) + "-" + matcher.group(2) + ".crate")
+        .build()
+        .toString();
   }
 }

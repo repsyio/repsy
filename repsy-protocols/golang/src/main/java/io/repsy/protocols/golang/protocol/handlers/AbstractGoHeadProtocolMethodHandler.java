@@ -24,19 +24,30 @@ import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
+/**
+ * Answers a {@code HEAD} on a Go proxy path like the {@code GET} of the same path would, without
+ * the body (RPS-1465): 200 with the {@code Content-Type}, {@code Content-Disposition} and {@code
+ * Content-Length} of the file, or the 404 the {@code GET} gives. Before, a {@code HEAD} on an
+ * existing {@code .zip} or {@code .mod} was answered by the router's generic {@code unknownPath}
+ * 404, which even carried Spring's {@code Content-Disposition: inline;filename=f.txt}.
+ *
+ * <p>The authorization is the one of the {@code GET}: read permission, decided by the same
+ * pre-processor. A {@code HEAD} is not a download, so it is not counted as one.
+ */
 @NullMarked
-public abstract class AbstractGoDownloadProtocolMethodHandler<ID> implements ProtocolMethodHandler {
+public abstract class AbstractGoHeadProtocolMethodHandler<ID> implements ProtocolMethodHandler {
 
   private final PathParser pathParser;
   private final GoProtocolFacade<ID> goProtocolFacade;
 
-  public AbstractGoDownloadProtocolMethodHandler(
+  protected AbstractGoHeadProtocolMethodHandler(
       final PathParser pathParser,
       final GoProtocolFacade<ID> goProtocolFacade,
       final GolangProtocolProvider provider) {
@@ -48,12 +59,13 @@ public abstract class AbstractGoDownloadProtocolMethodHandler<ID> implements Pro
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false, "method", "download");
+    return Map.of(
+        "permission", Permission.READ, "writeOperation", false, "skipUsagePostProcessor", true);
   }
 
   @Override
   public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
+    return List.of(HttpMethod.HEAD);
   }
 
   @Override
@@ -65,22 +77,19 @@ public abstract class AbstractGoDownloadProtocolMethodHandler<ID> implements Pro
   public ResponseEntity<Object> handle(
       final ProtocolContext context,
       final HttpServletRequest request,
-      final HttpServletResponse response) {
+      final HttpServletResponse response)
+      throws IOException {
 
     try {
       final var resource = this.goProtocolFacade.download(context);
 
       if (!resource.exists()) {
-        return notFound(context);
+        return GoDownloadResponses.notFound().build();
       }
 
-      return GoDownloadResponses.ok(context).body(resource);
+      return GoDownloadResponses.ok(context).contentLength(resource.contentLength()).build();
     } catch (final ItemNotFoundException _) {
-      return notFound(context);
+      return GoDownloadResponses.notFound().build();
     }
-  }
-
-  private static ResponseEntity<Object> notFound(final ProtocolContext context) {
-    return GoDownloadResponses.notFound().body(GoDownloadResponses.notFoundText(context));
   }
 }

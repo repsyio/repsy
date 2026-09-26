@@ -514,6 +514,21 @@ test.describe('ruby registry rules (raw HTTP)', () => {
 
     const versions = await rawHead(layout.repoName, admin, versionsRelPath());
     expect(versions.status, 'HEAD of /versions').toBe(200);
+
+    // RPS-1465: a HEAD carries the Content-Type of the GET it mirrors, for every kind of path.
+    for (const relPath of [
+      gemRelPath(built.filename),
+      versionsRelPath(),
+      namesRelPath(),
+      infoRelPath(layout.packageName),
+    ]) {
+      const get = await rawGet(layout.repoName, admin, relPath);
+      const head = await rawHead(layout.repoName, admin, relPath);
+      expect(head.contentType, `HEAD ${relPath} Content-Type`).toBeDefined();
+      expect(head.contentType, `HEAD ${relPath} Content-Type mirrors the GET`).toBe(
+        get.contentType,
+      );
+    }
   });
 
   test(

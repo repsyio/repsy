@@ -109,7 +109,12 @@ public abstract class AbstractPypiFileDownloadProtocolMethodHandler<ID>
 
     return ResponseEntity.ok()
         .contentType(MediaType.APPLICATION_OCTET_STREAM)
-        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+        .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition(fileName))
         .body(resource);
+  }
+
+  /** The header of a file download; the {@code HEAD} of the same file answers it too. */
+  static String contentDisposition(final String fileName) {
+    return "attachment; filename=\"" + fileName + "\"";
   }
 }

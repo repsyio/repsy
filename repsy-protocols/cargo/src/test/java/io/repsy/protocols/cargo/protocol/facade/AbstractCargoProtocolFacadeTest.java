@@ -1002,4 +1002,22 @@ class AbstractCargoProtocolFacadeTest {
       verify(crateService).incrementDownloadCount(repoInfo, "some_crate", "0.5.1");
     }
   }
+
+  // =========================================================================
+
+  @Nested
+  @DisplayName("getCrate() (RPS-1465)")
+  class GetCrateTests {
+
+    @Test
+    @DisplayName("returns the resource from storage and counts no download")
+    void resolvesWithoutCounting() {
+      when(storageService.getCrate(REPO_ID, REPO_NAME, "my_crate", "1.0.0")).thenReturn(resource);
+
+      final var result = facade.getCrate(context("/api/v1/crates/my_crate/1.0.0/download"));
+
+      assertThat(result).isSameAs(resource);
+      verifyNoInteractions(crateService);
+    }
+  }
 }

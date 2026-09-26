@@ -20,6 +20,8 @@ import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.gem;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.HttpHeaders.CONTENT_DISPOSITION;
+import static org.springframework.http.HttpHeaders.CONTENT_LENGTH;
+import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -61,9 +63,12 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * <p>RPS-1442 went through the routes RPS-1389 left: the Ruby indexes ({@code .gemspec.rz}, {@code
  * *specs.4.8.gz}, a compact index {@code /info/foo.rb} whose dotted gem name reads as an
  * extension), the 404 of a Go file URL, and the JSON of the Cargo and NuGet indexes, which are not
- * files and must carry no name. The Ruby {@code HEAD} answers the header of its {@code GET}. Go,
- * NuGet and Cargo have no {@code HEAD} handler at all: a {@code HEAD} is the router's "unknownPath"
- * 404, which is not pinned here.
+ * files and must carry no name. The Ruby {@code HEAD} answers the header of its {@code GET}.
+ *
+ * <p>RPS-1465 gave Go, NuGet and Cargo a {@code HEAD} handler (before, a {@code HEAD} was the
+ * router's "unknownPath" 404, which on a {@code .zip} or {@code .nupkg} URL carried {@code f.txt})
+ * and the Ruby {@code HEAD} the {@code Content-Type} of its {@code GET}: each answers the status
+ * and the headers of its {@code GET} for a file that exists and a file that does not.
  *
  * <p>The packages are pushed (NuGet: written to storage, its push needs a committed repo) in the
  * default rolled-back transaction and read back on the protocol port.
@@ -166,6 +171,10 @@ class ProtocolDownloadContentDispositionIT extends AbstractIntegrationTest {
       assertThat(head.getHeader(CONTENT_DISPOSITION))
           .as("HEAD %s", path)
           .isEqualTo(get.getHeader(CONTENT_DISPOSITION));
+      assertThat(head.getHeader(CONTENT_TYPE))
+          .as("HEAD %s Content-Type (RPS-1465)", path)
+          .isNotNull()
+          .isEqualTo(get.getHeader(CONTENT_TYPE));
     }
   }
 
@@ -313,6 +322,104 @@ class ProtocolDownloadContentDispositionIT extends AbstractIntegrationTest {
           this.call(get("/{repo}/" + GO_MODULE + "/@v/v9.9.9." + extension, repo.getName()), 404);
 
       assertThat(response.getHeader(CONTENT_DISPOSITION)).as(extension).isEqualTo("inline");
+    }
+  }
+
+  /**
+   * The answer a {@code HEAD} must give: the status and the headers of the {@code GET} of the same
+   * URL, without a body. {@code Content-Length} is compared only when the {@code GET} sets it (the
+   * generated JSON bodies are not measured by the {@code HEAD}).
+   */
+  private void assertHeadMirrorsGet(
+      final String path, final String repoName, final boolean sameLength) throws Exception {
+    final var get = this.call(get(path, repoName), 200);
+    final var head = this.call(head(path, repoName), 200);
+
+    assertThat(head.getContentAsByteArray()).as("HEAD %s body", path).isEmpty();
+    assertThat(head.getHeader(CONTENT_TYPE))
+        .as("HEAD %s Content-Type", path)
+        .isNotNull()
+        .isEqualTo(get.getHeader(CONTENT_TYPE));
+    assertThat(head.getHeader(CONTENT_DISPOSITION))
+        .as("HEAD %s Content-Disposition", path)
+        .isEqualTo(get.getHeader(CONTENT_DISPOSITION));
+
+    if (sameLength) {
+      assertThat(head.getHeader(CONTENT_LENGTH))
+          .as("HEAD %s Content-Length", path)
+          .isEqualTo(String.valueOf(get.getContentAsByteArray().length));
+    }
+  }
+
+  private void assertHeadNotFound(final String path, final String repoName) throws Exception {
+    final var head = this.call(head(path, repoName), 404);
+
+    assertThat(head.getContentAsByteArray()).as("HEAD %s body", path).isEmpty();
+    assertThat(head.getHeader(CONTENT_DISPOSITION))
+        .as("HEAD %s must not be named f.txt", path)
+        .isNull();
+  }
+
+  @Test
+  @DisplayName("Cargo: a HEAD answers the status and headers of the GET")
+  void cargoHeadMirrorsGet() throws Exception {
+    final var repo = this.seedRepo(RepoType.CARGO, uniqueRepoName("cargo-cd"));
+    this.call(put("/{repo}/api/v1/crates/new", repo.getName()).content(cargoPublishBody()), 200);
+    final var download = "/{repo}/api/v1/crates/" + CRATE + "/" + CRATE_VERSION + "/download";
+
+    this.assertHeadMirrorsGet(download, repo.getName(), true);
+    this.assertHeadMirrorsGet("/{repo}/my/-c/my-crate", repo.getName(), false);
+    this.assertHeadMirrorsGet("/{repo}/config.json", repo.getName(), false);
+    this.assertHeadNotFound("/{repo}/api/v1/crates/" + CRATE + "/9.9.9/download", repo.getName());
+    this.assertHeadNotFound("/{repo}/no/-n/no-such-crate", repo.getName());
+  }
+
+  @Test
+  @DisplayName("NuGet: a HEAD answers the status and headers of the GET")
+  void nugetHeadMirrorsGet() throws Exception {
+    final var repo = this.seedRepo(RepoType.NUGET, uniqueRepoName("nuget-cd"));
+    this.nugetStorageService.writePackage(
+        repo.getId(),
+        NUGET_ID,
+        NUGET_VERSION,
+        new ByteArrayInputStream(new byte[] {1, 2, 3}),
+        "<package/>".getBytes(StandardCharsets.UTF_8));
+    final var nupkg = "/{repo}/v3/package/" + NUGET_ID + "/1.0.0/" + NUGET_ID + ".1.0.0.nupkg";
+    final var nuspec = "/{repo}/v3/package/" + NUGET_ID + "/1.0.0/" + NUGET_ID + ".nuspec";
+
+    this.assertHeadMirrorsGet(nupkg, repo.getName(), true);
+    this.assertHeadMirrorsGet(nuspec, repo.getName(), true);
+    this.assertHeadMirrorsGet("/{repo}/v3/index.json", repo.getName(), false);
+    this.assertHeadNotFound(
+        "/{repo}/v3/package/" + NUGET_ID + "/9.9.9/" + NUGET_ID + ".9.9.9.nupkg", repo.getName());
+    this.assertHeadNotFound(
+        "/{repo}/v3/package/" + NUGET_ID + "/9.9.9/" + NUGET_ID + ".nuspec", repo.getName());
+    this.assertHeadNotFound("/{repo}/v3/package/no.such.package/index.json", repo.getName());
+    this.assertHeadNotFound("/{repo}/v3/registration/no.such.package/index.json", repo.getName());
+  }
+
+  @Test
+  @DisplayName("Go: a HEAD answers the status and headers of the GET for every module file")
+  void goHeadMirrorsGet() throws Exception {
+    final var repo = this.seedRepo(RepoType.GOLANG, uniqueRepoName("go-cd"));
+    this.call(
+        put("/{repo}/" + GO_MODULE + "/@v/" + GO_VERSION, repo.getName())
+            .contentType("application/zip")
+            .content(goModuleZip()),
+        200);
+    final var base = "/{repo}/" + GO_MODULE + "/@v/";
+
+    this.assertHeadMirrorsGet(base + GO_VERSION + ".zip", repo.getName(), true);
+    this.assertHeadMirrorsGet(base + GO_VERSION + ".info", repo.getName(), true);
+    this.assertHeadMirrorsGet(base + GO_VERSION + ".mod", repo.getName(), true);
+    this.assertHeadMirrorsGet(base + "list", repo.getName(), true);
+    this.assertHeadMirrorsGet("/{repo}/" + GO_MODULE + "/@latest", repo.getName(), true);
+
+    for (final var extension : List.of("zip", "info", "mod")) {
+      final var head = this.call(head(base + "v9.9.9." + extension, repo.getName()), 404);
+
+      assertThat(head.getContentAsByteArray()).isEmpty();
+      assertThat(head.getHeader(CONTENT_DISPOSITION)).as(extension).isEqualTo("inline");
     }
   }
 

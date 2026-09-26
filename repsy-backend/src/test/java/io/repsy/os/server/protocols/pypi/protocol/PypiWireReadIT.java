@@ -38,6 +38,7 @@ import java.util.HexFormat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -144,6 +145,40 @@ class PypiWireReadIT extends AbstractIntegrationTest {
 
     this.protocol(head("/{repo}/this/path/never/existed", repo.getName()))
         .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName(
+      "HEAD of a wheel answers the Content-Length, Content-Type, Content-Disposition and"
+          + " Accept-Ranges of its GET, and no body (RPS-1562)")
+  void headOfArchiveFileMirrorsGetHeaders() throws Exception {
+    final var repo = this.createRepo();
+    final var filename = "wireread_pkg-1.0.0-py3-none-any.whl";
+    final var content = "wheel bytes, long enough to slice".getBytes(StandardCharsets.UTF_8);
+
+    this.publish(repo, "wireread-pkg", "1.0.0", filename, content);
+
+    final var get =
+        this.protocol(get("/{repo}/wireread-pkg/-/{file}", repo.getName(), filename))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse();
+    final var head =
+        this.protocol(head("/{repo}/wireread-pkg/-/{file}", repo.getName(), filename))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse();
+
+    assertThat(head.getContentAsByteArray()).isEmpty();
+    assertThat(head.getHeader(HttpHeaders.CONTENT_LENGTH))
+        .isEqualTo(String.valueOf(content.length));
+    assertThat(head.getHeader(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
+    assertThat(get.getHeader(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
+    assertThat(head.getHeader(HttpHeaders.CONTENT_TYPE))
+        .isEqualTo(get.getHeader(HttpHeaders.CONTENT_TYPE));
+    assertThat(head.getHeader(HttpHeaders.CONTENT_DISPOSITION))
+        .isEqualTo(get.getHeader(HttpHeaders.CONTENT_DISPOSITION));
+    assertThat(get.getContentAsByteArray()).hasSize(content.length);
   }
 
   @Test

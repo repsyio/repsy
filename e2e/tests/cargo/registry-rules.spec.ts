@@ -48,7 +48,10 @@ import { RepoType } from '../../src/api/panel-api.js';
 import {
   adminCredential,
   buildPublishBody,
+  cargoAuthHeader,
   cargoErrorDetail,
+  downloadPath,
+  indexPath,
   parseIndex,
   rawDownload,
   rawGetConfigJson,
@@ -58,6 +61,7 @@ import {
   type RawResponse,
 } from '../../src/clients/cargo-raw.js';
 import { cargoAdapter } from '../../src/clients/cargo.js';
+import { expectHeadMirrorsGet } from '../../src/clients/head-parity.js';
 import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
@@ -329,6 +333,67 @@ test.describe('cargo registry rules (raw HTTP)', () => {
       const dlUnderscore = await rawDownload(repo.name, admin, underscoreName, version);
       expect(dlHyphen.status, `download by "${hyphenName}"`).toBe(200);
       expect(dlUnderscore.status, `download by "${underscoreName}"`).toBe(200);
+    },
+  );
+
+  test(
+    'a HEAD answers the status and headers of its GET, for the crate, its sparse index and ' +
+      'config.json, and 404 for what is missing (RPS-1465)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'head');
+      const admin = adminCredential();
+      const version = cargoAdapter.version('release');
+      const bytes = fakeCrate(layout.packageName, version, 'head');
+      expectPut(
+        await rawPublish(
+          layout.repoName,
+          admin,
+          buildPublishBody({ name: layout.packageName, version, crateBytes: bytes }),
+        ),
+        200,
+        undefined,
+      );
+      const headers = cargoAuthHeader(admin);
+
+      await expectHeadMirrorsGet(
+        'the crate',
+        repoUrl(layout.repoName, downloadPath(layout.packageName, version)),
+        headers,
+        { contentLength: true },
+      );
+      await expectHeadMirrorsGet(
+        'the sparse index',
+        repoUrl(layout.repoName, indexPath(layout.packageName)),
+        headers,
+        { contentLength: false },
+      );
+      // config.json needs no credential, HEAD or GET (a private repo included).
+      await expectHeadMirrorsGet(
+        'config.json without credentials',
+        repoUrl(layout.repoName, 'config.json'),
+        {},
+        { contentLength: false },
+      );
+
+      for (const missing of [
+        downloadPath(layout.packageName, '9.9.9'),
+        indexPath(`${layout.packageName}-missing`),
+      ]) {
+        const res = await fetch(repoUrl(layout.repoName, missing), {
+          method: 'HEAD',
+          headers,
+        });
+        expect(res.status, `HEAD ${missing} of something never published`).toBe(404);
+        expect(res.headers.get('content-disposition'), 'not named f.txt').toBeNull();
+      }
+
+      // The same credential rules as the GET: no credentials on a private repo is a 401.
+      const anonymous = await fetch(
+        repoUrl(layout.repoName, downloadPath(layout.packageName, version)),
+        { method: 'HEAD' },
+      );
+      expect(anonymous.status, 'HEAD of a private crate without credentials').toBe(401);
     },
   );
 });

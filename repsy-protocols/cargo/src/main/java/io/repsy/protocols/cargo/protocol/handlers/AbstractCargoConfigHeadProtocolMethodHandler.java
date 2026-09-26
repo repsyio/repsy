@@ -13,76 +13,65 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.nuget.protocol.handlers;
+package io.repsy.protocols.cargo.protocol.handlers;
 
-import static org.springframework.http.MediaType.APPLICATION_JSON;
-
-import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
-import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
-import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
+import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Pattern;
-import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-@Slf4j
+/**
+ * Answers a {@code HEAD} on {@code config.json} like its {@code GET} would, without the body
+ * (RPS-1465). Like the {@code GET} it needs no credentials: cargo reads the file before it knows
+ * whether the registry wants any. The {@code Content-Length} is not sent, the body is built from
+ * the request's own URL.
+ */
 @NullMarked
-public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
+public abstract class AbstractCargoConfigHeadProtocolMethodHandler
     implements ProtocolMethodHandler {
 
-  static final Pattern VERSIONS_PATTERN =
-      Pattern.compile("^.*/v3/package/[^/]+/index\\.json$", Pattern.CASE_INSENSITIVE);
-
   private final PathParser basePathParser;
-  private final NuGetProtocolFacade facade;
 
-  public AbstractNuGetPackageVersionsProtocolMethodHandler(
-      final PathParser basePathParser,
-      final NuGetProtocolFacade facade,
-      final NuGetProtocolProvider provider) {
+  protected AbstractCargoConfigHeadProtocolMethodHandler(
+      final PathParser basePathParser, final CargoProtocolProvider provider) {
 
     this.basePathParser = basePathParser;
-    this.facade = facade;
 
     provider.registerMethodHandler(this);
   }
 
   @Override
   public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
+    return List.of(HttpMethod.HEAD);
   }
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
+    return Map.of(
+        "permission", Permission.READ,
+        "skipUsagePostProcessor", true,
+        "skipPreProcessor", true);
   }
 
   @Override
   public PathParser getPathParser() {
     return request -> {
-      final var contextOpt = this.basePathParser.parse(request);
-
-      if (contextOpt.isEmpty()) {
+      if (!request.getServletPath().endsWith("/config.json")) {
         return Optional.empty();
       }
 
-      final var relativePath = request.getServletPath();
-
-      if (!VERSIONS_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return contextOpt;
+      return this.basePathParser.parse(request);
     };
   }
 
@@ -92,16 +81,8 @@ public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
       final HttpServletRequest request,
       final HttpServletResponse response) {
 
-    try {
-      final var versions = this.facade.getPackageVersions(context);
-      return ResponseEntity.ok().contentType(APPLICATION_JSON).body(Map.of("versions", versions));
-
-    } catch (final ItemNotFoundException e) {
-      log.debug("NuGet package versions not found: {}", e.getMessage());
-      return ResponseEntity.notFound().build();
-    } catch (final Exception e) {
-      log.error("NuGet package versions failed", e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+        .build();
   }
 }

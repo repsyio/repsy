@@ -31,6 +31,7 @@ import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /**
@@ -42,7 +43,8 @@ import org.springframework.http.ResponseEntity;
  * <p>The path patterns below intentionally mirror, rather than share, the private patterns in
  * {@link AbstractRubyCompactIndexInfoHandler}, {@link AbstractRubyGemDownloadHandler} and {@link
  * AbstractRubyGemspecHandler}: those GET handlers keep their own copies, so this class keeps its
- * own rather than reaching into them.
+ * own rather than reaching into them. The {@code Content-Type} it sends is the one of the {@code
+ * GET} (RPS-1465).
  */
 @NullMarked
 public abstract class AbstractRubyHeadHandler implements ProtocolMethodHandler {
@@ -97,15 +99,29 @@ public abstract class AbstractRubyHeadHandler implements ProtocolMethodHandler {
       return ResponseEntity.notFound().build();
     }
 
-    // The header the GET of this path sends (RPS-1442).
+    // The headers the GET of this path sends (RPS-1442, RPS-1465).
     final var contentDisposition = RubyContentDisposition.forPath(relativePath);
-    final var ok = ResponseEntity.ok();
+    final var ok = ResponseEntity.ok().contentType(contentType(relativePath));
 
     if (contentDisposition != null) {
       ok.header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition);
     }
 
     return ok.build();
+  }
+
+  /**
+   * The compact index answers are text ({@code /names}, {@code /versions}, {@code /info/<gem>}),
+   * everything else is binary (the gem, its gemspec, the specs indexes).
+   */
+  private static MediaType contentType(final String relativePath) {
+    if (relativePath.equals("/names")
+        || relativePath.equals("/versions")
+        || INFO_PATTERN.matcher(relativePath).matches()) {
+      return MediaType.TEXT_PLAIN;
+    }
+
+    return MediaType.APPLICATION_OCTET_STREAM;
   }
 
   private boolean exists(final ProtocolContext context, final String relativePath) {

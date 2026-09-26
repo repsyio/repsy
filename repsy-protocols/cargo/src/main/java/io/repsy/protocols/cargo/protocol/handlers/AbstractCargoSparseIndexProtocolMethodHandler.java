@@ -45,14 +45,14 @@ public abstract class AbstractCargoSparseIndexProtocolMethodHandler
 
   private final ObjectMapper objectMapper;
 
-  private static final Pattern INDEX_PATTERN =
+  static final Pattern INDEX_PATTERN =
       Pattern.compile(
           "^(?:/1/(?<n1>[^/]+)"
               + "|/2/(?<n2>[^/]+)"
               + "|/3/[^/]+/(?<n3>[^/]+)"
               + "|/[^/]{2}/[^/]{2}/(?<n4>[^/]+))$");
 
-  private static final Pattern EXCLUDED_PATTERN = Pattern.compile("^/(?:api/|config\\.json|me).*");
+  static final Pattern EXCLUDED_PATTERN = Pattern.compile("^/(?:api/|config\\.json|me).*");
 
   private final PathParser basePathParser;
   private final CargoProtocolFacade facade;
