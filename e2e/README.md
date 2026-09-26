@@ -3748,12 +3748,13 @@ differently, so each of them is an **opt-in overlay**: a compose file layered on
 PostgreSQL one or the H2 one) with one more `-f`, that changes what Repsy runs with for one nightly leg
 and is never part of the default stack.
 
-| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                              | Specs                                                              |
-| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | -------------------------------------------- | ------------------------------------------------------------------ |
-| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`     | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack" |
-| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client | `@throttle` (stack, ui), "Auth-throttle leg"                       |
-| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443        | `@tls` (skeleton, golang), "TLS stack"                             |
-| `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB    | `@limits` (7 runners), "Size-limit leg"                            |
+| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                                            | Specs                                                              |
+| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | ---------------------------------------------------------- | ------------------------------------------------------------------ |
+| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack" |
+| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                       |
+| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang), "TLS stack"                             |
+| `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                            |
+| `upgrade`  | `--upgrade`             | `REPSY_E2E_UPGRADE=1`  | `docker-compose.stack-upgrade.yml`  | `upgrade`   | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                 |
 
 How it fits together, so a later overlay is one row:
 
@@ -3866,6 +3867,95 @@ Flip checks (each made the named test fail, then reverted): `--renew-anon-volume
 volume is another one), the secret set in the "unset" case (the token after the restart is accepted),
 `STORAGE_BASE_PATH=/home/appuser/.repsy` in the stack file (control test: the path is not under `/app/data`;
 without it the recreate test: Maven 404).
+
+### Upgrade path: the previous release on a populated volume (RPS-1487)
+
+`tests/stack/upgrade.spec.ts` (`@local-only`, `@upgrade`, serial, opt-in) is what `README.md` (the repository
+one) "Upgrading" promises, run for real: the PREVIOUS release's published image runs on fresh volumes, is
+filled with the real clients, and its container is then recreated on the image under test, on the same
+volumes. PostgreSQL and embedded H2 are the same spec (`--h2`): both databases migrate differently (H2 has a
+Java migration, V0014) and keep their data in different volumes.
+
+```bash
+./run.sh local up --upgrade [--h2]       # (or REPSY_E2E_UPGRADE=1) the previous release, on fresh volumes
+REPSY_E2E_UPGRADE=1 ./run.sh test --protocol stack --grep @upgrade
+./run.sh local down --upgrade [--h2]     # the stack ends on the image under test: throw it away
+```
+
+**One constant names the previous release**: `PREVIOUS_RELEASE` in `src/upgrade/previous-release.ts`
+(`26.08.4`, the image `repo.repsy.io/repsy/os/repsy:26.08.4`, pullable without a login). The spec imports it
+and `run.sh` reads that line with `sed`. **Bump it after each release**, to the newest published tag (the Git
+tags carry a `v`, the image tags do not), and read the spec's per-release expectations again: the password
+reset (V0017) and the Docker manifest migration (V0024) only happen from a release before them, so the day the
+previous release already has both, the accounts and the layout parts of the spec need another shape.
+`REPSY_E2E_UPGRADE_FROM=<tag>` (the nightly's `upgrade_from` input) overrides it for one run. `local up
+--upgrade` pulls it first and stops with a clear message when it cannot (no network, tag not published).
+
+What `--upgrade` does (`docker-compose.stack-upgrade.yml`, an overlay row like the others, "Stack overlays"):
+`run.sh` prepares the image under test (`REPSY_IMAGE` as it is, else built as `repsy-os-e2e:<project tag>`,
+not started) and starts the previous release from the stack files, whose ports, healthcheck and volumes
+work unchanged on it. The overlay gives it the environment of an installation as that release documented it:
+`STORAGE_BASE_PATH=/app/data/storage` (no image default yet), `DB_HOST`, `DB_PORT` and `DB_DATABASE` next to
+`DB_URL` (the stack files' `DB_URL` selects the database for both releases), `DOCKER_MANIFEST_LAYOUT_REPAIR_INITIAL_DELAY=PT5S`
+(the job waits ten minutes by default), the manifest repair switch `REPSY_E2E_UPGRADE_REPAIR` (default on) and
+INFO logging for Flyway and the repair job (the application logs at WARN, which hides both, README "Upgrading").
+Without the overlay's stack the spec **skips** with the reason (not opted in, or the container is not the
+previous release's image); the nightly leg fails on a skip.
+
+**Populating a release the generated client does not know.** The previous release's panel API is not
+today's (`POST /api/repos/{type}` and not `POST /api/repos`, `?search=` and not `?q=`, no `/actions/rotate`,
+...), so `src/upgrade/legacy-panel.ts` is a plain `fetch` client of the four calls the spec needs (login,
+create repo, create user, create deploy token; the envelope and `POST /api/auth/login` are the same). Packages
+go through the real clients with the same adapters as the other stack specs (`src/clients/stack-packages.ts`,
+shared with the persistence spec): `mvn deploy`, `npm publish`, `crane push` (two tags of an image and a
+multi-platform index made with `crane index append`, whose children the previous release stores per tag).
+Accounts: the admin, a second `ADMIN` and a plain `USER`.
+
+The five tests, in order (the stack keeps its state between them):
+
+1. **control**: on the previous release every package is consumed with the admin's password and with the
+   deploy token, Docker by tag and by digest (the index and its children too), and the manifests are stored
+   as one file per tag, `manifests/manifest_<12 hex>_<image>_<tag>` (7 files here). Two previous-release
+   quirks are proven here and not asserted as behaviour of the new one: `npm install` does not work on it (its
+   packument's tarball URL repeats the repo name and answers 404), so npm is checked by fetching the tarball
+   itself; and its panel lists every image with size 0 and no digest (see "What it found").
+2. **recreate on the image under test**, same volumes (`dataMount` is the same), with the manifest repair OFF:
+   Flyway went from schema 11 to the newest version of the image (the count comes from the jar's
+   `db/migration`, so it does not go stale: 18 applied on PostgreSQL, 18 on H2 today), the WARN that `DB_HOST,
+DB_PORT, DB_DATABASE` are no longer read is logged once, without credentials (and with the H2 sentence only on
+   H2), the image's legacy-storage fallback (`holds artifacts and ...`) stays quiet, and the log holds no ERROR.
+3. **accounts**: V0017 reset every account that had a SHA-256 hash. The `Admin password has been reset for
+user <name>. New password: <...>` line is printed for both admins and only for them; the old passwords are
+   refused on the panel (401) and on the wire (a Maven client with the admin's old password: 401); the printed
+   ones work; a deploy token still consumes every package (it is not a password); an admin resets the plain
+   user (`POST /api/users/{id}/actions/reset-password`) and the new password signs in. The admin's password is
+   then put back to `REPSY_ADMIN_PASSWORD` (`PUT /api/profile/password`), which every other runner needs.
+4. **consume and list**: every package again with the admin and with the token (npm now with the real client:
+   the new release serves a working tarball URL for a package the old one published), the panel lists the
+   three repositories with their types, the deploy tokens by name, the two accounts with their roles, both
+   Docker images with their tag counts and the tags. Files served from the legacy names, because the repair is off.
+5. **layout repair**: the repair job has not run (no log line, the files untouched), then the container is
+   recreated with the job on: `Docker manifest layout repair: 5 repaired, 0 left as they are ..., 0 failed`
+   (exactly the five distinct manifests: the digest-named copies the previous release kept of an index's
+   children are folded into them), no `manifest_...` file is left outside the storage trash and every
+   digest is a file `manifests/sha256:<hex>`, the reset password is NOT printed again, and everything is
+   pulled once more by tag and by digest and consumed with the admin and the token.
+
+The spec puts `REPSY_ADMIN_PASSWORD` back and deletes what it made (`Seeder.cleanup`), so `sweep --all --dry-run`
+is clean. It fails loudly if the image under test is the previous release itself (no migration to find).
+
+**What it found (proposed, not pinned):** the previous release never fills a Docker image row's `size` and
+`digest`, so the panel lists images with size 0 and no digest (probed on `26.08.4`, single tag too), and the
+migrations do not backfill them: an image pushed before the upgrade stays like that until it is pushed again,
+while the same push on the new release lists its size and digest. The upgrade spec therefore asserts that
+both images and their tags are listed, not their size or digest. The README's "Upgrading" says the repair and
+Flyway report at `INFO`, but the default log level is `WARN`, so an operator sees neither line unless
+`LOGGING_LEVEL_...` is raised (the overlay does it).
+
+Flip checks (each made the named test fail, then reverted): a digest that was never pushed added to the ones
+the repair test expects (`manifests/sha256:000...` is missing, and the repaired count differs), the image under
+test set to the previous release itself (`REPSY_IMAGE=repo.repsy.io/repsy/os/repsy:26.08.4`: test 2 finds no
+migration to apply).
 
 ### Auth-throttle leg (RPS-1477)
 
@@ -5110,8 +5200,9 @@ and on demand only, by the product owner's decision (RPS-1260): it has no `pull_
 
 ```bash
 gh workflow run e2e-nightly.yml                            # everything, like the nightly run
-gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | all
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | upgrade (both) | all
 gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
+gh workflow run e2e-nightly.yml -f suite=upgrade -f upgrade_from=26.08.3   # the upgrade legs from another release
 gh workflow run e2e-nightly.yml -f suite=h2 -f h2_full=docker   # the full catalog of this runner on H2, not tonight's
 gh workflow run e2e-nightly.yml -f grep=@smoke             # a Playwright --grep for every leg
 gh workflow run e2e-nightly.yml -f keep_stack_logs=true    # upload the container logs of a green run too
@@ -5126,16 +5217,18 @@ cancelling): a second one waits.
 
 ### What runs
 
-| Job / leg  | Stack                                       | Runs                                                                                                                                                                                                                     | Timeout |
-| ---------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
-| `image`    |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                                           | 40 min  |
-| `ui`       | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                | 60 min  |
-| `wire`     | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                                    | 150 min |
-| `h2`       | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                    | 90 min  |
-| `h2-full`  | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another              | 60 min  |
-| `scanner`  | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite | 60 min  |
-| `throttle` | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                | 30 min  |
-| `limits`   | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                  | 60 min  |
+| Job / leg    | Stack                                       | Runs                                                                                                                                                                                                                     | Timeout |
+| ------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| `image`      |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                                           | 40 min  |
+| `ui`         | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                | 60 min  |
+| `wire`       | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                                    | 150 min |
+| `h2`         | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                    | 90 min  |
+| `h2-full`    | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another              | 60 min  |
+| `scanner`    | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite | 60 min  |
+| `throttle`   | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                | 30 min  |
+| `limits`     | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                  | 60 min  |
+| `upgrade`    | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                             | 30 min  |
+| `upgrade-h2` | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                 | 30 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
 others. Every leg does the same: load the image, `./run.sh local up [--h2]` (with `REPSY_IMAGE` set, so
@@ -5159,6 +5252,12 @@ stub of `repsy-scanner-trivy`, built from `runners/scanner-stub.Dockerfile` on t
 is off. The `@scanner` specs skip themselves without the opt-in, and a skipped test is not a failure, so the
 step "Check the opt-in specs ran" fails the leg when the `junit.xml` of any of its runners holds no test or any
 skipped one; every overlay leg (`matrix.opt_in` set, "Stack overlays") gets that check.
+
+The `upgrade` and `upgrade-h2` legs (two legs, because a leg has one stack and the two databases migrate differently)
+start with `./run.sh local up --upgrade [--h2]`: `REPSY_IMAGE` (the loaded image) is the image under test and the
+previous release is pulled and started instead; only the `stack` runner runs, `--grep @upgrade`, the `grep` input is
+ignored, and `upgrade_from` (default `PREVIOUS_RELEASE`) picks the release. A release whose image cannot be pulled
+fails `local up` with a message; a spec that skipped fails the leg ("Upgrade path").
 
 The `throttle` leg is the same with `./run.sh local up --throttle`, the `stack` runner first and the `ui` runner
 last (both `--grep @throttle`, `grep` input ignored), and one extra step, "Wait out the throttle window" (12 s):
