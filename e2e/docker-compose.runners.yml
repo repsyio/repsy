@@ -335,6 +335,8 @@ services:
       REPSY_E2E_SCANNER_PORT: ${REPSY_E2E_SCANNER_PORT:-8090}
       REPSY_E2E_IMAGE_TAG: ${REPSY_E2E_IMAGE_TAG:-local}
       REPSY_IMAGE: ${REPSY_IMAGE:-}
+      # The release the upgrade leg started from (tests/stack/upgrade.spec.ts, RPS-1487); empty: PREVIOUS_RELEASE.
+      REPSY_E2E_UPGRADE_FROM: ${REPSY_E2E_UPGRADE_FROM:-}
       REPSY_E2E_HOST_DIR: ${REPSY_E2E_HOST_DIR:-${PWD}}
       # The spec restarts and recreates the one Repsy container of its stack, so it never runs in parallel.
       REPSY_E2E_WORKERS: '1'

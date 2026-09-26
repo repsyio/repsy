@@ -58,14 +58,18 @@ import {
   type ComposeFiles,
 } from '../../src/clients/stack.js';
 import { dockerAdapter } from '../../src/clients/docker.js';
-import { splitPackageName } from '../../src/clients/maven-raw.js';
+import {
+  ADMIN,
+  consume,
+  expectListedInPanel,
+  publishInto,
+  type Package,
+} from '../../src/clients/stack-packages.js';
 import { mavenAdapter } from '../../src/clients/maven-adapter.js';
 import { npmAdapter } from '../../src/clients/npm.js';
 import { env } from '../../src/env.js';
 import type { ProtocolAdapter } from '../../src/scenarios/adapter.js';
-import { SCENARIOS } from '../../src/scenarios/catalog.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
-import type { MaterializedCredential, World } from '../../src/scenarios/world.js';
 import { perTestRunId } from '../../src/seed/run-id.js';
 import { Seeder } from '../../src/seed/seeder.js';
 import { target } from '../../src/target.js';
@@ -78,28 +82,11 @@ const REFUSED_MSG_ID = 'accessNotAllowed';
 /** Long enough for H2's auto-commit delay (1 s) to have written the last commit to the file. */
 const SETTLE_MS = 3_000;
 
-interface Package {
-  /** What the scenario adapter published (real client, no raw companion probe). */
-  adapter: ProtocolAdapter;
-  world: World;
-  /** A read-write deploy token of the repo, the credential of the consumes that are not the admin's. */
-  token: MaterializedCredential;
-  /** sha256 of the primary file the real client sent; what every later consume must give back. */
-  contentSha256: string | undefined;
-}
-
 let panelApi: PanelApi;
 let seeder: Seeder;
 let originalStack: ComposeFiles;
 let packages: Package[] = [];
 let user: { username: string; password: string };
-
-const ADMIN: MaterializedCredential = {
-  transport: 'basic',
-  username: env.adminUsername,
-  password: env.adminPassword,
-  kind: 'password',
-};
 
 /** Signs the admin in again: a restart of a stack without a fixed JWT secret ended the old session. */
 async function relogin(): Promise<void> {
@@ -108,93 +95,12 @@ async function relogin(): Promise<void> {
 
 /** Publishes one package with the protocol's real client (no raw companion probe) into a repo of its own. */
 async function publish(adapter: ProtocolAdapter, repoType: RepoType): Promise<Package> {
-  const scenario = SCENARIOS.find((candidate) => candidate.id === 'password-admin');
-  if (!scenario) {
-    throw new Error('the catalog has no password-admin scenario');
-  }
   const repo = await seeder.createRepo(repoType, { privateRepo: true });
   const token = await seeder.createToken(repo.name, { readOnly: false });
-  const coordinates = {
-    packageName: adapter.packageName(seeder.runId, scenario),
-    version: adapter.version('release'),
-  };
-  const world: World = {
-    scenario,
-    protocol: adapter.protocol,
-    repoName: repo.name,
-    credential: ADMIN,
-    publishTarget: coordinates,
-    consumeTarget: coordinates,
-  };
-  const seeded = await adapter.seedPublish(world);
-  expect(
-    seeded.contentSha256,
-    `${adapter.protocol}: the real client reported no content digest`,
-  ).toBeTruthy();
-  return {
-    adapter,
-    world,
-    contentSha256: seeded.contentSha256,
-    token: {
-      transport: 'basic',
-      username: token.username,
-      password: token.token,
-      kind: 'token',
-    },
-  };
-}
-
-/** A real-client consume with `credential`: it succeeds and returns the very bytes that were published. */
-async function consume(
-  pkg: Package,
-  credential: MaterializedCredential,
-  when: string,
-): Promise<void> {
-  const what = `${pkg.adapter.protocol} ${when} (${credential.kind})`;
-  const resolved = await pkg.adapter.resolve({ ...pkg.world, credential });
-  expect(
-    resolved.outcome,
-    `${what}: outcome (http ${resolved.httpStatus}; ${resolved.command})`,
-  ).toBe('ok');
-  expect(resolved.clientExitCode, `${what}: client exit code (${resolved.command})`).toBe(0);
-  expect(resolved.contentSha256, `${what}: the consumed content is not the published one`).toBe(
-    pkg.contentSha256,
-  );
-}
-
-/** What the panel lists for the package: the name, the version (or, for Docker, the manifest digest). */
-async function expectListedInPanel(pkg: Package, when: string): Promise<void> {
-  const { repoName } = pkg.world;
-  const { packageName, version } = pkg.world.publishTarget;
-  const what = `${pkg.adapter.protocol} ${when}: the panel`;
-  if (pkg.adapter.protocol === 'maven') {
-    const [groupId, artifactId] = splitPackageName(packageName);
-    expect(
-      await panelApi.listMavenArtifactNames(repoName, groupId),
-      `${what} lists the artifact`,
-    ).toContain(artifactId);
-    expect(
-      await panelApi.listMavenArtifactVersionNames(repoName, groupId, artifactId),
-      `${what} lists the version`,
-    ).toContain(version);
-    return;
-  }
-  const path =
-    pkg.adapter.protocol === 'npm'
-      ? `/api/npm/packages/${encodeURIComponent(repoName)}?size=100`
-      : `/api/docker/images/${encodeURIComponent(repoName)}?size=100`;
-  const res = await panelApi.rawRequest('GET', path);
-  expect(res.status, `${what}: GET ${path}`).toBe(200);
-  const content = (
-    res.body.data as { content?: { name?: string; latestVersion?: string; digest?: string }[] }
-  ).content;
-  const item = (content ?? []).find((candidate) => candidate.name === packageName);
-  expect(item, `${what} lists ${packageName}`).toBeDefined();
-  if (pkg.adapter.protocol === 'npm') {
-    expect(item?.latestVersion, `${what}: the npm latest version`).toBe(version);
-  } else {
-    expect(item?.digest, `${what}: the image digest`).toBe(`sha256:${pkg.contentSha256}`);
-  }
+  return publishInto(adapter, seeder.runId, repo.name, {
+    username: token.username,
+    password: token.token,
+  });
 }
 
 /** On the H2 profile (DB_URL is a jdbc:h2 file URL), whether the database file is NOT on the volume; never on PostgreSQL. */
@@ -212,7 +118,7 @@ async function expectEverythingThere(when: string): Promise<void> {
   for (const pkg of packages) {
     await consume(pkg, ADMIN, when);
     await consume(pkg, pkg.token, when);
-    await expectListedInPanel(pkg, when);
+    await expectListedInPanel(panelApi, pkg, when);
   }
   // The admin (the seeded row) and a user created through the panel both still log in with their passwords.
   await new PanelApi(env.apiBaseUrl).login(env.adminUsername, env.adminPassword);
