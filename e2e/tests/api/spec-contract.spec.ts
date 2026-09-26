@@ -73,6 +73,14 @@ test.describe('the response validator', () => {
         errorCode: 'nope',
       }).join(),
     ).toContain('/errorCode must match format "uuid"');
+    // only the success envelope allows a null errorCode: a failure always carries the id of the failure
+    expect(
+      contractProblems('deleteMavenGroup', 404, {
+        msgId: 'x',
+        type: 'ERROR',
+        errorCode: null,
+      }).join(),
+    ).toContain('/errorCode must be string');
   });
 
   test('catches a wrong type, a fractional integer and a string where the schema says integer', () => {
@@ -92,18 +100,14 @@ test.describe('the response validator', () => {
     ).toContain('/data/artifactCount must be integer');
   });
 
-  test('catches a null the schema does not allow, but leaves out errorCode: null on its own', () => {
+  test('catches a null the schema does not allow, but accepts errorCode: null (RPS-1574)', () => {
     expect(
       contractProblems('listPypiPackages', 200, packages({ ...ITEM, name: null })).join(),
     ).toContain('/data/content/0/name must be string');
+    // every success body carries "errorCode": null and the RestResponse* schemas declare it nullable
     expect(contractProblems('listPypiPackages', 200, packages(ITEM, { errorCode: null }))).toEqual(
       [],
     );
-    expect(
-      contractProblems('listPypiPackages', 200, packages(ITEM, { errorCode: null }), {
-        strict: true,
-      }),
-    ).toEqual(['/errorCode must be string']);
     expect(
       contractProblems('listPypiPackages', 200, packages(ITEM, { errorCode: 5 })).join(),
     ).toContain('/errorCode must be string');

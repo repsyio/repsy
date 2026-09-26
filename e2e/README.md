@@ -4753,10 +4753,6 @@ operations of the protocol BY `operationId` (`src/api/contract-checks.ts`: the p
 **Known bugs** (each is a `test.fail()` with its ticket in `tests/maven/panel-api.spec.ts`: the test asserts the correct
 behaviour, passes while the bug is there and goes red when it is fixed; the fix removes the `test.fail()` in the same PR):
 
-- RPS-1574: every success body carries `"errorCode": null`, and every `RestResponse*` schema declares `errorCode` as a
-  `string`. It is the same mismatch on every operation, so `contractProblems` leaves out exactly that one violation
-  (`isKnownErrorCodeNull`, unit-tested) and validates the rest of the body in full; `{ strict: true }` shows it. The fix
-  (a nullable `errorCode` in the spec, or no field) removes the filter.
 - RPS-1573: `DELETE /api/mvn/artifacts/{repo}/{group}/{artifact}` for an artifact that does not exist deletes the whole GROUP
   (files and rows) and answers 200 `data: GROUP` when the group holds exactly one artifact: `deleteArtifact` asks
   `hasOnlyOneArtifact(group)` before it checks the artifact exists (the same shape as RPS-1190, which fixed it for
