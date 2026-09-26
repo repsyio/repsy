@@ -38,6 +38,33 @@ import { Shell } from '../../src/ui/pages/shell.js';
 import { UsersPage } from '../../src/ui/pages/users.js';
 
 /**
+ * What the browser complained about while `context` was open, besides the hosts it contacted:
+ * `csp` are the console errors of a blocked resource ("Refused to load ... Content Security Policy"),
+ * `misserved` the fonts, stylesheets and scripts that came back as an HTML document. The panel's
+ * static files are served next to a single-page-app fallback that answers HTML for a path it does not
+ * recognise, so a bundled icon font that lands on such a path fails silently (a box instead of the
+ * glyph) and only shows here (RPS-1445: `/media/remixicon-*.woff2` did).
+ */
+function recordPageProblems(context: BrowserContext): { csp: string[]; misserved: string[] } {
+  const problems = { csp: [] as string[], misserved: [] as string[] };
+  context.on('console', (message) => {
+    if (/Content Security Policy/i.test(message.text())) {
+      problems.csp.push(message.text());
+    }
+  });
+  context.on('response', (response) => {
+    const type = response.request().resourceType();
+    if (
+      ['font', 'stylesheet', 'script'].includes(type) &&
+      (response.headers()['content-type'] ?? '').startsWith('text/html')
+    ) {
+      problems.misserved.push(`${type} ${response.url()}`);
+    }
+  });
+  return problems;
+}
+
+/**
  * Records every http(s) request of `context` whose origin is not the UI, the panel API or the repo
  * protocol port. `request` fires for an aborted request too, so the list is what was ASKED for.
  */
@@ -64,14 +91,25 @@ test.describe('No third-party requests', { tag: '@net' }, () => {
     baseURL,
   }) => {
     const external = recordExternalRequests(context, baseURL);
+    const problems = recordPageProblems(context);
 
     const login = new LoginPage(page);
     await login.goto();
     await login.password.fill('anything');
     // The eye icon is a bundled remixicon glyph now: it has a box, so a real click works.
     await login.passwordToggle.click();
+    // The toggle is the login page's only remixicon glyph, so the font is requested for it and no other.
+    await page.evaluate(() => document.fonts.load('16px remixicon').catch(() => []));
+    await page.evaluate(() => document.fonts.ready);
+    const iconFont = await page.evaluate(() =>
+      [...document.fonts]
+        .filter((face) => face.family.includes('remixicon'))
+        .map((face) => face.status),
+    );
 
     expect(external).toEqual([]);
+    expect(problems).toEqual({ csp: [], misserved: [] });
+    expect(iconFont).toContain('loaded');
   });
 
   test('NET-01 the signed-in pages ask for nothing outside the stack', async ({
@@ -81,6 +119,7 @@ test.describe('No third-party requests', { tag: '@net' }, () => {
   }) => {
     const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: false });
     const external = recordExternalRequests(adminPage.context(), baseURL);
+    const problems = recordPageProblems(adminPage.context());
 
     await new DashboardPage(adminPage).goto();
     await new RepositoriesPage(adminPage).goto();
@@ -92,5 +131,6 @@ test.describe('No third-party requests', { tag: '@net' }, () => {
     await expect(new Shell(adminPage).header.avatar).toBeVisible();
 
     expect(external).toEqual([]);
+    expect(problems).toEqual({ csp: [], misserved: [] });
   });
 });

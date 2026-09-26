@@ -26,7 +26,10 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
-            "outputPath": "dist/panel-frontend",
+            "outputPath": {
+              "base": "dist/panel-frontend",
+              "media": "assets"
+            },
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
