@@ -54,7 +54,7 @@ import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
 import { execYarn } from '../../../src/clients/npm-family/yarn-berry-client.js';
 import type { RunResult } from '../../../src/clients/exec.js';
-import type { PanelApi } from '../../../src/api/panel-api.js';
+import type { PanelBackend } from '../../../src/api/panel-backend.js';
 import type { Seeder, SeededRepo } from '../../../src/seed/seeder.js';
 import {
   SCANNER_TAG,
@@ -215,7 +215,7 @@ async function publishScanned(
   client: NpmFamilyClient,
   seeder: Seeder,
   scanner: ScannerStubClient,
-  panelApi: PanelApi,
+  panelApi: PanelBackend,
 ): Promise<Published> {
   const repo = await newRepo(seeder);
   expect((await panelApi.getSettings(repo.name)).securityScanEnabled, 'scanning is on').toBe(true);

@@ -29,7 +29,8 @@
  * `@local-only`: it needs the container of a stack this harness owns (`docker exec`), so it skips on a
  * remote target. It runs in the "stack" runner (`./run.sh test --protocol stack`).
  */
-import { ApiError, PanelApi } from '../../src/api/panel-api.js';
+import { loginPanel } from '../../src/api/backend-registry.js';
+import { PanelHttpError } from '../../src/api/panel-backend.js';
 import {
   dockerExec,
   findRepsyContainer,
@@ -92,7 +93,7 @@ test.describe('password reset marker file in the Docker image', { tag: '@local-o
     const user = await seeder.createUser();
     const bystander = await seeder.createUser();
     // The old password works before the reset (a failed login below must come from the reset).
-    await new PanelApi(env.apiBaseUrl).login(user.username, user.password);
+    await loginPanel(user.username, user.password);
 
     await touchMarker(user.username);
 
@@ -120,14 +121,12 @@ test.describe('password reset marker file in the Docker image', { tag: '@local-o
     expect(await markerExists(user.username)).toBe(false);
 
     // The old password no longer works, the new one from the log does.
-    await expect(
-      new PanelApi(env.apiBaseUrl).login(user.username, user.password),
-    ).rejects.toBeInstanceOf(ApiError);
-    const login = await new PanelApi(env.apiBaseUrl).login(user.username, newPassword);
+    await expect(loginPanel(user.username, user.password)).rejects.toBeInstanceOf(PanelHttpError);
+    const login = await loginPanel(user.username, newPassword);
     expect(login.token).toBeTruthy();
 
     // Only the named user was reset, and the admin the seeder logged in with is untouched.
-    await new PanelApi(env.apiBaseUrl).login(bystander.username, bystander.password);
+    await loginPanel(bystander.username, bystander.password);
     expect((await panelApi.listUsers({ q: user.username })).map((u) => u.username)).toContain(
       user.username,
     );

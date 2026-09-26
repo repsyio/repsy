@@ -40,7 +40,11 @@
  */
 import zlib from 'node:zlib';
 
-import { RepoType, type PanelApi, type VulnerabilityScanInfo } from '../../src/api/panel-api.js';
+import {
+  RepoType,
+  type PanelBackend,
+  type VulnerabilityScanInfo,
+} from '../../src/api/panel-backend.js';
 import { OCI_MEDIA_TYPES, buildTar } from '../../src/clients/docker-image.js';
 import {
   adminCredential,
@@ -254,7 +258,7 @@ function json(value: unknown): Buffer {
 
 /** The newest scan of a version once it is FINISHED (COMPLETED or FAILED); a FAILED one fails the spec with why. */
 async function finishedScan(
-  panelApi: PanelApi,
+  panelApi: PanelBackend,
   repoName: string,
   artifactName: string,
   version: string,

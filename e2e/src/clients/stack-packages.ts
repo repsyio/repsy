@@ -22,7 +22,7 @@
  */
 import { expect } from '@playwright/test';
 
-import type { PanelApi } from '../api/panel-api.js';
+import type { PanelBackend } from '../api/panel-backend.js';
 import { env } from '../env.js';
 import type { ProtocolAdapter } from '../scenarios/adapter.js';
 import { SCENARIOS } from '../scenarios/catalog.js';
@@ -112,7 +112,7 @@ export async function consume(
 
 /** What the panel lists for the package: the name, the version (or, for Docker, the manifest digest). */
 export async function expectListedInPanel(
-  panelApi: PanelApi,
+  panelApi: PanelBackend,
   pkg: Package,
   when: string,
 ): Promise<void> {

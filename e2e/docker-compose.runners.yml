@@ -39,6 +39,9 @@ x-runner-environment: &runner-environment
   REPSY_ADMIN_PASSWORD: ${REPSY_ADMIN_PASSWORD:?Set REPSY_ADMIN_PASSWORD in e2e/.env}
   REPSY_TARGET: ${REPSY_TARGET:-local}
   REPSY_E2E_RUN_ID: ${REPSY_E2E_RUN_ID:-}
+  # A module that supplies the panel backend instead of the built-in Repsy OS one (README.md "Targets"):
+  # a path the runner can read, or a package name. Empty: the built-in backend.
+  REPSY_E2E_BACKEND_MODULE: ${REPSY_E2E_BACKEND_MODULE:-}
   REPSY_E2E_INSECURE_REGISTRY: ${REPSY_E2E_INSECURE_REGISTRY:-}
   # Where the @scanner specs of ANY runner reach the stub scanner's /control API (the scanner overlay,
   # docker-compose.stack-scanner.yml, publishes it on loopback; every runner has the host network) and

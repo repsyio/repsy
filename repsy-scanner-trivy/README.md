@@ -22,6 +22,25 @@ Trivy keeps its vulnerability databases across container recreation). On the app
 service's `SCANNER_API_KEY`) and `DOCKER_INTERNAL_REGISTRY_BASE_URL`; see the root
 [README](../README.md#environment-variables).
 
+## What a scan covers
+
+A scan covers what the submitted artifact **contains**; it does not resolve what the artifact declares.
+
+- **Files (Maven, npm, PyPI).** The service unpacks a `.tgz`/`.tar.gz` or a wheel (`.whl`) into a temporary
+  directory (any other file, such as a jar, is scanned as it is) and runs `trivy rootfs --format json` on it.
+  `rootfs` runs Trivy's analyzers for *installed* packages: `node_modules/*/package.json`, jars (nested jars
+  included), Python `.dist-info` metadata. The analyzers for lock files (`package-lock.json`, `yarn.lock`,
+  `pnpm-lock.yaml`) and for dependency resolution (a `pom.xml`) only run under `trivy fs`, which this service does
+  not use.
+- **What follows.** An npm tarball is scanned for the packages it bundles, not for its `dependencies`; a thin jar
+  is scanned as itself, not for the dependencies of its POM; a wheel is scanned for its own metadata, not for its
+  `Requires-Dist`. A package that declares vulnerable dependencies without bundling them is scanned clean.
+- **Docker.** An image is not uploaded: the service runs `trivy image` on the reference it is given and pulls the
+  image itself, so all its layers are scanned.
+- **`npm audit`.** The application answers `npm audit` from the findings of these scans, so it reports an advisory
+  only for a package and version that a scanned tarball of that repository bundled (see the root
+  [README](../README.md#auditing-npm-packages)).
+
 ## Local build & run
 
 ```bash

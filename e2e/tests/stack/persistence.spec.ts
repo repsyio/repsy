@@ -45,7 +45,8 @@
  */
 import { randomBytes } from 'node:crypto';
 
-import { PanelApi, RepoType } from '../../src/api/panel-api.js';
+import { createPanelBackend, loginPanel } from '../../src/api/backend-registry.js';
+import { type PanelBackend, RepoType } from '../../src/api/panel-backend.js';
 import {
   crashRepsy,
   currentComposeFiles,
@@ -82,7 +83,7 @@ const REFUSED_MSG_ID = 'accessNotAllowed';
 /** Long enough for H2's auto-commit delay (1 s) to have written the last commit to the file. */
 const SETTLE_MS = 3_000;
 
-let panelApi: PanelApi;
+let panelApi: PanelBackend;
 let seeder: Seeder;
 let originalStack: ComposeFiles;
 let packages: Package[] = [];
@@ -121,8 +122,8 @@ async function expectEverythingThere(when: string): Promise<void> {
     await expectListedInPanel(panelApi, pkg, when);
   }
   // The admin (the seeded row) and a user created through the panel both still log in with their passwords.
-  await new PanelApi(env.apiBaseUrl).login(env.adminUsername, env.adminPassword);
-  await new PanelApi(env.apiBaseUrl).login(user.username, user.password);
+  await loginPanel(env.adminUsername, env.adminPassword);
+  await loginPanel(user.username, user.password);
 }
 
 /** `GET /api/repos` with a session token as it stands: 200, or the refusal of a token Repsy cannot verify. */
@@ -148,7 +149,7 @@ async function refreshStatus(
 
 /** A fresh session of the admin, as a browser or a script would hold it: an access and a refresh token. */
 async function newSession(): Promise<{ token: string; refreshToken: string }> {
-  const info = await new PanelApi(env.apiBaseUrl).login(env.adminUsername, env.adminPassword);
+  const info = await loginPanel(env.adminUsername, env.adminPassword);
   if (!info.token || !info.refreshToken) {
     throw new Error('login returned no token or no refresh token');
   }
@@ -193,7 +194,7 @@ test.describe.serial(
     test.beforeAll(async () => {
       test.setTimeout(600_000);
       originalStack = await currentComposeFiles();
-      panelApi = new PanelApi(env.apiBaseUrl);
+      panelApi = await createPanelBackend();
       await relogin();
       // One worker, so a fixed worker digit that no fixture-created Seeder of this run shares.
       seeder = new Seeder(panelApi, perTestRunId(env.runId, 35, 1));
