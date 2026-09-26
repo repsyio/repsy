@@ -136,8 +136,8 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
 
   private ResponseEntity<Object> issueToken(final HttpServletRequest request) {
     final var authHeader = request.getHeader(AUTHORIZATION);
-    final var scope = request.getParameter("scope");
-    final var grants = DockerScopes.parseGrants(request.getParameterValues("scope"));
+    final var scopeParameters = request.getParameterValues("scope");
+    final var grants = DockerScopes.parseGrants(scopeParameters);
 
     final var formCredentials = readPasswordGrantCredentials(request);
     if (authHeader == null && formCredentials != null) {
@@ -146,7 +146,7 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
     }
 
     if (authHeader == null) {
-      return this.handleUnauthenticatedRequest(scope);
+      return this.handleUnauthenticatedRequest(scopeParameters);
     }
 
     final var sessionToken = this.authService.authenticateUserDockerCli(authHeader, grants);
@@ -176,13 +176,36 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
     return "Basic " + Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
   }
 
-  private ResponseEntity<Object> handleUnauthenticatedRequest(final @Nullable String scope) {
+  private ResponseEntity<Object> handleUnauthenticatedRequest(
+      final String @Nullable [] scopeParameters) {
 
-    if (scope == null || scope.trim().isEmpty() || this.requiresAuthentication(scope)) {
+    final var scopes = allScopes(scopeParameters);
+
+    if (scopes.isEmpty()
+        || scopes.stream()
+            .anyMatch(AbstractDockerTokenProtocolMethodHandler::requiresAuthentication)) {
       throw challenge("unauthorizedRequest");
     }
 
-    return this.handlePublicReadRequest(scope);
+    return this.handlePublicReadRequest(String.join(" ", scopes));
+  }
+
+  /**
+   * Every scope of the request: each {@code scope} parameter may hold several space separated
+   * scopes, and a client that asks for the placeholder {@code repository:*:pull} next to a real one
+   * (containerd, crane) sends both, the placeholder first because {@code *} sorts before every
+   * letter. Judging only the first parameter would judge that request on the placeholder
+   * (RPS-1588).
+   */
+  private static List<String> allScopes(final String @Nullable [] scopeParameters) {
+
+    if (scopeParameters == null) {
+      return List.of();
+    }
+
+    return Arrays.stream(scopeParameters)
+        .flatMap(parameter -> Arrays.stream(StringUtils.split(parameter)))
+        .toList();
   }
 
   private ResponseEntity<Object> handlePublicReadRequest(final String scope) {
@@ -207,7 +230,7 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
     return ResponseEntity.ok(this.createLoginResponse(sessionToken));
   }
 
-  private boolean requiresAuthentication(final String scope) {
+  private static boolean requiresAuthentication(final String scope) {
     final var lowerScope = scope.toLowerCase(Locale.getDefault());
     return lowerScope.contains("push")
         || lowerScope.contains(",*")
@@ -216,22 +239,16 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
   }
 
   /**
-   * Tells whether any of the space separated scopes asks for the {@code delete} action (RPS-1216),
-   * which is never anonymous. Only the actions after the last colon are read, so an image that is
-   * merely named {@code delete-me} does not need credentials to be pulled.
+   * Tells whether the scope asks for the {@code delete} action (RPS-1216), which is never
+   * anonymous. Only the actions after the last colon are read, so an image that is merely named
+   * {@code delete-me} does not need credentials to be pulled.
    */
   private static boolean requestsDelete(final String lowerScope) {
-    for (final var single : StringUtils.split(lowerScope, ' ')) {
-      final var actionsStart = single.lastIndexOf(':');
+    final var actionsStart = lowerScope.lastIndexOf(':');
 
-      if (actionsStart >= 0
-          && Arrays.asList(StringUtils.split(single.substring(actionsStart + 1), ','))
-              .contains("delete")) {
-        return true;
-      }
-    }
-
-    return false;
+    return actionsStart >= 0
+        && Arrays.asList(StringUtils.split(lowerScope.substring(actionsStart + 1), ','))
+            .contains("delete");
   }
 
   /**

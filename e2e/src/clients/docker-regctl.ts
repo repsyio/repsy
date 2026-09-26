@@ -22,10 +22,13 @@
  *
  * How this client differs from `crane`/`skopeo` on the wire (probed live against a Repsy Docker repo):
  *  - It pings `/v2/` itself (no TLS attempt: `"tls": "disabled"` in the host entry, `docker-tls.ts`)
- *    and follows the Bearer challenge; its token scope is `repository:<repo>/<image>:pull,push` and it
- *    never asks for `delete` up front: `regctl manifest delete`/`tag delete` get one `401
- *    insufficient_scope` naming `repository:<repo>/<image>:delete`, ask again with it and are
- *    accepted (the "older crane" round trip of `tests/docker/crane-delete.spec.ts`).
+ *    and follows the Bearer challenge; its own token scope is `repository:<repo>/<image>:pull,push` and it
+ *    never asks for `delete` up front, but it merges the scope of the challenge into its token request:
+ *    the unauthenticated DELETE of `regctl manifest delete`/`tag delete` is challenged with
+ *    `scope="repository:<repo>/<image>:delete"` (RPS-1588), so the one token it fetches already carries
+ *    `delete,pull,push` and the delete is accepted with no `insufficient_scope` round trip (before
+ *    RPS-1588 the challenge named a constant scope and regctl took that round trip, the "older crane"
+ *    one of `tests/docker/crane-delete.spec.ts`).
  *  - `regctl manifest delete` needs a DIGEST reference (it refuses a tag); `regctl tag delete` is the
  *    tag one.
  *  - A local OCI layout is addressed by digest (`ocidir://<dir>@sha256:...`) because the hand-built

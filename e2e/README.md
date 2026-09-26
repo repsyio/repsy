@@ -2610,8 +2610,10 @@ applies unchanged, with the SAME shared `expect` maven already pins.
 | everything else (`password-admin`, `token-rw`, ...)                      | matches the shared `expect` | unchanged                                                                        |
 
 `registry-rules.spec.ts` additionally pins (R1-R13, mirroring the plan's own hypothesis numbering, plus R14 and R15):
-the ping challenge's exact `realm`/`service`/`scope` (R1); the token-endpoint matrix — issuance is
-never scope-checked, only an expired/revoked/wrong credential fails at the token hop (R2); a
+the ping challenge's exact `realm`/`service` and no `scope`, and the scope every other challenge names
+for what its request needs (R1, R1b, RPS-1588); the token-endpoint matrix — issuance is
+never scope-checked, only an expired/revoked/wrong credential fails at the token hop, and every
+`scope` value of an anonymous request is judged, not the first (R2); a
 read-only token's write refusal at the OPERATION hop, reads still working (R3); monolithic/chunked
 blob upload, a wrong digest, and dedup (R4); manifest push validation — missing blobs, a wrong
 `sha256:` reference, an unknown `Content-Type` (R5, **B4**); the override rule and an orphaned blob
@@ -2646,11 +2648,13 @@ prediction, the actual observed behaviour is what got pinned, not the guess.
 
 - **H1** (no `--insecure` needed for `localhost:9090`; the ping challenge shape): confirmed —
   `GET /v2/` (no auth) answers `401` with
-  `WWW-Authenticate: Bearer realm="http://localhost:9090/v2/token",service="repsy",scope="repository:*:pull"`;
+  `WWW-Authenticate: Bearer realm="http://localhost:9090/v2/token",service="repsy"` (no `scope`: the ping
+  addresses no image; RPS-1588 dropped the constant `scope="repository:*:pull"` it used to carry, and a
+  request that addresses an image now names the scope it needs, see R1b);
   `crane push`/`pull` against `localhost:9090` succeed with no `--insecure` flag at all (ggcr's own
   `pkg/name/registry.go` resolves `localhost`/loopback/RFC1918 hosts as plain HTTP automatically);
   the token GET carries `service=repsy` and ggcr's OWN scope (`repository:<repo>/<image>:push,pull`
-  or `:pull`), never the challenge's constant `repository:*:pull` — confirmed with `crane -v`'s
+  or `:pull`) — confirmed with `crane -v`'s
   request trace.
 - **H2** (the push wire sequence): confirmed, and MORE DETAILED than the plan's own guess —
   `crane -v push` traced live shows `GET https://.../v2/` (TLS attempt, fails) → `GET http://.../v2/`

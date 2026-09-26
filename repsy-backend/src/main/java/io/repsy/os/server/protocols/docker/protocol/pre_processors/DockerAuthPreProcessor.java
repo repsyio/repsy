@@ -30,9 +30,9 @@ import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
@@ -77,7 +77,7 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
     try {
       this.authenticate(request, repoInfo.getStorageKey(), properties);
     } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(ex, DockerAuthChallenge.of(request));
+      throw AuthChallenges.challenged(ex, DockerAuthChallenge.of(context, request, properties));
     }
 
     this.authorizeGrantedAccess(context, request, repoInfo, properties);
@@ -103,7 +103,9 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
       return;
     }
 
-    final var name = requestedName(context, repoInfo);
+    final var name =
+        Objects.requireNonNullElse(
+            DockerAuthChallenge.requestedName(context, repoInfo), repoInfo.getName());
 
     try {
       this.authComponent.authorizeGrantedAccess(authHeader, name, permission);
@@ -111,15 +113,6 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
       throw AuthChallenges.challenged(
           ex, DockerAuthChallenge.insufficientScope(request, "repository:" + name + ":delete"));
     }
-  }
-
-  /** The {@code <repo>/<image>} a request addresses: its path is {@code /<image>/manifests/...}. */
-  private static String requestedName(final ProtocolContext context, final RepoInfo repoInfo) {
-
-    final var segments =
-        StringUtils.split(ProtocolContextUtils.getRelativePath(context).getPath(), '/');
-
-    return segments.length > 0 ? repoInfo.getName() + "/" + segments[0] : repoInfo.getName();
   }
 
   private void authenticate(

@@ -541,9 +541,9 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
                       .formatted(repo.getName(), image.childDigests.getFirst()))
                   .header(AUTHORIZATION, DockerImageControllerIT.this.userBearerToken())),
           HttpStatus.NOT_FOUND,
-          "tagNotFound",
-          "tagNotFound",
-          "Tag not found.");
+          "manifestNotFound",
+          "manifestNotFound",
+          "Manifest not found.");
     }
 
     @Test
@@ -610,6 +610,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
     void unknownItems() throws Exception {
       final var repo = DockerImageControllerIT.this.dockerRepo();
       final var token = DockerImageControllerIT.this.userBearerToken();
+      DockerImageControllerIT.this.seedImage(repo, "app", "latest");
       DockerImageControllerIT.this.expectError(
           DockerImageControllerIT.this.perform(
               get("/api/docker/images/%s/missing/tags/latest".formatted(repo.getName()))
@@ -624,9 +625,9 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
                       .formatted(repo.getName(), "f".repeat(64)))
                   .header(AUTHORIZATION, token)),
           HttpStatus.NOT_FOUND,
-          "tagNotFound",
-          "tagNotFound",
-          "Tag not found.");
+          "manifestNotFound",
+          "manifestNotFound",
+          "Manifest not found.");
       DockerImageControllerIT.this.expectError(
           DockerImageControllerIT.this.perform(
               get("/api/docker/images/%s/app/manifests/missing-tag".formatted(repo.getName()))
@@ -635,6 +636,25 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           "tagNotFound",
           "tagNotFound",
           "Tag not found.");
+      // RPS-1579: the tags and the manifests of an image the repo does not have are a 404 of the
+      // image,
+      // not an empty page or a missing tag.
+      DockerImageControllerIT.this.expectError(
+          DockerImageControllerIT.this.perform(
+              get("/api/docker/images/%s/missing/tags".formatted(repo.getName()))
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.NOT_FOUND,
+          "imageNotFound",
+          "imageNotFound",
+          "Image not found.");
+      DockerImageControllerIT.this.expectError(
+          DockerImageControllerIT.this.perform(
+              get("/api/docker/images/%s/missing/manifests/latest".formatted(repo.getName()))
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.NOT_FOUND,
+          "imageNotFound",
+          "imageNotFound",
+          "Image not found.");
       DockerImageControllerIT.this.expectError(
           DockerImageControllerIT.this.perform(
               get("/api/docker/images/%s/missing/configs/sha256:%s"

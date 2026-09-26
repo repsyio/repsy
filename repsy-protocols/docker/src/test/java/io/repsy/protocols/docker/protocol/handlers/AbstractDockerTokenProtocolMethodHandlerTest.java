@@ -426,4 +426,94 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
             TooManyRequestsException.class,
             ex -> assertThat(ex.getRetryAfterSeconds()).isEqualTo(7));
   }
+
+  private MockHttpServletRequest anonymousRequestForScopes(final String... scopes) {
+    final var request = new MockHttpServletRequest("GET", "/v2/token");
+
+    for (final var scope : scopes) {
+      request.addParameter("scope", scope);
+    }
+
+    return request;
+  }
+
+  /**
+   * RPS-1588: containerd and crane send one {@code scope} parameter per scope, the placeholder
+   * {@code repository:*:pull} first because {@code *} sorts before every letter. Every value is
+   * judged, so a push or delete scope after the placeholder is not answered with an anonymous
+   * token.
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "repository:images/app:pull,push",
+        "repository:images/app:push,pull",
+        "repository:images/app:delete",
+        "repository:images/app:*",
+        "registry:catalog:*"
+      })
+  @DisplayName("a scope after the placeholder that needs credentials is judged too (RPS-1588)")
+  void everyScopeValueIsJudged(final String second) {
+    assertThatThrownBy(
+            () ->
+                this.handler.handle(
+                    new ProtocolContext(),
+                    this.anonymousRequestForScopes("repository:*:pull", second),
+                    new MockHttpServletResponse()))
+        .satisfies(e -> expectChallenge(e, "unauthorizedRequest"));
+    verify(this.authService, never()).createAnonymousUser();
+    verifyNoInteractions(this.scopeParser);
+  }
+
+  @Test
+  @DisplayName("the placeholder next to a public pull scope is still an anonymous token")
+  void placeholderNextToPublicPull() throws Exception {
+    final var repo = repo(false);
+    doReturn(Optional.of(repo))
+        .when(this.scopeParser)
+        .getRepoInfoByScope("repository:*:pull " + PULL_SCOPE);
+    when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
+
+    final var result =
+        this.handler.handle(
+            new ProtocolContext(),
+            this.anonymousRequestForScopes("repository:*:pull", PULL_SCOPE),
+            new MockHttpServletResponse());
+
+    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+    verify(this.authService).authorizePublicRead(repo);
+  }
+
+  @Test
+  @DisplayName("the placeholder next to a private pull scope is not an anonymous token")
+  void placeholderNextToPrivatePull() throws Exception {
+    final var repo = repo(true);
+    doReturn(Optional.of(repo))
+        .when(this.scopeParser)
+        .getRepoInfoByScope("repository:*:pull " + PULL_SCOPE);
+    doThrow(new ItemNotFoundException("repoNotFound"))
+        .when(this.authService)
+        .authorizePublicRead(repo);
+
+    assertThatThrownBy(
+            () ->
+                this.handler.handle(
+                    new ProtocolContext(),
+                    this.anonymousRequestForScopes("repository:*:pull", PULL_SCOPE),
+                    new MockHttpServletResponse()))
+        .satisfies(e -> expectChallenge(e, "unAuthorized"));
+    verify(this.authService, never()).createAnonymousUser();
+  }
+
+  @Test
+  @DisplayName("a token request without any scope value is challenged")
+  void noScopeValue() {
+    assertThatThrownBy(
+            () ->
+                this.handler.handle(
+                    new ProtocolContext(),
+                    this.anonymousRequestForScopes("  "),
+                    new MockHttpServletResponse()))
+        .satisfies(e -> expectChallenge(e, "unauthorizedRequest"));
+  }
 }
