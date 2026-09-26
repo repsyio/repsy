@@ -255,7 +255,7 @@ e2e/
       skopeo.spec.ts            # skopeo: copy between two repos, inspect, delete (scope *), multi-arch --all
       regctl.spec.ts            # regctl: manifest get/head, image inspect, copy between repos, tag/manifest delete, sha512, multi-arch
       client-tag-list.spec.ts   # crane ls/catalog, skopeo list-tags/inspect, regctl tag ls/repo ls against the missing tags/list (RPS-1489)
-      oras.spec.ts              # oras: push/pull/blob/manifest of OCI artifacts, attach + the referrers tag-schema fallback, discover, copy, delete, the RPS-1490 test.fail pins (RPS-1478 part C)
+      oras.spec.ts              # oras: push/pull/blob/manifest of OCI artifacts, attach + the referrers tag-schema fallback, discover, copy, delete, the OR6 cases for a manifest naming one digest twice (RPS-1490)
     helm/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
@@ -3145,9 +3145,8 @@ is in the PR that added this file.
   destination repo (`HEAD` `404`), and appears only once the client's `PUT ?digest=` finishes.
 - Not in this file: `oras attach` of an artifact whose layer is the empty descriptor. A manifest
   whose config digest is also one of its layers (`{}` twice, as `oras attach`/`oras push
---config` without files produces) is answered `404` `MANIFEST_BLOB_UNKNOWN` `layerNotFound`
-  (observed live while probing; the OCI artifact manifest with a distinct layer is `201`). It
-  is pinned in part C as `test.fail` under RPS-1490 (see "Fourth Docker client: `oras`").
+--config` without files produces) was answered `404` `MANIFEST_BLOB_UNKNOWN` `layerNotFound`
+  (RPS-1490, fixed); it is covered in part C (see "Fourth Docker client: `oras`", OR6).
 
 ```bash
 ./run.sh test --protocol docker -b   # -b the first time: builds the docker runner image
@@ -3237,14 +3236,14 @@ Backend follow-up (RPS-1489 already lists the referrers API): implementing `GET 
 `oras discover`, `oras copy -r` and `oras manifest delete` of a referrer work without forcing the tag
 schema; the `discover`/`copy -r`/referrer-delete halves of OR3/OR4/OR5 then flip on purpose (with RA3).
 
-**RPS-1490 (`test.fail`, OR6).** A manifest whose config digest equals one of its layer digests, or that
-lists the same layer digest twice, is answered `404 MANIFEST_BLOB_UNKNOWN / layerNotFound` on `PUT
-manifests/<ref>` although every blob is stored (`AbstractDockerProtocolTxFacade.verifyLayers` adds the
-config digest to the layer digest list and `LayerTxService.isAllExistsByRepoIdAndDigests` compares the
-list's size with the number of distinct rows found). The OCI spec allows both. Real clients hit it in three
-places, each a `test.fail` here: `oras push --artifact-type X` without files and `oras attach` with only an
-annotation (both send `{}` as the config AND the one layer), `oras push` of two files with identical bytes;
-OR6d reproduces it with raw HTTP. The fix flips all four.
+**RPS-1490 (OR6).** A manifest whose config digest equals one of its layer digests, or that lists the
+same layer digest twice, is stored: `PUT manifests/<ref>` answers `201`. It used to answer `404
+MANIFEST_BLOB_UNKNOWN / layerNotFound` although every blob was stored, because `verifyLayers` handed the
+duplicate digests to `LayerTxService.isAllExistsByRepoIdAndDigests`, which compared their number with the
+number of distinct rows found; both now work on the distinct digests. The OCI spec allows both shapes. Real
+clients produce them in three places, each a case here: `oras push --artifact-type X` without files and
+`oras attach` with only an annotation (both send `{}` as the config AND the one layer), and `oras push` of
+two files with identical bytes; OR6d does the same with raw HTTP.
 
 ```bash
 ./run.sh test --protocol docker -b               # -b the first time this runner image changes

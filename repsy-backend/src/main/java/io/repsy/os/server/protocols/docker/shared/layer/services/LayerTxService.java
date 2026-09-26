@@ -25,6 +25,7 @@ import io.repsy.protocols.docker.shared.layer.dtos.LayerForm;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -92,9 +93,12 @@ public class LayerTxService implements LayerService<UUID> {
   public void isAllExistsByRepoIdAndDigests(
       final @NonNull UUID repoId, final @NonNull List<String> digests) {
 
-    final var foundCount = this.layerRepository.countByRepoIdAndDigestIn(repoId, digests);
+    // The count is of stored rows, one per digest, so it is compared with the distinct digests: a
+    // manifest may name one blob twice (RPS-1490).
+    final var distinctDigests = List.copyOf(new LinkedHashSet<>(digests));
+    final var foundCount = this.layerRepository.countByRepoIdAndDigestIn(repoId, distinctDigests);
 
-    if (foundCount != digests.size()) {
+    if (foundCount != distinctDigests.size()) {
       throw new ItemNotFoundException("layerNotFound");
     }
   }

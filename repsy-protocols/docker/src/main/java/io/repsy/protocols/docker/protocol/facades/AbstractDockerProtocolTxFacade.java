@@ -60,6 +60,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.util.LinkedHashSet;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONException;
@@ -312,8 +314,12 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
     final var configDigest = manifestInfo.getConfig().getDigest();
 
-    final var digests = manifestInfo.getLayerDigests();
-    digests.add(configDigest);
+    // A manifest may name one blob more than once (RPS-1490): its config as one of its layers (the
+    // empty {} descriptor of `oras push` without files) and two layers of identical bytes. The
+    // stored blob is one row, so the lookup is by distinct digest.
+    final var distinctDigests = new LinkedHashSet<>(manifestInfo.getLayerDigests());
+    distinctDigests.add(configDigest);
+    final var digests = List.copyOf(distinctDigests);
 
     this.layerService.isAllExistsByRepoIdAndDigests(repoId, digests);
   }
