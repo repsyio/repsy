@@ -30,7 +30,7 @@
       </a>
 
       <!-- Users Link (Admin Only) -->
-      @if (isAdmin) {
+      @if (isAdmin()) {
         <a
           data-testid="sidebar-link-users"
           routerLink="/users"
@@ -75,7 +75,7 @@
       }
 
       <!-- Security Link (Admin Only) -->
-      @if (isAdmin) {
+      @if (isAdmin()) {
         <a
           data-testid="sidebar-link-security"
           routerLink="/security"
@@ -195,7 +195,7 @@
         </a>
 
         <!-- Users Link (Admin Only) -->
-        @if (isAdmin) {
+        @if (isAdmin()) {
           <a
             data-testid="mobile-sidebar-link-users"
             (click)="closeMobileMenu()"
@@ -241,7 +241,7 @@
         }
 
         <!-- Security Link (Admin Only) -->
-        @if (isAdmin) {
+        @if (isAdmin()) {
           <a
             data-testid="mobile-sidebar-link-security"
             (click)="closeMobileMenu()"
