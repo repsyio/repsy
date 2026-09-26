@@ -233,7 +233,14 @@ class NpmTokenRevokeProtocolIT extends AbstractIntegrationTest {
 
     final var result = this.logout(repo, bearer(secret), secret);
 
+    final var body = result.getResponse().getContentAsString();
+
     assertThat(result.getResponse().getStatus()).isEqualTo(403);
+    assertThat(JsonPath.<String>read(body, "$.msgId")).isEqualTo("deployTokenNotRevocable");
+    // The npm error shape, so `npm logout` and `pnpm logout` print why (RPS-1391).
+    assertThat(JsonPath.<String>read(body, "$.error"))
+        .contains("managed in the web UI")
+        .contains("npm logout");
     assertThat(this.read(repo, secret)).isEqualTo(404);
     assertThat(this.whoami(repo, secret)).isEqualTo(200);
   }

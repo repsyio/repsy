@@ -18,6 +18,7 @@ package io.repsy.protocols.npm.protocol.handlers;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 
+import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -29,9 +30,11 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -44,6 +47,11 @@ import org.springframework.http.ResponseEntity;
  * does, and the token is refused from then on (RPS-1361). The request has to carry credentials on a
  * public repository too, so the handler asks the pre-processor to authenticate ({@code
  * requireAuthentication}) and still verifies everything itself, like {@code whoami}.
+ *
+ * <p>A refusal (403) carries the npm error shape, {@code {"error": "<text>"}}, which is what {@code
+ * npm} and {@code pnpm} print, besides the {@code msgId} of the refusal. The secret of a deploy
+ * token is refused ({@code deployTokenNotRevocable}) and the text says why and what to do instead
+ * (RPS-1391).
  */
 @NullMarked
 public abstract class AbstractNpmTokenRevokeProtocolMethodHandler<ID>
@@ -55,6 +63,7 @@ public abstract class AbstractNpmTokenRevokeProtocolMethodHandler<ID>
   private static final String BEARER_PREFIX = "Bearer ";
   private static final String TOKEN_PATH_REGEX = "/-/user/token/[^/]+";
   private static final String TOKEN_PATH_PREFIX = "/-/user/token/";
+  private static final String DEFAULT_FORBIDDEN_MSG_ID = "accessNotAllowed";
 
   private final PathParser pathParser;
   private final NpmTokenRevoker<ID> tokenRevoker;
@@ -114,6 +123,25 @@ public abstract class AbstractNpmTokenRevokeProtocolMethodHandler<ID>
           .header(WWW_AUTHENTICATE, challenge)
           .contentType(MediaType.APPLICATION_JSON)
           .body(Map.of("error", "unAuthorized"));
+
+    } catch (final AccessNotAllowedException e) {
+      final var msgId = e.getMessage() == null ? DEFAULT_FORBIDDEN_MSG_ID : e.getMessage();
+      final var body = new LinkedHashMap<String, Object>();
+
+      body.put("error", this.forbiddenText(msgId));
+      body.put("msgId", msgId);
+
+      return ResponseEntity.status(HttpStatus.FORBIDDEN)
+          .contentType(MediaType.APPLICATION_JSON)
+          .body(body);
     }
+  }
+
+  /**
+   * The text of the 403 body for the message id the exception carries. The id itself is the
+   * fallback; the application overrides it to resolve the id into its message.
+   */
+  protected String forbiddenText(final @Nullable String msgId) {
+    return msgId == null ? DEFAULT_FORBIDDEN_MSG_ID : msgId;
   }
 }

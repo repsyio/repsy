@@ -1373,6 +1373,11 @@ plan said). `pnpm logout` sends `DELETE /-/user/token/<token>`. For the token an
 it gets `200 {"ok": true}`, exits 0, and the token is refused from then on (RPS-1361, `commands.spec.ts`). For
 the secret of a deploy token (what `tokenBinding` writes) the registry answers 403, pnpm **exits 1**
 (`ERR_PNPM_LOGOUT_FAILED`) and the token keeps working: a deploy token is managed in the panel.
+The 403 body is `{"error": "<why>", "msgId": "deployTokenNotRevocable"}` (RPS-1391): a deploy token is managed in
+the panel, so a CI job that uses one should not run `pnpm logout`/`npm logout` (or should ignore the exit code). `npm logout`
+exits non-zero (`E403`, and prints the `error` text) and keeps the token in `.npmrc`. With Basic `_auth`
+(`username:password`) there is no token to revoke: `npm logout` stops with `ENEEDAUTH` and `pnpm logout` with
+`ERR_PNPM_NOT_LOGGED_IN`, both before they call the registry (observed with the pinned clients, RPS-1391).
 
 **Backend candidates found here** (new; not filed yet, the parent files them and replaces the `NCn` keys):
 
@@ -1381,7 +1386,7 @@ the secret of a deploy token (what `tokenBinding` writes) the registry answers 4
   at all as deprecated, so a range keeps skipping the un-deprecated version (`resolution.spec.ts`).
   Serving no field is what npm's own semantics ask for.
 - **RPS-1361** (fixed): `DELETE /-/user/token/<token>` revokes the token of a login; a deploy token is refused
-  (403) and can only be revoked in the panel (`commands.spec.ts`).
+  (403) and can only be revoked in the panel (`commands.spec.ts`). The 403 explains itself in an npm-shaped `error` text (RPS-1391).
 
 Still open and only observed, not asserted as fixed: RPS-1345 (RPS-1343, 1344 and 1356 to 1360 are fixed).
 

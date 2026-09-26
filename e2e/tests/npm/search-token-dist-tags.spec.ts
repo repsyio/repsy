@@ -26,7 +26,7 @@
  *    whole number of 0 or more is a 400 (`invalidSearchParameter`), not the first page.
  *  - `DELETE /-/user/token/<token>` (RPS-1361): `npm logout` and `pnpm logout` call it. It revokes the
  *    token of a login (`200 {"ok": true}`, and the token is refused from then on), refuses the secret
- *    of a deploy token (`403`, it is managed in the panel) and needs credentials (`401`).
+ *    of a deploy token (`403`, it is managed in the panel; the body explains that in `error`, RPS-1391) and needs credentials (`401`).
  *  - `PUT`/`DELETE /-/package/<pkg>/dist-tags/<tag>` (RPS-1362): answer `{"ok": true, "id": ...,
  *    "dist-tags": {...}}`, because yarn classic takes an answer without `ok` for a failure.
  */
@@ -250,6 +250,10 @@ test.describe('npm token revocation (raw HTTP)', () => {
       const refused = await rawRequestPath(repo, 'DELETE', `-/user/token/${deploy.token}`, bearer);
       expect(refused.status, 'a deploy token is managed in the panel').toBe(403);
       expect(refused.msgId).toBe('deployTokenNotRevocable');
+      // The npm error shape, so `npm logout` and `pnpm logout` print why (RPS-1391).
+      const refusedBody = JSON.parse(refused.body.toString('utf8')) as { error?: string };
+      expect(refusedBody.error).toContain('managed in the web UI');
+      expect(refusedBody.error).toContain('npm logout');
       expect((await rawRequestPath(repo, 'GET', '-/whoami', bearer)).status).toBe(200);
 
       const anonymous = await rawRequestPath(repo, 'DELETE', '-/user/token/anything');
