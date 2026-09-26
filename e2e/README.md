@@ -1248,7 +1248,7 @@ and version-smoke-tested here, and each gets its `NpmFamilyClient` in its own PR
 ```bash
 ./run.sh test --protocol npm-clients -b       # build the runner image, then everything (about 25 s warm)
 ./run.sh test --protocol npm-clients --grep @smoke   # one publish + install round trip and one frozen lockfile cell (about 8 s)
-./run.sh test --protocol npm-clients --grep @pnpm    # one client (@npm @pnpm @yarn-classic @yarn-berry @bun)
+./run.sh test --protocol npm-clients --grep @pnpm    # one client (@npm @pnpm @yarn-classic @yarn-berry @bun @deno)
 ```
 
 It is its own runner and Playwright project, so `--protocol npm` stays exactly as small and fast as it
@@ -1273,6 +1273,7 @@ checked against each client's own `--version` at build time and by `tests/npm-cl
 | yarn classic | `… --prefix /opt/clients/yarn1 yarn@…`                                                                                                                                   | `YARN_CLASSIC_VERSION` = **1.22.22** (the frozen last release of the line)                           | `npm view yarn dist-tags` (`latest`)              |
 | yarn berry   | `… --prefix /opt/clients/yarn4 @yarnpkg/cli-dist@…`                                                                                                                      | `YARN_BERRY_VERSION` = **4.18.1**                                                                    | `npm view @yarnpkg/cli-dist dist-tags` (`latest`) |
 | bun          | `COPY --from=oven/bun:<v>-debian /usr/local/bin/bun /opt/clients/bun/bin/bun` (the cargo/golang/ruby "copy the toolchain" pattern; a glibc binary runs on bookworm-slim) | `BUN_VERSION` = **1.3.14**                                                                           | the newest `1.3.x-debian` tag of `oven/bun`       |
+| deno         | `COPY --from=denoland/deno:bin-<v> /deno /opt/clients/deno/bin/deno` (the `bin-<version>` image holds just that glibc binary; consume-only, see "Deno")                  | `DENO_VERSION` = **2.9.7**                                                                           | the newest `bin-2.x.y` tag of `denoland/deno`     |
 
 To bump one: change its build arg in `docker-compose.runners.yml`, `./run.sh test --protocol
 npm-clients -b` (the Dockerfile fails the build when a client reports another version), then re-run the
@@ -1288,6 +1289,7 @@ src/clients/npm-family/
   npm-client.ts      # the npm CLI as an NpmFamilyClient (the baseline / reference implementation)
   yarn-classic-client.ts  # yarn 1.22.22 as an NpmFamilyClient (RPS-1330 PR 3; see "Yarn classic")
   bun-client.ts      # bun: bunClient (bunfig.toml), bunfigOnlyClient, bunNpmrcClient, bunExec()
+  deno-client.ts     # deno 2, CONSUME-ONLY (RPS-1486): denoClient (caps all off), denoExec(); see "Deno"
   adapter.ts         # npmFamilyAdapter(client): a ProtocolAdapter (protocol 'npm', label + tag per client) for the shared catalog loop
   registry.ts        # ENABLED_CLIENTS (what the matrix runs against), clientsWith('<capability>'), INSTALLED_CLIENTS, versionOf()
   fixtures.ts        # package builders (single package, lib + app graph, extra manifest fields), publishPackage(), repo/token helpers
@@ -1298,6 +1300,7 @@ tests/npm-clients/
   pnpm/*.spec.ts                # pnpm: catalog, workspace publish, commands (H-1/H-2), resolution
   yarn-classic/publish-consume.spec.ts  # the catalog with yarn 1 + the yarn-only cells (always-auth, auth keys, scoped publish, tag, ...)
   bun/                          # publish-consume.spec.ts (the catalog), config.spec.ts, commands.spec.ts: see "bun"
+  deno/*.spec.ts                # publish-consume (catalog: npm publishes, deno consumes), consume (graph, lockfile, override, age gate), config (auth kinds on the wire, scopes): see "Deno"
   yarn-berry/*.spec.ts          # the catalog with berry + the berry-only cells (PnP, hardened mode, settings, `yarn npm` commands, workspaces): see "yarn berry"
   versions.spec.ts              # --version of every installed client == its pin; config renderers read back by the client
   sealed-network.spec.ts        # the network seal, proven for all five clients
@@ -1784,6 +1787,56 @@ How it is driven, and why (all probed live):
 
 No new backend candidate came out of berry: it hits RPS-1357 (full packument on every read), RPS-1359 and,
 through the shared cells, RPS-1356/RPS-1358 as pinned above.
+
+### Deno (2.9.7, consume-only; RPS-1486)
+
+Deno 2 installs npm packages (`deno install npm:<pkg>@<version>`, or the dependencies of a `package.json`) and
+has no npm `publish`, so it is a **consume-only** client: `denoClient` (`src/clients/npm-family/deno-client.ts`)
+is in `ENABLED_CLIENTS` (the sealed-env and version specs use it) with every capability off, because the matrix
+cells publish with the client under test. Every package a Deno cell consumes is published by `npmClient`. Its
+own cells are `tests/npm-clients/deno/`: `publish-consume.spec.ts` is the 13-scenario catalog with
+`npmFamilyAdapter(npmClient, denoClient)` (`npm[deno] > ...`; `npmFamilyAdapter` gained an optional second
+argument, the consumer, whose label and tag name the tests), `consume.spec.ts` the graph, the lockfile, the
+override that breaks it and the age gate, `config.spec.ts` the credential kinds and scopes on the wire.
+`./run.sh test --protocol npm-clients --grep @deno` runs them (about 25 tests, 13 s).
+
+Probed against 2.9.7 (H24, H25 of the plan, and what came with them):
+
+- **Configuration is `$HOME/.npmrc`**, the same file npm reads, so `writeNpmrc` is all there is: `registry=`,
+  `@scope:registry=`, the path-scoped `:_authToken=` (Bearer) and `:_auth=` / `:username=`+`:_password=` (Basic).
+  H25: a deploy token works both as `_authToken` (Bearer) and as `_auth` of `<username>:<token>` (Basic), and the
+  admin password as `_auth`; credentials go only to the repository they belong to (two-repository cell), and
+  Deno sends none to another origin: a tarball whose `dist.tarball` names another host is fetched without
+  (probed by hand; the registry always names its own address, RPS-1333).
+- **`DENO_AUTH_TOKENS` does not authenticate to an npm registry.** Deno sends the token with its first
+  packument request (a 200) and asks the next ones, and the tarball, with no `Authorization`: 401, `Bad
+response: 401`. Deno's behaviour, not the registry's; pinned in `config.spec.ts` so a Deno that fixes it
+  shows up. Configure `.npmrc`.
+- **H24: the abbreviated packument is asked for and served**: `Accept: application/vnd.npm.install-v1+json;
+q=1.0, application/json; q=0.8, */*` (bun's and yarn classic's), `User-Agent: Deno/<version>`, and the
+  registry answers 200 with the abbreviated document. That holds with the age gate off:
+- **`minimumDependencyAge` (Deno 2.9, 24 h by default) blocks a version published minutes ago** (`error: Could
+not find npm package ... A newer matching version was found, but it was not used because it was newer than
+the specified minimum dependency date`) and makes Deno ask for the FULL packument (`Accept: */*`, it needs
+  `time`). Every test publishes seconds before it consumes, so `add`/`install` pass
+  `--minimum-dependency-age=0`; the gate has its own cell. A frozen install from a lockfile is not subject to it.
+- **`deno.lock` (v5)** records each package's `integrity` (sha512) and its `tarball` URL; `deno install --frozen`
+  from `package.json` + `deno.lock` alone, in a fresh HOME and cache, reproduces the install, and after an
+  override republish it stops with `Tarball checksum did not match what was provided by npm registry`.
+- **A 401 reads as "not found".** With a missing or wrong credential Deno prints `npm:<pkg> was not found` (exit
+  1), the same words as for a package that does not exist; the catalog's negative scenarios assert the exit code.
+- The layout: `node_modules/<name>` is a symlink into `node_modules/.deno/<name>@<version>/node_modules/<name>`
+  and only the project's own dependencies get one (a transitive dependency is read from `.deno/`).
+- The network seal is `HTTP_PROXY`/`HTTPS_PROXY` (Deno honours them and `NO_PROXY`); its message for a refused
+  connection is the bare `was not found` above, so `sealed-network.spec.ts` turns on `DENO_LOG=hyper_util=debug`
+  and asserts the connection to the dead proxy in the log. `deno task <script>` is Deno's `run`, used by
+  `sealed-env.spec.ts` to prove no runner variable reaches a client's scripts.
+
+**TLS stack: not wired yet.** Deno's own trust knobs are `DENO_CERT=<ca.pem>` (or `--cert`) and `DENO_TLS_CA_STORE`; it
+was not probed whether it also honours the variables `TRUST_VARIABLES` (`src/clients/client-env.ts`) copies for the other
+npm-family clients. Against the TLS stack ("TLS stack") Deno therefore needs `DENO_CERT` pointing at the generated CA:
+`sealedEnv` does not pass it and the `tls` overlay does not set it for this runner. The `npm-clients` runner is not part
+of the TLS smoke, so nothing runs Deno against https today; wiring it is a follow-up of that part.
 
 ## Credential invalidation (RPS-1481)
 
@@ -4354,6 +4407,51 @@ Two more specs of the `api` runner (`./run.sh test --protocol api`, see "API sui
   path of the repo, for the same path in another repo, for a garbage token, for a `PUT` (repo unchanged), and as a
   Bearer or `?downloadToken=` on the panel API and on the protocol port. The expiry test waits 61 s and is tagged
   `@slow` (`--grep '^((?!@slow).)*$'` leaves it out).
+
+## Panel API contract specs (RPS-1483)
+
+`tests/<protocol>/panel-api.spec.ts` runs in the protocol's own runner (`--protocol maven|npm|pypi`, so it has the
+real client). Maven, npm and PyPI exist; the other protocols follow in their own PRs. Each spec publishes with the
+REAL client (`maven.seedPublish`, `npm.seedPublish`, `pypi.seedPublish`, the adapters' pre-publish), calls the panel
+operations of the protocol BY `operationId` (`src/api/contract-checks.ts`: the path template is read from
+`openapi-spec.yaml`, so a renamed route fails instead of being skipped) and checks:
+
+- **The schema.** `src/api/spec-contract.ts` validates a live body against the operation's response schema with `ajv`
+  (`ajv/dist/2020`, strict: the spec is OpenAPI 3.1, whose schemas are JSON Schema 2020-12 as they are; `int32` and
+  `int64` are registered, `ajv-formats` supplies `uuid` and `date-time`, `$ref`s of `components/schemas` and
+  `components/responses` are resolved from the file). The spec declares no `required` and no `additionalProperties`,
+  so `undeclaredProperties` walks the body along its schema and lists every property the schema does not declare;
+  `expectContract` asserts both. Errors are validated too (`expectFailure`: status, `ErrorResponse`, `msgId`).
+  `tests/api/spec-contract.spec.ts` tries the validator on bodies written out in the file (no server).
+- **The facts.** Names, versions, kinds (RELEASE/SNAPSHOT, PEP 440 pre/post/dev), the POM the wire serves, the
+  `<versions>` of `maven-metadata.xml`, the packument's versions and dist-tags, `npm deprecate` and `npm dist-tag add`
+  results, the wheel's `Summary` and `Requires-Python`, the project page's files.
+- **Paging** (`expectPagingSweep`, one list operation per protocol plus one more for npm/PyPI): `size` pages cover every
+  row once with the right `page` block, a page past the end is empty, the default size is 10, `sort` orders and `desc`
+  is the reverse of `asc`, `q` narrows, and `size=0`, `size=101`, `page=-1` and a `sort` the operation does not list are
+  400 `validationError` naming the parameter. The rows are seeded over raw HTTP; the sort values differ only in a
+  trailing number, so the order does not depend on the database collation.
+- **The wire effect of a delete.** After the panel DELETE the file answers 404, the metadata (maven-metadata.xml,
+  packument, project page) drops it, and a real `mvn dependency:get` / `npm install` / `pip download` fails, while the
+  sibling still resolves to the bytes the client built.
+- **Coverage.** Each spec names the operations it calls and a test compares them to the spec's own list under the
+  protocol's path prefix (`expectCovers`), so a new route is a red test until a case exists for it.
+
+**Known bugs** (each is a `test.fail()` with its ticket in `tests/maven/panel-api.spec.ts`: the test asserts the correct
+behaviour, passes while the bug is there and goes red when it is fixed; the fix removes the `test.fail()` in the same PR):
+
+- RPS-1574: every success body carries `"errorCode": null`, and every `RestResponse*` schema declares `errorCode` as a
+  `string`. It is the same mismatch on every operation, so `contractProblems` leaves out exactly that one violation
+  (`isKnownErrorCodeNull`, unit-tested) and validates the rest of the body in full; `{ strict: true }` shows it. The fix
+  (a nullable `errorCode` in the spec, or no field) removes the filter.
+- RPS-1573: `DELETE /api/mvn/artifacts/{repo}/{group}/{artifact}` for an artifact that does not exist deletes the whole GROUP
+  (files and rows) and answers 200 `data: GROUP` when the group holds exactly one artifact: `deleteArtifact` asks
+  `hasOnlyOneArtifact(group)` before it checks the artifact exists (the same shape as RPS-1190, which fixed it for
+  versions). With two artifacts it answers 404 as it should.
+
+```bash
+./run.sh test --protocol maven,npm,pypi --grep "panel API"
+```
 
 ## Remote hardening
 

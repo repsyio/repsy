@@ -146,6 +146,8 @@ services:
         YARN_CLASSIC_VERSION: '1.22.22'
         YARN_BERRY_VERSION: '4.18.1'
         BUN_VERSION: '1.3.14'
+        # `docker pull denoland/deno:bin-2.9.7` (the `bin-<version>` tags hold just the binary).
+        DENO_VERSION: '2.9.7'
     environment:
       <<: *runner-environment
     volumes:

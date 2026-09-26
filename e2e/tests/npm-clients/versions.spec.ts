@@ -56,7 +56,12 @@ test.describe('npm-family client versions', () => {
         const pinnedBy = CLIENT_VERSION_ENV[client.id] ?? '';
         const pinned = process.env[pinnedBy];
         expect(pinned, `${pinnedBy} is set by runners/npm-clients.Dockerfile`).toBeTruthy();
-        expect(result.stdout.trim()).toBe(pinned);
+        // `deno --version` prints three lines, the first `deno 2.9.7 (stable, release, ...)`; the others'
+        // whole output is the version.
+        const reported = (result.stdout.trim().split('\n')[0] ?? '')
+          .replace(/^deno /, '')
+          .replace(/ \(.*$/, '');
+        expect(reported).toBe(pinned);
       },
     );
   }

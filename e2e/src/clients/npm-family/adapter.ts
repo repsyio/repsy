@@ -28,6 +28,10 @@
  * asserted separately. `resolve` installs the version into an empty project and reads the marker back
  * out of the installed package; its `Outcome` comes from a raw packument GET. `fingerprint` and
  * `expectNothingStored` are `clients/npm.ts`'s own.
+ *
+ * A consume-only client (deno, RPS-1486) is `npmFamilyAdapter(npmClient, denoClient)`: `client` packs
+ * and publishes (`publish`, `seedPublish`), `consumer` (default: `client`) resolves, and the title,
+ * tag and the client named in a failure message are the consumer's.
  */
 import type { AdapterResult, ProtocolAdapter } from '../../scenarios/adapter.js';
 import { boundedSemverVersion, slugify } from '../../scenarios/coordinates.js';
@@ -49,7 +53,10 @@ interface PublishRun {
   marker: string;
 }
 
-export function npmFamilyAdapter(client: NpmFamilyClient): ProtocolAdapter<NpmFingerprint> {
+export function npmFamilyAdapter(
+  client: NpmFamilyClient,
+  consumer: NpmFamilyClient = client,
+): ProtocolAdapter<NpmFingerprint> {
   async function publishWithClient(world: World, label: string): Promise<PublishRun> {
     const ctx = await client.prepare(label, [bindingFor(world)]);
     const { packageName, version } = world.publishTarget;
@@ -109,18 +116,18 @@ export function npmFamilyAdapter(client: NpmFamilyClient): ProtocolAdapter<NpmFi
   }
 
   async function resolve(world: World): Promise<AdapterResult> {
-    const ctx = await client.prepare(`consume-${world.scenario.id}`, [bindingFor(world)]);
+    const ctx = await consumer.prepare(`consume-${world.scenario.id}`, [bindingFor(world)]);
     const { packageName, version } = world.consumeTarget;
 
     // A source-free consumer project, so the explicit `<pkg>@<version>` install target is what
     // resolves anything (clients/npm.ts).
     await renderConsumer(ctx.work, `e2e-consumer-${world.scenario.id}`);
-    const install = await client.add(ctx, [`${packageName}@${version}`]);
+    const install = await consumer.add(ctx, [`${packageName}@${version}`]);
 
     // The auth-only companion probe: a packument GET never touches the tarball path, so its status
     // is a clean signal of authn/authz alone.
     const rawRes = await rawGetPackument(world.repoName, world.credential, packageName);
-    const marker = await client.readInstalledFile(ctx, packageName, MARKER_FILENAME);
+    const marker = await consumer.readInstalledFile(ctx, packageName, MARKER_FILENAME);
 
     return {
       outcome: outcomeForStatus(rawRes.status),
@@ -135,10 +142,11 @@ export function npmFamilyAdapter(client: NpmFamilyClient): ProtocolAdapter<NpmFi
 
   return {
     protocol: 'npm',
-    label: client.label,
-    tags: [client.tag],
-    client: { name: client.label, publishVerb: 'publish', consumeVerb: 'install' },
-    knownClientExitDisagreement: client.exitQuirk,
+    label: consumer.label,
+    tags: [consumer.tag],
+    client: { name: consumer.label, publishVerb: 'publish', consumeVerb: 'install' },
+    knownClientExitDisagreement: (scenario, side, outcome) =>
+      (side === 'publish' ? client : consumer).exitQuirk?.(scenario, side, outcome),
 
     packageName: (runId, scenario) => `e2e-${runId}-${slugify(scenario.id)}`,
     version: () => boundedSemverVersion(),

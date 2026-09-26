@@ -32,7 +32,7 @@ import type { RunResult } from '../exec.js';
 import type { Outcome, Scenario } from '../../scenarios/types.js';
 import type { MaterializedCredential } from '../../scenarios/world.js';
 
-export type ClientId = 'npm' | 'pnpm' | 'yarn-classic' | 'yarn-berry' | 'bun';
+export type ClientId = 'npm' | 'pnpm' | 'yarn-classic' | 'yarn-berry' | 'bun' | 'deno';
 
 /** Absolute path of each client's binary in the runner image (`runners/npm-clients.Dockerfile`). */
 export const CLIENT_BINARIES: Record<ClientId, string> = {
@@ -41,6 +41,7 @@ export const CLIENT_BINARIES: Record<ClientId, string> = {
   'yarn-classic': '/opt/clients/yarn1/bin/yarn',
   'yarn-berry': '/opt/clients/yarn4/bin/yarn',
   bun: '/opt/clients/bun/bin/bun',
+  deno: '/opt/clients/deno/bin/deno',
 };
 
 /**
@@ -53,6 +54,7 @@ export const CLIENT_VERSION_ENV: Partial<Record<ClientId, string>> = {
   'yarn-classic': 'NPM_CLIENTS_YARN_CLASSIC_VERSION',
   'yarn-berry': 'NPM_CLIENTS_YARN_BERRY_VERSION',
   bun: 'NPM_CLIENTS_BUN_VERSION',
+  deno: 'NPM_CLIENTS_DENO_VERSION',
 };
 
 /** What a client can do, so a matrix spec registers a cell only for a client that supports it. */
@@ -117,7 +119,7 @@ export interface NpmFamilyClient {
   readonly id: ClientId;
   /** The name a test title / describe block carries: `npm`, `pnpm`, `yarn-classic`, ... */
   readonly label: string;
-  /** `@npm`, `@pnpm`, `@yarn-classic`, `@yarn-berry`, `@bun`: `--grep` selects one client. */
+  /** `@npm`, `@pnpm`, `@yarn-classic`, `@yarn-berry`, `@bun`, `@deno`: `--grep` selects one client. */
   readonly tag: `@${string}`;
   readonly binary: string;
   readonly caps: Capabilities;
