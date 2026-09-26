@@ -30,6 +30,9 @@
   <artifactId>{{artifactId}}</artifactId>
   <version>{{version}}</version>
   <packaging>jar</packaging>
+  {{#pomPadding}}
+  <description>{{{pomPadding}}}</description>
+  {{/pomPadding}}
 
   <properties>
     <maven.compiler.source>21</maven.compiler.source>

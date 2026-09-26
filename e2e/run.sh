@@ -63,8 +63,8 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--upgrade] [--force]
-  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--upgrade]
+  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--upgrade] [--force]
+  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--upgrade]
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
@@ -110,6 +110,11 @@ generated into e2e/.tls/<project> (docker-compose.stack-tls.yml). With the switc
 client trust that CA in its own way. Give "test" the same switch as "up" (REPSY_E2E_TLS=1). The ui runner
 is left out. See README.md "TLS stack".
 
+--limits (or REPSY_E2E_LIMITS=1) is the fourth overlay: Repsy starts with tiny upload size limits, 64 KiB for a
+PyPI/Helm/NuGet upload, a gem, a crate and a Go module zip (docker-compose.stack-limits.yml), for the @limits
+specs of the pypi, helm, nuget, ruby, cargo, golang and api runners: an over-limit push gets a 413. No other
+suite may run there. See README.md "Size-limit leg".
+
 --upgrade (or REPSY_E2E_UPGRADE=1) is the upgrade-path overlay (docker-compose.stack-upgrade.yml, RPS-1487): "local up"
 starts the PREVIOUS release on a fresh volume (the tag in src/upgrade/previous-release.ts, or
 REPSY_E2E_UPGRADE_FROM=<tag>) and builds the image under test
@@ -135,6 +140,7 @@ OVERLAYS=(
   "scanner|--scanner|REPSY_E2E_SCANNER|docker-compose.stack-scanner.yml"
   "throttle|--throttle|REPSY_E2E_THROTTLE|docker-compose.stack-throttle.yml"
   "tls|--tls|REPSY_E2E_TLS|docker-compose.stack-tls.yml"
+  "limits|--limits|REPSY_E2E_LIMITS|docker-compose.stack-limits.yml"
   "upgrade|--upgrade|REPSY_E2E_UPGRADE|docker-compose.stack-upgrade.yml"
 )
 
@@ -530,6 +536,9 @@ cmd_local_up() {
   fi
   if overlay_active throttle; then
     echo "Throttle overlay on: 3 failed password checks per 10 s per client; run REPSY_E2E_THROTTLE=1 ./run.sh test --protocol stack,ui --grep @throttle (the ui runner last: AUTH-11 locks the docker gateway's bucket)"
+  fi
+  if overlay_active limits; then
+    echo "Limits overlay on: uploads over 64 KiB are refused (413); run REPSY_E2E_LIMITS=1 ./run.sh test --protocol pypi,helm,nuget,ruby,cargo,golang,api --grep @limits, one runner per call"
   fi
   if overlay_active upgrade; then
     echo "Upgrade overlay on: run REPSY_E2E_UPGRADE=1 ./run.sh test --protocol stack --grep @upgrade (the stack ends on the image under test)"

@@ -80,6 +80,7 @@ e2e/
   docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
   docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
   docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
+  docker-compose.stack-limits.yml  # OPT-IN overlay on either stack: every configurable upload limit at 64 KiB, `run.sh local up|down --limits`, see "Size-limit leg"
   docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" and "api"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle/sbt/Ant + Ivy and gpg; see "Adding a protocol adapter" below
@@ -88,9 +89,9 @@ e2e/
   runners/npm-clients.Dockerfile  # + pinned pnpm, yarn classic, yarn berry (npm --prefix /opt/clients/<name>) and bun (copied from oven/bun); see "npm-family clients"
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
   runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
-  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image, `skopeo` (built statically from its pinned tag) and `regctl` (pinned release binary); no daemon, no socket
+  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image, `skopeo` (built statically from its pinned tag), `regctl` and `oras` (pinned release binaries, sha256 per arch); no daemon, no socket
   runners/helm.Dockerfile      # + the static `helm` binary + the cm-push plugin installed at build time; no daemon, no socket
-  runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time
+  runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time; the static uv binary copied out of Astral's image
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
   runners/ruby.Dockerfile      # + a pinned Ruby toolchain (ruby/gem/bundle/bundler + stdlib) copied out of the official ruby image
   runners/stack.Dockerfile     # + the static `docker` CLI and its compose plugin copied out of docker-cli, a JDK + Maven, crane and npm; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
@@ -159,7 +160,8 @@ e2e/
       docker-copy-adapter.ts         # the scenario-loop adapter of the copy clients (CopyClient -> ProtocolAdapter) + openSession, RPS-1478 part B
       docker-skopeo.ts               # skopeo: skopeoAdapter (skopeo copy), its env/auth file, the dir: reader
       docker-regctl.ts               # regctl: regctlAdapter (regctl image copy), its regctl.json renderer
-      docker-tls.ts                  # the ONE place skopeo/regctl's TLS setting is decided (plain HTTP today; the HTTPS leg switches it here)
+      docker-oras.ts                 # oras: openOrasSession (oras login --password-stdin into an isolated --registry-config file), REFERRERS_TAG, RPS-1478 part C
+      docker-tls.ts                  # the ONE place skopeo/regctl/oras's TLS setting is decided (plain HTTP today; the HTTPS leg switches it here)
       docker-client-tests.ts         # seeding + raw comparison helpers of the skopeo/regctl specs
       helm-chart.ts                   # hand-assembled Helm chart .tgz builder (Chart.yaml + values.yaml + marker, ustar+gzip)
       helm-raw.ts                     # raw HTTP for BOTH Helm protocols: OCI manifest/blob PUT/GET/HEAD + classic index/chart/upload/delete
@@ -167,6 +169,7 @@ e2e/
       helm-classic.ts                  # the classic (ChartMuseum) client + helmClassicAdapter: helm cm-push / pull --repo
       pypi-raw.ts                     # pypi-specific raw POST/GET (upload/simple page/root index/download), buildWheel (fflate)
       pypi.ts                          # the pypi client + pypiAdapter: publish()/resolve()/seedPublish(), python3 -m twine/pip
+      uv.ts                            # the second pypi client: uvAdapter (uv publish / uv lock + uv sync), uvEnv, runUv, a uv.lock reader
       golang-raw.ts                     # golang-specific raw PUT/GET (@v/list, @latest, .info/.mod/.zip), buildModuleZip (fflate), dirhashHash1
       golang-tls-shim.ts                 # in-process HTTPS reverse proxy for a credentialed consume (a real `go` refuses plain-http creds; not used on a TLS stack)
       golang.ts                          # the golang client + golangAdapter: publish()/resolve()/seedPublish(), real curl -T / go mod download
@@ -240,6 +243,7 @@ e2e/
       skopeo.spec.ts            # skopeo: copy between two repos, inspect, delete (scope *), multi-arch --all
       regctl.spec.ts            # regctl: manifest get/head, image inspect, copy between repos, tag/manifest delete, sha512, multi-arch
       client-tag-list.spec.ts   # crane ls/catalog, skopeo list-tags/inspect, regctl tag ls/repo ls against the missing tags/list (RPS-1489)
+      oras.spec.ts              # oras: push/pull/blob/manifest of OCI artifacts, attach + the referrers tag-schema fallback, discover, copy, delete, the RPS-1490 test.fail pins (RPS-1478 part C)
     helm/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
@@ -248,6 +252,8 @@ e2e/
     pypi/
       publish-consume.spec.ts   # registerPublishConsumeLoop(pypiAdapter) + a real pip-install and a mixed-case/dotted-name real-client test
       registry-rules.spec.ts    # raw-HTTP pins of the override/version/digest rules, root-index shape, HEAD, 307 redirect, no releases/snapshots rule
+      uv-catalog.spec.ts        # RPS-1486 registerPublishConsumeLoop(uvAdapter): the shared catalog with `uv publish` + `uv lock`/`uv sync`
+      uv-client.spec.ts         # RPS-1486 U1-U9: uv's upload form, uv.lock hashes, netrc, uv pip --require-hashes, tampered lock, PEP 691 Accept, --check-url, deleted release
     golang/
       publish-consume.spec.ts   # registerPublishConsumeLoop(golangAdapter) + go-get-build-run, plain-http-creds-refused, dirhash cross-check, mixed-case and wire-trace real-client tests
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload) + G1/G2/G10 candidates
@@ -291,6 +297,7 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_UI_OPT_IN`             | _(unset)_                  | ui runner only: the UI suite's older spelling of `REPSY_E2E_OPT_IN`; `optedIn()` reads both, so either works                                                                                                                                                                                                                                                                                                                             |
 | `REPSY_E2E_SCANNER`           | _(unset)_                  | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_E2E_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                    |
 | `REPSY_E2E_THROTTLE`          | _(unset)_                  | `1` makes `local up\|down` include the auth-throttle overlay (same as `--throttle`) and `test` add `throttle` to `REPSY_E2E_OPT_IN`, see "Auth-throttle leg"                                                                                                                                                                                                                                                                             |
+| `REPSY_E2E_LIMITS`            | _(unset)_                  | `1` makes `local up\|down` include the tiny-upload-limit overlay (same as `--limits`) and `test` add `limits` to `REPSY_E2E_OPT_IN`, see "Size-limit leg"                                                                                                                                                                                                                                                                                |
 | `REPSY_E2E_SCANNER_PORT`      | `8090` + offset            | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_SCANNER_STUB_URL`      | `http://localhost:8090`    | ui runner only: where the `@scanner` specs reach that API (follows `REPSY_E2E_SCANNER_PORT`)                                                                                                                                                                                                                                                                                                                                             |
 | `REPSY_SCANNER_API_KEY`       | `e2e-scanner-key`          | the shared secret of the stub scanner and the backend's scanner client                                                                                                                                                                                                                                                                                                                                                                   |
@@ -2568,7 +2575,7 @@ is in the PR that added this file.
   whose config digest is also one of its layers (`{}` twice, as `oras attach`/`oras push
 --config` without files produces) is answered `404` `MANIFEST_BLOB_UNKNOWN` `layerNotFound`
   (observed live while probing; the OCI artifact manifest with a distinct layer is `201`). It
-  belongs to part C, which decides how to pin it.
+  is pinned in part C as `test.fail` under RPS-1490 (see "Fourth Docker client: `oras`").
 
 ```bash
 ./run.sh test --protocol docker -b   # -b the first time: builds the docker runner image
@@ -2623,11 +2630,52 @@ Probed live (skopeo 1.24.1, regctl 0.11.6):
 
 `client-tag-list.spec.ts` pins what `crane ls`/`catalog`, `skopeo list-tags`/`inspect` and `regctl tag
 ls`/`repo ls` do against RA1/RA2 (fail with the registry's `unknownPath`): the story that adds `tags/list`
-(RPS-1489) flips it. Not covered: `oras` (RPS-1478 part C), the HTTPS leg (RPS-1474).
+(RPS-1489) flips it. `oras` is in its own section below; not covered: the HTTPS leg (RPS-1474).
 
 ```bash
 ./run.sh test --protocol docker -b               # -b the first time this runner image changes
 ./run.sh test --protocol docker --grep "@skopeo"  # or "@regctl"
+```
+
+### Fourth Docker client: `oras` (RPS-1478 part C)
+
+`oras` v1.3.4 (`ORAS_VERSION`, `ORAS_SHA256_AMD64`/`ORAS_SHA256_ARM64` in `runners/docker.Dockerfile` and
+`docker-compose.runners.yml`; a release tarball checked against its sha256, `oras version` checked at build
+time) is the OCI ARTIFACT client: it pushes arbitrary files with an `artifactType`, attaches referrers (an
+SBOM, a signature) to an image and copies them. `clients/docker-oras.ts` opens a session per credential:
+`oras login --password-stdin` into an isolated `--registry-config` file inside the invocation's private `HOME`
+(oras's own auth store, the secret on stdin and never in argv), `clientEnv` allow-list environment
+(`sealed-env.spec.ts` has a cell), TLS from `docker-tls.ts` (`--plain-http` today; `--from-plain-http`/
+`--to-plain-http` for `copy`). It has no scenario-loop adapter: `tests/docker/oras.spec.ts` (tag `@oras`) pins
+what it does that the image clients never reach. Probed live (oras 1.3.4):
+
+| Behaviour                                               | What oras does against Repsy                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `push` / `pull` / `manifest fetch` / `blob fetch` (OR1) | an OCI artifact manifest (`artifactType`, config `application/vnd.oci.empty.v1+json`, a file layer with a custom media type and a `title` annotation) is stored as sent and reads back byte-identical, by tag and by digest; `--config <file>:<type>` stores that config and the type becomes the artifact type                                                                                                                              |
+| `attach` (OR2)                                          | never asks the referrers API: the `201` of the referrer PUT has no `OCI-Subject` header, which oras-go reads as "no referrers API", so it takes the spec's FALLBACK: `GET manifests/sha256-<hex>` (`404`, then the existing index), `PUT` an OCI image index under that tag listing the referrer                                                                                                                                             |
+| the fallback index tag (OR2)                            | an ordinary tag (RA4): raw HTTP and `crane manifest <repo>/<image>:sha256-<hex>` read the same bytes; a read-write deploy token can attach, a read-only one is refused (`401`) and the index does not change                                                                                                                                                                                                                                 |
+| `discover` (OR3)                                        | **fails** by default: it asks `GET .../referrers/<digest>`, gets `404` WITH `NAME_UNKNOWN` (RA3) and oras-go reads that code as "repository not found", not as "API unsupported". `--distribution-spec v1.1-referrers-tag` works (`--format json`, `--artifact-type` filter)                                                                                                                                                                 |
+| `copy` (OR4)                                            | between two repos of one Repsy the artifact arrives byte-identical (oras asks for a mount, gets the `202` fallback of RA5, uploads); `-r` fails like `discover` unless `--from-distribution-spec` and `--to-distribution-spec` are both `v1.1-referrers-tag`, then the referrer and its index tag are copied                                                                                                                                 |
+| `manifest delete` (OR5)                                 | deletes by digest (a tag reference resolves first: every tag of the manifest goes), asked for the `delete` scope up front (token scope `repository:<repo>/<image>:delete,pull`, seen through a logging proxy: no `insufficient_scope` round trip, unlike crane/regctl); a rw deploy token is refused. Deleting a REFERRER fails on the same referrers-API probe unless the tag schema is forced, which also removes its entry from the index |
+| `repo tags` / `repo ls` (OR7)                           | fail with `unknownPath` (RA1/RA2, RPS-1489)                                                                                                                                                                                                                                                                                                                                                                                                  |
+
+Backend follow-up (RPS-1489 already lists the referrers API): implementing `GET /v2/<repo>/<image>/referrers/<digest>`
+(or, at the least, answering the missing route with a `404` that does not carry `NAME_UNKNOWN`) makes
+`oras discover`, `oras copy -r` and `oras manifest delete` of a referrer work without forcing the tag
+schema; the `discover`/`copy -r`/referrer-delete halves of OR3/OR4/OR5 then flip on purpose (with RA3).
+
+**RPS-1490 (`test.fail`, OR6).** A manifest whose config digest equals one of its layer digests, or that
+lists the same layer digest twice, is answered `404 MANIFEST_BLOB_UNKNOWN / layerNotFound` on `PUT
+manifests/<ref>` although every blob is stored (`AbstractDockerProtocolTxFacade.verifyLayers` adds the
+config digest to the layer digest list and `LayerTxService.isAllExistsByRepoIdAndDigests` compares the
+list's size with the number of distinct rows found). The OCI spec allows both. Real clients hit it in three
+places, each a `test.fail` here: `oras push --artifact-type X` without files and `oras attach` with only an
+annotation (both send `{}` as the config AND the one layer), `oras push` of two files with identical bytes;
+OR6d reproduces it with raw HTTP. The fix flips all four.
+
+```bash
+./run.sh test --protocol docker -b               # -b the first time this runner image changes
+./run.sh test --protocol docker --grep "@oras"
 ```
 
 ## Helm runner
@@ -3149,6 +3197,55 @@ covered by `tests/helm/classic-publish-consume.spec.ts`'s existing "C1" test (ad
 runner step) — checked first, confirmed by reading that file, so nothing new was added for Helm in
 this step; see the "Helm runner" section above for C1's own coverage.
 
+### uv (RPS-1486)
+
+`uv` is the second PyPI client: the pinned static binary (`UV_VERSION`, copied out of
+`ghcr.io/astral-sh/uv` in `runners/pypi.Dockerfile`; `UV_PYTHON` is the CPython the image carries and
+`UV_PYTHON_DOWNLOADS=never`). `clients/uv.ts`'s `uvAdapter` (`label: 'uv'`, tag `@uv`, titles
+`pypi[uv] > <scenario>`) reuses everything of `pypiAdapter` but the client: `publish`/`seedPublish`
+run `uv publish --trusted-publishing never --publish-url <repo>/`, `resolve` runs `uv lock` then
+`uv sync --locked` in an isolated project whose `pyproject.toml` names the repo as its default index.
+`tests/pypi/uv-catalog.spec.ts` runs the whole shared catalog through it (13 scenarios), and
+`tests/pypi/uv-client.spec.ts` (U1-U9) pins what only uv shows:
+
+```bash
+./run.sh test --protocol pypi --grep @uv -b   # -b the first time: the runner image gained uv
+```
+
+- **Credentials are uv's own**, in a private `HOME` (`clientEnv`, RPS-1446), never argv or a file:
+  `UV_PUBLISH_USERNAME`/`UV_PUBLISH_PASSWORD` for a password credential, `UV_PUBLISH_TOKEN` for a
+  deploy token (uv sends the username `__token__`; Repsy tries the token by its secret alone), and
+  `UV_INDEX_REPSY_USERNAME`/`UV_INDEX_REPSY_PASSWORD` for the named index of the consumer project (so
+  neither `pyproject.toml` nor `uv.lock` holds one). `~/.netrc` works too (U3). A plain-http index on
+  `localhost` needs no `--allow-insecure-host`; a remote plain-http target gets `UV_INSECURE_HOST`
+  under `REPSY_E2E_INSECURE_REGISTRY`, like pip's `PIP_TRUSTED_HOST`. The keyring provider needs the
+  `keyring` executable, which the runner does not carry: not covered.
+- **`uv publish` sends `sha256_digest`** (and `blake2_256_digest`, ignored server-side), so the
+  `sha256DigestMissing` refusal of RPS-1224 does not affect it: it is accepted like twine (captured
+  off a local server in U1). A wheel and an sdist in one call are both stored (U2).
+- **An anonymous publish** would make uv try "trusted publishing" first (an OIDC request to
+  `https://<repo host>/_/oidc/audience`, three retries, then `Missing credentials`); the adapter passes
+  `--trusted-publishing never`, so it fails client-side at once, like twine's non-interactive preflight,
+  and the outcome comes from the raw companion probe (401).
+- **`resolve` is lock + sync**, not `uv pip install`: `uv.lock` records the registry (no credential),
+  the canonical download URL and the sha256 the index advertised, and `uv sync` refuses a wheel whose
+  bytes differ (U5), so the locked hash is the installed bytes and is what `contentSha256` reports.
+  `uv pip install --index-url`, `--require-hashes` (a wrong hash is a hash mismatch, an unpinned
+  requirement is refused) and `uv pip compile --generate-hashes` are U4; pip's `--require-hashes` is U9.
+- **PEP 691** (U6): uv asks for `application/vnd.pypi.simple.v1+json` first, with HTML fallbacks. Repsy
+  has no JSON simple API and answers `200 text/html` to that header and to a JSON-only one (PEP 691
+  would also allow a 406 for the latter); uv falls back to the page. Pinned as observed.
+- **`uv publish --check-url`** (U7): the same bytes are skipped (exit 0, even on a no-override repo), other
+  bytes under the same name are refused by uv before it uploads, and a check URL without credentials
+  cannot read a private index, so uv uploads and the repo answers `403 fileAlreadyExists`.
+- **A deleted release** (U8; PyPI has no wire delete, the panel is the only way): file, page and HEAD
+  404, `uv lock` has no solution, an old lock fails on the 404, and a re-published wheel (fresh bytes)
+  is refused by the old lock's hash until it is re-locked. A ranged GET of a wheel answers `206` with
+  the right slice.
+- Observed, not pinned (no ticket): a `HEAD` of a wheel answers `200` with neither `Content-Length` nor
+  `Accept-Ranges` (the `GET` has both), so uv's range-request fast path logs "Range requests not
+  supported" and streams the whole wheel (`uv pip install -v`). Performance only.
+
 ## Go runner
 
 Go is the first protocol in this harness with **no official publisher at all**:
@@ -3656,6 +3753,7 @@ and is never part of the default stack.
 | `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack" |
 | `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                       |
 | `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang), "TLS stack"                             |
+| `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                            |
 | `upgrade`  | `--upgrade`             | `REPSY_E2E_UPGRADE=1`  | `docker-compose.stack-upgrade.yml`  | `upgrade`   | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                 |
 
 How it fits together, so a later overlay is one row:
@@ -3995,6 +4093,70 @@ passed", which is the reminder to delete the line:
   unscoped one passes).
 
 Part b's `@smoke` leg meets the first of them.
+
+### Size-limit leg (RPS-1482)
+
+Every package format has an upload size limit, and a limit nobody exercises is a limit nobody knows still works.
+The default stack leaves them at their defaults (100-500 MB), so the overlay `docker-compose.stack-limits.yml`
+sets the configurable ones to **64 KiB** (`MULTIPART_MAX_FILE_SIZE`, `MULTIPART_MAX_REQUEST_SIZE` 256 KiB,
+`RUBY_MAX_GEM_SIZE`, `CARGO_MAX_CRATE_SIZE`, `GO_MAX_MODULE_ZIP_SIZE`; the request limit stays above the file
+limit so the file limit is what trips). No other suite may run there: any package over 64 KiB is refused.
+
+```bash
+./run.sh local up --limits                                        # (or REPSY_E2E_LIMITS=1) add --h2 for H2
+REPSY_E2E_LIMITS=1 ./run.sh test --protocol pypi --grep @limits   # and helm, nuget, ruby, cargo, golang, api
+./run.sh local down --limits
+```
+
+Per real client, `tests/<protocol>/size-limits.spec.ts` (`@limits`, registered by `registerSizeLimitSpecs`,
+`src/scenarios/size-limits.ts`; the push is `src/clients/oversize.ts`) runs two tests. The package is padded with
+RANDOM bytes (`src/clients/padding.ts`: gems, crates and charts are gzipped, so compressible padding would slip under):
+
+- **over the limit** (about 100 KB): the client exits non-zero and prints the message below, a raw replay of the same
+  package to the route the client uses answers what the server really sends, and the adapter's `fingerprint` shows
+  the repository exactly as before ("Nothing stored");
+- **under the limit** (about 20 KB, same client, a fresh repo): the push succeeds and the package is in the repository,
+  so the limit is what refused the first push, not a client or a repo that cannot publish.
+
+| Format         | Limit                     | Client                                                         | What the client prints (asserted)                                                                                                                            | Raw replay                                                                                              |
+| -------------- | ------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| PyPI           | `MULTIPART_MAX_FILE_SIZE` | `twine upload`                                                 | `HTTPError: 413 Content Too Large`                                                                                                                           | 413, `payloadTooLarge`                                                                                  |
+| NuGet          | `MULTIPART_MAX_FILE_SIZE` | `dotnet nuget push`                                            | `error: Response status code does not indicate success: 413`                                                                                                 | 413, `payloadTooLarge`                                                                                  |
+| Helm (classic) | `MULTIPART_MAX_FILE_SIZE` | `helm cm-push`                                                 | `Error: 413: could not properly parse response JSON: {...payloadTooLarge...}` (cm-push expects ChartMuseum's `{"error"}`, so it prints Repsy's envelope raw) | 413, `payloadTooLarge`                                                                                  |
+| Ruby           | `RUBY_MAX_GEM_SIZE`       | `gem push`                                                     | the envelope itself (`{"msgId":"payloadTooLarge",...}`, no status)                                                                                           | 413, `payloadTooLarge`                                                                                  |
+| Cargo          | `CARGO_MAX_CRATE_SIZE`    | `cargo publish`                                                | `the remote server responded with an error (status 413 Payload Too Large): the crate exceeds the maximum upload size`                                        | 413, cargo's own shape `{"errors":[{"detail":"the crate exceeds the maximum upload size"}]}` (no msgId) |
+| Go             | `GO_MAX_MODULE_ZIP_SIZE`  | `curl -T` (there is no Go publisher, the panel documents curl) | `curl: (22) The requested URL returned error: 413` and the envelope                                                                                          | 413, `payloadTooLarge`                                                                                  |
+
+The envelope is `{"msgId":"payloadTooLarge","type":"ERROR","text":"The uploaded content is too large."}`, always
+with `Connection: close`. The Helm OCI push and Docker send blobs, which none of these variables limit, so they
+are left out. twine is not counted for retries (there is no wire recorder): a 413 is not a status it retries.
+
+`tests/api/connector-limits.spec.ts` covers the two limits of the connector itself, on the `api` runner:
+
+- an oversized request header (`@smoke`, no overlay needed): Tomcat's default 8 KiB for the whole header block
+  (a 4000-byte header is served, a 9000-byte one and 120 headers of 80 bytes are not) is a **400 with Tomcat's own
+  HTML page** on both ports, never Repsy's JSON envelope, because the request never reaches Repsy;
+- a **chunked** upload (`Transfer-Encoding: chunked`, no `Content-Length`; `@limits`): a gem and a Go module zip
+  over the limit are 413 `payloadTooLarge` and store nothing, the same upload under the limit is accepted, so the
+  limit counts the bytes that arrive and chunked is not refused wholesale (50 repetitions were stable).
+
+**Maven is not part of the overlay**: its limits are fixed in the handlers (10 MiB `maven-metadata.xml` and POM,
+64 KiB `.asc`) and a breach is a plain **400 with a msgId** (`mavenMetadataTooLarge`, `pomFileTooLarge`,
+`mavenSignatureTooLarge`), not a 413 (`MavenUploadSizeLimitIT`). `tests/maven/size-limits.spec.ts` runs on the
+default stack: a real `mvn deploy` of a POM over 10 MiB (exit 1, `Could not transfer artifact ...:pom:... status
+code: 400`; the jar and its checksums, uploaded before the POM, stay, the POM and the metadata never do, a deploy
+is not one transaction), a POM of exactly 10 MiB stored and one byte more refused, and the metadata and a POM
+signature (exactly 64 KiB meets the signature check, a 422 `artifactSignatureNotVerified`, one byte more is the 400) as raw PUTs, since no signer produces a 65 KiB signature.
+
+**npm has no limit and no spec** (not pinned on purpose, a follow-up is proposed): probed on this stack, a real
+`npm publish` of 30 MB and a raw publish of 42 MB are accepted (200), and a publish of an 84 MB tarball (112 MB of
+base64 JSON) is a **500 `errorOccurred`** (`StreamConstraintsException: String value length (100007936) exceeds the
+maximum allowed (100000000)` on `_attachments`, Jackson's default; `npm` retries it three times). So there is no
+configurable limit, everything below Jackson's ceiling is read into memory, and above it the answer is a 500, not a 413. Do not pin that as the contract.
+
+Flip checks: raising all five values to 1 MB in the overlay fails every over-limit test (six clients, two chunked
+cases) and keeps every under-limit one green; running the specs on the default stack with `REPSY_E2E_OPT_IN=limits`
+does the same (every push succeeds); without the opt-in every `@limits` test skips, and the nightly leg fails on a skip.
 
 ## API suite (RPS-1480)
 
@@ -5038,7 +5200,7 @@ and on demand only, by the product owner's decision (RPS-1260): it has no `pull_
 
 ```bash
 gh workflow run e2e-nightly.yml                            # everything, like the nightly run
-gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | upgrade (both) | all
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | upgrade (both) | all
 gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
 gh workflow run e2e-nightly.yml -f suite=upgrade -f upgrade_from=26.08.3   # the upgrade legs from another release
 gh workflow run e2e-nightly.yml -f suite=h2 -f h2_full=docker   # the full catalog of this runner on H2, not tonight's
@@ -5064,6 +5226,7 @@ cancelling): a second one waits.
 | `h2-full`    | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another              | 60 min  |
 | `scanner`    | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite | 60 min  |
 | `throttle`   | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                | 30 min  |
+| `limits`     | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                  | 60 min  |
 | `upgrade`    | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                             | 30 min  |
 | `upgrade-h2` | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                 | 30 min  |
 
@@ -5099,6 +5262,9 @@ fails `local up` with a message; a spec that skipped fails the leg ("Upgrade pat
 The `throttle` leg is the same with `./run.sh local up --throttle`, the `stack` runner first and the `ui` runner
 last (both `--grep @throttle`, `grep` input ignored), and one extra step, "Wait out the throttle window" (12 s):
 AUTH-11 leaves the docker gateway's bucket, admin included, locked for the window, and the leak check logs in.
+
+The `limits` leg is the same with `./run.sh local up --limits` and `--grep @limits` (the `grep` input is ignored)
+on seven runners, one `run.sh test` each; the step "Check the opt-in specs ran" fails it when any of them skipped.
 
 Each runner gets its own `run.sh test` invocation because every invocation overwrites `test-results/`
 and `playwright-report/` (see "Running"); the workflow copies each runner's output aside first.
@@ -5136,8 +5302,8 @@ CI=true ./run.sh test --protocol ui --grep @smoke          # with the CI retry/t
 
 The `h2` leg is the same with `./run.sh local up --h2` and `--grep @smoke` on every runner (and `ui`, and no
 `--grep` for `stack`); `h2-full` is `./run.sh local up --h2` and one `./run.sh test --target ci --protocol <runner>`
-without `--grep`. The stack logs of a failed leg are `./run.sh local ps [--h2|--scanner|--throttle]` and
-`./run.sh local logs [--h2|--scanner|--throttle]` (the step "Collect the stack logs" calls them, so a new stack flag needs
+without `--grep`. The stack logs of a failed leg are `./run.sh local ps [--h2|--scanner|--throttle|--limits]` and
+`./run.sh local logs [--h2|--scanner|--throttle|--limits]` (the step "Collect the stack logs" calls them, so a new stack flag needs
 no change in the workflow). To run against an image you already built, set `REPSY_IMAGE` to its tag.
 
 ### Runner requirements and the Chromium sandbox
