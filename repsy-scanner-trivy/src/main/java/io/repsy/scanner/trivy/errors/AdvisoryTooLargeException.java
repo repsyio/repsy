@@ -16,15 +16,11 @@
 package io.repsy.scanner.trivy.errors;
 
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
-public class TrivyScanException extends RuntimeException {
+// The request is larger than the contract allows: 413.
+public final class AdvisoryTooLargeException extends RuntimeException {
 
-  public TrivyScanException(final @NonNull String message) {
+  public AdvisoryTooLargeException(final @NonNull String message) {
     super(message);
-  }
-
-  public TrivyScanException(final @NonNull String message, final @Nullable Throwable cause) {
-    super(message, cause);
   }
 }

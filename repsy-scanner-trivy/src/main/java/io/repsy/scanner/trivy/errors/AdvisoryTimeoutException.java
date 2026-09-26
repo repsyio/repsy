@@ -16,15 +16,11 @@
 package io.repsy.scanner.trivy.errors;
 
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
-public class TrivyScanException extends RuntimeException {
+// Trivy did not answer within the lookup timeout: 504.
+public final class AdvisoryTimeoutException extends RuntimeException {
 
-  public TrivyScanException(final @NonNull String message) {
+  public AdvisoryTimeoutException(final @NonNull String message) {
     super(message);
-  }
-
-  public TrivyScanException(final @NonNull String message, final @Nullable Throwable cause) {
-    super(message, cause);
   }
 }

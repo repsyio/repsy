@@ -29,6 +29,27 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+  @ExceptionHandler(AdvisoryUnavailableException.class)
+  public @NonNull ResponseEntity<ErrorResponse> handleAdvisoryUnavailable(
+      final @NonNull AdvisoryUnavailableException exception) {
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .body(new ErrorResponse(exception.getMessage()));
+  }
+
+  @ExceptionHandler(AdvisoryTimeoutException.class)
+  public @NonNull ResponseEntity<ErrorResponse> handleAdvisoryTimeout(
+      final @NonNull AdvisoryTimeoutException exception) {
+    return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
+        .body(new ErrorResponse(exception.getMessage()));
+  }
+
+  @ExceptionHandler(AdvisoryTooLargeException.class)
+  public @NonNull ResponseEntity<ErrorResponse> handleAdvisoryTooLarge(
+      final @NonNull AdvisoryTooLargeException exception) {
+    return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
+        .body(new ErrorResponse(exception.getMessage()));
+  }
+
   @ExceptionHandler(TrivyScanException.class)
   public @NonNull ResponseEntity<ErrorResponse> handleScanException(
       final @NonNull TrivyScanException exception) {

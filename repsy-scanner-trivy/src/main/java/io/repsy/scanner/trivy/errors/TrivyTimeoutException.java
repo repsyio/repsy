@@ -16,15 +16,10 @@
 package io.repsy.scanner.trivy.errors;
 
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
-public class TrivyScanException extends RuntimeException {
+public final class TrivyTimeoutException extends TrivyScanException {
 
-  public TrivyScanException(final @NonNull String message) {
+  public TrivyTimeoutException(final @NonNull String message) {
     super(message);
-  }
-
-  public TrivyScanException(final @NonNull String message, final @Nullable Throwable cause) {
-    super(message, cause);
   }
 }

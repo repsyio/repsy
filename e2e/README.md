@@ -5940,7 +5940,7 @@ network hiccup or a rate limit), not a Repsy fault: run the leg again. `TRIVY_DB
 `E2E_TRIVY_DB_REPOSITORY` and `E2E_TRIVY_JAVA_DB_REPOSITORY`, "CI"). The contract spec retries once for exactly this
 reason (`test.describe.configure({ retries: 1 })`, the one place of the `api` project that does).
 
-`tests/api/trivy-contract.spec.ts` (`@trivy`, opt-in `trivy`, the `api` runner, 10 tests):
+`tests/api/trivy-contract.spec.ts` (`@trivy`, opt-in `trivy`, the `api` runner, 14 tests):
 
 - **The contract cases the stub is held to as well** (`src/stubs/scanner/contract.ts`, run by this spec against the real
   scanner and by `tests/skeleton/scanner-stub.spec.ts` against the stub): `GET /health` needs no key; a call without
@@ -5952,6 +5952,14 @@ reason (`test.describe.configure({ retries: 1 })`, the one place of the `api` pr
   The first run of this list found two drifts, now fixed in the stub: the 404 message and the 415 for a body that is not
   multipart (the stub said 400). A third, the text of the 400 of a missing field (the stub had a message, the real one
   has none of its own), is why 400 bodies are not compared.
+- **The status and the advisory lookup** (RPS-1610, RPS-1611; contract in `repsy-scanner-trivy/README.md`, 4 tests, no
+  stub counterpart yet, that is RPS-1613): `GET /status` is a 401 without the key and reports `trivyVersion` and the
+  database dates with it (`/health` still says only `{"status":"ok"}`); `POST /advisories` is a 401 without the key and a
+  400 for another ecosystem, no list, an empty name or a name with a second `/`; a pair that is stored nowhere is looked
+  up in Trivy's own database (`lodash@4.17.20` has `CVE-2021-23337`, `@babel/traverse@7.20.0` is found under its scoped
+  name, `left-pad@1.3.0` and `lodash@latest` have nothing), with the `dbUpdatedAt` of `/status` in the answer; an empty
+  list is answered without a lookup. A lookup that answers 503 (a scan holds the database at that moment, the scanner
+  cannot share it, see its README) is repeated for up to a minute.
 - **A real scan, directly**: a tarball that bundles `lodash@4.17.20` ends COMPLETED, every finding has the fields of
   `ScannerFinding` in the service's order, and `CVE-2021-23337` is HIGH, fixed in 4.17.21.
 - **A real scan through Repsy, npm**: the same tarball published to an npm repository; the panel's
@@ -6136,7 +6144,7 @@ says; without it the leg takes tonight's runner of the rotation and `protocol` f
 | `cors`       | PostgreSQL + the CORS overlay               | `REPSY_E2E_OPT_IN=cors`, `--grep @cors` on `api`, "CORS leg": the configured origins are reflected, any other refused                                                                                                                       | 30 min  |
 | `upgrade`    | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                                                | 30 min  |
 | `upgrade-h2` | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                                    | 30 min  |
-| `trivy`      | PostgreSQL + the real scanner overlay       | `REPSY_E2E_OPT_IN=trivy`, `--grep @trivy` on `api`, 10 tests, "Real scanner stack": the contract the stub mimics and one real scan of an npm package and of a Docker image                                                                  | 45 min  |
+| `trivy`      | PostgreSQL + the real scanner overlay       | `REPSY_E2E_OPT_IN=trivy`, `--grep @trivy` on `api`, 14 tests, "Real scanner stack": the contract the stub mimics, the status and advisory lookup, and one real scan of an npm package and of a Docker image                                 | 45 min  |
 | `tls`        | PostgreSQL + the TLS overlay                | `REPSY_E2E_OPT_IN=tls` and `REPSY_E2E_TLS=1`, `@smoke` of `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` and `api` over Repsy's https listeners ("TLS stack"); no `ui`, no `stack` | 60 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the

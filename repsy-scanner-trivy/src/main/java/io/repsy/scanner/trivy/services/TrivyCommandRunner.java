@@ -13,18 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.scanner.trivy.errors;
+package io.repsy.scanner.trivy.services;
 
+import java.util.List;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
-public class TrivyScanException extends RuntimeException {
+/** Runs one trivy command line and returns its standard output. Tests replace it by a fake. */
+public interface TrivyCommandRunner {
 
-  public TrivyScanException(final @NonNull String message) {
-    super(message);
-  }
-
-  public TrivyScanException(final @NonNull String message, final @Nullable Throwable cause) {
-    super(message, cause);
-  }
+  /**
+   * @throws io.repsy.scanner.trivy.errors.TrivyTimeoutException when the command runs longer than
+   *     {@code timeoutSeconds}
+   * @throws io.repsy.scanner.trivy.errors.TrivyScanException when the command cannot be started or
+   *     exits with a non-zero code
+   */
+  @NonNull String run(@NonNull List<String> command, long timeoutSeconds);
 }
