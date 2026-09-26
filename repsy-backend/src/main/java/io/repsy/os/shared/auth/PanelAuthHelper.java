@@ -47,7 +47,9 @@ public final class PanelAuthHelper {
     final var claims = this.jwtUtils.extractPanelClaims(authHeader);
     final var user = this.userTxService.getAuthenticatedUserByUsername(claims.username());
 
-    if (claims.tokenVersion() != user.getTokenVersion()) {
+    // The token version and the user id (RPS-1604), as ProtocolAuthService#authenticatePanelBearer
+    // does for the @RepoOperation routes.
+    if (!claims.issuedTo(user)) {
       throw new UnAuthorizedException("sessionExpired");
     }
 

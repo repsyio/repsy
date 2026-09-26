@@ -214,6 +214,59 @@ class ProtocolJwtTokenVersionIT extends AbstractIntegrationTest {
     assertThat(this.read(type, repo, jwt).getStatus()).isEqualTo(401);
   }
 
+  /**
+   * RPS-1604: A is renamed, somebody registers the name A had freed, and a fresh user starts at the
+   * version (0) that A's old token carries, because the rename moved only A's version. Only the
+   * subject tells the two users apart.
+   */
+  @ParameterizedTest(name = "{0}: a reused username does not inherit the login token of its owner")
+  @MethodSource("protocols")
+  void aReusedUsernameDoesNotInheritTheLoginToken(final RepoType type) throws Exception {
+    final var former = createUser(uniqueUsername("tvfrm"), UserRole.USER);
+    final var oldName = former.getUsername();
+    final var repo = privateRepo(type);
+    final var jwt = login(type, repo, oldName, VALID_PASSWORD);
+
+    assertAccepted(type, repo, jwt);
+
+    this.perform(
+            put("/api/profile/username")
+                .header(AUTHORIZATION, this.bearerTokenFor(former))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"%s\"}".formatted(uniqueUsername("tvmov"))))
+        .andExpect(status().isOk());
+
+    final var successor = createUser(oldName, UserRole.USER);
+
+    assertThat(JWT.decode(jwt).getClaim("tv").asInt()).isEqualTo(successor.getTokenVersion());
+    assertSessionExpired(type, repo, jwt);
+
+    // The new owner of the name logs in and works with a token of its own.
+    assertAccepted(type, repo, login(type, repo, oldName, VALID_PASSWORD));
+  }
+
+  @ParameterizedTest(
+      name = "{0}: a claim-less token (grace) does not follow the name to a new user")
+  @MethodSource("protocols")
+  void aClaimlessTokenDoesNotFollowTheNameToAnotherUser(final RepoType type) throws Exception {
+    final var former = createUser(uniqueUsername("tvgfrm"), UserRole.USER);
+    final var oldName = former.getUsername();
+    final var repo = privateRepo(type);
+    final var claimless = this.claimlessProtocolToken(former, Duration.ofMinutes(30));
+
+    assertAccepted(type, repo, claimless);
+
+    this.perform(
+            put("/api/profile/username")
+                .header(AUTHORIZATION, this.bearerTokenFor(former))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"%s\"}".formatted(uniqueUsername("tvgmov"))))
+        .andExpect(status().isOk());
+    createUser(oldName, UserRole.USER);
+
+    assertSessionExpired(type, repo, claimless);
+  }
+
   @ParameterizedTest(name = "{0}: an admin's password reset ends the login token")
   @MethodSource("protocols")
   void anAdminPasswordResetEndsTheLoginToken(final RepoType type) throws Exception {

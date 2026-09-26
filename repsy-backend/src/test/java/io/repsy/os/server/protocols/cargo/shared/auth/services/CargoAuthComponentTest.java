@@ -116,7 +116,7 @@ class CargoAuthComponentTest {
   void authenticateAndCreateTokenUserNoLongerExists() {
     final var jwtUtils = Mockito.mock(JwtUtils.class);
     when(jwtUtils.extractProtocolUserClaims(anyString()))
-        .thenReturn(new ProtocolUserClaims("ghost", null));
+        .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), "ghost", null));
     // A real UserTxService over an empty repository: the lookup itself is under test.
     final var component =
         new CargoAuthComponent(
@@ -141,7 +141,7 @@ class CargoAuthComponentTest {
     when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
         .thenReturn(AuthenticationType.DEPLOY_TOKEN);
     when(jwtUtils.extractProtocolUserClaims(anyString()))
-        .thenReturn(new ProtocolUserClaims(USERNAME, null));
+        .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), USERNAME, null));
     final var component =
         new CargoAuthComponent(
             this.userTxService,
@@ -164,13 +164,13 @@ class CargoAuthComponentTest {
   @DisplayName("authenticateAndCreateToken refuses a bearer token of an older version")
   void authenticateAndCreateTokenRefusesAnOlderVersion() {
     final var jwtUtils = Mockito.mock(JwtUtils.class);
+    final var userId = UUID.randomUUID();
     when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
     when(jwtUtils.extractProtocolUserClaims(anyString()))
-        .thenReturn(new ProtocolUserClaims(USERNAME, 1));
+        .thenReturn(new ProtocolUserClaims(userId, USERNAME, 1));
     when(this.userTxService.getAuthenticatedUserByUsername(USERNAME))
-        .thenReturn(
-            UserInfo.builder().id(UUID.randomUUID()).username(USERNAME).tokenVersion(2).build());
+        .thenReturn(UserInfo.builder().id(userId).username(USERNAME).tokenVersion(2).build());
     final var component = this.componentWith(jwtUtils);
 
     assertThatThrownBy(() -> component.authenticateAndCreateToken("Bearer signed.jwt.token"))
@@ -188,8 +188,8 @@ class CargoAuthComponentTest {
     when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
     when(jwtUtils.extractProtocolUserClaims(anyString()))
-        .thenReturn(new ProtocolUserClaims(USERNAME, 2))
-        .thenReturn(new ProtocolUserClaims(USERNAME, null));
+        .thenReturn(new ProtocolUserClaims(userId, USERNAME, 2))
+        .thenReturn(new ProtocolUserClaims(userId, USERNAME, null));
     when(this.userTxService.getAuthenticatedUserByUsername(USERNAME))
         .thenReturn(UserInfo.builder().id(userId).username(USERNAME).tokenVersion(2).build());
     when(jwtUtils.createProtocolToken(eq(userId), eq(USERNAME), any(TemporalAmount.class), eq(2)))

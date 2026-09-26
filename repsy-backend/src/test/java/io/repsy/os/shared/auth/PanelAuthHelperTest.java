@@ -32,6 +32,7 @@ import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -40,6 +41,7 @@ import org.mockito.Mockito;
 class PanelAuthHelperTest {
 
   private static final String AUTH_HEADER = "Bearer signed.jwt.token";
+  private static final UUID USER_ID = UUID.randomUUID();
   private static final Instant SESSION_START = Instant.parse("2026-09-01T10:00:00Z");
 
   private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
@@ -55,7 +57,7 @@ class PanelAuthHelperTest {
   @DisplayName("authenticate returns the user of a valid panel token")
   void authenticateReturnsUser() {
     final var user = new User();
-    final var userInfo = UserInfo.builder().username("alice").build();
+    final var userInfo = UserInfo.builder().id(USER_ID).username("alice").build();
     when(this.jwtUtils.extractPanelClaims(AUTH_HEADER)).thenReturn(claims("alice", 0));
     when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
     when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
@@ -68,7 +70,7 @@ class PanelAuthHelperTest {
   @DisplayName("authenticateSession returns the user and the session start from one decode")
   void authenticateSessionDecodesTheTokenOnce() {
     final var user = new User();
-    final var userInfo = UserInfo.builder().username("alice").tokenVersion(2).build();
+    final var userInfo = UserInfo.builder().id(USER_ID).username("alice").tokenVersion(2).build();
     when(this.jwtUtils.extractPanelClaims(AUTH_HEADER)).thenReturn(claims("alice", 2));
     when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
     when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
@@ -85,8 +87,41 @@ class PanelAuthHelperTest {
   @DisplayName("authenticate answers sessionExpired for a token issued before a credential change")
   void authenticateRejectsAStaleTokenVersion() {
     final var user = new User();
-    final var userInfo = UserInfo.builder().username("alice").tokenVersion(3).build();
+    final var userInfo = UserInfo.builder().id(USER_ID).username("alice").tokenVersion(3).build();
     when(this.jwtUtils.extractPanelClaims(AUTH_HEADER)).thenReturn(claims("alice", 2));
+    when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+    when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
+
+    assertThatThrownBy(() -> this.helper.authenticate(AUTH_HEADER))
+        .isExactlyInstanceOf(UnAuthorizedException.class)
+        .hasMessage("sessionExpired");
+  }
+
+  /**
+   * RPS-1604: the name of a user that was renamed or deleted is registered again. The new user has
+   * the token version of the old token (a fresh user starts at 0), only its id differs.
+   */
+  @Test
+  @DisplayName("authenticate answers sessionExpired for a token of another user of the same name")
+  void authenticateRejectsAReusedUsername() {
+    final var user = new User();
+    final var successor = UserInfo.builder().id(UUID.randomUUID()).username("alice").build();
+    when(this.jwtUtils.extractPanelClaims(AUTH_HEADER)).thenReturn(claims("alice", 0));
+    when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+    when(this.userConverter.toUserInfo(user)).thenReturn(successor);
+
+    assertThatThrownBy(() -> this.helper.authenticate(AUTH_HEADER))
+        .isExactlyInstanceOf(UnAuthorizedException.class)
+        .hasMessage("sessionExpired");
+  }
+
+  @Test
+  @DisplayName("authenticate answers sessionExpired for a token whose subject is no user id")
+  void authenticateRejectsATokenWithoutAUserId() {
+    final var user = new User();
+    final var userInfo = UserInfo.builder().id(USER_ID).username("alice").build();
+    when(this.jwtUtils.extractPanelClaims(AUTH_HEADER))
+        .thenReturn(new PanelTokenClaims(null, "alice", 0, SESSION_START));
     when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
     when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
 
@@ -107,6 +142,6 @@ class PanelAuthHelperTest {
   }
 
   private static PanelTokenClaims claims(final String username, final int tokenVersion) {
-    return new PanelTokenClaims(username, tokenVersion, SESSION_START);
+    return new PanelTokenClaims(USER_ID, username, tokenVersion, SESSION_START);
   }
 }

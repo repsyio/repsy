@@ -104,7 +104,7 @@ class HelmAuthComponentTest {
     when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
     when(this.jwtUtils.extractProtocolUserClaims(anyString()))
-        .thenReturn(new ProtocolUserClaims("ghost", null));
+        .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), "ghost", null));
     // A real UserTxService over an empty repository: the lookup itself is under test.
     final var component =
         new HelmAuthComponent(

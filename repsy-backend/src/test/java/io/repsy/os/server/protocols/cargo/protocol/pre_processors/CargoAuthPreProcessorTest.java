@@ -84,7 +84,7 @@ class CargoAuthPreProcessorTest {
     when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
     when(this.jwtUtils.extractProtocolUserClaims(anyString()))
-        .thenReturn(new ProtocolUserClaims("ghost", null));
+        .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), "ghost", null));
   }
 
   private static ProtocolContext contextOf(final boolean privateRepo) {

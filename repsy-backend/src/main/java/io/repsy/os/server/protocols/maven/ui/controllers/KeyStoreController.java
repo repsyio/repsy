@@ -25,8 +25,7 @@ import io.repsy.os.generated.model.PgpPublicKeyForm;
 import io.repsy.os.generated.model.PgpPublicKeyItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.TokenRealm;
+import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.os.shared.utils.SortValidator;
@@ -66,13 +65,14 @@ public class KeyStoreController {
 
   private final KeyStoreService keyStoreService;
   private final RestResponseFactory restResponseFactory;
-  private final JwtUtils jwtUtils;
+  private final PanelAuthHelper panelAuthHelper;
 
   @GetMapping("/allowed-servers")
   public RestResponse<List<AllowedKeyserverItem>> listAllowedServers(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader) {
 
-    this.jwtUtils.verify(authHeader, TokenRealm.PANEL);
+    // A signed-in user of the current session, not just a token that verifies (RPS-1604).
+    this.panelAuthHelper.authenticate(authHeader);
 
     return this.restResponseFactory.success(
         "allowedKeyserversFetched", this.keyStoreService.findAllActiveKeyservers());
