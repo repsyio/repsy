@@ -715,6 +715,21 @@ a USER password may yank/unlist (RPS-1317); an anonymous caller on a public repo
 checks the status), so `ruby-manage.ts` reads the outcome from the server's "Successfully yanked gem"
 message instead of the exit code.
 
+Helm, Docker and the protocols with no wire delete (`clients/{helm,docker,no-route}-manage.ts`,
+`tests/{helm,docker,pypi,golang,maven}/manage-matrix.spec.ts`; `./run.sh test --protocol
+helm,docker,pypi,golang,maven --grep " manage "`, 35 cells). MANAGE: the classic Helm chart
+`DELETE /<repo>/api/charts/<chart>/<version>` (raw, no Helm command sends it) and Docker
+`delete-manifest`/`delete-tag` (the real `crane delete` by digest and by tag, replayed as the token
+dance plus `DELETE` for a refused cell). A USER account gets a Docker token (issuance is not scope- or
+role-checked) and then a 401 on the `DELETE` with a Bearer challenge, not a 403 (`insufficient_scope`
+only comes for a token asked for less than `delete`, R15); a deploy token likewise; an anonymous caller
+never gets past the token endpoint (401, Basic challenge, even on a public repo). `NO_ROUTE` (PyPI
+wheel, Go module zip, Maven jar, Helm OCI manifest `DELETE /v2/<repo>/<chart>/manifests/<tag>`): no
+handler exists, so the router answers a plain 404 `unknownPath` (an OCI `NAME_UNKNOWN` envelope on
+`/v2`) to every credential, admin included, whether the file exists or not and before any credential
+is looked at (an unauthenticated `DELETE` on a private repo gets the same 404, not a challenge); the
+file is still served byte for byte. Removing those is a panel action.
+
 ## Maven runner
 
 `runners/maven.Dockerfile` adds a pinned Eclipse Temurin JDK and Apache Maven (build args
