@@ -23,7 +23,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.cargo.shared.crate.storage.CargoStorageService;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -125,7 +124,7 @@ class CargoPublishGlobalRowsRaceIT extends AbstractIntegrationTest {
   private String adminToken() {
     final var userInfo =
         this.userTxService.create(
-            uniqueUsername("cargo-admin"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+            uniqueUsername("cargo-admin"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(userInfo.getId());
 
     return this.protocolBearerTokenFor(

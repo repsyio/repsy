@@ -33,7 +33,6 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -103,7 +102,7 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
 
   private UUID commitUser(final UserRole role) {
     final var username = uniqueUsername("untagged");
-    final var info = this.userTxService.create(username, role, PasswordHasher.hash(VALID_PASSWORD));
+    final var info = this.userTxService.create(username, role, VALID_PASSWORD_HASH);
     this.createdUserIds.add(info.getId());
 
     return info.getId();

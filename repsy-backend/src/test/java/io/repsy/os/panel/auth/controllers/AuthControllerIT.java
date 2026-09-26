@@ -399,7 +399,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void updatesLastLoginAt() throws Exception {
       // Committed for real: the async listener runs on another thread and must be able to see it.
-      final var hash = PasswordHasher.hash(VALID_PASSWORD);
+      final var hash = VALID_PASSWORD_HASH;
       final var userId =
           AuthControllerIT.this
               .userTxService
@@ -1327,7 +1327,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var userId =
           AuthControllerIT.this
               .userTxService
-              .create(username, UserRole.USER, PasswordHasher.hash(VALID_PASSWORD))
+              .create(username, UserRole.USER, VALID_PASSWORD_HASH)
               .getId();
 
       try {

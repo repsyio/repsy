@@ -19,7 +19,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
@@ -83,8 +82,7 @@ class AuthUserServiceRaceIT extends AbstractIntegrationTest {
    */
   private UserInfo newUser(final String prefix) {
     final var user =
-        this.userTxService.create(
-            uniqueUsername(prefix), UserRole.USER, PasswordHasher.hash(VALID_PASSWORD));
+        this.userTxService.create(uniqueUsername(prefix), UserRole.USER, VALID_PASSWORD_HASH);
     this.createdUserIds.add(user.getId());
     return user;
   }

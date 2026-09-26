@@ -83,8 +83,7 @@ class UserConcurrentUpdateIT extends AbstractIntegrationTest {
 
   private UserInfo commitUser() {
     final var user =
-        this.userTxService.create(
-            uniqueUsername("race"), UserRole.USER, PasswordHasher.hash(VALID_PASSWORD));
+        this.userTxService.create(uniqueUsername("race"), UserRole.USER, VALID_PASSWORD_HASH);
     this.createdUserIds.add(user.getId());
 
     return user;

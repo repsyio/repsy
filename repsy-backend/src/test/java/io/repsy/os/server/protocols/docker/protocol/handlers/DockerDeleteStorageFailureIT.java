@@ -31,7 +31,6 @@ import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorage
 import io.repsy.os.server.security.scan.dtos.ScanStatus;
 import io.repsy.os.server.security.scan.entities.VulnerabilityScan;
 import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -96,7 +95,7 @@ class DockerDeleteStorageFailureIT extends AbstractIntegrationTest {
   void setUpWire() {
     final var info =
         this.userTxService.create(
-            uniqueUsername("deletefail"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+            uniqueUsername("deletefail"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(info.getId());
     final var user = this.userRepository.findById(info.getId()).orElseThrow();
     this.protocolToken = this.protocolBearerTokenFor(user);

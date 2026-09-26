@@ -72,8 +72,9 @@ jobs:
       - name: Install core modules
         run: mvn -B -ntp install -f core/pom.xml -DskipTests -Drat.skip=true -Dcheckstyle.skip=true
 
+      # RPS-1453: two test JVMs for the integration tests on this 2-vCPU runner (see pr-checks.yml).
       - name: Build and Verify
-        run: mvn -B -ntp verify
+        run: mvn -B -ntp -T 1C verify -Dit.fork.count=2
 
       # Where repsy-frontend/pom.xml tells the scan to look for the lcov report. It is downloaded
       # after "Build and Verify" so that the Apache RAT check does not see it.

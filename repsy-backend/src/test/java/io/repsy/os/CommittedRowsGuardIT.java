@@ -18,7 +18,6 @@ package io.repsy.os;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectClass;
 
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.repositories.UserRepository;
@@ -143,7 +142,7 @@ class CommittedRowsGuardIT extends AbstractIntegrationTest {
 
   private static UUID commitUser(final AbstractIntegrationTest test) {
     return test.userTxService
-        .create(uniqueUsername("guard"), UserRole.USER, PasswordHasher.hash(VALID_PASSWORD))
+        .create(uniqueUsername("guard"), UserRole.USER, VALID_PASSWORD_HASH)
         .getId();
   }
 

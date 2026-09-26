@@ -27,7 +27,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.generated.model.UserUpdateForm;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import java.util.ArrayList;
@@ -118,8 +117,7 @@ class LastAdminConcurrencyIT extends AbstractIntegrationTest {
 
   private UserInfo commitUser(final UserRole role) {
     final var user =
-        this.userTxService.create(
-            uniqueUsername("lastadmin"), role, PasswordHasher.hash(VALID_PASSWORD));
+        this.userTxService.create(uniqueUsername("lastadmin"), role, VALID_PASSWORD_HASH);
     this.createdUserIds.add(user.getId());
 
     return user;

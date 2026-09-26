@@ -28,7 +28,6 @@ import com.jayway.jsonpath.JsonPath;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -140,7 +139,7 @@ class UsageControllerIT extends AbstractIntegrationTest {
   /** Creates a committed user with the given role and returns its username. */
   private String createUser(final UserRole role) {
     final var username = uniqueUsername("usage");
-    final var hash = PasswordHasher.hash(VALID_PASSWORD);
+    final var hash = VALID_PASSWORD_HASH;
     final var userInfo = this.userTxService.create(username, role, hash);
     this.createdUserIds.add(userInfo.getId());
     return username;

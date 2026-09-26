@@ -26,7 +26,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -90,7 +89,7 @@ class DockerBlobPullIT extends AbstractIntegrationTest {
   private String adminToken() {
     final var userInfo =
         this.userTxService.create(
-            uniqueUsername("docker-admin"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+            uniqueUsername("docker-admin"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(userInfo.getId());
 
     return this.protocolBearerTokenFor(

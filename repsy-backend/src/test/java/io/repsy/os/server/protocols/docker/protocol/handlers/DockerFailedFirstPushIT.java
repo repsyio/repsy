@@ -26,7 +26,6 @@ import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -90,7 +89,7 @@ class DockerFailedFirstPushIT extends AbstractIntegrationTest {
   void setUpWire() {
     final var info =
         this.userTxService.create(
-            uniqueUsername("failedpush"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+            uniqueUsername("failedpush"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(info.getId());
     final var user = this.userRepository.findById(info.getId()).orElseThrow();
     this.wire =

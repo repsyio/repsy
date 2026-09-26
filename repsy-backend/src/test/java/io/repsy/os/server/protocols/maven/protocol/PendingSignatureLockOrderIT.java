@@ -28,7 +28,6 @@ import io.repsy.os.server.protocols.maven.shared.artifact.services.PendingSignat
 import io.repsy.os.server.protocols.maven.shared.artifact.services.VersionSignatureService;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -144,7 +143,7 @@ class PendingSignatureLockOrderIT extends AbstractIntegrationTest {
 
     final var userInfo =
         this.userTxService.create(
-            uniqueUsername("mvn-lockorder"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+            uniqueUsername("mvn-lockorder"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(userInfo.getId());
     final var admin = this.userRepository.findById(userInfo.getId()).orElseThrow();
 

@@ -30,7 +30,6 @@ import ch.qos.logback.core.read.ListAppender;
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIntegrationTest;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -188,7 +187,7 @@ class ProtocolRepoDeleteUsageIT extends AbstractIntegrationTest {
    */
   private String createCommittedAdmin() {
     final var username = uniqueUsername("deladm");
-    final var hash = PasswordHasher.hash(VALID_PASSWORD);
+    final var hash = VALID_PASSWORD_HASH;
     final var userInfo = this.userTxService.create(username, UserRole.ADMIN, hash);
     this.createdUserIds.add(userInfo.getId());
     return this.bearerTokenFor(userInfo.getId(), username);

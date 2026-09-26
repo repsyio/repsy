@@ -26,7 +26,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -66,8 +65,7 @@ class DockerImageSizeRefreshIT extends AbstractIntegrationTest {
   @BeforeEach
   void setUpWire() {
     final var info =
-        this.userTxService.create(
-            uniqueUsername("imgsize"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+        this.userTxService.create(uniqueUsername("imgsize"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(info.getId());
     final var user = this.userRepository.findById(info.getId()).orElseThrow();
     this.panelToken = this.bearerTokenFor(user.getId(), user.getUsername());

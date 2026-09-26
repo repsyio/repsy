@@ -38,7 +38,6 @@ import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
 import io.repsy.os.server.security.scanner.dtos.ScanRequest;
 import io.repsy.os.server.security.scanner.dtos.ScannerFinding;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -244,7 +243,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
   /** Creates a committed user with the given role and returns its username. */
   private String createUser(final UserRole role) {
     final var username = uniqueUsername("scan");
-    final var hash = PasswordHasher.hash(VALID_PASSWORD);
+    final var hash = VALID_PASSWORD_HASH;
     final var userInfo = this.userTxService.create(username, role, hash);
     this.createdUserIds.add(userInfo.getId());
     return username;

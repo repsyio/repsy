@@ -156,6 +156,13 @@ mvn verify
 
 Re-run the `install -f core/pom.xml` step after the `core` submodule pointer moves.
 
+`mvn verify` runs the integration tests of `repsy-backend` (nearly all the time it takes) in
+several test JVMs at once: `it.fork.count` of them, 4 by default. Each JVM starts its own
+`postgres:18` container and storage root (see "Testing"), so they never share a database. A JVM
+needs about 1.5 GB and one CPU core to itself; set `-Dit.fork.count=` to the number of cores you
+can spare, and `-Dit.fork.count=1` to run them one after the other (for example to look for an
+order-dependent failure). `-T 1C` also builds independent modules in parallel.
+
 `mvn verify` (what CI runs) covers unit tests, integration tests, `fmt-maven-plugin`
 (Google Java Format), Checkstyle, SpotBugs, Apache RAT and Error Prone. Run
 `mvn com.spotify.fmt:fmt-maven-plugin:format` if it reports formatting violations.
@@ -167,14 +174,31 @@ for SonarCloud.
 ## Testing
 
 - **Unit tests** are named `*Test` and run in Surefire (`mvn test`). They must not need Docker.
-- **Integration tests** are named `*IT` and run in Failsafe (`mvn verify`, or
-  `mvn verify -pl repsy-backend -am -Dit.test=ProfileControllerIT` for one class). They need a
-  running Docker daemon. Never give an integration test a `*Test` name, or it will run in
-  `mvn test`.
+- **Integration tests** are named `*IT` and run in Failsafe (`mvn verify`, or the one-class command
+  below). They need a running Docker daemon. Never give an integration test a `*Test` name, or it
+  will run in `mvn test`.
+- **Faster edit-test loop.** `mvn -T 1C test` runs the unit tests of all modules with no Docker in
+  about a minute. For one integration test class:
+
+  ```bash
+  mvn verify -T 1C -pl repsy-backend -am -Dit.test=ProfileControllerIT \
+    -Dtest=NoSuchTest -Dsurefire.failIfNoSpecifiedTests=false -Dfailsafe.failIfNoSpecifiedTests=false \
+    -Dfmt.skip -Dcheckstyle.skip -Drat.skip
+  ```
+
+  It builds the upstream modules without running their tests and takes about 1.5 minutes on a
+  24-thread workstation, most of it compiling; add `-o` when nothing has to be downloaded. Separate
+  several classes with commas (`-Dit.test='AIT,BIT'`): a `+` matches nothing and still ends in
+  `BUILD SUCCESS`, so look for `-- in ...IT` lines. The full `mvn -T 1C verify` takes about 5 to 6
+  minutes there (12 to 13 before RPS-1453).
 - Integration tests use Testcontainers with **PostgreSQL 18** (`postgres:18`), wired in through
   `@ServiceConnection`. Keep it on the same major version as the images documented in
   `README.md`.
-- Every `*IT` extends `AbstractIntegrationTest` and shares that one PostgreSQL container. Most tests
+- Every `*IT` extends `AbstractIntegrationTest` and shares that one PostgreSQL container. The
+  container is per test JVM: `mvn verify` runs `it.fork.count` JVMs at once (see "Build & verify"),
+  each with its own container, storage root and Spring contexts, and Failsafe hands the classes out
+  to them one by one. So a class only ever shares a database with the classes of its own JVM, and a
+  test must not rely on any other class having run, or not run, in the same JVM. Most tests
   run in a transaction that is rolled back. A class that must commit (an `@Async` listener cannot
   see an open transaction) uses `@Transactional(propagation = Propagation.NOT_SUPPORTED)`, tracks
   the rows it creates and deletes exactly those in an `@AfterEach`. It never empties a table, and
@@ -187,6 +211,13 @@ for SonarCloud.
   caused it. When it fails a class, add the missing cleanup to that class; do not loosen the guard.
 - The order of the IT classes is deliberately not fixed. The guard makes it irrelevant for leaked
   rows, so don't write a test that only passes because another class ran (or didn't run) before it.
+- A BCrypt hash costs about 100 ms of CPU, and hashing per test was about 60% of the CPU of a full
+  integration run (RPS-1453). `createUser` and the `*BearerToken()` helpers reuse
+  `VALID_PASSWORD_HASH`, the hash of `VALID_PASSWORD` made once per JVM; use it (not
+  `PasswordHasher.hash(VALID_PASSWORD)`) whenever a test only needs a user that can log in with the
+  known password, and hash on your own only for a different password or a specific work factor.
+  `mvn verify` runs the forked test JVMs with C1 only (`test.jvm.args` in the root `pom.xml`): see
+  the comment there before touching `argLine`.
 - Do not declare versions for `org.testcontainers:*` artifacts: they are managed by `core-parent`
   (`testcontainers-bom`). The same goes for any other dependency `repsy-core` already manages,
   so only add a `<version>` for something it does not.

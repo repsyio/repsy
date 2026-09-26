@@ -27,7 +27,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -136,7 +135,7 @@ class MavenPostStoreFailureIT extends AbstractIntegrationTest {
   private String adminToken() {
     final var userInfo =
         this.userTxService.create(
-            uniqueUsername("maven-admin"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+            uniqueUsername("maven-admin"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(userInfo.getId());
 
     return this.protocolBearerTokenFor(

@@ -174,7 +174,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
   @Test
   @DisplayName("a current hash is not rewritten by a login")
   void bcryptHashIsLeftAlone() throws Exception {
-    final var user = this.commitUser(PasswordHasher.hash(VALID_PASSWORD));
+    final var user = this.commitUser(VALID_PASSWORD_HASH);
 
     this.panelLogin(user.getUsername(), VALID_PASSWORD, 200);
     this.basicRequest(user.getUsername(), VALID_PASSWORD, AUTHENTICATED);
