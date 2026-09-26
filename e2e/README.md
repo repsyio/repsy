@@ -577,17 +577,20 @@ included) has two copies, and Playwright stops with `Requiring @playwright/test 
 consumer's copy the harness's is what works: `pnpm add -D link:<os>/e2e/node_modules/@playwright/test`
 beside `pnpm add link:<os>/e2e`. Prefer the workspace, which needs neither.
 
-### One Playwright copy (needs an OS maintainers' decision)
+### One Playwright copy
 
-Playwright refuses two copies in one process, and the two packages declare different ranges: this package
-`@playwright/test ^1.56.1` (locked at 1.63.0 in `pnpm-lock.yaml`), Repsy Cloud's e2e package `^1.62.1`
+Playwright refuses two copies in one process, so the two packages declare the same range (RPS-1500): this
+package `@playwright/test ^1.62.1` (locked at 1.63.0 in `pnpm-lock.yaml`), Repsy Cloud's e2e package `^1.62.1`
 (locked at 1.62.1). `package.json` declares it as a `devDependency` (the harness's own install and CI need
-it) and as a `peerDependency` (`^1.56.1`), so a consumer supplies the one copy and the harness uses it.
-What was measured for this section, with the pinned pnpm 10 in a scratch workspace laid out as above:
+it) and as a `peerDependency` (`^1.62.1`), so a consumer supplies the one copy and the harness uses it.
+Consumers must keep their `@playwright/test` range compatible with the harness's so that a single copy
+resolves (check with `pnpm why -r @playwright/test`), with `overrides` or `pnpm dedupe --check` as the guard.
+What was measured before the range was raised (when it was `^1.56.1`), with the pinned pnpm 10 in a scratch
+workspace laid out as above:
 
 - One shared lockfile gives one copy: pnpm resolves both importers to the same version (a fresh install: the
   latest, 1.63.0; a lockfile that already holds the consumer at 1.62.1: 1.62.1 for the harness too, because
-  it satisfies `^1.56.1`). `pnpm why -r @playwright/test` shows one line each.
+  it satisfied `^1.56.1`). `pnpm why -r @playwright/test` shows one line each.
 - The hazard is a change to ONE importer: bumping the consumer's range to a version the lockfile does not
   hold leaves the harness on the old one, two copies again (`Requiring @playwright/test second time`).
   `pnpm dedupe --check` reports it, `pnpm dedupe` fixes it, and so does an `overrides` entry in the
@@ -600,17 +603,13 @@ What was measured for this section, with the pinned pnpm 10 in a scratch workspa
 - The runner images install from the harness directory's own `package.json` and `pnpm-lock.yaml`, so they
   carry 1.63.0. A Cloud layer added on top must reuse that copy, not install a second one (RPS-1507).
 
-The two ways to a single, agreed version:
-
-1. **Bump the OS range to `^1.62.1`** (Cloud's). The OS lockfile already resolves 1.63.0, which satisfies it,
-   so no version, image or browser changes: it is a specifier edit in `package.json` and `pnpm-lock.yaml`.
-   Both packages then always share a floor, and Dependabot proposes the same versions for both.
-2. **Pin Cloud down to `^1.56.1`** (the OS range). Nothing forces Cloud below its locked 1.62.1 (it satisfies
-   both), so this gains nothing and gives up newer Playwright releases for Cloud's own suites.
-
-**Recommendation: option 1, plus `overrides` (or `pnpm dedupe --check` in CI) in the consumer's workspace**,
-so that one Dependabot bump of one importer cannot silently produce two copies. This PR does not change the
-version; the maintainers decide.
+The decision (RPS-1500): the OS range was raised to `^1.62.1` (Cloud's), a specifier edit in `package.json`
+and `pnpm-lock.yaml` only, because the OS lockfile already resolved 1.63.0, so no version, image or browser
+changed. Both packages now share a floor, and Dependabot proposes the same versions for both. Pinning Cloud
+down to `^1.56.1` was the rejected alternative: nothing forces Cloud below its locked 1.62.1, so it gained
+nothing and gave up newer Playwright releases for Cloud's own suites. The consumer's workspace adds
+`overrides` (or `pnpm dedupe --check` in CI), so that one Dependabot bump of one importer cannot silently
+produce two copies again.
 
 ### The environment of a Cloud run
 
