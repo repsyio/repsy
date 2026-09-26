@@ -24,6 +24,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.Data;
@@ -84,6 +85,13 @@ public class CargoCrateIndex {
 
   @Column(name = "rust_version", length = CrateUtils.MAX_RUST_VERSION_LENGTH)
   private String rustVersion;
+
+  /**
+   * When the version was published. It orders the sparse index (oldest first) and is never changed
+   * afterwards: a yank rewrites the row but not this column.
+   */
+  @Column(name = "created_at", nullable = false, updatable = false)
+  private Instant createdAt;
 
   /**
    * Identifier-based equality: two cargo crate indexs are equal when they are the same instance or

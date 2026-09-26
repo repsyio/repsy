@@ -220,7 +220,8 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
     final var normalizedName = CrateUtils.normalizeCrateName(name);
 
     final var entries =
-        this.crateIndexRepository.findAllByCrateRepoIdAndName(repoInfo.getId(), normalizedName);
+        this.crateIndexRepository.findAllByCrateRepoIdAndNameOrderByCreatedAtAscIdAsc(
+            repoInfo.getId(), normalizedName);
 
     return entries.stream().map(this.crateConverter::toCrateIndexEntry).toList();
   }
@@ -377,6 +378,7 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
     index.setLinks(request.links());
     index.setV(request.features2() != null ? 2 : 1);
     index.setRustVersion(request.rustVersion());
+    index.setCreatedAt(Instant.now());
 
     this.crateIndexRepository.save(index);
   }
