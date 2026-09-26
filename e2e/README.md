@@ -75,12 +75,12 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
-  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" (the panel in headless Chromium, see "UI suite")
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" (the panel in headless Chromium, see "UI suite") and "api" (raw HTTP at the edge, see "API suite")
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
   docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
   docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui"
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" and "api"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle/sbt/Ant + Ivy and gpg; see "Adding a protocol adapter" below
   runners/sbt-warmup/          # the throwaway sbt project maven.Dockerfile builds once to prime the sbt caches (RPS-134)
@@ -242,6 +242,10 @@ e2e/
     ruby/
       publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install (RPS-1233, fixed)/gem-fetch (RPS-1234, fixed), anonymous-push, yank (RPS-1235, fixed), USER-role-push, bundle-install-e2e real-client tests
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow incl. RPS-1238 fixed, specs.4.8.gz gzip framing (RPS-1234, fixed), gemspec.rz (RPS-1233, fixed), HEAD mirrors GET (RPS-1237, fixed), platform gem, RPS-1236 fixed) -- no remaining test.fail() pins
+    api/
+      port-separation.spec.ts   # RPS-1480 /api/** is not served on the protocol port (404 unknownPath); /v2/ and a Maven path on the api port are the SPA, not the protocol
+      forwarded-headers.spec.ts # RPS-1480 X-Forwarded-Proto/Host/Port drive the Docker realm, the Cargo config.json and the PyPI simple links
+      cors-csp.spec.ts          # RPS-1480 CSP on the SPA and never on /api or the protocol port; the default (unset APP_ALLOWED_ORIGINS) CORS of the panel API
 ```
 
 ## Setup
@@ -656,6 +660,60 @@ five worked examples.
 8. Restrict any scenario your adapter cannot express (or add one only it needs) via the catalog
    entry's `protocols` field, or override its `expect` for your protocol via `expectByProtocol`
    (`scenarios/types.ts`'s `expectationFor`) when the real, probed status differs from maven's.
+
+### Manage matrix (RPS-1475)
+
+The publish/consume loop cannot express an operation that changes a registry after the publish, so the
+permission of those has its own catalog and runner: `scenarios/manage-catalog.ts` (the model, and the
+rule that derives an expectation) and `scenarios/manage-matrix.ts` (`registerManageMatrix(operations)`).
+A protocol contributes a `ManageOperation` list from `clients/<protocol>-manage.ts` and one spec,
+`tests/<protocol>/manage-matrix.spec.ts`, that registers it (npm: `clients/npm-manage.ts`,
+`tests/npm/manage-matrix.spec.ts`). Every operation runs once per credential, in a repo of its own
+(private; public for `anonymous`), as `<protocol> manage > <operation> > <credential>` with the tag
+`@manage` (and `@negative` for a refused cell, which reserves the remote failed-auth budget like the
+loop does):
+
+| Permission                                                    | admin-password                                                              | user-password | token-rw | token-ro | anonymous |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------- | -------- | -------- | --------- |
+| `WRITE` (publishing-level: deprecate, dist-tag, yank, unlist) | ok                                                                          | ok            | ok       | 401      | 401       |
+| `MANAGE` (removes stored files: unpublish, package delete)    | ok                                                                          | 401           | 401      | 401      | 401       |
+| `NO_ROUTE` (the protocol has no such wire operation)          | the operation's own probed status for every credential, and nothing changes |               |          |          |           |
+
+The permissions are the ones the handlers declare (`getProperties()`), decided in RPS-1424 and
+RPS-1317: a deploy token is never granted MANAGE, and an operation that only changes what is advertised
+stays WRITE. A cell whose real answer differs from the table lists it in the operation's `expectByCell`
+(`{ allowed?, status? }`) with a comment; `refusedStatus` changes the status of a refused cell.
+
+- **An allowed cell** seeds the state with the admin credential, runs the REAL client, requires exit 0
+  and hands the fingerprint before and after to the operation's `expectEffect`.
+- **A refused cell** requires a non-zero client exit, then replays the wire request the client sends
+  as raw HTTP (`probe`) and pins the status (a client hides it behind its exit code), and requires the
+  fingerprint (packument, dist-tags, deprecations and every tarball's bytes) to be exactly what it was.
+- To add an operation, write `prepare(seeder, repo)` (seed as admin, return `bindPrepared({ run, probe,
+fingerprint, expectEffect })`) in the protocol's `clients/<protocol>-manage.ts`; it needs no change
+  to the framework. A credential is made with `fixtures.ts`'s `materializeCredentialKind`.
+- The existing pins of single cells stay where they are (`tests/npm/unpublish.spec.ts`, the Helm R14
+  case, the Ruby, Cargo and crane-delete ones); the matrix adds the other credentials and the
+  "nothing changed" half.
+
+npm (25 cells, `./run.sh test --protocol npm --grep "npm manage"`): `unpublish-version` (`npm unpublish
+<pkg>@<v>`) and `unpublish-package` (`npm unpublish <pkg> --force`) are MANAGE, `deprecate` (`npm
+deprecate`) and `dist-tag-add`/`dist-tag-rm` (`npm dist-tag`) are WRITE. Probed live: a USER account
+on unpublish answers 401, not 403; an anonymous caller on a public repo gets 401 on every operation
+(the real client, given no credential at all, fails on its own, and the raw replay without an
+`Authorization` header is refused with 401); a raw replay as admin of each wire request changes the
+package exactly like the client does, so the replays are faithful.
+
+Cargo, NuGet and Ruby (`clients/{cargo,nuget,ruby}-manage.ts`, `tests/<protocol>/manage-matrix.spec.ts`;
+`./run.sh test --protocol cargo,nuget,ruby --grep " manage "`) are all WRITE: Cargo `yank`/`unyank`
+(`cargo yank [--undo]`) and `owner-add`/`owner-remove` (`cargo owner --add|--remove`, 20 cells), NuGet
+`unlist`/`relist` (raw `DELETE`/`POST /v3/package/<id>/<version>`, 10 cells; `dotnet nuget delete` is
+RPS-1486's), Ruby `yank` (`gem yank`, 5 cells). Probed live: the owner calls are accepted and change
+nothing (Repsy has no owners below the repository), so their allowed cell asserts an unchanged crate;
+a USER password may yank/unlist (RPS-1317); an anonymous caller on a public repo gets 401 everywhere.
+`gem yank` exits 0 even when it is refused (RubyGems 4.0 `yank_command.rb` prints the body and never
+checks the status), so `ruby-manage.ts` reads the outcome from the server's "Successfully yanked gem"
+message instead of the exit code.
 
 ## Maven runner
 
@@ -3454,6 +3512,47 @@ The reset user is always one the test created through the panel API (the seeder 
 the test's own users are read, so no other password is ever printed. Flip check: `docker exec -u root
 <repsy> chown root:root /app/data/password-reset` (the Dockerfile bug the case guards against) makes
 all four tests fail on the owner assertion or on `touch: Permission denied`.
+
+## API suite (RPS-1480)
+
+Raw `fetch` against the two ports of a Repsy, no package client and no browser: what the HTTP edge
+answers (`tests/api/`, Playwright project and runner `api`, on the `skeleton` base image;
+`src/clients/edge-raw.ts` is its tiny client). Every URL comes from `REPSY_API_BASE_URL` and
+`REPSY_REPO_BASE_URL`, never a literal port, so it runs on a "Parallel stacks" project unchanged.
+
+```bash
+./run.sh local up
+./run.sh test --protocol api -b       # -b the first time: builds the runner image
+```
+
+What it pins, as observed on the built image:
+
+- **Port separation** (`port-separation.spec.ts`). `/api/**` is not served on the protocol port: an
+  anonymous or admin-Bearer `GET /api/users` and `POST /api/auth/login` there are `404` with the
+  `unknownPath` error, and no user list or token comes back. The reverse is NOT a 404: the api port
+  answers a wire-protocol path (`/v2/`, a Maven `.pom` path) with the single-page app's `index.html`
+  (`200 text/html`, the deep-link fallback of `SpaController`), so "not served" there means "answered
+  by the SPA": no `Docker-Distribution-Api-Version`, no `WWW-Authenticate`, no package bytes.
+- **Public URLs** (`forwarded-headers.spec.ts`). `X-Forwarded-Proto`, `-Host` and `-Port` on the
+  protocol port (`server.forward-headers-strategy: native`) rewrite the Docker token realm, the Cargo
+  `config.json` `dl`/`api` and the PyPI simple page's links; without them the client's own URL is
+  used. Tomcat trusts them from the private addresses a docker bridge connects from, so the spec skips
+  itself against a `remote` target. The standard `Forwarded` header is ignored, and an
+  `X-Forwarded-Host` that carries its own port loses that port unless `X-Forwarded-Port` is sent
+  (neither is asserted).
+  npm's `dist.tarball` and the NuGet service index are NOT covered: the e2e stacks set `REPO_BASE_URL`,
+  which those two prefer to the request, so they ignore `X-Forwarded-*` here. Pinning them needs a stack
+  without `REPO_BASE_URL`.
+- **CSP and CORS** (`cors-csp.spec.ts`). The single-page app (`/`, a deep route, `/index.html`) carries
+  a Content-Security-Policy with `default-src 'self'`, `object-src 'none'` and `frame-ancestors 'none'`;
+  `/api/**` and everything on the protocol port carry none. With `APP_ALLOWED_ORIGINS` unset (the
+  default; the repository README's `APP_ALLOWED_ORIGINS` row) the panel API answers a preflight from any origin with that
+  origin and `Access-Control-Allow-Credentials: true`, and a request without an `Origin` gets no CORS
+  header. The restricted-origin half (a foreign origin refused, the allowed one reflected, `connect-src`
+  naming it) needs a stack that sets the variable.
+
+Deliberately not asserted, because they are open product questions rather than contracts: what CORS
+does on the protocol port, and the absence of `X-Content-Type-Options`, `Referrer-Policy` and HSTS.
 
 ## Remote hardening
 

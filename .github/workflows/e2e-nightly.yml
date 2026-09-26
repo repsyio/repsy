@@ -23,7 +23,7 @@ on:
         options: [all, ui, wire, h2, scanner]
         default: all
       protocol:
-        description: "Only these runner services, comma separated (skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,golang,ruby,stack,ui). Empty: every runner of the chosen legs"
+        description: "Only these runner services, comma separated (skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,golang,ruby,stack,api,ui). Empty: every runner of the chosen legs"
         type: string
         default: ""
       grep:
@@ -74,11 +74,12 @@ jobs:
           python3 - <<'PY'
           import datetime, json, os, re, sys
 
-          WIRE = "skeleton maven npm npm-clients cargo nuget docker helm pypi golang ruby stack".split()
+          WIRE = "skeleton maven npm npm-clients cargo nuget docker helm pypi golang ruby stack api".split()
           # The runner whose full catalog runs on H2 tonight: one protocol runner per night, in turn
           # (the date, so every runner comes round every len(ROTATION) days). Not skeleton (the harness
-          # proof) and not stack (its @local-only cases already run in full in the h2 leg).
-          ROTATION = [r for r in WIRE if r not in ("skeleton", "stack")]
+          # proof), not stack (its @local-only cases already run in full in the h2 leg) and not api (its
+          # 18 raw-HTTP tests are all @smoke, so the h2 leg already runs them in full).
+          ROTATION = [r for r in WIRE if r not in ("skeleton", "stack", "api")]
           H2_FULL = os.environ["H2_FULL"].strip()
           h2_full_runner = H2_FULL or ROTATION[datetime.datetime.now(datetime.timezone.utc).toordinal() % len(ROTATION)]
           # leg -> (suite it belongs to, stack flag for run.sh local up, runners, default --grep, timeout,

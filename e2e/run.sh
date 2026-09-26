@@ -71,8 +71,9 @@ REPSY_E2E_PORT_OFFSET), anywhere on the line.
 --protocol takes runner service names: skeleton, maven, npm, npm-clients (the npm registry under pnpm,
 yarn classic, yarn berry and bun as well as npm; see README.md "npm-family clients"), cargo, nuget,
 docker, helm, pypi, golang, ruby, stack (cases that docker-exec into the Repsy container, tests/stack;
-local stack only, see README.md "Stack runner") and ui (the panel UI suite in headless Chromium,
-tests/ui; see README.md "UI suite").
+local stack only, see README.md "Stack runner") ui (the panel UI suite in headless Chromium,
+tests/ui; see README.md "UI suite") and api (raw HTTP at Repsy's edge, no package client: port separation,
+X-Forwarded-* public URLs, CORS/CSP; tests/api, see README.md "API suite").
 
 REPSY_ADMIN_PASSWORD must be set (copy .env.example to .env and fill it in) for every subcommand
 except "local down".
@@ -438,7 +439,7 @@ cmd_test() {
     IFS=',' read -ra services <<< "$protocols"
   else
     # No --protocol given: run the skeleton harness proof only. A protocol runner (maven, npm,
-    # npm-clients, cargo, nuget, docker, helm, pypi, golang, ruby) is opt-in via --protocol so a plain
+    # npm-clients, cargo, nuget, docker, helm, pypi, golang, ruby, api) is opt-in via --protocol so a plain
     # "run.sh test" stays fast; pass e.g. --protocol maven or
     # --protocol skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,golang,ruby,stack,ui to run more. "stack" is
     # the docker-exec cases against the container of a local stack (tests/stack); "ui" is the

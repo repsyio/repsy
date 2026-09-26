@@ -295,22 +295,34 @@ export async function unpublish(
   spec: string,
   options: { force?: boolean } = {},
 ): Promise<UnpublishRun> {
-  const { home, work } = await isolatedWorkDir(`npm-unpublish-${world.scenario.id}`);
+  return runNpmCommand(
+    world,
+    ['unpublish', spec, ...(options.force ? ['--force'] : [])],
+    `npm-unpublish-${world.scenario.id}`,
+  );
+}
+
+/**
+ * Runs one real `npm <args>` that changes a registry (`unpublish`, `deprecate`, `dist-tag`; the
+ * manage matrix, RPS-1475) against `world`'s repo with `world.credential`: an isolated `HOME`, the
+ * `.npmrc` this file renders and an isolated cache are appended to `args`.
+ */
+export async function runNpmCommand(
+  world: World,
+  args: readonly string[],
+  label: string,
+): Promise<UnpublishRun> {
+  const { home, work } = await isolatedWorkDir(label);
   const npmrcPath = await renderNpmrc(home, world.repoName, world.credential);
   const cacheDir = await isolatedCache(home);
 
   const secrets = world.credential.password ? [world.credential.password] : [];
-  const args = ['unpublish', spec, '--userconfig', npmrcPath, '--cache', cacheDir];
-  if (options.force) {
-    args.push('--force');
-  }
-
-  const result = await run('npm', args, {
+  const result = await run('npm', [...args, '--userconfig', npmrcPath, '--cache', cacheDir], {
     cwd: work,
     env: npmEnv(home),
     timeoutMs: PUBLISH_TIMEOUT_MS,
     redact: secrets,
-    label: `npm-unpublish-${world.scenario.id}`,
+    label,
   });
 
   return {

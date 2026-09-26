@@ -129,3 +129,26 @@ export function scenariosFor(catalog: readonly Scenario[], protocol: string): Sc
 export function expectationFor(scenario: Scenario, protocol: string): ScenarioExpectation {
   return { ...scenario.expect, ...scenario.expectByProtocol?.[protocol] };
 }
+
+/**
+ * What a registry-changing operation needs (RPS-1475, the manage matrix in `manage-catalog.ts`):
+ * `WRITE` is what publishing needs (an ADMIN or USER account, a read-write deploy token), `MANAGE`
+ * removes stored files and only an ADMIN account has it (a deploy token never does, RPS-1424), and
+ * `NO_ROUTE` marks a protocol that has no such wire operation at all, so every credential gets the
+ * same answer and nothing changes.
+ */
+export type ManagePermission = 'WRITE' | 'MANAGE' | 'NO_ROUTE';
+
+/** The credentials the manage matrix runs every operation with: the subset of `CredentialKind` that
+ *  says who is asking, without the states of a token (expired, revoked, ...) the publish loop covers. */
+export type ManageCredentialKind = Extract<
+  CredentialKind,
+  'admin-password' | 'user-password' | 'token-rw' | 'token-ro' | 'anonymous'
+>;
+
+/** A cell of the manage matrix whose observed answer is not what `ManagePermission` derives. */
+export interface ManageCellOverride {
+  allowed?: boolean;
+  /** The HTTP status of a refused (or `NO_ROUTE`) cell; 401 when left out. */
+  status?: number;
+}
