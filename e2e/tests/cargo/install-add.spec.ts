@@ -608,7 +608,8 @@ test.describe('cargo install and cargo add, as the panel advertises them', () =>
     const reg = await newRegistry(seeder, 'search');
     const prefix = crateName(reg, 'srch');
     const names = ['a', 'b', 'c'].map((suffix) => `${prefix}_${suffix}`);
-    for (const name of names) {
+    // Published in reverse, so the storage order is not the name order the search must answer in.
+    for (const name of [...names].reverse()) {
       await publishCrate(reg, { crate: name, version: '0.1.0' });
     }
     const opts = { home: reg.home, cwd: reg.work, token: reg.token };
@@ -624,17 +625,16 @@ test.describe('cargo install and cargo add, as the panel advertises them', () =>
 
     // Every query: a subset of the crates, named as published.
     const all = await search();
-    expect([...all.found].sort()).toEqual(names);
+    expect(all.found, 'sorted by crate name (RPS-1571)').toEqual(names);
     expect(all.more, 'everything fits the default limit').toBeUndefined();
     const two = await search('--limit', '2');
-    expect(two.found).toHaveLength(2);
-    expect(two.found.every((name) => names.includes(name))).toBe(true);
+    expect(two.found).toEqual(names.slice(0, 2));
     expect(two.more).toContain('... and 1 crates more');
     const one = await search('--limit', '1');
-    expect(one.found).toHaveLength(1);
+    expect(one.found).toEqual(names.slice(0, 1));
     expect(one.more).toContain('... and 2 crates more');
     const hundred = await search('--limit', '100');
-    expect([...hundred.found].sort()).toEqual(names);
+    expect(hundred.found).toEqual(names);
     expect(hundred.more).toBeUndefined();
 
     // No match: an empty result, not an error.
@@ -649,7 +649,8 @@ test.describe('cargo install and cargo add, as the panel advertises them', () =>
     const reg = await newRegistry(seeder, 'search-raw');
     const prefix = crateName(reg, 'srch');
     const names = ['a', 'b', 'c'].map((suffix) => `${prefix}_${suffix}`);
-    for (const name of names) {
+    // Published in reverse, so the storage order is not the name order the search must answer in.
+    for (const name of [...names].reverse()) {
       await publishCrate(reg, { crate: name, version: '0.1.0' });
     }
     const admin = adminCredential();
@@ -673,19 +674,24 @@ test.describe('cargo install and cargo add, as the panel advertises them', () =>
     expect([first.total, second.total, third.total], 'meta.total is the whole match count').toEqual(
       [3, 3, 3],
     );
-    expect(
-      first.crates,
-      'first page results are sorted by name (RPS-1571)',
-    ).toEqual([...first.crates].sort());
-    expect([...first.crates, ...second.crates].sort(), 'two pages cover every crate once').toEqual(
+    expect([...first.crates, ...second.crates], 'the pages are one name order (RPS-1571)').toEqual(
       names,
     );
 
     // A page size above 100 is clamped, not refused: 3 crates fit, so they all come back.
     expect((await page('1000')).crates).toHaveLength(3);
 
-    const garbage = await rawSearchPage(reg.repoName, admin, prefix, { perPage: 'many' });
-    expect(garbage.status).toBe(400);
-    expect(cargoErrorDetail(garbage.body), 'cargo error envelope').toBeDefined();
+    // per_page=0 (RPS-1571): no crates, but the true total, not one crate and not a clamp to 1.
+    const none = await page('0');
+    expect(none.crates).toEqual([]);
+    expect(none.total).toBe(3);
+
+    for (const bad of [{ perPage: 'many' }, { page: 'first' }]) {
+      const garbage = await rawSearchPage(reg.repoName, admin, prefix, bad);
+      expect(garbage.status, JSON.stringify(bad)).toBe(400);
+      const detail = cargoErrorDetail(garbage.body);
+      expect(detail, 'cargo error envelope').toContain('must be a whole number');
+      expect(garbage.body.toString('utf8'), 'no Java exception text').not.toContain('NumberFormatException');
+    }
   });
 });
