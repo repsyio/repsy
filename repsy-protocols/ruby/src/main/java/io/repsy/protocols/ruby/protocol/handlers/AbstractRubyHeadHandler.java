@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
@@ -93,9 +94,19 @@ public abstract class AbstractRubyHeadHandler implements ProtocolMethodHandler {
       final HttpServletRequest request,
       final HttpServletResponse response) {
     final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
-    return this.exists(context, relativePath)
-        ? ResponseEntity.ok().build()
-        : ResponseEntity.notFound().build();
+    if (!this.exists(context, relativePath)) {
+      return ResponseEntity.notFound().build();
+    }
+
+    // The header the GET of this path sends (RPS-1442).
+    final var contentDisposition = RubyContentDisposition.forPath(relativePath);
+    final var ok = ResponseEntity.ok();
+
+    if (contentDisposition != null) {
+      ok.header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition);
+    }
+
+    return ok.build();
   }
 
   private boolean exists(final ProtocolContext context, final String relativePath) {

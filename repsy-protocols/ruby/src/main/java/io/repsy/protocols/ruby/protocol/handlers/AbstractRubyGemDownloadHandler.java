@@ -26,10 +26,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -97,10 +97,7 @@ public abstract class AbstractRubyGemDownloadHandler implements ProtocolMethodHa
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
           .header(
               HttpHeaders.CONTENT_DISPOSITION,
-              ContentDisposition.attachment()
-                  .filename(filename.substring(filename.lastIndexOf('/') + 1))
-                  .build()
-                  .toString())
+              Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
           .body(resource);
     } catch (final Exception e) {
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();

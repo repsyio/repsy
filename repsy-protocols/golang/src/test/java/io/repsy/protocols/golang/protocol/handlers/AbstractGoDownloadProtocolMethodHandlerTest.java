@@ -85,6 +85,24 @@ class AbstractGoDownloadProtocolMethodHandlerTest {
     assertThat(response.getBody()).isEqualTo("not found: " + LIST_PATH);
   }
 
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/example.com/mod/@v/v1.0.0.zip",
+        "/example.com/mod/@v/v1.0.0.info",
+        "/example.com/mod/@v/v1.0.0.mod"
+      })
+  @DisplayName("the 404 of a file URL names no file, Spring would call it f.txt (RPS-1442)")
+  void notFoundNamesNoFile(final String path) {
+    final var context = context(path);
+    when(this.facade.download(context)).thenThrow(new ItemNotFoundException("itemNotFound"));
+
+    final var response = this.handler.handle(context, null, null);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).isEqualTo("inline");
+  }
+
   @Test
   @DisplayName("a resource that does not exist is the same 404")
   void missingResourceIsPlainText() {

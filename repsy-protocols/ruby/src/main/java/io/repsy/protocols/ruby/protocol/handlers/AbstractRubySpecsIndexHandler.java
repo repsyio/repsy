@@ -29,10 +29,12 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -90,7 +92,13 @@ public abstract class AbstractRubySpecsIndexHandler implements ProtocolMethodHan
       final HttpServletResponse response) {
     final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
     final var raw = this.resolveSpecs(context, relativePath);
-    return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).body(gzip(raw));
+    // Without a header of its own Spring names the download "f.txt" (RPS-1442).
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
+        .body(gzip(raw));
   }
 
   private byte[] resolveSpecs(final ProtocolContext context, final String relativePath) {

@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.HttpHeaders.CONTENT_DISPOSITION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
@@ -35,6 +36,8 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -55,12 +58,21 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * zip as {@code f.txt}. Cargo's download URL ends in {@code /download}, so it got no header at all
  * and was saved as {@code download}. Each of them now names the file it is.
  *
+ * <p>RPS-1442 went through the routes RPS-1389 left: the Ruby indexes ({@code .gemspec.rz}, {@code
+ * *specs.4.8.gz}, a compact index {@code /info/foo.rb} whose dotted gem name reads as an
+ * extension), the 404 of a Go file URL, and the JSON of the Cargo and NuGet indexes, which are not
+ * files and must carry no name. The Ruby {@code HEAD} answers the header of its {@code GET}. Go,
+ * NuGet and Cargo have no {@code HEAD} handler at all: a {@code HEAD} is the router's "unknownPath"
+ * 404, which is not pinned here.
+ *
  * <p>The packages are pushed (NuGet: written to storage, its push needs a committed repo) in the
  * default rolled-back transaction and read back on the protocol port.
  */
-@DisplayName("Downloads name the file they serve (RPS-1389)")
+@DisplayName("Downloads name the file they serve (RPS-1389, RPS-1442)")
 class ProtocolDownloadContentDispositionIT extends AbstractIntegrationTest {
 
+  private static final String RUBY_GEM = "dispo-gem";
+  private static final String RUBY_DOTTED_GEM = "dispo.rb";
   private static final String CRATE = "my-crate";
   private static final String CRATE_VERSION = "1.0.0";
   private static final String GO_MODULE = "example.com/disposition";
@@ -103,6 +115,99 @@ class ProtocolDownloadContentDispositionIT extends AbstractIntegrationTest {
 
     assertThat(response.getHeader(CONTENT_DISPOSITION))
         .isEqualTo("attachment; filename=\"dispo-gem-1.2.3.gem\"");
+  }
+
+  @Test
+  @DisplayName("Ruby: the .gemspec.rz and the three specs indexes are attachments named after them")
+  void rubyIndexFiles() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby-cd"));
+    this.publishGem(repo.getName(), RUBY_GEM, "1.2.3");
+
+    for (final var path : rubyFilePaths()) {
+      final var response = this.call(get("/{repo}" + path, repo.getName()), 200);
+
+      assertThat(response.getHeader(CONTENT_DISPOSITION))
+          .as(path)
+          .isEqualTo("attachment; filename=\"" + path.substring(path.lastIndexOf('/') + 1) + "\"");
+    }
+  }
+
+  @Test
+  @DisplayName("Ruby: the compact index is text, a dotted gem name is not named f.txt")
+  void rubyCompactIndex() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby-cd"));
+    this.publishGem(repo.getName(), RUBY_GEM, "1.2.3");
+    this.publishGem(repo.getName(), RUBY_DOTTED_GEM, "1.0.0");
+
+    final var info = this.call(get("/{repo}/info/" + RUBY_GEM, repo.getName()), 200);
+    final var dotted = this.call(get("/{repo}/info/" + RUBY_DOTTED_GEM, repo.getName()), 200);
+    final var names = this.call(get("/{repo}/names", repo.getName()), 200);
+    final var versions = this.call(get("/{repo}/versions", repo.getName()), 200);
+
+    assertThat(info.getHeader(CONTENT_DISPOSITION)).isEqualTo("inline");
+    assertThat(dotted.getHeader(CONTENT_DISPOSITION)).isEqualTo("inline");
+    assertThat(names.getHeader(CONTENT_DISPOSITION)).isNull();
+    assertThat(versions.getHeader(CONTENT_DISPOSITION)).isNull();
+  }
+
+  @Test
+  @DisplayName("Ruby: a HEAD answers the Content-Disposition of the GET it mirrors")
+  void rubyHeadMirrorsGet() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby-cd"));
+    this.publishGem(repo.getName(), RUBY_GEM, "1.2.3");
+    this.publishGem(repo.getName(), RUBY_DOTTED_GEM, "1.0.0");
+    final var paths = new ArrayList<>(rubyFilePaths());
+    paths.addAll(List.of("/info/" + RUBY_GEM, "/info/" + RUBY_DOTTED_GEM, "/names", "/versions"));
+
+    for (final var path : paths) {
+      final var get = this.call(get("/{repo}" + path, repo.getName()), 200);
+      final var head = this.call(head("/{repo}" + path, repo.getName()), 200);
+
+      assertThat(head.getHeader(CONTENT_DISPOSITION))
+          .as("HEAD %s", path)
+          .isEqualTo(get.getHeader(CONTENT_DISPOSITION));
+    }
+  }
+
+  private static List<String> rubyFilePaths() {
+    return List.of(
+        "/gems/" + RUBY_GEM + "-1.2.3.gem",
+        "/quick/Marshal.4.8/" + RUBY_GEM + "-1.2.3.gemspec.rz",
+        "/specs.4.8.gz",
+        "/latest_specs.4.8.gz",
+        "/prerelease_specs.4.8.gz");
+  }
+
+  private void publishGem(final String repoName, final String name, final String version)
+      throws Exception {
+    this.call(
+        post(PUBLISH_PATH, repoName)
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .content(gem(name, version)),
+        200);
+  }
+
+  @Test
+  @DisplayName("Cargo: config.json and the sparse index are data and carry no file name")
+  void cargoIndexHasNoDisposition() throws Exception {
+    final var repo = this.seedRepo(RepoType.CARGO, uniqueRepoName("cargo-cd"));
+    this.call(put("/{repo}/api/v1/crates/new", repo.getName()).content(cargoPublishBody()), 200);
+
+    final var config = this.call(get("/{repo}/config.json", repo.getName()), 200);
+    final var index = this.call(get("/{repo}/my/-c/my-crate", repo.getName()), 200);
+
+    assertThat(config.getHeader(CONTENT_DISPOSITION)).isNull();
+    assertThat(index.getHeader(CONTENT_DISPOSITION)).isNull();
+  }
+
+  @Test
+  @DisplayName("NuGet: the service index is data and carries no file name")
+  void nugetServiceIndexHasNoDisposition() throws Exception {
+    final var repo = this.seedRepo(RepoType.NUGET, uniqueRepoName("nuget-cd"));
+
+    final var response = this.call(get("/{repo}/v3/index.json", repo.getName()), 200);
+
+    assertThat(response.getHeader(CONTENT_DISPOSITION)).isNull();
   }
 
   @Test
@@ -196,6 +301,19 @@ class ProtocolDownloadContentDispositionIT extends AbstractIntegrationTest {
 
     assertThat(list.getHeader(CONTENT_DISPOSITION)).isNull();
     assertThat(latest.getHeader(CONTENT_DISPOSITION)).isNull();
+  }
+
+  @Test
+  @DisplayName("Go: the 404 of a module file is not named f.txt either")
+  void goNotFoundNamesNoFile() throws Exception {
+    final var repo = this.seedRepo(RepoType.GOLANG, uniqueRepoName("go-cd"));
+
+    for (final var extension : List.of("zip", "info", "mod")) {
+      final var response =
+          this.call(get("/{repo}/" + GO_MODULE + "/@v/v9.9.9." + extension, repo.getName()), 404);
+
+      assertThat(response.getHeader(CONTENT_DISPOSITION)).as(extension).isEqualTo("inline");
+    }
   }
 
   private static byte[] goModuleZip() {

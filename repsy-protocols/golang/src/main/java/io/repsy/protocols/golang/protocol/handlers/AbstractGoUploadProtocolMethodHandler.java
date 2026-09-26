@@ -30,12 +30,16 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
 public abstract class AbstractGoUploadProtocolMethodHandler<ID> implements ProtocolMethodHandler {
+
+  private static final String DEFAULT_UNAUTHORIZED_MSG_ID = "unAuthorized";
 
   private final PathParser pathParser;
   private final GoProtocolFacade<ID> goProtocolFacade;
@@ -80,12 +84,25 @@ public abstract class AbstractGoUploadProtocolMethodHandler<ID> implements Proto
     try {
       this.goProtocolFacade.upload(
           context, request.getInputStream(), request.getContentLengthLong());
-    } catch (final UnAuthorizedException _) {
+    } catch (final UnAuthorizedException e) {
+      // The go command prints the body of a failed answer only when it is text/plain, and curl or
+      // a custom client would see nothing at all with an empty one (RPS-1450, as RPS-1435 did for
+      // the auth pre-processor).
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
-          .build();
+          .contentType(MediaType.TEXT_PLAIN)
+          .body(this.unauthorizedText(e.getMessage()));
     }
 
     return ResponseEntity.ok().build();
+  }
+
+  /**
+   * The text of the 401 body for the message id the exception carries. The id itself is the
+   * fallback; the application overrides it to resolve the id into its message, the same text {@code
+   * GolangAuthPreProcessor} answers.
+   */
+  protected String unauthorizedText(final @Nullable String msgId) {
+    return msgId == null ? DEFAULT_UNAUTHORIZED_MSG_ID : msgId;
   }
 }

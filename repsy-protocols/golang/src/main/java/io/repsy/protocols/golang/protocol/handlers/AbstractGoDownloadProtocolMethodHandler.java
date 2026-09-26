@@ -96,11 +96,13 @@ public abstract class AbstractGoDownloadProtocolMethodHandler<ID> implements Pro
   /**
    * The GOPROXY protocol wants a 404 (or 410) for what a proxy does not have, and a text/plain
    * body, which the go command prints as the reason when no other GOPROXY entry has it either
-   * (RPS-1428).
+   * (RPS-1428). The header keeps Spring from naming the reason "f.txt" when the URL ends in {@code
+   * .zip}, {@code .info} or {@code .mod} (RPS-1442).
    */
   private static ResponseEntity<Object> notFound(final ProtocolContext context) {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .contentType(MediaType.TEXT_PLAIN)
+        .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().build().toString())
         .body("not found: " + ProtocolContextUtils.getRelativePath(context).getPath());
   }
 

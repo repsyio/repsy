@@ -29,11 +29,13 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.zip.DeflaterOutputStream;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -98,7 +100,13 @@ public abstract class AbstractRubyGemspecHandler implements ProtocolMethodHandle
     }
     try {
       final var raw = this.facade.getGemspec(context, parsed[0], parsed[1]);
-      return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).body(deflate(raw));
+      // Without a header of its own Spring names the download "f.txt" (RPS-1442).
+      return ResponseEntity.ok()
+          .contentType(MediaType.APPLICATION_OCTET_STREAM)
+          .header(
+              HttpHeaders.CONTENT_DISPOSITION,
+              Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
+          .body(deflate(raw));
     } catch (final Exception e) {
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }

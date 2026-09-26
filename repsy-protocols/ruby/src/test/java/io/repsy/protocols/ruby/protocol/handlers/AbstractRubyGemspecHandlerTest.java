@@ -42,6 +42,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -152,6 +153,22 @@ class AbstractRubyGemspecHandlerTest {
     assertThat(response.getHeaders().getContentType())
         .isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
     verify(this.facade).getGemspec(any(), eq("demo"), eq("1.2.3"));
+  }
+
+  @Test
+  @DisplayName("names the download after the .gemspec.rz file instead of f.txt (RPS-1442)")
+  void namesTheGemspecFile() {
+    when(this.facade.getGemspec(any(), eq("demo"), eq("1.2.3"))).thenReturn(new byte[0]);
+
+    final var response =
+        this.handler()
+            .handle(
+                contextFor("/quick/Marshal.4.8/demo-1.2.3.gemspec.rz"),
+                new MockHttpServletRequest(),
+                new MockHttpServletResponse());
+
+    assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+        .isEqualTo("attachment; filename=\"demo-1.2.3.gemspec.rz\"");
   }
 
   @Test
