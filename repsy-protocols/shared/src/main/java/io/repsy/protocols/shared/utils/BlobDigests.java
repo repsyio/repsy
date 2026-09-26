@@ -80,6 +80,18 @@ public class BlobDigests {
   }
 
   /**
+   * Tells whether {@code algorithm} is the OCI name of an algorithm this registry can check, for
+   * example the value of the {@code digest-algorithm} parameter of a blob upload start.
+   *
+   * @param algorithm The algorithm name the client sent
+   * @return True for {@code sha256} and {@code sha512}
+   */
+  public static boolean isSupportedAlgorithm(final String algorithm) {
+
+    return HEX_LENGTH_BY_ALGORITHM.containsKey(algorithm);
+  }
+
+  /**
    * Tells whether {@code text} names a digest of a supported algorithm anywhere in it, that is,
    * contains {@code sha256:} or {@code sha512:}. It is a cheap dispatch test for a request path: it
    * does not validate the digest, which {@link #isSupported} or {@link #DIGEST_REGEX} do.

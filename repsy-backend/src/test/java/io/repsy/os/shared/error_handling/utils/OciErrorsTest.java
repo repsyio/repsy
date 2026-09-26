@@ -81,6 +81,8 @@ class OciErrorsTest {
         Arguments.of("manifestMediaTypeTooLong", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
         Arguments.of("blobDigestUnsupported", 400, UPLOAD_PATH, OciErrorCode.DIGEST_INVALID),
         Arguments.of(
+            "dockerDigestAlgorithmUnsupported", 400, UPLOAD_PATH, OciErrorCode.DIGEST_INVALID),
+        Arguments.of(
             "manifestMediaTypeUnsupported", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
         Arguments.of("manifestConfigInvalid", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
         Arguments.of(
