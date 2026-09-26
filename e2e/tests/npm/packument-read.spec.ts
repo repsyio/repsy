@@ -22,6 +22,7 @@
  * proof, with headers the clients hide.
  */
 import http from 'node:http';
+import https from 'node:https';
 import zlib from 'node:zlib';
 
 import { RepoType } from '../../src/api/panel-api.js';
@@ -106,7 +107,9 @@ async function rawExchange(
   encoding: string,
 ): Promise<{ headers: http.IncomingHttpHeaders; body: Buffer }> {
   return new Promise((resolve, reject) => {
-    const req = http.get(
+    // node:http refuses an https URL, which a TLS stack's repo URL is (README.md "TLS stack").
+    const transport = env.repoBaseUrl.startsWith('https:') ? https : http;
+    const req = transport.get(
       urlOf(repoName, encodePackageNameForUrl(name)),
       {
         headers: {

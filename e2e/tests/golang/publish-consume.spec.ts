@@ -106,9 +106,11 @@ test(
     '(H3/RPS-1229)',
   { tag: ['@auth', '@negative'] },
   async ({ seeder }) => {
+    // On a TLS stack (README.md "TLS stack", RPS-1474) the plain listener is still there, so the refusal is
+    // pinned against it: `plainRepoBaseUrl` is `repoBaseUrl` on a stack without TLS.
     test.skip(
-      new URL(env.repoBaseUrl).protocol !== 'http:',
-      'this pins the plain-http-specific client refusal; irrelevant against an https target',
+      new URL(env.plainRepoBaseUrl).protocol !== 'http:',
+      'this pins the plain-http-specific client refusal; irrelevant against an https-only target',
     );
 
     const repo = await seeder.createRepo(RepoType.GOLANG, { privateRepo: true });
@@ -122,7 +124,7 @@ test(
 
     // Exactly the panel's own documented incantation (golang-config.component.ts): userinfo
     // embedded directly in a PLAIN http:// GOPROXY URL -- deliberately bypassing the TLS shim.
-    const insecureProxy = `http://token:${token.token}@${new URL(env.repoBaseUrl).host}/${repo.name},off`;
+    const insecureProxy = `http://token:${token.token}@${new URL(env.plainRepoBaseUrl).host}/${repo.name},off`;
 
     const { home, work } = await isolatedWorkDir(`golang-plainhttpcreds-${seeder.runId}`);
     const result = await run('go', ['mod', 'download', '-json', `${modulePath}@${version}`], {
@@ -229,7 +231,7 @@ test(
   async ({ seeder }) => {
     test.skip(
       new URL(env.repoBaseUrl).protocol !== 'http:',
-      'the shim only engages for a credentialed request against a plain-http target',
+      'the shim only engages for a credentialed request against a plain-http target (its https twin follows)',
     );
 
     const repo = await seeder.createRepo(RepoType.GOLANG, { privateRepo: true });
@@ -283,5 +285,68 @@ test(
       paths.some((p) => p.endsWith('.zip')),
       `.zip was requested: ${paths.join(', ')}`,
     ).toBe(true);
+  },
+);
+
+test(
+  "golang > credentials in GOPROXY over Repsy's own TLS: .info, .mod and .zip, no shim (RPS-1474)",
+  { tag: ['@smoke', '@tls'] },
+  async ({ seeder }) => {
+    test.skip(
+      new URL(env.repoBaseUrl).protocol !== 'https:',
+      'the https twin of the shim case above: needs a TLS stack (README.md "TLS stack")',
+    );
+
+    const repo = await seeder.createRepo(RepoType.GOLANG, { privateRepo: true });
+    const token = await seeder.createToken(repo.name, { readOnly: false });
+    const credential = {
+      transport: 'basic' as const,
+      username: token.username,
+      password: token.token,
+      kind: 'token' as const,
+    };
+    const modulePath = `${MODULE_DOMAIN}/e2e-${seeder.runId}-tlsconsume`;
+    const version = golangAdapter.version('release');
+
+    const admin = adminCredential();
+    const built = await buildModuleZip({ modulePath, version });
+    expect((await rawUpload(repo.name, admin, built)).status).toBe(200);
+
+    const before = (await shimTraceSoFar())?.length ?? 0;
+
+    const { home, work } = await isolatedWorkDir(`golang-tlsconsume-${seeder.runId}`);
+    // The panel's own documented incantation: userinfo in an https GOPROXY URL, straight at Repsy's TLS
+    // listener (`goEnv` embeds it because the target is https), trusting the stack's CA through the
+    // SSL_CERT_FILE the runner was given.
+    const goGetEnv = await goEnv(home, credential, repo.name);
+    expect(goGetEnv.GOPROXY, 'the proxy is Repsy itself, over TLS').toMatch(
+      new RegExp(`^https://[^@]+@${new URL(env.repoBaseUrl).host}/${repo.name},off$`),
+    );
+    const result = await run('go', ['mod', 'download', '-json', `${modulePath}@${version}`], {
+      cwd: work,
+      env: goGetEnv,
+      timeoutMs: 60_000,
+      redact: [token.token],
+      label: 'golang-tlsconsume',
+    });
+    expect(result.exitCode, `go mod download: ${result.command}`).toBe(0);
+
+    // `go mod download -json` reports the three files it fetched (.info, .mod, .zip) as cache paths.
+    const parsed = JSON.parse(result.stdout) as {
+      Info?: string;
+      GoMod?: string;
+      Zip?: string;
+      Version?: string;
+    };
+    expect(parsed.Version).toBe(version);
+    for (const file of [parsed.Info, parsed.GoMod, parsed.Zip]) {
+      expect(file, 'a file go downloaded').toBeTruthy();
+      await expect(fs.stat(file as string), `${file} is in the module cache`).resolves.toBeTruthy();
+    }
+    expect(await fs.readFile(parsed.Zip as string)).toHaveLength(built.bytes.length);
+    expect(
+      (await shimTraceSoFar())?.length ?? 0,
+      'the consume never went through the in-process TLS shim',
+    ).toBe(before);
   },
 );

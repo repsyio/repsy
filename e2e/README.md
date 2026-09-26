@@ -163,7 +163,7 @@ e2e/
       pypi-raw.ts                     # pypi-specific raw POST/GET (upload/simple page/root index/download), buildWheel (fflate)
       pypi.ts                          # the pypi client + pypiAdapter: publish()/resolve()/seedPublish(), python3 -m twine/pip
       golang-raw.ts                     # golang-specific raw PUT/GET (@v/list, @latest, .info/.mod/.zip), buildModuleZip (fflate), dirhashHash1
-      golang-tls-shim.ts                 # in-process HTTPS reverse proxy for a credentialed consume (a real `go` refuses plain-http creds)
+      golang-tls-shim.ts                 # in-process HTTPS reverse proxy for a credentialed consume (a real `go` refuses plain-http creds; not used on a TLS stack)
       golang.ts                          # the golang client + golangAdapter: publish()/resolve()/seedPublish(), real curl -T / go mod download
       ruby-raw.ts                          # ruby-specific raw POST/GET/DELETE (gems/yank/versions/info/names/specs.4.8.gz), buildGem (buildTar + node:zlib)
       ruby.ts                              # the ruby client + rubyAdapter: publish()/resolve()/seedPublish(), real gem push / bundle install
@@ -3547,6 +3547,7 @@ and is never part of the default stack.
 | ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | -------------------------------------------- | -------------------------------------------- |
 | `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`     | `@scanner` (ui), "Scanner stack"             |
 | `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client | `@throttle` (stack, ui), "Auth-throttle leg" |
+| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443        | `@tls` (skeleton, golang), "TLS stack"       |
 
 How it fits together, so a later overlay is one row:
 
@@ -3652,6 +3653,89 @@ Flip checks: `AUTH_THROTTLE_ENABLED: 'false'` in the overlay fails all eight cas
 shorter than the window in the reset case fails it with a 429 where the right password should pass.
 The throttle is per client and never per username, so a leg like this cannot be run by other suites in
 parallel: any client that fails authentication three times is locked out for ten seconds.
+
+## TLS stack (RPS-1474, part a)
+
+Repsy has optional HTTPS listeners of its own (the main README's "HTTPS / SSL": `API_SSL_*` for 8443 next to
+the panel API, `REPO_SSL_*` for 9443 next to the package protocols; HTTP stays open). Every other suite
+talks plain HTTP to a stack behind no proxy, so the `tls` overlay (`docker-compose.stack-tls.yml`, see
+"Stack overlays") is what proves those listeners with real clients: each runner reaches Repsy over https and
+has to trust its certificate in its own way.
+
+```bash
+./run.sh local up --tls                                   # (or REPSY_E2E_TLS=1) add --h2 for H2
+REPSY_E2E_TLS=1 ./run.sh test --protocol skeleton,api,golang,docker,npm --grep @smoke
+./run.sh local down --tls
+```
+
+Give `test` and `sweep` the switch (`REPSY_E2E_TLS=1`) as well as `up`: `test` cannot see the stack, so the
+switch is what makes it use the https URLs. A plain `test` against a TLS stack still reaches the http ports,
+but npm and NuGet then follow the https `REPO_BASE_URL` they name (below) without a trusted CA.
+
+**Certificates.** Nothing is committed. A one-shot `tls-init` service (`eclipse-temurin:25-jre`, `keytool`
+only, run as the invoking user) writes into `e2e/.tls/<project>` (git-ignored; `run.sh` creates the
+directory, since Docker would create it as root) once and reuses it after that, because a running Repsy
+holds the keystore; delete the directory for new ones:
+
+| File             | What                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `ca.pem`         | the throwaway CA (`CN=Repsy e2e CA`, 10 years) every client trusts                                                       |
+| `leaf.pem`       | what Repsy serves, signed by it: `CN=localhost`, SANs `localhost`, `repsy` (the compose service), `127.0.0.1`, `::1`     |
+| `keystore.p12`   | the leaf key and chain, mounted into Repsy at `/app/certs` (the README's documented path); password `changeit`           |
+| `truststore.p12` | the CA as a Java truststore for the JVM clients (`REPSY_E2E_TLS_TRUSTSTORE`, password `changeit`); no runner uses it yet |
+
+**Ports and URLs.** The https ports are 8443/9443 plus the port offset (`REPSY_E2E_API_TLS_PORT`,
+`REPSY_E2E_REPO_TLS_PORT`); the offset cap is now computed on 9443. Offsets that differ by a multiple of 1000 collide (8443 + 1000 is 9443), so keep to
+100..900. With TLS on, `run.sh` exports
+`REPSY_API_BASE_URL`/`REPSY_REPO_BASE_URL` as the **https** URLs (a value the user set still wins), and keeps
+the http ones in `REPSY_E2E_PLAIN_API_BASE_URL`/`REPSY_E2E_PLAIN_REPO_BASE_URL` (`env.plainApiBaseUrl`,
+`env.plainRepoBaseUrl`, equal to the normal ones without TLS). The repo URL is also the stack's `REPO_BASE_URL`.
+
+**How every runner trusts the CA.** Not in `docker-compose.runners.yml`: `run.sh test|sweep` adds them to
+`docker compose run` for every runner it starts (`tls_run_args`), so a runner added later needs nothing, and a
+stack without TLS sets none of them (an empty `SSL_CERT_FILE` would replace the system trust store). It mounts
+`e2e/.tls/<project>` at `/tls` and sets, each read by the clients that use it: `SSL_CERT_FILE` (Go, OpenSSL,
+.NET on Linux), `NODE_EXTRA_CA_CERTS` (Node: the harness's own `fetch`, npm, pnpm, yarn, bun), `REQUESTS_CA_BUNDLE`
+(Python: pip, twine), `CARGO_HTTP_CAINFO` (Cargo), `CURL_CA_BUNDLE` (curl), plus `REPSY_E2E_TLS_CA_FILE`,
+`REPSY_E2E_TLS_TRUSTSTORE(_PASSWORD)` for the specs and the JVM clients (which take a truststore through their
+own flags: part b). A client's environment is an allow-list, so the names are in `TRUST_VARIABLES`
+(`src/clients/client-env.ts`) and the npm-family's `sealedEnv` copies them too. The `ui` runner is left out
+of the TLS leg (Chromium would need `ignoreHTTPSErrors` and a config change).
+
+**`tests/skeleton/tls-listeners.spec.ts`** (`@tls`, `@smoke`, skipped without the overlay) pins:
+
+| Case                       | Asserted                                                                                                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Listeners                  | the panel API and the protocols answer on the https and the http port; a token issued over https works on the http port; plain http to a TLS port is Tomcat's `400`, TLS to a plain port is refused |
+| Certificate                | chain to the CA (`authorized`), the SANs above, valid for `127.0.0.1` too; a Node child **without** `NODE_EXTRA_CA_CERTS` gets `SELF_SIGNED_CERT_IN_CHAIN` (the control), with it `401`             |
+| Cargo `config.json`        | `dl` and `api` follow the listener: https on 9443, http on 9090 (built from the request)                                                                                                            |
+| Docker `WWW-Authenticate`  | the realm follows the listener the same way                                                                                                                                                         |
+| npm `dist.tarball`         | the configured `REPO_BASE_URL` (https) on **both** listeners: it wins over the request (README "npm tarball URLs")                                                                                  |
+| NuGet service index `@id`s | the same: every `@id` names the https `REPO_BASE_URL`, also when asked on the http port                                                                                                             |
+| Panel snippets             | `static-env.js` carries the https repo URL                                                                                                                                                          |
+
+**Go without the shim.** On a TLS stack the target is https, so `goEnv` embeds the credentials in an https `GOPROXY`
+and Go trusts the CA through `SSL_CERT_FILE`; the in-process shim is never started. In
+`tests/golang/publish-consume.spec.ts` the plain-http refusal case (H3) runs against the plain port
+(`plainRepoBaseUrl`, still there), and the shim wire-sequence case (H8/H19) has an https twin: a credentialed
+`go mod download -json` straight at Repsy's TLS listener, whose `Info`, `GoMod` and `Zip` files exist and
+whose zip is the published one, with the shim's trace unchanged.
+
+**Runs of this part** (own stack, offset 200, image of main): skeleton `@tls` 12/12, `api` `@smoke` 18/18,
+golang full 43 passed and 1 skipped (the shim case), docker full 56/56, npm 77 passed and 7 failed (below).
+Flip checks: with `SSL_CERT_FILE` withheld from the runner the golang `@smoke` cases fail with `tls: failed to verify
+certificate`; with `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE` withheld every npm and docker case fails with `self-signed
+certificate in certificate chain`; the untrusted-child case above pins the same thing permanently.
+
+**Found, not pinned (no ticket yet; the report of the PR proposes them).** Repsy's own https connectors
+(`SslConnectorCustomizer`) are built without what the other connectors get: `EncodedSolidusHandling.DECODE`
+(`TomcatMultiPortConfiguration`) and the connector-level response compression. Observed on 9443 against 9090:
+a request path with `%2F` (an npm **scoped** package, `@scope%2Fname`, which is how `npm publish`/`install`
+spell it) is answered by Tomcat with a bodyless `400 Bad Request`, and a large packument is not gzipped for
+`Accept-Encoding: gzip` (RPS-1359). Six npm cases of a full run over TLS fail on the first (the scoped
+publishes of `packument-read`, `unpublish` and `publish-consume`; the unscoped ones pass) and one on the
+second; their assertions stay as they are so that a fix turns them green. Part b's `@smoke` leg has the
+scoped-package case to account for until then.
 
 ## API suite (RPS-1480)
 
