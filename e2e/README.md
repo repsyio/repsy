@@ -192,7 +192,7 @@ e2e/
       sbt.spec.ts               # RPS-134: registerPublishConsumeLoop(sbtAdapter) + the sbt extras
       ivy.spec.ts               # RPS-135: registerPublishConsumeLoop(ivyAdapter), a real `ant` with ivy:publish and ivy:retrieve
       ivy-client.spec.ts        # RPS-135: IV1-IV9 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete, the generated maven-metadata.xml read by Maven and Gradle, RPS-1369, an Ivy publish after mvn deploy, RPS-1437)
-      plugin-prefix.spec.ts     # RPS-1438, RPS-1457: PP1-PP4, real Maven plugins built by `mvn package`, uploaded without a group-level maven-metadata.xml and run by `mvn hello:hi` through the file Repsy generates (and a control, a stored file that wins, and a second plugin added to a stored file)
+      plugin-prefix.spec.ts     # RPS-1438, RPS-1457, RPS-1458: PP1-PP5, real Maven plugins built by `mvn package`, uploaded without a group-level maven-metadata.xml and run by `mvn hello:hi` through the file Repsy generates (and a control, a stored file that wins, a second plugin added to a stored file, and a plugin with its own goalPrefix)
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
@@ -927,15 +927,16 @@ realm, `publishivy="true"`, the dependency line with and without its `conf`) and
 its version into the file Maven stored, with its checksum rewritten, RPS-1437). No `test.fail` pin is
 left in this suite.
 
-### Maven plugin prefix (`plugin-prefix.spec.ts`, RPS-1438, RPS-1457)
+### Maven plugin prefix (`plugin-prefix.spec.ts`, RPS-1438, RPS-1457, RPS-1458)
 
 `mvn hello:hi` (with the plugin's group in `pluginGroups`) finds a plugin by its prefix in the
 group-level `<group path>/maven-metadata.xml`. `mvn deploy` uploads that file for a plugin, but Gradle's
 `maven-publish`, sbt, Ivy and a raw `PUT` send only the jar and the POM, and Maven then failed with
 "No plugin found for prefix" against a repo that holds the plugin. Repsy answers the file (and its four
-checksums) from the plugins it has registered when none is stored, with the prefix Maven derives from
-the artifactId. The spec builds a one-goal plugin once per worker with the real `mvn package`
-(`clients/maven-plugin.ts`; `maven-plugin-plugin` and the plugin API come from Central, like the other
+checksums) from the plugins it has registered when none is stored, with the plugin's own `goalPrefix`
+(read from `META-INF/maven/plugin.xml` in its jar when the jar is stored before the POM) or else the
+prefix `maven-plugin-plugin` derives from the artifactId. The spec builds a one-goal plugin once per
+worker with the real `mvn package` (`clients/maven-plugin.ts`; `maven-plugin-plugin` and the plugin API come from Central, like the other
 Maven builds), uploads its jar and POM by hand, and runs the real `mvn` in a clean local repository:
 
 - **PP1** (`@smoke`): the goal runs; the file lists the plugin, its four checksums are those of the file,
@@ -949,14 +950,19 @@ Maven builds), uploads its jar and POM by hand, and runs the real `mvn` in a cle
   after a group-level file that lists only the first was stored (what `mvn deploy` of it leaves): Repsy
   appends the second plugin's entry to that file, keeps the stored one, rewrites the stored `.sha1` (no
   `.sha256` is created), and the real `mvn bye:hi` finds the plugin, while `mvn hello:hi` still runs.
+- **PP5** (RPS-1458): a plugin built with its own `<goalPrefix>` (`tool-maven-plugin`, prefix `tl`) is
+  published by hand, jar first and then the POM (Gradle's order), with no group-level file: the file
+  Repsy answers lists `<prefix>tl</prefix>`, the real `mvn tl:hi` runs the goal and `mvn tool:hi` (the
+  prefix derived from the artifactId) fails with "No plugin found for prefix 'tool'".
 
 The version-level `maven-metadata.xml` of a SNAPSHOT is not generated (RPS-1438, decided): no client
 publishes timestamped SNAPSHOT files without it (Maven and Gradle send it, sbt and Ivy send the literal
 `-SNAPSHOT` names, which resolve without it), so the `404` pinned in `ivy-client.spec.ts` stays.
 
-Not covered: a plugin whose `plugin.xml` sets its own `goalPrefix` (Repsy derives the prefix from the
-artifactId; a plugin like that is published by Maven, which stores the file itself, and one `mvn deploy`
-adds to a group whose file is stored already is listed under both the derived and its own prefix).
+Not covered: a plugin with its own `goalPrefix` whose POM arrives before its jar (Repsy reads the
+prefix when the POM registers, so it keeps the derived one until the POM is uploaded again; the
+integration test `MavenPluginGoalPrefixIT` pins that), and one `mvn deploy` adds to a group whose file
+is stored already (it is listed under both the derived and its own prefix).
 
 Not covered: an Ivy-native (non-Maven) layout, which Repsy cannot serve (a descriptor named
 `<artifact>-<revision>.ivy` is a valid Maven file name and is stored, but nothing registers it), the

@@ -818,9 +818,14 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
   Gradle's `maven-publish`, sbt, Ivy and a raw `PUT` do not. Repsy answers a `GET` or `HEAD` of that file
   (and of its four checksums) too, from the plugins it has registered for the group, when none is stored:
   a `<plugins>` list with each plugin's name, prefix and artifactId, ordered by artifactId. The prefix
-  is the one Maven derives from the artifactId (`hello-maven-plugin` gives `hello`), so a plugin that
-  sets its own `goalPrefix` has to be published by Maven, which stores the file itself, or its prefix is
-  not found. A stored group-level file is served as it is, and it is kept complete like the
+  is the plugin's own `goalPrefix`, which its jar names in `META-INF/maven/plugin.xml`, when the jar is
+  stored before the POM (the order of Gradle's `maven-publish`; `mvn deploy` stores the file with the
+  real prefix itself), and otherwise the one `maven-plugin-plugin` derives from the artifactId
+  (`hello-maven-plugin` and `maven-hello-plugin` give `hello`, `maven-plugin-plugin` gives `plugin`).
+  It is read once, when the POM registers, so a client that sends the POM before the jar gets the
+  derived prefix until it uploads the POM again; the prefix of the artifact is that of its latest POM.
+  A jar that cannot be read, has no descriptor, describes another artifact or names something that is
+  not a usable prefix falls back to the derived one and never fails the upload. A stored group-level file is served as it is, and it is kept complete like the
   artifact-level one: when the POM of a plugin registers and the stored file does not list its
   artifactId (a plugin that `mvn deploy` published first and that Gradle, sbt or Ivy then adds a second
   plugin to), Repsy appends a `<plugin>` entry (name, prefix, artifactId) for it, and for any other
@@ -829,8 +834,8 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
   changes or removes an entry, and leaves untouched a file it cannot parse and a file that lists
   versions and no plugins (the artifact-level file of the same path, see below). A plugin that sets its
   own `goalPrefix` and is published by `mvn deploy` into a group whose file is stored already can end up
-  listed twice, under the prefix derived from its artifactId (added when its POM arrived) and under its
-  own (merged in by Maven afterwards); Maven finds the plugin by either. The path of that file has the
+  listed twice, under the prefix derived from its artifactId (added when its POM arrived, before its
+  jar, in Maven's order) and under its own (merged in by Maven afterwards); Maven finds the plugin by either. The path of that file has the
   shape of an artifact-level one (`com/acme/tools/maven-metadata.xml` is both the artifact `tools` of
   `com.acme` and the group `com.acme.tools`), so the artifact-level answer comes first and the
   group-level one is given only when no artifact of that name is registered.

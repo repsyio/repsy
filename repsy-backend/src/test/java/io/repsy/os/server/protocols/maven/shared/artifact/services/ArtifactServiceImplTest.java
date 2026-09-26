@@ -60,6 +60,8 @@ import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -67,6 +69,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -2040,6 +2044,146 @@ class ArtifactServiceImplTest {
     final var version = ArgumentCaptor.forClass(ArtifactVersion.class);
     verify(this.artifactUpsertHelper).insertArtifactVersion(version.capture(), any(), any());
     assertThat(version.getValue().getPrefix()).isNull();
+  }
+
+  private static byte[] pluginJar(final String artifactId, final String goalPrefix)
+      throws IOException {
+    final var bytes = new ByteArrayOutputStream();
+
+    try (final var zip = new ZipOutputStream(bytes)) {
+      zip.putNextEntry(new ZipEntry("META-INF/maven/plugin.xml"));
+      zip.write(
+          ("<plugin><name>x</name><groupId>com.acme</groupId><artifactId>"
+                  + artifactId
+                  + "</artifactId><version>1.0</version><goalPrefix>"
+                  + goalPrefix
+                  + "</goalPrefix><mojos/></plugin>")
+              .getBytes(UTF_8));
+      zip.closeEntry();
+    }
+
+    return bytes.toByteArray();
+  }
+
+  private static String pluginPom(final String artifactId, final String packaging) {
+    return """
+        <project><modelVersion>4.0.0</modelVersion><groupId>com.acme</groupId>\
+        <artifactId>%s</artifactId><version>%s</version><packaging>%s</packaging></project>"""
+        .formatted(artifactId, "1.0", packaging);
+  }
+
+  /** Registers the POM at {@code pomPath} and returns the rows that were inserted. */
+  private List<String> registerPomAndPrefixes(
+      final UUID id, final String pomPath, final String pom) {
+    this.stubRepo(id);
+    when(this.artifactUpsertHelper.insertArtifact(any(Artifact.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(this.storageStrategy.listStorageItems(any(StoragePath.class))).thenReturn(List.of());
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, pomPath),
+        new ByteArrayResource(pom.getBytes(UTF_8)));
+
+    final var artifact = ArgumentCaptor.forClass(Artifact.class);
+    verify(this.artifactUpsertHelper).insertArtifact(artifact.capture());
+    final var version = ArgumentCaptor.forClass(ArtifactVersion.class);
+    verify(this.artifactUpsertHelper).insertArtifactVersion(version.capture(), any(), any());
+
+    return Arrays.asList(artifact.getValue().getPrefix(), version.getValue().getPrefix());
+  }
+
+  @Test
+  @DisplayName("a plugin POM registers both rows with the goalPrefix of the stored jar (RPS-1458)")
+  void aPluginPomTakesTheGoalPrefixOfItsStoredJar() throws Exception {
+    final var id = UUID.randomUUID();
+    final var jarPath = "com/acme/foo-maven-plugin/1.0/foo-maven-plugin-1.0.jar";
+    when(this.storageStrategy.get(pathOf(jarPath), eq("mvn")))
+        .thenReturn(Optional.of(new ByteArrayResource(pluginJar("foo-maven-plugin", "custom"))));
+
+    assertThat(
+            this.registerPomAndPrefixes(
+                id,
+                "com/acme/foo-maven-plugin/1.0/foo-maven-plugin-1.0.pom",
+                pluginPom("foo-maven-plugin", "maven-plugin")))
+        .containsExactly("custom", "custom");
+  }
+
+  @Test
+  @DisplayName("a plugin POM whose jar is not stored yet gets the derived prefix (RPS-1458)")
+  void aPluginPomWithoutItsJarGetsTheDerivedPrefix() {
+    final var id = UUID.randomUUID();
+
+    assertThat(
+            this.registerPomAndPrefixes(
+                id,
+                "com/acme/foo-maven-plugin/1.0/foo-maven-plugin-1.0.pom",
+                pluginPom("foo-maven-plugin", "maven-plugin")))
+        .containsExactly("foo", "foo");
+    verify(this.storageStrategy)
+        .get(pathOf("com/acme/foo-maven-plugin/1.0/foo-maven-plugin-1.0.jar"), eq("mvn"));
+  }
+
+  @Test
+  @DisplayName("a jar that is not a jar, or has another descriptor, gives the derived prefix")
+  void anUnreadableOrForeignJarGivesTheDerivedPrefix() throws Exception {
+    final var id = UUID.randomUUID();
+    when(this.storageStrategy.get(any(StoragePath.class), eq("mvn")))
+        .thenReturn(Optional.of(new ByteArrayResource(pluginJar("other-maven-plugin", "other"))));
+
+    assertThat(
+            this.registerPomAndPrefixes(
+                id,
+                "com/acme/foo-maven-plugin/1.0/foo-maven-plugin-1.0.pom",
+                pluginPom("foo-maven-plugin", "maven-plugin")))
+        .containsExactly("foo", "foo");
+  }
+
+  @Test
+  @DisplayName("a storage failure while reading the jar never fails the registration (RPS-1458)")
+  void aFailingJarReadDoesNotFailTheRegistration() {
+    final var id = UUID.randomUUID();
+    when(this.storageStrategy.get(any(StoragePath.class), eq("mvn")))
+        .thenThrow(new IllegalStateException("disk gone"));
+
+    assertThat(
+            this.registerPomAndPrefixes(
+                id,
+                "com/acme/foo-maven-plugin/1.0/foo-maven-plugin-1.0.pom",
+                pluginPom("foo-maven-plugin", "maven-plugin")))
+        .containsExactly("foo", "foo");
+  }
+
+  @Test
+  @DisplayName("a POM that is not a plugin's does not read any jar (RPS-1458)")
+  void aPlainPomReadsNoJar() {
+    final var id = UUID.randomUUID();
+
+    assertThat(
+            this.registerPomAndPrefixes(
+                id,
+                "com/acme/foo-maven-plugin/1.0/foo-maven-plugin-1.0.pom",
+                pluginPom("foo-maven-plugin", "jar")))
+        .containsExactly(null, null);
+    verify(this.storageStrategy, never()).get(any(StoragePath.class), any());
+  }
+
+  @Test
+  @DisplayName("the POM of a timestamped snapshot reads the jar of that timestamp (RPS-1458)")
+  void aSnapshotPomReadsTheJarOfItsTimestamp() throws Exception {
+    final var id = UUID.randomUUID();
+    final var jarPath =
+        "com/acme/foo-maven-plugin/1.0-SNAPSHOT/foo-maven-plugin-1.0-20260921.101010-1.jar";
+    when(this.storageStrategy.get(pathOf(jarPath), eq("mvn")))
+        .thenReturn(Optional.of(new ByteArrayResource(pluginJar("foo-maven-plugin", "snap"))));
+
+    assertThat(
+            this.registerPomAndPrefixes(
+                id,
+                "com/acme/foo-maven-plugin/1.0-SNAPSHOT/foo-maven-plugin-1.0-20260921.101010-1.pom",
+                pluginPom("foo-maven-plugin", "maven-plugin")
+                    .replace("<version>1.0<", "<version>1.0-SNAPSHOT<")))
+        .containsExactly("snap", "snap");
   }
 
   @Test

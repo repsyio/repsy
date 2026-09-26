@@ -17,7 +17,8 @@
 /**
  * A real Maven plugin, and the real `mvn prefix:goal` that resolves it (RPS-1438).
  *
- * `buildHelloPlugin` builds the one-goal plugin `hello-maven-plugin` (prefix `hello`) with the real
+ * `buildHelloPlugin` builds the one-goal plugin `hello-maven-plugin` (prefix `hello`; `buildPlugin`
+ * builds others, one with its own `goalPrefix` too, RPS-1458) with the real
  * `mvn package` (maven-plugin-plugin from Central, like every other spec's Maven build) once per
  * worker, and `uploadPluginFiles` sends its jar and POM the way Gradle `maven-publish`, sbt or Ivy do:
  * two PUTs, and no group-level `maven-metadata.xml`. `runPrefixGoal` then runs `mvn hello:hi` in a
@@ -49,15 +50,21 @@ export const PLUGIN_ARTIFACT_ID = 'hello-maven-plugin';
 export const PLUGIN_VERSION = '1.0';
 /** What `mvn hello:hi` logs: the goal ran, so Maven found the plugin. */
 export const PLUGIN_MARKER = `E2E-HELLO-PLUGIN-RAN-${randomUUID()}`;
-/** The prefix Maven derives from the artifactId (`hello-maven-plugin`). */
+/** The prefix maven-plugin-plugin derives from the artifactId (`hello-maven-plugin`). */
 export const PLUGIN_PREFIX = 'hello';
 
-/** A plugin `buildPlugin` builds: its artifactId, its POM `<name>`, the prefix Maven derives from the artifactId and what its goal logs. */
+/**
+ * A plugin `buildPlugin` builds: its artifactId, its POM `<name>`, the prefix it is run by (what
+ * maven-plugin-plugin derives from the artifactId, or the `goalPrefix` when one is configured) and
+ * what its goal logs.
+ */
 export interface PluginSpec {
   artifactId: string;
   name: string;
   prefix: string;
   marker: string;
+  /** Sets `<goalPrefix>` in the plugin's `maven-plugin-plugin` configuration (RPS-1458); its jar's plugin.xml then names it. */
+  goalPrefix?: string;
 }
 
 export const HELLO_PLUGIN: PluginSpec = {
@@ -73,6 +80,15 @@ export const BYE_PLUGIN: PluginSpec = {
   name: 'Bye Maven Plugin',
   prefix: 'bye',
   marker: `E2E-BYE-PLUGIN-RAN-${randomUUID()}`,
+};
+
+/** A plugin with its own `goalPrefix`, that differs from the one derived from its artifactId (RPS-1458). */
+export const TOOL_PLUGIN: PluginSpec = {
+  artifactId: 'tool-maven-plugin',
+  name: 'Tool Maven Plugin',
+  prefix: 'tl',
+  goalPrefix: 'tl',
+  marker: `E2E-TOOL-PLUGIN-RAN-${randomUUID()}`,
 };
 
 export interface BuiltPlugin {
@@ -108,6 +124,7 @@ export function buildPlugin(spec: PluginSpec): Promise<BuiltPlugin> {
       artifactId: spec.artifactId,
       version: PLUGIN_VERSION,
       name: spec.name,
+      goalPrefix: spec.goalPrefix,
     });
     await render(
       'HelloMojo.template.java',
