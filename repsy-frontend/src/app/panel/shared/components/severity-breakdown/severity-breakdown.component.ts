@@ -25,7 +25,6 @@ Chart.register(...registerables);
 const SEVERITY_CHART_COLORS = ['#ed7688', '#ffec7d', '#7de2ff', '#9eff87', '#9fa0a0'];
 const SEVERITY_CHART_LABELS = ['Critical', 'High', 'Medium', 'Low', 'Unknown'];
 
-
 export interface SeverityCounts {
   criticalCount?: number;
   highCount?: number;

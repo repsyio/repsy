@@ -13,7 +13,6 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-
 // Test-only helper for the specs that render a panel component's real template (the list templates and the help
 // texts), where the rest of the specs drive the class alone. Nothing under src/app imports it, so it is never part of
 // the application bundle.
