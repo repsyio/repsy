@@ -89,7 +89,7 @@ e2e/
   runners/npm-clients.Dockerfile  # + pinned pnpm, yarn classic, yarn berry (npm --prefix /opt/clients/<name>) and bun (copied from oven/bun); see "npm-family clients"
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
   runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
-  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image, `skopeo` (built statically from its pinned tag) and `regctl` (pinned release binary); no daemon, no socket
+  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image, `skopeo` (built statically from its pinned tag), `regctl` and `oras` (pinned release binaries, sha256 per arch); no daemon, no socket
   runners/helm.Dockerfile      # + the static `helm` binary + the cm-push plugin installed at build time; no daemon, no socket
   runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time; the static uv binary copied out of Astral's image
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
@@ -160,7 +160,8 @@ e2e/
       docker-copy-adapter.ts         # the scenario-loop adapter of the copy clients (CopyClient -> ProtocolAdapter) + openSession, RPS-1478 part B
       docker-skopeo.ts               # skopeo: skopeoAdapter (skopeo copy), its env/auth file, the dir: reader
       docker-regctl.ts               # regctl: regctlAdapter (regctl image copy), its regctl.json renderer
-      docker-tls.ts                  # the ONE place skopeo/regctl's TLS setting is decided (plain HTTP today; the HTTPS leg switches it here)
+      docker-oras.ts                 # oras: openOrasSession (oras login --password-stdin into an isolated --registry-config file), REFERRERS_TAG, RPS-1478 part C
+      docker-tls.ts                  # the ONE place skopeo/regctl/oras's TLS setting is decided (plain HTTP today; the HTTPS leg switches it here)
       docker-client-tests.ts         # seeding + raw comparison helpers of the skopeo/regctl specs
       helm-chart.ts                   # hand-assembled Helm chart .tgz builder (Chart.yaml + values.yaml + marker, ustar+gzip)
       helm-raw.ts                     # raw HTTP for BOTH Helm protocols: OCI manifest/blob PUT/GET/HEAD + classic index/chart/upload/delete
@@ -243,6 +244,7 @@ e2e/
       skopeo.spec.ts            # skopeo: copy between two repos, inspect, delete (scope *), multi-arch --all
       regctl.spec.ts            # regctl: manifest get/head, image inspect, copy between repos, tag/manifest delete, sha512, multi-arch
       client-tag-list.spec.ts   # crane ls/catalog, skopeo list-tags/inspect, regctl tag ls/repo ls against the missing tags/list (RPS-1489)
+      oras.spec.ts              # oras: push/pull/blob/manifest of OCI artifacts, attach + the referrers tag-schema fallback, discover, copy, delete, the RPS-1490 test.fail pins (RPS-1478 part C)
     helm/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
@@ -2606,7 +2608,7 @@ is in the PR that added this file.
   whose config digest is also one of its layers (`{}` twice, as `oras attach`/`oras push
 --config` without files produces) is answered `404` `MANIFEST_BLOB_UNKNOWN` `layerNotFound`
   (observed live while probing; the OCI artifact manifest with a distinct layer is `201`). It
-  belongs to part C, which decides how to pin it.
+  is pinned in part C as `test.fail` under RPS-1490 (see "Fourth Docker client: `oras`").
 
 ```bash
 ./run.sh test --protocol docker -b   # -b the first time: builds the docker runner image
@@ -2661,11 +2663,52 @@ Probed live (skopeo 1.24.1, regctl 0.11.6):
 
 `client-tag-list.spec.ts` pins what `crane ls`/`catalog`, `skopeo list-tags`/`inspect` and `regctl tag
 ls`/`repo ls` do against RA1/RA2 (fail with the registry's `unknownPath`): the story that adds `tags/list`
-(RPS-1489) flips it. Not covered: `oras` (RPS-1478 part C), the HTTPS leg (RPS-1474).
+(RPS-1489) flips it. `oras` is in its own section below; not covered: the HTTPS leg (RPS-1474).
 
 ```bash
 ./run.sh test --protocol docker -b               # -b the first time this runner image changes
 ./run.sh test --protocol docker --grep "@skopeo"  # or "@regctl"
+```
+
+### Fourth Docker client: `oras` (RPS-1478 part C)
+
+`oras` v1.3.4 (`ORAS_VERSION`, `ORAS_SHA256_AMD64`/`ORAS_SHA256_ARM64` in `runners/docker.Dockerfile` and
+`docker-compose.runners.yml`; a release tarball checked against its sha256, `oras version` checked at build
+time) is the OCI ARTIFACT client: it pushes arbitrary files with an `artifactType`, attaches referrers (an
+SBOM, a signature) to an image and copies them. `clients/docker-oras.ts` opens a session per credential:
+`oras login --password-stdin` into an isolated `--registry-config` file inside the invocation's private `HOME`
+(oras's own auth store, the secret on stdin and never in argv), `clientEnv` allow-list environment
+(`sealed-env.spec.ts` has a cell), TLS from `docker-tls.ts` (`--plain-http` today; `--from-plain-http`/
+`--to-plain-http` for `copy`). It has no scenario-loop adapter: `tests/docker/oras.spec.ts` (tag `@oras`) pins
+what it does that the image clients never reach. Probed live (oras 1.3.4):
+
+| Behaviour                                               | What oras does against Repsy                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `push` / `pull` / `manifest fetch` / `blob fetch` (OR1) | an OCI artifact manifest (`artifactType`, config `application/vnd.oci.empty.v1+json`, a file layer with a custom media type and a `title` annotation) is stored as sent and reads back byte-identical, by tag and by digest; `--config <file>:<type>` stores that config and the type becomes the artifact type                                                                                                                              |
+| `attach` (OR2)                                          | never asks the referrers API: the `201` of the referrer PUT has no `OCI-Subject` header, which oras-go reads as "no referrers API", so it takes the spec's FALLBACK: `GET manifests/sha256-<hex>` (`404`, then the existing index), `PUT` an OCI image index under that tag listing the referrer                                                                                                                                             |
+| the fallback index tag (OR2)                            | an ordinary tag (RA4): raw HTTP and `crane manifest <repo>/<image>:sha256-<hex>` read the same bytes; a read-write deploy token can attach, a read-only one is refused (`401`) and the index does not change                                                                                                                                                                                                                                 |
+| `discover` (OR3)                                        | **fails** by default: it asks `GET .../referrers/<digest>`, gets `404` WITH `NAME_UNKNOWN` (RA3) and oras-go reads that code as "repository not found", not as "API unsupported". `--distribution-spec v1.1-referrers-tag` works (`--format json`, `--artifact-type` filter)                                                                                                                                                                 |
+| `copy` (OR4)                                            | between two repos of one Repsy the artifact arrives byte-identical (oras asks for a mount, gets the `202` fallback of RA5, uploads); `-r` fails like `discover` unless `--from-distribution-spec` and `--to-distribution-spec` are both `v1.1-referrers-tag`, then the referrer and its index tag are copied                                                                                                                                 |
+| `manifest delete` (OR5)                                 | deletes by digest (a tag reference resolves first: every tag of the manifest goes), asked for the `delete` scope up front (token scope `repository:<repo>/<image>:delete,pull`, seen through a logging proxy: no `insufficient_scope` round trip, unlike crane/regctl); a rw deploy token is refused. Deleting a REFERRER fails on the same referrers-API probe unless the tag schema is forced, which also removes its entry from the index |
+| `repo tags` / `repo ls` (OR7)                           | fail with `unknownPath` (RA1/RA2, RPS-1489)                                                                                                                                                                                                                                                                                                                                                                                                  |
+
+Backend follow-up (RPS-1489 already lists the referrers API): implementing `GET /v2/<repo>/<image>/referrers/<digest>`
+(or, at the least, answering the missing route with a `404` that does not carry `NAME_UNKNOWN`) makes
+`oras discover`, `oras copy -r` and `oras manifest delete` of a referrer work without forcing the tag
+schema; the `discover`/`copy -r`/referrer-delete halves of OR3/OR4/OR5 then flip on purpose (with RA3).
+
+**RPS-1490 (`test.fail`, OR6).** A manifest whose config digest equals one of its layer digests, or that
+lists the same layer digest twice, is answered `404 MANIFEST_BLOB_UNKNOWN / layerNotFound` on `PUT
+manifests/<ref>` although every blob is stored (`AbstractDockerProtocolTxFacade.verifyLayers` adds the
+config digest to the layer digest list and `LayerTxService.isAllExistsByRepoIdAndDigests` compares the
+list's size with the number of distinct rows found). The OCI spec allows both. Real clients hit it in three
+places, each a `test.fail` here: `oras push --artifact-type X` without files and `oras attach` with only an
+annotation (both send `{}` as the config AND the one layer), `oras push` of two files with identical bytes;
+OR6d reproduces it with raw HTTP. The fix flips all four.
+
+```bash
+./run.sh test --protocol docker -b               # -b the first time this runner image changes
+./run.sh test --protocol docker --grep "@oras"
 ```
 
 ## Helm runner
@@ -3738,12 +3781,13 @@ differently, so each of them is an **opt-in overlay**: a compose file layered on
 PostgreSQL one or the H2 one) with one more `-f`, that changes what Repsy runs with for one nightly leg
 and is never part of the default stack.
 
-| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                              | Specs                                                              |
-| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | -------------------------------------------- | ------------------------------------------------------------------ |
-| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`     | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack" |
-| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client | `@throttle` (stack, ui), "Auth-throttle leg"                       |
-| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443        | `@tls` (skeleton, golang), "TLS stack"                             |
-| `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB    | `@limits` (7 runners), "Size-limit leg"                            |
+| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                                            | Specs                                                              |
+| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | ---------------------------------------------------------- | ------------------------------------------------------------------ |
+| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack" |
+| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                       |
+| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang), "TLS stack"                             |
+| `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                            |
+| `upgrade`  | `--upgrade`             | `REPSY_E2E_UPGRADE=1`  | `docker-compose.stack-upgrade.yml`  | `upgrade`   | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                 |
 
 How it fits together, so a later overlay is one row:
 
@@ -3856,6 +3900,95 @@ Flip checks (each made the named test fail, then reverted): `--renew-anon-volume
 volume is another one), the secret set in the "unset" case (the token after the restart is accepted),
 `STORAGE_BASE_PATH=/home/appuser/.repsy` in the stack file (control test: the path is not under `/app/data`;
 without it the recreate test: Maven 404).
+
+### Upgrade path: the previous release on a populated volume (RPS-1487)
+
+`tests/stack/upgrade.spec.ts` (`@local-only`, `@upgrade`, serial, opt-in) is what `README.md` (the repository
+one) "Upgrading" promises, run for real: the PREVIOUS release's published image runs on fresh volumes, is
+filled with the real clients, and its container is then recreated on the image under test, on the same
+volumes. PostgreSQL and embedded H2 are the same spec (`--h2`): both databases migrate differently (H2 has a
+Java migration, V0014) and keep their data in different volumes.
+
+```bash
+./run.sh local up --upgrade [--h2]       # (or REPSY_E2E_UPGRADE=1) the previous release, on fresh volumes
+REPSY_E2E_UPGRADE=1 ./run.sh test --protocol stack --grep @upgrade
+./run.sh local down --upgrade [--h2]     # the stack ends on the image under test: throw it away
+```
+
+**One constant names the previous release**: `PREVIOUS_RELEASE` in `src/upgrade/previous-release.ts`
+(`26.08.4`, the image `repo.repsy.io/repsy/os/repsy:26.08.4`, pullable without a login). The spec imports it
+and `run.sh` reads that line with `sed`. **Bump it after each release**, to the newest published tag (the Git
+tags carry a `v`, the image tags do not), and read the spec's per-release expectations again: the password
+reset (V0017) and the Docker manifest migration (V0024) only happen from a release before them, so the day the
+previous release already has both, the accounts and the layout parts of the spec need another shape.
+`REPSY_E2E_UPGRADE_FROM=<tag>` (the nightly's `upgrade_from` input) overrides it for one run. `local up
+--upgrade` pulls it first and stops with a clear message when it cannot (no network, tag not published).
+
+What `--upgrade` does (`docker-compose.stack-upgrade.yml`, an overlay row like the others, "Stack overlays"):
+`run.sh` prepares the image under test (`REPSY_IMAGE` as it is, else built as `repsy-os-e2e:<project tag>`,
+not started) and starts the previous release from the stack files, whose ports, healthcheck and volumes
+work unchanged on it. The overlay gives it the environment of an installation as that release documented it:
+`STORAGE_BASE_PATH=/app/data/storage` (no image default yet), `DB_HOST`, `DB_PORT` and `DB_DATABASE` next to
+`DB_URL` (the stack files' `DB_URL` selects the database for both releases), `DOCKER_MANIFEST_LAYOUT_REPAIR_INITIAL_DELAY=PT5S`
+(the job waits ten minutes by default), the manifest repair switch `REPSY_E2E_UPGRADE_REPAIR` (default on) and
+INFO logging for Flyway and the repair job (the application logs at WARN, which hides both, README "Upgrading").
+Without the overlay's stack the spec **skips** with the reason (not opted in, or the container is not the
+previous release's image); the nightly leg fails on a skip.
+
+**Populating a release the generated client does not know.** The previous release's panel API is not
+today's (`POST /api/repos/{type}` and not `POST /api/repos`, `?search=` and not `?q=`, no `/actions/rotate`,
+...), so `src/upgrade/legacy-panel.ts` is a plain `fetch` client of the four calls the spec needs (login,
+create repo, create user, create deploy token; the envelope and `POST /api/auth/login` are the same). Packages
+go through the real clients with the same adapters as the other stack specs (`src/clients/stack-packages.ts`,
+shared with the persistence spec): `mvn deploy`, `npm publish`, `crane push` (two tags of an image and a
+multi-platform index made with `crane index append`, whose children the previous release stores per tag).
+Accounts: the admin, a second `ADMIN` and a plain `USER`.
+
+The five tests, in order (the stack keeps its state between them):
+
+1. **control**: on the previous release every package is consumed with the admin's password and with the
+   deploy token, Docker by tag and by digest (the index and its children too), and the manifests are stored
+   as one file per tag, `manifests/manifest_<12 hex>_<image>_<tag>` (7 files here). Two previous-release
+   quirks are proven here and not asserted as behaviour of the new one: `npm install` does not work on it (its
+   packument's tarball URL repeats the repo name and answers 404), so npm is checked by fetching the tarball
+   itself; and its panel lists every image with size 0 and no digest (see "What it found").
+2. **recreate on the image under test**, same volumes (`dataMount` is the same), with the manifest repair OFF:
+   Flyway went from schema 11 to the newest version of the image (the count comes from the jar's
+   `db/migration`, so it does not go stale: 18 applied on PostgreSQL, 18 on H2 today), the WARN that `DB_HOST,
+DB_PORT, DB_DATABASE` are no longer read is logged once, without credentials (and with the H2 sentence only on
+   H2), the image's legacy-storage fallback (`holds artifacts and ...`) stays quiet, and the log holds no ERROR.
+3. **accounts**: V0017 reset every account that had a SHA-256 hash. The `Admin password has been reset for
+user <name>. New password: <...>` line is printed for both admins and only for them; the old passwords are
+   refused on the panel (401) and on the wire (a Maven client with the admin's old password: 401); the printed
+   ones work; a deploy token still consumes every package (it is not a password); an admin resets the plain
+   user (`POST /api/users/{id}/actions/reset-password`) and the new password signs in. The admin's password is
+   then put back to `REPSY_ADMIN_PASSWORD` (`PUT /api/profile/password`), which every other runner needs.
+4. **consume and list**: every package again with the admin and with the token (npm now with the real client:
+   the new release serves a working tarball URL for a package the old one published), the panel lists the
+   three repositories with their types, the deploy tokens by name, the two accounts with their roles, both
+   Docker images with their tag counts and the tags. Files served from the legacy names, because the repair is off.
+5. **layout repair**: the repair job has not run (no log line, the files untouched), then the container is
+   recreated with the job on: `Docker manifest layout repair: 5 repaired, 0 left as they are ..., 0 failed`
+   (exactly the five distinct manifests: the digest-named copies the previous release kept of an index's
+   children are folded into them), no `manifest_...` file is left outside the storage trash and every
+   digest is a file `manifests/sha256:<hex>`, the reset password is NOT printed again, and everything is
+   pulled once more by tag and by digest and consumed with the admin and the token.
+
+The spec puts `REPSY_ADMIN_PASSWORD` back and deletes what it made (`Seeder.cleanup`), so `sweep --all --dry-run`
+is clean. It fails loudly if the image under test is the previous release itself (no migration to find).
+
+**What it found (proposed, not pinned):** the previous release never fills a Docker image row's `size` and
+`digest`, so the panel lists images with size 0 and no digest (probed on `26.08.4`, single tag too), and the
+migrations do not backfill them: an image pushed before the upgrade stays like that until it is pushed again,
+while the same push on the new release lists its size and digest. The upgrade spec therefore asserts that
+both images and their tags are listed, not their size or digest. The README's "Upgrading" says the repair and
+Flyway report at `INFO`, but the default log level is `WARN`, so an operator sees neither line unless
+`LOGGING_LEVEL_...` is raised (the overlay does it).
+
+Flip checks (each made the named test fail, then reverted): a digest that was never pushed added to the ones
+the repair test expects (`manifests/sha256:000...` is missing, and the repaired count differs), the image under
+test set to the previous release itself (`REPSY_IMAGE=repo.repsy.io/repsy/os/repsy:26.08.4`: test 2 finds no
+migration to apply).
 
 ### Auth-throttle leg (RPS-1477)
 
@@ -5100,8 +5233,9 @@ and on demand only, by the product owner's decision (RPS-1260): it has no `pull_
 
 ```bash
 gh workflow run e2e-nightly.yml                            # everything, like the nightly run
-gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | all
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | upgrade (both) | all
 gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
+gh workflow run e2e-nightly.yml -f suite=upgrade -f upgrade_from=26.08.3   # the upgrade legs from another release
 gh workflow run e2e-nightly.yml -f suite=h2 -f h2_full=docker   # the full catalog of this runner on H2, not tonight's
 gh workflow run e2e-nightly.yml -f grep=@smoke             # a Playwright --grep for every leg
 gh workflow run e2e-nightly.yml -f keep_stack_logs=true    # upload the container logs of a green run too
@@ -5116,16 +5250,18 @@ cancelling): a second one waits.
 
 ### What runs
 
-| Job / leg  | Stack                                       | Runs                                                                                                                                                                                                                     | Timeout |
-| ---------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
-| `image`    |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                                           | 40 min  |
-| `ui`       | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                | 60 min  |
-| `wire`     | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                                    | 150 min |
-| `h2`       | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                    | 90 min  |
-| `h2-full`  | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another              | 60 min  |
-| `scanner`  | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite | 60 min  |
-| `throttle` | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                | 30 min  |
-| `limits`   | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                  | 60 min  |
+| Job / leg    | Stack                                       | Runs                                                                                                                                                                                                                     | Timeout |
+| ------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| `image`      |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                                           | 40 min  |
+| `ui`         | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                | 60 min  |
+| `wire`       | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                                    | 150 min |
+| `h2`         | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                    | 90 min  |
+| `h2-full`    | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another              | 60 min  |
+| `scanner`    | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite | 60 min  |
+| `throttle`   | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                | 30 min  |
+| `limits`     | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                  | 60 min  |
+| `upgrade`    | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                             | 30 min  |
+| `upgrade-h2` | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                 | 30 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
 others. Every leg does the same: load the image, `./run.sh local up [--h2]` (with `REPSY_IMAGE` set, so
@@ -5149,6 +5285,12 @@ stub of `repsy-scanner-trivy`, built from `runners/scanner-stub.Dockerfile` on t
 is off. The `@scanner` specs skip themselves without the opt-in, and a skipped test is not a failure, so the
 step "Check the opt-in specs ran" fails the leg when the `junit.xml` of any of its runners holds no test or any
 skipped one; every overlay leg (`matrix.opt_in` set, "Stack overlays") gets that check.
+
+The `upgrade` and `upgrade-h2` legs (two legs, because a leg has one stack and the two databases migrate differently)
+start with `./run.sh local up --upgrade [--h2]`: `REPSY_IMAGE` (the loaded image) is the image under test and the
+previous release is pulled and started instead; only the `stack` runner runs, `--grep @upgrade`, the `grep` input is
+ignored, and `upgrade_from` (default `PREVIOUS_RELEASE`) picks the release. A release whose image cannot be pulled
+fails `local up` with a message; a spec that skipped fails the leg ("Upgrade path").
 
 The `throttle` leg is the same with `./run.sh local up --throttle`, the `stack` runner first and the `ui` runner
 last (both `--grep @throttle`, `grep` input ignored), and one extra step, "Wait out the throttle window" (12 s):
