@@ -36,6 +36,7 @@ import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { Toasts } from '../../../src/ui/pages/components.js';
 import { UsersPage } from '../../../src/ui/pages/users.js';
+import { errorToasts } from '../../../src/ui/page-errors.js';
 
 const LIST_URL = /\/api\/repos(\?|$)/;
 const USERS_URL = /\/api\/users(\?|$)/;
@@ -74,6 +75,17 @@ function expectToastLater(toasts: Toasts, text: string): Promise<void> {
 }
 
 test.describe('Error handling', () => {
+  test.use({
+    allowedPageErrors: errorToasts(
+      'by design: every case stubs the fault whose toast it asserts',
+      'Server error',
+      'Connection error',
+      'Access denied',
+      'Only administrators may list users',
+      'You do not have permission to view this page',
+    ),
+  });
+
   test('ERR-01: a 500 on the repository list shows a "Server error" toast and no rows', async ({
     adminPage,
   }) => {

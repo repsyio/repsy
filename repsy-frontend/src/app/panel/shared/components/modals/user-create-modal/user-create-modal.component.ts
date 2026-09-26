@@ -126,10 +126,15 @@ export class UserCreateModalComponent {
           this.loading = false;
         }),
       )
-      .subscribe(() => {
-        this.toastService.show('User created successfully.', 'success');
-        this.closeModal();
-        this.created.emit();
+      .subscribe({
+        next: () => {
+          this.toastService.show('User created successfully.', 'success');
+          this.closeModal();
+          this.created.emit();
+        },
+        // The HTTP interceptor has shown the toast; without a handler rxjs would report the failure to the
+        // global error handler as an application error (RPS-1617).
+        error: () => undefined,
       });
   }
 

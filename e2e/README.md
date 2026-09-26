@@ -249,12 +249,12 @@ e2e/
       registry-rules.spec.ts    # raw-HTTP pins R1-R15: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type, sha512 digests, protocol DELETE
       image-lifecycle.spec.ts   # crane: the last tag keeps the image (manifest pullable by digest), the last manifest removes it, a new push recreates it (RPS-1288)
       crane-delete.spec.ts      # crane delete: password deletes by tag and by digest, a deploy token is refused, an older crane's insufficient_scope round trip (RPS-1440)
-      registry-api.spec.ts      # raw-HTTP pins RA1-RA6 of what the Docker server does not implement: tags/list, _catalog, referrers (404 no route), the referrers tag-schema fallback, mount= (202 fallback) (RPS-1478)
+      registry-api.spec.ts      # raw-HTTP pins RA1-RA6 of the Docker registry API: tags/list served with n/last + Link (RA1, RPS-1489), _catalog and referrers (404 no route), the referrers tag-schema fallback, mount= (202 fallback) (RPS-1478)
       skopeo-catalog.spec.ts    # registerPublishConsumeLoop(skopeoAdapter): the whole catalog through skopeo copy (RPS-1478 part B)
       regctl-catalog.spec.ts    # registerPublishConsumeLoop(regctlAdapter): the whole catalog through regctl image copy
       skopeo.spec.ts            # skopeo: copy between two repos, inspect, delete (scope *), multi-arch --all
       regctl.spec.ts            # regctl: manifest get/head, image inspect, copy between repos, tag/manifest delete, sha512, multi-arch
-      client-tag-list.spec.ts   # crane ls/catalog, skopeo list-tags/inspect, regctl tag ls/repo ls against the missing tags/list (RPS-1489)
+      client-tag-list.spec.ts   # crane ls, skopeo list-tags/inspect, regctl tag ls list the tags (RPS-1489); crane catalog / regctl repo ls still fail on the missing _catalog
       oras.spec.ts              # oras: push/pull/blob/manifest of OCI artifacts, attach + the referrers tag-schema fallback, discover, copy, delete, the OR6 cases for a manifest naming one digest twice (RPS-1490)
     helm/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
@@ -2846,8 +2846,8 @@ precedent of never shelling out to a tool this harness does not control the exac
   protocol at all** (grep-confirmed), so docker is never added to
   `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*`.
 - **Fingerprint** (`ProtocolAdapter.fingerprint`/`expectNothingStored`): scoped to the ONE
-  `<image>:<tag>` a scenario's own publish targets — Docker has no `tags/list`/`_catalog` route on
-  Repsy (no handler exists for either) — a raw manifest GET by tag (`tagDigest`, a body hash) plus a
+  `<image>:<tag>` a scenario's own publish targets — the fingerprint does not use `tags/list` (RPS-1489
+  added it; `_catalog` is still no route) — a raw manifest GET by tag (`tagDigest`, a body hash) plus a
   `HEAD` of every blob digest the served manifest names (`'present'`/`'status:N'`). A refused
   publish's own blobs are allowed to be present (protocol-inherent: blobs go up before the manifest,
   confirmed live — see "R6" below), so `expectNothingStored` only additionally asserts the tag
@@ -3114,33 +3114,40 @@ IllegalArgumentException("unsupportedMediaType")` branch B4/RPS-1110 above pins 
   (`ManifestService.findManifestByRepoIdAndImageNameAndDigest`), which is exactly what this suite
   confirms live, end to end, with a real client.
 
-### Docker registry API pins: tags/list, `_catalog`, referrers, `mount=` (RPS-1478 part A)
+### Docker registry API pins: tags/list (RPS-1489), `_catalog`, referrers, `mount=` (RPS-1478 part A)
 
 `tests/docker/registry-api.spec.ts` (RA1-RA6, raw HTTP through `docker-raw.ts`'s `rawTagsList`/
 `rawCatalog`/`rawReferrers`/`rawMountUpload`, no runner change) pins what the Docker server does
-with the parts of the distribution spec it does not implement, so the second client family
+with the distribution spec: `tags/list` (implemented by RPS-1489, RA1) and the parts it does not implement, so the second client family
 (skopeo/regctl/oras, RPS-1478 parts B and C) meets a documented, tested surface. Every row was
 probed against a live stack first. It is pinned at today's behaviour (no `test.fail`, no ticket
-key): a backend story that implements a route flips its own test on purpose. The proposed story
+key): a backend story that implements a route flips its own test on purpose (RPS-1489 did for `tags/list`). The proposed story
 is in the PR that added this file.
 
-| Request                                                               | Answer, for every caller (admin, deploy token, read-only token, anonymous, unknown repo or image)                                                                                                                                              | Consequence for a real client                                                                          |
-| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `GET /v2/<repo>/<image>/tags/list[?n=&last=]`                         | `404` `NAME_UNKNOWN` / `unknownPath`, no `WWW-Authenticate`, before authentication (RA1)                                                                                                                                                       | `crane ls`, `skopeo list-tags`, `regctl tag ls` fail: a tag list is only available in the panel        |
-| `GET /v2/_catalog[?n=]`, `GET /v2/<repo>/_catalog`                    | the same `404` (RA2)                                                                                                                                                                                                                           | `crane catalog`, `regctl repo ls` fail                                                                 |
-| `GET /v2/<repo>/<image>/referrers/<digest>[?artifactType=]`           | the same `404`, also for a stored digest (the spec wants `200` + an index, `404` only when the API is unsupported) (RA3)                                                                                                                       | `oras discover`, `regctl artifact tree`, `cosign tree` fall back to the referrers tag schema           |
-| `GET/PUT manifests/sha256-<hex>` (the tag schema)                     | an absent tag is `404` `MANIFEST_UNKNOWN` / `tagNotFound`; a `PUT` of an OCI image index under it is `201` and reads back byte-identical (RA4)                                                                                                 | the fallback itself works at the wire level (its `oras attach`/`discover` proof is RPS-1478 part C)    |
-| `POST .../blobs/uploads/?mount=<digest>[&from=<repo>]`                | `202` + a new upload session (`Location`, `Docker-Upload-UUID`), never the `201` of a real mount, whether or not the blob exists, in this or another repo, and for a malformed digest too; a read-only token is `401` at the request hop (RA5) | copies between two repos of one Repsy upload the bytes instead of mounting them; slower, still correct |
-| `HEAD blobs/<digest>` of a blob another image of the SAME repo pushed | `200`: blobs are stored per repo, not per image (RA6)                                                                                                                                                                                          | a same-repo copy never reaches the mount request, a client's own `HEAD` finds the blob                 |
+| Request                                                               | Answer (`tags/list`: as listed; the rest: for every caller: admin, deploy token, read-only token, anonymous, unknown repo or image)                                                                                                                                                                                                                                           | Consequence for a real client                                                                           |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `GET /v2/<repo>/<image>/tags/list[?n=&last=]`                         | `200` `{"name": "<repo>/<image>", "tags": [...]}`, tags in lexical order; `n` limits the page, `last` starts after a tag, a `Link: <...?n=N&last=T>; rel="next"` names the next page; `n` that is no number is `400` `PAGINATION_NUMBER_INVALID`; an unknown image is `404` `NAME_UNKNOWN` / `imageNotFound`; anonymous on a private repo is `401` + a `pull` challenge (RA1) | `crane ls`, `skopeo list-tags`, `skopeo inspect <tag>`, `regctl tag ls`, `oras repo tags` list the tags |
+| `GET /v2/_catalog[?n=]`, `GET /v2/<repo>/_catalog`                    | the same `404` (RA2)                                                                                                                                                                                                                                                                                                                                                          | `crane catalog`, `regctl repo ls` fail                                                                  |
+| `GET /v2/<repo>/<image>/referrers/<digest>[?artifactType=]`           | the same `404`, also for a stored digest (the spec wants `200` + an index, `404` only when the API is unsupported) (RA3)                                                                                                                                                                                                                                                      | `oras discover`, `regctl artifact tree`, `cosign tree` fall back to the referrers tag schema            |
+| `GET/PUT manifests/sha256-<hex>` (the tag schema)                     | an absent tag is `404` `MANIFEST_UNKNOWN` / `tagNotFound`; a `PUT` of an OCI image index under it is `201` and reads back byte-identical (RA4)                                                                                                                                                                                                                                | the fallback itself works at the wire level (its `oras attach`/`discover` proof is RPS-1478 part C)     |
+| `POST .../blobs/uploads/?mount=<digest>[&from=<repo>]`                | `202` + a new upload session (`Location`, `Docker-Upload-UUID`), never the `201` of a real mount, whether or not the blob exists, in this or another repo, and for a malformed digest too; a read-only token is `401` at the request hop (RA5)                                                                                                                                | copies between two repos of one Repsy upload the bytes instead of mounting them; slower, still correct  |
+| `HEAD blobs/<digest>` of a blob another image of the SAME repo pushed | `200`: blobs are stored per repo, not per image (RA6)                                                                                                                                                                                                                                                                                                                         | a same-repo copy never reaches the mount request, a client's own `HEAD` finds the blob                  |
 
-- The unauthenticated `404` is the router's catch-all (no handler is registered for the route),
-  which is why there is not even the `401` Bearer challenge a known route such as
-  `GET manifests/<tag>` gives an anonymous caller (RA1 asserts both), and why a made-up repo cannot
-  be told from a real one. The token endpoint still issues a token for `scope=registry:catalog:*`
+- The unauthenticated `404` of `_catalog` and `referrers` is the router's catch-all (no handler is
+  registered for the route), which is why there is not even the `401` Bearer challenge a known route
+  such as `GET manifests/<tag>` or, since RPS-1489, `tags/list` gives an anonymous caller (RA1 asserts
+  it for `tags/list`; a private repo's real and made-up images get the same `401`, so the route leaks
+  nothing), and why a made-up repo cannot be told from a real one. The token endpoint still issues a token for `scope=registry:catalog:*`
   (issuance never reads the scope).
-- Helm OCI is different on the same port: `GET /v2/<helm repo>/<chart>/tags/list` answers `200`
-  `{"name": "<chart>", "tags": [...]}` (RPS-1219). RA1b pins that a Docker repo is not caught by
-  that handler (the Helm section's "no `tags/list` handler" notes predate RPS-1219).
+- Helm OCI has its own `tags/list` handler on the same port: `GET /v2/<helm repo>/<chart>/tags/list`
+  answers `200` `{"name": "<chart>", "tags": [...]}` (RPS-1219), with the BARE chart name (RPS-1557
+  is about the repository-qualified one the spec wants) and no pagination; the Docker handler
+  answers the qualified name and paginates. RA1b pins both, side by side (the Helm section's "no
+  `tags/list` handler" notes predate RPS-1219).
+- `tags/list` is `GET` only: a `HEAD` is still the router's `404` (the spec defines no `HEAD` for
+  it). The order is byte order (`v10` before `v2`), computed in Java over the image's tag names, so
+  it does not depend on the database collation and `last` pages consistently on PostgreSQL and H2.
+  There is no default page size: without `n` every tag of the image comes back in one answer.
 - A cross-repo mount never moves a byte: after the `202` the blob is still absent from the
   destination repo (`HEAD` `404`), and appears only once the client's `PUT ?digest=` finishes.
 - Not in this file: `oras attach` of an artifact whose layer is the empty descriptor. A manifest
@@ -3196,13 +3203,14 @@ Probed live (skopeo 1.24.1, regctl 0.11.6):
 | Blob upload                         | `POST` + one `PATCH` + `PUT ?digest=`                                                                                                                                                            | asks for a mount first and logs `Failed to mount blob ... blob mount returned a location to upload` (WARN, RA5), then uploads                                                                                                                                                                               |
 | Copy between two repos of one Repsy | destination has the identical manifest bytes and blobs (`SK1`)                                                                                                                                   | same (`RC2`)                                                                                                                                                                                                                                                                                                |
 | Anonymous                           | a public repo pulls (the token endpoint answers `200` to an anonymous `pull` token of a public repo, `401` + `Basic` for a private one); its anonymous push is refused by the catalog's own cell | same                                                                                                                                                                                                                                                                                                        |
-| Tag listing                         | `list-tags` fails (`name unknown: unknownPath`); **`skopeo inspect <tag>` also fails** because it lists the tags: `--no-tags` is needed (RPS-1489)                                               | `tag ls`/`repo ls` fail with the `404` envelope (RPS-1489)                                                                                                                                                                                                                                                  |
+| Tag listing                         | `list-tags` prints the tags, sorted (RPS-1489); a plain `skopeo inspect <tag>` works and its `RepoTags` is the same list (it used to fail without `--no-tags`)                                   | `tag ls` lists the tags (RPS-1489); `repo ls` fails with the `404` envelope (no `_catalog`)                                                                                                                                                                                                                 |
 | Multi-arch                          | `copy --all` keeps the index digest and children; `inspect --override-arch` picks the child                                                                                                      | `image copy` copies the list and its children; `--platform` resolves the child                                                                                                                                                                                                                              |
 | sha512 (RPS-1244)                   | not exercised                                                                                                                                                                                    | an image addressed by its sha512 digest (`regctl image mod --digest-algo sha512`) copies in by that digest and is served under it (`RC4`); copied to a TAG instead it is stored but regctl fails the copy on the sha256 answer of a tag push (`RC4b`, RPS-1594; RPS-1607 decided to keep the sha256 answer) |
 
-`client-tag-list.spec.ts` pins what `crane ls`/`catalog`, `skopeo list-tags`/`inspect` and `regctl tag
-ls`/`repo ls` do against RA1/RA2 (fail with the registry's `unknownPath`): the story that adds `tags/list`
-(RPS-1489) flips it. `oras` is in its own section below; not covered: the HTTPS leg (RPS-1474).
+`client-tag-list.spec.ts` proves `tags/list` with the real clients (RPS-1489): `crane ls`, `skopeo
+list-tags`, `skopeo inspect <tag>` (without `--no-tags`) and `regctl tag ls` list the three tags of a
+pushed image in lexical order; `crane catalog` and `regctl repo ls` still fail with the registry's
+`unknownPath` (RA2, no `_catalog`). `oras` is in its own section below; not covered: the HTTPS leg (RPS-1474).
 
 ```bash
 ./run.sh test --protocol docker -b               # -b the first time this runner image changes
@@ -3229,9 +3237,9 @@ what it does that the image clients never reach. Probed live (oras 1.3.4):
 | `discover` (OR3)                                        | **fails** by default: it asks `GET .../referrers/<digest>`, gets `404` WITH `NAME_UNKNOWN` (RA3) and oras-go reads that code as "repository not found", not as "API unsupported". `--distribution-spec v1.1-referrers-tag` works (`--format json`, `--artifact-type` filter)                                                                                                                                                                 |
 | `copy` (OR4)                                            | between two repos of one Repsy the artifact arrives byte-identical (oras asks for a mount, gets the `202` fallback of RA5, uploads); `-r` fails like `discover` unless `--from-distribution-spec` and `--to-distribution-spec` are both `v1.1-referrers-tag`, then the referrer and its index tag are copied                                                                                                                                 |
 | `manifest delete` (OR5)                                 | deletes by digest (a tag reference resolves first: every tag of the manifest goes), asked for the `delete` scope up front (token scope `repository:<repo>/<image>:delete,pull`, seen through a logging proxy: no `insufficient_scope` round trip, unlike crane/regctl); a rw deploy token is refused. Deleting a REFERRER fails on the same referrers-API probe unless the tag schema is forced, which also removes its entry from the index |
-| `repo tags` / `repo ls` (OR7)                           | fail with `unknownPath` (RA1/RA2, RPS-1489)                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `repo tags` / `repo ls` (OR7)                           | `repo tags` lists the tags (RA1, RPS-1489); `repo ls` fails with `unknownPath` (RA2, no `_catalog`)                                                                                                                                                                                                                                                                                                                                          |
 
-Backend follow-up (RPS-1489 already lists the referrers API): implementing `GET /v2/<repo>/<image>/referrers/<digest>`
+Backend follow-up (not built by RPS-1489, which implemented `tags/list` only): implementing `GET /v2/<repo>/<image>/referrers/<digest>`
 (or, at the least, answering the missing route with a `404` that does not carry `NAME_UNKNOWN`) makes
 `oras discover`, `oras copy -r` and `oras manifest delete` of a referrer work without forcing the tag
 schema; the `discover`/`copy -r`/referrer-delete halves of OR3/OR4/OR5 then flip on purpose (with RA3).
@@ -4987,7 +4995,7 @@ same `expectCovers`). What is specific to them:
   `freedManifestBytes` (the index and the arm64 child, not the manifest image B still has) and `orphanLayersScheduled`
   (the arm64 config and layer, not the blobs a tagged manifest uses); the blobs go in the background (the spec polls a
   blob HEAD); `deleteDockerImage` leaves the blobs until `deleteDockerOrphanLayers`. After every step the wire is read
-  (manifest GET by tag and digest, `tags/list` still 404 as pinned for RPS-1489, blob HEAD, `crane pull`).
+  (manifest GET by tag and digest, `tags/list` (RPS-1489) after each step, blob HEAD, `crane pull`).
 - **Helm** calls all 6 operations. One repo serves OCI and classic, so `web` is pushed with `helm push` and `lib` with
   `helm cm-push`, and `index.yaml` lists both with the digest, `appVersion`, `type` and `created` the panel reports. An OCI
   chart's `digest` and `size` are those of the `.tgz` `helm package` built (`helm push` sends it verbatim); a classic chart
@@ -5136,6 +5144,8 @@ so `panelApi` and `seeder` (per-test run id, cleanup) work unchanged, and adds:
 | `userPage`                            | a second `BrowserContext`, logged in as `seededUser`. No video (Playwright only records its own default context); trace and screenshot yes |
 | `openUiPage({ session?, viewport? })` | opens more contexts (a second admin, a mobile viewport); all are closed after the test, before `seeder` cleans up                          |
 | `uiPreflight`                         | automatic, per worker: the admin-password check above                                                                                      |
+| `pageErrors`                          | the runtime errors recorded in this test's contexts; `pageErrors.allow(/regex/, 'reason')` for ones the test provokes (RPS-1617, below)    |
+| `pageErrorGuard`                      | automatic: fails the test at teardown with every recorded error nobody allowed (RPS-1617, below)                                           |
 
 - **Session seeding.** A logged-in page gets the three `localStorage` keys the SPA reads (`username`,
   `token`, `refresh-token`) from a context init script (`seedSession` in `src/ui/session.ts`): no
@@ -5190,6 +5200,37 @@ so `panelApi` and `seeder` (per-test run id, cleanup) work unchanged, and adds:
   parallel test: a list that reloads without the search (after a delete or a refresh) is newest first
   and may not hold this test's rows on page 1 any more, so search for `seeder.runId` again before
   asserting a row, and stub the scan list of `/security` (RPS-1303).
+
+#### Runtime errors fail the test (RPS-1617)
+
+Every browser context of the UI suite (the built-in `page`, `adminPage`, `userPage`, every `openUiPage`) is
+watched by `watchPageErrors` (`src/ui/page-errors.ts`), and the automatic `pageErrorGuard` fails the test
+at teardown with the list of what was recorded and not allowed. Recorded: an uncaught exception or unhandled
+rejection (`weberror`), every `console.error`, and every `securitypolicyviolation` (re-logged by an init
+script as `[csp-violation] ...`, next to Chromium's own "Refused to ..." line). This is what makes a
+component that throws but still renders red; the panel's `AppGlobalErrorHandler` logs again for that reason
+(one string: message, stack and route, no user data). The guard is torn down BEFORE `seeder` cleans up, so
+the 404s of a page that is still loading when its repository is deleted are not counted.
+
+- **Ignored everywhere:** Chromium's `Failed to load resource ...` line for a failed request (the specs assert
+  those outcomes themselves). Nothing else is muted globally, and `pageerror` is never ignored.
+- **The panel logs every error toast** with `console.error(message)` (`ToastService`), so a spec that
+  provokes one (a stubbed 500, a wrong password, a duplicate name) allows exactly that message:
+  `test.use({ allowedPageErrors: errorToasts('why', 'Toast text', ...) })` for a `describe`
+  (`allowLists()` joins several lists; it is an object, not an array, because Playwright reads a two-element
+  array in `test.use` as a `[value, options]` tuple), or `pageErrors.allowToast('Toast text', 'why')` /
+  `pageErrors.allow(/regex/, 'why')` inside one test. **A reason is mandatory**: a ticket key while the
+  bug is open, or the sentence that says why it is by design. An error toast in a test that does not allow
+  it fails that test, which is how an unexpected failing request shows up.
+- **A test that pins a bug with `test.fail()`** is checked too: a page error there would count as its
+  expected failure, so such a spec must not raise errors it has not allowed.
+- **The proof** is `harness.spec.ts`: three `test.fail()` cases (an uncaught exception, a `console.error` on an
+  `openUiPage`, a CSP violation) that wait for the event with their own listener, so a broken recorder cannot
+  satisfy them by timing out. Flip check: removing the `watchPageErrors` calls in `fixtures.ts` turns all
+  three red ("Expected to fail, but passed").
+- **NET-01** keeps recording the requests and the misserved fonts, styles and scripts; its CSP part is the
+  global guard now.
+- The module names no URL or route, so a UI project for another target (Repsy Cloud) reuses it as it is.
 
 ### Page objects (`src/ui/pages/`)
 
@@ -5249,9 +5290,8 @@ Things a later author must know:
 - **The SPA reads `localStorage` once, at boot** (`AuthService`), and `seedSession()` writes once per
   tab: change the storage, then `reload()`; the change survives it. Two tokens minted in the same second
   are byte-identical, so compare a refreshed access token with a value the test wrote, not with the old one.
-- **The password eye button is only a Font Awesome glyph**, and the font is a CDN resource the harness
-  blocks, so the button has no size and Playwright calls it "not visible": use
-  `LoginValidation.togglePasswordVisibility()` (a DOM click).
+- **The password eye button is a bundled remixicon glyph** (RPS-1402), so it has a box and a real click
+  works: `LoginValidation.togglePasswordVisibility()` clicks it (RPS-1617: it used to dispatch the event).
 - **Inline validation messages appear on blur** (`touched`), one at a time, in the order required,
   pattern, minlength, maxlength; `LoginValidation.enter()` types and blurs. The texts are the shared credential
   sentences of `src/ui/credential-messages.ts` (RPS-1265: one wording for a username, a password and a
@@ -5366,8 +5406,8 @@ Rules these specs follow (and a later spec on these pages should too):
   the search (and empties the box), so a test that checks a row afterwards searches for it again.
 - **Toggle.** Click the `toggle` label (`UserCreateModal.roleToggle`), assert on `toggle-input`
   (`roleSwitch`): a click on the sr-only input is intercepted by the slider.
-- **Eye buttons** (show/hide password) are Font Awesome glyphs, and the network allow-list blocks the
-  Font Awesome CDN, so the buttons have no box: they are activated with `dispatchEvent('click')`.
+- **Eye buttons** (show/hide password) are bundled remixicon glyphs (RPS-1402), so a real `click()` works
+  (`ProfilePage.toggleVisibility`; RPS-1617 dropped the `dispatchEvent('click')`).
 - **Timing.** The username change ends in `location.reload()` in the tick that raises its toast, so that
   toast is not observable: assert the reload (`ProfilePage.changeUsername`) and the outcome.
 - **Known bugs, pinned with `test.fail`**: none left in the users suite. The mojibake `â€¢` of the create-user
@@ -5412,9 +5452,8 @@ How the tests are written, and what they had to work around:
   and `settings-*` ids are used, never a label or `#id`.
 - **Toggles are flipped through their label** (`toggle-label`): the `role="switch"` checkbox is
   `sr-only` and covered by the drawn switch, so Playwright refuses to click it as "intercepted".
-- **The token "show" eye is clicked by event.** Its icon is a Font Awesome glyph from a CDN that the
-  UI suite blocks (`src/ui/defaults.ts`), so the button has no size; `toggleTokenVisibility()`
-  dispatches the click and the test asserts `aria-pressed` and the input's `type`.
+- **The token "show" eye is clicked for real.** Its icon is a bundled remixicon glyph (RPS-1402, RPS-1617);
+  `toggleTokenVisibility()` clicks it and the test asserts `aria-pressed` and the input's `type`.
 - **Long names** are in the row in full and clipped by CSS (`truncate`, RPS-1267; the popup on hover
   shows the whole name only while it is clipped): `expectCellText()` reads the cell's
   `tooltip-text`; rows are keyed by the raw name through `token-row-<name>`.
@@ -5432,8 +5471,8 @@ bug is fixed and the marker has to go. The Visibility and Package Override help 
 (RPS-1261) are fixed and asserted unpinned, and so is the duplicated `#name`/`#description` of the rename form and the
 create-token modal (RPS-1266, TOK-05), and so is RPS-1285: TOK-03 revokes the only token on page 2
 with the page-2 answer delayed and asserts a single list request (the first page) and the three
-remaining rows. Not covered here: the Vulnerability Scanning toggle
-(hidden without a scanner, RPS-1259), the per-protocol "configure" modal behind a token row, the
+remaining rows. The Vulnerability Scanning toggle is covered by SEC-01/SEC-02c
+(it is hidden without a scanner, RPS-1259). Not covered here: the per-protocol "configure" modal behind a token row, the
 `reservedName` rename error (it has no test id), the expiration-date range messages (no test id) and
 the token-name `minLength` branch, which was unreachable and is gone (`required` already covers an empty name, RPS-1265).
 
@@ -5590,10 +5629,9 @@ keys a crate by its normalised name, `-` becoming `_`), NuGet and Helm `e2e-<run
 | ruby-07   | yanked badge on the versions list and on the detail after a yank through the API; install commands, platform and checksum; the Latest link                                                                                                                                                                                                                                                            |
 
 What the descriptors record (found by running each protocol): a version row's link appends `#security`
-(the template accepts a fragment); a detail Delete lands on the list (Cargo, Ruby), on the versions page
-(NuGet, Helm, Go, and Docker since RPS-1288 (7)) and, for the LAST version, on the list for NuGet and Helm (`landsOnLast`) and on the empty
-versions page for Go and Docker; deleting the last version removes the package for all but Go and Docker: Go's module
-stays listed with no versions, and Docker keeps an emptied image, by design, as "No tags" while it stores a manifest (RPS-1288 (5)); Cargo/NuGet/Helm/Ruby Configure texts have
+(the template accepts a fragment); a detail Delete follows the RPS-1288 (7) convention for every protocol (the versions page, or the list after the package's LAST version); only Docker records
+a landing of its own (`landsOn: 'versions'` also for its last tag, since its image stays listed), and deleting the last version removes the package for all but Docker
+(Go's module goes with its last version: `lastVersionRemovesPackage: true`), which keeps an emptied image, by design, as "No tags" while it stores a manifest (RPS-1288 (5)); Cargo/NuGet/Helm/Ruby Configure texts have
 `<YOUR_...>` placeholders and the same body in the deploy-token variant (`deployTokenMarker` is optional
 now: absent = same body, only the title differs), Ruby's title is the same in both.
 
@@ -5663,8 +5701,8 @@ Things a later author must know:
   label (`getByLabel(..., { exact: true })` reaches the field it names, also on `/:repo/settings` with the
   create-token modal open), by element ids (none twice in the document, every `label[for]` resolves to a form
   control), by the accessible names of the icon-only buttons (refresh, PGP add, token rotate/configure/revoke,
-  modal X) and by the password eyes, whose name and `aria-pressed` follow the state (they are still clicked with
-  `dispatchEvent`: the blocked Font Awesome CDN leaves them without a box).
+  modal X) and by the password eyes, whose name and `aria-pressed` follow the state (they are clicked for real
+  since RPS-1617: the icons are bundled remixicon glyphs).
 - **List rows are links (A11Y-08..10, `a11y/rows.spec.ts`, RPS-1266 part 4).** A row used to be
   `<div role="button" [routerLink]>` holding links and the row menu (axe `nested-interactive`). Now it is a plain
   container (`.row-link-host`, `position: relative`) whose first child is ONE real `<a class="row-link"
@@ -5687,8 +5725,8 @@ Things a later author must know:
   fails the test on a serious or critical violation (RPS-1266 part 4 flipped `DEFAULT_A11Y_MODE`, the one flag,
   from `report` to `enforce`). For a single run that only reports, use `REPSY_UI_OPT_IN=a11y-report` (or
   `a11y-enforce` to force the failing mode if the default is changed back), because `docker-compose.runners.yml`
-  forwards that variable already. Font Awesome (a blocked CDN in this harness) icons render as empty boxes; each
-  summary counts them as `faNodes` per rule so they stay separable. The five page scans are of the pages at rest;
+  forwards that variable already. Each
+  summary also counts the nodes that are still Font Awesome icons as `faNodes` per rule (0 since RPS-1402 bundled the icons). The five page scans are of the pages at rest;
   A11Y-01 also scans the open create-repository, create-token, create-user, confirmation and one-time-password
   modals (`scanPage(page, testInfo, label, selector)` scopes a scan to one element) and, for every protocol, the
   pages of the seeded package.

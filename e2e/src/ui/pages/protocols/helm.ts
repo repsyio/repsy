@@ -17,7 +17,7 @@ import { NEWEST_OLDEST, NEWEST_OLDEST_NAME, need, type ProtocolDescriptor } from
 import { repoPath } from '../../../repo-url.js';
 
 /**
- * Helm: charts -> versions -> detail. Read from the components, not yet run in a browser (RPS-1257).
+ * Helm: charts -> versions -> detail. Run in a browser by the package scenarios (RPS-1257).
  *
  *  - Helm has TWO backend modules behind ONE panel: `oci` (OCI registry, `helm push oci://`) and
  *    `classic` (ChartMuseum HTTP API). Both feed the same chart list, so a seeded chart of either

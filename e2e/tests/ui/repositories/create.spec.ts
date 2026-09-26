@@ -287,7 +287,12 @@ test.describe('Create repository modal', () => {
     adminPage,
     seeder,
     panelApi,
+    pageErrors,
   }) => {
+    pageErrors.allowToast(
+      'The repository exists. Please try another name.',
+      'by design: a duplicate name is refused',
+    );
     const repos = new RepositoriesPage(adminPage);
     const maven = uiRepoType(RepoType.MAVEN);
     const existing = await seeder.createRepo(RepoType.MAVEN);

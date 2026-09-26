@@ -171,9 +171,9 @@ async function expectOnPage(page: Page, opened: ProtocolPage, target: PackageRef
  * A descriptor that has not adopted it yet records its own landing (`landsOn`, `landsOnLast`).
  */
 function expectedLanding(
-  affordance: { landsOn?: LevelName | 'unverified'; landsOnLast?: LevelName },
+  affordance: { landsOn?: LevelName; landsOnLast?: LevelName },
   wasLastVersion: boolean,
-): LevelName | 'unverified' {
+): LevelName {
   if (wasLastVersion) {
     return affordance.landsOnLast ?? affordance.landsOn ?? 'list';
   }
@@ -184,13 +184,10 @@ function expectedLanding(
 async function expectLandedOn(
   page: Page,
   descriptor: ProtocolDescriptor,
-  level: LevelName | 'unverified',
+  level: LevelName,
   repoName: string,
   target: PackageRef,
-): Promise<ProtocolPage | null> {
-  if (level === 'unverified') {
-    return null;
-  }
+): Promise<ProtocolPage> {
   const lands = pageOf(page, descriptor, level, repoName, target);
   await expect(page).toHaveURL(endsWith(lands.path()));
   return lands;
@@ -580,17 +577,12 @@ export function registerPackageScenarios(
           if (descriptor.lastVersionRemovesPackage === true) {
             await expect(list.emptyList.root).toBeVisible();
             await list.expectNoRow(pkg);
-          } else if (descriptor.lastVersionRemovesPackage === false) {
+          } else {
             // By design (RPS-1288 item 5): the package stays listed, and its row says why.
             await list.expectRow(pkg);
             if (descriptor.lastVersionKeptRowText) {
               await expect(list.row(pkg)).toContainText(descriptor.lastVersionKeptRowText);
             }
-          } else {
-            test.skip(
-              true,
-              `${protocol}: lastVersionRemovesPackage is unverified in the descriptor`,
-            );
           }
         },
       );

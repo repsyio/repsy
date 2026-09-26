@@ -64,4 +64,10 @@ public interface ManifestService<ID> {
    */
   BaseManifestDetail<ID> findManifestByRepoIdAndImageNameAndDigest(
       ID repoId, BaseImageInfo<ID> imageInfo, String digest);
+
+  /**
+   * The names of the tags of an image, in no particular order: the caller sorts and pages them, so
+   * the order a listing answers in does not depend on the database's collation.
+   */
+  List<String> findTagNamesByImageId(ID imageId);
 }

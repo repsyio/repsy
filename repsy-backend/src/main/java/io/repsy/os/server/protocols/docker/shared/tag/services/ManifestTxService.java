@@ -145,6 +145,12 @@ public class ManifestTxService implements ManifestService<UUID> {
   }
 
   @Override
+  public List<String> findTagNamesByImageId(final UUID imageId) {
+
+    return this.tagRepository.findNamesByImageId(imageId);
+  }
+
+  @Override
   public ManifestDetail findManifestByRepoIdAndImageNameAndDigest(
       final UUID repoId, final BaseImageInfo<UUID> imageInfo, final String digest) {
 

@@ -110,10 +110,15 @@ export class UserEditModalComponent implements OnChanges {
           this.loading = false;
         }),
       )
-      .subscribe(() => {
-        this.toastService.show('User updated successfully', 'success');
-        this.updated.emit();
-        this.closeModal();
+      .subscribe({
+        next: () => {
+          this.toastService.show('User updated successfully', 'success');
+          this.updated.emit();
+          this.closeModal();
+        },
+        // The HTTP interceptor has shown the toast; without a handler rxjs would report the failure to the
+        // global error handler as an application error (RPS-1617).
+        error: () => undefined,
       });
   }
 }

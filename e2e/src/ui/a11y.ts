@@ -31,11 +31,9 @@
  * `docker-compose.runners.yml` already forwards to the ui runner. A dedicated `REPSY_UI_A11Y`
  * variable would not reach the container without editing that file.
  *
- * Note on the harness: the Font Awesome CDN is blocked (`defaults.ts`), so its icon buttons render as
- * empty, zero-size boxes here. Those buttons have no accessible name in production either (an
- * `<i class="fa ...">` carries no text), but a rule that is about size or colour of a glyph could
- * differ from production, so every summary counts how many of a rule's nodes are Font Awesome icons
- * (`faNodes`) to keep them separable from the rest.
+ * Note on the harness: the panel no longer loads Font Awesome (RPS-1402, its icons are bundled
+ * remixicon glyphs), so `faNodes` is expected to stay 0; it counts how many of a rule's nodes are
+ * still `<i class="fa ...">` icons, in case one comes back.
  */
 import { writeFile } from 'node:fs/promises';
 

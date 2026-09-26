@@ -27,6 +27,12 @@
  * revocation, so a token pair shared between tests (a worker-scoped fixture, a `storageState` file)
  * would be logged out mid-run by the first test whose page refreshes it. See `session.ts`.
  *
+ * Runtime errors fail the test (RPS-1617): every context made here (the built-in `page`, `adminPage`,
+ * `userPage` and every `openUiPage`) is watched for uncaught exceptions, `console.error` and CSP
+ * violations (`page-errors.ts`), and the test fails at teardown with the list. A spec that provokes
+ * errors on purpose allows them with `pageErrors.allow(/regex/, 'reason or RPS-nnnn')`, or for a whole
+ * `describe` with `test.use({ allowedPageErrors: errorToasts(reason, 'Toast text') })` (`allowLists()` joins several).
+ *
  * A spec needing more fixtures composes on top instead of editing this file: create
  * `src/ui/<area>-fixtures.ts` with `export const test = uiTest.extend<...>({...})`.
  */
@@ -36,6 +42,7 @@ import { env } from '../env.js';
 import { type SeededUser } from '../seed/seeder.js';
 import { expect, test as base } from '../scenarios/fixtures.js';
 import { applyUiDefaults } from './defaults.js';
+import { type PageErrorAllowList, PageErrors, watchPageErrors } from './page-errors.js';
 import {
   assertAdminCredentialsUsableInUi,
   loginSession,
@@ -61,6 +68,13 @@ export interface UiFixtures {
    * in a test tagged `@credentials` (see `CREDENTIALS_TAG`): those tests use `userPage`.
    */
   adminPage: Page;
+  /**
+   * The runtime errors recorded in this test's browser contexts (RPS-1617). Use `allow()` to declare
+   * the ones the test provokes on purpose; the automatic `pageErrorGuard` fails the test with the rest.
+   */
+  pageErrors: PageErrors;
+  /** Errors every test of a `describe` provokes on purpose: `test.use({ allowedPageErrors: errorToasts(...) })`. */
+  allowedPageErrors: PageErrorAllowList;
   /** A USER created through `seeder` for this test (deleted by it). */
   seededUser: SeededUser;
   /** A second `BrowserContext`, logged in as `seededUser`, with the flake defaults applied. */
@@ -71,6 +85,11 @@ export interface UiFixtures {
    * failure screenshot but no video (Playwright only records video for its own default context).
    */
   openUiPage: (options?: OpenUiPageOptions) => Promise<Page>;
+}
+
+export interface UiAutoFixtures {
+  /** Automatic (RPS-1617): fails the test if a watched context recorded an error nobody allowed. */
+  pageErrorGuard: void;
 }
 
 export interface UiWorkerFixtures {
@@ -92,7 +111,7 @@ function originOf(baseURL: string | undefined): string {
   return new URL(baseURL).origin;
 }
 
-export const test = base.extend<UiFixtures, UiWorkerFixtures>({
+export const test = base.extend<UiFixtures & UiAutoFixtures, UiWorkerFixtures>({
   uiPreflight: [
     // eslint-disable-next-line no-empty-pattern
     async ({}, use) => {
@@ -102,11 +121,37 @@ export const test = base.extend<UiFixtures, UiWorkerFixtures>({
     { scope: 'worker', auto: true },
   ],
 
+  allowedPageErrors: [{ entries: [] }, { option: true }],
+
+  pageErrors: async ({ allowedPageErrors }, use) => {
+    const errors = new PageErrors();
+    for (const entry of allowedPageErrors.entries) {
+      errors.allow(entry.pattern, entry.reason);
+    }
+    await use(errors);
+  },
+
   // Overrides Playwright's built-in `context` (and so the built-in `page`) to apply the defaults.
-  context: async ({ context, baseURL }, use) => {
+  context: async ({ context, baseURL, pageErrors }, use) => {
     await applyUiDefaults(context, allowedOrigins(baseURL));
+    await watchPageErrors(context, pageErrors);
     await use(context);
   },
+
+  // Depends on `context`, `openUiPage` and `seeder`, so it is torn down BEFORE they close their contexts
+  // and BEFORE the seeder deletes the test's repositories: the check sees what the pages did during the
+  // test, not the 404s of a page that is still loading when its repository is cleaned up. It also runs for a test.fail() one: an error
+  // there counts as that test's expected failure (which is how harness.spec.ts proves the guard), so a
+  // pinned bug's spec must not raise page errors it has not allowed.
+  pageErrorGuard: [
+    async ({ context: _context, openUiPage: _openUiPage, seeder: _seeder, pageErrors }, use) => {
+      await use();
+      if (pageErrors.unexpected().length > 0) {
+        throw new Error(pageErrors.describeUnexpected());
+      }
+    },
+    { auto: true },
+  ],
 
   // eslint-disable-next-line no-empty-pattern
   adminSession: async ({}, use) => {
@@ -129,7 +174,7 @@ export const test = base.extend<UiFixtures, UiWorkerFixtures>({
     await use(await seeder.createUser());
   },
 
-  openUiPage: async ({ browser, baseURL }, use) => {
+  openUiPage: async ({ browser, baseURL, pageErrors }, use) => {
     const opened: BrowserContext[] = [];
     await use(async (options = {}) => {
       const context = await browser.newContext(
@@ -137,6 +182,7 @@ export const test = base.extend<UiFixtures, UiWorkerFixtures>({
       );
       opened.push(context);
       await applyUiDefaults(context, allowedOrigins(baseURL));
+      await watchPageErrors(context, pageErrors);
       if (options.session) {
         await seedSession(context, originOf(baseURL), options.session);
       }

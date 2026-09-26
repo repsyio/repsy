@@ -208,6 +208,29 @@ describe('DockerImagesTagListComponent', () => {
       expect(component.loadingSummary).toBeFalse();
     }));
 
+    it('leaves for the image list when the tag list itself is a 404, as the image is gone (RPS-1579)', fakeAsync(() => {
+      const fixture = build();
+      dockerService.searchTags.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+      router.navigate.and.returnValue(Promise.resolve(true));
+
+      repoChanges.next(permission(REPO_NAME, { canManage: true }));
+      flushMicrotasks();
+
+      expect(fixture.component.loading).toBeFalse();
+      expect(router.navigate).toHaveBeenCalledOnceWith([`/${REPO_NAME}`]);
+      expect(dockerService.fetchImageSummary).not.toHaveBeenCalled();
+    }));
+
+    it('stays put when the tag list fails with anything but a 404', fakeAsync(() => {
+      build();
+      dockerService.searchTags.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+
+      repoChanges.next(permission(REPO_NAME, { canManage: true }));
+      flushMicrotasks();
+
+      expect(router.navigate).not.toHaveBeenCalled();
+    }));
+
     it('stays put on any other failure', fakeAsync(() => {
       openEmpty('failing');
 

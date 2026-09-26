@@ -83,12 +83,11 @@ export class OneTimeSecretModal {
   }
 
   /**
-   * Clicks the eye and waits until the input is a plain text field. The click event is dispatched:
-   * this predates RPS-1402, when the eye was a Font Awesome glyph from a CDN the suite blocks, so the
-   * button had no box and a real click was refused as "not visible". The icon is bundled now.
+   * Clicks the eye (a real click: the icon is a bundled remixicon glyph since RPS-1402, RPS-1617)
+   * and waits until the input is a plain text field.
    */
   async reveal(): Promise<void> {
-    await this.toggle.dispatchEvent('click');
+    await this.toggle.click();
     await expect(this.value).toHaveAttribute('type', 'text');
   }
 

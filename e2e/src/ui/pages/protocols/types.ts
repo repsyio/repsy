@@ -24,10 +24,8 @@
  *
  * Every value was read from the Angular templates and components under
  * `repsy-frontend/src/app/panel/pages/repository/<proto>/` and the `data-testid` inventory
- * (`git grep -n data-testid repsy-frontend/src/app`). Where a value is only read from code and has
- * not been exercised in a browser yet, the descriptor says "unverified" in a comment; the story that
- * first runs that protocol (RPS-1256 for maven/npm/docker/pypi, RPS-1257 for the rest) confirms it
- * and fixes the descriptor in its own `<proto>.ts`.
+ * (`git grep -n data-testid repsy-frontend/src/app`) and is exercised in a browser by the package
+ * scenarios (RPS-1256 for maven/npm/docker/pypi, RPS-1257 for the rest).
  */
 import type { PackageProtocol, PackageRef } from '../../../seed/packages.js';
 
@@ -122,7 +120,7 @@ export interface DetailLevel {
    */
   delete:
     | (DeleteAffordance & {
-        landsOn?: LevelName | 'unverified';
+        landsOn?: LevelName;
         landsOnLast?: LevelName;
       })
     | null;
@@ -168,9 +166,8 @@ export interface ProtocolDescriptor {
    * Whether deleting a package's LAST version removes the package from the list (true for maven, npm,
    * pypi, nuget). Docker keeps the image listed BY DESIGN (RPS-1288 item 5): deleting a tag removes
    * only the tag, the manifest stays pullable by digest, and the image goes with its last manifest.
-   * `unverified` = read from the code only.
    */
-  lastVersionRemovesPackage: boolean | 'unverified';
+  lastVersionRemovesPackage: boolean;
   /** What a package kept after its last version was deleted says in its list row (Docker: "No tags"). */
   lastVersionKeptRowText?: string;
   /** Routes that are not a level (maven's `/:repo/browser`). */

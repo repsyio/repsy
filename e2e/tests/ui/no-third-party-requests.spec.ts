@@ -39,19 +39,15 @@ import { UsersPage } from '../../src/ui/pages/users.js';
 
 /**
  * What the browser complained about while `context` was open, besides the hosts it contacted:
- * `csp` are the console errors of a blocked resource ("Refused to load ... Content Security Policy"),
- * `misserved` the fonts, stylesheets and scripts that came back as an HTML document. The panel's
+ * `misserved` are the fonts, stylesheets and scripts that came back as an HTML document. (The console
+ * errors of a blocked resource, "Refused to load ... Content Security Policy", are recorded by the
+ * `pageErrorGuard` fixture for every UI test since RPS-1617, and fail this one too.) The panel's
  * static files are served next to a single-page-app fallback that answers HTML for a path it does not
  * recognise, so a bundled icon font that lands on such a path fails silently (a box instead of the
  * glyph) and only shows here (RPS-1445: `/media/remixicon-*.woff2` did).
  */
-function recordPageProblems(context: BrowserContext): { csp: string[]; misserved: string[] } {
-  const problems = { csp: [] as string[], misserved: [] as string[] };
-  context.on('console', (message) => {
-    if (/Content Security Policy/i.test(message.text())) {
-      problems.csp.push(message.text());
-    }
-  });
+function recordPageProblems(context: BrowserContext): { misserved: string[] } {
+  const problems = { misserved: [] as string[] };
   context.on('response', (response) => {
     const type = response.request().resourceType();
     if (
@@ -108,7 +104,7 @@ test.describe('No third-party requests', { tag: '@net' }, () => {
     );
 
     expect(external).toEqual([]);
-    expect(problems).toEqual({ csp: [], misserved: [] });
+    expect(problems).toEqual({ misserved: [] });
     expect(iconFont).toContain('loaded');
   });
 
@@ -131,6 +127,6 @@ test.describe('No third-party requests', { tag: '@net' }, () => {
     await expect(new Shell(adminPage).header.avatar).toBeVisible();
 
     expect(external).toEqual([]);
-    expect(problems).toEqual({ csp: [], misserved: [] });
+    expect(problems).toEqual({ misserved: [] });
   });
 });

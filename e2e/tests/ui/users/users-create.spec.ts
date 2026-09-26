@@ -351,7 +351,12 @@ test.describe('USR-02 create validation', () => {
     usersPage,
     seededUser,
     panelApi,
+    pageErrors,
   }) => {
+    pageErrors.allowToast(
+      'Username is in use. Please try another one.',
+      'by design: a duplicate username is refused',
+    );
     await usersPage.goto();
     await usersPage.createUser({ username: seededUser.username, password: VALID_PASSWORD });
 

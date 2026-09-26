@@ -197,7 +197,12 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
   test('PKG-golang-07 the versions page of an unknown module shows its error once (RPS-1302)', async ({
     adminPage,
     seeder,
+    pageErrors,
   }) => {
+    pageErrors.allowToast(
+      'Module not found.',
+      'by design: the test opens an unknown module and asserts the error toast',
+    );
     const repo = await seeder.createRepo(RepoType.GOLANG);
     const versions = protocolPages(adminPage, golang, repo.name).versions({
       name: `e2e.repsy.test/e2e-${seeder.runId}-none`,
@@ -225,7 +230,9 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
   test('PKG-golang-07 the empty versions page of an unknown module shows no pager (RPS-1262)', async ({
     adminPage,
     seeder,
+    pageErrors,
   }) => {
+    pageErrors.allowToast('Module not found.', 'by design: the test opens an unknown module');
     const repo = await seeder.createRepo(RepoType.GOLANG);
     const versions = protocolPages(adminPage, golang, repo.name).versions({
       name: `e2e.repsy.test/e2e-${seeder.runId}-none`,
