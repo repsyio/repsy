@@ -95,6 +95,13 @@ const CASES: Record<ClientId, SealCase> = {
     args: ['pm', 'view', 'left-pad', 'version', '--registry', PUBLIC_REGISTRY],
     refused: /ConnectionRefused|failed to send/,
   },
+  deno: {
+    // Deno's own message for a connection it could not make is just "npm:left-pad was not found" (the
+    // same words a 401 gets), so its connection log names the dead proxy instead.
+    args: ['install', 'npm:left-pad', '--minimum-dependency-age=0'],
+    refused: /connecting to 127\.0\.0\.1:9\b/,
+    extraEnv: { DENO_LOG: 'hyper_util=debug' },
+  },
 };
 
 test.describe('network seal: a misconfigured registry fails fast, never reaching the internet', () => {
