@@ -269,6 +269,8 @@ interface DeployRun {
   contentSha256?: string;
   /** The POM the deploy was built from, which the raw probe re-sends. */
   pomBytes: Buffer;
+  /** stdout and stderr of the `mvn deploy`, for the message it prints. */
+  output: string;
 }
 
 /**
@@ -277,7 +279,12 @@ interface DeployRun {
  * exactly this deploy: without it two deploys of the same coordinate would usually build identical
  * bytes and "the consumer got the latest deploy" could not be told from "the consumer got the first".
  */
-async function deploy(world: World): Promise<DeployRun> {
+export async function deploy(
+  world: World,
+  /** `pomPadding`: text for a `<description>` that makes the POM as big as a test needs (the size
+   *  limits of `tests/maven/size-limits.spec.ts`, RPS-1482). */
+  opts: { pomPadding?: string } = {},
+): Promise<DeployRun> {
   await ensureSharedCacheWarm();
 
   const { home, work } = await isolatedWorkDir(`mvn-pub-${world.scenario.id}`);
@@ -291,6 +298,7 @@ async function deploy(world: World): Promise<DeployRun> {
     version,
     withDistribution: true,
     repoUrl,
+    pomPadding: opts.pomPadding,
   });
   await renderTemplate(
     'settings.template.xml',
@@ -332,6 +340,7 @@ async function deploy(world: World): Promise<DeployRun> {
     command: execResult.command,
     contentSha256: await digestOf(path.join(work, 'target', `${artifactId}-${version}.jar`)),
     pomBytes: await fs.readFile(path.join(work, 'pom.xml')),
+    output: `${execResult.stdout}\n${execResult.stderr}`,
   };
 }
 

@@ -80,6 +80,7 @@ e2e/
   docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
   docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
   docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
+  docker-compose.stack-limits.yml  # OPT-IN overlay on either stack: every configurable upload limit at 64 KiB, `run.sh local up|down --limits`, see "Size-limit leg"
   docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" and "api"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle/sbt/Ant + Ivy and gpg; see "Adding a protocol adapter" below
@@ -281,6 +282,7 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_UI_OPT_IN`             | _(unset)_                  | ui runner only: the UI suite's older spelling of `REPSY_E2E_OPT_IN`; `optedIn()` reads both, so either works                                                                                                                                                                                                                                                                                                                             |
 | `REPSY_E2E_SCANNER`           | _(unset)_                  | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_E2E_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                    |
 | `REPSY_E2E_THROTTLE`          | _(unset)_                  | `1` makes `local up\|down` include the auth-throttle overlay (same as `--throttle`) and `test` add `throttle` to `REPSY_E2E_OPT_IN`, see "Auth-throttle leg"                                                                                                                                                                                                                                                                             |
+| `REPSY_E2E_LIMITS`            | _(unset)_                  | `1` makes `local up\|down` include the tiny-upload-limit overlay (same as `--limits`) and `test` add `limits` to `REPSY_E2E_OPT_IN`, see "Size-limit leg"                                                                                                                                                                                                                                                                                |
 | `REPSY_E2E_SCANNER_PORT`      | `8090` + offset            | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_SCANNER_STUB_URL`      | `http://localhost:8090`    | ui runner only: where the `@scanner` specs reach that API (follows `REPSY_E2E_SCANNER_PORT`)                                                                                                                                                                                                                                                                                                                                             |
 | `REPSY_SCANNER_API_KEY`       | `e2e-scanner-key`          | the shared secret of the stub scanner and the backend's scanner client                                                                                                                                                                                                                                                                                                                                                                   |
@@ -3589,6 +3591,7 @@ and is never part of the default stack.
 | ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | -------------------------------------------- | -------------------------------------------- |
 | `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`     | `@scanner` (ui), "Scanner stack"             |
 | `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client | `@throttle` (stack, ui), "Auth-throttle leg" |
+| `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB    | `@limits` (7 runners), "Size-limit leg"      |
 
 How it fits together, so a later overlay is one row:
 
@@ -3694,6 +3697,70 @@ Flip checks: `AUTH_THROTTLE_ENABLED: 'false'` in the overlay fails all eight cas
 shorter than the window in the reset case fails it with a 429 where the right password should pass.
 The throttle is per client and never per username, so a leg like this cannot be run by other suites in
 parallel: any client that fails authentication three times is locked out for ten seconds.
+
+### Size-limit leg (RPS-1482)
+
+Every package format has an upload size limit, and a limit nobody exercises is a limit nobody knows still works.
+The default stack leaves them at their defaults (100-500 MB), so the overlay `docker-compose.stack-limits.yml`
+sets the configurable ones to **64 KiB** (`MULTIPART_MAX_FILE_SIZE`, `MULTIPART_MAX_REQUEST_SIZE` 256 KiB,
+`RUBY_MAX_GEM_SIZE`, `CARGO_MAX_CRATE_SIZE`, `GO_MAX_MODULE_ZIP_SIZE`; the request limit stays above the file
+limit so the file limit is what trips). No other suite may run there: any package over 64 KiB is refused.
+
+```bash
+./run.sh local up --limits                                        # (or REPSY_E2E_LIMITS=1) add --h2 for H2
+REPSY_E2E_LIMITS=1 ./run.sh test --protocol pypi --grep @limits   # and helm, nuget, ruby, cargo, golang, api
+./run.sh local down --limits
+```
+
+Per real client, `tests/<protocol>/size-limits.spec.ts` (`@limits`, registered by `registerSizeLimitSpecs`,
+`src/scenarios/size-limits.ts`; the push is `src/clients/oversize.ts`) runs two tests. The package is padded with
+RANDOM bytes (`src/clients/padding.ts`: gems, crates and charts are gzipped, so compressible padding would slip under):
+
+- **over the limit** (about 100 KB): the client exits non-zero and prints the message below, a raw replay of the same
+  package to the route the client uses answers what the server really sends, and the adapter's `fingerprint` shows
+  the repository exactly as before ("Nothing stored");
+- **under the limit** (about 20 KB, same client, a fresh repo): the push succeeds and the package is in the repository,
+  so the limit is what refused the first push, not a client or a repo that cannot publish.
+
+| Format         | Limit                     | Client                                                         | What the client prints (asserted)                                                                                                                            | Raw replay                                                                                              |
+| -------------- | ------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| PyPI           | `MULTIPART_MAX_FILE_SIZE` | `twine upload`                                                 | `HTTPError: 413 Content Too Large`                                                                                                                           | 413, `payloadTooLarge`                                                                                  |
+| NuGet          | `MULTIPART_MAX_FILE_SIZE` | `dotnet nuget push`                                            | `error: Response status code does not indicate success: 413`                                                                                                 | 413, `payloadTooLarge`                                                                                  |
+| Helm (classic) | `MULTIPART_MAX_FILE_SIZE` | `helm cm-push`                                                 | `Error: 413: could not properly parse response JSON: {...payloadTooLarge...}` (cm-push expects ChartMuseum's `{"error"}`, so it prints Repsy's envelope raw) | 413, `payloadTooLarge`                                                                                  |
+| Ruby           | `RUBY_MAX_GEM_SIZE`       | `gem push`                                                     | the envelope itself (`{"msgId":"payloadTooLarge",...}`, no status)                                                                                           | 413, `payloadTooLarge`                                                                                  |
+| Cargo          | `CARGO_MAX_CRATE_SIZE`    | `cargo publish`                                                | `the remote server responded with an error (status 413 Payload Too Large): the crate exceeds the maximum upload size`                                        | 413, cargo's own shape `{"errors":[{"detail":"the crate exceeds the maximum upload size"}]}` (no msgId) |
+| Go             | `GO_MAX_MODULE_ZIP_SIZE`  | `curl -T` (there is no Go publisher, the panel documents curl) | `curl: (22) The requested URL returned error: 413` and the envelope                                                                                          | 413, `payloadTooLarge`                                                                                  |
+
+The envelope is `{"msgId":"payloadTooLarge","type":"ERROR","text":"The uploaded content is too large."}`, always
+with `Connection: close`. The Helm OCI push and Docker send blobs, which none of these variables limit, so they
+are left out. twine is not counted for retries (there is no wire recorder): a 413 is not a status it retries.
+
+`tests/api/connector-limits.spec.ts` covers the two limits of the connector itself, on the `api` runner:
+
+- an oversized request header (`@smoke`, no overlay needed): Tomcat's default 8 KiB for the whole header block
+  (a 4000-byte header is served, a 9000-byte one and 120 headers of 80 bytes are not) is a **400 with Tomcat's own
+  HTML page** on both ports, never Repsy's JSON envelope, because the request never reaches Repsy;
+- a **chunked** upload (`Transfer-Encoding: chunked`, no `Content-Length`; `@limits`): a gem and a Go module zip
+  over the limit are 413 `payloadTooLarge` and store nothing, the same upload under the limit is accepted, so the
+  limit counts the bytes that arrive and chunked is not refused wholesale (50 repetitions were stable).
+
+**Maven is not part of the overlay**: its limits are fixed in the handlers (10 MiB `maven-metadata.xml` and POM,
+64 KiB `.asc`) and a breach is a plain **400 with a msgId** (`mavenMetadataTooLarge`, `pomFileTooLarge`,
+`mavenSignatureTooLarge`), not a 413 (`MavenUploadSizeLimitIT`). `tests/maven/size-limits.spec.ts` runs on the
+default stack: a real `mvn deploy` of a POM over 10 MiB (exit 1, `Could not transfer artifact ...:pom:... status
+code: 400`; the jar and its checksums, uploaded before the POM, stay, the POM and the metadata never do, a deploy
+is not one transaction), a POM of exactly 10 MiB stored and one byte more refused, and the metadata and a POM
+signature (exactly 64 KiB meets the signature check, a 422 `artifactSignatureNotVerified`, one byte more is the 400) as raw PUTs, since no signer produces a 65 KiB signature.
+
+**npm has no limit and no spec** (not pinned on purpose, a follow-up is proposed): probed on this stack, a real
+`npm publish` of 30 MB and a raw publish of 42 MB are accepted (200), and a publish of an 84 MB tarball (112 MB of
+base64 JSON) is a **500 `errorOccurred`** (`StreamConstraintsException: String value length (100007936) exceeds the
+maximum allowed (100000000)` on `_attachments`, Jackson's default; `npm` retries it three times). So there is no
+configurable limit, everything below Jackson's ceiling is read into memory, and above it the answer is a 500, not a 413. Do not pin that as the contract.
+
+Flip checks: raising all five values to 1 MB in the overlay fails every over-limit test (six clients, two chunked
+cases) and keeps every under-limit one green; running the specs on the default stack with `REPSY_E2E_OPT_IN=limits`
+does the same (every push succeeds); without the opt-in every `@limits` test skips, and the nightly leg fails on a skip.
 
 ## API suite (RPS-1480)
 
@@ -4657,7 +4724,7 @@ and on demand only, by the product owner's decision (RPS-1260): it has no `pull_
 
 ```bash
 gh workflow run e2e-nightly.yml                            # everything, like the nightly run
-gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | all
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | all
 gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
 gh workflow run e2e-nightly.yml -f suite=h2 -f h2_full=docker   # the full catalog of this runner on H2, not tonight's
 gh workflow run e2e-nightly.yml -f grep=@smoke             # a Playwright --grep for every leg
@@ -4682,6 +4749,7 @@ cancelling): a second one waits.
 | `h2-full`  | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another | 60 min  |
 | `scanner`  | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--protocol ui --grep @scanner` only (20 tests, "Scanner stack" above), never the whole `ui` suite                                                                              | 45 min  |
 | `throttle` | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                   | 30 min  |
+| `limits`   | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                     | 60 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
 others. Every leg does the same: load the image, `./run.sh local up [--h2]` (with `REPSY_IMAGE` set, so
@@ -4709,6 +4777,9 @@ skipped one; every overlay leg (`matrix.opt_in` set, "Stack overlays") gets that
 The `throttle` leg is the same with `./run.sh local up --throttle`, the `stack` runner first and the `ui` runner
 last (both `--grep @throttle`, `grep` input ignored), and one extra step, "Wait out the throttle window" (12 s):
 AUTH-11 leaves the docker gateway's bucket, admin included, locked for the window, and the leak check logs in.
+
+The `limits` leg is the same with `./run.sh local up --limits` and `--grep @limits` (the `grep` input is ignored)
+on seven runners, one `run.sh test` each; the step "Check the opt-in specs ran" fails it when any of them skipped.
 
 Each runner gets its own `run.sh test` invocation because every invocation overwrites `test-results/`
 and `playwright-report/` (see "Running"); the workflow copies each runner's output aside first.
@@ -4746,8 +4817,8 @@ CI=true ./run.sh test --protocol ui --grep @smoke          # with the CI retry/t
 
 The `h2` leg is the same with `./run.sh local up --h2` and `--grep @smoke` on every runner (and `ui`, and no
 `--grep` for `stack`); `h2-full` is `./run.sh local up --h2` and one `./run.sh test --target ci --protocol <runner>`
-without `--grep`. The stack logs of a failed leg are `./run.sh local ps [--h2|--scanner|--throttle]` and
-`./run.sh local logs [--h2|--scanner|--throttle]` (the step "Collect the stack logs" calls them, so a new stack flag needs
+without `--grep`. The stack logs of a failed leg are `./run.sh local ps [--h2|--scanner|--throttle|--limits]` and
+`./run.sh local logs [--h2|--scanner|--throttle|--limits]` (the step "Collect the stack logs" calls them, so a new stack flag needs
 no change in the workflow). To run against an image you already built, set `REPSY_IMAGE` to its tag.
 
 ### Runner requirements and the Chromium sandbox

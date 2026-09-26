@@ -39,6 +39,7 @@ import zlib from 'node:zlib';
 import mustache from 'mustache';
 
 import { buildTar } from './docker-image.js';
+import { randomPadding } from './padding.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.resolve(__dirname, '../packages/helm');
@@ -110,6 +111,9 @@ export async function buildChart(opts: {
   marker: string;
   /** `dependencies:` of `Chart.yaml` (RPS-1479): what `helm dependency update` resolves. */
   dependencies?: ChartDependency[];
+  /** Bytes of random padding stored in `<name>/e2e-padding.bin`, for the size-limit leg (RPS-1482,
+   *  `padding.ts`). */
+  padBytes?: number;
 }): Promise<BuiltChart> {
   const chartYaml = await renderChartYaml(opts);
 
@@ -117,6 +121,9 @@ export async function buildChart(opts: {
     { name: `${opts.name}/Chart.yaml`, data: Buffer.from(chartYaml, 'utf8') },
     { name: `${opts.name}/values.yaml`, data: Buffer.from('replicaCount: 1\n', 'utf8') },
     { name: `${opts.name}/e2e-marker.txt`, data: Buffer.from(opts.marker, 'utf8') },
+    ...(opts.padBytes === undefined
+      ? []
+      : [{ name: `${opts.name}/e2e-padding.bin`, data: randomPadding(opts.padBytes) }]),
   ]);
   const tgzBytes = zlib.gzipSync(tar, { level: 6 });
   const hex = sha256Hex(tgzBytes);
