@@ -4,10 +4,28 @@ Standalone Trivy vulnerability scanner adapter service. Exposes a single `POST /
 endpoint (multipart: `file` + `repoType`/`artifactName`/`artifactVersion` form fields),
 protected by a shared API key (`X-Scanner-Api-Key` header). `GET /health` is unauthenticated.
 
+## Published image
+
+Every Repsy Open Source release publishes the scanner next to the application image, under the same
+tags (a release tag without the leading `v`, such as `26.10.0`, and `latest`):
+
+```bash
+docker pull repo.repsy.io/repsy/os/repsy-scanner-trivy:26.10.0
+```
+
+Run it with the application image of the **same release** (`repo.repsy.io/repsy/os/repsy`). The
+HTTP contract between them is not versioned and `GET /health` reports no version, so a mixed pair is
+not supported. [`../examples/docker-compose.scanner.yml`](../examples/docker-compose.scanner.yml)
+runs both, PostgreSQL and the `trivy-cache` volume (mounted at `/home/appuser/.cache/trivy`, where
+Trivy keeps its vulnerability databases across container recreation). On the application side set
+`SECURITY_SCANNER=enabled`, `TRIVY_SCANNER_BASE_URL`, `TRIVY_SCANNER_API_KEY` (the same value as this
+service's `SCANNER_API_KEY`) and `DOCKER_INTERNAL_REGISTRY_BASE_URL`; see the root
+[README](../README.md#environment-variables).
+
 ## Local build & run
 
 ```bash
-docker build -t repsy-scanner-trivy:local repsy-os/repsy-scanner-trivy
+docker build -t repsy-scanner-trivy:local repsy-scanner-trivy
 
 docker run -p 8090:8090 \
   -e SCANNER_API_KEY=<key> \
@@ -27,6 +45,9 @@ The container listens on port `8090` by default (`SERVER_PORT` env var to overri
 | `SCANNER_WORKER_COUNT` | no | `1` | Number of scan jobs processed concurrently |
 | `SCANNER_JOB_RETENTION_MINUTES` | no | `60` | How long a finished job's status/result stays queryable via `GET /scan/{id}` |
 | `SCANNER_JOB_RETENTION_CHECK_INTERVAL_MS` | no | `600000` | How often the retention sweep runs to evict expired jobs |
+| `TRIVY_DB_REPOSITORY` | no | `ghcr.io/aquasecurity/trivy-db:2,mirror.gcr.io/aquasec/trivy-db:2` | Comma-separated OCI repositories the vulnerability database is downloaded from, tried in order (set it to a mirror on a network without access to `ghcr.io`) |
+| `TRIVY_JAVA_DB_REPOSITORY` | no | `ghcr.io/aquasecurity/trivy-java-db:1,mirror.gcr.io/aquasec/trivy-java-db:1` | Same, for the Java (Maven) database |
+| `SHUTDOWN_TIMEOUT_SECONDS` | no | `300` | How long a graceful shutdown waits for running scans |
 
 ### Try it
 

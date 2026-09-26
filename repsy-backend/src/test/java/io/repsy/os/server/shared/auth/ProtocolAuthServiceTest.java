@@ -847,6 +847,56 @@ class ProtocolAuthServiceTest {
           () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.READ));
     }
 
+    /**
+     * RPS-1424: a deploy token reads and writes and never manages, so a route that removes stored
+     * files ({@code npm unpublish}, a Helm chart delete) is refused for it on every protocol, not
+     * only on Docker.
+     */
+    @Test
+    @DisplayName("a read-write deploy-token JWT is refused MANAGE, and is not counted as used")
+    void readWriteJwtIsRefusedManage() {
+      this.storeToken(false, null);
+
+      assertUnauthorized(
+          () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.MANAGE));
+      verify(this.deployTokenService, never()).updateLastUsedTime(any());
+    }
+
+    @Test
+    @DisplayName("a read-only deploy-token JWT is refused MANAGE too")
+    void readOnlyJwtIsRefusedManage() {
+      this.storeToken(true, null);
+
+      assertUnauthorized(
+          () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.MANAGE));
+    }
+
+    @Test
+    @DisplayName("a read-write deploy token sent raw or as the Basic password is refused MANAGE")
+    void rawReadWriteTokenIsRefusedManage() {
+      final var info = new DeployTokenInfo();
+      info.setId(this.tokenId);
+      info.setReadOnly(false);
+      when(this.deployTokenService.findByRepoIdAndToken(this.repoId, "signed.jwt.token"))
+          .thenReturn(Optional.of(info));
+      when(this.deployTokenService.findByRepoIdAndToken(this.repoId, PASSWORD))
+          .thenReturn(Optional.of(info));
+
+      assertUnauthorized(
+          () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.MANAGE));
+      assertUnauthorized(
+          () ->
+              this.jwtAuthService.handleBasicAuth(
+                  basicAuth("whatever", PASSWORD), Permission.MANAGE, this.repoId));
+      verify(this.deployTokenService, never()).updateLastUsedTime(any());
+
+      // The same token still reads and writes.
+      this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.WRITE);
+      this.jwtAuthService.handleBasicAuth(
+          basicAuth("whatever", PASSWORD), Permission.WRITE, this.repoId);
+      verify(this.deployTokenService, times(2)).updateLastUsedTime(this.tokenId);
+    }
+
     @Test
     @DisplayName("a user token still resolves the user, and MANAGE still needs an admin")
     void userTokenIsUnchanged() {

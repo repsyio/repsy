@@ -77,6 +77,26 @@ class ArtifactUtilsTest {
     return ArtifactUtils.readMetadata(xml.getBytes(UTF_8));
   }
 
+  @ParameterizedTest(name = "{0} is run by the prefix {1}")
+  @CsvSource({
+    "hello-maven-plugin, hello",
+    "spring-boot-maven-plugin, spring-boot",
+    "maven-clean-plugin, clean",
+    "maven-plugin-plugin, plugin",
+    "maven-plugin-report-plugin, plugin-report",
+    "maven-maven-plugin, maven",
+    "a-maven-plugin, a",
+    "gmavenplus-plugin, gplus",
+    "jooq-codegen-maven, jooq-codegen",
+    "pitest-maven, pitest",
+    "maven-plugin, ''",
+    "maven-x-maven-plugin, maven-x"
+  })
+  @DisplayName("derives the prefix from the artifactId the way maven-plugin-plugin 3.x does")
+  void derivesThePluginPrefixFromTheArtifactId(final String artifactId, final String prefix) {
+    assertThat(ArtifactUtils.getPrefixFromArtifactId(artifactId)).isEqualTo(prefix);
+  }
+
   @Test
   @DisplayName(
       "plugin metadata needs at least one plugin, an empty plugin list is not plugin metadata")

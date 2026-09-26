@@ -192,12 +192,12 @@ e2e/
       sbt.spec.ts               # RPS-134: registerPublishConsumeLoop(sbtAdapter) + the sbt extras
       ivy.spec.ts               # RPS-135: registerPublishConsumeLoop(ivyAdapter), a real `ant` with ivy:publish and ivy:retrieve
       ivy-client.spec.ts        # RPS-135: IV1-IV9 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete, the generated maven-metadata.xml read by Maven and Gradle, RPS-1369, an Ivy publish after mvn deploy, RPS-1437)
-      plugin-prefix.spec.ts     # RPS-1438: PP1-PP3, a real Maven plugin built by `mvn package`, uploaded without a group-level maven-metadata.xml and run by `mvn hello:hi` through the file Repsy generates (and a control, and a stored file that wins)
+      plugin-prefix.spec.ts     # RPS-1438, RPS-1457, RPS-1458: PP1-PP5, real Maven plugins built by `mvn package`, uploaded without a group-level maven-metadata.xml and run by `mvn hello:hi` through the file Repsy generates (and a control, a stored file that wins, a second plugin added to a stored file, and a plugin with its own goalPrefix)
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
       packument-read.spec.ts    # raw-HTTP reads: abbreviated packument, no publish-only fields, HEAD, ETag/304/gzip, undeprecate, tarball header (RPS-1356..1360, 1363)
-      unpublish.spec.ts         # real `npm unpublish` (RPS-1289): one version (unscoped/scoped), the only version, a whole package
+      unpublish.spec.ts         # real `npm unpublish` (RPS-1289): one version (unscoped/scoped), the only version, a whole package; refused for a read-write deploy token (RPS-1424)
     npm-clients/
       npm/publish-consume.spec.ts   # registerPublishConsumeLoop(npmFamilyAdapter(npmClient)): the catalog through the npm-family harness
       pnpm/*.spec.ts            # pnpm: the catalog, `pnpm -r publish` (workspace: rewrite), native-command wire proof, resolution / minimumReleaseAge
@@ -331,8 +331,8 @@ Otherwise `run.sh` does the following for every subcommand:
 - runs the runner containers in the compose project `<project>-runners` for a non-default project.
   Their shared Maven/Gradle cache volumes and their images are keyed by that name, so they are private to
   the stack: slower the first time, but a branch that changes a runner Dockerfile cannot swap another
-  worktree's runner image. Remove them with `docker compose -p <project>-runners -f
-  docker-compose.runners.yml down -v --rmi local` when the stack is retired.
+  worktree's runner image. Remove them with
+  `docker compose -p <project>-runners -f docker-compose.runners.yml down -v --rmi local` when the stack is retired.
 - validates the values: the project is compose's own rule (`[a-z0-9][a-z0-9_-]*`), the offset a
   non-negative integer with `9090 + offset <= 65535`.
 
@@ -927,15 +927,16 @@ realm, `publishivy="true"`, the dependency line with and without its `conf`) and
 its version into the file Maven stored, with its checksum rewritten, RPS-1437). No `test.fail` pin is
 left in this suite.
 
-### Maven plugin prefix (`plugin-prefix.spec.ts`, RPS-1438)
+### Maven plugin prefix (`plugin-prefix.spec.ts`, RPS-1438, RPS-1457, RPS-1458)
 
 `mvn hello:hi` (with the plugin's group in `pluginGroups`) finds a plugin by its prefix in the
 group-level `<group path>/maven-metadata.xml`. `mvn deploy` uploads that file for a plugin, but Gradle's
 `maven-publish`, sbt, Ivy and a raw `PUT` send only the jar and the POM, and Maven then failed with
 "No plugin found for prefix" against a repo that holds the plugin. Repsy answers the file (and its four
-checksums) from the plugins it has registered when none is stored, with the prefix Maven derives from
-the artifactId. The spec builds a one-goal plugin once per worker with the real `mvn package`
-(`clients/maven-plugin.ts`; `maven-plugin-plugin` and the plugin API come from Central, like the other
+checksums) from the plugins it has registered when none is stored, with the plugin's own `goalPrefix`
+(read from `META-INF/maven/plugin.xml` in its jar when the jar is stored before the POM) or else the
+prefix `maven-plugin-plugin` derives from the artifactId. The spec builds a one-goal plugin once per
+worker with the real `mvn package` (`clients/maven-plugin.ts`; `maven-plugin-plugin` and the plugin API come from Central, like the other
 Maven builds), uploads its jar and POM by hand, and runs the real `mvn` in a clean local repository:
 
 - **PP1** (`@smoke`): the goal runs; the file lists the plugin, its four checksums are those of the file,
@@ -945,13 +946,23 @@ Maven builds), uploads its jar and POM by hand, and runs the real `mvn` in a cle
   is a `404`.
 - **PP3**: a group-level file a client stored is served as it is and used by Maven, and its checksum is a
   `404` until one is stored.
+- **PP4** (RPS-1457): a second plugin (`bye-maven-plugin`, built like the first) is published by hand
+  after a group-level file that lists only the first was stored (what `mvn deploy` of it leaves): Repsy
+  appends the second plugin's entry to that file, keeps the stored one, rewrites the stored `.sha1` (no
+  `.sha256` is created), and the real `mvn bye:hi` finds the plugin, while `mvn hello:hi` still runs.
+- **PP5** (RPS-1458): a plugin built with its own `<goalPrefix>` (`tool-maven-plugin`, prefix `tl`) is
+  published by hand, jar first and then the POM (Gradle's order), with no group-level file: the file
+  Repsy answers lists `<prefix>tl</prefix>`, the real `mvn tl:hi` runs the goal and `mvn tool:hi` (the
+  prefix derived from the artifactId) fails with "No plugin found for prefix 'tool'".
 
 The version-level `maven-metadata.xml` of a SNAPSHOT is not generated (RPS-1438, decided): no client
 publishes timestamped SNAPSHOT files without it (Maven and Gradle send it, sbt and Ivy send the literal
 `-SNAPSHOT` names, which resolve without it), so the `404` pinned in `ivy-client.spec.ts` stays.
 
-Not covered: a plugin whose `plugin.xml` sets its own `goalPrefix` (Repsy derives the prefix from the
-artifactId; a plugin like that is published by Maven, which stores the file itself).
+Not covered: a plugin with its own `goalPrefix` whose POM arrives before its jar (Repsy reads the
+prefix when the POM registers, so it keeps the derived one until the POM is uploaded again; the
+integration test `MavenPluginGoalPrefixIT` pins that), and one `mvn deploy` adds to a group whose file
+is stored already (it is listed under both the derived and its own prefix).
 
 Not covered: an Ivy-native (non-Maven) layout, which Repsy cannot serve (a descriptor named
 `<artifact>-<revision>.ivy` is a valid Maven file name and is stored, but nothing registers it), the
@@ -1338,8 +1349,10 @@ registry's), so pnpm asks for the full packument too (a second `GET` with `Accep
 strict 5-minute policy refuses a package published seconds ago and its message names the exact publish time
 Repsy served, the non-strict default installs it and records the exclusion.
 
-**`unpublish`, `login`, `logout`.** `pnpm unpublish <pkg>@<ver>` works: the version leaves the packument and
-its tarball is 404. pnpm has no `_rev` to send (a Repsy packument has none), so the PUT is
+**`unpublish`, `login`, `logout`.** `pnpm unpublish <pkg>@<ver>` works for an admin: the version leaves the
+packument and its tarball is 404. Removing a version needs MANAGE (the ADMIN role, as in the panel), which a
+deploy token never has, so a read-write token is refused (`401`, pnpm exits non-zero, the version stays;
+RPS-1424) while its `deprecate` and `dist-tag` still work. pnpm has no `_rev` to send (a Repsy packument has none), so the PUT is
 `/<pkg>/-rev/undefined`; it then also sends a `DELETE /<pkg>/-/<file>.tgz/-rev/undefined` **without the
 repository path** (pnpm keeps only the registry's origin for this URL), a harmless 404, not asserted.
 `pnpm login` first POSTs the web login `/-/v1/login` (404 in Repsy) and, with no terminal, stops with
@@ -4111,6 +4124,11 @@ by the backend's own ITs.
 | One scan              | seconds to minutes, depends on the artifact | 2 s by default, a few seconds on demand |
 | Findings              | whatever the DB says today                  | fixed by the package name               |
 | Failed / refused scan | cannot be produced                          | by the package name                     |
+
+The stack does not use the published scanner image (`repo.repsy.io/repsy/os/repsy-scanner-trivy`, released
+with every Repsy version since RPS-1400) for the same reasons, and the stub is a deliberate, permanent choice
+rather than a placeholder: the leg has to be offline, fast and able to produce failures. The published image
+is therefore not exercised by any e2e leg; its build is the only thing the release workflow checks.
 
 ```bash
 ./run.sh local up --scanner          # (or REPSY_E2E_SCANNER=1) postgres + Repsy + the stub scanner; add --h2 for H2

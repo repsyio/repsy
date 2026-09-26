@@ -15,7 +15,7 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, EventEmitter, HostListener, Input, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, HostListener, Input, OnInit, Output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterModule } from '@angular/router';
 import { filter } from 'rxjs';
@@ -34,7 +34,13 @@ export class SidebarComponent implements OnInit {
   @Output() closeModal = new EventEmitter<Event>();
 
   public username: string;
-  public isAdmin = false;
+  /**
+   * A signal, not a field (RPS-1456): at "/" the dashboard is created inside the OnPush
+   * `AuthRedirectComponent`, so this view is only checked again when something marks it. A plain field
+   * set by the profile answer left Users and Security hidden whenever that answer was the last event
+   * of the page (a slow host); a signal read by the template refreshes the view by itself.
+   */
+  public readonly isAdmin = signal(false);
 
   constructor(
     private readonly authService: AuthService,
@@ -58,11 +64,11 @@ export class SidebarComponent implements OnInit {
   private loadUserRole(): void {
     this.profileFacadeService.get().subscribe({
       next: (profile) => {
-        this.isAdmin = profile.role === 'ADMIN';
+        this.isAdmin.set(profile.role === 'ADMIN');
       },
       error: (error) => {
         console.error('Failed to load user role:', error);
-        this.isAdmin = false;
+        this.isAdmin.set(false);
       },
     });
   }

@@ -29,6 +29,7 @@ import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.util.Map;
 import java.util.Optional;
@@ -92,6 +93,14 @@ class AbstractNpmPackageDeleteProtocolMethodHandlerTest {
     when(this.basePathParser.parse(request)).thenReturn(Optional.of(context(relativePath)));
 
     return this.handler().getPathParser().parse(request);
+  }
+
+  @Test
+  @DisplayName("needs MANAGE, so a USER account and a deploy token are refused (RPS-1424)")
+  void needsManage() {
+    assertThat(this.handler().getProperties())
+        .containsEntry("permission", Permission.MANAGE)
+        .containsEntry("writeOperation", true);
   }
 
   @ParameterizedTest(name = "DELETE {0} -> matches={1}")

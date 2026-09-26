@@ -197,10 +197,25 @@ public class ArtifactUtils {
     }
   }
 
+  /**
+   * The plugin prefix {@code maven-plugin-plugin} 3.x derives from an artifactId when the plugin
+   * sets no {@code goalPrefix}: {@code x-maven-plugin} and {@code maven-x-plugin} give {@code x},
+   * and so {@code maven-plugin-plugin} gives {@code plugin}. Any other name is not derivable by
+   * that plugin (its build fails and asks for an explicit {@code goalPrefix}), so it falls back to
+   * what Maven core used to do: drop every {@code maven} and {@code plugin} word, which gives
+   * {@code jooq-codegen} for {@code jooq-codegen-maven}. This is only the fallback for a plugin
+   * whose real prefix is not known, {@link PluginDescriptorReader} reads it from the plugin's jar
+   * (RPS-1458).
+   */
   public static String getPrefixFromArtifactId(final String artifactId) {
 
-    if ("maven-plugin-plugin".equals(artifactId)) {
-      return "plugin";
+    final var suffixed = artifactId.endsWith("-maven-plugin");
+    final var prefixed = artifactId.startsWith("maven-") && artifactId.endsWith("-plugin");
+
+    if (suffixed && artifactId.length() > "-maven-plugin".length()) {
+      return artifactId.substring(0, artifactId.length() - "-maven-plugin".length());
+    } else if (prefixed && artifactId.length() > "maven--plugin".length()) {
+      return artifactId.substring("maven-".length(), artifactId.length() - "-plugin".length());
     } else {
       return artifactId.replaceAll("-?maven-?", "").replaceAll("-?plugin-?", "");
     }

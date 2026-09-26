@@ -128,7 +128,9 @@ docker run \
 
 ## Vulnerability Scanning
 
-Repsy can scan pushed artifacts (Maven, npm, PyPI, Docker) for known vulnerabilities using a separate `repsy-scanner-trivy` service. This is **disabled by default** (`SECURITY_SCANNER=disabled`) and adds no dependency to a plain install. To enable it, run the `repsy-scanner-trivy` service (see [Option 3](#option-3-docker-compose-with-postgresql) and [`repsy-scanner-trivy/README.md`](./repsy-scanner-trivy/README.md)) and set `SECURITY_SCANNER=enabled` along with the `TRIVY_*`/`DOCKER_INTERNAL_REGISTRY_BASE_URL` variables above.
+Repsy can scan pushed artifacts (Maven, npm, PyPI, Docker) for known vulnerabilities using a separate `repsy-scanner-trivy` service. This is **disabled by default** (`SECURITY_SCANNER=disabled`) and adds no dependency to a plain install. To enable it, run the `repsy-scanner-trivy` service (see [Option 3](#option-3-docker-compose-with-postgresql) and [`repsy-scanner-trivy/README.md`](./repsy-scanner-trivy/README.md)) and set `SECURITY_SCANNER=enabled` along with the `TRIVY_*`/`DOCKER_INTERNAL_REGISTRY_BASE_URL` variables in [Environment Variables](#environment-variables).
+
+The scanner is published with every release as `repo.repsy.io/repsy/os/repsy-scanner-trivy`, under the same tags as the application image (`repo.repsy.io/repsy/os/repsy`): a release tag without the leading `v` (for example `26.10.0`) and `latest`. Run the application and the scanner of the **same release**: the HTTP contract between them (`POST /scan`, `GET /scan/{scanId}`, the `X-Scanner-Api-Key` header) is not versioned, so a mixed pair is not supported. [`examples/docker-compose.scanner.yml`](./examples/docker-compose.scanner.yml) is a complete Compose example (PostgreSQL, Repsy, the scanner and the `trivy-cache` volume) that pins both images with one `REPSY_VERSION`.
 
 Each repository has a security scan setting that controls whether newly pushed versions are scanned automatically. It does not block manual scans: a version can always be scanned on demand from the panel or with `POST /api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan`, even when the repository's setting is off.
 
@@ -235,15 +237,13 @@ volumes:
 
 #### Adding vulnerability scanning to the stack
 
-To enable vulnerability scanning, add the following service to your docker-compose.yml:
+To enable vulnerability scanning, add the following service to your docker-compose.yml (a complete file is [`examples/docker-compose.scanner.yml`](./examples/docker-compose.scanner.yml)). Use the same tag as your `repsy` service instead of `latest` when you pin a release:
 
 ```yaml
   repsy-scanner-trivy:
     container_name: repsy-scanner-trivy
     hostname: repsy-scanner-trivy
-    build:
-      context: ./repsy-scanner-trivy
-      dockerfile: Dockerfile
+    image: repo.repsy.io/repsy/os/repsy-scanner-trivy:latest
     environment:
       - SCANNER_API_KEY=${TRIVY_SCANNER_API_KEY:-changeme-trivy-api-key}
     ports:
@@ -373,6 +373,23 @@ admin resets its password, either from the users page in the web UI or directly 
 [password reset marker file](#forgot-admin-password) resets the password of any account, not only
 an admin's, from inside the container.
 
+### `npm unpublish` and Helm chart delete need the `ADMIN` role (RPS-1424)
+
+Before this change, a `USER` account and a read-write deploy token could remove
+stored files through two package clients although the web UI restricted that to `ADMIN`: `npm
+unpublish` (one version or a whole package) and deleting a Helm chart version with `DELETE
+/api/charts/<name>/<version>`. Both are manage operations now, like the web UI's delete and like
+Docker's manifest delete: they need an `ADMIN` account, and a deploy token, read-write or read-only,
+is refused for any manage operation in every format. See [Repository Access](#repository-access).
+
+**Who is affected:** a CI job that runs `npm unpublish` or deletes chart versions with a deploy token
+or with a non-admin account. It now gets `401` and the command fails. Use an `ADMIN` account for
+those jobs, or delete the version in the web UI.
+
+**What does not change:** `npm publish`, `npm deprecate`, `npm dist-tag add` and `rm`, `cargo yank`,
+NuGet unlist and relist, `gem yank` and publishing a Helm chart still need only write access, so a
+read-write deploy token keeps running them.
+
 ### Docker manifests are content-addressed (RPS-1216)
 
 Docker manifests used to be stored as a child of a tag: pushing a tag again with a new manifest
@@ -424,9 +441,11 @@ and after the upgrade. A manifest whose file is missing or does not match its di
 | `H2_TCP_SERVER_PORT` | H2 TCP server port | `9092` |
 | `SECURITY_SCANNER` | Enables vulnerability scanning of pushed artifacts (`enabled`/`disabled`) | `disabled` |
 | `TRIVY_SCANNER_BASE_URL` | Base URL of the `repsy-scanner-trivy` service | `http://localhost:8090` |
-| `TRIVY_SCANNER_API_KEY` | Shared API key sent to the scanner service (must match its `SCANNER_API_KEY`) | *(empty)* |
+| `TRIVY_SCANNER_API_KEY` | Shared API key sent to the scanner service (must match its `SCANNER_API_KEY`). The scanner's own settings (`SCANNER_API_KEY`, `TRIVY_TIMEOUT_SECONDS`, `TRIVY_DB_REPOSITORY`, ...) are listed in [`repsy-scanner-trivy/README.md`](./repsy-scanner-trivy/README.md) | *(empty)* |
 | `DOCKER_INTERNAL_REGISTRY_BASE_URL` | Base URL the scanner uses to pull Docker images from this instance's own registry | `http://localhost:9090` |
-| `TRIVY_GATE_ACQUIRE_TIMEOUT_SECONDS` | Scanner-side: max time a queued scan waits to acquire the single-Trivy-execution gate | `60` |
+| `TRIVY_REQUEST_TIMEOUT_SECONDS` | Timeout of one HTTP request from Repsy to the scanner (submitting a scan, reading its status) | `10` |
+| `TRIVY_POLL_INTERVAL_MS` | How often Repsy asks the scanner for the status of an unfinished scan | `3000` |
+| `TRIVY_MAX_SCAN_DURATION_SECONDS` | How long Repsy waits for a scan to finish before it marks the scan failed | `330` |
 | `BASIC_AUTH_CACHE_ENABLED` | Remember successful HTTP Basic password checks, so a client that sends its username and password on every request pays for one password verification instead of one per request. See [Authenticating from CI](#authenticating-from-ci). | `true` |
 | `BASIC_AUTH_CACHE_TTL_SECONDS` | How long a remembered password check stays valid | `300` |
 | `BASIC_AUTH_CACHE_MAX_ENTRIES` | How many remembered password checks are kept | `10000` |
@@ -574,8 +593,17 @@ names. Only *manage* operations need the `ADMIN` role: creating a repository, re
 changing its description and settings, deleting it, deleting its artifacts and versions, managing
 its deploy tokens, and managing users.
 
+The web UI and the package clients follow the same rule (RPS-1424). What removes stored files is a
+manage operation on the wire too: `npm unpublish` (one version or the whole package) and deleting a
+Helm chart version with `DELETE /api/charts/<name>/<version>` need the `ADMIN` role, and so does
+deleting a Docker manifest or tag. A `USER` account and a deploy token are refused with `401` and a
+challenge, as for any credential a package client is not allowed to use. Operations that only change what a repository
+advertises, and keep every file, need write access: `npm deprecate`, `npm dist-tag add` and `rm`,
+`cargo yank`, NuGet unlist and relist, and `gem yank`.
+
 Deploy tokens are scoped to a single repository, so use one to give a CI job or an external party
-access to that repository without a user account. Only create user accounts for people you trust
+access to that repository without a user account. A deploy token reads and, unless it is read-only,
+writes; it **never** manages, so a CI credential can publish but cannot delete what it published. Only create user accounts for people you trust
 with every repository on the instance; to keep repositories apart between teams, run one Repsy
 instance per team.
 
@@ -818,12 +846,27 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
   Gradle's `maven-publish`, sbt, Ivy and a raw `PUT` do not. Repsy answers a `GET` or `HEAD` of that file
   (and of its four checksums) too, from the plugins it has registered for the group, when none is stored:
   a `<plugins>` list with each plugin's name, prefix and artifactId, ordered by artifactId. The prefix
-  is the one Maven derives from the artifactId (`hello-maven-plugin` gives `hello`), so a plugin that
-  sets its own `goalPrefix` has to be published by Maven, which stores the file itself, or its prefix is
-  not found. A stored group-level file is served as it is. The path of that file has the shape of an
-  artifact-level one (`com/acme/tools/maven-metadata.xml` is both the artifact `tools` of `com.acme` and
-  the group `com.acme.tools`), so the artifact-level answer comes first and the group-level one is
-  given only when no artifact of that name is registered.
+  is the plugin's own `goalPrefix`, which its jar names in `META-INF/maven/plugin.xml`, when the jar is
+  stored before the POM (the order of Gradle's `maven-publish`; `mvn deploy` stores the file with the
+  real prefix itself), and otherwise the one `maven-plugin-plugin` derives from the artifactId
+  (`hello-maven-plugin` and `maven-hello-plugin` give `hello`, `maven-plugin-plugin` gives `plugin`).
+  It is read once, when the POM registers, so a client that sends the POM before the jar gets the
+  derived prefix until it uploads the POM again; the prefix of the artifact is that of its latest POM.
+  A jar that cannot be read, has no descriptor, describes another artifact or names something that is
+  not a usable prefix falls back to the derived one and never fails the upload. A stored group-level file is served as it is, and it is kept complete like the
+  artifact-level one: when the POM of a plugin registers and the stored file does not list its
+  artifactId (a plugin that `mvn deploy` published first and that Gradle, sbt or Ivy then adds a second
+  plugin to), Repsy appends a `<plugin>` entry (name, prefix, artifactId) for it, and for any other
+  plugin it has registered for the group that the file lacks, after the entries that are there, rewrites
+  the checksums that are stored next to it and deletes a stored `maven-metadata.xml.asc`. It never
+  changes or removes an entry, and leaves untouched a file it cannot parse and a file that lists
+  versions and no plugins (the artifact-level file of the same path, see below). A plugin that sets its
+  own `goalPrefix` and is published by `mvn deploy` into a group whose file is stored already can end up
+  listed twice, under the prefix derived from its artifactId (added when its POM arrived, before its
+  jar, in Maven's order) and under its own (merged in by Maven afterwards); Maven finds the plugin by either. The path of that file has the
+  shape of an artifact-level one (`com/acme/tools/maven-metadata.xml` is both the artifact `tools` of
+  `com.acme` and the group `com.acme.tools`), so the artifact-level answer comes first and the
+  group-level one is given only when no artifact of that name is registered.
   Nothing generated is stored: it is not in the directory listing and is never signed (`.asc` is a
   `404`). The version-level `<version>-SNAPSHOT/maven-metadata.xml` is not generated (RPS-1438): Maven
   and Gradle publish it themselves for a unique SNAPSHOT, and Ivy and sbt publish a non-unique one under

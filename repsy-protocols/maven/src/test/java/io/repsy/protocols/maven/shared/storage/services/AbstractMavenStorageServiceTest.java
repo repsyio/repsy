@@ -18,6 +18,7 @@ package io.repsy.protocols.maven.shared.storage.services;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -33,6 +34,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -76,6 +78,9 @@ import org.springframework.core.io.Resource;
  * <p>RPS-1437: {@link AbstractMavenStorageService#addVersionsToMetadata} adds the registered
  * versions a stored {@code maven-metadata.xml} lacks, with the same rewrite, and the rewrite, a
  * delete's and a client's own upload of the file are serialized per artifact.
+ *
+ * <p>RPS-1457: {@link AbstractMavenStorageService#addPluginsToGroupMetadata} appends the registered
+ * plugins a stored group-level {@code maven-metadata.xml} lacks, under the lock of the same path.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractMavenStorageService")
@@ -685,6 +690,370 @@ class AbstractMavenStorageServiceTest {
     this.storageService.writeInputStreamToPath(
         StoragePath.of(REPO_ID, "com/example/demo/1.0/demo-1.0.pom"),
         new ByteArrayInputStream("pom".getBytes(UTF_8)),
+        REPO_NAME);
+
+    assertThat(append).isNotDone();
+
+    release.countDown();
+    append.get(10, TimeUnit.SECONDS);
+  }
+
+  // RPS-1457: the group-level file. The group com.example.demo has its file where the
+  // artifact-level
+  // file of com.example:demo is, so METADATA_PATH is both.
+
+  private static final String GROUP_OF_DEMO = "com.example.demo";
+
+  private static final String PLUGIN_GROUP_XML =
+      """
+      <metadata>
+        <plugins>
+          <plugin>
+            <name>Foo</name>
+            <prefix>foo</prefix>
+            <artifactId>foo-maven-plugin</artifactId>
+          </plugin>
+        </plugins>
+      </metadata>
+      """;
+
+  private static Supplier<Collection<RegisteredPlugin>> plugins(
+      final RegisteredPlugin... registered) {
+    return () -> List.of(registered);
+  }
+
+  private static RegisteredPlugin foo() {
+    return new RegisteredPlugin("foo-maven-plugin", "Foo", "foo");
+  }
+
+  private static RegisteredPlugin bar() {
+    return new RegisteredPlugin("bar-maven-plugin", "Bar", "bar");
+  }
+
+  private long addPlugins(final Supplier<Collection<RegisteredPlugin>> registered)
+      throws Exception {
+    return this.storageService.addPluginsToGroupMetadata(repoInfo(), GROUP_OF_DEMO, registered);
+  }
+
+  @Test
+  @DisplayName("adding plugins to a group without a stored metadata file creates nothing")
+  void addPluginsWithoutMetadataFileIsANoOp() throws Exception {
+    useInMemoryStorage();
+    final var asked = new AtomicBoolean();
+
+    final var delta =
+        addPlugins(
+            () -> {
+              asked.set(true);
+
+              return List.of(bar());
+            });
+
+    assertThat(delta).isZero();
+    assertThat(asked).as("no plugin is asked for when there is no file").isFalse();
+    assertThat(this.writes).isEmpty();
+    assertThat(this.files).isEmpty();
+  }
+
+  @Test
+  @DisplayName(
+      "adding plugins the file already lists (by artifactId, whatever the prefix) leaves it byte for"
+          + " byte and keeps its .asc")
+  void addPluginsAlreadyListedWritesNothing() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, PLUGIN_GROUP_XML);
+    store(METADATA_FILENAME + ".asc", "signature");
+    store(METADATA_FILENAME + ".sha1", "stale");
+
+    // The registered prefix is the derived one, the file's is the plugin's own goalPrefix.
+    final var delta = addPlugins(plugins(new RegisteredPlugin("foo-maven-plugin", "Foo", "other")));
+
+    assertThat(delta).isZero();
+    assertThat(this.writes).isEmpty();
+    assertThat(this.deletes).isEmpty();
+    assertThat(stored(METADATA_FILENAME)).isEqualTo(PLUGIN_GROUP_XML);
+    assertThat(stored(METADATA_FILENAME + ".asc")).isEqualTo("signature");
+    assertThat(stored(METADATA_FILENAME + ".sha1")).isEqualTo("stale");
+  }
+
+  @Test
+  @DisplayName(
+      "adding a plugin the file lacks appends it after the others, rewrites only the stored"
+          + " checksums, drops the .asc family and counts every byte")
+  void addPluginsAppendsTheMissingPlugin() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, PLUGIN_GROUP_XML);
+    store(METADATA_FILENAME + ".sha1", DigestUtils.sha1Hex(PLUGIN_GROUP_XML) + "\n");
+    store(METADATA_FILENAME + ".md5", "stale");
+    store(METADATA_FILENAME + ".asc", "x".repeat(100));
+    store(METADATA_FILENAME + ".asc.sha1", "y".repeat(40));
+    final var before = this.files.get(METADATA_PATH).length;
+
+    final var delta =
+        addPlugins(plugins(foo(), bar(), new RegisteredPlugin("baz-maven-plugin", null, "baz")));
+
+    final var storedPlugins = storedMetadata().getPlugins();
+
+    assertThat(storedPlugins)
+        .extracting("artifactId", "prefix", "name")
+        .containsExactly(
+            tuple("foo-maven-plugin", "foo", "Foo"),
+            tuple("bar-maven-plugin", "bar", "Bar"),
+            tuple("baz-maven-plugin", "baz", null));
+
+    final var xml = this.files.get(METADATA_PATH);
+
+    assertThat(storedMetadata().getVersioning()).isNull();
+    assertThat(stored(METADATA_FILENAME + ".sha1")).isEqualTo(DigestUtils.sha1Hex(xml));
+    assertThat(stored(METADATA_FILENAME + ".md5")).isEqualTo(DigestUtils.md5Hex(xml));
+    assertThat(this.files).doesNotContainKey(METADATA_PATH + ".sha256");
+    assertThat(this.files).doesNotContainKey(METADATA_PATH + ".asc");
+    assertThat(this.files).doesNotContainKey(METADATA_PATH + ".asc.sha1");
+    assertThat(this.deletes).hasSize(2);
+
+    // The xml grew, the sha1 lost its newline (-1), the md5 grew from "stale" (5) to 32, and 140
+    // bytes of signatures were freed.
+    assertThat(delta).isEqualTo((xml.length - before) + (-1) + (32 - 5) - 140);
+  }
+
+  @Test
+  @DisplayName("a plugin is added once even when the supplier lists it twice")
+  void addPluginsAddsAPluginOnce() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, PLUGIN_GROUP_XML);
+
+    addPlugins(plugins(bar(), bar()));
+
+    assertThat(storedMetadata().getPlugins()).hasSize(2);
+  }
+
+  @Test
+  @DisplayName(
+      "adding a plugin to a file with <versioning> and <plugins> keeps the versioning as it is")
+  void addPluginsKeepsTheVersioningOfAMixedFile() throws Exception {
+    useInMemoryStorage();
+    store(
+        METADATA_FILENAME,
+        METADATA_XML.replace(
+            "</metadata>",
+            "<plugins><plugin><prefix>foo</prefix><artifactId>foo-maven-plugin</artifactId>"
+                + "</plugin></plugins></metadata>"));
+
+    addPlugins(plugins(foo(), bar()));
+
+    final var metadata = storedMetadata();
+
+    assertThat(metadata.getPlugins()).hasSize(2);
+    assertThat(metadata.getVersioning().getVersions()).containsExactly("1.0", "2.0");
+    assertThat(metadata.getVersioning().getLatest()).isEqualTo("2.0");
+    assertThat(metadata.getVersioning().getLastUpdated()).isEqualTo("20260101000000");
+  }
+
+  @Test
+  @DisplayName("adding a plugin to an empty <metadata/> writes the entry")
+  void addPluginsToAnEmptyMetadataAddsTheEntry() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, "<metadata/>");
+
+    addPlugins(plugins(bar()));
+
+    assertThat(storedMetadata().getPlugins()).hasSize(1);
+  }
+
+  @Test
+  @DisplayName(
+      "adding plugins leaves the artifact-level file that has the path of the group's file alone")
+  void addPluginsLeavesAnArtifactLevelFileAlone() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, METADATA_XML);
+    store(METADATA_FILENAME + ".sha1", "sum");
+    store(METADATA_FILENAME + ".asc", "signature");
+    final var asked = new AtomicBoolean();
+
+    final var delta =
+        addPlugins(
+            () -> {
+              asked.set(true);
+
+              return List.of(bar());
+            });
+
+    assertThat(delta).isZero();
+    assertThat(asked).isFalse();
+    assertThat(this.writes).isEmpty();
+    assertThat(this.deletes).isEmpty();
+    assertThat(stored(METADATA_FILENAME)).isEqualTo(METADATA_XML);
+    assertThat(stored(METADATA_FILENAME + ".asc")).isEqualTo("signature");
+  }
+
+  @Test
+  @DisplayName("adding plugins to a file that cannot be parsed fails before anything is written")
+  void addPluginsWithUnparsableFileChangesNothing() {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, "<metadata><plugins>");
+    store(METADATA_FILENAME + ".asc", "signature");
+
+    assertThatThrownBy(() -> addPlugins(plugins(bar()))).isInstanceOf(BadRequestException.class);
+
+    assertThat(this.writes).isEmpty();
+    assertThat(this.deletes).isEmpty();
+    assertThat(stored(METADATA_FILENAME)).isEqualTo("<metadata><plugins>");
+  }
+
+  @Test
+  @DisplayName("adding plugins to a group of one segment appends to its file")
+  void addPluginsToAOneSegmentGroup() throws Exception {
+    useInMemoryStorage();
+    this.files.put("org/" + METADATA_FILENAME, PLUGIN_GROUP_XML.getBytes(UTF_8));
+
+    this.storageService.addPluginsToGroupMetadata(repoInfo(), "org", plugins(foo(), bar()));
+
+    assertThat(new String(this.files.get("org/" + METADATA_FILENAME), UTF_8))
+        .contains("foo-maven-plugin", "bar-maven-plugin");
+  }
+
+  /** Runs an append of a plugin that stays inside the group's lock until {@code release}. */
+  private CompletableFuture<Long> pluginAppendHeldUntil(
+      final CountDownLatch inside, final CountDownLatch release, final String groupId) {
+
+    return CompletableFuture.supplyAsync(
+        () -> {
+          try {
+            return this.storageService.addPluginsToGroupMetadata(
+                repoInfo(),
+                groupId,
+                () -> {
+                  inside.countDown();
+
+                  try {
+                    release.await(10, TimeUnit.SECONDS);
+                  } catch (final InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                  }
+
+                  return List.of(foo(), bar());
+                });
+          } catch (final java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+          }
+        });
+  }
+
+  @Test
+  @DisplayName("a client's own upload of the group-level file waits for a running plugin append")
+  void clientUploadOfTheGroupMetadataWaitsForAPluginAppend() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, PLUGIN_GROUP_XML);
+    final var inside = new CountDownLatch(1);
+    final var release = new CountDownLatch(1);
+
+    final var append = pluginAppendHeldUntil(inside, release, GROUP_OF_DEMO);
+    assertThat(inside.await(10, TimeUnit.SECONDS)).isTrue();
+
+    final var clientBytes = "<metadata><plugins/></metadata>";
+    final var upload =
+        CompletableFuture.runAsync(
+            () ->
+                this.storageService.writeInputStreamToPath(
+                    StoragePath.of(REPO_ID, METADATA_PATH),
+                    new ByteArrayInputStream(clientBytes.getBytes(UTF_8)),
+                    REPO_NAME));
+
+    TimeUnit.MILLISECONDS.sleep(300);
+    assertThat(upload).isNotDone();
+    assertThat(this.writes).isEmpty();
+
+    release.countDown();
+    append.get(10, TimeUnit.SECONDS);
+    upload.get(10, TimeUnit.SECONDS);
+
+    assertThat(this.writes).containsExactly(METADATA_PATH, METADATA_PATH);
+    assertThat(stored(METADATA_FILENAME)).isEqualTo(clientBytes);
+  }
+
+  @Test
+  @DisplayName(
+      "a client's own upload of the file of a group of one segment waits for a plugin append too")
+  void oneSegmentGroupUploadWaitsForAPluginAppend() throws Exception {
+    useInMemoryStorage();
+    this.files.put("org/" + METADATA_FILENAME, PLUGIN_GROUP_XML.getBytes(UTF_8));
+    final var inside = new CountDownLatch(1);
+    final var release = new CountDownLatch(1);
+
+    final var append = pluginAppendHeldUntil(inside, release, "org");
+    assertThat(inside.await(10, TimeUnit.SECONDS)).isTrue();
+
+    final var upload =
+        CompletableFuture.runAsync(
+            () ->
+                this.storageService.writeInputStreamToPath(
+                    StoragePath.of(REPO_ID, "org/" + METADATA_FILENAME),
+                    new ByteArrayInputStream("<metadata/>".getBytes(UTF_8)),
+                    REPO_NAME));
+
+    TimeUnit.MILLISECONDS.sleep(300);
+    assertThat(upload).isNotDone();
+    assertThat(this.writes).isEmpty();
+
+    release.countDown();
+    append.get(10, TimeUnit.SECONDS);
+    upload.get(10, TimeUnit.SECONDS);
+
+    assertThat(this.writes).containsExactly("org/" + METADATA_FILENAME, "org/" + METADATA_FILENAME);
+  }
+
+  @Test
+  @DisplayName("a version rewrite of the same path waits for a running plugin append")
+  void versionRewriteWaitsForAPluginAppend() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, PLUGIN_GROUP_XML);
+    final var inside = new CountDownLatch(1);
+    final var release = new CountDownLatch(1);
+
+    final var append = pluginAppendHeldUntil(inside, release, GROUP_OF_DEMO);
+    assertThat(inside.await(10, TimeUnit.SECONDS)).isTrue();
+
+    final var versions =
+        CompletableFuture.runAsync(
+            () -> {
+              try {
+                this.storageService.addVersionsToMetadata(
+                    repoInfo(), GROUP, ARTIFACT, registered("1.0"));
+              } catch (final Exception e) {
+                throw new IllegalStateException(e);
+              }
+            });
+
+    TimeUnit.MILLISECONDS.sleep(300);
+    assertThat(versions).isNotDone();
+
+    release.countDown();
+    append.get(10, TimeUnit.SECONDS);
+    versions.get(10, TimeUnit.SECONDS);
+  }
+
+  @Test
+  @DisplayName("the upload of a checksum of the group-level file is not locked")
+  void groupMetadataChecksumUploadIsNotLocked() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, PLUGIN_GROUP_XML);
+    final var inside = new CountDownLatch(1);
+    final var release = new CountDownLatch(1);
+
+    final var append = pluginAppendHeldUntil(inside, release, GROUP_OF_DEMO);
+    assertThat(inside.await(10, TimeUnit.SECONDS)).isTrue();
+
+    this.storageService.writeInputStreamToPath(
+        StoragePath.of(REPO_ID, "org/" + METADATA_FILENAME + ".sha1"),
+        new ByteArrayInputStream("x".getBytes(UTF_8)),
+        REPO_NAME);
+    this.storageService.writeInputStreamToPath(
+        StoragePath.of(REPO_ID, "org/" + METADATA_FILENAME + ".asc"),
+        new ByteArrayInputStream("x".getBytes(UTF_8)),
+        REPO_NAME);
+    this.storageService.writeInputStreamToPath(
+        StoragePath.of(REPO_ID, "org/other.txt"),
+        new ByteArrayInputStream("x".getBytes(UTF_8)),
         REPO_NAME);
 
     assertThat(append).isNotDone();
