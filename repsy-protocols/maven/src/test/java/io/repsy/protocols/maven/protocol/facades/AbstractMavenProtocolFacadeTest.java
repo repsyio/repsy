@@ -38,6 +38,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.PluginPrefixChange;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
@@ -65,6 +66,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -1352,5 +1354,86 @@ class AbstractMavenProtocolFacadeTest {
     upload(ARMORED_SIGNATURE);
 
     verify(this.storageService, never()).addPluginsToGroupMetadata(any(), any(), any());
+  }
+
+  // RPS-1589: the main jar of a plugin that arrives after its POM corrects the registered prefix.
+
+  private static final String JAR_PATH = "com/example/lib/1.0/lib-1.0.jar";
+
+  private void jarUploadIsAllowed() {
+    requestFor(JAR_PATH);
+    deployIsAllowed();
+    storageReportsUsage(9);
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource("jar bytes".getBytes(UTF_8)));
+  }
+
+  @Test
+  @DisplayName(
+      "asks the artifact service for the goalPrefix of the stored main jar and corrects the stored"
+          + " group-level file with the change it reports, counting the rewrite in the usage")
+  void aMainJarCorrectsThePluginPrefix() throws Exception {
+    jarUploadIsAllowed();
+    final var change = new PluginPrefixChange("lib", "lib", "custom");
+    when(this.artifactService.refreshPluginPrefixFromJar(any(), any(StoragePath.class), any()))
+        .thenReturn(change);
+    when(this.storageService.replacePluginPrefixInGroupMetadata(any(), anyString(), any()))
+        .thenReturn(-3L);
+
+    upload("jar bytes");
+
+    final var order = inOrder(this.artifactService, this.storageService);
+    order.verify(this.artifactService).createOrUpdateArtifact(any(), any(), any());
+    order.verify(this.artifactService).refreshPluginPrefixFromJar(any(), any(), any());
+    order
+        .verify(this.storageService)
+        .replacePluginPrefixInGroupMetadata(this.repoInfo, "com.example", change);
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(9L - 3L);
+  }
+
+  @Test
+  @DisplayName("rewrites nothing when the jar changed no prefix")
+  void aMainJarThatChangesNothingRewritesNothing() throws Exception {
+    jarUploadIsAllowed();
+
+    upload("jar bytes");
+
+    verify(this.artifactService).refreshPluginPrefixFromJar(any(), any(), any());
+    verify(this.storageService, never()).replacePluginPrefixInGroupMetadata(any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(9L);
+  }
+
+  @Test
+  @DisplayName("answers a success when correcting the prefix fails, whatever the reason")
+  void aFailedPrefixCorrectionNeverFailsTheUpload() throws Exception {
+    jarUploadIsAllowed();
+    when(this.artifactService.refreshPluginPrefixFromJar(any(), any(StoragePath.class), any()))
+        .thenThrow(new IllegalStateException("database down"));
+
+    upload("jar bytes");
+
+    verify(this.storageService, never()).deleteFile(any());
+    verify(this.storageService, never()).replacePluginPrefixInGroupMetadata(any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(9L);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(
+      strings = {
+        "com/example/lib/1.0/lib-1.0-sources.jar",
+        "com/example/lib/1.0/lib-1.0.jar.sha1",
+        "com/example/lib/1.0/lib-1.0.war"
+      })
+  @DisplayName("looks at no file but the main jar of a version for a plugin prefix")
+  void onlyAMainJarIsLookedAtForAPluginPrefix(final String path) throws Exception {
+    requestFor(path);
+    lenient()
+        .when(this.artifactService.getVersionType(any(), any()))
+        .thenReturn(ArtifactVersionType.RELEASE);
+    storageReportsUsage(9);
+
+    upload("bytes");
+
+    verify(this.artifactService, never()).refreshPluginPrefixFromJar(any(), any(), any());
   }
 }

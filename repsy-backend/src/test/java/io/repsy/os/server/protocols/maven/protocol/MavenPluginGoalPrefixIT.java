@@ -59,14 +59,15 @@ import org.springframework.transaction.annotation.Transactional;
  * names in {@code META-INF/maven/plugin.xml}. When the POM of a plugin registers and the jar of
  * that version is stored already (Gradle's {@code maven-publish}, sbt and Ivy send the jar first),
  * the prefix of the artifact and of the version is the one of the descriptor, and the group-level
- * {@code maven-metadata.xml} Repsy answers lists it. A POM that arrives before its jar gets the
- * prefix derived from the artifactId until it is uploaded again.
+ * {@code maven-metadata.xml} Repsy answers lists it. A POM that arrives before its jar (what {@code
+ * mvn deploy} sends) registers the prefix derived from the artifactId, and the jar corrects it, and
+ * the entry the stored group-level file got, when it is stored (RPS-1589).
  *
  * <p>Runs without a test transaction: registering a POM commits its rows in a transaction of its
  * own. It deletes the repos and users it commits. {@link UsageUpdateService} is mocked.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@DisplayName("A plugin POM registers the goalPrefix of its stored jar (RPS-1458)")
+@DisplayName("A plugin registers the goalPrefix of its jar, in either order (RPS-1458, RPS-1589)")
 class MavenPluginGoalPrefixIT extends AbstractIntegrationTest {
 
   private static final String GROUP = "com.example.prefixes";
@@ -237,6 +238,21 @@ class MavenPluginGoalPrefixIT extends AbstractIntegrationTest {
     return Arrays.asList(artifact.getPrefix(), version.getPrefix());
   }
 
+  private static String entry(final String artifactId, final String prefix) {
+    return "<plugin><name>"
+        + artifactId
+        + "</name><prefix>"
+        + prefix
+        + "</prefix><artifactId>"
+        + artifactId
+        + "</artifactId></plugin>";
+  }
+
+  private static byte[] groupFileOf(final String... entries) {
+    return ("<metadata><plugins>" + String.join("", entries) + "</plugins></metadata>")
+        .getBytes(StandardCharsets.UTF_8);
+  }
+
   @Test
   @DisplayName("the jar stored before the POM gives both rows and the group file its goalPrefix")
   void jarThenPom() throws Exception {
@@ -252,20 +268,105 @@ class MavenPluginGoalPrefixIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("the POM before the jar has the derived prefix until the POM is uploaded again")
+  @DisplayName("the POM before the jar: the jar corrects both rows and the group file (RPS-1589)")
   void pomThenJar() throws Exception {
     final var repo = this.mavenRepo();
 
     uploadPom(repo, ARTIFACT_ID);
-    uploadJar(repo, ARTIFACT_ID, jar(ARTIFACT_ID, "custom"));
 
     assertThat(prefixesOf(repo, ARTIFACT_ID)).containsExactly("foo", "foo");
-    assertThat(groupFile(repo)).extracting(Plugin::getPrefix).containsExactly("foo");
 
-    uploadPom(repo, ARTIFACT_ID);
+    uploadJar(repo, ARTIFACT_ID, jar(ARTIFACT_ID, "custom"));
 
     assertThat(prefixesOf(repo, ARTIFACT_ID)).containsExactly("custom", "custom");
-    assertThat(groupFile(repo)).extracting(Plugin::getPrefix).containsExactly("custom");
+    assertThat(groupFile(repo))
+        .extracting(Plugin::getArtifactId, Plugin::getPrefix)
+        .containsExactly(tuple(ARTIFACT_ID, "custom"));
+  }
+
+  @Test
+  @DisplayName("the jar corrects the entry the POM added to a group file Maven stored (RPS-1589)")
+  void pomThenJarCorrectsAStoredGroupFile() throws Exception {
+    final var repo = this.mavenRepo();
+    uploadJar(repo, "stored-maven-plugin", jar("stored-maven-plugin", "stored"));
+    uploadPom(repo, "stored-maven-plugin");
+    upload(repo, METADATA_PATH, groupFileOf(entry("stored-maven-plugin", "stored")));
+
+    // What mvn deploy does: the POM first (it adds the derived entry to the stored file), then the
+    // jar.
+    uploadPom(repo, ARTIFACT_ID);
+
+    assertThat(groupFile(repo))
+        .extracting(Plugin::getPrefix)
+        .as("the POM added the derived prefix")
+        .containsExactly("stored", "foo");
+
+    uploadJar(repo, ARTIFACT_ID, jar(ARTIFACT_ID, "custom"));
+
+    assertThat(groupFile(repo))
+        .extracting(Plugin::getArtifactId, Plugin::getPrefix)
+        .containsExactly(tuple("stored-maven-plugin", "stored"), tuple(ARTIFACT_ID, "custom"));
+    assertThat(prefixesOf(repo, ARTIFACT_ID)).containsExactly("custom", "custom");
+  }
+
+  @Test
+  @DisplayName("the jar drops the derived entry when Maven merged its own entry in meanwhile")
+  void pomThenMavenMergeThenJar() throws Exception {
+    final var repo = this.mavenRepo();
+    uploadJar(repo, "stored-maven-plugin", jar("stored-maven-plugin", "stored"));
+    uploadPom(repo, "stored-maven-plugin");
+    upload(repo, METADATA_PATH, groupFileOf(entry("stored-maven-plugin", "stored")));
+    uploadPom(repo, ARTIFACT_ID);
+    // Maven read the file with the derived entry, added its own and stored the whole file.
+    upload(
+        repo,
+        METADATA_PATH,
+        groupFileOf(
+            entry("stored-maven-plugin", "stored"),
+            entry(ARTIFACT_ID, "foo"),
+            entry(ARTIFACT_ID, "custom")));
+
+    uploadJar(repo, ARTIFACT_ID, jar(ARTIFACT_ID, "custom"));
+
+    assertThat(groupFile(repo))
+        .extracting(Plugin::getArtifactId, Plugin::getPrefix)
+        .containsExactly(tuple("stored-maven-plugin", "stored"), tuple(ARTIFACT_ID, "custom"));
+  }
+
+  @Test
+  @DisplayName("a jar with a classifier does not change the prefix the POM registered")
+  void aClassifierJarIsNotLookedAt() throws Exception {
+    final var repo = this.mavenRepo();
+
+    uploadPom(repo, ARTIFACT_ID);
+    upload(
+        repo,
+        GROUP_DIR + ARTIFACT_ID + "/1.0/" + ARTIFACT_ID + "-1.0-sources.jar",
+        jar(ARTIFACT_ID, "custom"));
+
+    assertThat(prefixesOf(repo, ARTIFACT_ID)).containsExactly("foo", "foo");
+  }
+
+  @Test
+  @DisplayName("a jar that names no usable prefix leaves the derived one after the POM")
+  void unusableJarsAfterThePom(@TempDir final Path dir) throws Exception {
+    final var repo = this.mavenRepo();
+    final var secret = dir.resolve("secret.txt");
+    Files.writeString(secret, "leaked");
+
+    uploadPom(repo, "plain-maven-plugin");
+    uploadJar(repo, "plain-maven-plugin", jarWithoutDescriptor());
+    uploadPom(repo, "broken-maven-plugin");
+    uploadJar(repo, "broken-maven-plugin", "this is not a zip".getBytes(StandardCharsets.UTF_8));
+    uploadPom(repo, "shaded-maven-plugin");
+    uploadJar(repo, "shaded-maven-plugin", jar("other-maven-plugin", "foreign"));
+    uploadPom(repo, "xxe-maven-plugin");
+    uploadJar(repo, "xxe-maven-plugin", jarWithExternalEntity("xxe-maven-plugin", secret));
+
+    assertThat(prefixesOf(repo, "plain-maven-plugin")).containsExactly("plain", "plain");
+    assertThat(prefixesOf(repo, "broken-maven-plugin")).containsExactly("broken", "broken");
+    assertThat(prefixesOf(repo, "shaded-maven-plugin")).containsExactly("shaded", "shaded");
+    assertThat(prefixesOf(repo, "xxe-maven-plugin")).containsExactly("xxe", "xxe");
   }
 
   @Test

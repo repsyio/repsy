@@ -34,6 +34,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.maven.shared.artifact.dtos.PluginPrefixChange;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.ByteArrayInputStream;
@@ -814,6 +815,85 @@ class AbstractMavenStorageServiceTest {
     // The xml grew, the sha1 lost its newline (-1), the md5 grew from "stale" (5) to 32, and 140
     // bytes of signatures were freed.
     assertThat(delta).isEqualTo((xml.length - before) + (-1) + (32 - 5) - 140);
+  }
+
+  private long replacePrefix(final String artifactId, final String from, final String to)
+      throws Exception {
+    return this.storageService.replacePluginPrefixInGroupMetadata(
+        repoInfo(), GROUP_OF_DEMO, new PluginPrefixChange(artifactId, from, to));
+  }
+
+  @Test
+  @DisplayName(
+      "the derived prefix of a plugin is replaced by the one its jar names, in place, and the"
+          + " checksums are rewritten (RPS-1589)")
+  void replacePluginPrefixRenamesTheEntry() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, PLUGIN_GROUP_XML);
+    store(METADATA_FILENAME + ".sha1", "stale");
+    store(METADATA_FILENAME + ".asc", "signature");
+
+    replacePrefix("foo-maven-plugin", "foo", "custom");
+
+    assertThat(storedMetadata().getPlugins())
+        .extracting("artifactId", "prefix", "name")
+        .containsExactly(tuple("foo-maven-plugin", "custom", "Foo"));
+    assertThat(stored(METADATA_FILENAME + ".sha1"))
+        .isEqualTo(DigestUtils.sha1Hex(this.files.get(METADATA_PATH)));
+    assertThat(this.files).doesNotContainKey(METADATA_PATH + ".asc");
+  }
+
+  @Test
+  @DisplayName("the derived entry is dropped when the file lists the plugin under its prefix too")
+  void replacePluginPrefixDropsAStaleDuplicate() throws Exception {
+    useInMemoryStorage();
+    store(
+        METADATA_FILENAME,
+        """
+        <metadata><plugins>
+          <plugin><name>Foo</name><prefix>foo</prefix><artifactId>foo-maven-plugin</artifactId></plugin>
+          <plugin><name>Bar</name><prefix>bar</prefix><artifactId>bar-maven-plugin</artifactId></plugin>
+          <plugin><name>Foo</name><prefix>custom</prefix><artifactId>foo-maven-plugin</artifactId></plugin>
+        </plugins></metadata>
+        """);
+
+    replacePrefix("foo-maven-plugin", "foo", "custom");
+
+    assertThat(storedMetadata().getPlugins())
+        .extracting("artifactId", "prefix")
+        .containsExactly(tuple("bar-maven-plugin", "bar"), tuple("foo-maven-plugin", "custom"));
+  }
+
+  @Test
+  @DisplayName(
+      "an entry of another plugin, or of the plugin under another prefix, is left byte for byte")
+  void replacePluginPrefixLeavesOtherEntriesAlone() throws Exception {
+    useInMemoryStorage();
+    store(METADATA_FILENAME, PLUGIN_GROUP_XML);
+    store(METADATA_FILENAME + ".asc", "signature");
+
+    assertThat(replacePrefix("bar-maven-plugin", "foo", "custom")).isZero();
+    assertThat(replacePrefix("foo-maven-plugin", "derived", "custom")).isZero();
+
+    assertThat(this.writes).isEmpty();
+    assertThat(this.deletes).isEmpty();
+    assertThat(stored(METADATA_FILENAME)).isEqualTo(PLUGIN_GROUP_XML);
+    assertThat(stored(METADATA_FILENAME + ".asc")).isEqualTo("signature");
+  }
+
+  @Test
+  @DisplayName("replacing a plugin prefix creates nothing, and leaves an artifact-level file alone")
+  void replacePluginPrefixWithoutAGroupFile() throws Exception {
+    useInMemoryStorage();
+
+    assertThat(replacePrefix("foo-maven-plugin", "foo", "custom")).isZero();
+    assertThat(this.files).isEmpty();
+
+    store(METADATA_FILENAME, METADATA_XML);
+
+    assertThat(replacePrefix("foo-maven-plugin", "foo", "custom")).isZero();
+    assertThat(this.writes).isEmpty();
+    assertThat(stored(METADATA_FILENAME)).isEqualTo(METADATA_XML);
   }
 
   @Test

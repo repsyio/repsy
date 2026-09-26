@@ -88,6 +88,12 @@ public class ArtifactDeletionComponent {
   public Pair<DeletedItem, BaseUsages> deleteArtifact(
       final RepoInfo repoInfo, final String groupName, final String artifactName) {
 
+    // Confirms the artifact is real before the "only artifact of the group" cascade below. Without
+    // it, an artifact name that does not exist in a group holding exactly one artifact reached
+    // hasOnlyOneArtifact() as true and deleted the whole group (files and rows) instead of
+    // answering 404 (RPS-1573, the shape RPS-1190 fixed for versions).
+    this.artifactService.requireArtifact(repoInfo.getStorageKey(), groupName, artifactName);
+
     if (this.artifactService.hasOnlyOneArtifact(repoInfo.getStorageKey(), groupName)) {
       return this.deleteGroup(repoInfo, groupName);
     }
@@ -110,6 +116,11 @@ public class ArtifactDeletionComponent {
 
   public Pair<DeletedItem, BaseUsages> deleteGroup(
       final RepoInfo repoInfo, final String groupName) {
+
+    // A group that holds no artifact is not there: 404 instead of a 200 that deleted nothing
+    // (RPS-1573). The cascade from deleteArtifact() and deleteArtifactVersion() passes it, the
+    // artifact being deleted still holds a row.
+    this.artifactService.requireGroup(repoInfo.getStorageKey(), groupName);
 
     // No special case for a "root group" (the one whose name prefixes every other group): its own
     // artifacts are removed like any group's, and a nested group such as com.acme.sub next to

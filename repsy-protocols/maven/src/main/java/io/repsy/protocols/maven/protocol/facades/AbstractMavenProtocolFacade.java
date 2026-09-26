@@ -348,17 +348,71 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       throw e;
     }
 
+    context.addProperty(USAGES, this.usageAfterRegistration(repoInfo, storagePath, stored));
+  }
+
+  /**
+   * The usage of a file that is registered, with what the rewrites of the stored metadata that its
+   * registration triggers cost: the ones a POM triggers (see {@code reconcileStoredMetadata} and
+   * {@code reconcileStoredGroupMetadata}) and the correction of the group-level file that the main
+   * jar of a plugin triggers (see {@code refreshPluginPrefix}).
+   */
+  private BaseUsages usageAfterRegistration(
+      final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath, final Stored stored) {
+
+    final var usage = stored.usage();
+
     if (ArtifactUtils.isPomToParse(storagePath)) {
       final var reconciled =
           this.reconcileStoredMetadata(repoInfo, storagePath)
               + (stored.plugin() ? this.reconcileStoredGroupMetadata(repoInfo, storagePath) : 0L);
 
-      context.addProperty(USAGES, BaseUsages.ofDisk(usage.getDiskUsage() + reconciled));
-
-      return;
+      return BaseUsages.ofDisk(usage.getDiskUsage() + reconciled);
     }
 
-    context.addProperty(USAGES, usage);
+    if (ArtifactUtils.isMainJar(storagePath)) {
+      return BaseUsages.ofDisk(
+          usage.getDiskUsage() + this.refreshPluginPrefix(repoInfo, storagePath));
+    }
+
+    return usage;
+  }
+
+  /**
+   * The jar of a version that arrived after its POM (what {@code mvn deploy} sends) tells the
+   * {@code goalPrefix} of a plugin, which the POM could not read when it registered the version:
+   * the registered prefix is corrected to it and so is the entry the stored group-level {@code
+   * maven-metadata.xml} got at that time, so the plugin is listed once, under the prefix it is run
+   * by, whichever order the client sent its files in (RPS-1589). Best effort in the way {@link
+   * #reconcileStoredMetadata} is: what the jar holds never fails its upload.
+   *
+   * @return the change of the disk usage the rewrite of the group-level file caused, {@code 0} when
+   *     there was none
+   */
+  private long refreshPluginPrefix(final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath) {
+
+    return this.bestEffort(
+        repoInfo,
+        storagePath,
+        "the corrected plugin prefix of",
+        () -> {
+          final var gav = ArtifactUtils.getGavByFile(storagePath);
+
+          if (gav == null) {
+            return 0L;
+          }
+
+          final var change =
+              this.artifactService.refreshPluginPrefixFromJar(
+                  repoInfo,
+                  storagePath,
+                  this.mavenStorageService.getResource(repoInfo.getName(), storagePath));
+
+          return change == null
+              ? 0L
+              : this.mavenStorageService.replacePluginPrefixInGroupMetadata(
+                  repoInfo, gav.getGroupId(), change);
+        });
   }
 
   /**
@@ -415,11 +469,11 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * of the group the file lacks is added, not only this one, so a plugin that was registered while
    * the file was not there to be changed is added with the next one.
    *
-   * <p>The plugin is added with the prefix the repository derives from its artifactId. A plugin
-   * that sets its own {@code goalPrefix} and is published by {@code mvn deploy} into a group whose
-   * file is stored already is added here first (Maven sends the POM before it reads the file it
-   * merges its entry into), so that file ends up with its entry under the derived prefix too, next
-   * to the one Maven merges in: harmless, {@code mvn prefix:goal} finds the plugin by either.
+   * <p>The plugin is added with the prefix the repository has registered for it, which is the one
+   * derived from its artifactId when its jar is not stored yet (Maven sends the POM before the jar
+   * and before it reads the file it merges its entry into). A plugin that sets its own {@code
+   * goalPrefix} gets that entry corrected when the jar arrives ({@link #refreshPluginPrefix},
+   * RPS-1589), so the file lists it once.
    *
    * <p>It is best effort in the way {@link #reconcileStoredMetadata} is.
    *

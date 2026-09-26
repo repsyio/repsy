@@ -35,9 +35,9 @@
  *    the plugins published without the file.
  *  - RA4: a second plugin deployed by `mvn deploy` (Maven downloads the stored group-level file, adds its
  *    entry and uploads it) leaves both listed, and both prefixes run.
- *  - RA5 (RPS-1458): a plugin with its own `goalPrefix` (`tl`) deployed by `mvn deploy` onto that group is
- *    listed by it and run by `mvn tl:hi`. The file Repsy leaves ALSO lists it under the prefix derived from
- *    its artifactId (README "Maven plugin prefix", not covered); that is deliberately not asserted here.
+ *  - RA5 (RPS-1458, RPS-1589): a plugin with its own `goalPrefix` (`tl`) deployed by `mvn deploy` onto that
+ *    group is listed by it, ONCE and not under the prefix derived from its artifactId (the POM arrives before
+ *    the jar, and the jar corrects the entry the POM added), and run by `mvn tl:hi`.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -328,7 +328,7 @@ test('maven plugin > a second plugin deployed by mvn joins the group-level file 
   }
 });
 
-test('maven plugin > a plugin with its own goalPrefix deployed by mvn is listed and run by that prefix (RPS-1458)', async ({
+test('maven plugin > a plugin with its own goalPrefix deployed by mvn is listed once and run by that prefix (RPS-1458, RPS-1589)', async ({
   seeder,
 }) => {
   const { repoName, credential } = await newRepoWithToken(seeder);
@@ -348,6 +348,13 @@ test('maven plugin > a plugin with its own goalPrefix deployed by mvn is listed 
     `<prefix>${TOOL_PLUGIN.prefix}</prefix>`,
   );
   expect(xml).toContain(`<artifactId>${TOOL_PLUGIN.artifactId}</artifactId>`);
+  expect(
+    xml.split(`<artifactId>${TOOL_PLUGIN.artifactId}</artifactId>`).length - 1,
+    'the plugin is listed once',
+  ).toBe(1);
+  expect(xml, 'and not under the prefix derived from its artifactId').not.toContain(
+    '<prefix>tool</prefix>',
+  );
   expect(xml, 'the first plugin is still listed, once').toContain(
     `<artifactId>${PLUGIN_ARTIFACT_ID}</artifactId>`,
   );

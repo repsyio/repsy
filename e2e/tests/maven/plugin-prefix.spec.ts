@@ -35,6 +35,8 @@
  *  - PP5 (RPS-1458): a plugin with its own `goalPrefix` (`tool-maven-plugin`, prefix `tl`), published
  *    jar first and then the POM (Gradle's order) and without the file, is listed and found by that
  *    prefix, not by the one derived from its artifactId.
+ *  - PP6 (RPS-1589): the same plugin published POM first and then the jar (the order of `mvn deploy`):
+ *    the jar corrects the prefix the POM registered, so the file lists `tl` and no derived `tool`.
  */
 import { createHash } from 'node:crypto';
 
@@ -263,6 +265,35 @@ test('plugin-prefix > a plugin with its own goalPrefix published without the fil
   expect(found.exitCode, `mvn ${TOOL_PLUGIN.prefix}:hi: ${found.command}\n${output}`).toBe(0);
   expect(output, 'the goal of the plugin ran').toContain(TOOL_PLUGIN.marker);
   expect(output).not.toContain('No plugin found for prefix');
+
+  const derived = await runPrefixGoal(repo.name, credential, 'tool');
+  expect(derived.exitCode, `mvn tool:hi: ${derived.command}`).not.toBe(0);
+  expect(`${derived.stdout}\n${derived.stderr}`).toContain("No plugin found for prefix 'tool'");
+});
+
+test('plugin-prefix > a plugin with its own goalPrefix whose POM arrives before its jar is found by that prefix (RPS-1589)', async ({
+  seeder,
+}) => {
+  const tool = await buildPlugin(TOOL_PLUGIN);
+  const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+  const credential = adminCredential();
+  // The POM first and then the jar, which is the order of maven-deploy-plugin: the POM registers the
+  // prefix derived from the artifactId, and the jar corrects it.
+  await uploadPluginFiles(repo.name, credential, tool, 'pom-first');
+
+  const file = await rawGet(repo.name, credential, groupMetadataPath());
+  expect(file.status).toBe(200);
+  const xml = file.body.toString('utf8');
+  expect(xml, 'the plugin is listed by the goalPrefix of its plugin.xml').toContain(
+    `<prefix>${TOOL_PLUGIN.prefix}</prefix>`,
+  );
+  expect(xml.split(`<artifactId>${TOOL_PLUGIN.artifactId}</artifactId>`).length - 1).toBe(1);
+  expect(xml, 'not by the one derived from the artifactId').not.toContain('<prefix>tool</prefix>');
+
+  const found = await runPrefixGoal(repo.name, credential, TOOL_PLUGIN.prefix);
+  const output = `${found.stdout}\n${found.stderr}`;
+  expect(found.exitCode, `mvn ${TOOL_PLUGIN.prefix}:hi: ${found.command}\n${output}`).toBe(0);
+  expect(output, 'the goal of the plugin ran').toContain(TOOL_PLUGIN.marker);
 
   const derived = await runPrefixGoal(repo.name, credential, 'tool');
   expect(derived.exitCode, `mvn tool:hi: ${derived.command}`).not.toBe(0);
