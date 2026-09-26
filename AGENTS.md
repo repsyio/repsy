@@ -149,7 +149,10 @@ Optional and off by default (`SECURITY_SCANNER=disabled`). `server/security/` de
 resolves the artifact's files
 through the format's `ArtifactStorageResolver`, sends them to `repsy-scanner-trivy` (a separate
 service with `POST /scan`, guarded by an API key) and `TrivyScanStatusPoller` collects the result.
-Findings are stored per repo and surfaced in the panel and in `npm audit`.
+Findings are stored per repo and surfaced in the panel and in `npm audit`. `npm audit` also asks the
+scanner's `POST /advisories` (`VulnerabilityAdvisoryLookup`, RPS-1612) for the name/version pairs the
+client sends and merges the answer with the stored findings; any non-200, timeout or failure of that
+lookup means "no lookup this time" and the audit is answered from the stored findings.
 
 ### Frontend
 

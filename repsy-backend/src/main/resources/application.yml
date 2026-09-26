@@ -182,6 +182,13 @@ repsy:
       submit-max-attempts: ${TRIVY_SUBMIT_MAX_ATTEMPTS:3}
       submit-retry-initial-delay-seconds: ${TRIVY_SUBMIT_RETRY_INITIAL_DELAY_SECONDS:15}
       submit-retry-max-delay-seconds: ${TRIVY_SUBMIT_RETRY_MAX_DELAY_SECONDS:60}
+      # The npm audit asks the scanner's vulnerability database for the versions it is sent (RPS-1612),
+      # a short call bounded by request-timeout-seconds. At most max-concurrency such calls run at
+      # once; another audit waits for one up to max-wait-millis and then answers from the stored
+      # findings only, as it does whenever the scanner does not answer.
+      advisory-lookup:
+        max-concurrency: ${TRIVY_ADVISORY_LOOKUP_MAX_CONCURRENCY:2}
+        max-wait-millis: ${TRIVY_ADVISORY_LOOKUP_MAX_WAIT_MILLIS:2000}
     docker:
       internal-registry-base-url: ${DOCKER_INTERNAL_REGISTRY_BASE_URL:http://localhost:9090}
 
