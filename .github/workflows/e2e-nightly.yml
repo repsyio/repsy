@@ -18,9 +18,9 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack, plus the full catalog of one rotating runner), scanner (the @scanner specs of the ui runner and of the npm-clients, docker, maven and pypi runners against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack), limits (the @limits specs of the pypi, helm, nuget, ruby, cargo, golang and api runners against the tiny-upload-limit stack) or all"
+        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack, plus the full catalog of one rotating runner), scanner (the @scanner specs of the ui runner and of the npm-clients, docker, maven and pypi runners against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack), limits (the @limits specs of the pypi, helm, nuget, ruby, cargo, golang and api runners against the tiny-upload-limit stack), upgrade (the previous release on a populated volume, upgraded to this image: PostgreSQL and H2) or all"
         type: choice
-        options: [all, ui, wire, h2, scanner, throttle, limits]
+        options: [all, ui, wire, h2, scanner, throttle, limits, upgrade]
         default: all
       protocol:
         description: "Only these runner services, comma separated (skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,golang,ruby,stack,api,ui). Empty: every runner of the chosen legs"
@@ -32,6 +32,10 @@ on:
         default: ""
       h2_full:
         description: "The one runner whose FULL catalog the h2-full leg runs on the embedded-H2 stack (any runner name above). Empty: the runner that is next in the nightly rotation. It applies whatever the protocol input says"
+        type: string
+        default: ""
+      upgrade_from:
+        description: "The release the upgrade legs start from, an image tag of repo.repsy.io/repsy/os/repsy (e.g. 26.08.4). Empty: PREVIOUS_RELEASE in e2e/src/upgrade/previous-release.ts"
         type: string
         default: ""
       keep_stack_logs:
@@ -107,6 +111,12 @@ jobs:
               # every package over 64 KiB). One over-limit push per real client: pypi, helm, nuget, ruby, cargo
               # and golang, plus the raw connector cases (chunked uploads) of the api runner.
               "limits": ("limits", "--limits", ["pypi", "helm", "nuget", "ruby", "cargo", "golang", "api"], "@limits", 60, "limits", False),
+              # The upgrade path (README.md "Upgrade path"): `run.sh local up --upgrade` starts the previous
+              # release on fresh volumes and tests/stack/upgrade.spec.ts recreates it on this checkout's image,
+              # once on PostgreSQL and once on embedded H2 (two legs: the databases migrate differently and a
+              # leg has one stack). Only the stack runner, only @upgrade; the grep input does not apply.
+              "upgrade": ("upgrade", "--upgrade", ["stack"], "@upgrade", 30, "upgrade", False),
+              "upgrade-h2": ("upgrade", "--upgrade --h2", ["stack"], "@upgrade", 30, "upgrade", False),
           }
 
           # leg -> {runner: --grep} where a runner must not take the leg's default grep ("" is the whole
@@ -230,6 +240,9 @@ jobs:
       REPSY_ADMIN_PASSWORD: E2eAdmin-Pass1
       # Where the legs' reports are collected: e2e-artifacts/<leg>/<runner>/{junit.xml,playwright-report,test-results}
       ARTIFACTS: ${{ github.workspace }}/e2e/e2e-artifacts/${{ matrix.leg }}
+      # The release the upgrade legs start from (empty: PREVIOUS_RELEASE, e2e/src/upgrade/previous-release.ts);
+      # read by `run.sh local up --upgrade` and forwarded to the stack runner.
+      REPSY_E2E_UPGRADE_FROM: ${{ inputs.upgrade_from }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -252,7 +265,8 @@ jobs:
         # REPSY_IMAGE is set (workflow env), so run.sh starts the loaded image and does not build.
         # $STACK is empty (PostgreSQL profile), --h2, or an overlay flag (--scanner: PostgreSQL plus the
         # stub scanner; --throttle: PostgreSQL with the low auth-throttle limit; --limits: PostgreSQL with
-        # tiny upload size limits); it is split into words
+        # tiny upload size limits; --upgrade: the previous release, with REPSY_IMAGE as the image the spec
+        # upgrades it to); it is split into words
         # so an empty value passes no argument at all.
         run: |
           read -ra stack_args <<< "$STACK"
@@ -299,7 +313,7 @@ jobs:
           # the whole catalog of that runner.
           RUNNER_GREP: ${{ toJSON(matrix.runner_grep) }}
           # The opt-in suites (README.md "Stack overlays"): the name of the leg's overlay (`scanner`,
-          # `throttle`, `limits`), empty elsewhere. run.sh hands it to every runner (docker-compose.runners.yml) and
+          # `throttle`, `limits`, `upgrade`), empty elsewhere. run.sh hands it to every runner (docker-compose.runners.yml) and
           # the specs of that overlay skip without it.
           REPSY_E2E_OPT_IN: ${{ matrix.opt_in }}
           # Read by playwright.config.ts (retries: 1, forbidOnly, trace on first retry); run.sh
@@ -348,7 +362,7 @@ jobs:
           print(f"{flaky} retried test(s)")
           PY
 
-      # The specs of an overlay (@scanner, @throttle, @limits) skip themselves unless the opt-in reached the runner,
+      # The specs of an overlay (@scanner, @throttle, @limits, @upgrade) skip themselves unless the opt-in reached the runner,
       # and a skipped test is not a failure, so a broken opt-in would leave the leg green with everything
       # skipped. Fail it instead when a runner of an overlay leg ran nothing or skipped anything.
       - name: Check the opt-in specs ran
