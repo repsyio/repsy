@@ -38,6 +38,7 @@ import {
   planFor,
   type StubSeverity,
 } from '../../src/stubs/scanner/rules.ts';
+import { CONTRACT_CASES, expectFindingShape } from '../../src/stubs/scanner/contract.ts';
 import { createScannerStub, type StubOptions } from '../../src/stubs/scanner/server.ts';
 
 const KEY = 'unit-test-key';
@@ -197,6 +198,12 @@ test.describe('stub scanner findings', () => {
       cvssScore: null,
       cvssVector: null,
     });
+  });
+
+  test('have the shape of a finding of the real scanner (contract.ts)', () => {
+    for (const finding of findingsFor(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'])) {
+      expectFindingShape({ ...finding });
+    }
   });
 
   test('every CVE id of a profile is unique', () => {
@@ -411,7 +418,7 @@ test.describe('stub scanner HTTP contract', () => {
     const response = await status(s, 'nope');
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ message: 'Scan job not found: nope' });
+    expect(await response.json()).toEqual({ message: 'No scan job found for scanId: nope' });
   });
 
   test('a submit with a missing field or an empty file is a 400, and no job is made', async () => {
@@ -443,7 +450,7 @@ test.describe('stub scanner HTTP contract', () => {
       headers: { 'x-scanner-api-key': KEY, 'content-type': 'application/json' },
       body: '{}',
     });
-    expect(notMultipart.status).toBe(400);
+    expect(notMultipart.status).toBe(415);
 
     expect((await status(s, 'scan-empty')).status).toBe(404);
     expect((await s.client.calls()).map((call) => call.result)).toEqual([
@@ -675,4 +682,21 @@ test.describe('stub scanner with the control API disabled', () => {
       await s.close();
     }
   });
+});
+
+/**
+ * The raw contract cases the REAL scanner is held to as well (`tests/api/trivy-contract.spec.ts`, the
+ * trivy overlay), run against the stub on the real clock: the two answer alike, or one of the runs is red.
+ */
+test.describe('stub scanner and the contract of the real one (src/stubs/scanner/contract.ts)', () => {
+  for (const contract of CONTRACT_CASES) {
+    test(contract.name, async () => {
+      const s = await start({ now: () => Date.now() });
+      try {
+        await contract.run({ base: s.base, apiKey: KEY });
+      } finally {
+        await s.close();
+      }
+    });
+  }
 });

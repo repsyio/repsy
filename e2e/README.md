@@ -80,6 +80,7 @@ e2e/
   docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
   docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
   docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
+  docker-compose.stack-trivy.yml  # OPT-IN overlay on either stack: the REAL repsy-scanner-trivy (built from ../repsy-scanner-trivy) + Repsy with the scanner enabled, `run.sh local up|down --trivy`, see "Real scanner stack"
   docker-compose.stack-limits.yml  # OPT-IN overlay on either stack: every configurable upload limit at 64 KiB, `run.sh local up|down --limits`, see "Size-limit leg"
   docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" and "api"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
@@ -212,6 +213,7 @@ e2e/
       ivy.spec.ts               # RPS-135: registerPublishConsumeLoop(ivyAdapter), a real `ant` with ivy:publish and ivy:retrieve
       ivy-client.spec.ts        # RPS-135: IV1-IV9 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete, the generated maven-metadata.xml read by Maven and Gradle, RPS-1369, an Ivy publish after mvn deploy, RPS-1437)
       plugin-prefix.spec.ts     # RPS-1438, RPS-1457, RPS-1458: PP1-PP5, real Maven plugins built by `mvn package`, uploaded without a group-level maven-metadata.xml and run by `mvn hello:hi` through the file Repsy generates (and a control, a stored file that wins, a second plugin added to a stored file, and a plugin with its own goalPrefix)
+      maven-reactor-plugin.spec.ts # RPS-1488: RA1-RA5, real `mvn deploy` of a parent + jar + war reactor (consumed by a second project), a hand-built war and `maven-plugin` packaging (group-level metadata Maven uploads, `mvn hello:hi`)
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
@@ -300,6 +302,7 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_E2E_SCANNER`           | _(unset)_                  | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_E2E_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                    |
 | `REPSY_E2E_THROTTLE`          | _(unset)_                  | `1` makes `local up\|down` include the auth-throttle overlay (same as `--throttle`) and `test` add `throttle` to `REPSY_E2E_OPT_IN`, see "Auth-throttle leg"                                                                                                                                                                                                                                                                             |
 | `REPSY_E2E_LIMITS`            | _(unset)_                  | `1` makes `local up\|down` include the tiny-upload-limit overlay (same as `--limits`) and `test` add `limits` to `REPSY_E2E_OPT_IN`, see "Size-limit leg"                                                                                                                                                                                                                                                                                |
+| `REPSY_E2E_TRIVY`             | _(unset)_                  | `1` makes `local up\|down` include the real-scanner overlay (same as `--trivy`) and `test` add `trivy` to `REPSY_E2E_OPT_IN`, see "Real scanner stack"                                                                                                                                                                                                                                                                                   |
 | `REPSY_E2E_SCANNER_PORT`      | `8090` + offset            | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_SCANNER_STUB_URL`      | `http://localhost:8090`    | ui runner only: where the `@scanner` specs reach that API (follows `REPSY_E2E_SCANNER_PORT`)                                                                                                                                                                                                                                                                                                                                             |
 | `REPSY_SCANNER_API_KEY`       | `e2e-scanner-key`          | the shared secret of the stub scanner and the backend's scanner client                                                                                                                                                                                                                                                                                                                                                                   |
@@ -1085,6 +1088,37 @@ clients).
 
 ```bash
 ./run.sh test --protocol maven
+```
+
+### Maven reactor, war and plugin deploys (`maven-reactor-plugin.spec.ts`, RPS-1488)
+
+The other specs deploy a source-free jar or upload files by hand; this one runs the real `mvn deploy`
+of the other packagings (`clients/maven-reactor.ts`, templates `pom.{parent,module,war,consumer}.template.xml`
+and `web.template.xml`; recovered from the step-5 branch, ported from repsy-cloud's `multi_module` and `war`
+cases). Every credential is a fresh read-write deploy token; every `mvn` has a fresh local repository and the
+shared read-only tail. `-ntp` hides Maven's "Uploaded to" lines, so a deploy is proven by the repo's own tree.
+
+- **RA1** (`@smoke`): a reactor root (`packaging=pom`) with a jar module and a war module (which depends on the
+  jar) is deployed by ONE `mvn deploy`. The repo holds the parent POM, each module's POM, the jar and the war,
+  each with the `.md5` and `.sha1` Maven uploads (Maven sends no other digest), the stored bytes are the built
+  ones, and each artifact's `maven-metadata.xml` lists exactly the version. A second project that depends on the
+  jar and the war (`dependency:copy-dependencies`, clean local repository) gets both byte for byte, and the parent
+  POM they name, from the server.
+- **RA2** (`@smoke`): a hand-built `packaging=war` project (no archetype) is deployed and resolved back with
+  the bytes it built; a raw `GET` of the war is `200`, its `.sha1` is the digest of the war.
+- **RA3** (`@smoke`): `mvn deploy` of the hello `maven-plugin` (`clients/maven-plugin.ts`'s `deployPlugin`; the
+  plugin POM names the repository when given `repoUrl`) STORES the group-level `maven-metadata.xml` and its
+  checksums (listed in the directory, unlike the file Repsy generates for a plugin published by hand), which lists
+  the plugin by its prefix; `mvn hello:hi` from a clean local repository (the group in `pluginGroups`) finds and
+  runs it, and stores nothing.
+- **RA4**: a second plugin deployed by `mvn deploy` (Maven downloads the stored group file, adds its entry and
+  uploads it) leaves both listed once, the stored `.sha1` is that of the merged file, and both prefixes run.
+- **RA5** (RPS-1458): a plugin with its own `goalPrefix` deployed by `mvn deploy` is listed by it and run by
+  `mvn tl:hi`. Repsy's file also lists it under the prefix derived from its artifactId (the case "Maven plugin
+  prefix" lists as not covered), which is not asserted.
+
+```bash
+./run.sh test --protocol maven --grep "maven reactor|maven war|maven plugin"
 ```
 
 ## npm runner
@@ -3885,6 +3919,7 @@ and is never part of the default stack.
 | `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang), "TLS stack"; nightly `@smoke` of all clients |
 | `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                 |
 | `upgrade`  | `--upgrade`             | `REPSY_E2E_UPGRADE=1`  | `docker-compose.stack-upgrade.yml`  | `upgrade`   | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                      |
+| `trivy`    | `--trivy`               | `REPSY_E2E_TRIVY=1`    | `docker-compose.stack-trivy.yml`    | `trivy`     | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                                    |
 
 How it fits together, so a later overlay is one row:
 
@@ -4493,6 +4528,39 @@ behaviour, passes while the bug is there and goes red when it is fixed; the fix 
 
 ```bash
 ./run.sh test --protocol maven,npm,pypi --grep "panel API"
+```
+
+## Panel API contract specs: Docker and Helm (RPS-1483 part B6)
+
+`tests/docker/panel-api.spec.ts` (`--protocol docker`, real `crane`) and `tests/helm/panel-api.spec.ts` (`--protocol helm`,
+real `helm push`, `helm cm-push`, `helm package`, `helm show chart`, `helm pull`) follow the section above (same helpers,
+same `expectCovers`). What is specific to them:
+
+- **Docker** calls all 12 operations of `/api/docker/images`. The facts are the client's: `crane digest` of every tag, the
+  config and layer digests and sizes of the manifest, `crane config`, and the platforms of a two-arch OCI index
+  (`listDockerTagManifests` returns the index row plus one row per child, named by digest). `size` of an image is the
+  config plus layer bytes of every DISTINCT manifest its tags reach, and `untaggedSize` the same for the untagged ones,
+  both computed from the built layout. The deletes follow AGENTS.md "Database": a manifest is one row per image and digest,
+  a tag is a pointer, the manifest FILE is shared by the images of a repo and goes only when no row needs it. So deleting
+  a tag leaves the shared digest pullable through the sibling tag and image; `deleteDockerUntaggedManifests` reports
+  `freedManifestBytes` (the index and the arm64 child, not the manifest image B still has) and `orphanLayersScheduled`
+  (the arm64 config and layer, not the blobs a tagged manifest uses); the blobs go in the background (the spec polls a
+  blob HEAD); `deleteDockerImage` leaves the blobs until `deleteDockerOrphanLayers`. After every step the wire is read
+  (manifest GET by tag and digest, `tags/list` still 404 as pinned for RPS-1489, blob HEAD, `crane pull`).
+- **Helm** calls all 6 operations. One repo serves OCI and classic, so `web` is pushed with `helm push` and `lib` with
+  `helm cm-push`, and `index.yaml` lists both with the digest, `appVersion`, `type` and `created` the panel reports. An OCI
+  chart's `digest` and `size` are those of the `.tgz` `helm package` built (`helm push` sends it verbatim); a classic chart
+  is REPACKAGED by `cm-push`, so its digest is that of the file the classic download serves. `getHelmChartOciTags` returns
+  the tag AND the manifest digest `helm push` printed for each version, and `[]` for a classic chart. A delete drops the
+  version from `index.yaml`, the classic download and the OCI manifest (tag and digest) answer 404, `helm pull` and
+  `helm show chart` fail, and the sibling version pulls the bytes helm built.
+- **Deleting something that is not there** is a 404 that deletes nothing (a single-tag image, a single-version chart
+  stay complete), so neither protocol has the RPS-1573 cascade Maven has.
+- **Paging**: `listDockerImages`, `listDockerImageTags` and `searchHelmCharts` run `expectPagingSweep`; the version list of a
+  chart is not paged.
+
+```bash
+./run.sh test --protocol docker,helm --grep "panel API"
 ```
 
 ## Remote hardening
@@ -5374,6 +5442,70 @@ The Docker, Maven and PyPI specs script a finding list by name (`SCRIPTED_SEVERI
 names carry no directive. The scanner leg of the nightly runs `ui`, `npm-clients`, `docker`, `maven` and `pypi`;
 its step "Check the opt-in specs ran" fails a runner that skipped or ran nothing.
 
+### Real scanner stack (RPS-1484): `repsy-scanner-trivy` itself, once
+
+The stub scanner above stands in for `repsy-scanner-trivy`, so nothing but a mirror of its contract keeps the two
+alike. `./run.sh local up --trivy` (or `REPSY_E2E_TRIVY=1`, `docker-compose.stack-trivy.yml`) runs the REAL
+service instead: the image built from `../repsy-scanner-trivy` (Trivy 0.66 inside), started with
+`SCANNER_API_KEY` (`REPSY_SCANNER_API_KEY`, default `e2e-scanner-key`, the same value the backend gets as
+`TRIVY_SCANNER_API_KEY`), and Repsy with `SECURITY_SCANNER=enabled`, `TRIVY_SCANNER_BASE_URL=http://scanner-trivy:8090`,
+`DOCKER_INTERNAL_REGISTRY_BASE_URL=http://repsy:9090` (so the scanner can pull a Docker image from Repsy over the
+compose network, plain http, hence `--insecure`) and `TRIVY_MAX_SCAN_DURATION_SECONDS=900` (default 330). It is an
+alternative to `--scanner`, never combined with it (`run.sh` refuses the pair): both publish the scanner port
+(`REPSY_E2E_SCANNER_PORT`, 8090 + offset) and set the backend's scanner URL. The `@scanner` specs need the stub's
+`/control` API and do not run on it.
+
+```bash
+export REPSY_E2E_PROJECT=rps-1484 REPSY_E2E_PORT_OFFSET=900   # optional, "Parallel stacks"
+./run.sh local up --trivy          # about 3 minutes on a cold cache (network needed, see below)
+REPSY_E2E_TRIVY=1 ./run.sh test --protocol api --grep @trivy
+./run.sh local down --trivy        # keeps the trivy-cache volume; `docker compose ... down -v` drops it
+```
+
+**The network.** Trivy keeps its vulnerability databases (the general one and the Java one, about 1.4 GB on disk) in
+the `trivy-cache` volume of the compose project and downloads them from `ghcr.io` (falling back to `mirror.gcr.io`)
+when the scanner starts. The scanner holds its readiness (`/actuator/health/readiness`) until that is done, so
+`local up --wait` returns when the first scan can run (about 2 minutes of the 3), and the spec waits for readiness
+too (5 minutes at most, its message names the download). A download that keeps failing does not stop the scanner from
+starting: its first scan retries (5 attempts, 5 s doubling) and then ends FAILED with Trivy's own message. **A red leg
+whose failure reads `scan failed: trivy exited with code 1: ... FATAL ... failed to download vulnerability DB: OCI
+artifact error ... connection refused / unexpected status code / toomanyrequests` is the registry not answering (a
+network hiccup or a rate limit), not a Repsy fault: run the leg again. `TRIVY_DB_REPOSITORY` and
+`TRIVY_JAVA_DB_REPOSITORY` of the scanner point it at a mirror.**
+
+`tests/api/trivy-contract.spec.ts` (`@trivy`, opt-in `trivy`, the `api` runner, 10 tests):
+
+- **The contract cases the stub is held to as well** (`src/stubs/scanner/contract.ts`, run by this spec against the real
+  scanner and by `tests/skeleton/scanner-stub.spec.ts` against the stub): `GET /health` needs no key; a call without
+  the right key is a 401 `{"message":"unauthorized"}`; a submit without a required field, or with an empty or missing
+  file, is a 400 (the empty-file one with `{"message":"file must not be empty"}`) and makes no job; a body that is not
+  multipart is a 415; an unknown scan id is a 404 `{"message":"No scan job found for scanId: <id>"}`; an accepted scan
+  is `{"scanId","status":"QUEUED"}`, every answer has the job shape (`scanId`, `status`, `result`, `errorMessage`),
+  and it ends COMPLETED with a `findings` list. The text of a 400/415 body is Spring's, and differs, so it is not compared.
+  The first run of this list found two drifts, now fixed in the stub: the 404 message and the 415 for a body that is not
+  multipart (the stub said 400). A third, the text of the 400 of a missing field (the stub had a message, the real one
+  has none of its own), is why 400 bodies are not compared.
+- **A real scan, directly**: a tarball that bundles `lodash@4.17.20` ends COMPLETED, every finding has the fields of
+  `ScannerFinding` in the service's order, and `CVE-2021-23337` is HIGH, fixed in 4.17.21.
+- **A real scan through Repsy, npm**: the same tarball published to an npm repository; the panel's
+  `listVersionScans` shows a COMPLETED scan (HIGH, scanner `trivy`, not the stub's version) whose findings hold that CVE.
+- **A real scan through Repsy, Docker, by reference**: an image pushed with raw HTTP whose one layer holds
+  `app/node_modules/lodash/package.json`; the scanner pulls it from `repsy:9090/<repo>/<image>:<tag>` with the
+  registry token the backend gives it, and the same CVE is in the panel.
+
+What the probes showed (Trivy 0.66.0), so the spec is built the way it is:
+
+- The scanner runs `trivy rootfs` on the extracted tarball. It reads the **installed** packages (a `node_modules/*/package.json`),
+  **not lockfiles**: a `package-lock.json` in the tarball that pins `lodash@4.17.20` finds nothing (COMPLETED, no findings),
+  and neither does a `package.json` that only declares the dependency. So the npm scan sees a vulnerable dependency
+  only when the package bundles it.
+- Trivy's JSON has no `Trivy` object, which is where the scanner reads `scannerVersion` from, so a real scan reports
+  `scannerVersion: null` (the panel omits it) and `scannerName: trivy`. The spec asserts only that it is not the stub's version.
+
+The trivy leg of the nightly runs this spec (`api` runner, `--grep @trivy`, the step "Check the opt-in specs ran"
+fails it when the spec skipped) and takes 45 minutes at most: the scanner image is built on the runner (a Maven build,
+about 3 minutes) and the databases downloaded (about 2).
+
 ## Running
 
 ```bash
@@ -5439,8 +5571,8 @@ host-matching uid even though the packages themselves only need to be read.
 ## CI
 
 `.github/workflows/e2e-nightly.yml` ("E2E Nightly") runs this harness on GitHub Actions: the panel UI
-suite, the wire-level protocol runners, the embedded-H2 smoke run plus one rotating full catalog on H2, the
-scanner-stub UI specs, the auth-throttle specs and the `@smoke` of every client over Repsy's own TLS. **It runs nightly (01:23 UTC)
+suite, the wire-level protocol runners, the embedded-H2 smoke run plus one rotating full catalog on H2, and
+the scanner-stub UI specs, the real-scanner contract spec and the `@smoke` of every client over Repsy's own TLS. **It runs nightly (01:23 UTC)
 and on demand only, by the product owner's decision (RPS-1260): it has no `pull_request`, `push` or
 `merge_group` trigger.** PR checks are switched off in this repo on purpose (`pr-checks.yml` is
 `workflow_dispatch` only, `AGENTS.md` "Merging to main"), and this workflow is not a required check.
@@ -5449,7 +5581,7 @@ and on demand only, by the product owner's decision (RPS-1260): it has no `pull_
 
 ```bash
 gh workflow run e2e-nightly.yml                            # everything, like the nightly run
-gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | upgrade (both) | tls | all
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | upgrade (both) | trivy | tls | all
 gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
 gh workflow run e2e-nightly.yml -f suite=upgrade -f upgrade_from=26.08.3   # the upgrade legs from another release
 gh workflow run e2e-nightly.yml -f suite=h2 -f h2_full=docker   # the full catalog of this runner on H2, not tonight's
@@ -5478,6 +5610,7 @@ cancelling): a second one waits.
 | `limits`     | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                                     | 60 min  |
 | `upgrade`    | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                                                | 30 min  |
 | `upgrade-h2` | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                                    | 30 min  |
+| `trivy`      | PostgreSQL + the real scanner overlay       | `REPSY_E2E_OPT_IN=trivy`, `--grep @trivy` on `api`, 10 tests, "Real scanner stack": the contract the stub mimics and one real scan of an npm package and of a Docker image                                                                  | 45 min  |
 | `tls`        | PostgreSQL + the TLS overlay                | `REPSY_E2E_OPT_IN=tls` and `REPSY_E2E_TLS=1`, `@smoke` of `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` and `api` over Repsy's https listeners ("TLS stack"); no `ui`, no `stack` | 60 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the

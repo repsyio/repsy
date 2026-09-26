@@ -18,16 +18,16 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack, plus the full catalog of one rotating runner), scanner (the @scanner specs of the ui runner and of the npm-clients, docker, maven and pypi runners against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack), limits (the @limits specs of the pypi, helm, nuget, ruby, cargo, golang and api runners against the tiny-upload-limit stack), upgrade (the previous release on a populated volume, upgraded to this image: PostgreSQL and H2), tls (@smoke of every runner but ui and stack over Repsy's own https listeners, every client trusting the generated CA) or all"
+        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack, plus the full catalog of one rotating runner), scanner (the @scanner specs of the ui runner and of the npm-clients, docker, maven and pypi runners against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack), limits (the @limits specs of the pypi, helm, nuget, ruby, cargo, golang and api runners against the tiny-upload-limit stack), upgrade (the previous release on a populated volume, upgraded to this image: PostgreSQL and H2), trivy (the @trivy contract spec of the api runner against the real repsy-scanner-trivy), tls (@smoke of every runner but ui and stack over Repsy's own https listeners, every client trusting the generated CA) or all"
         type: choice
-        options: [all, ui, wire, h2, scanner, throttle, limits, upgrade, tls]
+        options: [all, ui, wire, h2, scanner, throttle, limits, upgrade, trivy, tls]
         default: all
       protocol:
         description: "Only these runner services, comma separated (skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,golang,ruby,stack,api,ui). Empty: every runner of the chosen legs"
         type: string
         default: ""
       grep:
-        description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 and tls legs then keep their default, @smoke). The scanner, throttle and limits legs ignore it and always run @scanner, @throttle and @limits"
+        description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 and tls legs then keep their default, @smoke). The scanner, throttle, limits and trivy legs ignore it and always run @scanner, @throttle, @limits and @trivy"
         type: string
         default: ""
       h2_full:
@@ -117,6 +117,11 @@ jobs:
               # leg has one stack). Only the stack runner, only @upgrade; the grep input does not apply.
               "upgrade": ("upgrade", "--upgrade", ["stack"], "@upgrade", 30, "upgrade", False),
               "upgrade-h2": ("upgrade", "--upgrade --h2", ["stack"], "@upgrade", 30, "upgrade", False),
+              # The REAL repsy-scanner-trivy (README.md "Real scanner stack"): the raw contract the stub is held
+              # to and one real scan of an npm package and of a Docker image, on the api runner. The scanner
+              # image is built on the runner and Trivy downloads its vulnerability databases at start-up
+              # (about 3 minutes on a cold cache, network needed), so the timeout is generous.
+              "trivy": ("trivy", "--trivy", ["api"], "@trivy", 45, "trivy", False),
               # Repsy's own https listeners (README.md "TLS stack"): @smoke of every runner but ui (Chromium
               # would need ignoreHTTPSErrors) and stack (its cases restart the container and use no client),
               # each client trusting the generated CA in its own way. The api runner goes with them: it also
@@ -280,7 +285,7 @@ jobs:
         # REPSY_IMAGE is set (workflow env), so run.sh starts the loaded image and does not build.
         # $STACK is empty (PostgreSQL profile), --h2, or an overlay flag (--scanner: PostgreSQL plus the
         # stub scanner; --throttle: PostgreSQL with the low auth-throttle limit; --limits: PostgreSQL with
-        # tiny upload size limits; --upgrade: the previous release, with REPSY_IMAGE as the image the spec
+        # tiny upload size limits; --trivy: PostgreSQL plus the REAL scanner; --upgrade: the previous release, with REPSY_IMAGE as the image the spec
         # upgrades it to); it is split into words
         # so an empty value passes no argument at all.
         run: |
