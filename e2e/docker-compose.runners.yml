@@ -40,6 +40,9 @@ x-runner-environment: &runner-environment
   REPSY_TARGET: ${REPSY_TARGET:-local}
   REPSY_E2E_RUN_ID: ${REPSY_E2E_RUN_ID:-}
   REPSY_E2E_INSECURE_REGISTRY: ${REPSY_E2E_INSECURE_REGISTRY:-}
+  # Comma list of opt-in suites (e.g. "throttle,scanner"): run.sh adds the name of every stack overlay
+  # that is on (README.md "Stack overlays"). Read by optedIn() in src/stack-overlays.ts.
+  REPSY_E2E_OPT_IN: ${REPSY_E2E_OPT_IN:-}
 
 services:
   skeleton:
@@ -337,7 +340,7 @@ services:
       # Playwright's default worker count.
       REPSY_UI_WORKERS: ${REPSY_UI_WORKERS:-4}
       REPSY_UI_NO_SANDBOX: ${REPSY_UI_NO_SANDBOX:-}
-      # Comma list of opt-in suites (e.g. "throttle,scanner"), read by optedIn() in src/ui/session.ts.
+      # The UI suite's own, older spelling of REPSY_E2E_OPT_IN (above); optedIn() reads both.
       REPSY_UI_OPT_IN: ${REPSY_UI_OPT_IN:-}
       # Where the @scanner specs reach the stub scanner's /control API (docker-compose.stack-scanner.yml
       # publishes it on loopback; this service has the host network) and the key both sides share.
