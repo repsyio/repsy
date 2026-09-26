@@ -58,6 +58,21 @@ services:
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
 
+  # Raw HTTP at the edge of Repsy (tests/api, README.md "API suite"): the base image, no client toolchain.
+  api:
+    <<: *runner-common
+    build:
+      context: .
+      dockerfile: runners/base.Dockerfile
+    environment:
+      <<: *runner-environment
+    volumes:
+      - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
+      - ./src:/app/src
+      - ./tests:/app/tests:ro
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+
   maven:
     <<: *runner-common
     build:
