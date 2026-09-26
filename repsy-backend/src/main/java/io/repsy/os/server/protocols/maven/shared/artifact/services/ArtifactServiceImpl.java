@@ -48,6 +48,7 @@ import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
+import io.repsy.protocols.maven.shared.utils.PluginDescriptorReader;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
@@ -297,7 +298,9 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       this.pendingSignatureService.verifyDirectory(repoInfo, versionPath);
     }
 
-    this.createOrUpdateArtifactByPomFile(repo, gav, versionPath, pomModel);
+    final var prefix = this.resolvePluginPrefix(repoInfo, storagePath, gav, pomModel);
+
+    this.createOrUpdateArtifactByPomFile(repo, gav, versionPath, pomModel, prefix);
 
     final var recorded =
         verifyAll
@@ -788,6 +791,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final String versionPath,
       final Gav gav,
       final @Nullable Model pomModel,
+      final @Nullable String pluginPrefix,
       final Artifact artifact) {
 
     final var repo = artifact.getRepo();
@@ -803,13 +807,17 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     version.setVersionName(gav.isSnapshot() ? gav.getBaseVersion() : gav.getVersion());
 
     this.setVersionProperties(
-        versionPath, this.storageStrategy.listStorageItems(storagePath), pomModel, version);
+        versionPath,
+        this.storageStrategy.listStorageItems(storagePath),
+        pomModel,
+        pluginPrefix,
+        version);
 
     try {
       this.artifactUpsertHelper.insertArtifactVersion(version, pomModel, artifact);
     } catch (final DataIntegrityViolationException e) {
       this.handleArtifactVersionInsertConflict(
-          repo, artifact, gav, versionPath, pomModel, version, e);
+          repo, artifact, gav, versionPath, pomModel, pluginPrefix, version, e);
     }
   }
 
@@ -819,6 +827,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final Gav gav,
       final String versionPath,
       final @Nullable Model pomModel,
+      final @Nullable String pluginPrefix,
       final ArtifactVersion version,
       final DataIntegrityViolationException e) {
 
@@ -840,7 +849,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       throw e;
     }
 
-    this.updateArtifactVersion(repo, existingVersion, versionPath, pomModel);
+    this.updateArtifactVersion(repo, existingVersion, versionPath, pomModel, pluginPrefix);
   }
 
   /**
@@ -1030,7 +1039,10 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   }
 
   private Artifact createArtifactByGav(
-      final Repo repo, final Gav gav, final @Nullable Model pomModel) {
+      final Repo repo,
+      final Gav gav,
+      final @Nullable Model pomModel,
+      final @Nullable String pluginPrefix) {
 
     final var artifact = new Artifact();
 
@@ -1041,13 +1053,13 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     artifact.setRepo(repo);
 
     if (pomModel != null) {
-      this.setArtifactProperties(pomModel, artifact);
+      this.setArtifactProperties(pomModel, pluginPrefix, artifact);
     }
 
     try {
       return this.artifactUpsertHelper.insertArtifact(artifact);
     } catch (final DataIntegrityViolationException e) {
-      return this.handleArtifactInsertConflict(repo, gav, pomModel, e);
+      return this.handleArtifactInsertConflict(repo, gav, pomModel, pluginPrefix, e);
     }
   }
 
@@ -1055,6 +1067,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final Repo repo,
       final Gav gav,
       final @Nullable Model pomModel,
+      final @Nullable String pluginPrefix,
       final DataIntegrityViolationException e) {
 
     if (!ConstraintViolations.violatesConstraint(e, ARTIFACT_UNIQUE_CONSTRAINT)) {
@@ -1074,7 +1087,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       throw e;
     }
 
-    return this.updateArtifactProperties(existing, pomModel);
+    return this.updateArtifactProperties(existing, pomModel, pluginPrefix);
   }
 
   private boolean checkExtractedInfos(
@@ -1125,25 +1138,31 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   }
 
   private void createOrUpdateArtifactByPomFile(
-      final Repo repo, final Gav gav, final String versionPath, final @Nullable Model pomModel) {
+      final Repo repo,
+      final Gav gav,
+      final String versionPath,
+      final @Nullable Model pomModel,
+      final @Nullable String pluginPrefix) {
 
     final var existingArtifact =
         this.getArtifact(repo.getId(), gav.getArtifactId(), gav.getGroupId());
     final var artifact =
         existingArtifact != null
-            ? this.updateArtifactProperties(existingArtifact, pomModel)
-            : this.createArtifactByGav(repo, gav, pomModel);
+            ? this.updateArtifactProperties(existingArtifact, pomModel, pluginPrefix)
+            : this.createArtifactByGav(repo, gav, pomModel, pluginPrefix);
 
-    this.createOrUpdateArtifactVersion(repo, artifact, gav, versionPath, pomModel);
+    this.createOrUpdateArtifactVersion(repo, artifact, gav, versionPath, pomModel, pluginPrefix);
   }
 
   private Artifact updateArtifactProperties(
-      final Artifact artifact, final @Nullable Model pomModel) {
+      final Artifact artifact,
+      final @Nullable Model pomModel,
+      final @Nullable String pluginPrefix) {
 
     artifact.setLastUpdatedAt(Instant.now());
 
     if (pomModel != null) {
-      this.setArtifactProperties(pomModel, artifact);
+      this.setArtifactProperties(pomModel, pluginPrefix, artifact);
     }
 
     return this.artifactRepository.save(artifact);
@@ -1154,14 +1173,16 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final Artifact artifact,
       final Gav gav,
       final String versionPath,
-      final @Nullable Model pomModel) {
+      final @Nullable Model pomModel,
+      final @Nullable String pluginPrefix) {
 
     final var artifactVersion = this.getArtifactVersionByGav(artifact.getId(), gav);
 
     if (artifactVersion != null) {
-      this.updateArtifactVersion(repo, artifactVersion, versionPath, pomModel);
+      this.updateArtifactVersion(repo, artifactVersion, versionPath, pomModel, pluginPrefix);
     } else {
-      this.createArtifactVersionByGav(versionPath, gav, pomModel, artifact); // version uploaded
+      this.createArtifactVersionByGav(
+          versionPath, gav, pomModel, pluginPrefix, artifact); // version uploaded
     }
   }
 
@@ -1169,7 +1190,8 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final Repo repo,
       final ArtifactVersion artifactVersion,
       final String versionPath,
-      final @Nullable Model pomModel) {
+      final @Nullable Model pomModel,
+      final @Nullable String pluginPrefix) {
 
     artifactVersion.setLastUpdatedAt(Instant.now());
 
@@ -1180,6 +1202,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
         versionPath,
         this.storageStrategy.listStorageItems(versionStoragePath),
         pomModel,
+        pluginPrefix,
         artifactVersion);
 
     this.versionDeveloperRepository.deleteAllByArtifactVersionId(artifactVersion.getId());
@@ -1309,21 +1332,69 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     }
   }
 
+  /**
+   * The prefix a plugin's POM registers with, {@code null} when the POM is not a plugin's or the
+   * prefix does not fit its column. It is the {@code goalPrefix} of {@code
+   * META-INF/maven/plugin.xml} in the plugin's jar when the jar of that exact version is stored
+   * already (Gradle's {@code maven-publish}, sbt and Ivy send it before the POM, and a plugin that
+   * sets its own {@code goalPrefix} is otherwise not found by it, RPS-1458), and the one derived
+   * from the artifactId otherwise. Only a plugin's POM costs the read of one stored file. A jar
+   * that arrives after the POM is not looked at: the prefix stays the derived one until the POM is
+   * stored again, like {@code hasSources}. Reading never fails the upload, whatever the jar is.
+   */
+  private @Nullable String resolvePluginPrefix(
+      final BaseRepoInfo<UUID> repoInfo,
+      final StoragePath pomPath,
+      final Gav gav,
+      final @Nullable Model pomModel) {
+
+    if (pomModel == null || !ArtifactUtils.artifactIsPlugin(pomModel)) {
+      return null;
+    }
+
+    final var pom = pomPath.getRelativePath().getPath();
+    final var jarPath = pom.substring(0, pom.length() - ".pom".length()) + ".jar";
+
+    try {
+      final var jar =
+          this.storageStrategy.get(
+              StoragePath.of(repoInfo.getStorageKey(), jarPath), repoInfo.getName());
+
+      if (jar.isPresent()) {
+        try (final var in = jar.get().getInputStream()) {
+          final var goalPrefix = PluginDescriptorReader.goalPrefix(in, gav.getArtifactId());
+
+          if (goalPrefix != null) {
+            return goalPrefix;
+          }
+        }
+      }
+    } catch (final IOException | RuntimeException e) {
+      log.warn(
+          "The goalPrefix of the plugin jar {} could not be read, the derived one is used: {}",
+          jarPath,
+          e.toString());
+    }
+
+    return derivedPluginPrefix(pomModel);
+  }
+
   /** The plugin prefix of the POM's artifactId, or {@code null} if it is longer than its column. */
-  private static @Nullable String pluginPrefix(final Model pomModel) {
+  private static @Nullable String derivedPluginPrefix(final Model pomModel) {
 
     return MavenPublishLimits.dropIfTooLong(
         ArtifactUtils.getPrefixFromArtifactId(pomModel.getArtifactId()),
         MavenPublishLimits.MAX_PREFIX_LENGTH);
   }
 
-  private void setArtifactProperties(final Model pomModel, final Artifact artifact) {
+  private void setArtifactProperties(
+      final Model pomModel, final @Nullable String pluginPrefix, final Artifact artifact) {
 
     artifact.setName(pomModel.getName());
     artifact.setPackaging(pomModel.getPackaging());
 
     if (ArtifactUtils.artifactIsPlugin(pomModel)) {
-      artifact.setPrefix(pluginPrefix(pomModel));
+      artifact.setPrefix(pluginPrefix);
       artifact.setPlugin(true);
     }
   }
@@ -1338,7 +1409,8 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    *
    * <p>Only the files directly in the version directory count. The flags are only recomputed when a
    * POM of the version is stored, so a sources or javadoc jar uploaded after the POM is not
-   * reflected until the POM is stored again.
+   * reflected until the POM is stored again. The same goes for the plugin prefix: it is the {@code
+   * goalPrefix} of a plugin jar only if the jar was stored before the POM (RPS-1458).
    *
    * @param versionPath the version directory inside the repo, {@code
    *     <group>/<artifactId>/<version>}
@@ -1347,6 +1419,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final String versionPath,
       final List<StorageItemInfo> itemsInVersionDir,
       final @Nullable Model pomModel,
+      final @Nullable String pluginPrefix,
       final ArtifactVersion artifactVersion) {
 
     var hasSources = false;
@@ -1362,7 +1435,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     artifactVersion.setHasDocuments(hasDocuments);
 
     if (pomModel != null) {
-      this.setVersionPropertiesByPomModel(pomModel, artifactVersion);
+      this.setVersionPropertiesByPomModel(pomModel, pluginPrefix, artifactVersion);
     }
   }
 
@@ -1380,7 +1453,9 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   }
 
   private void setVersionPropertiesByPomModel(
-      final Model pomModel, final ArtifactVersion artifactVersion) {
+      final Model pomModel,
+      final @Nullable String pluginPrefix,
+      final ArtifactVersion artifactVersion) {
 
     artifactVersion.setName(pomModel.getName());
     artifactVersion.setDescription(pomModel.getDescription());
@@ -1393,7 +1468,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
         pomModel.getModules() != null && !pomModel.getModules().isEmpty());
 
     if (ArtifactUtils.artifactIsPlugin(pomModel)) {
-      artifactVersion.setPrefix(pluginPrefix(pomModel));
+      artifactVersion.setPrefix(pluginPrefix);
     }
 
     if (pomModel.getParent() != null) {
