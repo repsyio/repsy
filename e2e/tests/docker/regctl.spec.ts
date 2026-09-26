@@ -33,11 +33,11 @@
  *  - RC4 sha512 (RPS-1244): an image whose manifest is addressed by its sha512 digest copies in by that
  *    digest, is served under it (`Docker-Content-Digest: sha512:...`) and `regctl manifest head`
  *    reports it.
- *  - RC4b sha512 by TAG (RPS-1594): the same rewritten image copied to a tag target. Repsy answers
- *    the canonical sha256 in `Docker-Content-Digest` of a tag push (RPS-1244); regctl, which hashed the
- *    manifest with sha512, FAILS the copy (`unexpected digest returned, expected sha512:..., received
- *    sha256:...`) although the tag is stored and serves the same bytes as the sha512. Pinned as
- *    observed: it is the trigger RPS-1594 names to revisit the sha256 answer.
+ *  - RC4b sha512 by TAG (RPS-1594, RPS-1607): the same rewritten image copied to a tag target. Repsy
+ *    answers the canonical sha256 in `Docker-Content-Digest` of a tag push (RPS-1244); regctl, which
+ *    hashed the manifest with sha512, FAILS the copy (`unexpected digest returned, expected sha512:...,
+ *    received sha256:...`) although the tag is stored and serves the same bytes as the sha512. Kept as
+ *    decided in RPS-1607: the sha256 answer stays and this test documents it.
  *  - RC5 a multi-platform Docker manifest list copies as a whole (children included), `--platform`
  *    resolves the right child through the served index, and it copies back unchanged.
  *  - `regctl tag ls` / `repo ls` (Repsy has no `tags/list`/`_catalog`, RPS-1489) are in
@@ -291,7 +291,7 @@ test(
 );
 
 test(
-  'docker > regctl pushing a sha512 image BY TAG fails on the sha256 answer of a tag push, the image is stored (RC4b, RPS-1594)',
+  'docker > regctl pushing a sha512 image BY TAG fails on the sha256 answer of a tag push, the image is stored (RC4b, RPS-1594, RPS-1607)',
   { tag: ['@regctl'] },
   async ({ seeder }) => {
     const repoName = await newDockerRepo(seeder);
@@ -323,8 +323,8 @@ test(
     // The target is a TAG. The push names no digest, so Repsy answers its canonical sha256 in
     // `Docker-Content-Digest` (the OCI spec lets the answer differ when the algorithms differ, and
     // RPS-1244 decided it, pinned by R14). regctl hashed the manifest with sha512 and treats an
-    // answer in another algorithm as a failed push: this is the evidence RPS-1594 asked for, and the
-    // trigger that ticket names to revisit the sha256 answer. Pinned as observed until that is decided.
+    // answer in another algorithm as a failed push. RPS-1607 decided to keep the sha256 answer (only
+    // regctl can produce such a push), so this pins the behaviour as documented.
     const ref = imageRef(repoName, image, 'tagged');
     const copied = await session.run(
       ['image', 'copy', `ocidir://${built.dir}@${digest}`, ref],
