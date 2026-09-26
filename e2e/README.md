@@ -4916,13 +4916,6 @@ Two more specs of the `api` runner (`./run.sh test --protocol api`, see "API sui
   (all of `/api/users*`, `createRepository`, the settings, token, key store and rename routes, and every `DELETE`
   but `deleteProfile`) stop a parser bug from emptying the sweep.
 
-  **RPS-1558** (found by the sweep): `GET /api/mvn/groups/{repo}/{group}` (`getMavenGroupSummary`) needs no
-  credentials on a PRIVATE repo (200 with the artifact and version counts), and answers 404 rather than 401 for a
-  repo that does not exist, because `ProtocolEndpointDispatcher.addInterceptors` lacks `/api/mvn/groups/**`. The
-  operation is in `ANONYMOUS_KNOWN_GAPS`, out of the anonymous sweeps, and two `test.fail()` tests under
-  "RPS-1558" assert the correct answer (401 in both cases): they pass today and go red when the fix lands, so the
-  fix removes the entry and the two `test.fail()` calls in the same PR.
-
   Two low observations, NOT pinned: `PUT /api/users/{id}`, `POST /api/users` and `POST /api/repos` validate the
   body before authorization (a USER with an empty body gets 400 `validationError`, not 403, which is why the sweep
   sends valid inert bodies), and an anonymous 401 has two `msgId`s (`loginRequired` on repo routes,

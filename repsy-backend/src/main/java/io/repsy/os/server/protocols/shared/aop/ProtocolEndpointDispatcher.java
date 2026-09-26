@@ -64,19 +64,10 @@ public class ProtocolEndpointDispatcher implements WebMvcConfigurer {
   @Override
   public void addInterceptors(final InterceptorRegistry registry) {
 
-    registry
-        .addInterceptor(this.authInterceptor)
-        .addPathPatterns("/api/repos/**")
-        .addPathPatterns("/api/npm/packages/**")
-        .addPathPatterns("/api/npm/scopes/**")
-        .addPathPatterns("/api/pypi/packages/**")
-        .addPathPatterns("/api/mvn/artifacts/**")
-        .addPathPatterns("/api/mvn/key-stores/**")
-        .addPathPatterns("/api/cargo/crates/**")
-        .addPathPatterns("/api/go/modules/**")
-        .addPathPatterns("/api/nuget/packages/**")
-        .addPathPatterns("/api/ruby/gems/**")
-        .addPathPatterns("/api/docker/images/**")
-        .addPathPatterns("/api/helm/charts/**");
+    // Every panel route, not a list of the families that have one: the interceptor does nothing
+    // for a handler without @RepoOperation, and a list forgot /api/mvn/groups/** (RPS-1558), which
+    // left a @RepoOperation route without its authorization. RepoOperationRoutesStatusIT keeps
+    // every @RepoOperation route under /api/.
+    registry.addInterceptor(this.authInterceptor).addPathPatterns("/api/**");
   }
 }
