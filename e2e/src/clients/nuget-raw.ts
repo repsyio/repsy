@@ -263,7 +263,16 @@ export function nugetReadHeaders(credential: MaterializedCredential): Record<str
  * `_rels` OPC parts: the server never looks for them, and a real `dotnet restore` only ever reads
  * `<id>.nuspec` back out of the file it downloaded, never the OPC metadata.
  */
-export function buildNupkg(opts: { packageId: string; version: string; marker?: string }): Buffer {
+export function buildNupkg(opts: {
+  packageId: string;
+  version: string;
+  marker?: string;
+  /** Dependencies the nuspec declares (RPS-1479), rendered as `<dependencies><group ...>` (one group
+   *  per `targetFramework`, a dependency without one goes into a group with no attribute). */
+  dependencies?: NuspecDependency[];
+  /** Target frameworks that get an EMPTY `<group targetFramework="..."/>` ("no dependencies there"). */
+  emptyGroups?: string[];
+}): Buffer {
   const marker = opts.marker ?? `e2e ${opts.packageId}@${opts.version}`;
   const nuspec =
     '<?xml version="1.0" encoding="utf-8"?>\n' +
@@ -273,6 +282,7 @@ export function buildNupkg(opts: { packageId: string; version: string; marker?: 
     `    <version>${opts.version}</version>\n` +
     '    <authors>repsy-e2e</authors>\n' +
     `    <description>e2e ${opts.packageId}@${opts.version}</description>\n` +
+    renderNuspecDependencies(opts.dependencies ?? [], opts.emptyGroups ?? []) +
     '  </metadata>\n' +
     '</package>\n';
 
@@ -284,6 +294,38 @@ export function buildNupkg(opts: { packageId: string; version: string; marker?: 
     { level: 0 },
   );
   return Buffer.from(zipped);
+}
+
+/** One `<dependency id="..." version="...">` of a nuspec (RPS-1479). `range` is a NuGet version
+ *  range (`[1.0.0, )`, `[1.0.0]`, `1.0.0`); omitted, the attribute is left out. */
+export interface NuspecDependency {
+  id: string;
+  range?: string;
+  targetFramework?: string;
+}
+
+function renderNuspecDependencies(deps: NuspecDependency[], emptyGroups: string[]): string {
+  if (deps.length === 0 && emptyGroups.length === 0) {
+    return '';
+  }
+  const groups = new Map<string, NuspecDependency[]>();
+  for (const dep of deps) {
+    const key = dep.targetFramework ?? '';
+    groups.set(key, [...(groups.get(key) ?? []), dep]);
+  }
+  let xml = '    <dependencies>\n';
+  for (const [tfm, members] of groups) {
+    xml += tfm === '' ? '      <group>\n' : `      <group targetFramework="${tfm}">\n`;
+    for (const dep of members) {
+      const version = dep.range === undefined ? '' : ` version="${dep.range}"`;
+      xml += `        <dependency id="${dep.id}"${version} />\n`;
+    }
+    xml += '      </group>\n';
+  }
+  for (const tfm of emptyGroups) {
+    xml += `      <group targetFramework="${tfm}" />\n`;
+  }
+  return `${xml}    </dependencies>\n`;
 }
 
 async function rawRequest(url: string, init: RequestInit): Promise<RawResponse> {
@@ -569,4 +611,43 @@ export function nugetErrorMessage(body: Buffer): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** One `dependencyGroups` entry of a registration leaf's `catalogEntry` (RPS-1479). */
+export interface RegistrationDependencyGroup {
+  targetFramework?: string;
+  dependencies: { id: string; range?: string }[];
+}
+
+/** The `catalogEntry.dependencyGroups` of one registration leaf document
+ *  (`rawGetRegistrationLeaf`); `[]` when it carries none. */
+export function parseLeafDependencyGroups(body: Buffer): RegistrationDependencyGroup[] {
+  const parsed = JSON.parse(body.toString('utf8')) as {
+    catalogEntry?: {
+      dependencyGroups?: {
+        targetFramework?: string;
+        dependencies?: { id?: string; range?: string }[];
+      }[];
+    };
+  };
+  return (parsed.catalogEntry?.dependencyGroups ?? []).map((g) => ({
+    ...(g.targetFramework === undefined ? {} : { targetFramework: g.targetFramework }),
+    dependencies: (g.dependencies ?? []).map((d) => ({
+      id: d.id ?? '',
+      ...(d.range === undefined ? {} : { range: d.range }),
+    })),
+  }));
+}
+
+/** Raw `GET` of one version's own registration leaf, `v3/registration/<idLower>/<verLower>.json`
+ *  (`NuGetRegistrationLeafResponse`; the registration INDEX inlines its own copy of every leaf). */
+export async function rawGetRegistrationLeaf(
+  repoName: string,
+  credential: MaterializedCredential,
+  idLower: string,
+  verLower: string,
+): Promise<RawResponse> {
+  return rawRequest(`${repoUrl(repoName)}v3/registration/${idLower}/${verLower}.json`, {
+    headers: nugetReadHeaders(credential),
+  });
 }

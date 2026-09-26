@@ -1,0 +1,37 @@
+# Copyright 2026 the original author or authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# OPT-IN overlay that gives the e2e stack the auth throttle's real limits (RPS-1477): three failed
+# password checks in a ten-second window instead of the default stack's 100000 in sixty seconds
+# (docker-compose.stack.yml raises the limit so the negative-auth scenarios of every other suite can
+# fail authentication on purpose). With it, the throttle is proven end to end through Tomcat and the
+# multiport listeners with a real X-Forwarded-For (tests/stack/auth-throttle.spec.ts, and AUTH-11 of
+# the UI suite), which the backend's own AuthThrottleIT cannot do.
+#
+# It is never part of the default stack and no other suite may run against it: any client that fails
+# authentication three times is locked out for ten seconds. It changes nothing unless it is passed as
+# an extra -f, which `./run.sh local up --throttle` (or REPSY_E2E_THROTTLE=1) does, on top of the
+# postgres or the H2 stack:
+#
+#   docker compose -f docker-compose.stack.yml -f docker-compose.stack-throttle.yml up -d --wait
+#
+# Give "down" the same flags as "up". See README.md "Auth-throttle leg".
+services:
+  repsy:
+    environment:
+      # Small enough that a test needs a handful of requests, big enough that the window can be
+      # waited out in a test: the window is a fixed window per client that starts at its first
+      # failure, so the reset case waits WINDOW + 1 s and the next request is clean again.
+      AUTH_THROTTLE_MAX_FAILURES: '3'
+      AUTH_THROTTLE_WINDOW_SECONDS: '10'
