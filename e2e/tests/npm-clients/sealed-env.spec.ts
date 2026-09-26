@@ -119,7 +119,7 @@ test.describe('the npm-family environment is an allow-list (RPS-1364)', () => {
   }
 
   test(
-    'runSealed gives the child only its env; run() still merges the runner env',
+    'runSealed and run() with an env give the child only that env; extendEnv: true still merges',
     { tag: ['@sealed-env'] },
     async () => {
       const script = `process.stdout.write(process.env.${SENTINEL} ?? 'absent')`;
@@ -130,8 +130,11 @@ test.describe('the npm-family environment is an allow-list (RPS-1364)', () => {
         expect(sealed.exitCode, sealed.stderr).toBe(0);
         expect(sealed.stdout).toBe('absent');
 
-        // The default is unchanged for every other suite: they rely on the merged runner env.
-        const merged = await run(node, ['-e', script], { cwd, env: {} });
+        // Since RPS-1446 run() seals an explicit env by default too (every client suite builds its env
+        // with clientEnv); the merge is opt-in.
+        const explicit = await run(node, ['-e', script], { cwd, env: {} });
+        expect(explicit.stdout).toBe('absent');
+        const merged = await run(node, ['-e', script], { cwd, env: {}, extendEnv: true });
         expect(merged.stdout).toBe('leaked');
       });
     },

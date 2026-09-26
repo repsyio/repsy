@@ -67,6 +67,7 @@ import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { boundedSemverVersion } from '../scenarios/coordinates.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
+import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 import {
   adminCredential,
@@ -151,9 +152,7 @@ export async function renderConsumerProject(
  *  rejected there with "error: Invalid culture identifier in DOTNET_CLI_UI_LANGUAGE ..." in the
  *  command's output (RPS-1462). */
 export function nugetEnv(home: string): NodeJS.ProcessEnv {
-  return {
-    ...process.env,
-    HOME: home,
+  return clientEnv(home, {
     DOTNET_CLI_HOME: home,
     NUGET_PACKAGES: path.join(home, 'nuget-packages'),
     NUGET_HTTP_CACHE_PATH: path.join(home, 'nuget-http-cache'),
@@ -167,7 +166,7 @@ export function nugetEnv(home: string): NodeJS.ProcessEnv {
     DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE: '1',
     MSBUILDDISABLENODEREUSE: '1',
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: '1',
-  };
+  });
 }
 
 /**

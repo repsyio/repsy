@@ -47,6 +47,7 @@ import { env } from '../env.js';
 import type { AdapterResult } from '../scenarios/adapter.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
+import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 import { digestOf, rawConsumeCheck, rawPublishCheck } from './maven.js';
 import { minimalPom, splitPackageName } from './maven-raw.js';
@@ -124,7 +125,7 @@ export async function prepareSbtRun(
     () => false,
   );
 
-  const childEnv: NodeJS.ProcessEnv = { ...process.env, HOME: home };
+  const childEnv: NodeJS.ProcessEnv = clientEnv(home);
   const args = [
     '-batch',
     '-no-colors',
@@ -159,8 +160,8 @@ export async function prepareSbtRun(
     const username = credential.username ?? '';
     const password = credential.password ?? '';
     if (via === 'env') {
-      childEnv.REPSY_E2E_USER = username;
-      childEnv.REPSY_E2E_PASS = password;
+      childEnv.E2E_SBT_USER = username;
+      childEnv.E2E_SBT_PASS = password;
     } else {
       await fs.mkdir(path.join(home, '.sbt'), { recursive: true });
       await fs.writeFile(

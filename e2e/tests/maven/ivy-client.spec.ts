@@ -57,6 +57,7 @@ import {
 } from '../../src/clients/ivy.js';
 import { GradleConsumer } from '../../src/clients/gradle-consumer.js';
 import { expectPublishStored } from '../../src/clients/ivy-checks.js';
+import { clientEnv } from '../../src/clients/client-env.js';
 import { run } from '../../src/clients/exec.js';
 import * as maven from '../../src/clients/maven.js';
 import { uniqueVersion } from '../../src/clients/maven-adapter.js';
@@ -138,10 +139,11 @@ async function publishOk(world: World, options: IvyOptions = {}): Promise<string
 }
 
 test('ivy > the runner has the pinned Ant and Ivy', async () => {
-  const ant = await run('ant', ['-version'], { cwd: '/tmp' });
+  const ant = await run('ant', ['-version'], { cwd: '/tmp', env: clientEnv('/tmp') });
   expect(ant.stdout).toContain(`Apache Ant(TM) version ${ANT_VERSION} `);
   const ivy = await run('java', ['-cp', IVY_JAR, 'org.apache.ivy.Main', '-version'], {
     cwd: '/tmp',
+    env: clientEnv('/tmp'),
   });
   expect(`${ivy.stdout}${ivy.stderr}`).toContain(`Apache Ivy ${IVY_VERSION} `);
 });

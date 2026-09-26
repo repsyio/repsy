@@ -34,9 +34,10 @@ import { fileURLToPath } from 'node:url';
 import mustache from 'mustache';
 
 import { env } from '../env.js';
+import { gradleEnv } from './gradle.js';
 import { gpgEnv, type GpgKey } from './gpg.js';
 import { isolatedWorkDir, run } from './exec.js';
-import { SHARED_M2_DIR } from './maven.js';
+import { mavenEnv, SHARED_M2_DIR } from './maven.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MAVEN_TEMPLATES = path.resolve(__dirname, '../packages/maven');
@@ -123,7 +124,7 @@ async function ensureSigningPluginsWarm(): Promise<void> {
         ['-B', '-ntp', `-Dmaven.repo.local=${SHARED_M2_DIR}`, '-Dgpg.skip=true', 'verify'],
         {
           cwd: work,
-          env: { ...process.env, HOME: home },
+          env: mavenEnv(home),
           timeoutMs: WARM_TIMEOUT_MS,
           label: 'maven-warm-signing-plugins',
         },
@@ -169,7 +170,7 @@ export async function mavenGpgDeploy(opts: SigningDeployOptions): Promise<Signin
     `-Dmaven.repo.local=${path.join(home, 'repo-local')}`,
     `-Dmaven.repo.local.tail=${SHARED_M2_DIR}`,
   ];
-  let childEnv: NodeJS.ProcessEnv = { ...process.env, HOME: home };
+  let childEnv: NodeJS.ProcessEnv = mavenEnv(home);
   const secrets = [env.adminPassword];
   if (opts.key) {
     args.push(`-Dgpg.keyname=${opts.key.fingerprint}`, `-Dgpg.homedir=${opts.key.gnupgHome}`);
@@ -227,13 +228,10 @@ export async function gradleSigningPublish(
   });
 
   const secrets = [env.adminPassword];
-  let childEnv: NodeJS.ProcessEnv = {
-    ...process.env,
-    HOME: home,
-    GRADLE_USER_HOME: gradleUserHome,
+  let childEnv: NodeJS.ProcessEnv = gradleEnv(home, gradleUserHome, {
     ORG_GRADLE_PROJECT_repsyUsername: env.adminUsername,
     ORG_GRADLE_PROJECT_repsyPassword: env.adminPassword,
-  };
+  });
   if (opts.key) {
     await fs.writeFile(
       path.join(gradleUserHome, 'gradle.properties'),

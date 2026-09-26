@@ -46,6 +46,7 @@ import { env } from '../env.js';
 import type { AdapterResult } from '../scenarios/adapter.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
+import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 import { digestOf, rawConsumeCheck, rawPublishCheck } from './maven.js';
 import { minimalPom, splitPackageName } from './maven-raw.js';
@@ -113,12 +114,10 @@ export interface IvyRun {
  */
 export async function prepareIvyRun(prefix: string): Promise<IvyRun> {
   const { home, work } = await isolatedWorkDir(prefix);
-  const childEnv: NodeJS.ProcessEnv = {
-    ...process.env,
-    HOME: home,
+  const childEnv: NodeJS.ProcessEnv = clientEnv(home, {
     // A run lives for seconds, and Ant's JVM needs neither a parallel collector nor the C2 compiler.
     ANT_OPTS: `-Duser.home=${home} -Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1`,
-  };
+  });
   const args = [
     '-noinput',
     '-lib',

@@ -46,6 +46,7 @@ import { env } from '../env.js';
 import type { AdapterResult } from '../scenarios/adapter.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
+import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 import { digestOf, rawConsumeCheck, rawPublishCheck } from './maven.js';
 import { minimalPom, splitPackageName } from './maven-raw.js';
@@ -75,6 +76,16 @@ export const SHARED_GRADLE_HOME_DIR =
 const WARM_VERSION = 3;
 const WARM_READY = path.join(SHARED_GRADLE_HOME_DIR, `.e2e-warm-ready-${WARM_VERSION}`);
 const WARM_LOCK = path.join(SHARED_GRADLE_HOME_DIR, `.e2e-warm-lock-${WARM_VERSION}`);
+
+/** The environment of every `gradle` invocation: `clientEnv` and the run's own Gradle user home
+ *  (no `JAVA_HOME` needed: the launcher finds `java` through `PATH`, see `mavenEnv`). */
+export function gradleEnv(
+  home: string,
+  gradleUserHome: string,
+  extra: NodeJS.ProcessEnv = {},
+): NodeJS.ProcessEnv {
+  return clientEnv(home, { GRADLE_USER_HOME: gradleUserHome, ...extra });
+}
 
 export type GradleDsl = 'groovy' | 'kotlin';
 
@@ -174,7 +185,7 @@ async function warmDsl(dsl: GradleDsl): Promise<void> {
 async function warmRun(home: string, cwd: string, label: string, task: string): Promise<void> {
   await run('gradle', gradleArgs(task), {
     cwd,
-    env: { ...process.env, HOME: home, GRADLE_USER_HOME: SHARED_GRADLE_HOME_DIR },
+    env: gradleEnv(home, SHARED_GRADLE_HOME_DIR),
     timeoutMs: WARM_TIMEOUT_MS,
     label: `gradle-warm-${label}`,
   });
@@ -263,11 +274,7 @@ export async function prepareGradleRun(
     });
   }
 
-  const childEnv: NodeJS.ProcessEnv = {
-    ...process.env,
-    HOME: home,
-    GRADLE_USER_HOME: gradleUserHome,
-  };
+  const childEnv: NodeJS.ProcessEnv = gradleEnv(home, gradleUserHome);
   const secrets: string[] = [];
 
   if (credential.transport === 'basic') {

@@ -57,6 +57,16 @@ model itself is maven-specific.
   The host needs Docker; it does not need Node, Maven, or any protocol client. (Host-side `pnpm
 install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, and are fine to run
   directly — see Verification below.)
+- **A client never sees the runner's environment** (RPS-1364, RPS-1446). Every real client runs with an
+  allow-list environment built by `clientEnv` (`src/clients/client-env.ts`): the invocation's isolated
+  `HOME`, a few runner variables (`PATH`, locale, `TMPDIR`, proxy and TLS trust), the client's own
+  settings and, where a live run showed the need, a named runner variable (`RUSTUP_HOME` for cargo, see
+  the comment where it is listed). `REPSY_ADMIN_PASSWORD` and every other `REPSY_*` variable stay out of
+  the client, its plugins and the scripts it runs. `run()` hands an explicit `env` to the child as its
+  whole environment (only a call with no `env`, such as `docker` in the stack runner, inherits) and
+  throws on a `REPSY_*` key in it. Each suite has a `tests/<protocol>/sealed-env.spec.ts` that runs
+  `env` through `run()` with the suite's own builder and checks what arrived; a new client suite adds
+  its builder to the same pattern.
 - **Nothing global is ever touched**: the `admin` user, and a fresh instance's 9 default repos, are
   never created, modified or deleted by anything in this harness.
 
@@ -115,7 +125,8 @@ e2e/
     ui/                        # the panel UI suite's plumbing (fixtures, session seeding, page objects) -- see "UI suite"
     clients/
       stack.ts                  # findRepsyContainer()/dockerExec()/logLinesContaining(): docker exec + docker logs against the local stack's Repsy container ("Stack runner")
-      exec.ts                   # execa wrapper: isolated work dir/HOME, redacted logs, attach-on-fail
+      exec.ts                   # execa wrapper: isolated work dir/HOME, redacted logs, attach-on-fail, an explicit env is the child's whole env
+      client-env.ts             # clientEnv(): the allow-list environment every client runs in (RPS-1446); env-probe.ts reads it back for the sealed-env specs
       raw-http.ts                # shared raw-HTTP building blocks: RawResponse, adminCredential(), authHeader(), sha256Hex, 429 backoff
       maven.ts                  # the maven client: publish()/resolve()/seedPublish(), raw-HTTP status pinning
       maven-raw.ts              # maven-specific raw PUT/GET, repo-tree fingerprint, maven-metadata.xml builders/parsers

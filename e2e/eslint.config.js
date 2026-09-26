@@ -55,6 +55,7 @@ export default tseslint.config(
         {
           assertFunctionNames: [
             'expectOutcome',
+            'expectSealed',
             'runScenario',
             'expectClientAgrees',
             'expectNothingStored',

@@ -71,6 +71,7 @@ import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { boundedSemverVersion } from '../scenarios/coordinates.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
+import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 import { buildImage, DOCKER_MEDIA_TYPES } from './docker-image.js';
 import {
@@ -137,7 +138,7 @@ export async function renderDockerConfig(
  *  (parallel Playwright workers, or publish vs. consume in the same test): a private `HOME`/
  *  `DOCKER_CONFIG`, nothing else -- `crane` is a static, daemonless binary with no other state. */
 export function craneEnv(home: string): NodeJS.ProcessEnv {
-  return { ...process.env, HOME: home, DOCKER_CONFIG: path.join(home, '.docker') };
+  return clientEnv(home, { DOCKER_CONFIG: path.join(home, '.docker') });
 }
 
 /** `--insecure` iff `REPSY_E2E_INSECURE_REGISTRY` is set (a remote plain-HTTP host): ggcr already
