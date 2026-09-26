@@ -21,7 +21,6 @@ import { Observable } from 'rxjs';
 
 import { SecurityScanSupportService } from '../../service/security-scan-support.service';
 
-
 @Component({
   selector: 'app-security-details-link',
   templateUrl: './security-details-link.component.html',

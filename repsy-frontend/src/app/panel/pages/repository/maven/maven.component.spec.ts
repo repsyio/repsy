@@ -98,10 +98,15 @@ describe('MavenComponent', () => {
   });
 
   it('sends an anonymous visitor of a private repository to not-found', () => {
-    mavenService.getRepository.and.returnValue(of({ ...permission('maven-repo'), private: true } as RepoPermissionInfo));
+    mavenService.getRepository.and.returnValue(
+      of({ ...permission('maven-repo'), private: true } as RepoPermissionInfo),
+    );
 
     create(false);
 
-    expect(router.navigate).toHaveBeenCalledWith(['/not-found'], jasmine.objectContaining({ queryParams: jasmine.anything() }));
+    expect(router.navigate).toHaveBeenCalledWith(
+      ['/not-found'],
+      jasmine.objectContaining({ queryParams: jasmine.anything() }),
+    );
   });
 });

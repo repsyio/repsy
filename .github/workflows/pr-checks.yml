@@ -163,6 +163,22 @@ jobs:
       - name: Check
         run: pnpm run lint
 
+      # ng lint does not run prettier over src/**/*.{ts,html,css,scss}, so drift would land
+      # unnoticed without this step.
+      - name: Check formatting
+        run: pnpm run format:check
+
+      # Prettier for the e2e suite. It needs neither the JDK nor gen:api nor Chrome: the generated
+      # client is in e2e/.prettierignore. pnpm is already installed by the setup step above.
+      # --ignore-scripts and --frozen-lockfile as in the setup action (githubactions:S6505, S8543).
+      - name: Install the e2e dependencies
+        working-directory: e2e
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Check e2e formatting
+        working-directory: e2e
+        run: pnpm exec prettier --check .
+
       # Karma needs a Chrome binary; the runner image ships google-chrome. The CI launcher in
       # karma.conf.cjs adds --no-sandbox. A failing spec makes ng test exit non-zero. The coverage
       # report (lcov.info) is what the SonarCloud scan in the "Repsy check" job reads.

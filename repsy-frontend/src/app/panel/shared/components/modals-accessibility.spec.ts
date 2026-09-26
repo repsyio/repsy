@@ -195,7 +195,9 @@ describe('modal and form accessibility', () => {
     const service = new DangerModalService();
     const confirmed: string[] = [];
     service.showWithMessage('Delete thing', 'Delete', 'It cannot be undone', () => confirmed.push('yes'));
-    const { fixture, el } = await renderComponent(DangerModalComponent, [{ provide: DangerModalService, useValue: service }]);
+    const { fixture, el } = await renderComponent(DangerModalComponent, [
+      { provide: DangerModalService, useValue: service },
+    ]);
 
     const dialog = expectDialog(el, 'danger-modal', 'alertdialog');
     expectBackdropIsNotAControl(el, 'danger-modal-backdrop');
