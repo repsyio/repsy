@@ -18,12 +18,10 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
-import { ProtocolRepoControllerService } from '../../../../../../generated/api';
+import { ProtocolRepoControllerService, RepoSettingsForm } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
-import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
-import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
+import { saveRepoSetting } from '../save-repo-setting';
 
 @Component({
   selector: 'app-visibility',
@@ -38,43 +36,32 @@ export class VisibilityComponent {
   @Input() public parentForm: FormGroup;
   @Output() public fetch = new EventEmitter<void>();
 
+  /** A save is on its way: the toggle is locked, so a double click sends one request (RPS-1618). */
+  public saving = false;
+
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly toastService: ToastService,
   ) {}
 
   public changePrivacy(isPublic: boolean) {
-    this.parentForm.get('privateRepository').setValue(!isPublic);
+    const control = this.parentForm.get('privateRepository');
+    const previous = control.value;
+    const privacy = !isPublic;
 
-    const privacy = this.parentForm.get('privateRepository').value;
+    control.setValue(privacy);
+    this.saving = true;
 
-    let form: RepoSettingsForm | MavenRepoSettingsForm;
+    // Only the field this toggle owns is sent (RPS-1619): the rest of the form was loaded when the page opened.
+    const form: RepoSettingsForm = { privateRepo: privacy };
 
-    if (this.repoType === RepoType.MAVEN) {
-      form = Object.assign(new MavenRepoSettingsForm(), this.parentForm.value);
-      (form as MavenRepoSettingsForm).privateRepo = this.parentForm.get('privateRepository').value;
-      (form as MavenRepoSettingsForm).allowOverride = this.parentForm.get('allowOverride').value;
-      (form as MavenRepoSettingsForm).securityScanEnabled = this.parentForm.get('securityScanEnabled').value;
-    } else if (this.repoType === RepoType.NUGET) {
-      form = new RepoSettingsForm();
-      form.privateRepo = this.parentForm.get('privateRepository').value;
-      form.allowOverride = this.parentForm.get('allowOverride').value;
-      form.releases = this.parentForm.get('releases').value;
-      form.snapshots = this.parentForm.get('snapshots').value;
-      form.securityScanEnabled = this.parentForm.get('securityScanEnabled').value;
-    } else {
-      form = new RepoSettingsForm();
-      form.privateRepo = this.parentForm.get('privateRepository').value;
-      form.allowOverride = this.parentForm.get('allowOverride').value;
-      form.securityScanEnabled = this.parentForm.get('securityScanEnabled').value;
-    }
-
-    this.protocolRepoControllerService.updateRepoSettings(this.repoName, form).subscribe({
-      next: () => {
+    saveRepoSetting(this.protocolRepoControllerService.updateRepoSettings(this.repoName, form), {
+      saved: () => {
         this.fetch.emit();
         this.toastService.show(`Repository visibility has changed as ${privacy ? 'private' : 'public'}`, 'success');
       },
-      error: () => {},
+      failed: () => control.setValue(previous),
+      settled: () => (this.saving = false),
     });
   }
 }

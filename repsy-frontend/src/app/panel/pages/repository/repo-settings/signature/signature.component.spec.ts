@@ -139,6 +139,22 @@ describe('SignatureComponent', () => {
       expect(toastService.show).not.toHaveBeenCalled();
       expect(reloaded).not.toHaveBeenCalled();
     });
+
+    it('locks both toggles while a settings save is on its way and unlocks them afterwards (RPS-1618)', () => {
+      const inFlight = new Subject<object>();
+      repoApi.updateRepoSettings.and.returnValue(inFlight as never);
+      component.ngOnInit();
+      component.verifyAllSignaturesEnabled = true;
+
+      component.changeVerifyAllSignatures();
+
+      expect(component.saving).toBeTrue();
+
+      inFlight.next({});
+      inFlight.complete();
+
+      expect(component.saving).toBeFalse();
+    });
   });
 
   describe('ngOnInit', () => {

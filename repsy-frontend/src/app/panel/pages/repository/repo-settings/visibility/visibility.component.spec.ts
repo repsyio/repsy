@@ -15,7 +15,7 @@
 ///
 
 import { TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 import { ProtocolRepoControllerService } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
@@ -45,7 +45,7 @@ describe('VisibilityComponent', () => {
     component.fetch.subscribe(() => fetchCount++);
   });
 
-  it('makes a general repository private and saves only the general settings', () => {
+  it('makes a repository private and sends only the visibility, whatever the other settings are', () => {
     component.repoType = RepoType.NPM;
     component.parentForm = generalParentForm({
       privateRepository: false,
@@ -57,11 +57,7 @@ describe('VisibilityComponent', () => {
 
     expect(component.parentForm.get('privateRepository').value).toBeTrue();
     expect(repoApi.updateRepoSettings.calls.mostRecent().args[0]).toBe(REPO);
-    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({
-      privateRepo: true,
-      allowOverride: false,
-      securityScanEnabled: false,
-    });
+    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({ privateRepo: true });
     expect(toastService.show).toHaveBeenCalledOnceWith('Repository visibility has changed as private', 'success');
     expect(fetchCount).toBe(1);
   });
@@ -73,54 +69,52 @@ describe('VisibilityComponent', () => {
     component.changePrivacy(true);
 
     expect(component.parentForm.get('privateRepository').value).toBeFalse();
-    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual(jasmine.objectContaining({ privateRepo: false }));
+    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({ privateRepo: false });
     expect(toastService.show).toHaveBeenCalledOnceWith('Repository visibility has changed as public', 'success');
   });
 
-  it('sends the release and snapshot flags of a NuGet repository along', () => {
-    component.repoType = RepoType.NUGET;
-    component.parentForm = releaseAwareParentForm({ releases: true, snapshots: false, allowOverride: false });
-
-    component.changePrivacy(false);
-
-    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({
-      privateRepo: true,
-      allowOverride: false,
-      releases: true,
-      snapshots: false,
-      securityScanEnabled: true,
-    });
-  });
-
-  it('sends the release and snapshot flags of a Maven repository along', () => {
-    component.repoType = RepoType.MAVEN;
-    component.parentForm = releaseAwareParentForm({
-      releases: false,
-      snapshots: true,
-      allowOverride: false,
-      securityScanEnabled: false,
-    });
-
-    component.changePrivacy(true);
-
-    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual(
-      jasmine.objectContaining({
-        privateRepo: false,
+  [RepoType.NUGET, RepoType.MAVEN].forEach((repoType) => {
+    it(`does not send the release, snapshot, override or scan flags of a ${repoType} repository (RPS-1619)`, () => {
+      component.repoType = repoType;
+      component.parentForm = releaseAwareParentForm({
+        releases: true,
+        snapshots: false,
         allowOverride: false,
-        releases: false,
-        snapshots: true,
         securityScanEnabled: false,
-      }),
-    );
+        pgpVerifyAllSignaturesEnabled: true,
+      });
+
+      component.changePrivacy(false);
+
+      expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({ privateRepo: true });
+    });
   });
 
-  it('neither refreshes nor toasts when saving fails, leaving the error to the interceptor', () => {
-    repoApi.updateRepoSettings.and.returnValue(throwError(() => new Error('boom')));
+  it('locks the toggle while the save is on its way and unlocks it afterwards', () => {
+    const inFlight = new Subject<object>();
+    repoApi.updateRepoSettings.and.returnValue(inFlight as never);
     component.repoType = RepoType.NPM;
     component.parentForm = generalParentForm();
 
     component.changePrivacy(false);
 
+    expect(component.saving).toBeTrue();
+
+    inFlight.next({});
+    inFlight.complete();
+
+    expect(component.saving).toBeFalse();
+  });
+
+  it('puts the toggle back to the stored value, and neither refreshes nor toasts, when saving fails (RPS-1618)', () => {
+    repoApi.updateRepoSettings.and.returnValue(throwError(() => new Error('boom')));
+    component.repoType = RepoType.NPM;
+    component.parentForm = generalParentForm({ privateRepository: true });
+
+    component.changePrivacy(true);
+
+    expect(component.parentForm.get('privateRepository').value).toBeTrue();
+    expect(component.saving).toBeFalse();
     expect(fetchCount).toBe(0);
     expect(toastService.show).not.toHaveBeenCalled();
   });
@@ -159,5 +153,32 @@ describe('VisibilityComponent template', () => {
 
     TestBed.resetTestingModule();
     expect(text(await render(true), 'settings-visibility-hint')).toBe('Turn it on to make the repository public.');
+  });
+});
+
+describe('VisibilityComponent toggle', () => {
+  it('ignores a second click while the first save is on its way (RPS-1618)', async () => {
+    const inFlight = new Subject<object>();
+    const repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'updateRepoSettings',
+    ]);
+    repoApi.updateRepoSettings.and.returnValue(inFlight as never);
+    const { el, fixture } = await renderComponent(
+      VisibilityComponent,
+      [
+        { provide: ProtocolRepoControllerService, useValue: repoApi },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+      ],
+      { repoName: REPO, repoType: RepoType.NPM, parentForm: generalParentForm({ privateRepository: false }) },
+    );
+    const input = el.querySelector<HTMLInputElement>('[data-testid="toggle-input"]');
+
+    input.click();
+    fixture.detectChanges();
+    input.click();
+    input.click();
+
+    expect(input.disabled).toBeTrue();
+    expect(repoApi.updateRepoSettings).toHaveBeenCalledTimes(1);
   });
 });

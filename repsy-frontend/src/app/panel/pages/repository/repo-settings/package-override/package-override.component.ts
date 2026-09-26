@@ -18,12 +18,11 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
-import { ProtocolRepoControllerService } from '../../../../../../generated/api';
+import { ProtocolRepoControllerService, RepoSettingsForm } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
-import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
+import { saveRepoSetting } from '../save-repo-setting';
 
 @Component({
   selector: 'app-package-override',
@@ -40,6 +39,9 @@ export class PackageOverrideComponent implements OnInit {
 
   public allowOverride: boolean;
 
+  /** A save is on its way: the toggle is locked, so a double click sends one request (RPS-1618). */
+  public saving = false;
+
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly toastService: ToastService,
@@ -55,39 +57,21 @@ export class PackageOverrideComponent implements OnInit {
   }
 
   public changeOverride() {
-    let form: RepoSettingsForm | MavenRepoSettingsForm;
+    const allowOverride = this.allowOverride;
 
-    if (this.repoType === RepoType.MAVEN) {
-      const mavenForm = new MavenRepoSettingsForm();
-      mavenForm.allowOverride = this.allowOverride;
-      mavenForm.privateRepo = this.parentForm.get('privateRepository')?.value;
-      mavenForm.snapshots = this.parentForm.get('snapshots')?.value;
-      mavenForm.releases = this.parentForm.get('releases')?.value;
-      mavenForm.securityScanEnabled = this.parentForm.get('securityScanEnabled')?.value;
-      form = mavenForm;
-    } else if (this.repoType === RepoType.NUGET) {
-      const nugetForm = new RepoSettingsForm();
-      nugetForm.allowOverride = this.allowOverride;
-      nugetForm.privateRepo = this.parentForm.get('privateRepository')?.value;
-      nugetForm.releases = this.parentForm.get('releases')?.value;
-      nugetForm.snapshots = this.parentForm.get('snapshots')?.value;
-      nugetForm.securityScanEnabled = this.parentForm.get('securityScanEnabled')?.value;
-      form = nugetForm;
-    } else {
-      const generalForm = new RepoSettingsForm();
-      generalForm.allowOverride = this.allowOverride;
-      generalForm.privateRepo = this.parentForm.get('privateRepository')?.value;
-      generalForm.securityScanEnabled = this.parentForm.get('securityScanEnabled')?.value;
-      form = generalForm;
-    }
+    this.saving = true;
 
-    this.protocolRepoControllerService.updateRepoSettings(this.repoName, form).subscribe({
-      next: () => {
-        this.parentForm.get('allowOverride')?.setValue(this.allowOverride);
-        this.toastService.show(`Package override is now ${this.allowOverride ? 'allowed' : 'blocked'}`, 'success');
+    // Only the field this toggle owns is sent (RPS-1619): the rest of the form was loaded when the page opened.
+    const form: RepoSettingsForm = { allowOverride };
+
+    saveRepoSetting(this.protocolRepoControllerService.updateRepoSettings(this.repoName, form), {
+      saved: () => {
+        this.parentForm.get('allowOverride')?.setValue(allowOverride);
+        this.toastService.show(`Package override is now ${allowOverride ? 'allowed' : 'blocked'}`, 'success');
         this.fetch.emit();
       },
-      error: () => {},
+      failed: () => (this.allowOverride = !allowOverride),
+      settled: () => (this.saving = false),
     });
   }
 }

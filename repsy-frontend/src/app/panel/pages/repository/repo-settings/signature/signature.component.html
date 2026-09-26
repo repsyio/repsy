@@ -20,6 +20,7 @@
           [(checked)]="verifyAllSignaturesEnabled"
           checkedLabel="On"
           uncheckedLabel="Off"
+          [disabled]="saving"
           (checkedChange)="changeVerifyAllSignatures()"
         />
         <div class="text-[13px]">
@@ -40,6 +41,7 @@
           [(checked)]="keyServerLookupEnabled"
           checkedLabel="On"
           uncheckedLabel="Off"
+          [disabled]="saving"
           (checkedChange)="changeKeyServerLookup()"
         />
         <div class="text-[13px]">

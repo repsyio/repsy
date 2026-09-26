@@ -10,6 +10,7 @@
       class="min-w-[150px]"
       [(selectedOption)]="selectedOption"
       [options]="repoOptions"
+      [disabled]="saving"
       (choose)="selectType($event)"
     />
 

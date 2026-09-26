@@ -5539,6 +5539,39 @@ remaining rows. The Vulnerability Scanning toggle is covered by SEC-01/SEC-02c
 `reservedName` rename error (it has no test id), the expiration-date range messages (no test id) and
 the token-name `minLength` branch, which was unreachable and is gone (`required` already covers an empty name, RPS-1265).
 
+### Settings writes: failed saves, read-back matrix, two admins (RPS-1618, RPS-1619, G25)
+
+The controls of `/:repo/settings` that save the moment they are touched (Visibility, Package Override, Vulnerability
+Scanning, Version Allowance, and the two PGP switches) share one client-side rule now
+(`repsy-frontend/.../repo-settings/save-repo-setting.ts`): the control is set first, the PUT sends **only the field(s)
+the control owns** (the OS settings PUT has been null-aware since RPS-1200: an omitted field keeps its stored value),
+a failed PUT puts the control back to the stored value (the HTTP interceptor raises the error toast), and the control
+is locked while its request is in flight. The specs walk one table, `src/ui/pages/repo-settings/setting-toggles.ts`
+(`SETTING_TOGGLES`: which repo types show the control, how to flip it, what a flip stores, what the control has to
+show for a stored state, `seedPattern()` for a non-default value of every stored field), so a new control is one row.
+
+| File                                          | What it proves                                                                                                                                                                                                                                  |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/ui/settings/readback-matrix.spec.ts`   | SET-12: every control x every repo type that shows it: flip it, compare the WHOLE stored settings with the seeded pattern (only its own fields moved), reload, the control shows the store                                                      |
+| `tests/ui/settings/write-failures.spec.ts`    | SET-10: a 500 and an aborted request per control (Maven, NPM, NuGet): error toast, control back at the stored value, store unchanged, reload agrees, a second try works. SET-11: a double click sends one request                               |
+| `tests/ui/settings/concurrent-admins.spec.ts` | SET-13 (RPS-1619): admin B flips control X in a second browser, admin A, on a page opened before that, flips control Y: both are stored (all 12 ordered pairs of the four controls on a Maven repo). `@cloud-skip`: needs a second seeded ADMIN |
+| `tests/ui/settings/repo-deleted.spec.ts`      | SET-14 (G25): the repo is deleted, or renamed, under the open page: the next save says `Repository not found`, the control does not keep the change, nothing throws                                                                             |
+
+- The Vulnerability Scanning section only renders when the repo's type has a scanner, so the table stubs
+  `GET /api/security/supported-repo-types` (`stubSupportedRepoTypes`); the settings PUTs stay real.
+- The two PGP switches are covered by the matrix as **fields** (Maven's seed pattern moves both away from their
+  defaults and every flip must leave them alone); their own page object and specs are RPS-1628's.
+- Failure cases make the panel raise an error toast on purpose, so the describe allow-lists `Server error`,
+  `Connection error` and `Repository not found` (`errorToasts`, RPS-1617); an unrelated toast still fails the test.
+- Flip-and-fail: against the previous frontend image the specs fail as they should (a failed save leaves the control
+  flipped, a double click sends two requests, the second admin's stale page overwrites the first one's change). The
+  old image is `git apply -R` of the frontend diff, `./run.sh local up --project <name> --port-offset <n>` beside the
+  new one (README "Parallel stacks").
+- Not asserted: reloading the page of a deleted repo (an unknown repository route fires about ten parallel lookups,
+  each with its own `Repository not found` toast, see SET-05), and what an open page shows for a field ANOTHER admin
+  changed after it loaded, until it is reloaded or refetched: only the visibility switch follows the refetch after a
+  save, the other controls keep the value they were opened with (they never write it back, RPS-1619).
+
 ### Package seeding and protocol page objects (RPS-1255)
 
 The `ui` runner image has only Node and Chromium, so a package for a package page is **published over

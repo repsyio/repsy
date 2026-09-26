@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 import { ProtocolRepoControllerService } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
@@ -51,7 +51,7 @@ describe('PackageOverrideComponent', () => {
     expect(component.allowOverride).toBeFalse();
   });
 
-  it('blocks overriding on a general repository and saves only the general settings', () => {
+  it('blocks overriding and sends only the override, whatever the other settings are', () => {
     component.repoType = RepoType.DOCKER;
     component.parentForm = generalParentForm({
       privateRepository: true,
@@ -64,11 +64,7 @@ describe('PackageOverrideComponent', () => {
     component.changeOverride();
 
     expect(repoApi.updateRepoSettings.calls.mostRecent().args[0]).toBe(REPO);
-    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({
-      privateRepo: true,
-      allowOverride: false,
-      securityScanEnabled: false,
-    });
+    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({ allowOverride: false });
     expect(component.parentForm.get('allowOverride').value).toBeFalse();
     expect(toastService.show).toHaveBeenCalledOnceWith('Package override is now blocked', 'success');
     expect(fetchCount).toBe(1);
@@ -82,13 +78,13 @@ describe('PackageOverrideComponent', () => {
 
     component.changeOverride();
 
-    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual(jasmine.objectContaining({ allowOverride: true }));
+    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({ allowOverride: true });
     expect(component.parentForm.get('allowOverride').value).toBeTrue();
     expect(toastService.show).toHaveBeenCalledOnceWith('Package override is now allowed', 'success');
   });
 
   [RepoType.MAVEN, RepoType.NUGET].forEach((repoType) => {
-    it(`sends the release and snapshot flags of a ${repoType} repository along`, () => {
+    it(`does not send the visibility, release, snapshot or scan flags of a ${repoType} repository (RPS-1619)`, () => {
       component.repoType = repoType;
       component.parentForm = releaseAwareParentForm({
         privateRepository: true,
@@ -102,17 +98,29 @@ describe('PackageOverrideComponent', () => {
 
       component.changeOverride();
 
-      expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({
-        privateRepo: true,
-        allowOverride: false,
-        releases: true,
-        snapshots: false,
-        securityScanEnabled: false,
-      });
+      expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({ allowOverride: false });
     });
   });
 
-  it('keeps the parent form and stays quiet when saving fails', () => {
+  it('locks the toggle while the save is on its way and unlocks it afterwards', () => {
+    const inFlight = new Subject<object>();
+    repoApi.updateRepoSettings.and.returnValue(inFlight as never);
+    component.repoType = RepoType.NPM;
+    component.parentForm = generalParentForm({ allowOverride: true });
+    component.ngOnInit();
+    component.allowOverride = false;
+
+    component.changeOverride();
+
+    expect(component.saving).toBeTrue();
+
+    inFlight.next({});
+    inFlight.complete();
+
+    expect(component.saving).toBeFalse();
+  });
+
+  it('puts the toggle back to the stored value, and neither refreshes nor toasts, when saving fails (RPS-1618)', () => {
     repoApi.updateRepoSettings.and.returnValue(throwError(() => new Error('boom')));
     component.repoType = RepoType.NPM;
     component.parentForm = generalParentForm({ allowOverride: true });
@@ -121,9 +129,23 @@ describe('PackageOverrideComponent', () => {
 
     component.changeOverride();
 
+    expect(component.allowOverride).toBeTrue();
     expect(component.parentForm.get('allowOverride').value).toBeTrue();
+    expect(component.saving).toBeFalse();
     expect(fetchCount).toBe(0);
     expect(toastService.show).not.toHaveBeenCalled();
+  });
+
+  it('puts a denied override back to Deny when saving the change to Allow fails', () => {
+    repoApi.updateRepoSettings.and.returnValue(throwError(() => new Error('boom')));
+    component.repoType = RepoType.NPM;
+    component.parentForm = generalParentForm({ allowOverride: false });
+    component.ngOnInit();
+    component.allowOverride = true;
+
+    component.changeOverride();
+
+    expect(component.allowOverride).toBeFalse();
   });
 });
 
@@ -170,5 +192,32 @@ describe('PackageOverrideComponent template', () => {
     });
 
     expect(el.querySelector('[data-testid="settings-override-maven-note"]')).toBeNull();
+  });
+});
+
+describe('PackageOverrideComponent toggle', () => {
+  it('ignores a second click while the first save is on its way (RPS-1618)', async () => {
+    const inFlight = new Subject<object>();
+    const repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'updateRepoSettings',
+    ]);
+    repoApi.updateRepoSettings.and.returnValue(inFlight as never);
+    const { el, fixture } = await renderComponent(
+      PackageOverrideComponent,
+      [
+        { provide: ProtocolRepoControllerService, useValue: repoApi },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+      ],
+      { repoName: REPO, repoType: RepoType.NPM, parentForm: generalParentForm({ allowOverride: true }) },
+    );
+    const input = el.querySelector<HTMLInputElement>('[data-testid="toggle-input"]');
+
+    input.click();
+    fixture.detectChanges();
+    input.click();
+    input.click();
+
+    expect(input.disabled).toBeTrue();
+    expect(repoApi.updateRepoSettings).toHaveBeenCalledTimes(1);
   });
 });
