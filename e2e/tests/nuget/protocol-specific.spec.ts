@@ -72,7 +72,12 @@
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import * as nuget from '../../src/clients/nuget.js';
-import { nugetAdapter, nugetEnv, renderNugetConfig } from '../../src/clients/nuget.js';
+import {
+  nugetAdapter,
+  nugetEnv,
+  packageSearchIds,
+  renderNugetConfig,
+} from '../../src/clients/nuget.js';
 import {
   adminCredential,
   normalizeVersion,
@@ -356,14 +361,41 @@ test(
     // NuGet.Client's ServiceTypes.SearchQueryService vocabulary ("/Versioned", "/3.4.0",
     // "/3.0.0-beta" -- no bare form), so it only reaches the v3/search route once the index
     // advertises one of those. "dotnet package search" reports a missing search service with exit 0,
-    // so the package id in the output is what proves the search request was really made.
+    // so the package id in the output is what proves the search request was really made. The ids are
+    // read out of the table, whose cells wrap at 24 characters (RPS-1462), instead of searching the text.
     expect(searchResult.exitCode, `dotnet package search: ${searchResult.command}`).toBe(0);
     expect(
-      searchResult.stdout,
-      'a real, working search would list the published package id in the command output',
+      packageSearchIds(searchResult.stdout),
+      `a real, working search would list the published package id in the command output:\n${searchResult.stdout}`,
     ).toContain(layout.packageId);
   },
 );
+
+test('nuget > packageSearchIds joins an id that dotnet package search wrapped onto several rows (RPS-1462)', () => {
+  const table = [
+    "error: Invalid culture identifier in DOTNET_CLI_UI_LANGUAGE environment variable. Value read is 'en-us'",
+    '****************************************',
+    'Source: repsy (http://localhost:9090/e2e-abc-nuget-1/v3/index.json)',
+    '| Package ID               | Latest Version | Owners | Total Downloads |',
+    '| ------------------------ | -------------- | ------ | --------------- |',
+    '| e2e-abcdef10001-pkgsearc | 0.23181620.1   |        | 0               |',
+    '| h                        |                |        |                 |',
+    '| ------------------------ | -------------- | ------ | --------------- |',
+    '| short-id                 | 1.0.0          | me     | 12              |',
+    '| ------------------------ | -------------- | ------ | --------------- |',
+    '| e2e-abcdef123456-abcdefg | 2.0.0          |        | 0               |',
+    '| hijklmnopqrstuvwxyz-1234 |                |        |                 |',
+    '| 56                       |                |        |                 |',
+    '| ------------------------ | -------------- | ------ | --------------- |',
+  ].join('\n');
+
+  expect(packageSearchIds(table)).toEqual([
+    'e2e-abcdef10001-pkgsearch',
+    'short-id',
+    'e2e-abcdef123456-abcdefghijklmnopqrstuvwxyz-123456',
+  ]);
+  expect(packageSearchIds('No packages found.')).toEqual([]);
+});
 
 test(
   'nuget > search honours semVerLevel: SemVer 2.0.0-only versions need the opt-in (RPS-1275)',

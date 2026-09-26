@@ -15,9 +15,10 @@
 ///
 
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormBuilder } from '@angular/forms';
+import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
@@ -33,6 +34,7 @@ describe('LoginComponent', () => {
   let router: Router;
   let navigateByUrl: jasmine.Spy;
   let toastService: jasmine.SpyObj<ToastService>;
+  let changeDetector: jasmine.SpyObj<ChangeDetectorRef>;
 
   beforeEach(() => {
     authService = jasmine.createSpyObj<AuthService>('AuthService', ['logIn']);
@@ -41,7 +43,9 @@ describe('LoginComponent', () => {
     navigateByUrl = spyOn(router, 'navigateByUrl').and.resolveTo(true);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
 
-    component = new LoginComponent(router, new FormBuilder(), authService, toastService);
+    changeDetector = jasmine.createSpyObj<ChangeDetectorRef>('ChangeDetectorRef', ['markForCheck']);
+
+    component = new LoginComponent(router, new FormBuilder(), authService, toastService, changeDetector);
     component.ngOnInit();
     component.form.setValue({ username: 'someone', password: 'Passw0rd' });
   });
@@ -119,6 +123,7 @@ describe('LoginComponent', () => {
     expect(navigateByUrl).not.toHaveBeenCalled();
     expect(component.loading).toBeFalse();
     expect(component.form.enabled).toBeTrue();
+    expect(changeDetector.markForCheck).toHaveBeenCalled();
   });
 
   it('falls back to a default message on a 401 without a body', () => {
@@ -139,9 +144,9 @@ describe('LoginComponent', () => {
 /**
  * RPS-1459: LoginComponent is OnPush, and at "/" it is created in the view container of the OnPush
  * AuthRedirectComponent. The answer of the login request is not an event of its template, so the view is only
- * refreshed if something marks it (today `FormGroup.enable()`, which the request's `finalize` calls). A root
- * OnPush component is always refreshed by `fixture.detectChanges()`, so it is rendered inside a host, whose
- * own OnPush view is only refreshed when marked.
+ * refreshed if something marks it (the request's `finalize` does, RPS-1462; before that only `FormGroup.enable()`
+ * did, as a side effect). A root OnPush component is always refreshed by `fixture.detectChanges()`, so it is
+ * rendered inside a host, whose own OnPush view is only refreshed when marked.
  */
 @Component({
   standalone: true,
@@ -190,6 +195,23 @@ describe('LoginComponent in an OnPush host (RPS-1459)', () => {
     answer.error(new HttpErrorResponse({ status: 401, error: null }));
     fixture.detectChanges();
 
+    expect(query<HTMLButtonElement>('login-submit').disabled).toBeFalse();
+  });
+
+  it('enables the submit button again although form.enable() marks nothing (RPS-1462)', () => {
+    // The button only depends on `loading`, so the view has to be marked by the component itself, not as a side
+    // effect of FormGroup.enable(): make that call a no-op.
+    const login = fixture.debugElement.query(By.directive(LoginComponent)).componentInstance as LoginComponent;
+    spyOn(login.form, 'enable');
+
+    query<HTMLButtonElement>('login-submit').click();
+    fixture.detectChanges();
+    expect(query<HTMLButtonElement>('login-submit').disabled).toBeTrue();
+
+    answer.error(new HttpErrorResponse({ status: 401, error: null }));
+    fixture.detectChanges();
+
+    expect(login.form.enable).toHaveBeenCalled();
     expect(query<HTMLButtonElement>('login-submit').disabled).toBeFalse();
   });
 });

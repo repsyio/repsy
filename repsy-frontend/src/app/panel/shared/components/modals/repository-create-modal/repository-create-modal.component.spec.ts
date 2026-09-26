@@ -14,9 +14,10 @@
 /// limitations under the License.
 ///
 
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormBuilder } from '@angular/forms';
+import { By } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
@@ -34,6 +35,7 @@ describe('RepositoryCreateModalComponent name validation', () => {
       new FormBuilder(),
       {} as Router,
       {} as ToastService,
+      {} as ChangeDetectorRef,
     );
     component.ngOnInit();
   });
@@ -137,6 +139,7 @@ describe('RepositoryCreateModalComponent create', () => {
   let api: jasmine.SpyObj<RepoCollectionControllerService>;
   let router: jasmine.SpyObj<Router>;
   let toast: jasmine.SpyObj<ToastService>;
+  let changeDetector: jasmine.SpyObj<ChangeDetectorRef>;
   let component: RepositoryCreateModalComponent;
   let created: unknown[];
   let closed: boolean[];
@@ -148,7 +151,8 @@ describe('RepositoryCreateModalComponent create', () => {
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     router.navigate.and.returnValue(Promise.resolve(true));
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
-    component = new RepositoryCreateModalComponent(api, new FormBuilder(), router, toast);
+    changeDetector = jasmine.createSpyObj<ChangeDetectorRef>('ChangeDetectorRef', ['markForCheck']);
+    component = new RepositoryCreateModalComponent(api, new FormBuilder(), router, toast, changeDetector);
     created = [];
     closed = [];
     component.created.subscribe((repo) => created.push(repo));
@@ -207,14 +211,15 @@ describe('RepositoryCreateModalComponent create', () => {
       expect(component.loading).toBeFalse();
       expect(component.form.enabled).toBeTrue();
       expect(component.form.get('name')?.value).toBe('my-repo');
+      expect(changeDetector.markForCheck).toHaveBeenCalled();
     });
   }
 });
 
 /**
  * How the dashboard renders it (RPS-1459): the modal sits under the OnPush `AuthRedirectComponent`, and the
- * answer of the create request is not an event of any template. Nothing but `FormGroup.enable()` (called by the
- * request's `finalize`) marks the view after a refusal: this pins that the buttons come back.
+ * answer of the create request is not an event of any template. The request's `finalize` marks the view (RPS-1462;
+ * before, only `FormGroup.enable()` did, as a side effect): this pins that the buttons come back after a refusal.
  */
 @Component({
   standalone: true,
@@ -259,6 +264,25 @@ describe('RepositoryCreateModalComponent in an OnPush host (RPS-1459)', () => {
     answer.error({ status: 409 });
     fixture.detectChanges();
 
+    expect(query<HTMLButtonElement>('repo-create-submit').disabled).toBeFalse();
+    expect(query<HTMLButtonElement>('repo-create-cancel').disabled).toBeFalse();
+  });
+
+  it('enables Create and Cancel again although form.enable() marks nothing (RPS-1462)', () => {
+    // The buttons only depend on `loading`, so the view has to be marked by the component itself, not as a side
+    // effect of FormGroup.enable(): make that call a no-op.
+    const modal = fixture.debugElement.query(By.directive(RepositoryCreateModalComponent))
+      .componentInstance as RepositoryCreateModalComponent;
+    spyOn(modal.form, 'enable');
+
+    query<HTMLButtonElement>('repo-create-submit').click();
+    fixture.detectChanges();
+    expect(query<HTMLButtonElement>('repo-create-submit').disabled).toBeTrue();
+
+    answer.error({ status: 409 });
+    fixture.detectChanges();
+
+    expect(modal.form.enable).toHaveBeenCalled();
     expect(query<HTMLButtonElement>('repo-create-submit').disabled).toBeFalse();
     expect(query<HTMLButtonElement>('repo-create-cancel').disabled).toBeFalse();
   });

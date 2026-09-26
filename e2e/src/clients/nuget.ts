@@ -146,7 +146,10 @@ export async function renderConsumerProject(
  *  global-packages folder, HTTP/plugins caches and scratch dir, all under `home`, plus the telemetry/
  *  first-run/build-server noise this harness never wants. `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT`
  *  avoids coupling the image to a specific ICU version (this harness's packages carry no culture-
- *  sensitive data). */
+ *  sensitive data). It also leaves the CLI only the invariant culture, whose messages are the English
+ *  ones, so `DOTNET_CLI_UI_LANGUAGE` is deliberately NOT set: any value ("en", "en-US", "en-us") is
+ *  rejected there with "error: Invalid culture identifier in DOTNET_CLI_UI_LANGUAGE ..." in the
+ *  command's output (RPS-1462). */
 export function nugetEnv(home: string): NodeJS.ProcessEnv {
   return {
     ...process.env,
@@ -162,10 +165,45 @@ export function nugetEnv(home: string): NodeJS.ProcessEnv {
     DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false',
     NUGET_XMLDOC_MODE: 'skip',
     DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE: '1',
-    DOTNET_CLI_UI_LANGUAGE: 'en-us',
     MSBUILDDISABLENODEREUSE: '1',
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: '1',
   };
+}
+
+/**
+ * The package ids `dotnet package search` lists, read back out of its table (`| Package ID | Latest
+ * Version | Owners | Total Downloads |`). The client wraps a cell that is wider than its column (24
+ * characters) onto further rows whose other cells are empty, so an id of 25 characters or more comes
+ * out split across two or more rows; those continuation rows are joined back onto their id. Searching
+ * a stdout for the id with `toContain` therefore depends on how long the id is (RPS-1462: the ids of
+ * this harness are `e2e-<run id><worker><seq>-<label>`, one character over the width from a run id of
+ * 7 characters on).
+ */
+export function packageSearchIds(stdout: string): string[] {
+  const ids: string[] = [];
+  let header = true;
+  for (const line of stdout.split(/\r?\n/)) {
+    if (!line.startsWith('|') || /^\|[\s|-]+$/.test(line)) {
+      continue;
+    }
+    const cells = line
+      .replace(/^\|/, '')
+      .replace(/\|\s*$/, '')
+      .split('|')
+      .map((cell) => cell.trim());
+    if (header) {
+      // The first row is the column titles.
+      header = false;
+      continue;
+    }
+    const [id, ...others] = cells;
+    if (others.every((cell) => cell === '') && ids.length > 0) {
+      ids[ids.length - 1] += id;
+    } else {
+      ids.push(id);
+    }
+  }
+  return ids;
 }
 
 interface PublishRun {

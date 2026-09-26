@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { ChangeDetectorRef } from '@angular/core';
 import { AbstractControl, FormBuilder } from '@angular/forms';
 import { Router } from '@angular/router';
 
@@ -271,7 +272,13 @@ describe('the password messages of the create-user, profile and login forms', ()
   });
 
   it('take a weaker password on the login form than on the create-user form, and the same otherwise', () => {
-    const login = new LoginComponent({} as Router, new FormBuilder(), {} as AuthService, {} as ToastService);
+    const login = new LoginComponent(
+      {} as Router,
+      new FormBuilder(),
+      {} as AuthService,
+      {} as ToastService,
+      {} as ChangeDetectorRef,
+    );
     login.ngOnInit();
     const create = new UserCreateModalComponent({} as UserService, new FormBuilder(), {} as ToastService);
 

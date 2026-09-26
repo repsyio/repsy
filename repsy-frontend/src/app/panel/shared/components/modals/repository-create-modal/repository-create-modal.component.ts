@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { ChangeDetectorRef, Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -74,6 +74,7 @@ export class RepositoryCreateModalComponent implements OnInit {
     private readonly fb: FormBuilder,
     private readonly router: Router,
     private readonly toastService: ToastService,
+    private readonly changeDetector: ChangeDetectorRef,
   ) {}
 
   public ngOnInit(): void {
@@ -119,6 +120,9 @@ export class RepositoryCreateModalComponent implements OnInit {
         finalize(() => {
           this.form.enable();
           this.loading = false;
+          // The answer is not an event of this view, and the OnPush AuthRedirectComponent above it is only
+          // refreshed when marked: do it here instead of relying on form.enable() (RPS-1462).
+          this.changeDetector.markForCheck();
         }),
       )
       .subscribe({

@@ -16,7 +16,7 @@
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, OnInit, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { finalize } from 'rxjs';
@@ -62,6 +62,7 @@ export class LoginComponent implements OnInit {
     private readonly fb: FormBuilder,
     private readonly authService: AuthService,
     private readonly toastService: ToastService,
+    private readonly changeDetector: ChangeDetectorRef,
   ) {}
 
   public ngOnInit(): void {
@@ -87,6 +88,9 @@ export class LoginComponent implements OnInit {
         finalize(() => {
           this.loading = false;
           this.form.enable();
+          // The answer is not an event of this OnPush view (nor of the OnPush AuthRedirectComponent above it):
+          // mark it here instead of relying on form.enable() to do it as a side effect (RPS-1462).
+          this.changeDetector.markForCheck();
         }),
       )
       .subscribe({
