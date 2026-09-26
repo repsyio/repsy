@@ -76,4 +76,15 @@ RUN chmod -R a+rX /usr/share/dotnet
 
 RUN dotnet --version
 
+# .NET keeps its named mutexes (NuGet takes one, "NuGet-Migrations", in every dotnet command) under
+# /tmp/.dotnet/shm/session<sid>, and removes each directory again once it is empty, the shm directory
+# itself included. Two dotnet processes that start together (the two Playwright workers do, on their
+# first tests) race that create/remove and the loser exits 1 with "System.IO.IOException: The system
+# cannot open the device or file specified. : 'NuGet-Migrations' ... mkdir(/tmp/.dotnet/shm/...) == -1;
+# errno == ENOENT|EEXIST" before it did anything (RPS-1455). A placeholder keeps shm from ever being
+# empty, so it is never removed (fresh containers with 6 concurrent pushes each: 0 failing pushes in
+# 300, against 25 in 240 without it). World-writable like the ones .NET creates itself, as the
+# runner runs as the host's uid, not the root that built the image.
+RUN mkdir -p /tmp/.dotnet/shm/keep /tmp/.dotnet/lockfiles && chmod -R 777 /tmp/.dotnet
+
 CMD ["./entrypoint.sh", "nuget"]

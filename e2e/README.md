@@ -1855,7 +1855,12 @@ that one directory, and Debian 12 is a supported .NET 10 OS, so the copy works u
 `node:24-bookworm-slim` base every other runner uses.
 `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` avoids coupling the image to a specific ICU package
 version (this harness's rendered packages/projects carry no culture-sensitive data), the same
-approach the official Alpine .NET images take. `clients/nuget.ts` builds a `.nupkg` directly with
+approach the official Alpine .NET images take. The image also pre-creates `/tmp/.dotnet/shm/keep`:
+.NET creates and removes its named-mutex directories there on every `dotnet` command, the shm directory
+itself when it is empty, and two `dotnet` processes starting together (Playwright's two workers on their
+first tests) race that and exit 1 with `System.IO.IOException: The system cannot open the device or file
+specified. : 'NuGet-Migrations' ... mkdir("/tmp/.dotnet/shm/...") == -1` (RPS-1455); a placeholder keeps
+the directory alive. `clients/nuget.ts` builds a `.nupkg` directly with
 `fflate` (`nuget-raw.ts`'s `buildNupkg` — **no `dotnet pack`, no build, no `[Content_Types].xml`**:
 a zip containing a root `<id>.nuspec` and `content/e2e-marker.txt`, which is all the server's own
 `.nuspec`-extraction regex and the real client's package reader need) and runs the real `dotnet`
