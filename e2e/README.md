@@ -4456,6 +4456,39 @@ behaviour, passes while the bug is there and goes red when it is fixed; the fix 
 ./run.sh test --protocol maven,npm,pypi --grep "panel API"
 ```
 
+## Panel API contract specs: Docker and Helm (RPS-1483 part B6)
+
+`tests/docker/panel-api.spec.ts` (`--protocol docker`, real `crane`) and `tests/helm/panel-api.spec.ts` (`--protocol helm`,
+real `helm push`, `helm cm-push`, `helm package`, `helm show chart`, `helm pull`) follow the section above (same helpers,
+same `expectCovers`). What is specific to them:
+
+- **Docker** calls all 12 operations of `/api/docker/images`. The facts are the client's: `crane digest` of every tag, the
+  config and layer digests and sizes of the manifest, `crane config`, and the platforms of a two-arch OCI index
+  (`listDockerTagManifests` returns the index row plus one row per child, named by digest). `size` of an image is the
+  config plus layer bytes of every DISTINCT manifest its tags reach, and `untaggedSize` the same for the untagged ones,
+  both computed from the built layout. The deletes follow AGENTS.md "Database": a manifest is one row per image and digest,
+  a tag is a pointer, the manifest FILE is shared by the images of a repo and goes only when no row needs it. So deleting
+  a tag leaves the shared digest pullable through the sibling tag and image; `deleteDockerUntaggedManifests` reports
+  `freedManifestBytes` (the index and the arm64 child, not the manifest image B still has) and `orphanLayersScheduled`
+  (the arm64 config and layer, not the blobs a tagged manifest uses); the blobs go in the background (the spec polls a
+  blob HEAD); `deleteDockerImage` leaves the blobs until `deleteDockerOrphanLayers`. After every step the wire is read
+  (manifest GET by tag and digest, `tags/list` still 404 as pinned for RPS-1489, blob HEAD, `crane pull`).
+- **Helm** calls all 6 operations. One repo serves OCI and classic, so `web` is pushed with `helm push` and `lib` with
+  `helm cm-push`, and `index.yaml` lists both with the digest, `appVersion`, `type` and `created` the panel reports. An OCI
+  chart's `digest` and `size` are those of the `.tgz` `helm package` built (`helm push` sends it verbatim); a classic chart
+  is REPACKAGED by `cm-push`, so its digest is that of the file the classic download serves. `getHelmChartOciTags` returns
+  the tag AND the manifest digest `helm push` printed for each version, and `[]` for a classic chart. A delete drops the
+  version from `index.yaml`, the classic download and the OCI manifest (tag and digest) answer 404, `helm pull` and
+  `helm show chart` fail, and the sibling version pulls the bytes helm built.
+- **Deleting something that is not there** is a 404 that deletes nothing (a single-tag image, a single-version chart
+  stay complete), so neither protocol has the RPS-1573 cascade Maven has.
+- **Paging**: `listDockerImages`, `listDockerImageTags` and `searchHelmCharts` run `expectPagingSweep`; the version list of a
+  chart is not paged.
+
+```bash
+./run.sh test --protocol docker,helm --grep "panel API"
+```
+
 ## Remote hardening
 
 On a `remote` target (`target.isRemote`, see `src/target.ts`), `AUTH_THROTTLE_MAX_FAILURES` cannot
