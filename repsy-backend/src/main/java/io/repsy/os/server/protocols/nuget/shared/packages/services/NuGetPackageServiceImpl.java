@@ -155,6 +155,25 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
         .toList();
   }
 
+  /**
+   * Every version of the package, listed or not, newest published first. The panel package view
+   * uses it: a package whose only version is unlisted is still in the panel list, so its detail has
+   * to describe it too, and the admin can list the version again (RPS-1580). {@link
+   * #getVersionInfos} keeps returning the listed versions only, which is what the wire protocol
+   * documents.
+   */
+  public List<NuGetVersionInfo> getVersionInfosIncludingUnlisted(
+      final BaseRepoInfo<UUID> repoInfo, final String packageId) {
+
+    final var pkg = this.findPackage(repoInfo.getId(), packageId);
+
+    return this.packageVersionRepository
+        .findByNugetPackageIdOrderByPublishedAtDesc(pkg.getId())
+        .stream()
+        .map(v -> this.converter.toVersionInfo(v, packageId))
+        .toList();
+  }
+
   @Override
   public List<NuGetVersionInfo> getAllVersionInfos(
       final BaseRepoInfo<UUID> repoInfo, final String packageId) {

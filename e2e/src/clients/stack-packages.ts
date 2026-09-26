@@ -39,11 +39,17 @@ export interface Package {
   contentSha256: string | undefined;
 }
 
-/** The admin the stack was started with, as a Basic-auth credential. */
+/**
+ * The admin the stack was started with, as a Basic-auth credential. The password is read on use, not when
+ * this module loads: a spec of the `stack` project is imported by `playwright test --list` on a
+ * `cloud-*` target too, which has no OS admin password (RPS-1500).
+ */
 export const ADMIN: MaterializedCredential = {
   transport: 'basic',
   username: env.adminUsername,
-  password: env.adminPassword,
+  get password(): string {
+    return env.adminPassword;
+  },
   kind: 'password',
 };
 

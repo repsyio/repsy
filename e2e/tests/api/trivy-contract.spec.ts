@@ -66,7 +66,6 @@ import {
   type ContractTarget,
 } from '../../src/stubs/scanner/contract.js';
 import { DEFAULT_SCANNER_API_KEY } from '../../src/stubs/scanner/client.js';
-import { SCANNER_VERSION } from '../../src/stubs/scanner/rules.js';
 
 const TARGET: ContractTarget = {
   base: (process.env.REPSY_SCANNER_STUB_URL || 'http://localhost:8090').replace(/\/+$/, ''),
@@ -77,6 +76,9 @@ const TARGET: ContractTarget = {
 const READY_TIMEOUT_MS = 300_000;
 /** A scan of a small package: Trivy on a directory, seconds; generous for a slow disk or a late download. */
 const SCAN_TIMEOUT_MS = 240_000;
+
+/** The Trivy release the scanner read from its binary (RPS-1578): `0.66.0`; the stub's is `stub-scanner-1.0.0`. */
+const TRIVY_VERSION = /^\d+\.\d+\.\d+$/;
 
 const LODASH = { name: 'lodash', version: '4.17.20', cve: 'CVE-2021-23337' };
 
@@ -176,8 +178,7 @@ test.describe('the real repsy-scanner-trivy', { tag: ['@trivy'] }, () => {
         highestSeverity: 'HIGH',
         scannerName: 'trivy',
       });
-      // The stub reports SCANNER_VERSION; the real service never does (whatever it reports).
-      expect(scan.scannerVersion).not.toBe(SCANNER_VERSION);
+      expect(scan.scannerVersion).toMatch(TRIVY_VERSION);
 
       const findings = await panelApi.listScanFindings(repo.name, scan.id ?? '');
       const finding = findings.find((candidate) => candidate.cveId === LODASH.cve);
@@ -226,7 +227,7 @@ test.describe('the real repsy-scanner-trivy', { tag: ['@trivy'] }, () => {
         repoType: RepoType.DOCKER,
         status: 'COMPLETED',
       });
-      expect(scan.scannerVersion).not.toBe(SCANNER_VERSION);
+      expect(scan.scannerVersion).toMatch(TRIVY_VERSION);
       const findings = await panelApi.listScanFindings(repo.name, scan.id ?? '');
       expect(
         findings.map((candidate) => candidate.cveId),

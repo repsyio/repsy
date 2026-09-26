@@ -25,18 +25,23 @@
 # including) the entrypoint COPY if that file changes.
 FROM node:24-bookworm-slim
 
+# The harness's directory in the build context (RPS-1500): `.` when the context is e2e/ (docker-compose.runners.yml),
+# a path such as `repsy-os/e2e` when another repository builds from a parent directory. Every COPY of the
+# harness's own files below is relative to it. Declared after FROM, so it is in scope for this stage only.
+ARG HARNESS_DIR=.
+
 RUN npm install -g --ignore-scripts pnpm@12.5.1
 
 WORKDIR /app
 RUN chmod 777 /app
 
-COPY package.json pnpm-lock.yaml ./
+COPY ${HARNESS_DIR}/package.json ${HARNESS_DIR}/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
-COPY tsconfig.json playwright.config.ts ./
-COPY src ./src
-COPY tests ./tests
-COPY runners/entrypoint.sh ./entrypoint.sh
+COPY ${HARNESS_DIR}/tsconfig.json ${HARNESS_DIR}/playwright.config.ts ./
+COPY ${HARNESS_DIR}/src ./src
+COPY ${HARNESS_DIR}/tests ./tests
+COPY ${HARNESS_DIR}/runners/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
 # --- maven-specific layers ---
@@ -153,7 +158,7 @@ RUN mkdir -p /app/.gradle-shared && chmod 777 /app/.gradle-shared
 # publishes to a repository of its own, so nothing a test publishes is ever found here. World-writable
 # for the same reason as the directories above (lock files), and never a named volume: it is part of
 # the image, so a run starts from exactly what the build primed.
-COPY runners/sbt-warmup /tmp/sbt-warmup
+COPY ${HARNESS_DIR}/runners/sbt-warmup /tmp/sbt-warmup
 RUN mkdir -p /opt/sbt-cache/boot /opt/sbt-cache/coursier /opt/sbt-cache/ivy /opt/sbt-cache/global \
     && cd /tmp/sbt-warmup \
     && HOME=/opt/sbt-cache/home COURSIER_CACHE=/opt/sbt-cache/coursier sbt -batch -no-colors \

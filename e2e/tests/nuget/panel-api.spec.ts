@@ -384,6 +384,55 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
     });
   });
 
+  test('a package whose only version is unlisted is in the list and has a detail that names that version', async ({
+    seeder,
+  }) => {
+    // RPS-1580: the list includes a package with no listed version, so its detail must not answer 404.
+    const names = await newNames(seeder);
+    const version = '1.0.0';
+    await pushPackage(names, { id: names.id, version });
+    const unlisted = await dotnetNugetDelete(names.repoName, adminCredential(), names.id, version);
+    expect(unlisted.exitCode, `dotnet nuget delete: ${unlisted.command}`).toBe(0);
+    expect(await registrationListed(names)).toEqual({ [version]: false });
+
+    const packages = expectContract(
+      'searchNugetPackages',
+      await callOperation('searchNugetPackages', { repoName: names.repoName }),
+    ) as { content: { packageId: string }[] };
+    expect(
+      packages.content.map((row) => row.packageId.toLowerCase()),
+      'the list still has the package',
+    ).toEqual([names.id.toLowerCase()]);
+
+    const detail = expectContract(
+      'getNugetPackage',
+      await callOperation('getNugetPackage', values(names)),
+    ) as Record<string, unknown>;
+    expect(detail, 'the detail describes the package by its only, unlisted, version').toMatchObject(
+      {
+        description: `e2e ${names.id}@${version}`,
+        latestVersion: version,
+        totalDownloads: 0,
+      },
+    );
+    expect((detail.packageId as string).toLowerCase()).toBe(names.id.toLowerCase());
+
+    expect(
+      (await panelVersions(names)).map((row) => [row.version, row.listed]),
+      'the versions list agrees: the version is there, unlisted',
+    ).toEqual([[version, false]]);
+
+    // A newer version pushed after the unlist is listed and becomes the latest one.
+    await pushPackage(names, { id: names.id, version: '2.0.0' });
+    const afterNewer = expectContract(
+      'getNugetPackage',
+      await callOperation('getNugetPackage', values(names)),
+    ) as Record<string, unknown>;
+    expect(afterNewer.latestVersion, 'the newest listed version wins over an unlisted one').toBe(
+      '2.0.0',
+    );
+  });
+
   test('answers the failures the spec declares, with the schema of an error', async ({
     seeder,
   }) => {

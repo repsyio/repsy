@@ -458,6 +458,66 @@ test.describe('docker registry rules (raw HTTP)', () => {
   );
 
   test(
+    'R4b: the digest-algorithm hint of a blob upload start is honoured (RPS-1594, OCI end-4c)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'blobalgo');
+      const admin = adminCredential();
+      const built = await freshImage('docker-r4b', 'r4b');
+
+      // sha256 (the default) and sha512 both start a session, and the response is the usual one.
+      for (const digestAlgorithm of ['sha256', 'sha512']) {
+        const start = await rawStartUpload(layout.repoName, admin, layout.image, {
+          digestAlgorithm,
+        });
+        expect(start.status, `start with digest-algorithm=${digestAlgorithm}`).toBe(202);
+        expect(start.location, 'the session Location').toMatch(/\/blobs\/uploads\/[0-9a-f-]{36}$/);
+      }
+
+      // A sha512 blob, monolithic and chunked, is stored under its sha512 and served by it.
+      const configSha512 = sha512Digest(built.configBytes);
+      const monolithic = await rawUploadBlob(
+        layout.repoName,
+        admin,
+        layout.image,
+        built.configBytes,
+        configSha512,
+        { mode: 'monolithic', digestAlgorithm: 'sha512' },
+      );
+      expect(monolithic.status, 'monolithic upload with the sha512 hint').toBe(201);
+      expect(monolithic.digestHeader).toBe(configSha512);
+
+      const layerSha512 = sha512Digest(built.layerBytes);
+      const chunked = await rawUploadBlob(
+        layout.repoName,
+        admin,
+        layout.image,
+        built.layerBytes,
+        layerSha512,
+        { mode: 'patch', digestAlgorithm: 'sha512' },
+      );
+      expect(chunked.status, 'chunked upload with the sha512 hint').toBe(201);
+      expect(chunked.digestHeader).toBe(layerSha512);
+
+      for (const digest of [configSha512, layerSha512]) {
+        const head = await rawHeadBlob(layout.repoName, admin, layout.image, digest);
+        expect(head.status, `HEAD of the blob by ${digest.slice(0, 15)}...`).toBe(200);
+      }
+
+      // An algorithm the registry cannot check is refused at the start, with no session to resume.
+      for (const digestAlgorithm of ['md5', 'sha384', 'SHA512']) {
+        const refused = await rawStartUpload(layout.repoName, admin, layout.image, {
+          digestAlgorithm,
+        });
+        expectOci(refused, 400, 'DIGEST_INVALID');
+        expect(refused.location, `no Location for digest-algorithm=${digestAlgorithm}`).toBe(
+          undefined,
+        );
+      }
+    },
+  );
+
+  test(
     'R5: manifest push validation (unknown blob digest, wrong sha256: reference, missing/unknown ' +
       'Content-Type)',
     { tag: ['@negative'] },

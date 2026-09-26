@@ -4,10 +4,18 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=24.0.0 <25.0.0"
+    "node": ">=24.0.0 <25.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "exports": {
+    "./src/*.js": "./src/*.ts",
+    "./src/*": "./src/*",
+    "./tests/*.js": "./tests/*.ts",
+    "./tests/*": "./tests/*",
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "gen:api": "rm -rf src/api/generated && openapi --input ../repsy-backend/src/main/resources/openapi/openapi-spec.yaml --client axios --name PanelClient --output src/api/generated --useOptions --indent 2",
+    "gen:api": "rm -rf ${REPSY_E2E_GEN_OUT:-src/api/generated} && openapi --input ${REPSY_E2E_OPENAPI_SPEC:-../repsy-backend/src/main/resources/openapi/openapi-spec.yaml} --client axios --name PanelClient --output ${REPSY_E2E_GEN_OUT:-src/api/generated} --useOptions --indent 2",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -26,6 +34,9 @@
     "mustache": "^4.2.0",
     "openpgp": "^6.3.1",
     "yaml": "^2.9.1"
+  },
+  "peerDependencies": {
+    "@playwright/test": "^1.56.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
