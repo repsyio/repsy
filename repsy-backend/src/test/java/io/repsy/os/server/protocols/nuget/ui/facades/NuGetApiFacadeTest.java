@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.os.generated.model.NuGetDeletedItem;
 import io.repsy.os.server.protocols.nuget.shared.packages.services.NuGetPackageServiceImpl;
+import io.repsy.os.server.protocols.nuget.shared.packages.services.NuGetPackageServiceImpl.VersionDeletion;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
@@ -145,9 +146,8 @@ class NuGetApiFacadeTest {
     @Test
     @DisplayName("removes the version files, then the emptied package directory")
     void removesPackageDirectoryWhenLastVersionIsDeleted() throws IOException {
-      when(nugetPackageService.deleteVersionAndGetDeletedItem(
-              REPO_INFO, "Some.Package", "1.0.0-RC1"))
-          .thenReturn(NuGetDeletedItem.PACKAGE);
+      when(nugetPackageService.deleteVersionAndGetDeletion(REPO_INFO, "Some.Package", "1.0.0-RC1"))
+          .thenReturn(new VersionDeletion(NuGetDeletedItem.PACKAGE, "1.0.0-RC1"));
       when(nugetStorageService.deletePackageVersion(REPO_ID, "some.package", "1.0.0-rc1"))
           .thenReturn(50L);
 
@@ -162,8 +162,8 @@ class NuGetApiFacadeTest {
     @Test
     @DisplayName("ignores a failure to clean up the package directory")
     void ignoresDirectoryCleanupFailure() throws IOException {
-      when(nugetPackageService.deleteVersionAndGetDeletedItem(REPO_INFO, "Some.Package", "1.0.0"))
-          .thenReturn(NuGetDeletedItem.PACKAGE);
+      when(nugetPackageService.deleteVersionAndGetDeletion(REPO_INFO, "Some.Package", "1.0.0"))
+          .thenReturn(new VersionDeletion(NuGetDeletedItem.PACKAGE, "1.0.0"));
       when(nugetStorageService.deletePackageVersion(REPO_ID, "some.package", "1.0.0"))
           .thenReturn(50L);
       doThrow(new IOException("not empty"))
@@ -178,8 +178,8 @@ class NuGetApiFacadeTest {
     @Test
     @DisplayName("keeps the package directory while other versions remain")
     void keepsPackageDirectoryWhenVersionsRemain() throws IOException {
-      when(nugetPackageService.deleteVersionAndGetDeletedItem(REPO_INFO, "Some.Package", "1.0.0"))
-          .thenReturn(NuGetDeletedItem.VERSION);
+      when(nugetPackageService.deleteVersionAndGetDeletion(REPO_INFO, "Some.Package", "1.0.0"))
+          .thenReturn(new VersionDeletion(NuGetDeletedItem.VERSION, "1.0.0"));
       when(nugetStorageService.deletePackageVersion(REPO_ID, "some.package", "1.0.0"))
           .thenReturn(30L);
 
@@ -191,10 +191,40 @@ class NuGetApiFacadeTest {
     }
 
     @Test
+    @DisplayName("deletes the directory of a row stored with build metadata, not the canonical one")
+    void deletesBuildMetadataDirectoryOfLeftoverRow() throws IOException {
+      when(nugetPackageService.deleteVersionAndGetDeletion(
+              REPO_INFO, "Some.Package", "1.0.0+Legacy"))
+          .thenReturn(new VersionDeletion(NuGetDeletedItem.VERSION, "1.0.0+Legacy"));
+      when(nugetStorageService.deleteBuildMetadataVersion(REPO_ID, "some.package", "1.0.0+legacy"))
+          .thenReturn(20L);
+
+      final var result = facade.deleteVersion(REPO_INFO, "Some.Package", "1.0.0+Legacy");
+
+      verify(nugetStorageService, never()).deletePackageVersion(any(), any(), any());
+      assertThat(result.deletedItem()).isEqualTo(NuGetDeletedItem.VERSION);
+      assertThat(result.usages().getDiskUsage()).isEqualTo(-20L);
+    }
+
+    @Test
+    @DisplayName("deletes the canonical directory when the requested build metadata has no row")
+    void deletesCanonicalDirectoryOfBuildMetadataSpelling() throws IOException {
+      when(nugetPackageService.deleteVersionAndGetDeletion(REPO_INFO, "Some.Package", "1.0.0+x"))
+          .thenReturn(new VersionDeletion(NuGetDeletedItem.VERSION, "1.0.0"));
+      when(nugetStorageService.deletePackageVersion(REPO_ID, "some.package", "1.0.0"))
+          .thenReturn(30L);
+
+      final var result = facade.deleteVersion(REPO_INFO, "Some.Package", "1.0.0+x");
+
+      verify(nugetStorageService, never()).deleteBuildMetadataVersion(any(), any(), any());
+      assertThat(result.usages().getDiskUsage()).isEqualTo(-30L);
+    }
+
+    @Test
     @DisplayName("still succeeds when the storage delete fails")
     void toleratesStorageFailure() throws IOException {
-      when(nugetPackageService.deleteVersionAndGetDeletedItem(REPO_INFO, "Some.Package", "1.0.0"))
-          .thenReturn(NuGetDeletedItem.VERSION);
+      when(nugetPackageService.deleteVersionAndGetDeletion(REPO_INFO, "Some.Package", "1.0.0"))
+          .thenReturn(new VersionDeletion(NuGetDeletedItem.VERSION, "1.0.0"));
       when(nugetStorageService.deletePackageVersion(REPO_ID, "some.package", "1.0.0"))
           .thenThrow(new IOException("disk error"));
 

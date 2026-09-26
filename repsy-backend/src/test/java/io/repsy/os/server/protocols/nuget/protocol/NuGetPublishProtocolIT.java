@@ -1668,6 +1668,91 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
                   legacy))
           .andExpect(status().isNotFound());
     }
+
+    /**
+     * What an installation holds when the RPS-1059 migration left a conflict: the canonical {@code
+     * 1.0.0}, pushed normally, and a {@code 1.0.0+legacy} row with a directory of its own.
+     */
+    private Pushed canonicalWithLegacyRow(final String legacy) throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), "1.0.0");
+      final var id = pkg.id();
+      final var lowerId = id.toLowerCase(java.util.Locale.ROOT);
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
+          201);
+
+      final var legacyPkg = new Pkg(id, legacy);
+      final var directory = java.nio.file.Path.of(packageDir(repo, id, legacy));
+      Files.createDirectories(directory);
+      Files.write(directory.resolve(lowerId + "." + legacy + ".nupkg"), legacyPkg.nupkg());
+      Files.writeString(directory.resolve(lowerId + "." + legacy + ".nuspec"), legacyPkg.nuspec());
+      NuGetPublishProtocolIT.this.nugetPackageService.publishVersion(
+          NuGetPublishProtocolIT.this.repoTxService.getRepoByName(repo.getName()),
+          id,
+          legacy,
+          legacyPkg.nuspec(),
+          null,
+          replacesExisting -> BaseUsages.ofDisk(0));
+
+      return new Pushed(repo, id, pkg.nupkg());
+    }
+
+    private void deleteVersion(final Pushed pushed, final String version) {
+      NuGetPublishProtocolIT.this.nugetApiFacade.deleteVersion(
+          NuGetPublishProtocolIT.this.repoTxService.getRepoByName(pushed.repo().getName()),
+          pushed.id(),
+          version);
+    }
+
+    private List<String> storedVersionStrings(final Pushed pushed) {
+      return NuGetPublishProtocolIT.this.storedVersions(pushed.repo(), pushed.id()).stream()
+          .map(NuGetPackageVersion::getVersion)
+          .toList();
+    }
+
+    @Test
+    @DisplayName(
+        "deleting a conflict row by its own spelling keeps the canonical version (RPS-1311)")
+    void deletingConflictRowKeepsCanonicalVersion() throws Exception {
+      final var pushed = this.canonicalWithLegacyRow("1.0.0+legacy");
+      assertThat(this.storedVersionStrings(pushed))
+          .containsExactlyInAnyOrder("1.0.0", "1.0.0+legacy");
+
+      this.deleteVersion(pushed, "1.0.0+legacy");
+
+      assertThat(this.storedVersionStrings(pushed)).containsExactly("1.0.0");
+      assertThat(java.nio.file.Path.of(packageDir(pushed.repo(), pushed.id(), "1.0.0+legacy")))
+          .doesNotExist();
+      assertThat(java.nio.file.Path.of(packageDir(pushed.repo(), pushed.id(), "1.0.0"))).exists();
+      assertThat(this.read(pushed, "1.0.0", "nupkg")).isEqualTo(pushed.nupkg());
+    }
+
+    @Test
+    @DisplayName("deleting the canonical version leaves the conflict row for the migration")
+    void deletingCanonicalVersionKeepsConflictRow() throws Exception {
+      final var pushed = this.canonicalWithLegacyRow("1.0.0+legacy");
+
+      this.deleteVersion(pushed, "1.0.0");
+
+      assertThat(this.storedVersionStrings(pushed)).containsExactly("1.0.0+legacy");
+      assertThat(java.nio.file.Path.of(packageDir(pushed.repo(), pushed.id(), "1.0.0+legacy")))
+          .exists();
+    }
+
+    @Test
+    @DisplayName("a spelling with build metadata that has no row of its own still deletes 1.0.0")
+    void spellingWithoutRowDeletesCanonicalVersion() throws Exception {
+      final var pushed = this.canonicalWithLegacyRow("1.0.0+legacy");
+
+      this.deleteVersion(pushed, "1.0.0+other");
+
+      assertThat(this.storedVersionStrings(pushed)).containsExactly("1.0.0+legacy");
+      assertThat(java.nio.file.Path.of(packageDir(pushed.repo(), pushed.id(), "1.0.0")))
+          .doesNotExist();
+    }
   }
 
   @Nested

@@ -27,6 +27,7 @@ import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
+import java.io.IOException;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -134,8 +135,10 @@ public class NuGetApiFacade implements ProtocolApiFacade {
   public NuGetDeleteVersionResult deleteVersion(
       final RepoInfo repoInfo, final String packageId, final String version) {
 
-    final var deletedItem =
-        this.nugetPackageService.deleteVersionAndGetDeletedItem(repoInfo, packageId, version);
+    final var deletion =
+        this.nugetPackageService.deleteVersionAndGetDeletion(repoInfo, packageId, version);
+    final var deletedItem = deletion.deletedItem();
+    final var storedVersion = deletion.storedVersion().toLowerCase(Locale.ROOT);
 
     this.eventPublisher.publishEvent(
         new ArtifactVersionDeletedEvent(
@@ -150,11 +153,7 @@ public class NuGetApiFacade implements ProtocolApiFacade {
     try {
       if (deletedItem == NuGetDeletedItem.PACKAGE) {
 
-        freed =
-            this.nugetStorageService.deletePackageVersion(
-                repoInfo.getId(),
-                packageId.toLowerCase(Locale.ROOT),
-                version.toLowerCase(Locale.ROOT));
+        freed = this.deleteVersionFiles(repoInfo, packageId, storedVersion);
         try {
 
           this.nugetStorageService.deletePackage(
@@ -166,11 +165,7 @@ public class NuGetApiFacade implements ProtocolApiFacade {
               cleanupException.getMessage());
         }
       } else {
-        freed =
-            this.nugetStorageService.deletePackageVersion(
-                repoInfo.getId(),
-                packageId.toLowerCase(Locale.ROOT),
-                version.toLowerCase(Locale.ROOT));
+        freed = this.deleteVersionFiles(repoInfo, packageId, storedVersion);
       }
     } catch (final Exception e) {
       log.warn(
@@ -181,6 +176,23 @@ public class NuGetApiFacade implements ProtocolApiFacade {
     }
     return new NuGetDeleteVersionResult(
         deletedItem, BaseUsages.builder().diskUsage(-1L * freed).build());
+  }
+
+  /**
+   * Deletes the files of the row that was deleted: a row stored with build metadata has a directory
+   * of its own, and the canonical directory beside it belongs to another row (RPS-1311).
+   */
+  private long deleteVersionFiles(
+      final RepoInfo repoInfo, final String packageId, final String storedVersion)
+      throws IOException {
+
+    final var normalizedId = packageId.toLowerCase(Locale.ROOT);
+
+    return storedVersion.contains("+")
+        ? this.nugetStorageService.deleteBuildMetadataVersion(
+            repoInfo.getId(), normalizedId, storedVersion)
+        : this.nugetStorageService.deletePackageVersion(
+            repoInfo.getId(), normalizedId, storedVersion);
   }
 
   private NuGetPackageListItem toPackageListItem(
