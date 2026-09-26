@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -32,6 +33,16 @@ import tools.jackson.databind.json.JsonMapper;
 class TrivyScanServiceTest {
 
   @TempDir Path tempDir;
+
+  private TrivyScannerProperties properties(final String binaryPath) {
+    return new TrivyScannerProperties(
+        binaryPath,
+        30,
+        "db-repo",
+        "java-db-repo",
+        this.tempDir.resolve("cache").toString(),
+        Duration.ofHours(12));
+  }
 
   @Test
   void endsTheImageCommandWithADoubleDashBeforeTheReference() throws IOException {
@@ -44,9 +55,11 @@ class TrivyScanServiceTest {
 
     final var service =
         new TrivyScanService(
-            new TrivyScannerProperties(fakeTrivy.toString(), 30, "db-repo", "java-db-repo"),
+            this.properties(fakeTrivy.toString()),
             JsonMapper.builder().build(),
             new InMemoryJobStore(),
+            new ProcessTrivyCommandRunner(),
+            new TrivyDatabaseAccess(),
             Runnable::run);
 
     service.submitDockerScan("scan-1", "--config=/etc/passwd", null, false, "DOCKER", "img", "1");
@@ -78,9 +91,11 @@ class TrivyScanServiceTest {
     Files.setPosixFilePermissions(fakeTrivy, PosixFilePermissions.fromString("rwxr-xr-x"));
 
     return new TrivyScanService(
-        new TrivyScannerProperties(fakeTrivy.toString(), 30, "db-repo", "java-db-repo"),
+        this.properties(fakeTrivy.toString()),
         JsonMapper.builder().build(),
         jobStore,
+        new ProcessTrivyCommandRunner(),
+        new TrivyDatabaseAccess(),
         Runnable::run);
   }
 

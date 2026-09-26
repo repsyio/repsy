@@ -15,6 +15,7 @@
  */
 package io.repsy.scanner.trivy.config;
 
+import java.time.Duration;
 import org.jspecify.annotations.NonNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -23,4 +24,6 @@ public record TrivyScannerProperties(
     @NonNull String binaryPath,
     long timeoutSeconds,
     @NonNull String dbRepository,
-    @NonNull String javaDbRepository) {}
+    @NonNull String javaDbRepository,
+    @NonNull String cacheDir,
+    @NonNull Duration dbRefreshInterval) {}

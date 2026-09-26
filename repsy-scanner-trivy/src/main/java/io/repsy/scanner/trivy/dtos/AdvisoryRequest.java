@@ -13,18 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.scanner.trivy.errors;
+package io.repsy.scanner.trivy.dtos;
 
-import org.jspecify.annotations.NonNull;
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-public class TrivyScanException extends RuntimeException {
-
-  public TrivyScanException(final @NonNull String message) {
-    super(message);
-  }
-
-  public TrivyScanException(final @NonNull String message, final @Nullable Throwable cause) {
-    super(message, cause);
-  }
-}
+public record AdvisoryRequest(
+    @Nullable String ecosystem, @Nullable List<@Nullable AdvisoryPackage> packages) {}

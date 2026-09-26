@@ -13,18 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.scanner.trivy.errors;
+package io.repsy.scanner.trivy.config;
 
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
-public class TrivyScanException extends RuntimeException {
-
-  public TrivyScanException(final @NonNull String message) {
-    super(message);
-  }
-
-  public TrivyScanException(final @NonNull String message, final @Nullable Throwable cause) {
-    super(message, cause);
-  }
-}
+// maxPackages and maxBodyBytes are part of the POST /advisories contract (see the README) and are
+// not exposed as environment variables; the others tune one installation.
+@ConfigurationProperties(prefix = "scanner.advisories")
+public record AdvisoryProperties(
+    int maxPackages,
+    long maxBodyBytes,
+    long timeoutSeconds,
+    int concurrency,
+    long maxWaitSeconds) {}

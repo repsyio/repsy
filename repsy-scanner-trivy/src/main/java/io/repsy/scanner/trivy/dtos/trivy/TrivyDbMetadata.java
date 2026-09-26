@@ -13,18 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.scanner.trivy.errors;
+package io.repsy.scanner.trivy.dtos.trivy;
 
-import org.jspecify.annotations.NonNull;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
-public class TrivyScanException extends RuntimeException {
-
-  public TrivyScanException(final @NonNull String message) {
-    super(message);
-  }
-
-  public TrivyScanException(final @NonNull String message, final @Nullable Throwable cause) {
-    super(message, cause);
-  }
-}
+// The metadata.json that Trivy keeps next to db/trivy.db and java-db/trivy-java.db.
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record TrivyDbMetadata(
+    @JsonProperty("UpdatedAt") @Nullable Instant updatedAt,
+    @JsonProperty("NextUpdate") @Nullable Instant nextUpdate,
+    @JsonProperty("DownloadedAt") @Nullable Instant downloadedAt) {}

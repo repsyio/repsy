@@ -13,18 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.scanner.trivy.errors;
+package io.repsy.scanner.trivy.dtos;
 
+import java.time.Instant;
+import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-public class TrivyScanException extends RuntimeException {
-
-  public TrivyScanException(final @NonNull String message) {
-    super(message);
-  }
-
-  public TrivyScanException(final @NonNull String message, final @Nullable Throwable cause) {
-    super(message, cause);
-  }
-}
+// dbUpdatedAt is null only for a request without packages, which needs no database.
+public record AdvisoryLookupResponse(
+    @Nullable Instant dbUpdatedAt,
+    @Nullable String scannerVersion,
+    @NonNull List<@NonNull ScannerFinding> findings) {}

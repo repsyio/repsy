@@ -122,6 +122,123 @@ test.describe('the real repsy-scanner-trivy', { tag: ['@trivy'] }, () => {
     }
   });
 
+  // RPS-1610, RPS-1611: GET /status and the synchronous POST /advisories lookup, in Trivy's own database,
+  // with no scan and nothing stored in Repsy. The contract is in repsy-scanner-trivy/README.md.
+  test.describe('the status and the advisory lookup', () => {
+    /** A lookup is refused with 503 while a scan holds the database (or one is being switched in): try again. */
+    async function lookup(body: unknown): Promise<LookupAnswer> {
+      let last: LookupAnswer = { status: 0, json: {} };
+      await expect
+        .poll(
+          async () => {
+            const response = await fetch(`${TARGET.base}/advisories`, {
+              method: 'POST',
+              headers: { 'x-scanner-api-key': TARGET.apiKey, 'content-type': 'application/json' },
+              body: JSON.stringify(body),
+              signal: AbortSignal.timeout(60_000),
+            });
+            last = { status: response.status, json: await response.json().catch(() => ({})) };
+            return response.status;
+          },
+          { message: 'the lookup is served (not 503)', timeout: 60_000, intervals: [1_000, 2_000] },
+        )
+        .not.toBe(503);
+      return last;
+    }
+
+    test('GET /status is behind the API key and reports the Trivy version and the database date; /health reports neither', async () => {
+      const anonymous = await fetch(`${TARGET.base}/status`);
+      expect(anonymous.status).toBe(401);
+      const wrongKey = await fetch(`${TARGET.base}/status`, {
+        headers: { 'x-scanner-api-key': `${TARGET.apiKey}-wrong` },
+      });
+      expect(wrongKey.status).toBe(401);
+
+      const status = await (
+        await fetch(`${TARGET.base}/status`, { headers: { 'x-scanner-api-key': TARGET.apiKey } })
+      ).json();
+      expect(status.trivyVersion).toMatch(TRIVY_VERSION);
+      expect(
+        Number.isNaN(Date.parse(status.dbUpdatedAt)),
+        `dbUpdatedAt ${status.dbUpdatedAt}`,
+      ).toBe(false);
+      expect(Number.isNaN(Date.parse(status.dbDownloadedAt))).toBe(false);
+      expect(Number.isNaN(Date.parse(status.javaDbUpdatedAt))).toBe(false);
+
+      const health = await (await fetch(`${TARGET.base}/health`)).json();
+      expect(health).toEqual({ status: 'ok' });
+    });
+
+    test('POST /advisories needs the API key and refuses what it cannot look up', async () => {
+      const body = JSON.stringify({
+        ecosystem: 'npm',
+        packages: [{ name: 'lodash', version: '4.17.20' }],
+      });
+      const anonymous = await fetch(`${TARGET.base}/advisories`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+      });
+      expect(anonymous.status).toBe(401);
+
+      for (const bad of [
+        { ecosystem: 'maven', packages: [] },
+        { ecosystem: 'npm' },
+        { ecosystem: 'npm', packages: [{ name: '', version: '1.0.0' }] },
+        { ecosystem: 'npm', packages: [{ name: 'a/b', version: '1.0.0' }] },
+      ]) {
+        const response = await lookup(bad);
+        expect(response.status, JSON.stringify(bad)).toBe(400);
+        expect(response.json.message).toEqual(expect.any(String));
+      }
+    });
+
+    test('a pair that is stored nowhere is looked up in the database: lodash 4.17.20 has CVE-2021-23337, a scoped package is found under its own name, a clean pair has nothing', async () => {
+      const response = await lookup({
+        ecosystem: 'npm',
+        packages: [
+          { name: 'lodash', version: '4.17.20' },
+          { name: '@babel/traverse', version: '7.20.0' },
+          { name: 'left-pad', version: '1.3.0' },
+          { name: 'lodash', version: 'latest' },
+        ],
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.json.scannerVersion).toMatch(TRIVY_VERSION);
+      const status = await (
+        await fetch(`${TARGET.base}/status`, { headers: { 'x-scanner-api-key': TARGET.apiKey } })
+      ).json();
+      expect(response.json.dbUpdatedAt).toBe(status.dbUpdatedAt);
+
+      const findings = response.json.findings ?? [];
+      for (const finding of findings) {
+        expectFindingShape(finding);
+      }
+      expect(
+        findings.find((f) => f.cveId === LODASH.cve && f.packageVersion === LODASH.version),
+      ).toMatchObject({
+        severity: 'HIGH',
+        packageName: LODASH.name,
+        packageVersion: LODASH.version,
+        fixedVersion: '4.17.21',
+        fixStatus: 'FIXED',
+      });
+      expect(findings.find((f) => f.cveId === 'CVE-2023-45133')).toMatchObject({
+        packageName: '@babel/traverse',
+        packageVersion: '7.20.0',
+      });
+      expect(findings.filter((f) => f.packageName === 'left-pad')).toEqual([]);
+    });
+
+    test('an empty list is answered without a lookup', async () => {
+      const response = await lookup({ ecosystem: 'npm', packages: [] });
+
+      expect(response.status).toBe(200);
+      expect(response.json.findings).toEqual([]);
+    });
+  });
+
   test.describe('a real scan', () => {
     test('a scan with findings is COMPLETED with findings of the contract shape, and a scanner version', async () => {
       const scanId = uniqueScanId('lodash');
@@ -282,6 +399,17 @@ test.describe('the real repsy-scanner-trivy', { tag: ['@trivy'] }, () => {
     });
   });
 });
+
+/** What POST /advisories answered: the status and the JSON body (`{}` when there was none). */
+interface LookupAnswer {
+  status: number;
+  json: {
+    message?: string;
+    dbUpdatedAt?: string;
+    scannerVersion?: string;
+    findings?: Array<Record<string, unknown>>;
+  };
+}
 
 /** An npm tarball of `name@version` that bundles lodash 4.17.20 in its `node_modules`. */
 function bundledLodashTarball(name: string, version: string): Buffer {

@@ -13,18 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.scanner.trivy.errors;
+package io.repsy.scanner.trivy.dtos;
 
-import org.jspecify.annotations.NonNull;
+import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
-public class TrivyScanException extends RuntimeException {
-
-  public TrivyScanException(final @NonNull String message) {
-    super(message);
-  }
-
-  public TrivyScanException(final @NonNull String message, final @Nullable Throwable cause) {
-    super(message, cause);
-  }
-}
+// Every field is null when unknown (no trivy binary answer, no database downloaded yet).
+public record ScannerStatus(
+    @Nullable String trivyVersion,
+    @Nullable Instant dbUpdatedAt,
+    @Nullable Instant dbDownloadedAt,
+    @Nullable Instant javaDbUpdatedAt) {}

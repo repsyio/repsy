@@ -23,17 +23,13 @@ import io.repsy.scanner.trivy.dtos.trivy.TrivyVersion;
 import io.repsy.scanner.trivy.errors.TrivyScanException;
 import io.repsy.scanner.trivy.jobs.JobStore;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.function.UnaryOperator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +55,7 @@ public class TrivyScanService {
   private static final String VERSION_COMMAND = "version";
 
   private static final String WARMUP_TARGET = ".";
+  private static final String STAGING_DIR = "refresh-staging";
   private static final String DOWNLOAD_DB_ONLY_FLAG = "--download-db-only";
   private static final String DOWNLOAD_JAVA_DB_ONLY_FLAG = "--download-java-db-only";
 
@@ -76,6 +73,8 @@ public class TrivyScanService {
   private final @NonNull TrivyScannerProperties properties;
   private final @NonNull ObjectMapper objectMapper;
   private final @NonNull JobStore jobStore;
+  private final @NonNull TrivyCommandRunner runner;
+  private final @NonNull TrivyDatabaseAccess databaseAccess;
 
   @Qualifier("scanWorkerExecutor")
   private final @NonNull Executor scanWorkerExecutor;
@@ -143,9 +142,41 @@ public class TrivyScanService {
     return this.jobStore.get(scanId);
   }
 
+  // Startup: trivy downloads what is missing or past its NextUpdate straight into the cache
+  // directory. Nothing is served yet, so nothing needs protecting, and trivy alone decides (it also
+  // replaces a database of an older schema after a Trivy upgrade).
   public void warmUpDatabases() {
-    this.runTrivy(this.buildDownloadOnlyCommand(DOWNLOAD_DB_ONLY_FLAG));
-    this.runTrivy(this.buildDownloadOnlyCommand(DOWNLOAD_JAVA_DB_ONLY_FLAG));
+    try (var ignored = this.databaseAccess.enterRefresh()) {
+      this.runTrivy(this.buildDownloadOnlyCommand(DOWNLOAD_DB_ONLY_FLAG, this.cacheDir()));
+      this.runTrivy(this.buildDownloadOnlyCommand(DOWNLOAD_JAVA_DB_ONLY_FLAG, this.cacheDir()));
+    }
+  }
+
+  // Scheduled refresh: trivy downloads both databases into an empty staging cache directory while
+  // scans and lookups go on undisturbed, and only a complete download replaces the live files, in
+  // a moment during which nothing else uses them. Trivy itself would delete metadata.json, then
+  // rewrite trivy.db in place, so a download that fails half way would leave no usable database.
+  public void refreshDatabases() {
+    final var staging = Path.of(this.cacheDir()).resolve(STAGING_DIR);
+
+    try {
+      TrivyDatabaseSwapper.recreate(staging);
+
+      this.runTrivy(this.buildDownloadOnlyCommand(DOWNLOAD_DB_ONLY_FLAG, staging.toString()));
+      this.runTrivy(this.buildDownloadOnlyCommand(DOWNLOAD_JAVA_DB_ONLY_FLAG, staging.toString()));
+
+      try (var ignored = this.databaseAccess.enterRefresh()) {
+        TrivyDatabaseSwapper.swap(staging, Path.of(this.cacheDir()));
+      }
+    } catch (final IOException exception) {
+      throw new TrivyScanException("Failed to replace the Trivy databases", exception);
+    } finally {
+      TrivyDatabaseSwapper.deleteRecursivelyQuietly(staging);
+    }
+  }
+
+  private @NonNull String cacheDir() {
+    return this.properties.cacheDir();
   }
 
   private void enqueue(
@@ -213,7 +244,12 @@ public class TrivyScanService {
   }
 
   private @NonNull ScanOutcome runAndParse(final @NonNull List<String> command) {
-    final var stdout = this.runTrivy(command);
+    final String stdout;
+
+    try (var ignored = this.databaseAccess.enterScan()) {
+      stdout = this.runTrivy(command);
+    }
+
     final var report = this.parseReport(stdout);
     final var findings = TrivyFindingMapper.toFindings(report.results());
 
@@ -310,6 +346,8 @@ public class TrivyScanService {
     command.add("--format");
     command.add("json");
     command.add("--quiet");
+    command.add("--cache-dir");
+    command.add(this.cacheDir());
     this.addDbRepositoryFlags(command);
     command.add(artifactPath.toString());
 
@@ -327,6 +365,8 @@ public class TrivyScanService {
     command.add("--format");
     command.add("json");
     command.add("--quiet");
+    command.add("--cache-dir");
+    command.add(this.cacheDir());
     this.addDbRepositoryFlags(command);
 
     if (registryInsecure) {
@@ -348,11 +388,14 @@ public class TrivyScanService {
     return List.of(this.properties.binaryPath(), VERSION_COMMAND, "--format", "json");
   }
 
-  private @NonNull List<String> buildDownloadOnlyCommand(final @NonNull String downloadOnlyFlag) {
+  private @NonNull List<String> buildDownloadOnlyCommand(
+      final @NonNull String downloadOnlyFlag, final @NonNull String cacheDir) {
     final var command = new ArrayList<String>();
     command.add(this.properties.binaryPath());
     command.add("rootfs");
     command.add(downloadOnlyFlag);
+    command.add("--cache-dir");
+    command.add(cacheDir);
     this.addDbRepositoryFlags(command);
     command.add(WARMUP_TARGET);
 
@@ -369,10 +412,7 @@ public class TrivyScanService {
   private @NonNull String runTrivy(final @NonNull List<String> command) {
     for (var attempt = 1; ; attempt++) {
       try {
-        final var process = new ProcessBuilder(command).start();
-        return this.awaitOutput(process);
-      } catch (final IOException exception) {
-        throw new TrivyScanException("Failed to start trivy process", exception);
+        return this.runner.run(command, this.properties.timeoutSeconds());
       } catch (final TrivyScanException exception) {
         if (attempt >= MAX_DB_DOWNLOAD_ATTEMPTS || !isDbDownloadFailure(exception.getMessage())) {
           throw exception;
@@ -412,43 +452,6 @@ public class TrivyScanService {
     }
   }
 
-  private @NonNull String awaitOutput(final @NonNull Process process) {
-    final var stdoutFuture =
-        CompletableFuture.supplyAsync(() -> readFully(process.getInputStream()));
-    final var stderrFuture =
-        CompletableFuture.supplyAsync(() -> readFully(process.getErrorStream()));
-
-    final var finished = this.waitForProcess(process);
-    final var stdout = stdoutFuture.join();
-    final var stderr = stderrFuture.join();
-
-    if (StringUtils.isNotBlank(stderr)) {
-      log.debug("trivy stderr output: {}", stderr);
-    }
-
-    if (!finished) {
-      process.destroyForcibly();
-      throw new TrivyScanException(
-          "Trivy scan timed out after " + this.properties.timeoutSeconds() + "s");
-    }
-
-    if (process.exitValue() != 0) {
-      throw new TrivyScanException(
-          truncateErrorMessage("trivy exited with code " + process.exitValue() + ": " + stderr));
-    }
-
-    return stdout;
-  }
-
-  private boolean waitForProcess(final @NonNull Process process) {
-    try {
-      return process.waitFor(this.properties.timeoutSeconds(), TimeUnit.SECONDS);
-    } catch (final InterruptedException exception) {
-      Thread.currentThread().interrupt();
-      throw new TrivyScanException("Interrupted while waiting for trivy", exception);
-    }
-  }
-
   private @NonNull TrivyReport parseReport(final @NonNull String json) {
     try {
       return this.objectMapper.readValue(json, TrivyReport.class);
@@ -462,14 +465,6 @@ public class TrivyScanService {
       Files.deleteIfExists(path);
     } catch (final IOException exception) {
       log.warn("Failed to delete temporary scan file {}", path, exception);
-    }
-  }
-
-  private static @NonNull String readFully(final @NonNull InputStream inputStream) {
-    try {
-      return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-    } catch (final IOException exception) {
-      throw new TrivyScanException("Failed to read trivy process output", exception);
     }
   }
 
