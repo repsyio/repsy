@@ -18,8 +18,8 @@
  * The Cargo commands the panel's own pages advertise (RPS-1486, epic RPS-1473), run by the real
  * `cargo` against a real Repsy: `cargo install <crate> --version <v> --registry repsy` (the crate page's
  * "Install Binary"), `cargo add <crate>@<v> --registry repsy` ("Add Dependency"), and the registry
- * page's `$HOME/.cargo/config.toml` plus `cargo login --registry repsy <YOUR_DEPLOY_TOKEN>`
- * (`repsy-frontend/.../cargo-config.component.ts`; `tests/ui/packages/cargo.spec.ts` pins that the
+ * page's `$HOME/.cargo/config.toml` plus `cargo login --registry repsy` (the token is pasted at Cargo's
+ * prompt, so it is read from stdin; RPS-1598) (`repsy-frontend/.../cargo-config.component.ts`; `tests/ui/packages/cargo.spec.ts` pins that the
  * page shows those strings, this file proves the strings work). The suite's other specs publish and
  * `cargo fetch` a dependency-free crate; this one builds: the runner image carries `gcc` for it.
  *
@@ -43,8 +43,8 @@
  *    its "... and K crates more" line. Search order is the storage order (no sort in the query), so
  *    the pages are compared as sets, never as a sequence.
  *
- * `cargo login <token>` prints "deprecated in favor of reading `<token>` from stdin" (cargo 1.98): the
- * panel still tells users the argument form. Both forms are run.
+ * `cargo login <token>` prints "deprecated in favor of reading `<token>` from stdin" (cargo 1.98), so the
+ * panel tells users the stdin form (`cargo login --registry repsy`, RPS-1598). Both forms are run.
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -408,7 +408,7 @@ test.describe('cargo install and cargo add, as the panel advertises them', () =>
     expect(byIndex.exitCode, `cargo install --index (public): ${byIndex.stderr}`).toBe(0);
   });
 
-  test('cargo > login: the panel command stores the deploy token that install and publish then use, logout drops it', async ({
+  test('cargo > login: the argument form (deprecated by cargo) stores the deploy token that install and publish then use, logout drops it', async ({
     seeder,
   }) => {
     const reg = await newRegistry(seeder, 'login');
@@ -461,7 +461,7 @@ test.describe('cargo install and cargo add, as the panel advertises them', () =>
     expect(afterLogout.stderr).toContain('no token found for `repsy`');
   });
 
-  test('cargo > login: a token read from stdin is stored the same way and opens the search', async ({
+  test('cargo > login: the panel command reads the token from stdin and stores it the same way, and it opens the search', async ({
     seeder,
   }) => {
     const reg = await newRegistry(seeder, 'login-stdin');
