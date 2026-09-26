@@ -36,6 +36,7 @@ import {
   rawGetTarballCanonical,
 } from '../../src/clients/npm-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
+import type { MaterializedCredential } from '../../src/scenarios/world.js';
 import type { Scenario } from '../../src/scenarios/types.js';
 import type { World } from '../../src/scenarios/world.js';
 
@@ -47,13 +48,18 @@ const SCENARIO: Scenario = {
   expect: { publish: 'ok', consume: 'ok' },
 };
 
-function worldFor(repoName: string, packageName: string, version: string): World {
+function worldFor(
+  repoName: string,
+  packageName: string,
+  version: string,
+  credential: MaterializedCredential = adminCredential(),
+): World {
   const target = { packageName, version };
   return {
     scenario: SCENARIO,
     protocol: 'npm',
     repoName,
-    credential: adminCredential(),
+    credential,
     publishTarget: target,
     consumeTarget: target,
   };
@@ -169,6 +175,40 @@ test.describe('npm unpublish (real client, RPS-1289)', () => {
       for (const version of versions) {
         expect(await tarballStatus(repo.name, packageName, version)).toBe(404);
       }
+    },
+  );
+
+  test(
+    'a read-write deploy token cannot unpublish: removing a version needs MANAGE (RPS-1424)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
+      const packageName = `e2e-${seeder.runId}-token`;
+      const kept = npmAdapter.version('release');
+      const other = npmAdapter.version('release');
+      for (const version of [kept, other]) {
+        await npm.seedPublish(worldFor(repo.name, packageName, version));
+      }
+
+      // A read-write token publishes, deprecates and re-tags (WRITE), but never removes files.
+      const token = await seeder.createToken(repo.name, { readOnly: false });
+      const credential: MaterializedCredential = {
+        transport: 'basic',
+        username: token.username,
+        password: token.token,
+        kind: 'token',
+      };
+
+      const run = await npm.unpublish(
+        worldFor(repo.name, packageName, other, credential),
+        `${packageName}@${other}`,
+      );
+      expect(run.exitCode, `npm unpublish: ${run.command}\n${run.stderr}`).not.toBe(0);
+
+      expect((await served(repo.name, packageName)).versions, 'nothing was removed').toEqual(
+        [kept, other].sort(),
+      );
+      expect(await tarballStatus(repo.name, packageName, other)).toBe(200);
     },
   );
 });

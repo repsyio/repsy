@@ -33,7 +33,11 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-/** Handles DELETE /{repo}/api/charts/{name}/{version} — removes a chart from the registry. */
+/**
+ * Handles DELETE /{repo}/api/charts/{name}/{version} — removes a chart from the registry. It
+ * removes stored files, so it needs {@link Permission#MANAGE} like the panel's delete, and a deploy
+ * token never has it (RPS-1424).
+ */
 @NullMarked
 public abstract class AbstractHelmChartDeleteProtocolMethodHandler<ID>
     implements ProtocolMethodHandler {
@@ -60,7 +64,7 @@ public abstract class AbstractHelmChartDeleteProtocolMethodHandler<ID>
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE, "writeOperation", true);
+    return Map.of("permission", Permission.MANAGE, "writeOperation", true);
   }
 
   @Override

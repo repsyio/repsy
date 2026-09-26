@@ -197,7 +197,7 @@ e2e/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
       packument-read.spec.ts    # raw-HTTP reads: abbreviated packument, no publish-only fields, HEAD, ETag/304/gzip, undeprecate, tarball header (RPS-1356..1360, 1363)
-      unpublish.spec.ts         # real `npm unpublish` (RPS-1289): one version (unscoped/scoped), the only version, a whole package
+      unpublish.spec.ts         # real `npm unpublish` (RPS-1289): one version (unscoped/scoped), the only version, a whole package; refused for a read-write deploy token (RPS-1424)
     npm-clients/
       npm/publish-consume.spec.ts   # registerPublishConsumeLoop(npmFamilyAdapter(npmClient)): the catalog through the npm-family harness
       pnpm/*.spec.ts            # pnpm: the catalog, `pnpm -r publish` (workspace: rewrite), native-command wire proof, resolution / minimumReleaseAge
@@ -1343,8 +1343,10 @@ registry's), so pnpm asks for the full packument too (a second `GET` with `Accep
 strict 5-minute policy refuses a package published seconds ago and its message names the exact publish time
 Repsy served, the non-strict default installs it and records the exclusion.
 
-**`unpublish`, `login`, `logout`.** `pnpm unpublish <pkg>@<ver>` works: the version leaves the packument and
-its tarball is 404. pnpm has no `_rev` to send (a Repsy packument has none), so the PUT is
+**`unpublish`, `login`, `logout`.** `pnpm unpublish <pkg>@<ver>` works for an admin: the version leaves the
+packument and its tarball is 404. Removing a version needs MANAGE (the ADMIN role, as in the panel), which a
+deploy token never has, so a read-write token is refused (`401`, pnpm exits non-zero, the version stays;
+RPS-1424) while its `deprecate` and `dist-tag` still work. pnpm has no `_rev` to send (a Repsy packument has none), so the PUT is
 `/<pkg>/-rev/undefined`; it then also sends a `DELETE /<pkg>/-/<file>.tgz/-rev/undefined` **without the
 repository path** (pnpm keeps only the registry's origin for this URL), a harmless 404, not asserted.
 `pnpm login` first POSTs the web login `/-/v1/login` (404 in Repsy) and, with no terminal, stops with

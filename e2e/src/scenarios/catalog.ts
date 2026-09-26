@@ -24,6 +24,14 @@
  *    `ProtocolAuthService.authorizeDeployToken` throws the same `UnAuthorizedException` it throws
  *    for "no credentials at all" (see that class's javadoc on the RPS-939 permission model), and
  *    `MavenAuthPreProcessor` turns every `UnAuthorizedException` from authentication into a 401.
+ *  - The auth scenarios are all about publish and consume (READ and WRITE). Operations that remove
+ *    stored files need MANAGE, which only the ADMIN role has and a deploy token NEVER has, read-write
+ *    or not (RPS-1424, `ProtocolAuthService.authorizeDeployToken`): `npm unpublish` and the Helm
+ *    classic chart DELETE answer 401 for any token or USER account. They are not scenarios here, but
+ *    `tests/npm/unpublish.spec.ts`, `tests/npm-clients/pnpm/commands.spec.ts` and
+ *    `tests/helm/registry-rules.spec.ts` (R14) pin them. Operations that only change what is
+ *    advertised (npm deprecate and dist-tag, Cargo yank, NuGet unlist, Ruby yank) stay WRITE, so a
+ *    read-write token keeps running them.
  *  - Rejecting an override, a release version or a snapshot version
  *    (`no-override`/`maven-releases-off`/`maven-snapshots-off` publish) throws
  *    `AccessNotAllowedException`, which `ErrorHandler` maps to 403, not the plan's 409/"conflict".

@@ -373,6 +373,23 @@ admin resets its password, either from the users page in the web UI or directly 
 [password reset marker file](#forgot-admin-password) resets the password of any account, not only
 an admin's, from inside the container.
 
+### `npm unpublish` and Helm chart delete need the `ADMIN` role (RPS-1424)
+
+Before this change, a `USER` account and a read-write deploy token could remove
+stored files through two package clients although the web UI restricted that to `ADMIN`: `npm
+unpublish` (one version or a whole package) and deleting a Helm chart version with `DELETE
+/api/charts/<name>/<version>`. Both are manage operations now, like the web UI's delete and like
+Docker's manifest delete: they need an `ADMIN` account, and a deploy token, read-write or read-only,
+is refused for any manage operation in every format. See [Repository Access](#repository-access).
+
+**Who is affected:** a CI job that runs `npm unpublish` or deletes chart versions with a deploy token
+or with a non-admin account. It now gets `401` and the command fails. Use an `ADMIN` account for
+those jobs, or delete the version in the web UI.
+
+**What does not change:** `npm publish`, `npm deprecate`, `npm dist-tag add` and `rm`, `cargo yank`,
+NuGet unlist and relist, `gem yank` and publishing a Helm chart still need only write access, so a
+read-write deploy token keeps running them.
+
 ### Docker manifests are content-addressed (RPS-1216)
 
 Docker manifests used to be stored as a child of a tag: pushing a tag again with a new manifest
@@ -576,8 +593,17 @@ names. Only *manage* operations need the `ADMIN` role: creating a repository, re
 changing its description and settings, deleting it, deleting its artifacts and versions, managing
 its deploy tokens, and managing users.
 
+The web UI and the package clients follow the same rule (RPS-1424). What removes stored files is a
+manage operation on the wire too: `npm unpublish` (one version or the whole package) and deleting a
+Helm chart version with `DELETE /api/charts/<name>/<version>` need the `ADMIN` role, and so does
+deleting a Docker manifest or tag. A `USER` account and a deploy token are refused with `401` and a
+challenge, as for any credential a package client is not allowed to use. Operations that only change what a repository
+advertises, and keep every file, need write access: `npm deprecate`, `npm dist-tag add` and `rm`,
+`cargo yank`, NuGet unlist and relist, and `gem yank`.
+
 Deploy tokens are scoped to a single repository, so use one to give a CI job or an external party
-access to that repository without a user account. Only create user accounts for people you trust
+access to that repository without a user account. A deploy token reads and, unless it is read-only,
+writes; it **never** manages, so a CI credential can publish but cannot delete what it published. Only create user accounts for people you trust
 with every repository on the instance; to keep repositories apart between teams, run one Repsy
 instance per team.
 
