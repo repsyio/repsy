@@ -1,0 +1,28 @@
+[package]
+name = "{{{crateName}}}"
+version = "{{{version}}}"
+edition = "2021"
+description = "Repsy e2e installable/addable crate (RPS-1486)"
+license = "MIT"
+publish = ["repsy"]
+{{#bin}}
+
+[[bin]]
+name = "{{{crateName}}}"
+path = "src/main.rs"
+{{/bin}}
+{{^bin}}
+
+[lib]
+path = "src/lib.rs"
+{{/bin}}
+
+[features]
+{{#features}}
+{{{.}}} = []
+{{/features}}
+
+[dependencies]
+{{#deps}}
+{{{name}}} = { version = "{{{req}}}", registry = "repsy" }
+{{/deps}}

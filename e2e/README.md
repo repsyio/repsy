@@ -228,6 +228,7 @@ e2e/
     cargo/
       publish-consume.spec.ts   # registerPublishConsumeLoop(cargoAdapter) + a hyphenated-crate-name real-client test
       registry-rules.spec.ts    # raw-HTTP pins of the duplicate-version/version-validation/config.json/name-normalisation rules
+      install-add.spec.ts       # the commands the panel advertises: `cargo install` of a binary crate (built and run), `cargo add`, `cargo login`/`logout`, `cargo search --limit` (RPS-1486)
     nuget/
       publish-consume.spec.ts   # registerPublishConsumeLoop(nugetAdapter) + api-key-only-push and mixed-case-id real-client tests
       registry-rules.spec.ts    # raw-HTTP pins of the 409/422 override & version-kind rules, service index, X-NuGet-ApiKey (H7)
@@ -1777,7 +1778,8 @@ is refused (401) because the user is read again. Whether that is acceptable is a
 ## Cargo runner
 
 `runners/cargo.Dockerfile` copies a pinned Rust toolchain (`rust:1.98.1-slim-bookworm`, latest
-stable per the Rust blog, `-slim` so no gcc lands in the image) in from that official image's
+stable per the Rust blog, `-slim`: the toolchain stage has no gcc; the final stage adds `gcc` and
+`libc6-dev` for `cargo install`, see "Cargo install, add and login") in from that official image's
 `/usr/local/{rustup,cargo}` directories rather than installing it by hand — `/usr/local/cargo/bin/
 {cargo,rustc}` are rustup proxies that resolve the real toolchain via `RUSTUP_HOME` at run time, so
 both directories have to come along, not just the proxies. `clients/cargo.ts` renders
@@ -1992,9 +1994,51 @@ in this registry"}"}`, since Repsy has no ownership model finer than the reposit
 - **Platform-specific dependency**: a `[target.'cfg(unix)'.dependencies]` entry publishes and is
   served with a `target` field on its `deps` entry containing `cfg(unix)`, confirmed live.
 - **Workspace**: a 3-member workspace (utils → core → app, each `cargo publish --package <member>`
-  from the workspace root, no compilation anywhere — the runner image ships no gcc/build-essential)
+  from the workspace root, `--no-verify`: nothing here compiles)
   publishes cleanly member-by-member in dependency order; each member's served `deps` correctly names
   every crate it depends on.
+
+### Cargo install, add and login (RPS-1486)
+
+`tests/cargo/install-add.spec.ts` runs the commands the panel's Cargo pages tell a user to run,
+literally: the registry page's `$HOME/.cargo/config.toml` (`clients/cargo.ts` `renderPanelCargoConfig`,
+from `src/packages/cargo/panel-config.template.toml`, with and without the `[registry]` section the
+page says a public repo may skip) and `cargo login --registry repsy <token>`, the crate page's
+`cargo install <crate> --version <v> --registry repsy` and `cargo add <crate>@<v> --registry repsy`.
+`cargoPanelEnv` leaves `CARGO_HOME` unset (so the config, `credentials.toml` and the installed binary
+live under `$HOME/.cargo`) and sets `CARGO_REGISTRIES_REPSY_TOKEN` only when a test gives it a token.
+This is the one place that compiles Rust: `renderInstallableCrate` renders a `[[bin]]` or `[lib]` crate
+whose sources build (`main.template.rs` prints `marker=<uuid>` and its dependency's version), so the
+runner image installs `gcc` and `libc6-dev` (the only image change; the first run needs `-b`). Every
+hypothesis was probed live before it was pinned:
+
+- **A binary crate with a Repsy dependency installs and runs.** The sparse-index entry lists the
+  dependency (`deps`, `kind: normal`, no `registry` key: same registry), its `cksum` is the sha256 of
+  the `.crate` cargo itself packaged, and `cargo install --list` names the registry
+  (`sparse+<repo url>`). `--index sparse+<repo url>` works too, and matches the token to the registry
+  by its index.
+- **Yanking drives resolution, not installation of a yanked version.** A dependency's yanked version is
+  skipped by a fresh resolution (`dep=1.0.0`) but kept by `--locked`, whose packaged `Cargo.lock` still
+  pins it (`dep=1.1.0`, a "is yanked" warning). `cargo install <crate>` with no version takes the highest
+  version that is not yanked. The plan expected a yanked version to install when named exactly: **refuted**,
+  real cargo refuses it in every spelling (`--version 2.0.0`, `=2.0.0`, `^2`), "it has been yanked", and
+  `cargo yank --undo` restores it.
+- **Credentials.** A private repo without a token stops in the client ("no token found for `repsy`,
+  please run `cargo login --registry repsy`": `config.json` says `auth-required`), a wrong token gets
+  Repsy's 401 ("token rejected"), a public repo needs no token and no `[registry]` section, and stores no
+  `credentials.toml`. `cargo login` (argument form, deprecated by cargo 1.98 in favour of stdin, both are
+  run) saves the token verbatim into `[registries.repsy]` of a mode-0600 `credentials.toml`; install and
+  publish then work without the environment variable, and `cargo logout` closes the repo again. It never
+  asks the server, so a read-only token logs in, installs and gets a 401 on publish (nothing stored).
+- **`cargo add`.** Writes `{ version = "1.1.0", registry = "repsy" }`; with no version the newest not
+  yanked one; `--features` are checked against the index entry's `features` ("unrecognized feature");
+  `cargo generate-lockfile` then locks `source = "sparse+<repo url>"` with a `checksum` equal to the
+  published `cksum`, and `cargo fetch --locked` verifies it.
+- **`cargo search --limit N`** sends `per_page=N`: `--limit 2` of 3 crates lists two and "... and 1 crates
+  more" (from `meta.total`). Raw: pages of 2 give 2, 1 and 0 crates with `total` 3 each, the pages are
+  compared as sets (the query has no sort), `per_page` above 100 is clamped, `per_page=many` is a 400
+  with cargo's error envelope. `--limit 0` is not pinned: the server clamps `per_page=0` to 1, so cargo
+  prints one crate and "... and 3 crates more" (proposed as a follow-up in the PR).
 
 ## NuGet runner
 
