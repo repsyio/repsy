@@ -228,6 +228,7 @@ e2e/
       registry-rules.spec.ts    # raw-HTTP pins R1-R15: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type, sha512 digests, protocol DELETE
       image-lifecycle.spec.ts   # crane: the last tag keeps the image (manifest pullable by digest), the last manifest removes it, a new push recreates it (RPS-1288)
       crane-delete.spec.ts      # crane delete: password deletes by tag and by digest, a deploy token is refused, an older crane's insufficient_scope round trip (RPS-1440)
+      registry-api.spec.ts      # raw-HTTP pins RA1-RA6 of what the Docker server does not implement: tags/list, _catalog, referrers (404 no route), the referrers tag-schema fallback, mount= (202 fallback) (RPS-1478)
     helm/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
@@ -2400,6 +2401,41 @@ IllegalArgumentException("unsupportedMediaType")` branch B4/RPS-1110 above pins 
   suite exercises — its own description says the registry path "already resolves such digests"
   (`ManifestService.findManifestByRepoIdAndImageNameAndDigest`), which is exactly what this suite
   confirms live, end to end, with a real client.
+
+### Docker registry API pins: tags/list, `_catalog`, referrers, `mount=` (RPS-1478 part A)
+
+`tests/docker/registry-api.spec.ts` (RA1-RA6, raw HTTP through `docker-raw.ts`'s `rawTagsList`/
+`rawCatalog`/`rawReferrers`/`rawMountUpload`, no runner change) pins what the Docker server does
+with the parts of the distribution spec it does not implement, so the second client family
+(skopeo/regctl/oras, RPS-1478 parts B and C) meets a documented, tested surface. Every row was
+probed against a live stack first. It is pinned at today's behaviour (no `test.fail`, no ticket
+key): a backend story that implements a route flips its own test on purpose. The proposed story
+is in the PR that added this file.
+
+| Request                                                               | Answer, for every caller (admin, deploy token, read-only token, anonymous, unknown repo or image)                                                                                                                                              | Consequence for a real client                                                                          |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `GET /v2/<repo>/<image>/tags/list[?n=&last=]`                         | `404` `NAME_UNKNOWN` / `unknownPath`, no `WWW-Authenticate`, before authentication (RA1)                                                                                                                                                       | `crane ls`, `skopeo list-tags`, `regctl tag ls` fail: a tag list is only available in the panel        |
+| `GET /v2/_catalog[?n=]`, `GET /v2/<repo>/_catalog`                    | the same `404` (RA2)                                                                                                                                                                                                                           | `crane catalog`, `regctl repo ls` fail                                                                 |
+| `GET /v2/<repo>/<image>/referrers/<digest>[?artifactType=]`           | the same `404`, also for a stored digest (the spec wants `200` + an index, `404` only when the API is unsupported) (RA3)                                                                                                                       | `oras discover`, `regctl artifact tree`, `cosign tree` fall back to the referrers tag schema           |
+| `GET/PUT manifests/sha256-<hex>` (the tag schema)                     | an absent tag is `404` `MANIFEST_UNKNOWN` / `tagNotFound`; a `PUT` of an OCI image index under it is `201` and reads back byte-identical (RA4)                                                                                                 | the fallback itself works at the wire level (its `oras attach`/`discover` proof is RPS-1478 part C)    |
+| `POST .../blobs/uploads/?mount=<digest>[&from=<repo>]`                | `202` + a new upload session (`Location`, `Docker-Upload-UUID`), never the `201` of a real mount, whether or not the blob exists, in this or another repo, and for a malformed digest too; a read-only token is `401` at the request hop (RA5) | copies between two repos of one Repsy upload the bytes instead of mounting them; slower, still correct |
+| `HEAD blobs/<digest>` of a blob another image of the SAME repo pushed | `200`: blobs are stored per repo, not per image (RA6)                                                                                                                                                                                          | a same-repo copy never reaches the mount request, a client's own `HEAD` finds the blob                 |
+
+- The unauthenticated `404` is the router's catch-all (no handler is registered for the route),
+  which is why there is not even the `401` Bearer challenge a known route such as
+  `GET manifests/<tag>` gives an anonymous caller (RA1 asserts both), and why a made-up repo cannot
+  be told from a real one. The token endpoint still issues a token for `scope=registry:catalog:*`
+  (issuance never reads the scope).
+- Helm OCI is different on the same port: `GET /v2/<helm repo>/<chart>/tags/list` answers `200`
+  `{"name": "<chart>", "tags": [...]}` (RPS-1219). RA1b pins that a Docker repo is not caught by
+  that handler (the Helm section's "no `tags/list` handler" notes predate RPS-1219).
+- A cross-repo mount never moves a byte: after the `202` the blob is still absent from the
+  destination repo (`HEAD` `404`), and appears only once the client's `PUT ?digest=` finishes.
+- Not in this file: `oras attach` of an artifact whose layer is the empty descriptor. A manifest
+  whose config digest is also one of its layers (`{}` twice, as `oras attach`/`oras push
+--config` without files produces) is answered `404` `MANIFEST_BLOB_UNKNOWN` `layerNotFound`
+  (observed live while probing; the OCI artifact manifest with a distinct layer is `201`). It
+  belongs to part C, which decides how to pin it.
 
 ```bash
 ./run.sh test --protocol docker -b   # -b the first time: builds the docker runner image
