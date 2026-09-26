@@ -204,9 +204,9 @@ export function pullScope(repoName: string, image: string): string {
 }
 
 /** The scope that lets a token delete a manifest (RPS-1216, RPS-1434). Current `crane` asks for
- *  `push,pull,delete` up front and `skopeo` for `*`; older `crane` (v0.12 to v0.20) and `regctl` ask
- *  for `push,pull` first and add `delete` only after the registry's `insufficient_scope` challenge
- *  names this scope. */
+ *  `push,pull,delete` up front and `skopeo` for `*`; older `crane` (v0.12 to v0.20) asks for
+ *  `push,pull` first and adds `delete` only after the registry's `insufficient_scope` challenge names
+ *  this scope. `regctl` and containerd take it from the scope of the first challenge (RPS-1588). */
 export function deleteScope(repoName: string, image: string): string {
   return `repository:${repoName}/${image}:delete`;
 }
