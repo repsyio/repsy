@@ -42,10 +42,10 @@
  *    seen at the token endpoint through a logging proxy; no `insufficient_scope` round trip, unlike
  *    crane/regctl), refused for a read-write deploy token. Deleting a REFERRER fails on the same
  *    referrers-API probe unless the tag schema is forced, which then also removes its entry from the index.
- *  - OR6 (RPS-1490, `test.fail`) a manifest whose config digest is also one of its layer digests, or
- *    that lists the same layer twice, is answered `404 MANIFEST_BLOB_UNKNOWN / layerNotFound` on PUT.
+ *  - OR6 (RPS-1490) a manifest whose config digest is also one of its layer digests, or that lists the
+ *    same layer twice, is stored (it was answered `404 MANIFEST_BLOB_UNKNOWN / layerNotFound` on PUT).
  *    That is what `oras push` and `oras attach` produce when they have no files (`{}` as the config AND
- *    the one layer), so an SBOM-less annotation attach and an empty artifact cannot be stored.
+ *    the one layer), so an annotation-only attach and an empty artifact are stored.
  *  - OR7 `oras repo tags` / `repo ls` fail on the missing `tags/list` / `_catalog` (RA1/RA2, RPS-1489).
  */
 import fs from 'node:fs/promises';
@@ -713,16 +713,13 @@ test(
   },
 );
 
-// RPS-1490: a manifest that names the same blob digest twice (config == a layer, or two equal layers)
-// is answered 404 MANIFEST_BLOB_UNKNOWN / layerNotFound on PUT although every blob is stored.
-const RPS_1490 =
-  'RPS-1490: PUT manifests/<ref> of a manifest whose config digest equals a layer digest (or with a repeated layer) answers 404 MANIFEST_BLOB_UNKNOWN / layerNotFound';
+// RPS-1490 (fixed): a manifest that names the same blob digest twice (config == a layer, or two equal
+// layers) was answered 404 MANIFEST_BLOB_UNKNOWN / layerNotFound on PUT although every blob was stored.
 
 test(
   'docker > oras push without files stores the empty artifact (OR6a, RPS-1490)',
   { tag: ['@oras'] },
   async ({ seeder }) => {
-    test.fail(true, RPS_1490);
     const repoName = await newDockerRepo(seeder);
     const image = `e2e-${seeder.runId}-orasempty`;
     const session = await openOrasSession(adminCredential(), `docker-oras-or6a-${seeder.runId}`);
@@ -745,7 +742,6 @@ test(
   'docker > oras attach with only an annotation stores the referrer (OR6b, RPS-1490)',
   { tag: ['@oras'] },
   async ({ seeder }) => {
-    test.fail(true, RPS_1490);
     const repoName = await newDockerRepo(seeder);
     const image = `e2e-${seeder.runId}-orasannot`;
     const ref = imageRef(repoName, image, 'v1');
@@ -778,7 +774,6 @@ test(
   'docker > oras push of two files with identical bytes stores the artifact (OR6c, RPS-1490)',
   { tag: ['@oras'] },
   async ({ seeder }) => {
-    test.fail(true, RPS_1490);
     const repoName = await newDockerRepo(seeder);
     const image = `e2e-${seeder.runId}-orasdup`;
     const session = await openOrasSession(adminCredential(), `docker-oras-or6c-${seeder.runId}`);
@@ -808,7 +803,6 @@ test(
   'docker > a raw manifest whose config digest equals its only layer digest is stored (OR6d, RPS-1490)',
   { tag: ['@oras'] },
   async ({ seeder }) => {
-    test.fail(true, RPS_1490);
     const repoName = await newDockerRepo(seeder);
     const image = `e2e-${seeder.runId}-orasraw`;
     const admin = adminCredential();

@@ -443,6 +443,99 @@ class DockerManifestPushIT extends AbstractIntegrationTest {
     assertThat(indexPush.getStatus()).as(indexPush.getContentAsString()).isEqualTo(201);
   }
 
+  @Test
+  @DisplayName(
+      "a manifest whose config is also its only layer (the empty {} descriptor of oras push"
+          + " without files) is stored and served, not refused with layerNotFound (RPS-1490)")
+  void configThatIsAlsoTheOnlyLayerIsStored() throws Exception {
+    final var repo = this.dockerRepo();
+    final var token = this.adminProtocolBearerToken();
+    final var empty = "{}".getBytes(StandardCharsets.UTF_8);
+    this.pushBlob(repo, empty, token);
+    final var manifest =
+        this.manifestNaming(
+            "application/vnd.oci.empty.v1+json",
+            sha256(empty),
+            empty.length,
+            "application/vnd.oci.empty.v1+json",
+            sha256(empty),
+            empty.length);
+
+    this.assertStoredAndServed(repo, manifest, token);
+  }
+
+  @Test
+  @DisplayName(
+      "a manifest that lists two layers of identical bytes is stored and served, not refused with"
+          + " layerNotFound (RPS-1490)")
+  void repeatedLayerIsStored() throws Exception {
+    final var repo = this.dockerRepo();
+    final var token = this.adminProtocolBearerToken();
+    final var config =
+        "{\"architecture\":\"amd64\",\"os\":\"linux\"}".getBytes(StandardCharsets.UTF_8);
+    final var layer = "layer-content".getBytes(StandardCharsets.UTF_8);
+    this.pushBlob(repo, config, token);
+    this.pushBlob(repo, layer, token);
+    final var manifest =
+        this.manifestNaming(
+                OCI_CONFIG, sha256(config), config.length, OCI_LAYER, sha256(layer), layer.length)
+            .replace(
+                "\"layers\":[",
+                "\"layers\":[{\"mediaType\":\"%s\",\"digest\":\"%s\",\"size\":%d},"
+                    .formatted(OCI_LAYER, sha256(layer), layer.length));
+
+    this.assertStoredAndServed(repo, manifest, token);
+  }
+
+  @Test
+  @DisplayName("a manifest that names a blob the repo does not have is still refused")
+  void missingBlobIsStillRefused() throws Exception {
+    final var repo = this.dockerRepo();
+    final var token = this.adminProtocolBearerToken();
+    final var config =
+        "{\"architecture\":\"amd64\",\"os\":\"linux\"}".getBytes(StandardCharsets.UTF_8);
+    final var missing = "never-uploaded".getBytes(StandardCharsets.UTF_8);
+    this.pushBlob(repo, config, token);
+
+    final var response =
+        this.putManifest(
+            repo,
+            "latest",
+            OCI_MANIFEST,
+            this.manifestNaming(
+                OCI_CONFIG,
+                sha256(config),
+                config.length,
+                OCI_LAYER,
+                sha256(missing),
+                missing.length));
+
+    assertThat(response.getStatus()).isEqualTo(404);
+    assertThat(response.getContentAsString()).contains("\"detail\":\"layerNotFound\"");
+  }
+
+  private String manifestNaming(
+      final String configType,
+      final String configDigest,
+      final int configSize,
+      final String layerType,
+      final String layerDigest,
+      final int layerSize) {
+    return "{\"schemaVersion\":2,\"mediaType\":\"%s\",\"config\":{\"mediaType\":\"%s\",\"digest\":\"%s\",\"size\":%d},\"layers\":[{\"mediaType\":\"%s\",\"digest\":\"%s\",\"size\":%d}]}"
+        .formatted(
+            OCI_MANIFEST, configType, configDigest, configSize, layerType, layerDigest, layerSize);
+  }
+
+  private void assertStoredAndServed(final Repo repo, final String manifest, final String token)
+      throws Exception {
+    final var push = this.putManifest(repo, "latest", OCI_MANIFEST, manifest);
+    assertThat(push.getStatus()).as(push.getContentAsString()).isEqualTo(201);
+
+    final var pull = this.getManifestWithAccept(repo, "latest", OCI_MANIFEST, token);
+    assertThat(pull.getStatus()).isEqualTo(200);
+    assertThat(pull.getContentAsString()).isEqualTo(manifest);
+  }
+
   @ParameterizedTest(name = "schemaVersion {0}")
   @ValueSource(strings = {"4294967298", "-1", "3"})
   @DisplayName(

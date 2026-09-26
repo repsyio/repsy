@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,6 +51,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -460,6 +462,57 @@ class AbstractDockerProtocolTxFacadeTest {
         .hasMessage("packageOverrideDisabled");
     verify(this.dockerStorageService, never()).writeInputStreamToPath(any(), any(), any());
     verify(this.imageService, never()).findOrCreateImage(any(), any());
+  }
+
+  private static final String EMPTY_BLOB = "sha256:" + "4".repeat(64);
+  private static final String OTHER_BLOB = "sha256:" + "5".repeat(64);
+
+  private static String manifestNaming(final String config, final String... layers) {
+    final var layerJson =
+        java.util.Arrays.stream(layers)
+            .map(d -> "{\"mediaType\":\"application/x\",\"digest\":\"" + d + "\",\"size\":2}")
+            .collect(java.util.stream.Collectors.joining(","));
+    return "{\"schemaVersion\":2,\"mediaType\":\"application/vnd.oci.image.manifest.v1+json\","
+        + "\"config\":{\"mediaType\":\"application/x\",\"digest\":\""
+        + config
+        + "\",\"size\":2},\"layers\":["
+        + layerJson
+        + "]}";
+  }
+
+  /** Runs saveManifest up to the layer check and returns the digests it asked the layers for. */
+  private List<String> digestsAskedFor(final String manifestJson) throws Exception {
+    final var bytes = manifestJson.getBytes(StandardCharsets.UTF_8);
+    final var digest = DockerDigestCalculator.calculateDigest(bytes);
+    when(this.imageService.findOrCreateImage(REPO_ID, IMAGE_NAME))
+        .thenReturn(BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name(IMAGE_NAME).build());
+    doThrow(new ItemNotFoundException("stop"))
+        .when(this.layerService)
+        .isAllExistsByRepoIdAndDigests(any(), any());
+
+    assertThatThrownBy(
+            () -> this.facade().saveManifest(newContext(), IMAGE_NAME, formFor(digest, bytes)))
+        .hasMessage("stop");
+
+    final var captor = org.mockito.ArgumentCaptor.<List<String>>captor();
+    verify(this.layerService).isAllExistsByRepoIdAndDigests(eq(REPO_ID), captor.capture());
+    return captor.getValue();
+  }
+
+  @Test
+  @DisplayName(
+      "saveManifest() asks for a config that is also the only layer once (RPS-1490: the empty {}"
+          + " descriptor of oras push without files)")
+  void saveManifestChecksAConfigThatIsAlsoALayerOnce() throws Exception {
+    assertThat(this.digestsAskedFor(manifestNaming(EMPTY_BLOB, EMPTY_BLOB)))
+        .containsExactly(EMPTY_BLOB);
+  }
+
+  @Test
+  @DisplayName("saveManifest() asks for two layers of identical bytes once (RPS-1490)")
+  void saveManifestChecksARepeatedLayerOnce() throws Exception {
+    assertThat(this.digestsAskedFor(manifestNaming(OTHER_BLOB, EMPTY_BLOB, EMPTY_BLOB)))
+        .containsExactly(EMPTY_BLOB, OTHER_BLOB);
   }
 
   @Test
