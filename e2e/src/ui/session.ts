@@ -25,7 +25,7 @@
  * with family revocation on reuse (`RefreshTokenService.consume` in the backend), which shapes
  * everything here: never share one token pair between tests or contexts.
  */
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext, Page, Request } from '@playwright/test';
 
 import { loginPanel } from '../api/backend-registry.js';
 import { env } from '../env.js';
@@ -142,6 +142,93 @@ export async function setStoredSessionValue(
   await page.evaluate(({ key, v }) => window.localStorage.setItem(key, v), {
     key: target.ui.sessionStorageKeys[which],
     v: value,
+  });
+}
+
+/** The panel's refresh call (`POST`). The SPA sends it with the stored refresh token and stores the rotated pair. */
+export const REFRESH_PATH = '/api/auth/tokens/refresh';
+
+/** Whether `response` answers the refresh call. */
+export function isRefreshResponse(response: { url(): string }): boolean {
+  return new URL(response.url()).pathname === REFRESH_PATH;
+}
+
+/**
+ * From now on the page's API calls carrying `Bearer <token>` are answered with the 401
+ * `sessionExpired` the backend gives an expired access token (the one answer that makes the SPA refresh
+ * and retry). An access token lives 30 minutes and is not configurable, so a test cannot wait for an
+ * expiry, nor forge one the backend calls expired: the 401 is the one thing stubbed. Calls with any
+ * other token (the one a refresh hands out) and the `/api/auth/` calls themselves (the refresh) go to
+ * the real backend, so the refresh, the token rotation and a refused refresh token are real.
+ *
+ * `methods` limits the stub to those HTTP methods (default: every method), `times` to that many
+ * refused calls (default: every call); `refused` is filled with the refused requests, in order.
+ */
+export async function expireAccessToken(
+  page: Page,
+  token: string,
+  options: { methods?: string[]; times?: number; refused?: Request[] } = {},
+): Promise<void> {
+  let left = options.times ?? Number.POSITIVE_INFINITY;
+  await page.route(/\/api\/(?!auth\/)/, async (route) => {
+    const request = route.request();
+    const matches =
+      request.headers()['authorization'] === `Bearer ${token}` &&
+      (!options.methods || options.methods.includes(request.method())) &&
+      left > 0;
+    if (!matches) {
+      await route.continue();
+      return;
+    }
+    left -= 1;
+    options.refused?.push(request);
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        msgId: 'sessionExpired',
+        type: 'ERROR',
+        data: 'sessionExpired',
+        text: 'Session expired.',
+      }),
+    });
+  });
+}
+
+/** Counts the refresh calls `page` sends from now on (the request, whatever the answer). */
+export function countRefreshCalls(page: Page): { readonly count: number } {
+  const counter = { count: 0 };
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === REFRESH_PATH) {
+      counter.count += 1;
+    }
+  });
+  return counter;
+}
+
+/**
+ * Makes `navigator.locks` (Web Locks) undefined (unless `remove` is false, so a table of variants needs no branch) in every page of `context` that loads from now on, as it
+ * is on any plain-HTTP origin other than localhost (Web Locks need a secure context, and `localhost`
+ * is one, so the suite's own stack has them): what a self-hosted install served over HTTP looks like.
+ */
+export async function withoutWebLocks(context: BrowserContext, remove = true): Promise<void> {
+  if (!remove) {
+    return;
+  }
+  await context.addInitScript(() => {
+    Object.defineProperty(window.navigator, 'locks', { value: undefined, configurable: true });
+  });
+}
+
+/**
+ * Holds every refresh answer of `page` back by `ms` (the real backend still answers it, and rotates
+ * the token, at once). Makes two tabs' refreshes overlap for certain, which is what a race needs.
+ */
+export async function delayRefreshAnswers(page: Page, ms: number): Promise<void> {
+  await page.route(`**${REFRESH_PATH}`, async (route) => {
+    const response = await route.fetch();
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    await route.fulfill({ response });
   });
 }
 

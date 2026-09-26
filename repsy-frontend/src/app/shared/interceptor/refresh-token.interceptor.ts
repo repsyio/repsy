@@ -21,6 +21,7 @@ import { EMPTY, Observable, throwError } from 'rxjs';
 import { catchError, finalize, share, switchMap } from 'rxjs/operators';
 
 import { AuthService } from '../../auth/pages/service/auth.service';
+import { loginUrlReturningTo } from '../../auth/util/return-url';
 import { ToastService } from '../../panel/shared/components/toast/toast.service';
 
 const LOGIN_PATH = '/api/auth/login';
@@ -49,8 +50,15 @@ const SESSION_INVALID_MESSAGE = 'Session invalid, please log in again.';
  *   401 with no or an unknown body): the token can never become valid, and a refresh token signed by
  *   the same key would not either, so log out without trying.
  *
- * "Log out" clears the session, shows a toast once and goes to /login. A 401 that arrives when no
- * session exists any more (a request that was in flight during the logout) is passed on quietly.
+ * "Log out" clears the session, shows a toast once and goes to /login, remembering the page the user was
+ * on (`returnUrl`, RPS-1621), so a new login returns there. A write (POST/PUT/PATCH/DELETE) is no
+ * different from a read here: the 401 means the server refused it before doing anything, so the one
+ * retry after a refresh cannot apply it twice, and when the refresh or the retry fails it was never
+ * applied at all. A 401 that arrives when no session exists any more (a request that was in flight
+ * during the logout) is passed on quietly.
+ *
+ * With several tabs (RPS-1621) the refresh goes through `AuthService.refreshToken()`, which adopts what
+ * another tab has already refreshed instead of spending the same single-use token twice.
  */
 @Injectable()
 export class RefreshTokenInterceptor implements HttpInterceptor {
@@ -109,7 +117,7 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
     if (this.authService.isAuthenticated()) {
       this.authService.logOut();
       this.toastService.show(message, 'error');
-      this.router.navigateByUrl('/login');
+      this.router.navigateByUrl(loginUrlReturningTo(this.router.url));
     }
     return EMPTY;
   }

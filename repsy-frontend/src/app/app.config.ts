@@ -31,7 +31,6 @@ import { environment } from '../environments/environment';
 import { BASE_PATH } from '../generated/api';
 import { routes } from './app.routes';
 import { AppGlobalErrorHandler } from './shared/error-handler/app-global-error-handler';
-import { ACCESS_TOKEN_INITIALIZER } from './shared/initializer/access-token.initializer';
 import { errorHandlerInterceptor } from './shared/interceptor/error-handler.interceptor';
 import { HttpHeadersInterceptor } from './shared/interceptor/http-headers.interceptor';
 import { RefreshTokenInterceptor } from './shared/interceptor/refresh-token.interceptor';
@@ -67,7 +66,6 @@ export const appConfig: ApplicationConfig = {
       useClass: PreloadAllModules,
     },
     { provide: BASE_PATH, useValue: environment.apiBaseUrl },
-    ACCESS_TOKEN_INITIALIZER,
     provideHighlightOptions({
       fullLibraryLoader: () => import('highlight.js'),
       lineNumbersLoader: () => import('ngx-highlightjs/line-numbers'),

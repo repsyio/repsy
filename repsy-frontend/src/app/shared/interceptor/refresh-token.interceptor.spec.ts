@@ -36,7 +36,7 @@ describe('RefreshTokenInterceptor', () => {
   let http: HttpClient;
   let httpTesting: HttpTestingController;
   let authService: jasmine.SpyObj<AuthService>;
-  let router: jasmine.SpyObj<Router>;
+  let router: jasmine.SpyObj<Router> & { url: string };
   let toastService: jasmine.SpyObj<ToastService>;
   let session: boolean;
   let refreshes: Subject<string>[];
@@ -53,7 +53,7 @@ describe('RefreshTokenInterceptor', () => {
       refreshes.push(refresh);
       return refresh;
     });
-    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
+    router = Object.assign(jasmine.createSpyObj<Router>('Router', ['navigateByUrl']), { url: '/' });
 
     TestBed.configureTestingModule({
       providers: [
@@ -143,6 +143,96 @@ describe('RefreshTokenInterceptor', () => {
     expect(results).toEqual([{ ok: '/c' }, { ok: '/d' }]);
     expect(errors.length).toBe(2);
     expect(authService.logOut).toHaveBeenCalledTimes(1);
+  });
+
+  // RPS-1621: a write is refused with 401 before the server does anything, so the one retry cannot apply it twice.
+  describe('a write refused with sessionExpired', () => {
+    const BODY = { name: 'my-repo', type: 'MAVEN' };
+
+    function write(method: 'post' | 'put' | 'patch' | 'delete', results: unknown[], errors: unknown[] = []): void {
+      const call = method === 'delete' ? http.delete('/api/repos/x') : http[method]('/api/repos/x', BODY);
+      call.subscribe({ next: (r) => results.push(r), error: (e) => errors.push(e) });
+    }
+
+    ['post', 'put', 'patch', 'delete'].forEach((method) => {
+      it(`${method.toUpperCase()} is replayed once, with its body and the new token, after one refresh`, () => {
+        const results: unknown[] = [];
+        write(method as 'post', results);
+
+        const refused = httpTesting.expectOne('/api/repos/x');
+        expect(refused.request.method).toBe(method.toUpperCase());
+        refused.flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
+        expect(authService.refreshToken).toHaveBeenCalledTimes(1);
+        refreshes[0].next('token-1');
+        refreshes[0].complete();
+
+        const retried = httpTesting.expectOne('/api/repos/x');
+        expect(retried.request.method).toBe(method.toUpperCase());
+        expect(retried.request.body).toEqual(method === 'delete' ? null : BODY);
+        expect(retried.request.headers.get('Authorization')).toBe('Bearer token-1');
+        retried.flush({ done: true });
+
+        expect(results).toEqual([{ done: true }]);
+        expect(authService.refreshToken).toHaveBeenCalledTimes(1);
+        expect(authService.logOut).not.toHaveBeenCalled();
+      });
+    });
+
+    it('is not sent again when the refresh fails: the session ends and the write was never applied', () => {
+      const results: unknown[] = [];
+      const errors: unknown[] = [];
+      router.url = '/my-repo/settings';
+      write('post', results, errors);
+
+      httpTesting.expectOne('/api/repos/x').flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
+      refreshes[0].error(new HttpErrorResponse({ status: 401, error: { msgId: 'refreshTokenExpired' } }));
+
+      httpTesting.expectNone('/api/repos/x');
+      expect(results).toEqual([]);
+      expect(errors.length).toBe(1);
+      expect(authService.logOut).toHaveBeenCalledTimes(1);
+      expect(toastService.show).toHaveBeenCalledOnceWith('Session expired, please log in again.', 'error');
+      expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/login?returnUrl=%2Fmy-repo%2Fsettings');
+    });
+
+    it('is not sent a third time when the retry is refused too: it logs out and completes quietly', () => {
+      const results: unknown[] = [];
+      const errors: unknown[] = [];
+      write('put', results, errors);
+
+      httpTesting.expectOne('/api/repos/x').flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
+      refreshes[0].next('token-1');
+      refreshes[0].complete();
+      httpTesting.expectOne('/api/repos/x').flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
+
+      httpTesting.expectNone('/api/repos/x');
+      expect(authService.refreshToken).toHaveBeenCalledTimes(1);
+      expect(results).toEqual([]);
+      expect(errors).toEqual([]);
+      expect(authService.logOut).toHaveBeenCalledTimes(1);
+      expect(toastService.show).toHaveBeenCalledOnceWith('Session invalid, please log in again.', 'error');
+    });
+
+    it('completes quietly, without a replay, when another tab ended the session meanwhile', () => {
+      const results: unknown[] = [];
+      const errors: unknown[] = [];
+      let completed = false;
+      http.post('/api/repos/x', BODY).subscribe({
+        next: (r) => results.push(r),
+        error: (e) => errors.push(e),
+        complete: () => (completed = true),
+      });
+
+      httpTesting.expectOne('/api/repos/x').flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
+      // AuthService.refreshToken() completes empty when the storage says the session is gone.
+      refreshes[0].complete();
+
+      httpTesting.expectNone('/api/repos/x');
+      expect(completed).toBeTrue();
+      expect(results).toEqual([]);
+      expect(errors).toEqual([]);
+      expect(authService.logOut).not.toHaveBeenCalled();
+    });
   });
 
   // RPS-1279: the rule per 401 msgId is documented on RefreshTokenInterceptor.

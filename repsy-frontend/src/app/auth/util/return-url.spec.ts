@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { safeReturnUrl } from './return-url';
+import { loginUrlReturningTo, safeReturnUrl } from './return-url';
 
 describe('safeReturnUrl', () => {
   ['/', '/repositories', '/my-repo/packages?tab=1#top', '/a%2Fb', '/users/ünï'].forEach((url) => {
@@ -45,6 +45,31 @@ describe('safeReturnUrl', () => {
   [null, undefined, 42, ['/repositories'], {}].forEach((value) => {
     it(`refuses the non-string ${JSON.stringify(value)}`, () => {
       expect(safeReturnUrl(value)).toBeNull();
+    });
+  });
+});
+
+describe('loginUrlReturningTo', () => {
+  it('remembers the page the user was on', () => {
+    expect(loginUrlReturningTo('/repositories')).toBe('/login?returnUrl=%2Frepositories');
+    expect(loginUrlReturningTo('/my-repo/packages?tab=1#top')).toBe(
+      '/login?returnUrl=%2Fmy-repo%2Fpackages%3Ftab%3D1%23top',
+    );
+  });
+
+  ['/', '/?returnUrl=%2Fx', '/#top', '/login', '/login?returnUrl=%2Fx', '/login/x'].forEach((url) => {
+    it(`has nothing to remember on ${url}`, () => {
+      expect(loginUrlReturningTo(url)).toBe('/login');
+    });
+  });
+
+  it('does not treat a repository called login-x as the login page', () => {
+    expect(loginUrlReturningTo('/login-x')).toBe('/login?returnUrl=%2Flogin-x');
+  });
+
+  [undefined, null, '', 'https://evil.example/', '//evil.example'].forEach((url) => {
+    it(`gives the bare login for the unsafe ${JSON.stringify(url)}`, () => {
+      expect(loginUrlReturningTo(url)).toBe('/login');
     });
   });
 });
