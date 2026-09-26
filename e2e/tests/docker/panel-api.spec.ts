@@ -25,7 +25,7 @@
  * The delete operations follow the content-addressed model of AGENTS.md "Database": a manifest is one row per
  * image and digest, a tag is a pointer to it, and a manifest FILE is shared by the images of a repo that have the
  * digest and is deleted only when no row needs it. After each delete the WIRE is checked (manifest by tag and by
- * digest, `tags/list` as pinned by RPS-1489, blob HEAD, a real `crane pull`), and that a sibling image or tag
+ * digest, `tags/list` (RPS-1489), blob HEAD, a real `crane pull`), and that a sibling image or tag
  * still pulls its exact digest.
  *
  * Copied from `tests/docker/image-lifecycle.spec.ts` (the crane session, the layout builder) and
@@ -196,6 +196,13 @@ async function tagNames(session: Session, image: string): Promise<string[]> {
     await callOperation('listDockerImageTags', values(session, image), { query: 'size=100' }),
   ) as { content: { name: string }[] };
   return page.content.map((tag) => tag.name).sort();
+}
+
+/** The tags the registry's own `tags/list` answers for the image (RPS-1489), in the order it lists. */
+async function wireTags(session: Session, image: string): Promise<string[]> {
+  const res = await rawTagsList(session.repoName, adminCredential(), image);
+  expect(res.status, `tags/list of ${image}: ${res.body.toString('utf8')}`).toBe(200);
+  return (JSON.parse(res.body.toString('utf8')) as { tags: string[] }).tags;
 }
 
 /** The two-platform OCI index every multi-arch case pushes. */
@@ -626,9 +633,11 @@ test.describe('the Docker panel API against what crane pushed', () => {
     await craneOk(session, ['tag', session.ref(imageA, 'v1'), 'v1b'], 'panel-tag-v1b');
     await push(session, other.dir, imageA, 'latest');
     await push(session, shared.dir, imageB, 'x');
-    const tagsListBefore = await rawTagsList(session.repoName, adminCredential(), imageA);
-    // tags/list is not served (RPS-1489 adds it, and flips this pin with `registry-api.spec.ts`).
-    expect(tagsListBefore.status).toBe(404);
+    expect(await wireTags(session, imageA), 'tags/list before the delete').toEqual([
+      'latest',
+      'v1',
+      'v1b',
+    ]);
 
     // Delete `v1`: the tag is gone on the wire and for the client; `v1b` (same digest), the digest itself and
     // the other image still serve the exact bytes.
@@ -660,7 +669,10 @@ test.describe('the Docker panel API against what crane pushed', () => {
       tagCount: 2,
       untaggedManifestCount: 0,
     });
-    expect((await rawTagsList(session.repoName, adminCredential(), imageA)).status).toBe(404);
+    expect(await wireTags(session, imageA), 'tags/list after v1 is deleted').toEqual([
+      'latest',
+      'v1b',
+    ]);
 
     // Delete the last tag of that manifest: the manifest stays, untagged, pullable by digest only.
     expectContract(
@@ -668,6 +680,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
       await callOperation('deleteDockerTag', values(session, imageA, { tagName: 'v1b' })),
     );
     expect(await manifestStatus(session, imageA, 'v1b')).toBe(404);
+    expect(await wireTags(session, imageA), 'tags/list after v1b is deleted').toEqual(['latest']);
     expect(
       await manifestStatus(session, imageA, shared.manifestDigest),
       'untagged, by digest',

@@ -16,7 +16,7 @@
 
 /**
  * The parts of the Registry HTTP API V2 / OCI distribution spec that the Docker server does NOT
- * implement, pinned at their CURRENT behaviour with raw HTTP (RPS-1478 part A; the second-client
+ * implement (and, since RPS-1489, `tags/list`, which it does), pinned at their CURRENT behaviour with raw HTTP (RPS-1478 part A; the second-client
  * family, skopeo/regctl/oras, follows in parts B and C). Nothing here is a `test.fail`: these are
  * documented gaps, not bugs with a ticket, and the backlog decision was to pin them until a backend
  * story implements them (the proposed story, with this file's evidence, is in the PR description).
@@ -24,20 +24,19 @@
  *
  * Every status below was probed live before it was pinned (README.md, "Docker registry API pins"):
  *
- *  - `GET /v2/<repo>/<image>/tags/list`, `GET /v2/_catalog`, `GET /v2/<repo>/<image>/referrers/<digest>`:
- *    no handler is registered, so the router's catch-all answers `404` + `NAME_UNKNOWN` /
- *    `unknownPath` for EVERY caller (admin, deploy token, read-only token, anonymous, a repo or an
- *    image that does not exist): before authentication, so not even a `401` challenge and no way to
- *    tell a real repo from a made-up one. The token hop still answers `200` (the endpoint never looks
- *    at the scope). Consequence for real clients: `crane ls`, `skopeo list-tags`, `regctl tag ls`
- *    and `regctl repo ls` fail against a Repsy Docker repo (they cannot list its tags or images; the
- *    panel is the only place a tag list is available), and OCI-1.1-aware clients (`oras discover`,
- *    `regctl artifact tree`, `cosign tree`) must take their spec-mandated fallback, the referrers
- *    TAG schema (`sha256-<hex>` tag holding an image index), which the server serves like any
+ *  - `GET /v2/<repo>/<image>/tags/list` IS served since RPS-1489 (RA1: the listing, `n`/`last` pagination
+ *    with its `Link` header, the pull permission check; RA1b: the Helm handler's bare name against
+ *    Docker's repository-qualified one), and `crane ls`, `skopeo list-tags` and `regctl tag ls` list a
+ *    Repsy Docker repo (`client-tag-list.spec.ts`).
+ *  - `GET /v2/_catalog` and `GET /v2/<repo>/<image>/referrers/<digest>`: no handler is registered, so the
+ *    router's catch-all answers `404` + `NAME_UNKNOWN` / `unknownPath` for EVERY caller (admin, deploy
+ *    token, read-only token, anonymous): before authentication, so not even a `401` challenge. The token
+ *    hop still answers `200` (the endpoint never looks at the scope). Consequence for real clients:
+ *    `crane catalog` and `regctl repo ls` fail against a Repsy Docker repo (they cannot enumerate its
+ *    images; the panel is the only place an image list is available), and OCI-1.1-aware clients
+ *    (`oras discover`, `regctl artifact tree`, `cosign tree`) must take their spec-mandated fallback, the
+ *    referrers TAG schema (`sha256-<hex>` tag holding an image index), which the server serves like any
  *    other tag (RA4).
- *  - Contrast: the Helm OCI handler DOES answer `tags/list` on the same port for a Helm repo
- *    (RPS-1219), and the Docker route is not swallowed by it: a Docker repo's path still ends in
- *    the 404 (RA1).
  *  - `POST /v2/<repo>/<image>/blobs/uploads/?mount=<digest>[&from=<repo>]`: `mount`/`from` are
  *    ignored. The server answers the spec-allowed fallback `202` + a fresh upload session (`Location`,
  *    `Docker-Upload-UUID`) whether the blob exists or not, in this repo or in another, and never the
@@ -60,10 +59,11 @@ import {
   ociErrorOf,
   rawCatalog,
   rawGetAnonymous,
-  rawGetManifest,
   rawHeadBlob,
   rawMountUpload,
   rawPutManifest,
+  rawFollowNextLink,
+  rawGetManifest,
   rawReferrers,
   rawTagsList,
   rawToken,
@@ -143,20 +143,19 @@ function expectNoRoute(res: RawResponse & { wwwAuthenticate?: string }, what: st
 
 test.describe('docker registry API gaps (raw HTTP, pinned at current behaviour)', () => {
   test(
-    'RA1: tags/list is no route for any caller (crane ls, skopeo list-tags, regctl tag ls cannot list a Repsy Docker repo)',
+    'RA1: tags/list lists the tags of an image in lexical order, with n/last pagination and a Link header (RPS-1489)',
     { tag: ['@auth'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'tagslist');
-      await pushImage(layout, 'v1', 'tagslist');
       await pushImage(layout, 'v2', 'tagslist-2');
+      await pushImage(layout, 'v10', 'tagslist-10');
+      await pushImage(layout, 'v1', 'tagslist');
       const admin = adminCredential();
       const rw = await tokenCredential(seeder, layout.repoName, false);
       const ro = await tokenCredential(seeder, layout.repoName, true);
+      const qualified = `${repoPath(layout.repoName)}/${layout.image}`;
 
-      // The tag the listing would have to contain really is there: the manifest GET is a known route.
-      const known = await rawGetManifest(layout.repoName, admin, layout.image, 'v1');
-      expect(known.status, 'the pushed tag resolves').toBe(200);
-
+      // Every credential that may pull may list: admin, a read-write and a read-only deploy token.
       for (const [who, credential] of [
         ['admin', admin],
         ['a read-write deploy token', rw],
@@ -164,53 +163,108 @@ test.describe('docker registry API gaps (raw HTTP, pinned at current behaviour)'
       ] as const) {
         const res = await rawTagsList(layout.repoName, credential, layout.image);
         expect(res.hop, `${who}: the token hop itself is fine`).toBe('request');
-        expectNoRoute(res, `${who} tags/list`);
+        expect(res.status, `${who} tags/list: ${res.body.toString('utf8')}`).toBe(200);
+        expect(res.contentType, `${who}: the content type`).toMatch(/^application\/json/);
+        expect(res.link, `${who}: one page, no Link`).toBeUndefined();
+        // The repository-qualified name, and the tags in lexical (byte) order: `v10` before `v2`.
+        expect(JSON.parse(res.body.toString('utf8')), `${who}: the listing`).toEqual({
+          name: qualified,
+          tags: ['v1', 'v10', 'v2'],
+        });
       }
 
-      // Pagination a real client may add changes nothing.
-      const paged = await rawTagsList(layout.repoName, admin, layout.image, 'n=1&last=v1');
-      expectNoRoute(paged, 'tags/list?n=1&last=v1');
+      // Pagination: `n` limits the page, `last` is where it starts (exclusive), and the Link of a page
+      // that has more names `n` and the last tag of the page.
+      const first = await rawTagsList(layout.repoName, admin, layout.image, 'n=1');
+      expect(JSON.parse(first.body.toString('utf8')).tags).toEqual(['v1']);
+      expect(first.link, 'a page with more after it links to the next one').toBe(
+        `</v2/${qualified}/tags/list?n=1&last=v1>; rel="next"`,
+      );
 
-      // An image that was never pushed and a repo that does not exist answer the SAME 404, so the
-      // route cannot be used to tell them apart from the real one either.
+      // A client that follows the Link visits every tag once and stops when the Link is gone.
+      const seen: string[] = ['v1'];
+      let link = first.link;
+      while (link) {
+        const page = await rawFollowNextLink(layout.repoName, admin, layout.image, link);
+        expect(page.status, `following ${link}`).toBe(200);
+        seen.push(...JSON.parse(page.body.toString('utf8')).tags);
+        link = page.link;
+      }
+      expect(seen, 'walking n=1 pages').toEqual(['v1', 'v10', 'v2']);
+
+      const rest = await rawTagsList(layout.repoName, admin, layout.image, 'n=5&last=v1');
+      expect(JSON.parse(rest.body.toString('utf8')).tags, 'last is exclusive').toEqual([
+        'v10',
+        'v2',
+      ]);
+      expect(rest.link, 'the rest fits the page: no Link').toBeUndefined();
+      const beyond = await rawTagsList(layout.repoName, admin, layout.image, 'last=zzz');
+      expect(beyond.status, 'a last beyond the end is not an error').toBe(200);
+      expect(JSON.parse(beyond.body.toString('utf8')).tags).toEqual([]);
+      const zero = await rawTagsList(layout.repoName, admin, layout.image, 'n=0');
+      expect(zero.status).toBe(200);
+      expect(JSON.parse(zero.body.toString('utf8')).tags, 'n=0').toEqual([]);
+      expect(zero.link, 'n=0: no Link').toBeUndefined();
+
+      // An `n` that is no number is refused with the distribution error code.
+      for (const n of ['abc', '-1']) {
+        const bad = await rawTagsList(layout.repoName, admin, layout.image, `n=${n}`);
+        expect(bad.status, `n=${n}: ${bad.body.toString('utf8')}`).toBe(400);
+        expect(ociErrorOf(bad.body)?.code, `n=${n}: the OCI error code`).toBe(
+          'PAGINATION_NUMBER_INVALID',
+        );
+      }
+
+      // An image that was never pushed is NAME_UNKNOWN / imageNotFound (after authentication, so a
+      // caller who may not read the repo learns nothing); a repo that does not exist is the router's
+      // uniform 404.
       const noImage = await rawTagsList(layout.repoName, admin, `${layout.image}-none`);
-      expectNoRoute(noImage, 'tags/list of an unknown image');
+      expect(noImage.status, 'tags/list of an unknown image').toBe(404);
+      expect(ociErrorOf(noImage.body)?.code).toBe('NAME_UNKNOWN');
+      expect(ociErrorOf(noImage.body)?.detail).toBe('imageNotFound');
       const noRepo = await rawTagsList(`${layout.repoName}-none`, admin, layout.image);
       expectNoRoute(noRepo, 'tags/list of an unknown repo');
 
-      // Anonymous: a 404 with no challenge, unlike a KNOWN route which answers 401 + Bearer challenge.
-      const anon = await rawGetAnonymous(`/${repoPath(layout.repoName)}/${layout.image}/tags/list`);
-      expectNoRoute(anon, 'anonymous tags/list');
+      // Anonymous, on a private repo: a 401 with the Bearer challenge for the pull scope (a known
+      // route now), for a real image and a made-up one alike, so it does not tell them apart.
+      for (const image of [layout.image, `${layout.image}-none`]) {
+        const anon = await rawGetAnonymous(`/${repoPath(layout.repoName)}/${image}/tags/list`);
+        expect(anon.status, `anonymous tags/list of ${image}`).toBe(401);
+        expect(anon.wwwAuthenticate ?? '', 'the challenge').toMatch(/^Bearer /);
+        expect(anon.wwwAuthenticate ?? '', 'names the pull scope').toContain(
+          `scope="repository:${repoPath(layout.repoName)}/${image}:pull"`,
+        );
+      }
+      // HEAD is not part of the spec for this route: the router has no handler for it.
       const anonHead = await rawGetAnonymous(
         `/${repoPath(layout.repoName)}/${layout.image}/tags/list`,
         'HEAD',
       );
       expect(anonHead.status, 'anonymous HEAD tags/list').toBe(404);
-      const anonManifest = await rawGetAnonymous(
-        `/${repoPath(layout.repoName)}/${layout.image}/manifests/v1`,
-      );
-      expect(anonManifest.status, 'control: a known route, anonymous, is challenged').toBe(401);
-      expect(anonManifest.wwwAuthenticate ?? '', 'control: with a Bearer challenge').toMatch(
-        /^Bearer /,
-      );
     },
   );
 
-  test('RA1b: control: the Helm OCI handler answers tags/list on the same port, a Docker repo is not covered by it', async ({
+  test('RA1b: control: the Helm OCI handler answers tags/list on the same port with the bare chart name, the Docker one with the repository-qualified name', async ({
     seeder,
   }) => {
     const helmRepo = await seeder.createRepo(RepoType.HELM, { privateRepo: true });
     const dockerLayout = await newRepo(seeder, 'tagslist-helm');
+    await pushImage(dockerLayout, 'v1', 'tagslist-helm');
     const admin = adminCredential();
 
     const helm = await rawTagsList(helmRepo.name, admin, 'somechart');
     expect(helm.status, 'Helm OCI tags/list is served (RPS-1219)').toBe(200);
     const body = JSON.parse(helm.body.toString('utf8')) as { name?: string; tags?: unknown };
-    expect(body.name, 'the chart name').toBe('somechart');
+    expect(body.name, 'the chart name, bare (the spec wants the qualified one: RPS-1557)').toBe(
+      'somechart',
+    );
     expect(Array.isArray(body.tags), 'a tags array').toBe(true);
 
     const docker = await rawTagsList(dockerLayout.repoName, admin, dockerLayout.image);
-    expectNoRoute(docker, 'a Docker repo tags/list');
+    expect(docker.status, 'a Docker repo tags/list').toBe(200);
+    expect(JSON.parse(docker.body.toString('utf8')).name).toBe(
+      `${repoPath(dockerLayout.repoName)}/${dockerLayout.image}`,
+    );
   });
 
   test('RA2: _catalog is no route (crane catalog, regctl repo ls cannot enumerate the registry)', async ({

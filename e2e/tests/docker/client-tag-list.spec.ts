@@ -16,18 +16,13 @@
 
 /**
  * What the real clients do when they ask a Repsy Docker repo for a tag list or a catalog (RPS-1478
- * part B; the raw pins are RA1/RA2 in `registry-api.spec.ts`). Repsy has no `tags/list` and no
- * `_catalog` route: both answer `404 NAME_UNKNOWN / unknownPath` for every caller, so each client
- * fails with that answer instead of listing anything. RPS-1489 is the backend story that adds
- * `tags/list`; the day it lands the `tags` cells of this file flip on purpose (the same day as RA1).
+ * part B; the raw pins are RA1/RA2 in `registry-api.spec.ts`). RPS-1489 added `tags/list`, so `crane
+ * ls`, `skopeo list-tags`, `skopeo inspect <tag>` (which lists the tags too, unless `--no-tags`),
+ * `regctl tag ls` and `oras repo tags` list the tags of a pushed image, in lexical order. There is no
+ * `_catalog` route: `crane catalog`, `regctl repo ls` and `oras repo ls` still fail with the router's
+ * `404 NAME_UNKNOWN / unknownPath` (RA2), which stays pinned here until a story adds it.
  *
- * Probed live, admin credential, private repo with one pushed image:
- *  - `crane ls` / `crane catalog`: exit 1, `NAME_UNKNOWN: unknownPath`.
- *  - `skopeo list-tags`: exit 1, "fetching tags list: name unknown: unknownPath". A plain
- *    `skopeo inspect <tag>` (without `--no-tags`) fails the same way, because it lists the repository's
- *    tags too: the one place a listing gap breaks a command that has nothing to do with listing.
- *  - `regctl tag ls` / `regctl repo ls`: exit 1, "request failed: not found [http 404]" with the same
- *    envelope.
+ * Probed live, admin credential, private repo with one image pushed under two tags.
  */
 import path from 'node:path';
 
@@ -45,56 +40,74 @@ import { expect, test } from '../../src/scenarios/fixtures.js';
 
 /** crane's own plain-HTTP switch (`docker.ts`): needed only for a remote plain-HTTP host. */
 const CRANE_INSECURE = env.insecureRegistry ? ['--insecure'] : [];
-const GAP = 'no tags/list or _catalog route (RPS-1489)';
+const NO_CATALOG = 'no _catalog route';
 
-function expectNoListing(result: RunResult, what: string): void {
-  expect(result.exitCode, `${what} cannot list: ${GAP}\n${result.stderr}`).not.toBe(0);
-  expect(result.stderr.toLowerCase(), `${what}: the registry's own answer (${GAP})`).toContain(
-    'unknownpath',
-  );
+function expectNoCatalog(result: RunResult, what: string): void {
+  expect(
+    result.exitCode,
+    `${what} cannot enumerate the registry: ${NO_CATALOG}\n${result.stderr}`,
+  ).not.toBe(0);
+  expect(
+    result.stderr.toLowerCase(),
+    `${what}: the registry's own answer (${NO_CATALOG})`,
+  ).toContain('unknownpath');
+}
+
+/** The non-empty lines of a client's stdout (`crane ls` and `regctl tag ls` print one tag per line). */
+function linesOf(result: RunResult): string[] {
+  return result.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 }
 
 test(
-  'docker > crane ls/catalog, skopeo list-tags/inspect and regctl tag ls/repo ls fail on the missing tags/list and _catalog (RPS-1489)',
+  'docker > crane ls, skopeo list-tags/inspect and regctl tag ls list the tags; crane catalog and regctl repo ls still fail on the missing _catalog (RPS-1489)',
   { tag: ['@skopeo', '@regctl'] },
   async ({ seeder }) => {
     const repoName = await newDockerRepo(seeder);
     const image = `e2e-${seeder.runId}-listing`;
     const ref = imageRef(repoName, image, 'v1');
+    const bare = ref.replace(/:v1$/, '');
     const admin = adminCredential();
 
     const skopeo = await openSession(skopeoClient, admin, `docker-listing-skopeo-${seeder.runId}`);
     const built = await buildImage({ dir: path.join(skopeo.work, 'image'), marker: 'listing' });
-    const pushed = await skopeo.run(skopeoClient.pushArgs(built, ref), 'listing-push');
-    expect(pushed.exitCode, `skopeo copy: ${pushed.stderr}`).toBe(0);
+    for (const tag of ['v2', 'v1', 'v10']) {
+      const pushed = await skopeo.run(
+        skopeoClient.pushArgs(built, imageRef(repoName, image, tag)),
+        `listing-push-${tag}`,
+      );
+      expect(pushed.exitCode, `skopeo copy ${tag}: ${pushed.stderr}`).toBe(0);
+    }
+    // Lexical order: `v10` sorts before `v2`.
+    const expectedTags = ['v1', 'v10', 'v2'];
 
     // skopeo
-    expectNoListing(
-      await skopeo.run(
-        [
-          'list-tags',
-          ...skopeoTlsFlags('both'),
-          `docker://${imageRef(repoName, image, 'v1').replace(/:v1$/, '')}`,
-        ],
-        'listing-skopeo-list-tags',
-      ),
-      'skopeo list-tags',
+    const listed = await skopeo.run(
+      ['list-tags', ...skopeoTlsFlags('both'), `docker://${bare}`],
+      'listing-skopeo-list-tags',
     );
-    expectNoListing(
-      await skopeo.run(
-        ['inspect', ...skopeoTlsFlags('both'), `docker://${ref}`],
-        'listing-skopeo-inspect',
-      ),
-      'skopeo inspect (without --no-tags)',
+    expect(listed.exitCode, `skopeo list-tags: ${listed.stderr}`).toBe(0);
+    expect((JSON.parse(listed.stdout) as { Tags: string[] }).Tags, 'skopeo list-tags').toEqual(
+      expectedTags,
     );
+    const inspected = await skopeo.run(
+      ['inspect', ...skopeoTlsFlags('both'), `docker://${ref}`],
+      'listing-skopeo-inspect',
+    );
+    expect(inspected.exitCode, `skopeo inspect (without --no-tags): ${inspected.stderr}`).toBe(0);
+    expect(
+      (JSON.parse(inspected.stdout) as { RepoTags: string[] }).RepoTags,
+      'skopeo inspect lists the repository tags too',
+    ).toEqual(expectedTags);
 
     // regctl
     const regctl = await openSession(regctlClient, admin, `docker-listing-regctl-${seeder.runId}`);
-    expectNoListing(
-      await regctl.run(['tag', 'ls', ref.replace(/:v1$/, '')], 'listing-regctl-tag-ls'),
-      'regctl tag ls',
-    );
-    expectNoListing(
+    const regctlTags = await regctl.run(['tag', 'ls', bare], 'listing-regctl-tag-ls');
+    expect(regctlTags.exitCode, `regctl tag ls: ${regctlTags.stderr}`).toBe(0);
+    expect(linesOf(regctlTags), 'regctl tag ls').toEqual(expectedTags);
+    expectNoCatalog(
       await regctl.run(['repo', 'ls', registryHost()], 'listing-regctl-repo-ls'),
       'regctl repo ls',
     );
@@ -110,7 +123,9 @@ test(
         redact: secretsOf(admin),
         label: 'listing-crane',
       });
-    expectNoListing(await craneRun(['ls', ref.replace(/:v1$/, '')]), 'crane ls');
-    expectNoListing(await craneRun(['catalog', registryHost()]), 'crane catalog');
+    const craneTags = await craneRun(['ls', bare]);
+    expect(craneTags.exitCode, `crane ls: ${craneTags.stderr}`).toBe(0);
+    expect(linesOf(craneTags), 'crane ls').toEqual(expectedTags);
+    expectNoCatalog(await craneRun(['catalog', registryHost()]), 'crane catalog');
   },
 );

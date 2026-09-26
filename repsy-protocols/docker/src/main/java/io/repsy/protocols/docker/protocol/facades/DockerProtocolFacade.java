@@ -21,9 +21,11 @@ import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestDetails;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
+import io.repsy.protocols.docker.shared.tag.dtos.TagPage;
 import java.io.IOException;
 import java.io.InputStream;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 @NullMarked
@@ -90,4 +92,15 @@ public interface DockerProtocolFacade<ID> {
    *     {@code manifestNotFound} for an unknown digest, {@code tagNotFound} for an unknown tag
    */
   void deleteManifest(ProtocolContext context, String imageName, String reference);
+
+  /**
+   * Lists the tags of an image in lexical order, one page of them (RPS-1489). An image that stores
+   * manifests but no tag has an empty list.
+   *
+   * @param limit the {@code n} of the request: the most tags to return, or {@code null} for all
+   * @param last the {@code last} of the request: the tag to start after, or {@code null}
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code imageNotFound}
+   */
+  TagPage listTags(
+      ProtocolContext context, String imageName, @Nullable Integer limit, @Nullable String last);
 }

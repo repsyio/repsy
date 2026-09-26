@@ -46,7 +46,8 @@
  *    same layer twice, is stored (it was answered `404 MANIFEST_BLOB_UNKNOWN / layerNotFound` on PUT).
  *    That is what `oras push` and `oras attach` produce when they have no files (`{}` as the config AND
  *    the one layer), so an annotation-only attach and an empty artifact are stored.
- *  - OR7 `oras repo tags` / `repo ls` fail on the missing `tags/list` / `_catalog` (RA1/RA2, RPS-1489).
+ *  - OR7 `oras repo tags` lists the tags since `tags/list` exists (RA1, RPS-1489); `repo ls` still fails on
+ *    the missing `_catalog` (RA2).
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -827,40 +828,48 @@ test(
 );
 
 test(
-  'docker > oras repo tags and repo ls fail on the missing tags/list and _catalog (OR7, RPS-1489)',
+  'docker > oras repo tags lists the tags, repo ls fails on the missing _catalog (OR7, RPS-1489)',
   { tag: ['@oras'] },
   async ({ seeder }) => {
     const repoName = await newDockerRepo(seeder);
     const image = `e2e-${seeder.runId}-orastags`;
     const session = await openOrasSession(adminCredential(), `docker-oras-or7-${seeder.runId}`);
     await writeWork(session, 'a.txt', 'a');
-    const pushed = await session.run(
-      [
-        'push',
-        ...session.common,
-        '--artifact-type',
-        'application/vnd.e2e.tags',
-        imageRef(repoName, image, 'v1'),
-        'a.txt:text/plain',
-      ],
-      'or7-push',
-    );
-    expect(pushed.exitCode, `oras push: ${pushed.stderr}`).toBe(0);
-    for (const [what, args] of [
-      [
-        'repo tags',
-        ['repo', 'tags', ...session.common, `${registryHost()}/${repoPath(repoName)}/${image}`],
-      ],
-      ['repo ls', ['repo', 'ls', ...session.common, `${registryHost()}/${repoPath(repoName)}`]],
-    ] as const) {
-      const result = await session.run([...args], `or7-${what}`);
-      expect(
-        result.exitCode,
-        `oras ${what} cannot list: no tags/list or _catalog route (RPS-1489)`,
-      ).not.toBe(0);
-      expect(result.stderr.toLowerCase(), `oras ${what}: the registry's own answer`).toContain(
-        'unknownpath',
+    for (const tag of ['v2', 'v1']) {
+      const pushed = await session.run(
+        [
+          'push',
+          ...session.common,
+          '--artifact-type',
+          'application/vnd.e2e.tags',
+          imageRef(repoName, image, tag),
+          'a.txt:text/plain',
+        ],
+        `or7-push-${tag}`,
       );
+      expect(pushed.exitCode, `oras push ${tag}: ${pushed.stderr}`).toBe(0);
     }
+
+    const tags = await session.run(
+      ['repo', 'tags', ...session.common, `${registryHost()}/${repoPath(repoName)}/${image}`],
+      'or7-repo-tags',
+    );
+    expect(tags.exitCode, `oras repo tags: ${tags.stderr}`).toBe(0);
+    expect(
+      tags.stdout
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0),
+      'oras repo tags',
+    ).toEqual(['v1', 'v2']);
+
+    const catalog = await session.run(
+      ['repo', 'ls', ...session.common, `${registryHost()}/${repoPath(repoName)}`],
+      'or7-repo-ls',
+    );
+    expect(catalog.exitCode, 'oras repo ls cannot enumerate: no _catalog route (RA2)').not.toBe(0);
+    expect(catalog.stderr.toLowerCase(), "oras repo ls: the registry's own answer").toContain(
+      'unknownpath',
+    );
   },
 );

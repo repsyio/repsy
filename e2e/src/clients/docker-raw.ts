@@ -538,13 +538,14 @@ export async function rawGetAnonymous(
 
 /** `GET /v2/<repo>/<image>/tags/list[?query]` through the two-hop `dockerRequest` for `pullScope`
  *  (what `crane ls`, `skopeo list-tags` and `regctl tag ls` send). `query` is appended as given
- *  (`n=1&last=x` is the pagination a real client may add). */
+ *  (`n=1&last=x` is the pagination a real client may add). `link` is the `Link` header of the answer
+ *  (RPS-1489: the `rel="next"` reference of a page that has more tags after it). */
 export async function rawTagsList(
   repoName: string,
   credential: MaterializedCredential,
   image: string,
   query?: string,
-): Promise<RawResponse & { hop: 'token' | 'request'; contentType?: string }> {
+): Promise<RawResponse & { hop: 'token' | 'request'; contentType?: string; link?: string }> {
   const rel = `${image}/tags/list${query ? `?${query}` : ''}`;
   const res = await dockerRequest(credential, pullScope(repoName, image), (headers) =>
     rawFetch(v2RepoUrl(repoName, rel), { headers }),
@@ -554,6 +555,31 @@ export async function rawTagsList(
     body: res.body,
     hop: res.hop,
     contentType: res.headers.get('content-type') ?? undefined,
+    link: res.headers.get('link') ?? undefined,
+  };
+}
+
+/** Follows the `rel="next"` reference of a tags/list page the way a client does: the `Link` value is
+ *  a reference resolved against the URL that was called (the server sends a path, not a host). */
+export async function rawFollowNextLink(
+  repoName: string,
+  credential: MaterializedCredential,
+  image: string,
+  link: string,
+): Promise<RawResponse & { hop: 'token' | 'request'; link?: string }> {
+  const match = /^<([^>]+)>;\s*rel="next"$/.exec(link);
+  if (!match) {
+    throw new Error(`not a rel="next" Link header: ${link}`);
+  }
+  const target = new URL(match[1], v2Url('/')).toString();
+  const res = await dockerRequest(credential, pullScope(repoName, image), (headers) =>
+    rawFetch(target, { headers }),
+  );
+  return {
+    status: res.status,
+    body: res.body,
+    hop: res.hop,
+    link: res.headers.get('link') ?? undefined,
   };
 }
 
