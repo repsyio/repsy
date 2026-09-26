@@ -34,10 +34,17 @@
  * when the scanner starts (readiness holds until that is done, bounded here by `READY_TIMEOUT_MS`). A
  * red run whose failure message mentions the download ("failed to download", "OCI artifact error",
  * "unexpected status code") is ghcr.io / mirror.gcr.io not answering, not a Repsy fault (README).
+ * That is why this spec retries once (`test.describe.configure` below, RPS-1595) in every environment,
+ * although the api project itself never retries: it is one of the two places of the suite that wait on
+ * the internet (the other is Maven Central for the maven project). REPSY_E2E_RETRIES does not apply here.
  */
 import zlib from 'node:zlib';
 
-import { RepoType, type PanelApi, type VulnerabilityScanInfo } from '../../src/api/panel-api.js';
+import {
+  RepoType,
+  type PanelBackend,
+  type VulnerabilityScanInfo,
+} from '../../src/api/panel-backend.js';
 import { OCI_MEDIA_TYPES, buildTar } from '../../src/clients/docker-image.js';
 import {
   adminCredential,
@@ -78,7 +85,7 @@ test.describe('the real repsy-scanner-trivy', { tag: ['@trivy'] }, () => {
     !optedIn('trivy'),
     'opt-in: needs the real scanner (./run.sh local up --trivy); run with REPSY_E2E_TRIVY=1 ./run.sh test (README "Real scanner stack")',
   );
-  test.describe.configure({ timeout: 360_000 });
+  test.describe.configure({ timeout: 360_000, retries: 1 });
 
   test.beforeAll(async () => {
     test.setTimeout(READY_TIMEOUT_MS + 30_000);
@@ -251,7 +258,7 @@ function json(value: unknown): Buffer {
 
 /** The newest scan of a version once it is FINISHED (COMPLETED or FAILED); a FAILED one fails the spec with why. */
 async function finishedScan(
-  panelApi: PanelApi,
+  panelApi: PanelBackend,
   repoName: string,
   artifactName: string,
   version: string,

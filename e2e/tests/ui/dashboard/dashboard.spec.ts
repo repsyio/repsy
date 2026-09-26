@@ -22,7 +22,7 @@
  */
 import type { APIRequestContext } from '@playwright/test';
 
-import { type PanelApi, RepoType } from '../../../src/api/panel-api.js';
+import { type PanelBackend, RepoType } from '../../../src/api/panel-backend.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage, RECENT_ACTIVITY_SIZE } from '../../../src/ui/pages/dashboard.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
@@ -33,7 +33,7 @@ import { JWT_SHAPE, storedSession } from '../auth/stored-session.js';
 const SETTLE_TIMEOUT = 45_000;
 
 /** What `GET /api/repos/counts` answers, by slug: the oracle for the count rows. */
-async function apiCounts(panelApi: PanelApi): Promise<Record<string, number>> {
+async function apiCounts(panelApi: PanelBackend): Promise<Record<string, number>> {
   const byType = await panelApi.repoCounts();
   const counts: Record<string, number> = {};
   for (const { type, slug } of UI_REPO_TYPES) {

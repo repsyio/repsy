@@ -39,6 +39,9 @@ x-runner-environment: &runner-environment
   REPSY_ADMIN_PASSWORD: ${REPSY_ADMIN_PASSWORD:?Set REPSY_ADMIN_PASSWORD in e2e/.env}
   REPSY_TARGET: ${REPSY_TARGET:-local}
   REPSY_E2E_RUN_ID: ${REPSY_E2E_RUN_ID:-}
+  # A module that supplies the panel backend instead of the built-in Repsy OS one (README.md "Targets"):
+  # a path the runner can read, or a package name. Empty: the built-in backend.
+  REPSY_E2E_BACKEND_MODULE: ${REPSY_E2E_BACKEND_MODULE:-}
   REPSY_E2E_INSECURE_REGISTRY: ${REPSY_E2E_INSECURE_REGISTRY:-}
   # Where the @scanner specs of ANY runner reach the stub scanner's /control API (the scanner overlay,
   # docker-compose.stack-scanner.yml, publishes it on loopback; every runner has the host network) and
@@ -48,6 +51,14 @@ x-runner-environment: &runner-environment
   # Comma list of opt-in suites (e.g. "throttle,scanner"): run.sh adds the name of every stack overlay
   # that is on (README.md "Stack overlays"). Read by optedIn() in src/stack-overlays.ts.
   REPSY_E2E_OPT_IN: ${REPSY_E2E_OPT_IN:-}
+  # Forwarded to EVERY runner (RPS-1595): playwright.config.ts's isCI gives each one `forbidOnly` (a stray
+  # `test.only` fails the run instead of silently narrowing it) and the ui runner its trace mode. Whether
+  # a project also retries is decided per project in that file (ui and maven, the trivy contract spec,
+  # never stack), so forwarding CI does not make every runner retry.
+  CI: ${CI:-}
+  # Overrides the retry count of every project but stack (empty: the per-project default), see
+  # playwright.config.ts and README.md "CI".
+  REPSY_E2E_RETRIES: ${REPSY_E2E_RETRIES:-}
 
 services:
   skeleton:
@@ -386,9 +397,6 @@ services:
       # publishes it on loopback; this service has the host network) and the key both sides share.
       REPSY_SCANNER_STUB_URL: ${REPSY_SCANNER_STUB_URL:-http://localhost:${REPSY_E2E_SCANNER_PORT:-8090}}
       REPSY_SCANNER_API_KEY: ${REPSY_SCANNER_API_KEY:-e2e-scanner-key}
-      # Forwarded to this service only: playwright.config.ts's isCI (retries, forbidOnly, trace mode)
-      # keys off it, and forwarding it to the protocol runners would change their behaviour.
-      CI: ${CI:-}
     volumes:
       # No shared/named cache volume: the browser is baked into the image (/ms-playwright).
       - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro

@@ -68,10 +68,14 @@ public class CargoAuthComponent extends ProtocolAuthService {
 
       this.rejectRevokedToken(removeBearerHeader(authHeader));
 
-      final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
-      final var userInfo = this.userTxService.getAuthenticatedUserByUsername(username);
+      // A token that a password change ended is not renewed: the renewal would hand out a fresh one
+      // (RPS-1552).
+      final var userInfo = this.authenticateJwtUser(authHeader);
       return this.jwtUtils.createProtocolToken(
-          userInfo.getId(), userInfo.getUsername(), TIMEOUT_ACCESS_TOKEN);
+          userInfo.getId(),
+          userInfo.getUsername(),
+          TIMEOUT_ACCESS_TOKEN,
+          userInfo.getTokenVersion());
     }
 
     throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
@@ -121,7 +125,10 @@ public class CargoAuthComponent extends ProtocolAuthService {
 
     final var token =
         this.jwtUtils.createProtocolToken(
-            userInfo.getId(), userInfo.getUsername(), TIMEOUT_ACCESS_TOKEN);
+            userInfo.getId(),
+            userInfo.getUsername(),
+            TIMEOUT_ACCESS_TOKEN,
+            userInfo.getTokenVersion());
 
     return Optional.of(token);
   }

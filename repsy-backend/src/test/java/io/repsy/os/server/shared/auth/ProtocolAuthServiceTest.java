@@ -16,6 +16,7 @@
 package io.repsy.os.server.shared.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -32,6 +33,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.dtos.ProtocolUserClaims;
 import io.repsy.os.shared.auth.services.RevokedProtocolTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
@@ -58,6 +60,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -605,8 +609,8 @@ class ProtocolAuthServiceTest {
       this.blockTheClientWithBadBearers();
       when(this.jwt.extractAuthenticationType(anyString(), any(TokenRealm.class)))
           .thenReturn(AuthenticationType.USERNAME_PASSWORD);
-      when(this.jwt.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
-          .thenReturn("dave");
+      when(this.jwt.extractProtocolUserClaims(anyString()))
+          .thenReturn(new ProtocolUserClaims("dave", null));
       when(this.users.getAuthenticatedUserByUsername("dave")).thenReturn(this.dave);
 
       this.bearer(Permission.WRITE);
@@ -687,8 +691,8 @@ class ProtocolAuthServiceTest {
             new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
     TokenUserNoLongerExists() {
-      when(this.jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
-          .thenReturn("ghost");
+      when(this.jwtUtils.extractProtocolUserClaims(anyString()))
+          .thenReturn(new ProtocolUserClaims("ghost", null));
     }
 
     @Test
@@ -735,8 +739,8 @@ class ProtocolAuthServiceTest {
       when(this.jwtUtils.extractUserId(anyString(), any(TokenRealm.class)))
           .thenReturn(this.tokenId);
       // The claim names a real user; it must not be looked at.
-      when(this.jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
-          .thenReturn(USERNAME);
+      when(this.jwtUtils.extractProtocolUserClaims(anyString()))
+          .thenReturn(new ProtocolUserClaims(USERNAME, null));
     }
 
     private void storeToken(final boolean readOnly, final Instant expirationDate) {
@@ -1129,8 +1133,8 @@ class ProtocolAuthServiceTest {
 
     RevokedProtocolJwt() {
       this.service.setRevokedTokens(this.revoked);
-      when(this.jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
-          .thenReturn(USERNAME);
+      when(this.jwtUtils.extractProtocolUserClaims(anyString()))
+          .thenReturn(new ProtocolUserClaims(USERNAME, null));
       when(this.users.getAuthenticatedUserByUsername(USERNAME)).thenReturn(ALICE);
     }
 
@@ -1191,6 +1195,96 @@ class ProtocolAuthServiceTest {
       assertUnauthorized(
           () -> counting.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
       verify(throttle, never()).recordFailure();
+    }
+  }
+
+  /**
+   * RPS-1552: a protocol JWT is bound to the {@code token_version} of the user it was issued to, so
+   * a password change, a username change or an admin edit ends it.
+   */
+  @Nested
+  @DisplayName("a protocol JWT is bound to the token version of its user")
+  class ProtocolJwtTokenVersion {
+
+    private static final String BEARER = "Bearer signed.jwt.token";
+
+    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final UserTxService users = Mockito.mock(UserTxService.class);
+    private final AuthFailureThrottle throttle = Mockito.mock(AuthFailureThrottle.class);
+
+    private final ProtocolAuthService service =
+        new ProtocolAuthService(
+            this.users,
+            this.jwtUtils,
+            Mockito.mock(DeployTokenService.class),
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            this.throttle);
+
+    ProtocolJwtTokenVersion() {
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+      when(this.users.getAuthenticatedUserByUsername(USERNAME))
+          .thenReturn(
+              UserInfo.builder().id(ALICE.getId()).username(USERNAME).tokenVersion(4).build());
+    }
+
+    private void tokenCarries(final Integer version) {
+      when(this.jwtUtils.extractProtocolUserClaims(anyString()))
+          .thenReturn(new ProtocolUserClaims(USERNAME, version));
+    }
+
+    @Test
+    @DisplayName("a token with the current version is accepted")
+    void currentVersionIsAccepted() {
+      this.tokenCarries(4);
+
+      assertThatCode(
+              () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.WRITE))
+          .doesNotThrowAnyException();
+    }
+
+    @ParameterizedTest(name = "a token of version {0} is refused with sessionExpired")
+    @ValueSource(ints = {3, 5, 0})
+    void otherVersionIsRefused(final int version) {
+      this.tokenCarries(version);
+
+      assertThatThrownBy(
+              () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
+          .isExactlyInstanceOf(UnAuthorizedException.class)
+          .hasMessage(ErrorConstants.SESSION_EXPIRED);
+    }
+
+    @Test
+    @DisplayName("a refused version is not counted against the client, like an expired token")
+    void refusedVersionIsNotCounted() {
+      this.tokenCarries(1);
+
+      assertThatThrownBy(
+              () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
+          .isInstanceOf(UnAuthorizedException.class);
+      verify(this.throttle, never()).recordFailure();
+      verify(this.throttle, never()).checkAllowed();
+    }
+
+    @Test
+    @DisplayName("a token without the claim, issued before it existed, is accepted (grace)")
+    void claimlessTokenIsAccepted() {
+      this.tokenCarries(null);
+
+      assertThatCode(
+              () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("a user that no longer exists is still unAuthorized, whatever the version")
+    void deletedUser() {
+      this.tokenCarries(4);
+      when(this.users.getAuthenticatedUserByUsername(USERNAME))
+          .thenThrow(new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+
+      assertUnauthorized(
+          () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
     }
   }
 }

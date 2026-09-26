@@ -594,7 +594,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     final var expired =
         AuthUtils.AUTH_BEARER
             + this.jwtUtils.createProtocolToken(
-                user.getId(), user.getUsername(), Duration.ofSeconds(-60));
+                user.getId(), user.getUsername(), Duration.ofSeconds(-60), user.getTokenVersion());
 
     for (var i = 0; i < MAX_FAILURES * 2; i++) {
       final var response = this.npmBearer(repo, expired);

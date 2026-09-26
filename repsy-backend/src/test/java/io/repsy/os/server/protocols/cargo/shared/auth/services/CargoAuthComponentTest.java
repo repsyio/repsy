@@ -15,9 +15,12 @@
  */
 package io.repsy.os.server.protocols.cargo.shared.auth.services;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,6 +32,7 @@ import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
 import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.dtos.ProtocolUserClaims;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.auth.utils.TokenRealm;
@@ -111,7 +115,8 @@ class CargoAuthComponentTest {
       "authenticateAndCreateToken answers unAuthorized for a bearer token whose user is gone")
   void authenticateAndCreateTokenUserNoLongerExists() {
     final var jwtUtils = Mockito.mock(JwtUtils.class);
-    when(jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class))).thenReturn("ghost");
+    when(jwtUtils.extractProtocolUserClaims(anyString()))
+        .thenReturn(new ProtocolUserClaims("ghost", null));
     // A real UserTxService over an empty repository: the lookup itself is under test.
     final var component =
         new CargoAuthComponent(
@@ -135,8 +140,8 @@ class CargoAuthComponentTest {
     final var jwtUtils = Mockito.mock(JwtUtils.class);
     when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
         .thenReturn(AuthenticationType.DEPLOY_TOKEN);
-    when(jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
-        .thenReturn(USERNAME);
+    when(jwtUtils.extractProtocolUserClaims(anyString()))
+        .thenReturn(new ProtocolUserClaims(USERNAME, null));
     final var component =
         new CargoAuthComponent(
             this.userTxService,
@@ -148,6 +153,61 @@ class CargoAuthComponentTest {
     assertUnauthorized(() -> component.authenticateAndCreateToken("Bearer signed.jwt.token"));
     verify(this.userTxService, never()).getAuthenticatedUserByUsername(anyString());
     verify(jwtUtils, never())
-        .createProtocolToken(any(UUID.class), anyString(), any(TemporalAmount.class));
+        .createProtocolToken(any(UUID.class), anyString(), any(TemporalAmount.class), anyInt());
+  }
+
+  /**
+   * RPS-1552: a token that a password change ended is not renewed (a renewal would hand out a fresh
+   * one), and the renewed token carries the user's current version.
+   */
+  @Test
+  @DisplayName("authenticateAndCreateToken refuses a bearer token of an older version")
+  void authenticateAndCreateTokenRefusesAnOlderVersion() {
+    final var jwtUtils = Mockito.mock(JwtUtils.class);
+    when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+        .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+    when(jwtUtils.extractProtocolUserClaims(anyString()))
+        .thenReturn(new ProtocolUserClaims(USERNAME, 1));
+    when(this.userTxService.getAuthenticatedUserByUsername(USERNAME))
+        .thenReturn(
+            UserInfo.builder().id(UUID.randomUUID()).username(USERNAME).tokenVersion(2).build());
+    final var component = this.componentWith(jwtUtils);
+
+    assertThatThrownBy(() -> component.authenticateAndCreateToken("Bearer signed.jwt.token"))
+        .isExactlyInstanceOf(UnAuthorizedException.class)
+        .hasMessage(ErrorConstants.SESSION_EXPIRED);
+    verify(jwtUtils, never())
+        .createProtocolToken(any(UUID.class), anyString(), any(TemporalAmount.class), anyInt());
+  }
+
+  @Test
+  @DisplayName("authenticateAndCreateToken renews a current or claim-less token with the version")
+  void authenticateAndCreateTokenRenewsWithTheCurrentVersion() {
+    final var jwtUtils = Mockito.mock(JwtUtils.class);
+    final var userId = UUID.randomUUID();
+    when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+        .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+    when(jwtUtils.extractProtocolUserClaims(anyString()))
+        .thenReturn(new ProtocolUserClaims(USERNAME, 2))
+        .thenReturn(new ProtocolUserClaims(USERNAME, null));
+    when(this.userTxService.getAuthenticatedUserByUsername(USERNAME))
+        .thenReturn(UserInfo.builder().id(userId).username(USERNAME).tokenVersion(2).build());
+    when(jwtUtils.createProtocolToken(eq(userId), eq(USERNAME), any(TemporalAmount.class), eq(2)))
+        .thenReturn("renewed");
+    final var component = this.componentWith(jwtUtils);
+
+    assertThat(component.authenticateAndCreateToken("Bearer signed.jwt.token"))
+        .isEqualTo("renewed");
+    assertThat(component.authenticateAndCreateToken("Bearer signed.jwt.token"))
+        .isEqualTo("renewed");
+  }
+
+  private CargoAuthComponent componentWith(final JwtUtils jwtUtils) {
+    return new CargoAuthComponent(
+        this.userTxService,
+        jwtUtils,
+        Mockito.mock(DeployTokenService.class),
+        new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+        new AuthFailureThrottle(AuthThrottleProperties.disabled()));
   }
 }
