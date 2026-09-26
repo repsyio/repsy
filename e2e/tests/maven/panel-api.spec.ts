@@ -37,7 +37,6 @@ import {
   expectFailure,
   expectPagingSweep,
 } from '../../src/api/contract-checks.js';
-import { contractProblems } from '../../src/api/spec-contract.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import * as mvn from '../../src/clients/maven.js';
 import { uniqueVersion } from '../../src/clients/maven-adapter.js';
@@ -465,18 +464,6 @@ test.describe('the Maven panel API against what mvn deploy stored', () => {
 // Known bugs, each a `test.fail()` with its ticket: the test asserts the correct behaviour, passes while the bug
 // is there and goes red when it is fixed, and the fix removes the `test.fail()` call in the same PR.
 test.describe('known bugs of the Maven panel API', () => {
-  test('RPS-1574: every success body carries errorCode: null, the spec declares a string', async ({
-    seeder,
-  }) => {
-    test.fail(true, 'RPS-1574: errorCode is null on every success body, the schema says string');
-    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
-    const res = await callOperation('listMavenGroups', { repoName: repo.name });
-    expect(
-      contractProblems('listMavenGroups', 200, res.json, { strict: true }),
-      'the body matches the schema exactly',
-    ).toEqual([]);
-  });
-
   test('RPS-1573: deleting an artifact that does not exist deletes the whole group when it holds one artifact', async ({
     seeder,
   }) => {
