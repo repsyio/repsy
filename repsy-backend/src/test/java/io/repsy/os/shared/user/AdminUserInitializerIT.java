@@ -100,7 +100,7 @@ class AdminUserInitializerIT extends AbstractIntegrationTest {
     final var newPassword = loggedPasswordOf(admin, output);
     final var after = this.reload(admin.getId());
     assertThat(after.getHash()).isNotEmpty();
-    assertThat(PasswordHasher.matches(newPassword, after.getHash())).isTrue();
+    assertThat(PasswordHasher.matches(newPassword, after.getHash(), null)).isTrue();
 
     this.login(admin.getUsername(), newPassword, 200);
     this.login(admin.getUsername(), SEEDED_ADMIN_PASSWORD, 401);

@@ -1,15 +1,10 @@
--- RPS-1033: retire the salted SHA-256 password hashes that RPS-961 replaced with BCrypt.
+-- RPS-1615 (was RPS-1033): this migration does nothing on purpose.
 --
--- A SHA-256 hash cannot be converted to BCrypt without the plain-text password, so every account
--- that still has one gets the empty hash, the marker of a password reset. The application no longer
--- verifies such a hash. On startup AdminUserInitializer generates a new password for each admin with
--- an empty hash and logs it ("Admin password has been reset ..."); an admin resets the password of
--- any other user from the users page. Refresh tokens of the affected accounts are revoked, as for
--- any password reset. A BCrypt hash always starts with its algorithm id ("{bcrypt}"), so those rows
--- are left alone.
-UPDATE "users"
-SET "hash" = '', "token_version" = "token_version" + 1
-WHERE "hash" NOT LIKE '{%';
-
--- BCrypt keeps its salt inside the hash, so the column has no reader left.
-ALTER TABLE "users" DROP COLUMN "salt";
+-- It used to blank the hash of every account that still had a salted SHA-256 hash (every account of
+-- release v26.08.4, which predates BCrypt) and to drop users.salt, so an upgrade reset every password.
+-- The application now verifies such a hash once and replaces it with BCrypt on the account's first
+-- successful login (PasswordHasher, RPS-1615), so the hashes and the salt column must stay. The
+-- version is kept, with a harmless statement, so the numbering of the migrations does not change.
+-- A database that already ran the old script (never a released one) has lost both, and V0031 only
+-- restores the column; see the README.
+SELECT 1;

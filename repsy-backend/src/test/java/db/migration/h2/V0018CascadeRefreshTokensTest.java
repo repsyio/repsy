@@ -132,14 +132,16 @@ class V0018CascadeRefreshTokensTest {
         final var insert =
             connection.prepareStatement(
                 "insert into \"public\".\"users\""
-                    + " (\"id\", \"username\", \"hash\", \"role\", \"created_at\","
-                    + " \"token_version\") values (?, ?, ?, ?, ?, ?)")) {
+                    + " (\"id\", \"username\", \"hash\", \"salt\", \"role\", \"created_at\","
+                    + " \"token_version\") values (?, ?, ?, ?, ?, ?, ?)")) {
       insert.setObject(1, id);
       insert.setString(2, "u" + id.toString().substring(0, 8));
       insert.setString(3, "");
-      insert.setString(4, "USER");
-      insert.setTimestamp(5, Timestamp.from(Instant.now()));
-      insert.setInt(6, 0);
+      // users.salt is kept again (RPS-1615), NOT NULL until V0031.
+      insert.setString(4, "");
+      insert.setString(5, "USER");
+      insert.setTimestamp(6, Timestamp.from(Instant.now()));
+      insert.setInt(7, 0);
       insert.executeUpdate();
     }
   }

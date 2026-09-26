@@ -4516,12 +4516,12 @@ The five tests, in order (the stack keeps its state between them):
    `db/migration`, so it does not go stale: 18 applied on PostgreSQL, 18 on H2 today), the WARN that `DB_HOST,
 DB_PORT, DB_DATABASE` are no longer read is logged once, without credentials (and with the H2 sentence only on
    H2), the image's legacy-storage fallback (`holds artifacts and ...`) stays quiet, and the log holds no ERROR.
-3. **accounts**: V0017 reset every account that had a SHA-256 hash. The `Admin password has been reset for
-user <name>. New password: <...>` line is printed for both admins and only for them; the old passwords are
-   refused on the panel (401) and on the wire (a Maven client with the admin's old password: 401); the printed
-   ones work; a deploy token still consumes every package (it is not a password); an admin resets the plain
-   user (`POST /api/users/{id}/actions/reset-password`) and the new password signs in. The admin's password is
-   then put back to `REPSY_ADMIN_PASSWORD` (`PUT /api/profile/password`), which every other runner needs.
+3. **accounts** (RPS-1615): nothing is reset. No `Admin password has been reset` line is logged; the first
+   login of the admin is a Maven client on the wire (HTTP Basic) with the password of the previous release and
+   it works (the SHA-256 hash is verified and replaced by BCrypt); the panel logins of both admins and the plain
+   user work with their old passwords, a second one works too, and a wrong password is 401; a deploy token
+   still consumes every package. That the stored hash is BCrypt afterwards is not visible from outside the
+   container and is proven by `PasswordHashUpgradeIT` and `LegacyPasswordMigrationIT` in the backend.
 4. **consume and list**: every package again with the admin and with the token (npm now with the real client:
    the new release serves a working tarball URL for a package the old one published), the panel lists the
    three repositories with their types, the deploy tokens by name, the two accounts with their roles, both
@@ -4530,10 +4530,10 @@ user <name>. New password: <...>` line is printed for both admins and only for t
    recreated with the job on: `Docker manifest layout repair: 5 repaired, 0 left as they are ..., 0 failed`
    (exactly the five distinct manifests: the digest-named copies the previous release kept of an index's
    children are folded into them), no `manifest_...` file is left outside the storage trash and every
-   digest is a file `manifests/sha256:<hex>`, the reset password is NOT printed again, and everything is
+   digest is a file `manifests/sha256:<hex>`, no password was reset, and everything is
    pulled once more by tag and by digest and consumed with the admin and the token.
 
-The spec puts `REPSY_ADMIN_PASSWORD` back and deletes what it made (`Seeder.cleanup`), so `sweep --all --dry-run`
+The spec deletes what it made (`Seeder.cleanup`), so `sweep --all --dry-run`
 is clean. It fails loudly if the image under test is the previous release itself (no migration to find).
 
 **What it found (proposed, not pinned):** the previous release never fills a Docker image row's `size` and

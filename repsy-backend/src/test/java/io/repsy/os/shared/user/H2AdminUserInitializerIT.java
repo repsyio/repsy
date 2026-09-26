@@ -111,7 +111,7 @@ class H2AdminUserInitializerIT extends H2IntegrationTest {
     final var newPassword = loggedPasswordOf(admin, output);
     final var after = this.reload(admin.getId());
     assertThat(after.getHash()).isNotEmpty();
-    assertThat(PasswordHasher.matches(newPassword, after.getHash())).isTrue();
+    assertThat(PasswordHasher.matches(newPassword, after.getHash(), null)).isTrue();
   }
 
   @Test
@@ -142,6 +142,6 @@ class H2AdminUserInitializerIT extends H2IntegrationTest {
         .as("reset log lines")
         .hasSize(2);
     assertThat(this.reload(admin.getId()).getHash()).isEqualTo(hash);
-    assertThat(PasswordHasher.matches(newPassword, hash)).isTrue();
+    assertThat(PasswordHasher.matches(newPassword, hash, null)).isTrue();
   }
 }

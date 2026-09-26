@@ -734,7 +734,7 @@ class UserControllerIT extends AbstractIntegrationTest {
       assertThat(instantOrNull(data.get("createdAt"))).isEqualTo(persisted.getCreatedAt());
       // The password is stored hashed, never verbatim, and must verify against the input.
       assertThat(persisted.getHash()).isNotEqualTo(password);
-      assertThat(PasswordHasher.matches(password, persisted.getHash())).isTrue();
+      assertThat(PasswordHasher.matches(password, persisted.getHash(), null)).isTrue();
     }
 
     static Stream<UserRole> validRoles() {
@@ -1357,8 +1357,8 @@ class UserControllerIT extends AbstractIntegrationTest {
       assertThat(after.getHash()).isNotEqualTo(oldHash);
       assertThat(after.getUsername()).isEqualTo(target.getUsername());
       assertThat(after.getRole()).isEqualTo(UserRole.USER);
-      assertThat(PasswordHasher.matches(newPassword, after.getHash())).isTrue();
-      assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash()))
+      assertThat(PasswordHasher.matches(newPassword, after.getHash(), null)).isTrue();
+      assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash(), null))
           .as("the previous password must no longer work")
           .isFalse();
     }
