@@ -42,6 +42,14 @@ import { createScannerStub, type StubOptions } from '../../src/stubs/scanner/ser
 
 const KEY = 'unit-test-key';
 
+interface StubFindingLike {
+  cveId: string;
+  severity: string;
+  packageName: string;
+  packageVersion: string;
+  description: string;
+}
+
 test.describe('stub scanner rule table', () => {
   const severities = (name: string, version = '1.0.0'): StubSeverity[] =>
     planFor(name, version).severities;
@@ -525,6 +533,63 @@ test.describe('stub scanner HTTP contract', () => {
       status: 'COMPLETED',
       result: { findings: [] },
     });
+  });
+
+  test('a scripted finding can name the package and version it is on (RPS-1484)', async () => {
+    await s.client.script('named', {
+      findings: [
+        {
+          severity: 'HIGH',
+          packageName: 'named-lib',
+          packageVersion: '2.3.4',
+          cveId: 'CVE-2099-9',
+        },
+        'HIGH',
+        { severity: 'LOW', description: 'a low one' },
+      ],
+      queueSeconds: 0,
+      runSeconds: 0,
+    });
+
+    await submit(s, 'nm-1', 'named');
+    const body = (await (await status(s, 'nm-1')).json()) as {
+      result: { findings: StubFindingLike[] };
+    };
+
+    expect(body.result.findings).toMatchObject([
+      {
+        cveId: 'CVE-2099-9',
+        severity: 'HIGH',
+        packageName: 'named-lib',
+        packageVersion: '2.3.4',
+        description: 'Stub high finding CVE-2099-9',
+      },
+      // A bare severity keeps the default: the n-th HIGH finding is the second, not the first.
+      { cveId: 'CVE-2099-2002', packageName: 'stub-lib-high-2', packageVersion: '1.2.0' },
+      { severity: 'LOW', packageName: 'stub-lib-low-1', description: 'a low one' },
+    ]);
+    expect((await s.client.calls('named'))[0]?.plan?.severities).toEqual(['HIGH', 'HIGH', 'LOW']);
+  });
+
+  test('a scripted finding object is checked too', async () => {
+    const put = (findings: unknown) =>
+      fetch(`${s.base}/control/scripts`, {
+        method: 'PUT',
+        headers: { 'x-scanner-api-key': KEY, 'content-type': 'application/json' },
+        body: JSON.stringify({ artifactName: 'a', script: { findings } }),
+      });
+
+    expect((await put([{ packageName: 'no-severity' }])).status).toBe(400);
+    expect((await put([{ severity: 'SEVERE' }])).status).toBe(400);
+    expect((await put([{ severity: 'LOW', packageName: '' }])).status).toBe(400);
+    const badText = await put([{ severity: 'LOW', packageVersion: 1 }]);
+    expect(badText.status).toBe(400);
+    expect(await badText.json()).toEqual({
+      message: 'packageVersion of a finding must be a non-empty string',
+    });
+    expect((await put([null])).status).toBe(400);
+    expect((await put({ severity: 'LOW' })).status).toBe(400);
+    expect((await put([{ severity: 'LOW', packageName: 'ok' }, 'HIGH'])).status).toBe(200);
   });
 
   test('a script is checked: a bad field is a 400 that names it', async () => {
