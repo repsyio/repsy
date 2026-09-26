@@ -29,7 +29,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -91,14 +93,54 @@ public abstract class AbstractCargoSearchProtocolMethodHandler implements Protoc
 
     try {
       final var query = request.getParameter("q");
-      final var perPage =
-          Optional.ofNullable(request.getParameter("per_page")).map(Integer::parseInt).orElse(10);
-      final var page =
-          Optional.ofNullable(request.getParameter("page")).map(Integer::parseInt).orElse(1);
+      final var perPageParam = request.getParameter("per_page");
+      final var pageParam = request.getParameter("page");
+
+      int perPage = 10;
+      int page = 1;
+
+      // Parse per_page parameter (catch non-numeric values)
+      if (perPageParam != null) {
+        try {
+          perPage = Integer.parseInt(perPageParam);
+        } catch (final NumberFormatException e) {
+          return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+              .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+              .body(CargoErrorResponse.of("per_page must be a whole number"));
+        }
+      }
+
+      // Parse page parameter (catch non-numeric values)
+      if (pageParam != null) {
+        try {
+          page = Integer.parseInt(pageParam);
+        } catch (final NumberFormatException e) {
+          return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+              .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+              .body(CargoErrorResponse.of("page must be a whole number"));
+        }
+      }
+
+      // Handle per_page=0: return empty list with total count
+      if (perPage == 0) {
+        final var pageRequest = PageRequest.of(0, 1, Sort.by("name"));
+        final var result = this.facade.search(context, query != null ? query : "", pageRequest);
+        final var emptyPage = new PageImpl<>(
+            List.of(),
+            pageRequest,
+            result.getTotalElements());
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .body(
+                Map.of(
+                    "crates", emptyPage.getContent(),
+                    "meta", Map.of("total", emptyPage.getTotalElements())));
+      }
 
       final var clampedPerPage = Math.clamp(perPage, 1, 100);
       final var zeroBasedPage = Math.max(page - 1, 0);
-      final var pageable = PageRequest.of(zeroBasedPage, clampedPerPage);
+      final var pageable = PageRequest.of(zeroBasedPage, clampedPerPage, Sort.by("name"));
       final var result = this.facade.search(context, query != null ? query : "", pageable);
 
       return ResponseEntity.ok()
@@ -110,7 +152,7 @@ public abstract class AbstractCargoSearchProtocolMethodHandler implements Protoc
     } catch (final Exception e) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-          .body(CargoErrorResponse.of(e.getMessage()));
+          .body(CargoErrorResponse.of("Search failed"));
     }
   }
 }

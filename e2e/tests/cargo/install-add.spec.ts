@@ -40,8 +40,8 @@
  *    needs; a private repo without a token stops in the client ("no token found", `config.json`
  *    advertises `auth-required`), a wrong one gets a 401.
  *  - H4 confirmed: `cargo search --limit N` sends `per_page=N`; the envelope's `meta.total` gives cargo
- *    its "... and K crates more" line. Search order is the storage order (no sort in the query), so
- *    the pages are compared as sets, never as a sequence.
+ *    its "... and K crates more" line. Search results are sorted by crate name (RPS-1571), so pages
+ *    are always in alphabetical order and paging is stable across queries.
  *
  * `cargo login <token>` prints "deprecated in favor of reading `<token>` from stdin" (cargo 1.98), so the
  * panel tells users the stdin form (`cargo login --registry repsy`, RPS-1598). Both forms are run.
@@ -673,6 +673,10 @@ test.describe('cargo install and cargo add, as the panel advertises them', () =>
     expect([first.total, second.total, third.total], 'meta.total is the whole match count').toEqual(
       [3, 3, 3],
     );
+    expect(
+      first.crates,
+      'first page results are sorted by name (RPS-1571)',
+    ).toEqual([...first.crates].sort());
     expect([...first.crates, ...second.crates].sort(), 'two pages cover every crate once').toEqual(
       names,
     );
