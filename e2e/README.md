@@ -4595,7 +4595,7 @@ and on demand only, by the product owner's decision (RPS-1260): it has no `pull_
 
 ```bash
 gh workflow run e2e-nightly.yml                            # everything, like the nightly run
-gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | all
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | all
 gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
 gh workflow run e2e-nightly.yml -f suite=h2 -f h2_full=docker   # the full catalog of this runner on H2, not tonight's
 gh workflow run e2e-nightly.yml -f grep=@smoke             # a Playwright --grep for every leg
@@ -4611,14 +4611,15 @@ cancelling): a second one waits.
 
 ### What runs
 
-| Job / leg | Stack                                       | Runs                                                                                                                                                                                                        | Timeout |
-| --------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `image`   |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                              | 40 min  |
-| `ui`      | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                   | 60 min  |
-| `wire`    | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                       | 150 min |
-| `h2`      | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                       | 90 min  |
-| `h2-full` | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another | 60 min  |
-| `scanner` | PostgreSQL + the stub scanner overlay       | `REPSY_UI_OPT_IN=scanner`, `--protocol ui --grep @scanner` only (20 tests, "Scanner stack" above), never the whole `ui` suite                                                                               | 45 min  |
+| Job / leg  | Stack                                       | Runs                                                                                                                                                                                                        | Timeout |
+| ---------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `image`    |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                              | 40 min  |
+| `ui`       | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                   | 60 min  |
+| `wire`     | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                       | 150 min |
+| `h2`       | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                       | 90 min  |
+| `h2-full`  | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another | 60 min  |
+| `scanner`  | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--protocol ui --grep @scanner` only (20 tests, "Scanner stack" above), never the whole `ui` suite                                                                              | 45 min  |
+| `throttle` | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                   | 30 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
 others. Every leg does the same: load the image, `./run.sh local up [--h2]` (with `REPSY_IMAGE` set, so
@@ -4640,7 +4641,12 @@ The `scanner` leg starts the stack with `./run.sh local up --scanner` (Repsy wit
 stub of `repsy-scanner-trivy`, built from `runners/scanner-stub.Dockerfile` on the runner) and ignores the
 `grep` input: it always runs `@scanner`, because the `@mocked` specs of the plain `ui` leg assume the scanner
 is off. The `@scanner` specs skip themselves without the opt-in, and a skipped test is not a failure, so the
-step "Check the scanner specs ran" fails the leg when its `junit.xml` holds no test or any skipped one.
+step "Check the opt-in specs ran" fails the leg when the `junit.xml` of any of its runners holds no test or any
+skipped one; every overlay leg (`matrix.opt_in` set, "Stack overlays") gets that check.
+
+The `throttle` leg is the same with `./run.sh local up --throttle`, the `stack` runner first and the `ui` runner
+last (both `--grep @throttle`, `grep` input ignored), and one extra step, "Wait out the throttle window" (12 s):
+AUTH-11 leaves the docker gateway's bucket, admin included, locked for the window, and the leak check logs in.
 
 Each runner gets its own `run.sh test` invocation because every invocation overwrites `test-results/`
 and `playwright-report/` (see "Running"); the workflow copies each runner's output aside first.
@@ -4678,8 +4684,8 @@ CI=true ./run.sh test --protocol ui --grep @smoke          # with the CI retry/t
 
 The `h2` leg is the same with `./run.sh local up --h2` and `--grep @smoke` on every runner (and `ui`, and no
 `--grep` for `stack`); `h2-full` is `./run.sh local up --h2` and one `./run.sh test --target ci --protocol <runner>`
-without `--grep`. The stack logs of a failed leg are `./run.sh local ps [--h2|--scanner]` and
-`./run.sh local logs [--h2|--scanner]` (the step "Collect the stack logs" calls them, so a new stack flag needs
+without `--grep`. The stack logs of a failed leg are `./run.sh local ps [--h2|--scanner|--throttle]` and
+`./run.sh local logs [--h2|--scanner|--throttle]` (the step "Collect the stack logs" calls them, so a new stack flag needs
 no change in the workflow). To run against an image you already built, set `REPSY_IMAGE` to its tag.
 
 ### Runner requirements and the Chromium sandbox
