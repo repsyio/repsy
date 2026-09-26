@@ -76,7 +76,8 @@ test.describe('AUTH-01 valid login', () => {
   });
 });
 
-test.describe('AUTH-02 wrong credentials', () => {
+// @cloud-skip: logs in as a seeded USER (Repsy Cloud has no USER role) and pins the OS toast text.
+test.describe('AUTH-02 wrong credentials', { tag: ['@cloud-skip'] }, () => {
   test.use({
     allowedPageErrors: errorToasts(
       'by design: the wrong-credentials case',
@@ -129,7 +130,9 @@ test.describe('AUTH-02 wrong credentials', () => {
 // password is checked for its shape only (typed, at most 72 characters). The complexity rule is for a
 // password that is SET: an account from before the policy, or an admin bootstrapped from a short
 // ADMIN_INITIAL_PASSWORD, must be able to type its own password, and a wrong one is the server's 401.
-test.describe('AUTH-03 client-side validation', () => {
+// @cloud-skip: the rules and messages of the OS login form (a `username` of 3-150 characters); Repsy Cloud's
+// form takes a `usernameOrEmail`, so its validation is pinned by the Cloud UI project (RPS-1639).
+test.describe('AUTH-03 client-side validation', { tag: ['@cloud-skip'] }, () => {
   const VALID_PASSWORD = 'Valid-Pass1';
   const passwordOfLength = (length: number) => `Aa1${'x'.repeat(length - 3)}`;
 
@@ -321,7 +324,8 @@ test.describe('AUTH-04 password visibility toggle', () => {
   });
 });
 
-test.describe('AUTH-11 auth throttle', { tag: ['@throttle'] }, () => {
+// @cloud-skip: an OS setting (AUTH_THROTTLE_*) and a seeded USER; Repsy Cloud's ingress rate-limits instead.
+test.describe('AUTH-11 auth throttle', { tag: ['@throttle', '@cloud-skip'] }, () => {
   // More failures than the smallest sensible AUTH_THROTTLE_MAX_FAILURES (the backend default is 20).
   const ATTEMPTS = 30;
   const THROTTLE_TOAST = 'Too many failed authentication attempts. Please try again later.';

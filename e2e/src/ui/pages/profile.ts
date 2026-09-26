@@ -27,6 +27,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
 import { assertPageNotAdmin } from '../session.js';
+import { profileRoute } from '../routes.js';
 import { UiPage } from './base.js';
 import { Shell } from './shell.js';
 
@@ -64,7 +65,7 @@ export class ProfilePage extends UiPage {
 
   /** A direct navigation that waits for the username to be filled in. */
   async goto(): Promise<void> {
-    await this.page.goto('/profile');
+    await this.page.goto(profileRoute());
     await expect(this.title).toBeVisible();
     await expect(this.username).not.toHaveValue('');
   }

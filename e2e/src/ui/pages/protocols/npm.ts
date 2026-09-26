@@ -17,6 +17,7 @@
 import type { PackageRef } from '../../../seed/packages.js';
 import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
 import { repoPath } from '../../../repo-url.js';
+import { repoRoute } from '../../routes.js';
 
 /** The route segment of an unscoped package: `/:repo/~/:package`. */
 const UNSCOPED = '~';
@@ -37,7 +38,7 @@ function split(target: PackageRef | undefined): {
 
 function packageBase(repo: string, target: PackageRef | undefined): string {
   const { scope, pkg } = split(target);
-  return `/${repo}/${scope ?? UNSCOPED}/${pkg}`;
+  return repoRoute(repo, scope ?? UNSCOPED, pkg);
 }
 
 /**
@@ -61,7 +62,7 @@ export const npmDescriptor: ProtocolDescriptor = {
   label: 'npm',
   levels: {
     list: {
-      path: (repo) => `/${repo}`,
+      path: (repo) => repoRoute(repo),
       rowKey: (t) => need(t, 'npm').name,
       search: {
         placeholder: '@scope',
@@ -80,7 +81,7 @@ export const npmDescriptor: ProtocolDescriptor = {
       installBar: false,
     },
     sublist: {
-      path: (repo, t) => `/${repo}/${split(t).scope ?? UNSCOPED}`,
+      path: (repo, t) => repoRoute(repo, split(t).scope ?? UNSCOPED),
       rowKey: (t) => split(t).pkg,
       search: { placeholder: 'package', term: (t) => t.name.slice(t.name.indexOf('/') + 1) },
       sort: NEWEST_OLDEST,

@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
+import { repoRoute } from '../../routes.js';
 
 /**
  * NuGet: packages -> versions -> detail. Run in a browser by the package scenarios (RPS-1257).
@@ -31,7 +32,7 @@ export const nugetDescriptor: ProtocolDescriptor = {
   label: 'NuGet',
   levels: {
     list: {
-      path: (repo) => `/${repo}`,
+      path: (repo) => repoRoute(repo),
       rowKey: (t) => need(t, 'nuget').name,
       search: { placeholder: 'package', term: (t) => t.name },
       sort: ['Name (A-Z)', 'Name (Z-A)'],
@@ -43,7 +44,7 @@ export const nugetDescriptor: ProtocolDescriptor = {
       installBar: false,
     },
     versions: {
-      path: (repo, t) => `/${repo}/${need(t, 'nuget').name}`,
+      path: (repo, t) => repoRoute(repo, need(t, 'nuget').name),
       rowKey: (t) => need(t, 'nuget').version,
       search: { placeholder: 'version', term: (t) => t.version },
       sort: NEWEST_OLDEST,
@@ -57,7 +58,7 @@ export const nugetDescriptor: ProtocolDescriptor = {
     detail: {
       path: (repo, t) => {
         const { name, version } = need(t, 'nuget');
-        return `/${repo}/${name}/${version}`;
+        return repoRoute(repo, name, version);
       },
       installContains: (_repo, t) => [
         `dotnet add package ${need(t, 'nuget').name} --version ${need(t, 'nuget').version}`,

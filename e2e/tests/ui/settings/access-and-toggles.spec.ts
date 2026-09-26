@@ -32,9 +32,10 @@ import { loginSession } from '../../../src/ui/session.js';
 const SETTINGS = '@settings';
 
 test.describe('Repository settings: access', { tag: SETTINGS }, () => {
+  // @cloud-skip: needs a seeded USER/ADMIN account; Repsy Cloud has no user roles (collaborators instead).
   test(
     'SET-01 a USER who opens /<repo>/settings is redirected to /repositories',
-    { tag: ['@smoke'] },
+    { tag: ['@cloud-skip', '@smoke'] },
     async ({ userPage, seeder }) => {
       // A public and a private repo: the USER may read the first and not the second, and neither
       // may be managed by them.
@@ -63,19 +64,23 @@ test.describe('Repository settings: access', { tag: SETTINGS }, () => {
     await expect(settings.deleteRepo.deleteButton).toBeVisible();
   });
 
-  test('SET-01 the role decides, not the account: a second ADMIN gets the page', async ({
-    openUiPage,
-    seeder,
-  }) => {
-    const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
-    const admin = await seeder.createUser({ role: UserRole.ADMIN });
-    const page = await openUiPage({ session: await loginSession(admin.username, admin.password) });
-    const settings = new RepoSettingsPage(page, repo.name);
+  // @cloud-skip: needs a seeded USER/ADMIN account; Repsy Cloud has no user roles (collaborators instead).
+  test(
+    'SET-01 the role decides, not the account: a second ADMIN gets the page',
+    { tag: ['@cloud-skip'] },
+    async ({ openUiPage, seeder }) => {
+      const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
+      const admin = await seeder.createUser({ role: UserRole.ADMIN });
+      const page = await openUiPage({
+        session: await loginSession(admin.username, admin.password),
+      });
+      const settings = new RepoSettingsPage(page, repo.name);
 
-    await settings.goto();
+      await settings.goto();
 
-    await expect(settings.root).toBeVisible();
-  });
+      await expect(settings.root).toBeVisible();
+    },
+  );
 });
 
 test.describe('Repository settings: visibility', { tag: SETTINGS }, () => {

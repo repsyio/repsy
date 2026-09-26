@@ -15,25 +15,20 @@
 
 /**
  * What the SPA keeps in `localStorage` for a session (`AuthService`): `username`, `token` and
- * `refresh-token`; it counts as logged in iff both tokens exist. Shared by the auth specs.
+ * `refresh-token` (under the keys of `target.ui.sessionStorageKeys`); it counts as logged in iff both
+ * tokens exist. Shared by the auth specs.
  */
 import type { Page } from '@playwright/test';
 
-export interface StoredSession {
-  username: string | null;
-  token: string | null;
-  refreshToken: string | null;
-}
+import { readStoredSession, type StoredSessionValues } from '../../../src/ui/session.js';
+
+export type StoredSession = StoredSessionValues;
 
 export const NO_SESSION: StoredSession = { username: null, token: null, refreshToken: null };
 
 /** The three keys as they are in the page's `localStorage` right now. */
 export function storedSession(page: Page): Promise<StoredSession> {
-  return page.evaluate(() => ({
-    username: window.localStorage.getItem('username'),
-    token: window.localStorage.getItem('token'),
-    refreshToken: window.localStorage.getItem('refresh-token'),
-  }));
+  return readStoredSession(page);
 }
 
 /** Three base64url segments: what a JWT looks like, without decoding or trusting it. */

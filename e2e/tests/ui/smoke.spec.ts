@@ -24,6 +24,7 @@ import { expect, test } from '../../src/ui/fixtures.js';
 import { DashboardPage } from '../../src/ui/pages/dashboard.js';
 import { LoginPage } from '../../src/ui/pages/login.js';
 import { Shell } from '../../src/ui/pages/shell.js';
+import { readStoredSession } from '../../src/ui/session.js';
 
 test.describe('UI smoke', () => {
   test('UI login lands on the dashboard', { tag: ['@smoke'] }, async ({ page }) => {
@@ -47,12 +48,7 @@ test.describe('UI smoke', () => {
     await dashboard.goto();
     await shell.logoutViaSidebar();
 
-    const storedSession = () =>
-      adminPage.evaluate(() => ({
-        username: window.localStorage.getItem('username'),
-        token: window.localStorage.getItem('token'),
-        refreshToken: window.localStorage.getItem('refresh-token'),
-      }));
+    const storedSession = () => readStoredSession(adminPage);
     expect(await storedSession()).toEqual({ username: null, token: null, refreshToken: null });
 
     // The session is seeded once per tab: a reload must NOT log the seeded admin back in.

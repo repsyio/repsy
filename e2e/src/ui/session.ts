@@ -19,7 +19,9 @@
  * login form, and the guards that keep a UI test from locking the harness out of its own admin.
  *
  * The SPA's session is three `localStorage` keys, `username`, `token` and `refresh-token`
- * (`AuthService`); it counts as authenticated iff both tokens exist. Refresh tokens are SINGLE-USE
+ * (`AuthService`; Repsy Cloud's panel also keeps an `email`): the names come from
+ * `target.ui.sessionStorageKeys` (RPS-1638), never a literal here. It counts as authenticated iff
+ * both tokens exist. Refresh tokens are SINGLE-USE
  * with family revocation on reuse (`RefreshTokenService.consume` in the backend), which shapes
  * everything here: never share one token pair between tests or contexts.
  */
@@ -27,11 +29,14 @@ import type { BrowserContext, Page } from '@playwright/test';
 
 import { loginPanel } from '../api/backend-registry.js';
 import { env } from '../env.js';
+import { target, type UiSessionStorageKeys } from '../target.js';
 
 export interface UiSession {
   username: string;
   token: string;
   refreshToken: string;
+  /** Only where the panel keeps one (`target.ui.sessionStorageKeys.email`, Repsy Cloud); the login answer's, when it has it. */
+  email?: string;
 }
 
 /** The login form's username rule (3-150 chars); `login.component.ts`. */
@@ -53,12 +58,22 @@ export async function loginSession(username: string, password: string): Promise<
   if (!info.username || !info.token || !info.refreshToken) {
     throw new Error(`Login as "${username}" did not return a username, token and refresh token`);
   }
-  return { username: info.username, token: info.token, refreshToken: info.refreshToken };
+  const session: UiSession = {
+    username: info.username,
+    token: info.token,
+    refreshToken: info.refreshToken,
+  };
+  // The OS login answer has no email; a backend module of Repsy Cloud may return one (RPS-1639).
+  const email = (info as { email?: unknown }).email;
+  if (typeof email === 'string' && email) {
+    session.email = email;
+  }
+  return session;
 }
 
 /**
- * Makes every page of `context` start logged in as `session`, by writing the three keys into
- * `localStorage` before the SPA boots (no `storageState` file: tokens are per run, and the SPA's
+ * Makes every page of `context` start logged in as `session`, by writing the keys of
+ * `target.ui.sessionStorageKeys` into `localStorage` before the SPA boots (no `storageState` file: tokens are per run, and the SPA's
  * refresh flow rewrites them).
  *
  * The write happens ONCE per tab, guarded by a `sessionStorage` flag, and only on `origin`. That is
@@ -71,8 +86,9 @@ export async function seedSession(
   origin: string,
   session: UiSession,
 ): Promise<void> {
+  const keys = target.ui.sessionStorageKeys;
   await context.addInitScript(
-    ({ origin: expectedOrigin, session: s, flag }) => {
+    ({ origin: expectedOrigin, session: s, flag, keys: k }) => {
       // about:blank, other origins and third-party frames must not be touched.
       if (window.location.origin !== expectedOrigin) {
         return;
@@ -81,16 +97,52 @@ export async function seedSession(
         if (window.sessionStorage.getItem(flag)) {
           return;
         }
-        window.localStorage.setItem('username', s.username);
-        window.localStorage.setItem('token', s.token);
-        window.localStorage.setItem('refresh-token', s.refreshToken);
+        window.localStorage.setItem(k.username, s.username);
+        window.localStorage.setItem(k.token, s.token);
+        window.localStorage.setItem(k.refreshToken, s.refreshToken);
+        if (k.email && s.email) {
+          window.localStorage.setItem(k.email, s.email);
+        }
         window.sessionStorage.setItem(flag, '1');
       } catch {
         // Storage is unavailable (e.g. a sandboxed frame): the test then fails on its own assertions.
       }
     },
-    { origin, session, flag: SEEDED_FLAG },
+    { origin, session, flag: SEEDED_FLAG, keys },
   );
+}
+
+/** What the SPA keeps of a session in `localStorage`, read from the keys of `target.ui.sessionStorageKeys`. */
+export interface StoredSessionValues {
+  username: string | null;
+  token: string | null;
+  refreshToken: string | null;
+}
+
+/** The session keys as they are in the page's `localStorage` right now (`null` = absent). */
+export function readStoredSession(page: Page): Promise<StoredSessionValues> {
+  return page.evaluate((k: UiSessionStorageKeys) => {
+    return {
+      username: window.localStorage.getItem(k.username),
+      token: window.localStorage.getItem(k.token),
+      refreshToken: window.localStorage.getItem(k.refreshToken),
+    };
+  }, target.ui.sessionStorageKeys);
+}
+
+/**
+ * Overwrites one value of the page's stored session (a tampered token, a stale refresh token), under
+ * the key `target.ui.sessionStorageKeys` names for it. The SPA reads `localStorage` once at boot.
+ */
+export async function setStoredSessionValue(
+  page: Page,
+  which: 'username' | 'token' | 'refreshToken',
+  value: string,
+): Promise<void> {
+  await page.evaluate(({ key, v }) => window.localStorage.setItem(key, v), {
+    key: target.ui.sessionStorageKeys[which],
+    v: value,
+  });
 }
 
 /**
@@ -110,7 +162,7 @@ export function assertNotAdmin(username: string | null | undefined): void {
 
 /** The username the SPA is currently logged in as (`localStorage.username`), or null. */
 export async function currentUsername(page: Page): Promise<string | null> {
-  return page.evaluate(() => window.localStorage.getItem('username'));
+  return (await readStoredSession(page)).username;
 }
 
 /** `assertNotAdmin()` for whoever `page` is logged in as. For page-object methods that change credentials. */

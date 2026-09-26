@@ -30,6 +30,7 @@ import type { Locator, Page } from '@playwright/test';
 import { RepoType } from '../../../src/api/panel-api.js';
 import type { PackageProtocol, PackageRef } from '../../../src/seed/packages.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
+import { repoRoute } from '../../../src/ui/routes.js';
 import { OpenedTabs } from '../../../src/ui/new-tabs.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import {
@@ -156,7 +157,7 @@ test.describe('List rows are links', { tag: '@a11y' }, () => {
     await repos.search(repo.name);
     const row = repos.list.row(repo.name);
     const href = await expectRowIsLink(row, repo.name);
-    expect(href).toBe(`/${repo.name}`);
+    expect(href).toBe(repoRoute(repo.name));
     // The dropdown toggle is a sibling of the link (a second, separate tab stop), not inside it.
     await expect(row.getByRole('button', { name: 'More options' })).toHaveCount(1);
     await expect(row.locator('a.row-link *')).toHaveCount(0);
@@ -197,7 +198,7 @@ test.describe('List rows are links', { tag: '@a11y' }, () => {
     const opened = new RegExp(`/${repo.name}$`);
 
     // The row link is a plain link (no target, no download): "open in a new tab" is the browser's.
-    await expect(link).toHaveAttribute('href', `/${repo.name}`);
+    await expect(link).toHaveAttribute('href', repoRoute(repo.name));
     await expect(link).not.toHaveAttribute('target', /.+/);
     expect(await newTabs(), 'no tab is open yet').toEqual([]);
 
@@ -265,7 +266,7 @@ test.describe('List rows are links', { tag: '@a11y' }, () => {
     await expect(dashboard.recentActivity).toBeVisible();
     const row = dashboard.recentRow(repo.name);
     const href = await expectRowIsLink(row, repo.name);
-    expect(pathOf(href)).toBe(`/${repo.name}`);
+    expect(pathOf(href)).toBe(repoRoute(repo.name));
     await row.click();
     await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
   });

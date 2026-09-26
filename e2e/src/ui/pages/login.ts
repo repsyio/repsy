@@ -21,6 +21,7 @@
  */
 import { expect, type Locator, type Page } from '@playwright/test';
 
+import { target } from '../../target.js';
 import { UiPage } from './base.js';
 
 export type LoginField = 'username' | 'password';
@@ -38,7 +39,9 @@ export class LoginPage extends UiPage {
     super(page);
     this.root = this.tid('login-page');
     this.form = this.tid('login-form');
-    this.username = this.tid('login-username');
+    // `login-username` on Repsy OS; the identifier field of Repsy Cloud's form is `usernameOrEmail`
+    // (provisional until RPS-1541 fixes the test ids, `target.ui.loginField`).
+    this.username = this.tid(`login-${target.ui.loginField}`);
     this.password = this.tid('login-password');
     this.passwordToggle = this.tid('login-password-toggle');
     this.submit = this.tid('login-submit');
@@ -46,7 +49,8 @@ export class LoginPage extends UiPage {
 
   /** One inline validation message of a field. */
   error(field: LoginField, validator: LoginValidator): Locator {
-    return this.tid(`login-${field}-error-${validator}`);
+    const stem = field === 'username' ? target.ui.loginField : field;
+    return this.tid(`login-${stem}-error-${validator}`);
   }
 
   async goto(): Promise<void> {

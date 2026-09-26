@@ -15,6 +15,7 @@
 
 import { NEWEST_OLDEST, NEWEST_OLDEST_NAME, need, type ProtocolDescriptor } from './types.js';
 import { repoPath } from '../../../repo-url.js';
+import { repoRoute } from '../../routes.js';
 
 /**
  * Helm: charts -> versions -> detail. Run in a browser by the package scenarios (RPS-1257).
@@ -32,7 +33,7 @@ export const helmDescriptor: ProtocolDescriptor = {
   label: 'Helm',
   levels: {
     list: {
-      path: (repo) => `/${repo}`,
+      path: (repo) => repoRoute(repo),
       rowKey: (t) => need(t, 'helm').name,
       search: { placeholder: 'chart', term: (t) => t.name },
       sort: NEWEST_OLDEST_NAME,
@@ -44,7 +45,7 @@ export const helmDescriptor: ProtocolDescriptor = {
       installBar: false,
     },
     versions: {
-      path: (repo, t) => `/${repo}/${need(t, 'helm').name}`,
+      path: (repo, t) => repoRoute(repo, need(t, 'helm').name),
       rowKey: (t) => need(t, 'helm').version,
       search: { placeholder: 'version', term: (t) => t.version },
       sort: NEWEST_OLDEST,
@@ -58,7 +59,7 @@ export const helmDescriptor: ProtocolDescriptor = {
     detail: {
       path: (repo, t) => {
         const { name, version } = need(t, 'helm');
-        return `/${repo}/${name}/${version}`;
+        return repoRoute(repo, name, version);
       },
       installContains: (repo, t) => [
         `helm install ${need(t, 'helm').name} ${repo}/${need(t, 'helm').name} --version ${need(t, 'helm').version}`,

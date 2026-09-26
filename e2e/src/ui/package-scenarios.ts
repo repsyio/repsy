@@ -691,6 +691,8 @@ export function registerPackageScenarios(
         'a USER sees no Settings, no row dropdown and no Delete, an admin does',
         '05-desktop',
       ),
+      // @cloud-skip: runs as a seeded USER; Repsy Cloud has no USER role (RPS-1638).
+      { tag: ['@cloud-skip'] },
       async ({ adminPage, userPage, seeder, seedPackage }) => {
         pin('05-desktop');
         const repo = await seeder.createRepo(type);
@@ -743,6 +745,8 @@ export function registerPackageScenarios(
       const key = `05-mobile-${name}` as PackageScenarioKey;
       test(
         title('05', `a USER sees no Delete on the mobile ${name} cards, an admin does`, key),
+        // @cloud-skip: as above, a seeded USER (RPS-1638).
+        { tag: ['@cloud-skip'] },
         async ({ openUiPage, adminSession, seededUser, seeder, seedVersions }) => {
           pin(key);
           const repo = await seeder.createRepo(type);
