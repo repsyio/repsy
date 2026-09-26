@@ -716,6 +716,21 @@ a USER password may yank/unlist (RPS-1317); an anonymous caller on a public repo
 checks the status), so `ruby-manage.ts` reads the outcome from the server's "Successfully yanked gem"
 message instead of the exit code.
 
+Helm, Docker and the protocols with no wire delete (`clients/{helm,docker,no-route}-manage.ts`,
+`tests/{helm,docker,pypi,golang,maven}/manage-matrix.spec.ts`; `./run.sh test --protocol
+helm,docker,pypi,golang,maven --grep " manage "`, 35 cells). MANAGE: the classic Helm chart
+`DELETE /<repo>/api/charts/<chart>/<version>` (raw, no Helm command sends it) and Docker
+`delete-manifest`/`delete-tag` (the real `crane delete` by digest and by tag, replayed as the token
+dance plus `DELETE` for a refused cell). A USER account gets a Docker token (issuance is not scope- or
+role-checked) and then a 401 on the `DELETE` with a Bearer challenge, not a 403 (`insufficient_scope`
+only comes for a token asked for less than `delete`, R15); a deploy token likewise; an anonymous caller
+never gets past the token endpoint (401, Basic challenge, even on a public repo). `NO_ROUTE` (PyPI
+wheel, Go module zip, Maven jar, Helm OCI manifest `DELETE /v2/<repo>/<chart>/manifests/<tag>`): no
+handler exists, so the router answers a plain 404 `unknownPath` (an OCI `NAME_UNKNOWN` envelope on
+`/v2`) to every credential, admin included, whether the file exists or not and before any credential
+is looked at (an unauthenticated `DELETE` on a private repo gets the same 404, not a challenge); the
+file is still served byte for byte. Removing those is a panel action.
+
 ## Maven runner
 
 `runners/maven.Dockerfile` adds a pinned Eclipse Temurin JDK and Apache Maven (build args
@@ -1713,6 +1728,30 @@ How it is driven, and why (all probed live):
 
 No new backend candidate came out of berry: it hits RPS-1357 (full packument on every read), RPS-1359 and,
 through the shared cells, RPS-1356/RPS-1358 as pinned above.
+
+## Credential invalidation (RPS-1481)
+
+`tests/maven/credential-invalidation.spec.ts` (real `mvn deploy`) and `tests/npm/credential-invalidation.spec.ts`
+(real `npm publish`) register the same four tests from `src/scenarios/credential-invalidation.ts`. A successful
+deploy with the credential comes first, so that the Basic-auth cache (`VerifiedPasswordCache`, keyed by user,
+password and stored hash) is warm and what is proved is invalidation, not a cold miss. Then the credential stops
+being valid and a deploy with it must be refused at once:
+
+| Event                                                                  | Old credential | Replacement               |
+| ---------------------------------------------------------------------- | -------------- | ------------------------- |
+| `PUT /api/profile/password` as the user (`PanelApi.changeOwnPassword`) | refused        | the new password deploys  |
+| `DELETE /api/users/{id}` as admin                                      | refused        | none                      |
+| deploy token revoked                                                   | refused        | none                      |
+| deploy token rotated                                                   | refused        | the rotated token deploys |
+
+"Refused" means the real client exits non-zero, the raw probe of the same credential (`adapter.publish`) answers 401
+(not 403 or 404), and an admin sees nothing of the refused version stored. `--grep "credential invalidation"`
+selects them, one test per protocol carries `@smoke`.
+
+Docker is not in this suite on purpose. A Docker `/v2/token` JWT is not re-checked against the password: probed
+live, a token minted before `PUT /api/profile/password` still starts a blob upload (202) until it expires
+(`expires_in` 1800), while the old password is refused by `/v2/token` at once (401) and a deleted user's token
+is refused (401) because the user is read again. Whether that is acceptable is an open decision, so nothing pins it.
 
 ## Cargo runner
 
