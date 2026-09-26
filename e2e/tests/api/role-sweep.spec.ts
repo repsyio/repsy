@@ -31,11 +31,12 @@
  */
 import { loadSpecOperations, requestFor, type SpecOperation } from '../../src/api/spec-ops.js';
 import { bodyFor, seedSweepWorld, snapshotWorld, valuesFor } from '../../src/api/sweep-world.js';
-import { PanelApi } from '../../src/api/panel-api.js';
+import { PanelApi, RepoType } from '../../src/api/panel-api.js';
 import { adminBearer, apiUrl, edgeRequest, type EdgeResponse } from '../../src/clients/edge-raw.js';
 import { env } from '../../src/env.js';
 import { expect, test as base } from '../../src/scenarios/fixtures.js';
 import { perTestRunId } from '../../src/seed/run-id.js';
+import { seedPackage } from '../../src/seed/packages.js';
 import { Seeder } from '../../src/seed/seeder.js';
 
 const OPERATIONS = loadSpecOperations();
@@ -55,11 +56,13 @@ const REVERSE_SKIP: Readonly<Record<string, string>> = {
 };
 
 /**
- * A defect the sweep found, kept out of the anonymous sweeps so that the rest of it can gate. The
- * interceptor that enforces `@RepoOperation` on the panel's repo routes (`ProtocolEndpointDispatcher`)
- * lists the path prefixes it covers, and `/api/mvn/groups/**` is not among them: an anonymous caller
- * reads the group summary (artifact and version counts) of a PRIVATE repo, and gets a 404 rather than a
- * 401 for a repo that does not exist. Remove the entry when the ticket for it is fixed.
+ * RPS-1558: `ProtocolEndpointDispatcher.addInterceptors` registers the `@RepoOperation` interceptor for a
+ * list of path prefixes, and `/api/mvn/groups/**` (`getMavenGroupSummary`) is not in it, so the
+ * permission check never runs: an anonymous caller reads the group summary of a PRIVATE repo, and gets
+ * 404 instead of 401 for a repo that does not exist. The operation is kept out of the anonymous sweeps,
+ * and the two `test.fail()` tests of "RPS-1558" below assert what it must do. The fix must flip both:
+ * the day it lands they pass, `test.fail()` turns that red, and the fix removes this entry and the two
+ * `test.fail()` calls (the sweeps then cover the operation).
  */
 const ANONYMOUS_KNOWN_GAPS: ReadonlySet<string> = new Set(['getMavenGroupSummary']);
 
@@ -154,7 +157,7 @@ test.describe('the operations the spec declares 403 on', { tag: ['@smoke'] }, ()
 
   test('every skipped operation exists in the spec', () => {
     const ids = new Set(OPERATIONS.map((op) => op.operationId));
-    for (const id of Object.keys(REVERSE_SKIP)) {
+    for (const id of [...Object.keys(REVERSE_SKIP), ...ANONYMOUS_KNOWN_GAPS]) {
       expect(ids.has(id), id).toBe(true);
     }
   });
@@ -193,6 +196,33 @@ test.describe('anonymous callers', { tag: ['@smoke'] }, () => {
       expect(res.status).not.toBe(403);
     });
   }
+});
+
+test.describe('RPS-1558: the Maven group summary is not protected', { tag: ['@smoke'] }, () => {
+  const summary = OPERATIONS.find(
+    (op) => op.operationId === 'getMavenGroupSummary',
+  ) as SpecOperation;
+
+  test('an anonymous caller is refused on a private repo', async ({ seeder }) => {
+    test.fail(true, 'RPS-1558: answers 200 with the artifact and version counts');
+    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+    const pkg = await seedPackage(repo, seeder, {});
+    const [groupName] = pkg.name.split(':');
+
+    const res = await call(summary, {
+      values: { repoName: repo.name, groupName: groupName ?? '' },
+    });
+
+    expect(res.status, res.text.slice(0, 200)).toBe(401);
+  });
+
+  test('an anonymous caller gets 401, not 404, for a repo that does not exist', async () => {
+    test.fail(true, 'RPS-1558: answers 404 repoNotFound');
+
+    const res = await call(summary, {});
+
+    expect(res.status, res.text.slice(0, 200)).toBe(401);
+  });
 });
 
 test.describe('the operations the spec does not declare 403 on', { tag: ['@smoke'] }, () => {
