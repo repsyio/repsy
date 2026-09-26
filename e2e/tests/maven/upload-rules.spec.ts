@@ -96,12 +96,12 @@ const XML = 'application/xml';
 const TEXT = 'text/plain';
 
 /**
- * An `.asc` that holds no signature packet: the check refuses it (422) before it asks any key
- * server, so this test needs neither a network nor a key pair.
+ * A non-empty `.asc` that holds no signature packet: the armor lines of a signature with nothing in
+ * between, which BouncyCastle rejects as invalid armor. The check refuses it (422) before it asks
+ * any key server, so a test using it needs neither a network nor a key pair. It is not empty on
+ * purpose: a body with no byte in it is refused with 400 `mavenUploadBodyEmpty` before anything
+ * else is looked at (RPS-1443), which is a different rule.
  */
-const NO_SIGNATURE = '';
-
-/** The armor lines of a signature with no packet in them: BouncyCastle rejects it as invalid armor. */
 const ARMOR_ONLY = '-----BEGIN PGP SIGNATURE-----\n\n-----END PGP SIGNATURE-----\n';
 
 const ARTIFACT_ID = 'raw';
@@ -637,7 +637,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
 
       for (const pom of [releasePom, snapshotPom[0]]) {
         expectPut(
-          await layout.put(`${pom}.asc`, NO_SIGNATURE, OCTET),
+          await layout.put(`${pom}.asc`, ARMOR_ONLY, OCTET),
           422,
           'artifactSignatureNotVerified',
           `${pom}.asc`,
@@ -658,9 +658,35 @@ test.describe('maven upload rules (raw HTTP)', () => {
       const layout = await newRepo(seeder);
       const pom = `${versionDir(layout.groupId, ARTIFACT_ID, RELEASE)}/${ARTIFACT_ID}-${RELEASE}.pom`;
 
-      expectPut(await layout.put(`${pom}.asc`, NO_SIGNATURE, OCTET), 404, 'itemNotFound', pom);
+      expectPut(await layout.put(`${pom}.asc`, ARMOR_ONLY, OCTET), 404, 'itemNotFound', pom);
 
       expect(await repoTree(layout.repoName)).toEqual({});
+    },
+  );
+
+  test(
+    'an empty .pom.asc answers 400 mavenUploadBodyEmpty and stores nothing (RPS-1443)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder);
+      await seedBothKinds(layout);
+      const before = await repoTree(layout.repoName);
+      const [snapshotPom] = snapshotDeployFiles(layout, FIRST_BUILD);
+      const releasePom = `${versionDir(layout.groupId, ARTIFACT_ID, RELEASE)}/${ARTIFACT_ID}-${RELEASE}.pom`;
+      const admin = adminCredential();
+
+      for (const pom of [releasePom, snapshotPom[0]]) {
+        expectPut(
+          await layout.put(`${pom}.asc`, '', OCTET),
+          400,
+          'mavenUploadBodyEmpty',
+          `${pom}.asc`,
+        );
+        const res = await rawGet(layout.repoName, admin, `${pom}.asc`);
+        expect(res.status, `GET ${pom}.asc answered ${res.status}`).toBe(404);
+      }
+
+      expect(await repoTree(layout.repoName)).toEqual(before);
     },
   );
 
