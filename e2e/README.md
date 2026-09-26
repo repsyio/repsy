@@ -4284,8 +4284,8 @@ Whichever adapter comes next needs its own TLS setting decided in that file (or 
 `@smoke` (and full catalog) on a TLS stack recorded under "Runs of this part".
 
 **Runs of this part** (own stack, offset 200, image of main, `REPSY_E2E_TLS=1`): `@smoke` skeleton 21, maven 20, npm 5
-(+1 expected failure), npm-clients 10, cargo 11, nuget 12, docker 6, helm 7, pypi 6, golang 10 + 1 skipped (the shim case),
-ruby 7, api 273: all green, none retried. The full catalogs on the same stack (not part of the nightly leg, run once for this part):
+(+1 expected failure), npm-clients 11, cargo 12, nuget 12, docker 8, helm 7, pypi 7, golang 10 + 1 skipped (the shim case),
+ruby 7, api 277: all green, none retried (run as the nightly leg runs them, then its opt-in check). The full catalogs on the same stack (not part of the nightly leg, run once for this part):
 maven 238 passed and 1 skipped, cargo 49, nuget 51, helm 63, ruby 51, golang 48 and 1 skipped, npm-clients 208 (the 13 RPS-1559
 expected failures among them) and 6 skipped, and, after merging the skopeo, regctl, oras, uv and deno adapters, docker 106 passed
 and 1 skipped (the 4 RPS-1490 expected failures among them) and pypi 66 passed and 3 skipped; no failure anywhere.
