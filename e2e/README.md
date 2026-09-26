@@ -3818,20 +3818,27 @@ and Go trusts the CA through `SSL_CERT_FILE`; the in-process shim is never start
 whose zip is the published one, with the shim's trace unchanged.
 
 **Runs of this part** (own stack, offset 200, image of main): skeleton `@tls` 12/12, `api` `@smoke` 18/18,
-golang full 43 passed and 1 skipped (the shim case), docker full 56/56, npm 77 passed and 7 failed (below).
+golang full 43 passed and 1 skipped (the shim case), docker full 56/56, npm full with the RPS-1559 cases as expected failures (below).
 Flip checks: with `SSL_CERT_FILE` withheld from the runner the golang `@smoke` cases fail with `tls: failed to verify
 certificate`; with `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE` withheld every npm and docker case fails with `self-signed
 certificate in certificate chain`; the untrusted-child case above pins the same thing permanently.
 
-**Found, not pinned (no ticket yet; the report of the PR proposes them).** Repsy's own https connectors
-(`SslConnectorCustomizer`) are built without what the other connectors get: `EncodedSolidusHandling.DECODE`
-(`TomcatMultiPortConfiguration`) and the connector-level response compression. Observed on 9443 against 9090:
-a request path with `%2F` (an npm **scoped** package, `@scope%2Fname`, which is how `npm publish`/`install`
-spell it) is answered by Tomcat with a bodyless `400 Bad Request`, and a large packument is not gzipped for
-`Accept-Encoding: gzip` (RPS-1359). Six npm cases of a full run over TLS fail on the first (the scoped
-publishes of `packument-read`, `unpublish` and `publish-consume`; the unscoped ones pass) and one on the
-second; their assertions stay as they are so that a fix turns them green. Part b's `@smoke` leg has the
-scoped-package case to account for until then.
+**RPS-1559: Repsy's own https connectors miss settings the plain ones get.** `SslConnectorCustomizer` builds a bare
+connector, without `EncodedSolidusHandling.DECODE` and the connection timeout that `TomcatMultiPortConfiguration`
+sets on the others, and response compression does not reach it. Observed on 9443 against 9090: a request path
+with `%2F` (an npm **scoped** package, `@scope%2Fname`, which is how `npm publish`/`install` spell it) is answered
+by Tomcat with a bodyless `400 Bad Request`, and a large packument is not gzipped for `Accept-Encoding: gzip`.
+On a TLS stack (`optedIn('tls')`) these `tests/npm` cases carry a `test.fail(..., 'RPS-1559: ...')`, so they are
+expected failures there and unchanged on the default stack; the fix turns them into "expected to fail but
+passed", which is the reminder to delete the line:
+
+- `publish-consume.spec.ts`: the scoped package real client round trip (RPS-1205);
+- `packument-read.spec.ts`: the publish body (RPS-1390), HEAD (RPS-1358) and tarball download (RPS-1363) cases, which
+  publish a scoped name, and the large packument compression case (RPS-1359);
+- `unpublish.spec.ts`: unpublishing one version of a scoped package, and the only version of a scoped package (the
+  unscoped one passes).
+
+Part b's `@smoke` leg meets the first of them.
 
 ## API suite (RPS-1480)
 

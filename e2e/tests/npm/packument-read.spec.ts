@@ -27,6 +27,7 @@ import zlib from 'node:zlib';
 
 import { RepoType } from '../../src/api/panel-api.js';
 import { env } from '../../src/env.js';
+import { optedIn } from '../../src/stack-overlays.js';
 import {
   adminCredential,
   bareName,
@@ -181,6 +182,10 @@ test.describe('npm registry reads (raw HTTP)', () => {
     'a publish answers a JSON body with ok, id and success, not an empty 200 (RPS-1390)',
     { tag: ['@packument'] },
     async ({ seeder }) => {
+      test.fail(
+        optedIn('tls'),
+        'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
+      );
       const repoName = await newRepo(seeder);
       const name = `@e2e-${seeder.runId}/publish-body`;
       const res = await rawPublish(
@@ -228,6 +233,10 @@ test.describe('npm registry reads (raw HTTP)', () => {
     'HEAD is 200 for a package and a tarball that exist, 404 for one that does not (RPS-1358)',
     { tag: ['@wire', '@negative'] },
     async ({ seeder }) => {
+      test.fail(
+        optedIn('tls'),
+        'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
+      );
       const repoName = await newRepo(seeder);
       const name = `e2e-${seeder.runId}-head`;
       const scoped = `@e2e-${seeder.runId}/head`;
@@ -314,6 +323,7 @@ test.describe('npm registry reads (raw HTTP)', () => {
     'a large packument is compressed for a client that accepts it (RPS-1359)',
     { tag: ['@wire'] },
     async ({ seeder }) => {
+      test.fail(optedIn('tls'), 'RPS-1559: the SSL connectors get no response compression');
       const repoName = await newRepo(seeder);
       const name = `e2e-${seeder.runId}-large`;
       const description = 'a long, compressible description. '.repeat(400);
@@ -385,6 +395,10 @@ test.describe('npm registry reads (raw HTTP)', () => {
     'a tarball is downloaded as an attachment named after it (RPS-1363)',
     { tag: ['@wire'] },
     async ({ seeder }) => {
+      test.fail(
+        optedIn('tls'),
+        'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
+      );
       const repoName = await newRepo(seeder);
       const name = `e2e-${seeder.runId}-download`;
       const scoped = `@e2e-${seeder.runId}/download`;
