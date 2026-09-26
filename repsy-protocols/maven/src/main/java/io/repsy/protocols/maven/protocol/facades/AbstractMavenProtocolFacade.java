@@ -39,6 +39,7 @@ import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PushbackInputStream;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -214,12 +215,18 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * POM is spooled to a temporary file, before anything about them is parsed or stored; each is
    * capped by {@link MavenUploadLimits} and refused with a 400 naming the limit, before anything is
    * read, when the client declares a larger body, and while it is read otherwise (RPS-1121).
+   *
+   * <p>A body with no byte in it is refused with a 400 {@code mavenUploadBodyEmpty} before anything
+   * else is looked at, whether it was declared empty ({@code Content-Length: 0}), sent chunked with
+   * no chunk, or already consumed before it got here, so a publisher is never answered 200 for a
+   * zero-byte file that every consumer then fails to verify (RPS-1443).
    */
   @Override
   public void upload(
-      final ProtocolContext context, final InputStream inputStream, final long contentLength)
+      final ProtocolContext context, final InputStream requestBody, final long contentLength)
       throws IOException, XmlPullParserException {
 
+    final var inputStream = nonEmpty(requestBody);
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var relativePath = ProtocolContextUtils.getRelativePath(context);
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
@@ -263,6 +270,25 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       context.addProperty(ARTIFACT_NAME, gav.getGroupId() + ":" + gav.getArtifactId());
       context.addProperty(ARTIFACT_VERSION, resolveLogicalVersion(gav));
     }
+  }
+
+  /**
+   * Answers the body with its first byte put back, refusing one that has none (RPS-1443). The
+   * artifact is what the body is, so an empty one can only be a mistake of the client or a body
+   * that was read by something else on the way.
+   */
+  private static InputStream nonEmpty(final InputStream inputStream) throws IOException {
+
+    final var body = new PushbackInputStream(inputStream, 1);
+    final var first = body.read();
+
+    if (first < 0) {
+      throw new BadRequestException("mavenUploadBodyEmpty");
+    }
+
+    body.unread(first);
+
+    return body;
   }
 
   /**
