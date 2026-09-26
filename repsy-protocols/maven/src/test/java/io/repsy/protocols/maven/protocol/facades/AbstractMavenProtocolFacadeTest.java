@@ -38,6 +38,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
@@ -96,6 +97,9 @@ import org.springframework.core.io.Resource;
  * <p>RPS-1437: a POM that registered a version has it added to the artifact-level {@code
  * maven-metadata.xml} that is stored, when that lacks it. The rewrite's usage is added to the POM's
  * and a failure of it never fails the upload.
+ *
+ * <p>RPS-1457: the POM of a plugin also completes the stored group-level file with the plugins that
+ * it lacks, with the same guarantees.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractMavenProtocolFacade upload")
@@ -1147,5 +1151,157 @@ class AbstractMavenProtocolFacadeTest {
 
     verify(this.storageService, never()).addVersionsToMetadata(any(), any(), any(), any());
     verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
+  }
+
+  // RPS-1457: the POM of a plugin also completes the stored group-level file.
+
+  private static final String PLUGIN_POM =
+      VALID_POM.replace("</project>", "<packaging>maven-plugin</packaging></project>");
+
+  /** Answers {@code delta} to the group append and remembers what the plugin supplier says. */
+  private void groupAppendReports(final long delta, final List<Collection<RegisteredPlugin>> asked)
+      throws Exception {
+    when(this.storageService.addPluginsToGroupMetadata(any(), anyString(), any(Supplier.class)))
+        .thenAnswer(
+            invocation -> {
+              asked.add(invocation.<Supplier<Collection<RegisteredPlugin>>>getArgument(2).get());
+              return delta;
+            });
+  }
+
+  @Test
+  @DisplayName(
+      "adds the plugins of the group to the stored group-level file after a plugin POM registered,"
+          + " asks for the registered plugins of that group and adds both rewrites to the usage"
+          + " (RPS-1457)")
+  void appendsTheRegisteredPluginsToTheStoredGroupMetadata() throws Exception {
+    requestFor(POM_PATH);
+    deployIsAllowed();
+    storageReportsUsage(PLUGIN_POM.length());
+    pomIsNewInTheRepo(false);
+    final var registered =
+        List.of(
+            new RegisteredPlugin("lib", "Lib", "lib"),
+            new RegisteredPlugin("other-maven-plugin", null, "other"));
+    when(this.artifactService.getRegisteredPlugins(this.repoInfo, "com.example"))
+        .thenReturn(registered);
+    when(this.storageService.addVersionsToMetadata(
+            any(), anyString(), anyString(), any(Supplier.class)))
+        .thenReturn(-7L);
+    final List<Collection<RegisteredPlugin>> asked = new ArrayList<>();
+    groupAppendReports(-25, asked);
+
+    upload(PLUGIN_POM);
+
+    final var order = inOrder(this.artifactService, this.storageService);
+    order.verify(this.artifactService).createOrUpdateArtifact(any(), any(), any());
+    order
+        .verify(this.storageService)
+        .addVersionsToMetadata(eq(this.repoInfo), eq("com.example"), eq("lib"), any());
+    order
+        .verify(this.storageService)
+        .addPluginsToGroupMetadata(eq(this.repoInfo), eq("com.example"), any());
+    assertThat(asked).singleElement().isEqualTo(registered);
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage())
+        .isEqualTo(PLUGIN_POM.length() - 7L - 25L);
+  }
+
+  @Test
+  @DisplayName("takes the group of a plugin from the path of its POM, a timestamped one too")
+  void appendsForTheTimestampedPomOfAPluginSnapshot() throws Exception {
+    requestFor("com/example/lib/1.0-SNAPSHOT/lib-1.0-20260101.101010-1.pom");
+    deployIsAllowed();
+    storageReportsUsage(PLUGIN_POM.length());
+    pomIsNewInTheRepo(false);
+
+    upload(PLUGIN_POM.replace("<version>1.0</version>", "<version>1.0-SNAPSHOT</version>"));
+
+    verify(this.storageService)
+        .addPluginsToGroupMetadata(eq(this.repoInfo), eq("com.example"), any());
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("appendFailures")
+  @DisplayName(
+      "answers a success and keeps the version rewrite in the usage when the group append fails"
+          + " (RPS-1457)")
+  void aGroupAppendFailureNeverFailsTheUpload(final String label, final Exception failure)
+      throws Exception {
+    requestFor(POM_PATH);
+    deployIsAllowed();
+    storageReportsUsage(PLUGIN_POM.length());
+    pomIsNewInTheRepo(false);
+    when(this.storageService.addVersionsToMetadata(
+            any(), anyString(), anyString(), any(Supplier.class)))
+        .thenReturn(-7L);
+    when(this.storageService.addPluginsToGroupMetadata(any(), anyString(), any(Supplier.class)))
+        .thenThrow(failure);
+
+    upload(PLUGIN_POM);
+
+    verify(this.storageService, never()).deleteFile(any());
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage())
+        .isEqualTo(PLUGIN_POM.length() - 7L);
+  }
+
+  @Test
+  @DisplayName("does not touch the stored group-level file for the POM of an ordinary artifact")
+  void doesNotAppendPluginsForAnOrdinaryPom() throws Exception {
+    requestFor(POM_PATH);
+    deployIsAllowed();
+    storageReportsUsage(VALID_POM.length());
+    pomIsNewInTheRepo(false);
+
+    upload(VALID_POM);
+
+    verify(this.storageService, never()).addPluginsToGroupMetadata(any(), any(), any());
+    verify(this.artifactService, never()).getRegisteredPlugins(any(), any());
+  }
+
+  @Test
+  @DisplayName("does not touch the stored group-level file when the plugin POM fails to register")
+  void doesNotAppendPluginsWhenTheRegistrationFails() throws Exception {
+    requestFor(POM_PATH);
+    deployIsAllowed();
+    storageReportsUsage(PLUGIN_POM.length());
+    pomIsNewInTheRepo(false);
+    registrationFails();
+
+    assertThatThrownBy(() -> upload(PLUGIN_POM)).isInstanceOf(IllegalStateException.class);
+
+    verify(this.storageService, never()).addPluginsToGroupMetadata(any(), any(), any());
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("filesThatRegisterNoVersion")
+  @DisplayName("appends plugins only for a plugin POM, not for any other file (RPS-1457)")
+  void appendsPluginsOnlyForAPluginPom(final String path, final String body) throws Exception {
+    requestFor(path);
+    lenient()
+        .when(this.artifactService.getVersionType(any(), any()))
+        .thenReturn(ArtifactVersionType.RELEASE);
+    lenient()
+        .when(this.artifactService.getVersionTypeByMetadataTypeFiles(any(), any(), any()))
+        .thenReturn(ArtifactVersionType.RELEASE);
+    storageReportsUsage(body.length());
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(body.getBytes(UTF_8)));
+
+    upload(body);
+
+    verify(this.storageService, never()).addPluginsToGroupMetadata(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("appends no plugins for a POM signature that is parked")
+  void aParkedSignatureAppendsNoPlugins() throws Exception {
+    requestFor(POM_PATH + ".asc");
+    deployIsAllowed();
+    when(this.artifactService.verifySignature(any(), any(StoragePath.class), any()))
+        .thenReturn(SignatureOutcome.PARKED);
+
+    upload(ARMORED_SIGNATURE);
+
+    verify(this.storageService, never()).addPluginsToGroupMetadata(any(), any(), any());
   }
 }

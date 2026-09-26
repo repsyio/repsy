@@ -282,18 +282,28 @@ public class ArtifactMetadataSynthesizer {
     final var metadata = new Metadata();
 
     for (final var registered : plugins) {
-      final var plugin = new Plugin();
-      plugin.setArtifactId(registered.artifactId());
-      plugin.setPrefix(registered.prefix());
-
-      if (registered.name() != null && !registered.name().isBlank()) {
-        plugin.setName(registered.name());
-      }
-
-      metadata.addPlugin(plugin);
+      metadata.addPlugin(toPlugin(registered));
     }
 
     return write(metadata);
+  }
+
+  /**
+   * The {@code <plugin>} entry of a group-level file for a registered plugin: the artifactId and
+   * the prefix, and the name when there is one. The file a plugin is added to (RPS-1457) and the
+   * one that is answered when none is stored list it the same way.
+   */
+  public static Plugin toPlugin(final RegisteredPlugin registered) {
+
+    final var plugin = new Plugin();
+    plugin.setArtifactId(registered.artifactId());
+    plugin.setPrefix(registered.prefix());
+
+    if (registered.name() != null && !registered.name().isBlank()) {
+      plugin.setName(registered.name());
+    }
+
+    return plugin;
   }
 
   /**

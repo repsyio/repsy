@@ -18,6 +18,7 @@ package io.repsy.protocols.maven.shared.storage.services;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.io.InputStream;
@@ -101,6 +102,32 @@ public interface MavenStorageService<ID> {
       String groupId,
       String artifactId,
       Supplier<? extends Collection<String>> registeredVersions)
+      throws IOException;
+
+  /**
+   * Adds to the group-level {@code maven-metadata.xml} that is stored the registered plugins whose
+   * artifactId it does not list, so a plugin registered by a client that sends no group-level file
+   * (Gradle, sbt, Apache Ivy, a raw PUT) is found by {@code mvn prefix:goal} even though Maven
+   * stored a file that lists other plugins earlier (RPS-1457). It only ever appends, after the
+   * entries that are there: an entry is matched by its artifactId and never changed or removed, and
+   * the file's {@code <versioning>} is left as it is.
+   *
+   * <p>When a plugin is added the file and the checksums that are stored next to it are rewritten
+   * (none is created) and a stored signature of it, which no longer verifies, is deleted. Nothing
+   * is written, deleted or created when the group has no stored file, when the file lists versions
+   * and no plugins (it is then the artifact-level file of the artifact that has that path), or when
+   * it lists every registered plugin already. {@code registeredPlugins} is only asked for once the
+   * file is known to be there, and it is asked inside the lock that also serializes the version
+   * rewrites of the same path and a client's own upload of the file.
+   *
+   * @return the change of the disk usage of the repository, negative when the files shrank
+   * @throws io.repsy.core.error_handling.exceptions.BadRequestException {@code
+   *     malformedMetadataFile}, before anything is written, when the stored file cannot be parsed
+   */
+  long addPluginsToGroupMetadata(
+      BaseRepoInfo<ID> repoInfo,
+      String groupId,
+      Supplier<? extends Collection<RegisteredPlugin>> registeredPlugins)
       throws IOException;
 
   Path getPath(String groupId, String artifactId);

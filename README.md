@@ -820,10 +820,20 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
   a `<plugins>` list with each plugin's name, prefix and artifactId, ordered by artifactId. The prefix
   is the one Maven derives from the artifactId (`hello-maven-plugin` gives `hello`), so a plugin that
   sets its own `goalPrefix` has to be published by Maven, which stores the file itself, or its prefix is
-  not found. A stored group-level file is served as it is. The path of that file has the shape of an
-  artifact-level one (`com/acme/tools/maven-metadata.xml` is both the artifact `tools` of `com.acme` and
-  the group `com.acme.tools`), so the artifact-level answer comes first and the group-level one is
-  given only when no artifact of that name is registered.
+  not found. A stored group-level file is served as it is, and it is kept complete like the
+  artifact-level one: when the POM of a plugin registers and the stored file does not list its
+  artifactId (a plugin that `mvn deploy` published first and that Gradle, sbt or Ivy then adds a second
+  plugin to), Repsy appends a `<plugin>` entry (name, prefix, artifactId) for it, and for any other
+  plugin it has registered for the group that the file lacks, after the entries that are there, rewrites
+  the checksums that are stored next to it and deletes a stored `maven-metadata.xml.asc`. It never
+  changes or removes an entry, and leaves untouched a file it cannot parse and a file that lists
+  versions and no plugins (the artifact-level file of the same path, see below). A plugin that sets its
+  own `goalPrefix` and is published by `mvn deploy` into a group whose file is stored already can end up
+  listed twice, under the prefix derived from its artifactId (added when its POM arrived) and under its
+  own (merged in by Maven afterwards); Maven finds the plugin by either. The path of that file has the
+  shape of an artifact-level one (`com/acme/tools/maven-metadata.xml` is both the artifact `tools` of
+  `com.acme` and the group `com.acme.tools`), so the artifact-level answer comes first and the
+  group-level one is given only when no artifact of that name is registered.
   Nothing generated is stored: it is not in the directory listing and is never signed (`.asc` is a
   `404`). The version-level `<version>-SNAPSHOT/maven-metadata.xml` is not generated (RPS-1438): Maven
   and Gradle publish it themselves for a unique SNAPSHOT, and Ivy and sbt publish a non-unique one under

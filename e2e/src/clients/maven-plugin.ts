@@ -52,12 +52,36 @@ export const PLUGIN_MARKER = `E2E-HELLO-PLUGIN-RAN-${randomUUID()}`;
 /** The prefix Maven derives from the artifactId (`hello-maven-plugin`). */
 export const PLUGIN_PREFIX = 'hello';
 
+/** A plugin `buildPlugin` builds: its artifactId, its POM `<name>`, the prefix Maven derives from the artifactId and what its goal logs. */
+export interface PluginSpec {
+  artifactId: string;
+  name: string;
+  prefix: string;
+  marker: string;
+}
+
+export const HELLO_PLUGIN: PluginSpec = {
+  artifactId: PLUGIN_ARTIFACT_ID,
+  name: 'Hello Maven Plugin',
+  prefix: PLUGIN_PREFIX,
+  marker: PLUGIN_MARKER,
+};
+
+/** A second plugin of the same group, for the specs that publish two (RPS-1457). */
+export const BYE_PLUGIN: PluginSpec = {
+  artifactId: 'bye-maven-plugin',
+  name: 'Bye Maven Plugin',
+  prefix: 'bye',
+  marker: `E2E-BYE-PLUGIN-RAN-${randomUUID()}`,
+};
+
 export interface BuiltPlugin {
+  artifactId: string;
   jar: Buffer;
   pom: Buffer;
 }
 
-let built: Promise<BuiltPlugin> | undefined;
+const built = new Map<string, Promise<BuiltPlugin>>();
 
 async function render(template: string, dest: string, view: Record<string, unknown>) {
   const source = await fs.readFile(path.join(TEMPLATES_DIR, template), 'utf8');
@@ -65,19 +89,30 @@ async function render(template: string, dest: string, view: Record<string, unkno
   await fs.writeFile(dest, mustache.render(source, view), 'utf8');
 }
 
-/** The plugin's jar and POM, built by the real `mvn package` once per worker. */
+/** The hello plugin's jar and POM, built by the real `mvn package` once per worker. */
 export function buildHelloPlugin(): Promise<BuiltPlugin> {
-  built ??= (async () => {
+  return buildPlugin(HELLO_PLUGIN);
+}
+
+/** A plugin's jar and POM, built by the real `mvn package` once per worker and plugin. */
+export function buildPlugin(spec: PluginSpec): Promise<BuiltPlugin> {
+  const cached = built.get(spec.artifactId);
+  if (cached) {
+    return cached;
+  }
+
+  const build = (async () => {
     const { home, work } = await isolatedWorkDir('mvn-plugin-build');
     await render('plugin-pom.template.xml', path.join(work, 'pom.xml'), {
       groupId: PLUGIN_GROUP_ID,
-      artifactId: PLUGIN_ARTIFACT_ID,
+      artifactId: spec.artifactId,
       version: PLUGIN_VERSION,
+      name: spec.name,
     });
     await render(
       'HelloMojo.template.java',
       path.join(work, 'src/main/java/io/repsy/e2e/plugin/HelloMojo.java'),
-      { marker: PLUGIN_MARKER },
+      { marker: spec.marker },
     );
 
     const result = await run(
@@ -97,23 +132,24 @@ export function buildHelloPlugin(): Promise<BuiltPlugin> {
       },
     );
     if (result.exitCode !== 0) {
-      throw new Error(`mvn package of the hello plugin failed (exit ${result.exitCode})`);
+      throw new Error(`mvn package of ${spec.artifactId} failed (exit ${result.exitCode})`);
     }
 
     return {
-      jar: await fs.readFile(
-        path.join(work, 'target', `${PLUGIN_ARTIFACT_ID}-${PLUGIN_VERSION}.jar`),
-      ),
+      artifactId: spec.artifactId,
+      jar: await fs.readFile(path.join(work, 'target', `${spec.artifactId}-${PLUGIN_VERSION}.jar`)),
       pom: await fs.readFile(path.join(work, 'pom.xml')),
     };
   })();
 
-  return built;
+  built.set(spec.artifactId, build);
+
+  return build;
 }
 
 /** The path of a file of the plugin's version directory. */
-export function pluginFilePath(fileName: string): string {
-  return `${groupPath(PLUGIN_GROUP_ID)}/${PLUGIN_ARTIFACT_ID}/${PLUGIN_VERSION}/${fileName}`;
+export function pluginFilePath(fileName: string, artifactId = PLUGIN_ARTIFACT_ID): string {
+  return `${groupPath(PLUGIN_GROUP_ID)}/${artifactId}/${PLUGIN_VERSION}/${fileName}`;
 }
 
 /** The path of the group-level `maven-metadata.xml` of the plugin's group (or of one of its checksums). */
@@ -128,10 +164,16 @@ export async function uploadPluginFiles(
   plugin: BuiltPlugin,
 ): Promise<void> {
   for (const [name, body, type] of [
-    [`${PLUGIN_ARTIFACT_ID}-${PLUGIN_VERSION}.jar`, plugin.jar, 'application/java-archive'],
-    [`${PLUGIN_ARTIFACT_ID}-${PLUGIN_VERSION}.pom`, plugin.pom, 'application/octet-stream'],
+    [`${plugin.artifactId}-${PLUGIN_VERSION}.jar`, plugin.jar, 'application/java-archive'],
+    [`${plugin.artifactId}-${PLUGIN_VERSION}.pom`, plugin.pom, 'application/octet-stream'],
   ] as const) {
-    const res = await rawPut(repoName, credential, pluginFilePath(name), body, type);
+    const res = await rawPut(
+      repoName,
+      credential,
+      pluginFilePath(name, plugin.artifactId),
+      body,
+      type,
+    );
     if (res.status !== 200 && res.status !== 201) {
       throw new Error(`PUT ${name} to "${repoName}" answered ${res.status}`);
     }
@@ -150,6 +192,7 @@ const xmlEscape = (text: string): string =>
 export async function runPrefixGoal(
   repoName: string,
   credential: MaterializedCredential,
+  prefix = PLUGIN_PREFIX,
 ): Promise<RunResult> {
   const { home, work } = await isolatedWorkDir('mvn-prefix');
   const url = `${env.repoBaseUrl}/${repoName}`;
@@ -175,7 +218,7 @@ export async function runPrefixGoal(
       'settings.xml',
       `-Dmaven.repo.local=${path.join(home, 'repo-local')}`,
       `-Dmaven.repo.local.tail=${SHARED_M2_DIR}`,
-      `${PLUGIN_PREFIX}:hi`,
+      `${prefix}:hi`,
     ],
     {
       cwd: work,
