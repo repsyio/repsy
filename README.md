@@ -128,7 +128,9 @@ docker run \
 
 ## Vulnerability Scanning
 
-Repsy can scan pushed artifacts (Maven, npm, PyPI, Docker) for known vulnerabilities using a separate `repsy-scanner-trivy` service. This is **disabled by default** (`SECURITY_SCANNER=disabled`) and adds no dependency to a plain install. To enable it, run the `repsy-scanner-trivy` service (see [Option 3](#option-3-docker-compose-with-postgresql) and [`repsy-scanner-trivy/README.md`](./repsy-scanner-trivy/README.md)) and set `SECURITY_SCANNER=enabled` along with the `TRIVY_*`/`DOCKER_INTERNAL_REGISTRY_BASE_URL` variables above.
+Repsy can scan pushed artifacts (Maven, npm, PyPI, Docker) for known vulnerabilities using a separate `repsy-scanner-trivy` service. This is **disabled by default** (`SECURITY_SCANNER=disabled`) and adds no dependency to a plain install. To enable it, run the `repsy-scanner-trivy` service (see [Option 3](#option-3-docker-compose-with-postgresql) and [`repsy-scanner-trivy/README.md`](./repsy-scanner-trivy/README.md)) and set `SECURITY_SCANNER=enabled` along with the `TRIVY_*`/`DOCKER_INTERNAL_REGISTRY_BASE_URL` variables in [Environment Variables](#environment-variables).
+
+The scanner is published with every release as `repo.repsy.io/repsy/os/repsy-scanner-trivy`, under the same tags as the application image (`repo.repsy.io/repsy/os/repsy`): a release tag without the leading `v` (for example `26.10.0`) and `latest`. Run the application and the scanner of the **same release**: the HTTP contract between them (`POST /scan`, `GET /scan/{scanId}`, the `X-Scanner-Api-Key` header) is not versioned, so a mixed pair is not supported. [`examples/docker-compose.scanner.yml`](./examples/docker-compose.scanner.yml) is a complete Compose example (PostgreSQL, Repsy, the scanner and the `trivy-cache` volume) that pins both images with one `REPSY_VERSION`.
 
 Each repository has a security scan setting that controls whether newly pushed versions are scanned automatically. It does not block manual scans: a version can always be scanned on demand from the panel or with `POST /api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan`, even when the repository's setting is off.
 
@@ -235,15 +237,13 @@ volumes:
 
 #### Adding vulnerability scanning to the stack
 
-To enable vulnerability scanning, add the following service to your docker-compose.yml:
+To enable vulnerability scanning, add the following service to your docker-compose.yml (a complete file is [`examples/docker-compose.scanner.yml`](./examples/docker-compose.scanner.yml)). Use the same tag as your `repsy` service instead of `latest` when you pin a release:
 
 ```yaml
   repsy-scanner-trivy:
     container_name: repsy-scanner-trivy
     hostname: repsy-scanner-trivy
-    build:
-      context: ./repsy-scanner-trivy
-      dockerfile: Dockerfile
+    image: repo.repsy.io/repsy/os/repsy-scanner-trivy:latest
     environment:
       - SCANNER_API_KEY=${TRIVY_SCANNER_API_KEY:-changeme-trivy-api-key}
     ports:
@@ -424,9 +424,11 @@ and after the upgrade. A manifest whose file is missing or does not match its di
 | `H2_TCP_SERVER_PORT` | H2 TCP server port | `9092` |
 | `SECURITY_SCANNER` | Enables vulnerability scanning of pushed artifacts (`enabled`/`disabled`) | `disabled` |
 | `TRIVY_SCANNER_BASE_URL` | Base URL of the `repsy-scanner-trivy` service | `http://localhost:8090` |
-| `TRIVY_SCANNER_API_KEY` | Shared API key sent to the scanner service (must match its `SCANNER_API_KEY`) | *(empty)* |
+| `TRIVY_SCANNER_API_KEY` | Shared API key sent to the scanner service (must match its `SCANNER_API_KEY`). The scanner's own settings (`SCANNER_API_KEY`, `TRIVY_TIMEOUT_SECONDS`, `TRIVY_DB_REPOSITORY`, ...) are listed in [`repsy-scanner-trivy/README.md`](./repsy-scanner-trivy/README.md) | *(empty)* |
 | `DOCKER_INTERNAL_REGISTRY_BASE_URL` | Base URL the scanner uses to pull Docker images from this instance's own registry | `http://localhost:9090` |
-| `TRIVY_GATE_ACQUIRE_TIMEOUT_SECONDS` | Scanner-side: max time a queued scan waits to acquire the single-Trivy-execution gate | `60` |
+| `TRIVY_REQUEST_TIMEOUT_SECONDS` | Timeout of one HTTP request from Repsy to the scanner (submitting a scan, reading its status) | `10` |
+| `TRIVY_POLL_INTERVAL_MS` | How often Repsy asks the scanner for the status of an unfinished scan | `3000` |
+| `TRIVY_MAX_SCAN_DURATION_SECONDS` | How long Repsy waits for a scan to finish before it marks the scan failed | `330` |
 | `BASIC_AUTH_CACHE_ENABLED` | Remember successful HTTP Basic password checks, so a client that sends its username and password on every request pays for one password verification instead of one per request. See [Authenticating from CI](#authenticating-from-ci). | `true` |
 | `BASIC_AUTH_CACHE_TTL_SECONDS` | How long a remembered password check stays valid | `300` |
 | `BASIC_AUTH_CACHE_MAX_ENTRIES` | How many remembered password checks are kept | `10000` |

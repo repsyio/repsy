@@ -289,3 +289,6 @@ PR, or a clearly called-out part of one), and re-run the core install above afte
 only to a commit that is on `repsy-core`'s `main`, so merge the `repsy-core` PR first: a commit
 that only exists on a PR branch disappears from the remote when that branch is deleted on merge.
 `repsy-core` merges to `main` through the same merge queue flow described above.
+
+repsy-core releases are tags only (no published artifacts, RPS-1085). After a core release, bump
+`<parent><version>` in `pom.xml` together with the pointer.
