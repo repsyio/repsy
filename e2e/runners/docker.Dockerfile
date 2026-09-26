@@ -64,6 +64,28 @@ RUN case "${TARGETARCH:-amd64}" in \
  && echo "${sha}  /regctl" | sha256sum -c - \
  && chmod a+rx /regctl
 
+# oras v1.3.4 (2026-08-27, oras-project) is the fourth daemonless client (RPS-1478 part C): the OCI
+# artifact client (`oras push`/`pull`/`attach`/`discover`, the referrers API and its tag-schema
+# fallback). One release tarball per arch, verified against a pinned sha256 (Docker's TARGETARCH picks
+# the file), like regctl above.
+FROM debian:bookworm-slim AS oras-download
+ARG TARGETARCH
+ARG ORAS_VERSION=v1.3.4
+ARG ORAS_SHA256_AMD64=f27adb935022d94df8dc77719c322dda592c78a0d57a6f7dcdd8d900b248c454
+ARG ORAS_SHA256_ARM64=15702c6e3a4a56a8bd8ac5c17efdbcab56d9bada661ccbcf017f5b10c1d89399
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/*
+RUN case "${TARGETARCH:-amd64}" in \
+      amd64) sha="${ORAS_SHA256_AMD64}" ;; \
+      arm64) sha="${ORAS_SHA256_ARM64}" ;; \
+      *) echo "oras: no pinned checksum for ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+ && curl -fsSL -o /oras.tar.gz "https://github.com/oras-project/oras/releases/download/${ORAS_VERSION}/oras_${ORAS_VERSION#v}_linux_${TARGETARCH:-amd64}.tar.gz" \
+ && echo "${sha}  /oras.tar.gz" | sha256sum -c - \
+ && tar -xzf /oras.tar.gz -C / oras \
+ && chmod a+rx /oras
+
 # The docker runner: the harness itself (see base.Dockerfile) plus the `crane` binary copied in from
 # the stage above, nothing else. Its first layers intentionally repeat base.Dockerfile's rather than
 # `FROM` a separately built tag, for the same reason maven.Dockerfile's/npm.Dockerfile's/
@@ -105,5 +127,10 @@ RUN chmod a+rx /usr/local/bin/skopeo /usr/local/bin/regctl
 
 RUN skopeo --version | grep -F "${SKOPEO_VERSION#v}" \
  && regctl version | grep -F "${REGCTL_VERSION}"
+
+ARG ORAS_VERSION=v1.3.4
+COPY --from=oras-download /oras /usr/local/bin/oras
+RUN chmod a+rx /usr/local/bin/oras \
+ && oras version | grep -F "${ORAS_VERSION#v}"
 
 CMD ["./entrypoint.sh", "docker"]
