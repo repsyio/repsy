@@ -27,12 +27,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.TestPropertySource;
 
 /**
- * RPS-1102: once {@code app.allowed-origins} (env {@code APP_ALLOWED_ORIGINS}) is set, a
- * cross-origin preflight is allowed only for a configured origin and rejected for any other. See
- * {@link CorsConfigurationIT} for the unset (default) case, which today's deployments keep.
+ * RPS-1102, RPS-1590: {@code app.allowed-origins} (env {@code APP_ALLOWED_ORIGINS}) is the only
+ * thing that opens CORS on the panel API: a cross-origin preflight or request is allowed, with
+ * credentials, only for a configured origin and rejected for any other. See {@link
+ * CorsConfigurationIT} for the unset (default, same-origin only) case.
  */
 @TestPropertySource(properties = "APP_ALLOWED_ORIGINS=https://allowed.example.com")
-@DisplayName("CORS, app.allowed-origins configured (RPS-1102)")
+@DisplayName("CORS, app.allowed-origins configured (RPS-1102, RPS-1590)")
 class CorsConfigurationRestrictedIT extends AbstractIntegrationTest {
 
   private static final String ALLOWED_ORIGIN = "https://allowed.example.com";
@@ -59,6 +60,19 @@ class CorsConfigurationRestrictedIT extends AbstractIntegrationTest {
             options("/api/auth/login")
                 .header(HttpHeaders.ORIGIN, OTHER_ORIGIN)
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
+        .andExpect(status().isForbidden())
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+  }
+
+  @Test
+  @DisplayName("reflects the configured origin, and only it, on a plain API request")
+  void reflectsConfiguredOriginOnPlainApiRequest() throws Exception {
+
+    this.perform(get("/api/profile").header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN))
+        .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
+        .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
+
+    this.perform(get("/api/profile").header(HttpHeaders.ORIGIN, OTHER_ORIGIN))
         .andExpect(status().isForbidden())
         .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
   }

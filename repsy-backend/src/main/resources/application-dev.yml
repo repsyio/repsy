@@ -1,0 +1,8 @@
+# Active only under `mvn spring-boot:run` (repsy-backend/pom.xml sets the profile for that goal),
+# never in the packaged jar or the Docker image.
+app:
+  # The documented split dev setup serves the Angular dev server (`pnpm start`) from
+  # http://localhost:4200 and calls the API on :8080 cross-origin. With app.allowed-origins unset
+  # the API is same-origin only (RPS-1590), so allow the dev server here. An exported
+  # APP_ALLOWED_ORIGINS still wins.
+  allowed-origins: ${APP_ALLOWED_ORIGINS:http://localhost:4200}

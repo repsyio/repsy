@@ -20,7 +20,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -28,9 +30,13 @@ import org.springframework.web.filter.CorsFilter;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Allows the panel API to be called cross-origin, and only the panel API (RPS-1514). See {@link
- * AppCorsProperties} for how {@code app.allowed-origins} (env {@code APP_ALLOWED_ORIGINS})
- * restricts this; unset, it keeps today's behaviour of accepting any origin.
+ * Allows the panel API to be called cross-origin, and only the panel API (RPS-1514), and only from
+ * the origins {@code app.allowed-origins} (env {@code APP_ALLOWED_ORIGINS}) names (see {@link
+ * AppCorsProperties}). Unset (the default), the panel API is same-origin only: no CORS header is
+ * sent at all (RPS-1590), so a browser refuses to hand a cross-origin page the response. Nothing is
+ * registered in that case, not even an empty configuration, because Spring answers a cross-origin
+ * request against an empty configuration with {@code 403 Invalid CORS request}, which would also
+ * hit a same-origin request whose {@code Origin} a reverse proxy makes look foreign.
  *
  * <p>The repository-serving port sends no CORS header at all: no browser calls it cross-origin (the
  * panel's CSP {@code connect-src} names only its own origin and {@code app.allowed-origins}, and
@@ -44,7 +50,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class CorsGlobalConfiguration extends OncePerRequestFilter {
 
   private final @NonNull ApiPortMatcher apiPortMatcher;
-  private final @NonNull CorsFilter apiCorsFilter;
+  private final @Nullable CorsFilter apiCorsFilter;
 
   public CorsGlobalConfiguration(
       final @NonNull AppCorsProperties appCorsProperties,
@@ -52,8 +58,15 @@ public class CorsGlobalConfiguration extends OncePerRequestFilter {
 
     this.apiPortMatcher = apiPortMatcher;
 
+    final var allowedOrigins = appCorsProperties.allowedOriginList();
+
+    if (allowedOrigins.isEmpty()) {
+      this.apiCorsFilter = null;
+      return;
+    }
+
     final var source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", buildConfiguration(appCorsProperties));
+    source.registerCorsConfiguration("/**", buildConfiguration(allowedOrigins));
     this.apiCorsFilter = new CorsFilter(source);
   }
 
@@ -64,33 +77,26 @@ public class CorsGlobalConfiguration extends OncePerRequestFilter {
       final @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
-    if (!this.apiPortMatcher.isApiPort(request.getLocalPort())) {
+    final var corsFilter = this.apiCorsFilter;
+
+    if (corsFilter == null || !this.apiPortMatcher.isApiPort(request.getLocalPort())) {
       filterChain.doFilter(request, response);
       return;
     }
 
-    this.apiCorsFilter.doFilter(request, response, filterChain);
+    corsFilter.doFilter(request, response, filterChain);
   }
 
   private static @NonNull CorsConfiguration buildConfiguration(
-      final @NonNull AppCorsProperties appCorsProperties) {
+      final @NonNull List<String> allowedOrigins) {
 
     final var configuration = new CorsConfiguration();
     configuration.addAllowedMethod("*");
     configuration.addAllowedHeader("*");
     configuration.setAllowCredentials(true);
 
-    final var allowedOrigins = appCorsProperties.allowedOriginList();
-
-    if (allowedOrigins.isEmpty()) {
-      // No app.allowed-origins configured: keep today's behaviour. allowedOriginPatterns("*")
-      // (unlike allowedOrigins("*")) is allowed together with allowCredentials(true), since Spring
-      // reflects the request's actual Origin back instead of a literal "*".
-      configuration.addAllowedOriginPattern("*");
-    } else {
-      // allowCredentials(true) requires exact origins, not patterns, once the list is configured.
-      allowedOrigins.forEach(configuration::addAllowedOrigin);
-    }
+    // allowCredentials(true) requires exact origins, not patterns.
+    allowedOrigins.forEach(configuration::addAllowedOrigin);
 
     return configuration;
   }

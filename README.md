@@ -646,7 +646,7 @@ Deleting `1.0.0+a` when there is no such entry (the usual case) still deletes `1
 | `MULTIPART_MAX_REQUEST_SIZE` | Largest total size of a multipart request, all parts included. Keep it at least as large as `MULTIPART_MAX_FILE_SIZE` | `500MB` |
 | `RUBY_MAX_GEM_SIZE` | Largest gem a `gem push` may carry (the raw request body, so the multipart limits do not apply to it). A larger gem is answered with `413`. The gem is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. Accepts a size such as `100MB` or `1GB` | `500MB` |
 | `CARGO_MAX_CRATE_SIZE` | Largest `.crate` a `cargo publish` may carry (a length-prefixed field inside Cargo's own wire format, so neither the multipart limits nor `MULTIPART_MAX_FILE_SIZE` apply to it). A larger crate is answered with `413`. The crate is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. crates.io itself defaults to `10MB`; raise this if you publish larger internal crates. Accepts a size such as `100MB` or `1GB` | `100MB` |
-| `APP_ALLOWED_ORIGINS` | Comma-separated list of exact origins (e.g. `https://panel.example.com,https://panel-staging.example.com`) the panel API accepts cross-origin, credentialed requests from. Unset keeps today's behaviour: any origin is allowed. Set it once the panel is reachable from a known, fixed set of origins | *(empty, any origin allowed)* |
+| `APP_ALLOWED_ORIGINS` | Comma-separated list of exact origins (e.g. `https://panel.example.com,https://panel-staging.example.com`) the panel API accepts cross-origin, credentialed requests from. **Unset (the default) means same-origin only: the panel API sends no CORS headers**, which is what the Docker image needs, since it serves the panel and the API from one origin. Set it when the panel is served from a different origin than the API (a separately hosted SPA, or `API_BASE_URL` pointing elsewhere). The CSP `connect-src` names the same origins. See [Cross-Origin Requests (CORS)](#cross-origin-requests-cors) | *(empty, same-origin only)* |
 | `APP_HSTS_MAX_AGE` | `max-age` in seconds of a `Strict-Transport-Security` header. `0` or unset never sends it (the default). When positive, it is sent only on a secure request (a TLS listener, or a reverse proxy that forwards `X-Forwarded-Proto: https`), on both ports. HSTS applies to a whole host, not a port, so leave it off when the same host also serves the panel over plain HTTP (for example `:8080` plain beside `:8443` TLS). See [Security headers](#security-headers) | `0` (off) |
 | `APP_CSP_ENABLED` | Send a `Content-Security-Policy` header with the panel SPA and its static assets (JSON API responses are unaffected). See [Content Security Policy](#content-security-policy) | `true` |
 | `APP_CSP_REPORT_ONLY` | Send `Content-Security-Policy-Report-Only` instead of the enforcing header: violations are reported (in a browser that supports the Reporting API and is told where to send reports), nothing is blocked. Useful while rolling out a widened or replaced policy | `false` |
@@ -696,12 +696,21 @@ cross-origin from one of those origins is exactly what CORS was configured to al
 
 ### Cross-Origin Requests (CORS)
 
-The panel API allows any origin to make credentialed cross-origin requests by default, which
-matches the documented setups where the frontend and the API are served from different origins
-(UI on `:4200`, API on `:8080`; the Docker image injects `API_BASE_URL` at runtime). Set
-`APP_ALLOWED_ORIGINS` to a comma-separated list of exact origins (for example
-`https://panel.example.com`) to restrict this once the panel is reachable from a known, fixed set
-of origins. A preflight from any other origin is then rejected.
+By default the panel API is **same-origin only**: it sends no CORS headers, so a browser refuses to let a
+page on another origin read its responses. That is what the Docker image needs, since it serves the
+panel and the API from one origin (`API_BASE_URL` is empty).
+
+Set `APP_ALLOWED_ORIGINS` to a comma-separated list of exact origins (for example
+`https://panel.example.com`) when the panel is served from a different origin than the API: a
+separately hosted single-page app, or the Docker image started with `API_BASE_URL` pointing at
+another host. Exactly those origins are then allowed, with credentials; a request or preflight from
+any other origin is rejected with `403`. Before this default changed, an unset variable reflected any
+origin with credentials.
+
+For local development, `mvn spring-boot:run` activates the `dev` profile
+(`application-dev.yml`), which sets `APP_ALLOWED_ORIGINS` to `http://localhost:4200`, the Angular dev
+server (`pnpm start`), unless you export the variable yourself. A packaged jar or image never
+activates it.
 
 This applies to the panel API port only. The repository port (`9090`, the one `mvn`, `npm`, `docker`
 and the other package-manager clients talk to) sends no CORS headers at all: no browser calls it
@@ -1352,6 +1361,7 @@ pnpm start
 
 Access development environment:
 - **Frontend (Web UI)**: http://localhost:4200 (with hot reload)
+  (`mvn spring-boot:run` activates the `dev` profile, which lets the dev server at `:4200` call the API cross-origin; see [Cross-Origin Requests (CORS)](#cross-origin-requests-cors))
 - **Backend API**: http://localhost:8080
 - **Repository Operations**: http://localhost:9090
 - To inspect the embedded H2 database directly, stop the app and open the database file with the H2 shell (see "Troubleshooting" below) — the TCP server (`H2_TCP_SERVER_ENABLED=true`) only binds inside the container/host loopback, so it is not reachable from an external client and is not a supported inspection path

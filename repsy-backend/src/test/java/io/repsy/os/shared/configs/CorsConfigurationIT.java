@@ -18,7 +18,6 @@ package io.repsy.os.shared.configs;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
@@ -26,16 +25,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 
 /**
- * RPS-1102: without {@code app.allowed-origins} configured (the default context every other IT
- * class shares), a cross-origin preflight is allowed for any origin, exactly like before this
- * property existed. See {@link CorsConfigurationRestrictedIT} for the configured case.
+ * RPS-1590: without {@code app.allowed-origins} configured (the default context every other IT
+ * class shares) the panel API is same-origin only: no CORS header for any origin, and a preflight
+ * is not answered with CORS headers. Before RPS-1590 (and RPS-1102) it reflected any origin with
+ * credentials. See {@link CorsConfigurationRestrictedIT} for the configured case.
  */
-@DisplayName("CORS, app.allowed-origins unset (RPS-1102)")
+@DisplayName("CORS, app.allowed-origins unset (RPS-1590)")
 class CorsConfigurationIT extends AbstractIntegrationTest {
 
   @Test
-  @DisplayName("allows a preflight from any origin")
-  void allowsPreflightFromAnyOrigin() throws Exception {
+  @DisplayName("does not answer a preflight from any origin with CORS headers")
+  void doesNotAnswerPreflightWithCorsHeaders() throws Exception {
 
     final var origin = "https://anything.example.com";
 
@@ -43,9 +43,9 @@ class CorsConfigurationIT extends AbstractIntegrationTest {
             options("/api/auth/login")
                 .header(HttpHeaders.ORIGIN, origin)
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
-        .andExpect(status().isOk())
-        .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin))
-        .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN))
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS))
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS));
   }
 
   // RPS-1514: the repository port sends no CORS header at all, whatever the origin.
@@ -72,12 +72,11 @@ class CorsConfigurationIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("still reflects the origin on a plain API request, not only on a preflight")
-  void reflectsOriginOnPlainApiRequest() throws Exception {
+  @DisplayName("sends no CORS header on a plain cross-origin API request either")
+  void sendsNoCorsHeaderOnPlainApiRequest() throws Exception {
 
-    final var origin = "https://anything.example.com";
-
-    this.perform(get("/api/profile").header(HttpHeaders.ORIGIN, origin))
-        .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin));
+    this.perform(get("/api/profile").header(HttpHeaders.ORIGIN, "https://anything.example.com"))
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN))
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
   }
 }

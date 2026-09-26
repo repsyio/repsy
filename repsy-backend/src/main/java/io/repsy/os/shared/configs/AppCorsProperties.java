@@ -24,18 +24,19 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Origins the panel API accepts cross-origin requests from (see {@code CorsGlobalConfiguration}).
  *
- * <p>Unset (the default) keeps today's behaviour: any origin is allowed via {@code
- * allowedOriginPatterns("*")} together with credentials. The frontend and the API are served from
- * different origins in the documented setups (UI on :4200, API on :8080; the Docker image injects
- * {@code API_BASE_URL} at runtime), so restricting origins is opt-in rather than the default.
+ * <p>Unset (the default) means same-origin only: the panel API sends no CORS header, so a browser
+ * blocks a page on another origin from reading its responses (RPS-1590). The Docker image serves
+ * the SPA and the API from one origin ({@code API_BASE_URL} empty), which needs no CORS. A split
+ * setup (the Angular dev server on :4200 against the API on :8080, or a SPA hosted elsewhere) must
+ * name the SPA's origin here, for example {@code APP_ALLOWED_ORIGINS=http://localhost:4200}.
  *
- * <p>Once set, {@code allowedOrigins(...)} is used instead of a wildcard pattern, because Spring
- * only allows exact origins (not patterns) together with {@code allowCredentials(true)}.
+ * <p>Once set, exactly the listed origins are allowed, with credentials, because Spring only allows
+ * exact origins (not patterns) together with {@code allowCredentials(true)}.
  *
  * <p>Bound as a single, comma-separated string (rather than a {@code List<String>}) so an unset
  * {@code APP_ALLOWED_ORIGINS} resolves to an empty string and therefore an empty list; a
  * property-source list binding would instead have bound the empty string to a one-element list
- * holding an empty origin, silently switching CORS from "any origin" to "no origin".
+ * holding an empty origin, silently opening CORS to a blank origin.
  *
  * @param allowedOrigins comma-separated exact origins (for example {@code
  *     https://panel.example.com,https://panel-staging.example.com}), empty unless {@code
