@@ -44,6 +44,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -143,7 +144,7 @@ class AbstractCargoSearchProtocolMethodHandlerTest {
 
       final var pageable = ArgumentCaptor.forClass(Pageable.class);
       verify(facade).search(eq(ctx), eq(""), pageable.capture());
-      assertThat(pageable.getValue()).isEqualTo(PageRequest.of(0, 10));
+      assertThat(pageable.getValue()).isEqualTo(PageRequest.of(0, 10, Sort.by("name")));
       assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
@@ -157,14 +158,15 @@ class AbstractCargoSearchProtocolMethodHandlerTest {
       request.setParameter("q", "ser");
       request.setParameter("per_page", "20");
       request.setParameter("page", "3");
+      final var sort = Sort.by("name");
       when(facade.search(eq(ctx), eq("ser"), any(Pageable.class)))
-          .thenReturn(new PageImpl<>(List.of(item), PageRequest.of(2, 20), 41));
+          .thenReturn(new PageImpl<>(List.of(item), PageRequest.of(2, 20, sort), 41));
 
       final var result = handler.handle(ctx, request, new MockHttpServletResponse());
 
       final var pageable = ArgumentCaptor.forClass(Pageable.class);
       verify(facade).search(eq(ctx), eq("ser"), pageable.capture());
-      assertThat(pageable.getValue()).isEqualTo(PageRequest.of(2, 20));
+      assertThat(pageable.getValue()).isEqualTo(PageRequest.of(2, 20, sort));
 
       final var body = (Map<String, Object>) result.getBody();
       assertThat(body).containsEntry("crates", List.of(item));
@@ -185,12 +187,12 @@ class AbstractCargoSearchProtocolMethodHandlerTest {
 
       final var pageable = ArgumentCaptor.forClass(Pageable.class);
       verify(facade).search(eq(ctx), eq(""), pageable.capture());
-      assertThat(pageable.getValue()).isEqualTo(PageRequest.of(0, 100));
+      assertThat(pageable.getValue()).isEqualTo(PageRequest.of(0, 100, Sort.by("name")));
     }
 
     @Test
-    @DisplayName("returns 400 with a cargo error body for invalid pagination")
-    void returnsBadRequestOnInvalidParameter() {
+    @DisplayName("returns 400 with a cargo error body for invalid per_page parameter")
+    void returnsBadRequestOnInvalidPerPage() {
       final var request = new MockHttpServletRequest("GET", SEARCH_PATH);
       request.setParameter("per_page", "abc");
 
@@ -198,8 +200,113 @@ class AbstractCargoSearchProtocolMethodHandlerTest {
           handler.handle(context(SEARCH_PATH), request, new MockHttpServletResponse());
 
       assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(errorDetail(result)).contains("abc");
+      assertThat(errorDetail(result)).isEqualTo("per_page must be a whole number");
       verifyNoInteractions(facade);
+    }
+
+    @Test
+    @DisplayName("returns 400 with a cargo error body for invalid page parameter")
+    void returnsBadRequestOnInvalidPage() {
+      final var request = new MockHttpServletRequest("GET", SEARCH_PATH);
+      request.setParameter("page", "xyz");
+
+      final var result =
+          handler.handle(context(SEARCH_PATH), request, new MockHttpServletResponse());
+
+      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(errorDetail(result)).isEqualTo("page must be a whole number");
+      verifyNoInteractions(facade);
+    }
+
+    @Test
+    @DisplayName("returns empty crates list with total count when per_page=0")
+    @SuppressWarnings("unchecked")
+    void returnsEmptyListWhenPerPageIsZero() {
+      final var ctx = context(SEARCH_PATH);
+      final var request = new MockHttpServletRequest("GET", SEARCH_PATH);
+      request.setParameter("q", "ser");
+      request.setParameter("per_page", "0");
+      when(facade.search(eq(ctx), eq("ser"), any(Pageable.class)))
+          .thenReturn(
+              new PageImpl<>(
+                  List.of(new CrateListItem("serde", "1.0.0", 42L, "desc", Instant.EPOCH)),
+                  PageRequest.of(0, 1, Sort.by("name")),
+                  2));
+
+      final var result = handler.handle(ctx, request, new MockHttpServletResponse());
+
+      final var body = (Map<String, Object>) result.getBody();
+      assertThat(body).containsEntry("crates", List.of());
+      assertThat((Map<String, Object>) body.get("meta")).containsEntry("total", 2L);
+      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+      final var pageable = ArgumentCaptor.forClass(Pageable.class);
+      verify(facade).search(eq(ctx), eq("ser"), pageable.capture());
+      assertThat(pageable.getValue()).isEqualTo(PageRequest.of(0, 1, Sort.by("name")));
+    }
+
+    @Test
+    @DisplayName("clamps a negative per_page to 1, as before")
+    void clampsNegativePerPage() {
+      final var ctx = context(SEARCH_PATH);
+      final var request = new MockHttpServletRequest("GET", SEARCH_PATH);
+      request.setParameter("per_page", "-5");
+      when(facade.search(eq(ctx), eq(""), any(Pageable.class)))
+          .thenReturn(new PageImpl<>(List.of()));
+
+      handler.handle(ctx, request, new MockHttpServletResponse());
+
+      final var pageable = ArgumentCaptor.forClass(Pageable.class);
+      verify(facade).search(eq(ctx), eq(""), pageable.capture());
+      assertThat(pageable.getValue()).isEqualTo(PageRequest.of(0, 1, Sort.by("name")));
+    }
+
+    @Test
+    @DisplayName("returns 400 for numbers that do not fit an int, without parse details")
+    void rejectsOutOfRangeNumbers() {
+      final var request = new MockHttpServletRequest("GET", SEARCH_PATH);
+      request.setParameter("per_page", "99999999999");
+
+      final var result =
+          handler.handle(context(SEARCH_PATH), request, new MockHttpServletResponse());
+
+      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(errorDetail(result)).isEqualTo("per_page must be a whole number");
+      verifyNoInteractions(facade);
+    }
+
+    @Test
+    @DisplayName("answers 400 with a fixed message, not the exception's, when the search fails")
+    void doesNotLeakTheExceptionMessage() {
+      final var ctx = context(SEARCH_PATH);
+      when(facade.search(eq(ctx), eq(""), any(Pageable.class)))
+          .thenThrow(new IllegalStateException("could not execute query: select * from secret"));
+
+      final var result =
+          handler.handle(
+              ctx, new MockHttpServletRequest("GET", SEARCH_PATH), new MockHttpServletResponse());
+
+      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(errorDetail(result)).isEqualTo("Search failed");
+    }
+
+    @Test
+    @DisplayName("sorts results by name")
+    @SuppressWarnings("unchecked")
+    void sortsByName() {
+      final var ctx = context(SEARCH_PATH);
+      final var request = new MockHttpServletRequest("GET", SEARCH_PATH);
+      request.setParameter("q", "");
+      request.setParameter("per_page", "10");
+      final var sort = Sort.by("name");
+      when(facade.search(eq(ctx), eq(""), any(Pageable.class)))
+          .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10, sort), 0));
+
+      handler.handle(ctx, request, new MockHttpServletResponse());
+
+      final var pageable = ArgumentCaptor.forClass(Pageable.class);
+      verify(facade).search(eq(ctx), eq(""), pageable.capture());
+      assertThat(pageable.getValue().getSort()).isEqualTo(sort);
     }
   }
 }
