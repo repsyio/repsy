@@ -23,10 +23,13 @@ import 'dotenv/config';
  *  - ci:     a pipeline-started stack, same freedoms as `local`.
  *  - remote: an already-running instance the harness does not own or reset; nothing global on it
  *            (the `admin` user, the default repos) is ever touched.
+ *  - cloud-remote, cloud-local (RPS-1498): Repsy Cloud instead of Repsy OS, a deployed environment or one
+ *            started next to the harness. The harness never owns or resets either (see `target.ts`
+ *            for what differs from the OS targets).
  */
-export type RepsyTarget = 'local' | 'remote' | 'ci';
+export type RepsyTarget = 'local' | 'remote' | 'ci' | 'cloud-remote' | 'cloud-local';
 
-const TARGETS: readonly RepsyTarget[] = ['local', 'remote', 'ci'];
+const TARGETS: readonly RepsyTarget[] = ['local', 'remote', 'ci', 'cloud-remote', 'cloud-local'];
 
 export interface Env {
   apiBaseUrl: string;

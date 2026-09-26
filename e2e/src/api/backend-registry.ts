@@ -21,8 +21,10 @@
  *     working directory, a `file:` URL or a package name) that is `import()`ed. It exports a factory
  *     `createPanelBackend(baseUrl: string): PanelBackend | Promise<PanelBackend>` as its named export
  *     of that name or as its default export.
- *  2. Otherwise `env.target` picks a built-in backend. Every current target (`local`, `ci`, `remote`)
- *     is a Repsy OS instance, so that is `OsPanelBackend`.
+ *  2. Otherwise `env.target` picks a built-in backend. `local`, `ci` and `remote` are Repsy OS
+ *     instances, so that is `OsPanelBackend`. The Repsy Cloud targets (`cloud-remote`, `cloud-local`,
+ *     RPS-1498) have none in this repository: their backend is a module (1), supplied by the
+ *     repository that owns Repsy Cloud, and a run without one fails with a message saying so.
  *
  * Playwright re-imports the test files (and everything they import) in every worker process, so the
  * backend cannot be registered once from `playwright.config.ts`: a registration made there would not
@@ -45,7 +47,16 @@ const BUILT_IN: Record<RepsyTarget, () => Promise<PanelBackendFactory>> = {
   local: builtInOs,
   ci: builtInOs,
   remote: builtInOs,
+  'cloud-remote': noBuiltInCloud,
+  'cloud-local': noBuiltInCloud,
 };
+
+async function noBuiltInCloud(): Promise<PanelBackendFactory> {
+  throw new Error(
+    `REPSY_TARGET="${env.target}" is a Repsy Cloud target, which has no built-in panel backend: ` +
+      `set ${BACKEND_MODULE_ENV} to the module that exports \`createPanelBackend\``,
+  );
+}
 
 async function builtInOs(): Promise<PanelBackendFactory> {
   const { OsPanelBackend } = await import('./os-panel-backend.js');

@@ -141,7 +141,7 @@ const wrong = (user: SeededUser): { username: string; password: string } => ({
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-test.describe('auth throttle on the wire', { tag: '@throttle' }, () => {
+test.describe('auth throttle on the wire', { tag: ['@throttle', '@cloud-skip'] }, () => {
   // eslint-disable-next-line playwright/no-skipped-test -- the local-only guard of every tests/stack spec
   test.skip(!target.ownsStack || target.isRemote, 'needs a stack this harness owns');
   // eslint-disable-next-line playwright/no-skipped-test -- the opt-in switch of README.md "Stack overlays"

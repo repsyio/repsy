@@ -31,8 +31,10 @@
 import type { PanelClient, RepoType as GeneratedRepoType } from './generated/index.js';
 import type { PagedModelRepoListInfo } from './generated/models/PagedModelRepoListInfo.js';
 import type { UserCreateForm } from './generated/models/UserCreateForm.js';
+import type { MaterializedCredential } from '../scenarios/world.js';
 import {
   type ArtifactVersionInfo,
+  type CredentialSeedContext,
   type DeployTokenForm,
   type DeployTokenInfoListItem,
   type DeployTokenPage,
@@ -59,6 +61,8 @@ import {
 } from './panel-backend.js';
 
 type Generated = typeof import('./generated/index.js');
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The panel's own query shapes, whose `RepoType` is the generated enum (see `RepoType` in panel-backend). */
 type GeneratedRepoTypeFilter = { repoType?: GeneratedRepoType; repoName?: string };
@@ -132,6 +136,29 @@ export class OsPanelBackend implements PanelBackend {
       throw new PanelApiError('OsPanelBackend.login() must succeed before an authenticated call');
     }
     return `Bearer ${this.token}`;
+  }
+
+  /** A plain `USER` account: the seeder creates it and deletes it at cleanup. */
+  async seedUserCredential({ seeder }: CredentialSeedContext): Promise<MaterializedCredential> {
+    const user = await seeder.createUser();
+    return {
+      transport: 'basic',
+      username: user.username,
+      password: user.password,
+      kind: 'password',
+    };
+  }
+
+  /** A token created with an expiration date in the past: the server accepts it (`past-date`). */
+  async seedExpiredTokenCredential({
+    seeder,
+    repoName,
+  }: CredentialSeedContext): Promise<MaterializedCredential> {
+    const token = await seeder.createToken(repoName, {
+      readOnly: false,
+      expirationDate: new Date(Date.now() - ONE_DAY_MS),
+    });
+    return { transport: 'basic', username: token.username, password: token.token, kind: 'token' };
   }
 
   /** `POST /api/users`. Repsy OS has roles only: `permissions` is a Repsy Cloud concept. */

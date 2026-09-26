@@ -52,19 +52,29 @@
  * scenario, side and outcome with the pinned quirk (the client exits 0); the raw outcome above it is
  * still the probed HTTP status, and `expectNothingStored` still proves the refusal was real.
  *
- * Remote hardening (plan section "Execution targets", "Remote specifics"): on a `remote` target,
- * `@local-only` scenarios are skipped, and `@negative` scenarios run serially, each reserving a slot
- * from a `RemoteAuthBudget` (one per protocol, scoped to this function's closure) first, so their
- * failed-auth attempts stay under the server's own throttle instead of tripping it for every client
- * behind the same address.
+ * Remote hardening (plan section "Execution targets", "Remote specifics"): on a `remote` target
+ * (every Repsy Cloud target counts, `target.isRemote`), `@local-only` scenarios are skipped, and
+ * `@negative` scenarios run serially, each reserving a slot from a `RemoteAuthBudget` (one per
+ * protocol, scoped to this function's closure) first, so their failed-auth attempts stay under the
+ * server's own throttle instead of tripping it for every client behind the same address.
+ *
+ * Target seam (RPS-1498). What differs by target is supplied by the target's `PanelBackend`, never
+ * put into the catalog: `expectByTarget` overlays the outcomes (`expectationFor`), and
+ * `knownGap(protocol, scenarioId, side)` names a scenario side that is expected to fail. The loop
+ * asks `knownGap` BEFORE that side runs and before every `adapter.known*` hook, and marks the test
+ * `test.fail`: a pinned gap that starts passing fails the run ("Expected to fail, but passed"), so
+ * the entry is flipped in the same change as the bump that fixed it. The adapter hooks receive the
+ * target's capabilities. On a Repsy Cloud target a `@cloud-skip` scenario is skipped, and a credential
+ * the target cannot seed (`fixtures.ts`) skips its scenario with a reason.
  */
+import type { PanelBackend } from '../api/panel-backend.js';
 import type { AdapterResult, ProtocolAdapter } from './adapter.js';
 import { SCENARIOS } from './catalog.js';
 import { expect, test } from './fixtures.js';
 import { RemoteAuthBudget } from './remote-throttle.js';
 import type { Outcome, Scenario } from './types.js';
 import { expectationFor, scenariosFor } from './types.js';
-import { target } from '../target.js';
+import { target, type TargetCapabilities } from '../target.js';
 import type { World } from './world.js';
 
 function expectOutcome(adapter: ProtocolAdapter, result: AdapterResult, expected: Outcome): void {
@@ -88,9 +98,12 @@ function expectClientAgrees(
   scenario: Scenario,
   side: 'publish' | 'consume',
   what: string,
+  caps: TargetCapabilities,
 ): void {
   const quirk =
-    expected === 'ok' ? undefined : adapter.knownClientExitDisagreement?.(scenario, side, expected);
+    expected === 'ok'
+      ? undefined
+      : adapter.knownClientExitDisagreement?.(scenario, side, expected, caps);
   if (quirk) {
     // A documented client quirk (RPS-1330): the refusal is real (the raw outcome above), the client
     // says success anyway. Pinned as it is, so a client that starts failing the request shows here.
@@ -127,15 +140,45 @@ function expectResolvedContent(w: World, published: AdapterResult, resolved: Ada
   ).toBe(expected);
 }
 
+export interface PublishConsumeLoopOptions {
+  /** The scenarios to register; the whole shared catalog when left out. A spec of the harness itself passes a few. */
+  scenarios?: readonly Scenario[];
+  /**
+   * The capabilities of the target, `target.ts`'s of this run when left out. A spec that stands a fake
+   * target in also does `test.use({ targetCapabilities })` with the same object, for the fixtures.
+   */
+  target?: TargetCapabilities;
+}
+
+/** Marks the test as expected to fail when `backend` pins a known gap for this side of the scenario. */
+function applyKnownGap(
+  backend: PanelBackend,
+  protocol: string,
+  scenario: Scenario,
+  side: 'publish' | 'consume',
+): void {
+  const gap = backend.knownGap?.(protocol, scenario.id, side);
+  if (gap) {
+    test.fail(true, gap);
+  }
+}
+
 /** Registers the whole scenario catalog for `adapter.protocol`, as two `test.describe` blocks. */
-export function registerPublishConsumeLoop<F>(adapter: ProtocolAdapter<F>): void {
+export function registerPublishConsumeLoop<F>(
+  adapter: ProtocolAdapter<F>,
+  options: PublishConsumeLoopOptions = {},
+): void {
+  const caps = options.target ?? target;
   const remoteAuthBudget = new RemoteAuthBudget();
   // `npm[pnpm]` when the adapter names a client (RPS-1330), plain `npm` otherwise.
   const title = adapter.label ? `${adapter.protocol}[${adapter.label}]` : adapter.protocol;
 
   /** Publishes, then resolves, and checks everything the catalog pins for `scenario`. */
-  async function runScenario(w: World, scenario: Scenario): Promise<void> {
-    const expectation = expectationFor(scenario, adapter.protocol);
+  async function runScenario(w: World, scenario: Scenario, backend: PanelBackend): Promise<void> {
+    const expectation = expectationFor(scenario, adapter.protocol, backend.expectByTarget);
+
+    // Before anything of the publish side runs (its fingerprint included), see `applyKnownGap`.
+    applyKnownGap(backend, adapter.protocol, scenario, 'publish');
 
     // The state a refused publish must leave untouched: taken after the fixture seeded and
     // configured the repo, right before the scenario's own publish.
@@ -150,22 +193,24 @@ export function registerPublishConsumeLoop<F>(adapter: ProtocolAdapter<F>): void
       scenario,
       'publish',
       adapter.client.publishVerb,
+      caps,
     );
     if (before !== undefined) {
-      const knownSideEffect = adapter.knownPublishSideEffect?.(scenario);
+      const knownSideEffect = adapter.knownPublishSideEffect?.(scenario, caps);
       if (knownSideEffect) {
         test.fail(true, knownSideEffect);
       }
       await adapter.expectNothingStored(w, before);
     }
 
+    applyKnownGap(backend, adapter.protocol, scenario, 'consume');
     const resolved = await adapter.resolve(w);
     expectOutcome(adapter, resolved, expectation.consume);
 
     // RPS-1205-style routing-around: only the remaining consume-side checks (client exit code,
     // content equality) become an expected failure -- the raw-probe-based outcome above already ran
     // and was asserted for real.
-    const knownFailure = adapter.knownConsumeFailure?.(scenario);
+    const knownFailure = adapter.knownConsumeFailure?.(scenario, caps);
     if (knownFailure) {
       test.fail(true, knownFailure);
     }
@@ -177,6 +222,7 @@ export function registerPublishConsumeLoop<F>(adapter: ProtocolAdapter<F>): void
       scenario,
       'consume',
       adapter.client.consumeVerb,
+      caps,
     );
 
     if (expectation.consume === 'ok') {
@@ -191,22 +237,26 @@ export function registerPublishConsumeLoop<F>(adapter: ProtocolAdapter<F>): void
     test(
       `${title} > ${scenario.id}`,
       { tag: [...scenario.tags, ...(adapter.tags ?? [])] },
-      async ({ world }) => {
+      async ({ world, panelApi }) => {
         test.skip(
-          target.isRemote && scenario.tags.includes('@local-only'),
+          caps.isRemote && scenario.tags.includes('@local-only'),
           'a @local-only scenario is skipped on a remote target',
         );
+        test.skip(
+          caps.kind === 'cloud' && scenario.tags.includes('@cloud-skip'),
+          'a @cloud-skip scenario is skipped on a Repsy Cloud target',
+        );
 
-        if (target.isRemote && scenario.tags.includes('@negative')) {
+        if (caps.isRemote && scenario.tags.includes('@negative')) {
           await remoteAuthBudget.reserve();
         }
 
-        await runScenario(await world(scenario, adapter), scenario);
+        await runScenario(await world(scenario, adapter), scenario, panelApi);
       },
     );
   }
 
-  const scenarios = scenariosFor(SCENARIOS, adapter.protocol);
+  const scenarios = scenariosFor(options.scenarios ?? SCENARIOS, adapter.protocol);
   const negativeScenarios = scenarios.filter((scenario) => scenario.tags.includes('@negative'));
   const otherScenarios = scenarios.filter((scenario) => !scenario.tags.includes('@negative'));
 
@@ -220,7 +270,7 @@ export function registerPublishConsumeLoop<F>(adapter: ProtocolAdapter<F>): void
     // Parallel on local/ci (the stack's own throttle is raised for exactly this, see
     // docker-compose.stack.yml); serial on remote, where it cannot be, so these scenarios' failed-auth
     // attempts spend the RemoteAuthBudget one at a time instead of bursting together.
-    test.describe.configure({ mode: target.isRemote ? 'serial' : 'parallel' });
+    test.describe.configure({ mode: caps.isRemote ? 'serial' : 'parallel' });
 
     for (const scenario of negativeScenarios) {
       registerScenario(scenario);

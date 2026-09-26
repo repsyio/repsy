@@ -103,7 +103,7 @@ e2e/
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
-    target.ts                  # capabilities derived from REPSY_TARGET, and the URL scheme (`repo` | `owner-repo`)
+    target.ts                  # capabilities derived from REPSY_TARGET: OS or Repsy Cloud (`kind`, the URL scheme `repo` | `owner-repo`, token and user model, plan limits), see "Targets"
     repo-url.ts                # repoPath/repoUrl/imageRef/v2Url/v2RepoUrl: the one place a repository's protocol URL is built, see "Repository URLs"
     api/
       panel-backend.ts         # the `PanelBackend` interface every panel operation goes through, plus `RepoType`, `UserRole`, `UserSpec`, `PanelHttpError`, `UnsupportedPanelOperation` (no runtime import of the generated client)
@@ -134,7 +134,7 @@ e2e/
       stack.ts                  # findRepsyContainer()/dockerExec()/logLinesContaining(), restartRepsy()/crashRepsy()/recreateRepsy()/restoreStack(): docker exec, logs, restart and compose recreate of the local stack's Repsy container ("Stack runner")
       exec.ts                   # execa wrapper: isolated work dir/HOME, redacted logs, attach-on-fail, an explicit env is the child's whole env
       client-env.ts             # clientEnv(): the allow-list environment every client runs in (RPS-1446); env-probe.ts reads it back for the sealed-env specs
-      raw-http.ts                # shared raw-HTTP building blocks: RawResponse, adminCredential(), authHeader(), sha256Hex, 429 backoff
+      raw-http.ts                # shared raw-HTTP building blocks: RawResponse, ownerCredential() (alias adminCredential()), authHeader(), sha256Hex, 429 backoff
       maven.ts                  # the maven client: publish()/resolve()/seedPublish(), raw-HTTP status pinning
       maven-raw.ts              # maven-specific raw PUT/GET, repo-tree fingerprint, maven-metadata.xml builders/parsers
       maven-checks.ts            # expectNothingStored / expectSnapshotFollowedThroughMetadata
@@ -198,6 +198,7 @@ e2e/
     ui/                         # the panel UI suite (Playwright + headless Chromium): smoke.spec.ts (@smoke) and harness.spec.ts, one folder per area from here on -- see "UI suite"
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe; both tests tagged @smoke
     skeleton/backend-module.spec.ts  # RPS-1495 the panel backend registry: `REPSY_E2E_BACKEND_MODULE` picks an external backend (`fake-panel-backend.ts`, in memory, no server), also for the `panelApi`/`seeder` fixtures; `UnsupportedPanelOperation`
+    skeleton/cloud-target.spec.ts    # RPS-1498 the Repsy Cloud target seam: capabilities, expectation overlay, credentials a target cannot seed, known gaps, and the real scenario loop on a fake cloud backend (`fake-cloud-panel-backend.ts`); three of its tests are skipped ON PURPOSE (they are the skip paths)
     skeleton/repo-settings.spec.ts  # RPS-1200 settings-PUT field-by-field matrix across RepoTypes; untagged (not smoke-sized)
     skeleton/repo-type-casing.spec.ts  # RPS-1269 repo type: /format answers upper case; type accepted in any case (query and body)
     skeleton/login-password.spec.ts  # RPS-1308 POST /api/auth/login: a wrong password of any strength is 401 invalidCredentials; malformed shapes stay 400
@@ -288,35 +289,35 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 
 ## Environment
 
-| Variable                      | Default                    | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ----------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REPSY_API_BASE_URL`          | `http://localhost:8080`    | panel API. Unset, it follows `REPSY_E2E_PORT_OFFSET` (`8080 + offset`); a value set here wins over the offset (see "Parallel stacks")                                                                                                                                                                                                                                                                                                    |
-| `REPSY_REPO_BASE_URL`         | `http://localhost:9090`    | repository/protocol operations. Unset, it follows `REPSY_E2E_PORT_OFFSET` (`9090 + offset`); the stack also prints it in the panel's client snippets                                                                                                                                                                                                                                                                                     |
-| `REPSY_ADMIN_USERNAME`        | `admin`                    |                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `REPSY_ADMIN_PASSWORD`        | _(none — required)_        | must match the target's admin password                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `REPSY_TARGET`                | `local`                    | `local` \| `remote` \| `ci` — see Targets below                                                                                                                                                                                                                                                                                                                                                                                          |
-| `REPSY_E2E_BACKEND_MODULE`    | _(unset — built-in)_       | module that supplies the panel backend instead of the built-in Repsy OS one: a path the runner can read (absolute, or relative to the working directory), a `file:` URL or a package name; exports `createPanelBackend(baseUrl)`. See "Panel backend" below                                                                                                                                                                              |
-| `REPSY_E2E_URL_SCHEME`        | `repo`                     | `repo` \| `owner-repo`: how a repository is addressed in a protocol URL, see "Repository URLs"                                                                                                                                                                                                                                                                                                                                           |
-| `REPSY_REPO_OWNER`            | _(unset)_                  | the `<owner>` of `/<owner>/<repo>/...` URLs; required, and read, only with `REPSY_E2E_URL_SCHEME=owner-repo`                                                                                                                                                                                                                                                                                                                             |
-| `REPSY_E2E_RUN_ID`            | random 6-char lowercase id | shared by every runner in one `run.sh test`                                                                                                                                                                                                                                                                                                                                                                                              |
-| `REPSY_E2E_STACK`             | _(unset — postgres)_       | `local up\|down` stack profile: unset/anything but `h2` is the postgres profile, `h2` is the embedded-H2 profile; equivalent to `--h2` on the command line. Unread by `run.sh test`, which is identical against either profile — see "Stack profiles" below                                                                                                                                                                              |
-| `REPSY_E2E_PROJECT`           | `repsy-e2e`                | compose project of the local stack (`local up\|down`, `test`, `sweep`, all of which follow it); also `--project NAME`. "Parallel stacks"                                                                                                                                                                                                                                                                                                 |
-| `REPSY_E2E_PORT_OFFSET`       | `0`                        | added to the stack's host ports 8080 (panel API), 9090 (repo protocols) and 8090 (stub scanner); also `--port-offset N`. "Parallel stacks"                                                                                                                                                                                                                                                                                               |
-| `REPSY_E2E_FORCE`             | _(unset)_                  | `1` lets `local up\|down` take over a project or host port held by a stack started from another checkout (same as `--force`)                                                                                                                                                                                                                                                                                                             |
-| `REPSY_UI_BASE_URL`           | _(REPSY_API_BASE_URL)_     | ui runner only: where the panel SPA is (it is served on the API port 8080, not the protocol port 9090)                                                                                                                                                                                                                                                                                                                                   |
-| `REPSY_UI_WORKERS`            | `4` (compose)              | ui runner only: Playwright workers (each is a Chromium, ~250-400 MB)                                                                                                                                                                                                                                                                                                                                                                     |
-| `REPSY_UI_NO_SANDBOX`         | _(unset — sandbox on)_     | ui runner only: `1` launches Chromium with `chromiumSandbox: false`, see "UI suite"                                                                                                                                                                                                                                                                                                                                                      |
-| `REPSY_E2E_OPT_IN`            | _(unset)_                  | every runner: comma list of opt-in suites (`throttle`, `scanner`, ...) read by `optedIn()` in `src/stack-overlays.ts`; `run.sh test` adds the name of every stack overlay whose switch is set, see "Stack overlays"                                                                                                                                                                                                                      |
-| `REPSY_UI_OPT_IN`             | _(unset)_                  | ui runner only: the UI suite's older spelling of `REPSY_E2E_OPT_IN`; `optedIn()` reads both, so either works                                                                                                                                                                                                                                                                                                                             |
-| `REPSY_E2E_SCANNER`           | _(unset)_                  | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_E2E_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                    |
-| `REPSY_E2E_THROTTLE`          | _(unset)_                  | `1` makes `local up\|down` include the auth-throttle overlay (same as `--throttle`) and `test` add `throttle` to `REPSY_E2E_OPT_IN`, see "Auth-throttle leg"                                                                                                                                                                                                                                                                             |
-| `REPSY_E2E_LIMITS`            | _(unset)_                  | `1` makes `local up\|down` include the tiny-upload-limit overlay (same as `--limits`) and `test` add `limits` to `REPSY_E2E_OPT_IN`, see "Size-limit leg"                                                                                                                                                                                                                                                                                |
-| `REPSY_E2E_TRIVY`             | _(unset)_                  | `1` makes `local up\|down` include the real-scanner overlay (same as `--trivy`) and `test` add `trivy` to `REPSY_E2E_OPT_IN`, see "Real scanner stack"                                                                                                                                                                                                                                                                                   |
-| `REPSY_E2E_SCANNER_PORT`      | `8090` + offset            | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
-| `REPSY_SCANNER_STUB_URL`      | `http://localhost:8090`    | ui runner only: where the `@scanner` specs reach that API (follows `REPSY_E2E_SCANNER_PORT`)                                                                                                                                                                                                                                                                                                                                             |
-| `REPSY_SCANNER_API_KEY`       | `e2e-scanner-key`          | the shared secret of the stub scanner and the backend's scanner client                                                                                                                                                                                                                                                                                                                                                                   |
-| `REPSY_E2E_STACK_PROJECT`     | `REPSY_E2E_PROJECT`        | stack runner only: the compose project whose `repsy` container `docker exec` targets (README "Stack runner"); `run.sh` sets it from the project                                                                                                                                                                                                                                                                                          |
-| `REPSY_E2E_INSECURE_REGISTRY` | _(unset)_                  | docker runner's `--insecure` (only needed for a remote plain-HTTP host; `localhost` already works without it); helm runner's `--insecure-skip-tls-verify` (a REMOTE HTTPS target with a bad cert only -- helm's own `--plain-http` is derived from `REPSY_REPO_BASE_URL`'s scheme instead, unconditionally on this harness's own `http://localhost:9090` stack, confirmed live H3: unlike `crane`, Helm has no localhost auto-detection) |
+| Variable                      | Default                             | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REPSY_API_BASE_URL`          | `http://localhost:8080`             | panel API. Unset, it follows `REPSY_E2E_PORT_OFFSET` (`8080 + offset`); a value set here wins over the offset (see "Parallel stacks")                                                                                                                                                                                                                                                                                                    |
+| `REPSY_REPO_BASE_URL`         | `http://localhost:9090`             | repository/protocol operations. Unset, it follows `REPSY_E2E_PORT_OFFSET` (`9090 + offset`); the stack also prints it in the panel's client snippets                                                                                                                                                                                                                                                                                     |
+| `REPSY_ADMIN_USERNAME`        | `admin`                             |                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `REPSY_ADMIN_PASSWORD`        | _(none — required)_                 | must match the target's admin password                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `REPSY_TARGET`                | `local`                             | `local` \| `remote` \| `ci` — see Targets below                                                                                                                                                                                                                                                                                                                                                                                          |
+| `REPSY_E2E_BACKEND_MODULE`    | _(unset — built-in)_                | module that supplies the panel backend instead of the built-in Repsy OS one: a path the runner can read (absolute, or relative to the working directory), a `file:` URL or a package name; exports `createPanelBackend(baseUrl)`. See "Panel backend" below                                                                                                                                                                              |
+| `REPSY_E2E_URL_SCHEME`        | `repo` (`owner-repo` for `cloud-*`) | `repo` \| `owner-repo`: how a repository is addressed in a protocol URL, see "Repository URLs"                                                                                                                                                                                                                                                                                                                                           |
+| `REPSY_REPO_OWNER`            | _(unset)_                           | the `<owner>` of `/<owner>/<repo>/...` URLs; required, and read, only with `REPSY_E2E_URL_SCHEME=owner-repo`                                                                                                                                                                                                                                                                                                                             |
+| `REPSY_E2E_RUN_ID`            | random 6-char lowercase id          | shared by every runner in one `run.sh test`                                                                                                                                                                                                                                                                                                                                                                                              |
+| `REPSY_E2E_STACK`             | _(unset — postgres)_                | `local up\|down` stack profile: unset/anything but `h2` is the postgres profile, `h2` is the embedded-H2 profile; equivalent to `--h2` on the command line. Unread by `run.sh test`, which is identical against either profile — see "Stack profiles" below                                                                                                                                                                              |
+| `REPSY_E2E_PROJECT`           | `repsy-e2e`                         | compose project of the local stack (`local up\|down`, `test`, `sweep`, all of which follow it); also `--project NAME`. "Parallel stacks"                                                                                                                                                                                                                                                                                                 |
+| `REPSY_E2E_PORT_OFFSET`       | `0`                                 | added to the stack's host ports 8080 (panel API), 9090 (repo protocols) and 8090 (stub scanner); also `--port-offset N`. "Parallel stacks"                                                                                                                                                                                                                                                                                               |
+| `REPSY_E2E_FORCE`             | _(unset)_                           | `1` lets `local up\|down` take over a project or host port held by a stack started from another checkout (same as `--force`)                                                                                                                                                                                                                                                                                                             |
+| `REPSY_UI_BASE_URL`           | _(REPSY_API_BASE_URL)_              | ui runner only: where the panel SPA is (it is served on the API port 8080, not the protocol port 9090)                                                                                                                                                                                                                                                                                                                                   |
+| `REPSY_UI_WORKERS`            | `4` (compose)                       | ui runner only: Playwright workers (each is a Chromium, ~250-400 MB)                                                                                                                                                                                                                                                                                                                                                                     |
+| `REPSY_UI_NO_SANDBOX`         | _(unset — sandbox on)_              | ui runner only: `1` launches Chromium with `chromiumSandbox: false`, see "UI suite"                                                                                                                                                                                                                                                                                                                                                      |
+| `REPSY_E2E_OPT_IN`            | _(unset)_                           | every runner: comma list of opt-in suites (`throttle`, `scanner`, ...) read by `optedIn()` in `src/stack-overlays.ts`; `run.sh test` adds the name of every stack overlay whose switch is set, see "Stack overlays"                                                                                                                                                                                                                      |
+| `REPSY_UI_OPT_IN`             | _(unset)_                           | ui runner only: the UI suite's older spelling of `REPSY_E2E_OPT_IN`; `optedIn()` reads both, so either works                                                                                                                                                                                                                                                                                                                             |
+| `REPSY_E2E_SCANNER`           | _(unset)_                           | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_E2E_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                    |
+| `REPSY_E2E_THROTTLE`          | _(unset)_                           | `1` makes `local up\|down` include the auth-throttle overlay (same as `--throttle`) and `test` add `throttle` to `REPSY_E2E_OPT_IN`, see "Auth-throttle leg"                                                                                                                                                                                                                                                                             |
+| `REPSY_E2E_LIMITS`            | _(unset)_                           | `1` makes `local up\|down` include the tiny-upload-limit overlay (same as `--limits`) and `test` add `limits` to `REPSY_E2E_OPT_IN`, see "Size-limit leg"                                                                                                                                                                                                                                                                                |
+| `REPSY_E2E_TRIVY`             | _(unset)_                           | `1` makes `local up\|down` include the real-scanner overlay (same as `--trivy`) and `test` add `trivy` to `REPSY_E2E_OPT_IN`, see "Real scanner stack"                                                                                                                                                                                                                                                                                   |
+| `REPSY_E2E_SCANNER_PORT`      | `8090` + offset                     | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
+| `REPSY_SCANNER_STUB_URL`      | `http://localhost:8090`             | ui runner only: where the `@scanner` specs reach that API (follows `REPSY_E2E_SCANNER_PORT`)                                                                                                                                                                                                                                                                                                                                             |
+| `REPSY_SCANNER_API_KEY`       | `e2e-scanner-key`                   | the shared secret of the stub scanner and the backend's scanner client                                                                                                                                                                                                                                                                                                                                                                   |
+| `REPSY_E2E_STACK_PROJECT`     | `REPSY_E2E_PROJECT`                 | stack runner only: the compose project whose `repsy` container `docker exec` targets (README "Stack runner"); `run.sh` sets it from the project                                                                                                                                                                                                                                                                                          |
+| `REPSY_E2E_INSECURE_REGISTRY` | _(unset)_                           | docker runner's `--insecure` (only needed for a remote plain-HTTP host; `localhost` already works without it); helm runner's `--insecure-skip-tls-verify` (a REMOTE HTTPS target with a bad cert only -- helm's own `--plain-http` is derived from `REPSY_REPO_BASE_URL`'s scheme instead, unconditionally on this harness's own `http://localhost:9090` stack, confirmed live H3: unlike `crane`, Helm has no localhost auto-detection) |
 
 ## Targets (`src/target.ts`)
 
@@ -326,6 +327,78 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
   `--target ci` (see "CI" below).
 - **remote** — an already-running instance the harness does not own or reset. Throttle cannot be
   tuned and nothing global is touched; later steps add a failure budget and a preflight check.
+- **cloud-remote**, **cloud-local** (RPS-1498) — Repsy Cloud instead of Repsy OS: a deployed environment,
+  or one that runs next to the harness. Neither is owned or tunable by the harness, and Repsy Cloud
+  rate-limits failed authentications, so both count as `isRemote` (the loop runs `@negative` scenarios
+  serially on a `RemoteAuthBudget`). A cloud run has no built-in panel backend in this repository: its
+  backend is a module (`REPSY_E2E_BACKEND_MODULE`, below) supplied by the repository that owns Repsy Cloud.
+  `env.ts` still requires the OS-only `REPSY_ADMIN_PASSWORD` at import (for a cloud run it is the tenant
+  owner's password); making it optional for `cloud-*` belongs to RPS-1500 (packaging).
+  Everything a cloud target needs from the engine lives in the seam described next. The OS targets are
+  unchanged: same tests, same titles, same JUnit names.
+
+### Target capabilities and the target seam (RPS-1498)
+
+`target` (`src/target.ts`) is the capabilities of the run's `REPSY_TARGET`. What differs by product is a
+capability, so a spec or the engine asks the capability and never the target's name:
+
+| Capability                               | Repsy OS                 | Repsy Cloud (provisional, see below)                           |
+| ---------------------------------------- | ------------------------ | -------------------------------------------------------------- |
+| `kind`                                   | `os`                     | `cloud` (for an adapter hook to branch on)                     |
+| `urlScheme`                              | `repo` (`/<repo>/...`)   | `owner-repo` (`/<owner>/<repo>/...`, `src/repo-url.ts`)        |
+| `supportsUserRole`                       | yes (`USER`/`ADMIN`)     | no                                                             |
+| `supportsRepoUsers`                      | no                       | yes (collaborators of a repo)                                  |
+| `supportsExpiredTokenSeed`               | yes (past date accepted) | no (an expiration date has to be in the future)                |
+| `expiredTokenStrategy`                   | `past-date`              | `short-ttl-wait` (short lifetime, then wait); or `unsupported` |
+| `maxDeployTokensPerRepo`                 | unlimited                | 1 (FREE plan)                                                  |
+| `supportsDirectoryListing`               | yes                      | no (nothing may rely on listings)                              |
+| `supportsVersionAllowanceSettings(type)` | Maven, NuGet             | the same                                                       |
+
+The Cloud column is **provisional**: only the FREE plan limits and the future-only expiration date are
+known; the rest is a guess until RPS-1491 (a probe of Repsy Cloud DEV that pins the cloud expectation
+table) is done, and that story may change any value here.
+
+The engine uses the capabilities and three hooks, so **no cloud-specific outcome ever goes into
+`catalog.ts`**:
+
+- **Credentials** (`scenarios/fixtures.ts`). `user-password` and `token-expired` are what differ per
+  product, so `materializeCredentialKind` asks the backend (`PanelBackend.seedUserCredential` /
+  `seedExpiredTokenCredential`; `OsPanelBackend` seeds a `USER` account and a token with a past
+  expiration date). A credential the target cannot seed **skips** the scenario with a reason
+  (`test.skip`): from the capabilities alone (`unsupportedCredentialReason`: no user model, or
+  `expiredTokenStrategy: 'unsupported'`), before anything is seeded, or because the backend threw
+  `UnsupportedPanelOperation` (`tryMaterializeCredentialKind` returns the reason without skipping, for
+  a test of the rule). `ownerCredential()` (`clients/raw-http.ts`, alias `adminCredential()`) is the
+  credential of the account the harness runs as: `admin` on OS, the tenant owner on Cloud.
+- **Expectation overlay** (`PanelBackend.expectByTarget`, `ExpectationOverlay` in `scenarios/types.ts`).
+  Outcomes that differ from the catalog's, keyed by scenario id, then by protocol or `*` for all of them:
+  `{ 'token-ro': { '*': { publish: 'unauthorized' }, maven: { publish: 'forbidden' } } }`.
+  `expectationFor(scenario, protocol, overlay?)` merges, later wins: the catalog's `expect`, the
+  scenario's `expectByProtocol[protocol]`, the overlay's `*`, the overlay's protocol entry. The loop and
+  the `world` fixture (its "needs a pre-publish" check) read through it. No overlay (every OS run) is
+  exactly the old behaviour.
+- **Known gaps** (`PanelBackend.knownGap(protocol, scenarioId, side)`, `side` is `publish` or
+  `consume`). Returns the reason (name the Jira key) when that side of the scenario is a known,
+  filed gap of the target. The loop asks BEFORE that side runs and before every `adapter.known*`
+  hook, and marks the test `test.fail`. That is a pin, not a skip: **a gap that starts passing fails
+  the run** ("Expected to fail, but passed"), so the entry is removed in the same change as the bump
+  that fixed it. (Checked by hand in RPS-1498: flip the fake's answer in `cloud-target.spec.ts` and the
+  test fails with that message; a permanently failing test cannot sit in a green suite.) `knownGap` and
+  `expectByTarget` are optional on a backend; absent means none.
+- **`@cloud-skip`**: a tag for what does not apply to Repsy Cloud at all. `tests/stack/**` and
+  `login-password.spec.ts` carry it, and a catalog scenario carrying it is skipped by the loop on a
+  cloud target with a reason. A cloud runner also excludes it for whole specs: `--grep-invert @cloud-skip`.
+- **Token limits.** `tests/skeleton/seed.spec.ts` seeds `min(3, maxDeployTokensPerRepo)` tokens (in the
+  order read-write, read-only, expired) and skips its expired-token round trip on a target that cannot
+  seed one or holds fewer than two tokens per repo. The manage matrix (`manage-matrix.ts`) still seeds a
+  read-write and a read-only token in one repo: it needs the cloud stories to decide how it fits one token.
+
+`tests/skeleton/cloud-target.spec.ts` proves the seam without a server, with `fake-cloud-panel-backend.ts`
+(the in-memory fake of RPS-1495 plus a capabilities object, an overlay, gaps and the two credential
+hooks): it runs the REAL `registerPublishConsumeLoop` (with the options `{ scenarios, target }` a spec of
+the harness itself may pass) and `world` fixture against a fake protocol adapter. It is also the smallest
+worked example of a cloud backend module. Three of its tests are skipped on purpose, because they are the
+skip paths.
 
 ### Panel backend (RPS-1495)
 
@@ -359,8 +432,12 @@ Things a backend module has to know:
   for a backend that has it. `OsPanelBackend` rejects `permissions`. The shape follows RPS-1491 (the Repsy
   Cloud panel probe) and may be refined by it.
 - **`UnsupportedPanelOperation(ticket, operation?)`**: an operation the target does not offer throws it, with
-  the Jira key that tracks the gap. A spec turns it into a known gap or a skip (`isUnsupportedPanelOperation`)
-  instead of a failure; nothing does yet, the expectation overlay is RPS-1498.
+  the Jira key that tracks the gap. `fixtures.ts` turns one thrown while a credential is seeded into a skip
+  (`isUnsupportedPanelOperation`, see "Target capabilities and the target seam" above); elsewhere it is still
+  a failure, a spec pins a gap through `knownGap` instead.
+- **Target hooks** (RPS-1498): `seedUserCredential` and `seedExpiredTokenCredential` are required (the two
+  credentials that differ per product); `expectByTarget` and `knownGap` are optional. See "Target
+  capabilities and the target seam" below.
 - **`PanelHttpError`** (`status`, `body`): what a backend throws for an HTTP error status. `OsPanelBackend`
   converts the generated client's `ApiError` into it, so specs match a status (`isPanelHttpStatus`) without
   importing the generated client.
@@ -381,7 +458,8 @@ such as Repsy Cloud serves it at `/<owner>/<repo>/...` (Docker `/v2/<owner>/<rep
 raw probe or spec writes `${env.repoBaseUrl}/${repoName}` itself: every repository URL goes through
 `src/repo-url.ts`, so a target only has to say which of the two it is.
 
-- **`target.urlScheme`** (`src/target.ts`): `'repo'` (the default for every target) or `'owner-repo'`.
+- **`target.urlScheme`** (`src/target.ts`): `'repo'` (the default of the OS targets) or `'owner-repo'` (the
+  default of `cloud-remote` and `cloud-local`).
   `REPSY_E2E_URL_SCHEME` sets it.
 - **`env.repoOwner`** (`src/env.ts`, `REPSY_REPO_OWNER`): the owner segment. Read only with
   `owner-repo`, where an unset owner is an error at the first URL built; ignored with `repo`.
@@ -765,7 +843,10 @@ five worked examples.
    (from step 1), `fingerprint`/`expectNothingStored` (a snapshot of "what exists" a refused publish
    must leave untouched, and the assertion that it did), and optionally
    `afterSuccessfulRoundTrip`/`knownConsumeFailure` (a known, already-filed backend bug that only
-   affects the consume side -- see `npmAdapter.knownConsumeFailure` and RPS-1205 below).
+   affects the consume side -- see `npmAdapter.knownConsumeFailure` and RPS-1205 below). Since RPS-1498
+   the `known*` hooks (`knownConsumeFailure`, `knownPublishSideEffect`, `knownClientExitDisagreement`)
+   get the target's capabilities as their last argument, so a bug of one product is
+   `target.kind === 'cloud' ? '<reason>' : undefined` and needs no second adapter.
 3. `src/packages/<protocol>/`: mustache templates of a tiny publishable project. A template that needs
    the repository takes the rendered URL, never the bare name ("Repository URLs").
 4. `runners/<protocol>.Dockerfile`: the toolchain that protocol's client needs, pinned versions as
@@ -787,6 +868,12 @@ five worked examples.
 9. Restrict any scenario your adapter cannot express (or add one only it needs) via the catalog
    entry's `protocols` field, or override its `expect` for your protocol via `expectByProtocol`
    (`scenarios/types.ts`'s `expectationFor`) when the real, probed status differs from maven's.
+10. A difference that belongs to a TARGET, not a protocol (what Repsy Cloud answers differently from Repsy
+    OS), never goes into the catalog or the adapter: it is the target backend's `expectByTarget` overlay
+    (a different outcome) or `knownGap` (a filed bug: the scenario side is pinned as an expected failure and
+    fails the run once it passes), and a scenario that cannot apply at all is tagged `@cloud-skip`. See
+    "Target capabilities and the target seam" under "Targets". Adding an adapter therefore needs nothing
+    for a cloud target: the loop reads the overlay and the gaps from the backend.
 
 ### Manage matrix (RPS-1475)
 

@@ -23,6 +23,7 @@
  */
 import {
   type ArtifactVersionInfo,
+  type DeployTokenForm,
   type DeployTokenInfoListItem,
   type ImageListItem,
   type LoginInfo,
@@ -41,6 +42,7 @@ import {
   type VulnerabilityScanInfo,
   UnsupportedPanelOperation,
 } from '../../src/api/panel-backend.js';
+import type { MaterializedCredential } from '../../src/scenarios/world.js';
 
 /** The ticket the fake names for every operation it does not implement. */
 export const FAKE_UNSUPPORTED_TICKET = 'RPS-1498';
@@ -114,6 +116,13 @@ export class FakePanelBackend implements PanelBackend {
 
   // Everything below is what this fake target does not offer.
 
+  async seedUserCredential(): Promise<MaterializedCredential> {
+    return unsupported('seedUserCredential');
+  }
+  async seedExpiredTokenCredential(): Promise<MaterializedCredential> {
+    return unsupported('seedExpiredTokenCredential');
+  }
+
   async changeOwnPassword(): Promise<void> {
     return unsupported('changeOwnPassword');
   }
@@ -129,10 +138,10 @@ export class FakePanelBackend implements PanelBackend {
   async getSettings(): Promise<RepoSettingsInfo> {
     return unsupported('getSettings');
   }
-  async createDeployToken(): Promise<TokenInfo> {
+  async createDeployToken(_repoName: string, _form: DeployTokenForm): Promise<TokenInfo> {
     return unsupported('createDeployToken');
   }
-  async revokeDeployToken(): Promise<void> {
+  async revokeDeployToken(_repoName: string, _tokenId: string): Promise<void> {
     return unsupported('revokeDeployToken');
   }
   async rotateDeployToken(): Promise<string> {
@@ -141,7 +150,10 @@ export class FakePanelBackend implements PanelBackend {
   async listDeployTokens(): Promise<DeployTokenInfoListItem[]> {
     return unsupported('listDeployTokens');
   }
-  async findDeployTokenByName(): Promise<DeployTokenInfoListItem | undefined> {
+  async findDeployTokenByName(
+    _repoName: string,
+    _name: string,
+  ): Promise<DeployTokenInfoListItem | undefined> {
     return unsupported('findDeployTokenByName');
   }
   async registerPgpPublicKey(): Promise<PgpPublicKeyItem> {
