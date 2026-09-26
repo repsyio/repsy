@@ -3225,6 +3225,24 @@ BEFORE any adapter code was written — H1-H4 and H12 gated the whole design.
   real `go get` succeeding is itself the correct, desired behavior; only the raw-HTTP "are these two
   DISTINCT modules" test is pinned as a candidate).
 
+### Transitive resolution (RPS-1479, `tests/golang/transitive-resolution.spec.ts`)
+
+`buildModuleZip({ requires })` (`golang-raw.ts`) writes `require` lines into a module's `go.mod` and
+a `hello.go` (`hello-deps.template.go`) that imports the dependencies, so a real `go mod tidy` in a
+consumer that imports only module A has to walk A's `go.mod` to B through what Repsy serves. Pinned,
+against the real `go` (through the TLS shim for the private-repo case): the consumer's `go.mod`
+names B at the version A's go.mod names, `// indirect` (minimal version selection: not B's `@latest`
+and not an older one), `go.sum` holds the `dirhashHash1` of the uploaded zip and go.mod of A and B,
+`go list -m all` / `-versions` report the graph and the version list, the built program runs B's
+code, the highest version anyone requires wins (both directions), and a `/v2` major-path module is a
+module of its own next to `/v1` in one repo. Probed live for a sumdb-less proxy: the existing
+`goEnv` is enough (`GOFLAGS` empty, no `-mod=mod`; `go mod tidy` writes go.mod/go.sum itself), and
+`GONOSUMDB=e2e.repsy.test` or `GOSUMDB=off` is REQUIRED: without either, `go` asks the public
+`sum.golang.org` and fails with `verifying module: ... 404 Not Found` (Repsy has no checksum
+database). A dependency's go.mod is plain `@v/<v>.mod` (`text/plain`); an unpublished one is a
+`text/plain` 404, and `go mod tidy` then exits 1 with `module lookup disabled by GOPROXY=off`
+(the harness's `,off` fallback) naming the importing chain.
+
 ## Ruby runner
 
 This is **step 4e ("ruby") — the LAST protocol adapter of step 4**: the Ruby gem (RubyGems/Bundler)

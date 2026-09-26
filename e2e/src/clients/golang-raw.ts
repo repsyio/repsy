@@ -248,9 +248,26 @@ export function dirhashHash1(entries: readonly { name: string; content: Buffer }
 /** Renders `go.template.mod` for `modulePath` alone (no marker involved) -- shared by `buildModuleZip`
  *  and by `golang.ts`'s `afterSuccessfulRoundTrip`, which needs the EXACT expected `go.mod` text
  *  without holding on to the `BuiltGoModule` a scenario's own (possibly refused) publish produced. */
-export async function renderGoModText(modulePath: string): Promise<string> {
+export async function renderGoModText(
+  modulePath: string,
+  requires?: readonly GoRequire[],
+): Promise<string> {
   const template = await fs.readFile(path.join(TEMPLATES_DIR, 'go.template.mod'), 'utf8');
-  return mustache.render(template, { modulePath });
+  const text = mustache.render(template, { modulePath });
+  if (!requires || requires.length === 0) {
+    return text;
+  }
+  // A `require` block appended after the template's `go` directive (RPS-1479): the rest of the
+  // template, and so every fixture without dependencies, is byte-for-byte what it always was.
+  const lines = requires.map((req) => `\t${req.modulePath} ${req.version}\n`).join('');
+  return `${text}\nrequire (\n${lines})\n`;
+}
+
+/** One `require` line of a module's `go.mod`: the dependency's module path and the version it
+ *  needs (`buildModuleZip`'s `requires`, RPS-1479). */
+export interface GoRequire {
+  modulePath: string;
+  version: string;
 }
 
 export interface BuiltGoModule {
@@ -282,14 +299,25 @@ export async function buildModuleZip(opts: {
   modulePath: string;
   version: string;
   marker?: string;
+  /** Dependencies (RPS-1479): each becomes a `require` line of the module's `go.mod`, and
+   *  `hello.go` imports the dependency's package so a consumer that imports THIS module really
+   *  needs the dependency to build (`DepMarkers()` reports the dependencies' own `Marker`s). */
+  requires?: readonly GoRequire[];
 }): Promise<BuiltGoModule> {
   const marker = opts.marker ?? randomUUID();
   const prefix = `${opts.modulePath}@${opts.version}/`;
 
-  const helloTemplate = await fs.readFile(path.join(TEMPLATES_DIR, 'hello.template.go'), 'utf8');
+  const requires = opts.requires ?? [];
+  const helloTemplate = await fs.readFile(
+    path.join(TEMPLATES_DIR, requires.length > 0 ? 'hello-deps.template.go' : 'hello.template.go'),
+    'utf8',
+  );
 
-  const goModText = await renderGoModText(opts.modulePath);
-  const helloText = mustache.render(helloTemplate, { marker });
+  const goModText = await renderGoModText(opts.modulePath, requires);
+  const helloText = mustache.render(helloTemplate, {
+    marker,
+    requires: requires.map((req, index) => ({ modulePath: req.modulePath, alias: `dep${index}` })),
+  });
   const markerText = `${marker}\n`;
 
   const entries: Record<string, Uint8Array> = {
