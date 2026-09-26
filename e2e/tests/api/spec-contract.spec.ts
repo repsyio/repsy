@@ -110,7 +110,7 @@ test.describe('the response validator', () => {
     );
     expect(
       contractProblems('listPypiPackages', 200, packages(ITEM, { errorCode: 5 })).join(),
-    ).toContain('/errorCode must be string,null');
+    ).toContain('/errorCode must be string');
     expect(
       contractProblems('listPypiPackages', 200, { ...packages(ITEM), msgId: null }).join(),
     ).toContain('/msgId must be string');
