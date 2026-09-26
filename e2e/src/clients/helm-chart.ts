@@ -54,6 +54,44 @@ export interface BuiltChart {
   version: string;
 }
 
+/** One `dependencies:` entry of `Chart.yaml`: `version` is a semver RANGE (`^1.0.0`, `>=1.0.0 <2.0.0`),
+ *  `repository` the classic repo URL or `oci://<host>/<repo>`. */
+export interface ChartDependency {
+  name: string;
+  version: string;
+  repository: string;
+  alias?: string;
+}
+
+/** `Chart.yaml` from `packages/helm/Chart.template.yaml`. */
+export async function renderChartYaml(opts: {
+  name: string;
+  version: string;
+  dependencies?: ChartDependency[];
+}): Promise<string> {
+  const template = await fs.readFile(path.join(TEMPLATES_DIR, 'Chart.template.yaml'), 'utf8');
+  const dependencies = opts.dependencies ?? [];
+  return mustache.render(template, {
+    name: opts.name,
+    version: opts.version,
+    hasDependencies: dependencies.length > 0,
+    dependencies,
+  });
+}
+
+/** Writes an unpacked chart directory `<dir>/<name>/` (`Chart.yaml`, `values.yaml`): the local
+ *  chart a consumer runs `helm dependency update` in. Returns the chart directory. */
+export async function writeChartDir(
+  dir: string,
+  opts: { name: string; version: string; dependencies?: ChartDependency[] },
+): Promise<string> {
+  const chartDir = path.join(dir, opts.name);
+  await fs.mkdir(chartDir, { recursive: true });
+  await fs.writeFile(path.join(chartDir, 'Chart.yaml'), await renderChartYaml(opts), 'utf8');
+  await fs.writeFile(path.join(chartDir, 'values.yaml'), 'replicaCount: 1\n', 'utf8');
+  return chartDir;
+}
+
 function sha256Hex(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
@@ -70,9 +108,10 @@ export async function buildChart(opts: {
   name: string;
   version: string;
   marker: string;
+  /** `dependencies:` of `Chart.yaml` (RPS-1479): what `helm dependency update` resolves. */
+  dependencies?: ChartDependency[];
 }): Promise<BuiltChart> {
-  const template = await fs.readFile(path.join(TEMPLATES_DIR, 'Chart.template.yaml'), 'utf8');
-  const chartYaml = mustache.render(template, { name: opts.name, version: opts.version });
+  const chartYaml = await renderChartYaml(opts);
 
   const tar = buildTar([
     { name: `${opts.name}/Chart.yaml`, data: Buffer.from(chartYaml, 'utf8') },

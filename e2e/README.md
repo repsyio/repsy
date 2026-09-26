@@ -233,6 +233,7 @@ e2e/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
       registry-rules.spec.ts           # raw-HTTP pins R1-R14 for BOTH modes: single-hop Basic auth, blob/manifest rules, override, tags/list, classic upload/delete/index shape
+      dependency-resolution.spec.ts    # RPS-1479 real helm dependency update/build of a chart with `dependencies:` against a Repsy repo: Chart.lock + fetched tgz, classic and OCI
     pypi/
       publish-consume.spec.ts   # registerPublishConsumeLoop(pypiAdapter) + a real pip-install and a mixed-case/dotted-name real-client test
       registry-rules.spec.ts    # raw-HTTP pins of the override/version/digest rules, root-index shape, HEAD, 307 redirect, no releases/snapshots rule
@@ -2723,6 +2724,29 @@ Checked first, as instructed: `tests/helm/classic-publish-consume.spec.ts`'s exi
 this exact flow end to end, real `helm` binary, real `cm-push` by repo alias — so this sub-scope was
 skipped as already-covered rather than duplicated; see the PyPI protocol-specific suite section
 below for the step 5h work that WAS added (PyPI sdist support).
+
+### Dependency resolution (RPS-1479)
+
+`tests/helm/dependency-resolution.spec.ts` proves that what Repsy serves is enough for the real `helm
+dependency update`/`build`. `buildChart` (and `writeChartDir`, an unpacked local chart) take
+`dependencies: [{ name, version, repository, alias? }]` for `Chart.yaml`; `version` is a semver range.
+Charts B (1.0.0, 1.1.0, 2.0.0, a prerelease) and A (depends on B) go into one repo and a local chart
+that names only the dependency is resolved. The tests assert `Chart.lock` (name, version, repository and
+the `digest`, which is `sha256` of the JSON of [requested, locked] dependencies) and the fetched
+`charts/<b>-<version>.tgz` (bytes equal to what Repsy stores; a `cm-push` repackages, so they are read
+back from the download route), never just an exit code. Classic (ChartMuseum): the highest B in `^1.0.0`
+from `index.yaml` with a read-only token in the `helm repo add` entry (`@alias` too), `~`, `>=`,
+interval, exact and prerelease ranges on a public repo with no repo entry at all, `build` replays the
+lock while `update` moves it (an edited `Chart.yaml` is refused), a private repo without the credential
+is a bare `401`, an unsatisfiable or missing dependency writes nothing, a locked version deleted from the
+repo cannot be rebuilt, and a chart pushed through the OCI API resolves via a classic URL (RPS-1217).
+OCI: a real `helm registry login`, then `repository: oci://<host>/<repo>` with `--plain-http` resolves
+from `tags/list` (RPS-1219) and the layer is byte-identical to the pushed file; without a login helm
+stops at "basic credential not found". `helm dependency update` does not recurse into a dependency's own
+`dependencies:` (A's are stored in A's chart and printed by `helm show chart`). Observed and not pinned
+(look like backend gaps, see the story report): the `index.yaml` entry of a chart with `dependencies:`
+carries no `dependencies` (nor `apiVersion`), and `tags/list` names the chart alone (`"name":"<chart>"`),
+not `<repo>/<chart>`.
 
 ### Backend bug candidates found while reading and confirmed live (do not fix here)
 

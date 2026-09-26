@@ -3,3 +3,14 @@ name: {{{name}}}
 version: {{{version}}}
 description: e2e {{{name}}}@{{{version}}}
 type: application
+{{#hasDependencies}}
+dependencies:
+{{#dependencies}}
+  - name: {{{name}}}
+    version: "{{{version}}}"
+    repository: "{{{repository}}}"
+{{#alias}}
+    alias: {{{alias}}}
+{{/alias}}
+{{/dependencies}}
+{{/hasDependencies}}
