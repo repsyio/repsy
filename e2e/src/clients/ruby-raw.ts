@@ -242,12 +242,63 @@ async function libTemplate(): Promise<string> {
   return libTemplateCache;
 }
 
+/** One `Gem::Dependency` of a gemspec: `requirement` is one `Gem::Requirement` clause (`'~> 1.0'`) or
+ *  several that all have to hold (`['>= 1.0', '< 2']`); `type` defaults to `runtime`. */
+export interface GemDependencySpec {
+  name: string;
+  requirement: string | string[];
+  type?: 'runtime' | 'development';
+}
+
+/** The value of the gemspec's `dependencies:` key, as `Gem::Specification#to_yaml` writes it: ` []`, or
+ *  a newline and a block list of `!ruby/object:Gem::Dependency` (each requirement twice, as
+ *  `requirement` and `version_requirements`, like a real `gem build`). Versions are quoted the way
+ *  Psych quotes a bare `1.0` (a float otherwise). */
+export function renderDependenciesYaml(dependencies: GemDependencySpec[]): string {
+  if (dependencies.length === 0) {
+    return ' []';
+  }
+  const requirementYaml = (clauses: string[], indent: string): string =>
+    `${indent}requirements:\n` +
+    clauses
+      .map((clause) => {
+        const [op, ...rest] = clause.trim().split(/\s+/);
+        return (
+          `${indent}- - "${op}"\n` +
+          `${indent}  - !ruby/object:Gem::Version\n` +
+          `${indent}    version: '${rest.join(' ')}'\n`
+        );
+      })
+      .join('');
+  return (
+    '\n' +
+    dependencies
+      .map((dep) => {
+        const clauses = Array.isArray(dep.requirement) ? dep.requirement : [dep.requirement];
+        return (
+          '- !ruby/object:Gem::Dependency\n' +
+          `  name: ${dep.name}\n` +
+          '  requirement: !ruby/object:Gem::Requirement\n' +
+          requirementYaml(clauses, '    ') +
+          `  type: :${dep.type ?? 'runtime'}\n` +
+          '  prerelease: false\n' +
+          '  version_requirements: !ruby/object:Gem::Requirement\n' +
+          requirementYaml(clauses, '    ')
+        );
+      })
+      .join('')
+      .replace(/\n$/, '')
+  );
+}
+
 export async function buildGem(opts: {
   name: string;
   version: string;
   platform?: string;
   marker?: string;
   requiredRubyVersion?: string;
+  /** Declared dependencies (`Gem::Dependency` entries of the gemspec YAML); none by default. */
+  dependencies?: GemDependencySpec[];
 }): Promise<BuiltGem> {
   const platform = opts.platform ?? 'ruby';
   const marker = opts.marker ?? createHash('sha256').update(`${Math.random()}`).digest('hex');
@@ -258,6 +309,7 @@ export async function buildGem(opts: {
     version: opts.version,
     platform,
     marker,
+    dependenciesYaml: renderDependenciesYaml(opts.dependencies ?? []),
   });
   const metadataGz = zlib.gzipSync(Buffer.from(metadataYaml, 'utf8'));
 

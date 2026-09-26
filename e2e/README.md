@@ -242,6 +242,7 @@ e2e/
     ruby/
       publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install (RPS-1233, fixed)/gem-fetch (RPS-1234, fixed), anonymous-push, yank (RPS-1235, fixed), USER-role-push, bundle-install-e2e real-client tests
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow incl. RPS-1238 fixed, specs.4.8.gz gzip framing (RPS-1234, fixed), gemspec.rz (RPS-1233, fixed), HEAD mirrors GET (RPS-1237, fixed), platform gem, RPS-1236 fixed) -- no remaining test.fail() pins
+      transitive-resolution.spec.ts # RPS-1479 gem A -> B -> C: real bundle install/--frozen/update and gem install resolve the graph from Repsy's /info; requirement shapes, yank, platform gem
     api/
       port-separation.spec.ts   # RPS-1480 /api/** is not served on the protocol port (404 unknownPath); /v2/ and a Maven path on the api port are the SPA, not the protocol
       forwarded-headers.spec.ts # RPS-1480 X-Forwarded-Proto/Host/Port drive the Docker realm, the Cargo config.json and the PyPI simple links
@@ -3447,6 +3448,31 @@ left alone on a failure — same as before). Confirmed live: `registry-rules.spe
 re-verifies that a refused re-publish under `allowOverride:false` changes NOTHING on disk (byte-for-
 byte). No regression from the RPS-1060 fix this codebase's other protocols' own equivalent stories
 reference.
+
+### Transitive resolution (RPS-1479)
+
+`tests/ruby/transitive-resolution.spec.ts` proves the dependency metadata Repsy generates. `buildGem`
+takes `dependencies: [{ name, requirement, type? }]` (the gemspec's `Gem::Dependency` entries; a
+requirement is one clause like `~> 1.0` or several, all of which must hold). A gem A that depends on B
+(which depends on C for one version only) is published to one repo and a Gemfile that names only A is
+consumed by the real `bundle install`, whose only source is the Repsy repo. The tests assert the
+resolved graph (`Gemfile.lock` specs, PLATFORMS, CHECKSUMS equal to the published sha256, the installed
+specifications, the cached `.gem` bytes), never just an exit code: the highest B that fits `~> 1.0` is
+picked and only that version's own dependency comes with it; `--frozen` on the same project and on a
+fresh machine with just the lockfile; a newer B moves nothing until `bundle update`; a private repo with
+a read-only token (the dependency requests carry the credential); multi-clause, exact, `<` and
+patch-level requirements (`/info` spells `>= 1.0&< 2.0`, a prerelease is never picked); an unsatisfiable
+or missing dependency fails and installs nothing; a platform gem (the runner's own platform, read with
+`ruby -e`) is chosen only with `BUNDLE_FORCE_RUBY_PLATFORM=false`; and `gem install` of A installs the
+same graph. Probed live: `/info` lists runtime dependencies only (`<b>:~> 1.0`, a platform line is
+`<version>-<platform> <deps>|checksum:...`), a yanked B version is skipped by a fresh resolution
+(RPS-1235), and a lockfile that already names a yanked version cannot be replayed on a machine that
+does not have it installed (Bundler looks locked versions up in the compact index, which omits yanked
+versions, as against rubygems.org), although the `.gem` file itself stays downloadable (RPS-1238). Not
+pinned, because they look like backend gaps: `quick/Marshal.4.8/*.gemspec.rz` is a stub without
+dependencies or platform and 404s for a multi-segment platform such as `x86_64-linux`, so `gem install`
+of a platform gem fails and `gem dependency --remote` prints no dependency lines; and `RubyMarshalWriter.dumpDependencies`
+(the legacy `/api/v1/dependencies`) has no route.
 
 ## Stack runner
 
