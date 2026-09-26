@@ -26,6 +26,10 @@
  *  3. the reverse: no other operation answers a USER 403, so a MANAGE route that forgot to declare its
  *     403 (or a read route that turned admin-only unannounced) fails here instead of going unnoticed.
  *
+ * Its static twin is `OpenApiSpecConsistencyIT.everyDocumented403IsManageOrAdmin` (RPS-1593): every
+ * documented 403 is a MANAGE route or in its literal `ADMIN_OPERATIONS`, with the same floor, in every
+ * `mvn verify`. A new `requireAdmin` route is added to both.
+ *
  * A floor on the size of the set (48 today) and a check of names that must be in it stop a parser bug
  * from emptying the sweep without a failure.
  */
