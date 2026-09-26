@@ -38,7 +38,12 @@ test.describe('Repository settings: rename and description', { tag: SETTINGS }, 
     adminPage,
     seeder,
     panelApi,
+    pageErrors,
   }) => {
+    pageErrors.allowToast(
+      'Repository not found',
+      "known bug, follow-up ticket proposed in the RPS-1617 PR: an unknown repository route fires about ten parallel lookups, each raising a 'Repository not found' toast",
+    );
     const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
     const newName = seeder.reserveRepoName(RepoType.NPM);
     // Tracked so cleanup deletes it; the original name is gone by then (a 404 is tolerated).

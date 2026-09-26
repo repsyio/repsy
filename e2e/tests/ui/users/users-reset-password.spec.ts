@@ -34,7 +34,12 @@ test.describe('USR-04 reset password', () => {
     usersPage,
     seededUser,
     openUiPage,
+    pageErrors,
   }) => {
+    pageErrors.allowToast(
+      'Username or password is incorrect.',
+      'by design: the old password is refused after the reset',
+    );
     await usersPage.goto();
     await usersPage.search(seededUser.username);
     await usersPage.clickResetPassword(seededUser.username);

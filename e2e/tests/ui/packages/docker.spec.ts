@@ -287,7 +287,12 @@ test.describe('Docker image, tags, manifests and tag detail', { tag: '@packages'
       panelApi,
       seeder,
       seedPackage,
+      pageErrors,
     }) => {
+      pageErrors.allowToast(
+        'Image not found.',
+        'by design since RPS-1579: the page reloads the tag list of the image its own delete just removed, that is a 404 with a toast, and the page leaves for the image list (a follow-up to drop that toast is proposed in the RPS-1617 PR)',
+      );
       const repo = await seeder.createRepo(RepoType.DOCKER);
       const emptied = await seedPackage(repo, { index: 1 });
       const kept = await seedPackage(repo, { index: 2 });

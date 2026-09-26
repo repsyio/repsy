@@ -5138,6 +5138,8 @@ so `panelApi` and `seeder` (per-test run id, cleanup) work unchanged, and adds:
 | `userPage`                            | a second `BrowserContext`, logged in as `seededUser`. No video (Playwright only records its own default context); trace and screenshot yes |
 | `openUiPage({ session?, viewport? })` | opens more contexts (a second admin, a mobile viewport); all are closed after the test, before `seeder` cleans up                          |
 | `uiPreflight`                         | automatic, per worker: the admin-password check above                                                                                      |
+| `pageErrors`                          | the runtime errors recorded in this test's contexts; `pageErrors.allow(/regex/, 'reason')` for ones the test provokes (RPS-1617, below)    |
+| `pageErrorGuard`                      | automatic: fails the test at teardown with every recorded error nobody allowed (RPS-1617, below)                                           |
 
 - **Session seeding.** A logged-in page gets the three `localStorage` keys the SPA reads (`username`,
   `token`, `refresh-token`) from a context init script (`seedSession` in `src/ui/session.ts`): no
@@ -5192,6 +5194,37 @@ so `panelApi` and `seeder` (per-test run id, cleanup) work unchanged, and adds:
   parallel test: a list that reloads without the search (after a delete or a refresh) is newest first
   and may not hold this test's rows on page 1 any more, so search for `seeder.runId` again before
   asserting a row, and stub the scan list of `/security` (RPS-1303).
+
+#### Runtime errors fail the test (RPS-1617)
+
+Every browser context of the UI suite (the built-in `page`, `adminPage`, `userPage`, every `openUiPage`) is
+watched by `watchPageErrors` (`src/ui/page-errors.ts`), and the automatic `pageErrorGuard` fails the test
+at teardown with the list of what was recorded and not allowed. Recorded: an uncaught exception or unhandled
+rejection (`weberror`), every `console.error`, and every `securitypolicyviolation` (re-logged by an init
+script as `[csp-violation] ...`, next to Chromium's own "Refused to ..." line). This is what makes a
+component that throws but still renders red; the panel's `AppGlobalErrorHandler` logs again for that reason
+(one string: message, stack and route, no user data). The guard is torn down BEFORE `seeder` cleans up, so
+the 404s of a page that is still loading when its repository is deleted are not counted.
+
+- **Ignored everywhere:** Chromium's `Failed to load resource ...` line for a failed request (the specs assert
+  those outcomes themselves). Nothing else is muted globally, and `pageerror` is never ignored.
+- **The panel logs every error toast** with `console.error(message)` (`ToastService`), so a spec that
+  provokes one (a stubbed 500, a wrong password, a duplicate name) allows exactly that message:
+  `test.use({ allowedPageErrors: errorToasts('why', 'Toast text', ...) })` for a `describe`
+  (`allowLists()` joins several lists; it is an object, not an array, because Playwright reads a two-element
+  array in `test.use` as a `[value, options]` tuple), or `pageErrors.allowToast('Toast text', 'why')` /
+  `pageErrors.allow(/regex/, 'why')` inside one test. **A reason is mandatory**: a ticket key while the
+  bug is open, or the sentence that says why it is by design. An error toast in a test that does not allow
+  it fails that test, which is how an unexpected failing request shows up.
+- **A test that pins a bug with `test.fail()`** is checked too: a page error there would count as its
+  expected failure, so such a spec must not raise errors it has not allowed.
+- **The proof** is `harness.spec.ts`: three `test.fail()` cases (an uncaught exception, a `console.error` on an
+  `openUiPage`, a CSP violation) that wait for the event with their own listener, so a broken recorder cannot
+  satisfy them by timing out. Flip check: removing the `watchPageErrors` calls in `fixtures.ts` turns all
+  three red ("Expected to fail, but passed").
+- **NET-01** keeps recording the requests and the misserved fonts, styles and scripts; its CSP part is the
+  global guard now.
+- The module names no URL or route, so a UI project for another target (Repsy Cloud) reuses it as it is.
 
 ### Page objects (`src/ui/pages/`)
 
@@ -5251,9 +5284,8 @@ Things a later author must know:
 - **The SPA reads `localStorage` once, at boot** (`AuthService`), and `seedSession()` writes once per
   tab: change the storage, then `reload()`; the change survives it. Two tokens minted in the same second
   are byte-identical, so compare a refreshed access token with a value the test wrote, not with the old one.
-- **The password eye button is only a Font Awesome glyph**, and the font is a CDN resource the harness
-  blocks, so the button has no size and Playwright calls it "not visible": use
-  `LoginValidation.togglePasswordVisibility()` (a DOM click).
+- **The password eye button is a bundled remixicon glyph** (RPS-1402), so it has a box and a real click
+  works: `LoginValidation.togglePasswordVisibility()` clicks it (RPS-1617: it used to dispatch the event).
 - **Inline validation messages appear on blur** (`touched`), one at a time, in the order required,
   pattern, minlength, maxlength; `LoginValidation.enter()` types and blurs. The texts are the shared credential
   sentences of `src/ui/credential-messages.ts` (RPS-1265: one wording for a username, a password and a
@@ -5368,8 +5400,8 @@ Rules these specs follow (and a later spec on these pages should too):
   the search (and empties the box), so a test that checks a row afterwards searches for it again.
 - **Toggle.** Click the `toggle` label (`UserCreateModal.roleToggle`), assert on `toggle-input`
   (`roleSwitch`): a click on the sr-only input is intercepted by the slider.
-- **Eye buttons** (show/hide password) are Font Awesome glyphs, and the network allow-list blocks the
-  Font Awesome CDN, so the buttons have no box: they are activated with `dispatchEvent('click')`.
+- **Eye buttons** (show/hide password) are bundled remixicon glyphs (RPS-1402), so a real `click()` works
+  (`ProfilePage.toggleVisibility`; RPS-1617 dropped the `dispatchEvent('click')`).
 - **Timing.** The username change ends in `location.reload()` in the tick that raises its toast, so that
   toast is not observable: assert the reload (`ProfilePage.changeUsername`) and the outcome.
 - **Known bugs, pinned with `test.fail`**: none left in the users suite. The mojibake `â€¢` of the create-user
@@ -5414,9 +5446,8 @@ How the tests are written, and what they had to work around:
   and `settings-*` ids are used, never a label or `#id`.
 - **Toggles are flipped through their label** (`toggle-label`): the `role="switch"` checkbox is
   `sr-only` and covered by the drawn switch, so Playwright refuses to click it as "intercepted".
-- **The token "show" eye is clicked by event.** Its icon is a Font Awesome glyph from a CDN that the
-  UI suite blocks (`src/ui/defaults.ts`), so the button has no size; `toggleTokenVisibility()`
-  dispatches the click and the test asserts `aria-pressed` and the input's `type`.
+- **The token "show" eye is clicked for real.** Its icon is a bundled remixicon glyph (RPS-1402, RPS-1617);
+  `toggleTokenVisibility()` clicks it and the test asserts `aria-pressed` and the input's `type`.
 - **Long names** are in the row in full and clipped by CSS (`truncate`, RPS-1267; the popup on hover
   shows the whole name only while it is clipped): `expectCellText()` reads the cell's
   `tooltip-text`; rows are keyed by the raw name through `token-row-<name>`.
@@ -5434,8 +5465,8 @@ bug is fixed and the marker has to go. The Visibility and Package Override help 
 (RPS-1261) are fixed and asserted unpinned, and so is the duplicated `#name`/`#description` of the rename form and the
 create-token modal (RPS-1266, TOK-05), and so is RPS-1285: TOK-03 revokes the only token on page 2
 with the page-2 answer delayed and asserts a single list request (the first page) and the three
-remaining rows. Not covered here: the Vulnerability Scanning toggle
-(hidden without a scanner, RPS-1259), the per-protocol "configure" modal behind a token row, the
+remaining rows. The Vulnerability Scanning toggle is covered by SEC-01/SEC-02c
+(it is hidden without a scanner, RPS-1259). Not covered here: the per-protocol "configure" modal behind a token row, the
 `reservedName` rename error (it has no test id), the expiration-date range messages (no test id) and
 the token-name `minLength` branch, which was unreachable and is gone (`required` already covers an empty name, RPS-1265).
 
@@ -5592,10 +5623,9 @@ keys a crate by its normalised name, `-` becoming `_`), NuGet and Helm `e2e-<run
 | ruby-07   | yanked badge on the versions list and on the detail after a yank through the API; install commands, platform and checksum; the Latest link                                                                                                                                                                                                                                                            |
 
 What the descriptors record (found by running each protocol): a version row's link appends `#security`
-(the template accepts a fragment); a detail Delete lands on the list (Cargo, Ruby), on the versions page
-(NuGet, Helm, Go, and Docker since RPS-1288 (7)) and, for the LAST version, on the list for NuGet and Helm (`landsOnLast`) and on the empty
-versions page for Go and Docker; deleting the last version removes the package for all but Go and Docker: Go's module
-stays listed with no versions, and Docker keeps an emptied image, by design, as "No tags" while it stores a manifest (RPS-1288 (5)); Cargo/NuGet/Helm/Ruby Configure texts have
+(the template accepts a fragment); a detail Delete follows the RPS-1288 (7) convention for every protocol (the versions page, or the list after the package's LAST version); only Docker records
+a landing of its own (`landsOn: 'versions'` also for its last tag, since its image stays listed), and deleting the last version removes the package for all but Docker
+(Go's module goes with its last version: `lastVersionRemovesPackage: true`), which keeps an emptied image, by design, as "No tags" while it stores a manifest (RPS-1288 (5)); Cargo/NuGet/Helm/Ruby Configure texts have
 `<YOUR_...>` placeholders and the same body in the deploy-token variant (`deployTokenMarker` is optional
 now: absent = same body, only the title differs), Ruby's title is the same in both.
 
@@ -5665,8 +5695,8 @@ Things a later author must know:
   label (`getByLabel(..., { exact: true })` reaches the field it names, also on `/:repo/settings` with the
   create-token modal open), by element ids (none twice in the document, every `label[for]` resolves to a form
   control), by the accessible names of the icon-only buttons (refresh, PGP add, token rotate/configure/revoke,
-  modal X) and by the password eyes, whose name and `aria-pressed` follow the state (they are still clicked with
-  `dispatchEvent`: the blocked Font Awesome CDN leaves them without a box).
+  modal X) and by the password eyes, whose name and `aria-pressed` follow the state (they are clicked for real
+  since RPS-1617: the icons are bundled remixicon glyphs).
 - **List rows are links (A11Y-08..10, `a11y/rows.spec.ts`, RPS-1266 part 4).** A row used to be
   `<div role="button" [routerLink]>` holding links and the row menu (axe `nested-interactive`). Now it is a plain
   container (`.row-link-host`, `position: relative`) whose first child is ONE real `<a class="row-link"
@@ -5689,8 +5719,8 @@ Things a later author must know:
   fails the test on a serious or critical violation (RPS-1266 part 4 flipped `DEFAULT_A11Y_MODE`, the one flag,
   from `report` to `enforce`). For a single run that only reports, use `REPSY_UI_OPT_IN=a11y-report` (or
   `a11y-enforce` to force the failing mode if the default is changed back), because `docker-compose.runners.yml`
-  forwards that variable already. Font Awesome (a blocked CDN in this harness) icons render as empty boxes; each
-  summary counts them as `faNodes` per rule so they stay separable. The five page scans are of the pages at rest;
+  forwards that variable already. Each
+  summary also counts the nodes that are still Font Awesome icons as `faNodes` per rule (0 since RPS-1402 bundled the icons). The five page scans are of the pages at rest;
   A11Y-01 also scans the open create-repository, create-token, create-user, confirmation and one-time-password
   modals (`scanPage(page, testInfo, label, selector)` scopes a scan to one element) and, for every protocol, the
   pages of the seeded package.

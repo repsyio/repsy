@@ -17,7 +17,7 @@ import { NEWEST_OLDEST_NAME, NEWEST_OLDEST, need, type ProtocolDescriptor } from
 import { repoPath } from '../../../repo-url.js';
 
 /**
- * Cargo: crates -> versions -> detail. Read from the components, not yet run in a browser (RPS-1257).
+ * Cargo: crates -> versions -> detail. Run in a browser by the package scenarios (RPS-1257).
  *
  *  - The crate list also sorts by name; a crate row opens the VERSIONS page (no latest-detail shortcut).
  *  - The version list has NO mobile card list (UX-12), so `mobileCards` is false and a mobile-viewport

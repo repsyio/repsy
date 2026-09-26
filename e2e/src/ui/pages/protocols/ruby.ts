@@ -16,12 +16,12 @@
 import { NEWEST_OLDEST, NEWEST_OLDEST_NAME, need, type ProtocolDescriptor } from './types.js';
 
 /**
- * Ruby: gems -> versions -> detail. Read from the components, not yet run in a browser (RPS-1257).
+ * Ruby: gems -> versions -> detail. Run in a browser by the package scenarios (RPS-1257).
  *
  *  - A gem row opens the VERSIONS page; `row-latest-link` opens the latest version's detail.
  *  - The detail page's `pkg-detail-yanked` badge shows after a yank; the install block is "Install"
  *    (`pkg-detail-snippet-gemfile` is the Gemfile line). A confirmed detail delete navigates `../..`
- *    (the list), unverified.
+ *    (the list), as the convention says.
  */
 export const rubyDescriptor: ProtocolDescriptor = {
   protocol: 'ruby',

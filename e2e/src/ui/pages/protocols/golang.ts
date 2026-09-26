@@ -18,8 +18,8 @@ import { repoPath } from '../../../repo-url.js';
 
 /**
  * Go: modules -> versions -> detail, but the routes carry the module path as a QUERY PARAMETER
- * (`golang.org/x/mod` has slashes), not as path segments. Read from the components, not yet run in
- * a browser (RPS-1257).
+ * (`golang.org/x/mod` has slashes), not as path segments. Run in a browser by the package
+ * scenarios (RPS-1257).
  *
  *  - versions:  `/:repo/modules?modulePath=<path>`
  *  - detail:    `/:repo/modules/version?modulePath=<path>&version=<v>`

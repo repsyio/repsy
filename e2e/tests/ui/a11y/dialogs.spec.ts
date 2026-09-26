@@ -23,9 +23,8 @@
  * points at its own control) and no element id occurs twice on a page, so the create-token modal that
  * sits over the rename form of `/:repo/settings` no longer steals its labels.
  *
- * The password "eyes" are Font Awesome glyphs and the harness blocks the CDN, so they have no box and a
- * real click is refused: like the other UI tests these dispatch the click. What is asserted here is
- * their accessible name and `aria-pressed`, which follow the state.
+ * The password "eyes" are bundled remixicon glyphs (RPS-1402) and are clicked for real (RPS-1617).
+ * What is asserted here is their accessible name and `aria-pressed`, which follow the state.
  */
 import type { Locator, Page } from '@playwright/test';
 
@@ -331,7 +330,7 @@ test.describe('Forms: labels, names and unique ids', { tag: '@a11y' }, () => {
 
     await expect(login.passwordToggle).toHaveAccessibleName('Show password');
     await expect(login.passwordToggle).toHaveAttribute('aria-pressed', 'false');
-    await login.passwordToggle.dispatchEvent('click');
+    await login.passwordToggle.click();
     await expect(login.passwordToggle).toHaveAccessibleName('Hide password');
     await expect(login.passwordToggle).toHaveAttribute('aria-pressed', 'true');
   });
@@ -379,7 +378,7 @@ test.describe('Forms: labels, names and unique ids', { tag: '@a11y' }, () => {
 
     await expect(eye).toHaveAccessibleName('Show password');
     await expect(confirmEye).toHaveAccessibleName('Show password confirmation');
-    await eye.dispatchEvent('click');
+    await eye.click();
     await expect(eye).toHaveAccessibleName('Hide password');
     await expect(eye).toHaveAttribute('aria-pressed', 'true');
     await expect(confirmEye).toHaveAttribute('aria-pressed', 'false');

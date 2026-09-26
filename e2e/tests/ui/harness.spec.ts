@@ -47,23 +47,33 @@ plainTest.describe('UI harness guards', () => {
   });
 
   plainTest('the preflight rejects an admin password the login form cannot submit', () => {
-    const original = env.adminPassword;
+    // `env.adminPassword` is a getter since RPS-1500 (it throws when unset), so it cannot be assigned:
+    // swap the property for the test and put the original descriptor back (RPS-1617: this case failed
+    // with "Cannot set property adminPassword ... which has only a getter" on main).
+    const original = Object.getOwnPropertyDescriptor(env, 'adminPassword');
+    const setPassword = (value: string): void => {
+      Object.defineProperty(env, 'adminPassword', {
+        configurable: true,
+        enumerable: true,
+        get: () => value,
+      });
+    };
     try {
       plainExpect(() => assertAdminCredentialsUsableInUi()).not.toThrow();
       // Synchronous set/check/restore, so no other test of this worker can observe the value.
       for (const unusable of ['', `Aa1${'x'.repeat(70)}`]) {
-        env.adminPassword = unusable;
+        setPassword(unusable);
         plainExpect(() => assertAdminCredentialsUsableInUi(), unusable).toThrow(
           /REPSY_ADMIN_PASSWORD must be 1-72 chars/,
         );
       }
       // Login only checks the shape (RPS-1308): a weak or a 72-character password is usable.
       for (const usable of ['a', 'abc', 'alllowercase1', 'Has Space1a', `Aa1${'x'.repeat(69)}`]) {
-        env.adminPassword = usable;
+        setPassword(usable);
         plainExpect(() => assertAdminCredentialsUsableInUi(), usable).not.toThrow();
       }
     } finally {
-      env.adminPassword = original;
+      Object.defineProperty(env, 'adminPassword', original as PropertyDescriptor);
     }
   });
 
@@ -101,7 +111,84 @@ test.describe('UI harness fixtures', () => {
     },
   );
 
-  test('the flake defaults are applied and third-party hosts are blocked', async ({ page }) => {
+  // RPS-1617: the page-error guard. The three cases below are expected failures for the same reason as
+  // the @credentials one above: the guard throws at teardown, so `test.fail()` is what proves it flags
+  // the error, and it turns red the day the guard stops doing so (flip proof: remove the
+  // `watchPageErrors` calls in `fixtures.ts`). Each waits for the event with its OWN listener, not with
+  // the recorder under test (a broken recorder would then time out, fail the body, and satisfy
+  // `test.fail()` for the wrong reason), and then makes a round trip so the fixture's listener has run.
+  // eslint-disable-next-line playwright/expect-expect
+  test.fail(
+    'an uncaught exception in the page fails the test (an expected failure: the list reporter shows it as ✘)',
+    async ({ page }) => {
+      await page.goto('/login');
+      const thrown = page.waitForEvent('pageerror');
+      await page.evaluate(() =>
+        setTimeout(() => {
+          throw new Error('harness-probe: uncaught');
+        }, 0),
+      );
+      await thrown;
+      await page.evaluate(() => 0);
+    },
+  );
+
+  // eslint-disable-next-line playwright/expect-expect
+  test.fail(
+    'a console.error fails the test, also on a page from openUiPage (an expected failure: the list reporter shows it as ✘)',
+    async ({ openUiPage }) => {
+      const page = await openUiPage();
+      await page.goto('/login');
+      const logged = page.waitForEvent('console', (message) => message.type() === 'error');
+      await page.evaluate(() => console.error('harness-probe: console error'));
+      await logged;
+      await page.evaluate(() => 0);
+    },
+  );
+
+  // eslint-disable-next-line playwright/expect-expect
+  test.fail(
+    'a CSP violation fails the test (an expected failure: the list reporter shows it as ✘)',
+    async ({ page }) => {
+      await page.goto('/login');
+      const violation = page.waitForEvent('console', (message) =>
+        /Content Security Policy/.test(message.text()),
+      );
+      // connect-src 'self': the browser refuses this before it leaves, and reports the violation.
+      await page.evaluate(() => fetch('https://csp-probe.invalid/x').catch(() => undefined));
+      await violation;
+      await page.evaluate(() => 0);
+    },
+  );
+
+  test('an allowed error is recorded but does not fail the test, and an allow needs a reason', async ({
+    page,
+    pageErrors,
+  }) => {
+    expect(() => pageErrors.allow(/x/, ' ')).toThrow(/needs a reason/);
+    pageErrors.allow(/harness-probe: allowed/, 'the harness proof throws it on purpose');
+    await page.goto('/login');
+    await page.evaluate(() => {
+      console.error('harness-probe: allowed');
+      // Chromium's own line for any failed request: ignored everywhere, by design.
+      return fetch('/api/harness-probe-does-not-exist').then(() => undefined);
+    });
+    await expect
+      .poll(() => pageErrors.all().map((error) => error.text))
+      .toContain('harness-probe: allowed');
+    expect(pageErrors.unexpected()).toEqual([]);
+  });
+
+  test('the flake defaults are applied and third-party hosts are blocked', async ({
+    page,
+    pageErrors,
+  }) => {
+    // The panel's CSP (connect-src 'self') refuses these two fetches before the flake defaults' abort
+    // even sees them: the CSP console lines are by design here (RPS-1617).
+    pageErrors.allow(
+      /gravatar\.com|googletagmanager\.com/,
+      'by design: the probe fetches third-party hosts to prove they are blocked',
+    );
     await page.goto('/login');
 
     const motion = await page.evaluate(() => ({

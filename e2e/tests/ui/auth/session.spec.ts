@@ -36,6 +36,7 @@ import { LoginPage } from '../../../src/ui/pages/login.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
 import { loginSession } from '../../../src/ui/session.js';
 import { JWT_SHAPE, NO_SESSION, storedSession } from './stored-session.js';
+import { allowLists, errorToasts } from '../../../src/ui/page-errors.js';
 
 const REFRESH_PATH = '/api/auth/tokens/refresh';
 
@@ -104,6 +105,24 @@ test.describe('AUTH-08 expired access token (stubbed 401)', () => {
 });
 
 test.describe('AUTH-08 tampered access token', () => {
+  test.use({
+    allowedPageErrors: allowLists(
+      errorToasts(
+        'by design: the server refuses the tampered token and the session ends',
+        'Session invalid, please log in again.',
+      ),
+      {
+        entries: [
+          {
+            pattern: /^Failed to load user role:/,
+            reason:
+              'by design: the sidebar asks for the profile with the refused token, right before the session ends',
+          },
+        ],
+      },
+    ),
+  });
+
   // The backend answers a token with a bad signature 401 `accessNotAllowed`. Such a token can never
   // become valid (and a refresh token signed by the same key would not either), so
   // `RefreshTokenInterceptor` logs out at once, without a refresh call (RPS-1279; before, every
@@ -139,6 +158,12 @@ async function expectLoggedOut(page: Page): Promise<void> {
 }
 
 test.describe('AUTH-09 refused refresh token', () => {
+  test.use({
+    allowedPageErrors: errorToasts(
+      'by design: the refresh is refused and the session ends',
+      'Session expired, please log in again.',
+    ),
+  });
   /** Boots the dashboard logged in, then returns the page's stored session. */
   async function bootLoggedIn(page: Page) {
     await new DashboardPage(page).goto();
@@ -168,6 +193,9 @@ test.describe('AUTH-09 refused refresh token', () => {
     });
     const session = await bootLoggedIn(page);
     // Somebody else (another tab, a stolen copy) spends the refresh token first: single use.
+    // NOTE (RPS-1621): logging the user out here is the current behaviour, not a contract. For "another
+    // tab of the same browser spent the token" it is arguably wrong (the second tab should adopt the
+    // first tab's new pair); RPS-1621 covers the multi-tab story. Do not rely on this test for it.
     const spent = await page.request.post(`${env.apiBaseUrl}${REFRESH_PATH}`, {
       data: { refreshToken: session.refreshToken },
     });
@@ -213,6 +241,24 @@ test.describe('AUTH-09 refused refresh token', () => {
  * could not tell them apart. Nothing is stubbed: both answers are the real ones.
  */
 test.describe('AUTH-12 permission failure is not a lost session', () => {
+  test.use({
+    allowedPageErrors: allowLists(
+      errorToasts(
+        'by design: an invalid token is a 401 that ends the session',
+        'Session invalid, please log in again.',
+      ),
+      {
+        entries: [
+          {
+            pattern: /^Failed to load user role:/,
+            reason:
+              'by design: the sidebar asks for the profile with the refused token, right before the session ends',
+          },
+        ],
+      },
+    ),
+  });
+
   test('a USER is answered 403 by a MANAGE route and stays signed in', async ({
     userPage,
     seeder,
