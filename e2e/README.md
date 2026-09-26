@@ -409,7 +409,7 @@ only `e2e/`, never the backend or its docs. **Fixed by RPS-1173 itself**: the `D
 no `DB_URL` is passed, matching the README. This transcript is kept as the historical record of the
 bug, not rewritten.
 
-### Scope decision: `@smoke` everywhere plus one full catalog, not ten full catalogs
+### Scope decision: `@smoke` everywhere plus one rotating full catalog, not ten full catalogs
 
 RPS-294's own "Out of scope" text keeps a per-database full run out of scope: "The design keeps it a
 matter of `run.sh local up && run.sh test` per protocol in a matrix, and an `@smoke` tag already
@@ -420,8 +420,10 @@ roughly double this harness's wall-clock time for a question that is database-ag
 layer. Schema/JPA/dialect divergence between postgres and H2 is already covered on the backend side
 by `H2IntegrationTest` and the `H2*IT` suite; what only the e2e H2 profile can show is that the
 built image actually boots on H2 and that each protocol's real client completes a round trip against
-it — which `@smoke` across every runner, plus one full catalog (maven, the protocol with the most
-repo-setting scenarios) on H2, demonstrates without doubling the run.
+it — which `@smoke` across every runner, plus one full catalog on H2, demonstrates without doubling the run.
+The nightly's `h2-full` leg runs that one catalog every night and rotates it over the protocol runners by
+date, so each protocol's whole catalog meets H2 every ten nights ("CI", "What runs"). `@smoke` alone was not
+enough: RPS-1385 (a native CTE that broke Docker on H2 while every IT passed) escaped for exactly that reason.
 
 ### H2-9, confirmed live: the skeleton `@smoke` tag gap
 
@@ -1228,12 +1230,12 @@ berry each answered `whoami` from the stack) and are covered by their own PRs.
 | 17 `dist.tarball` host                        | `matrix/tarball-host.spec.ts` (`@local-only`) | pass (RPS-1333)                                   | pass (RPS-1333)                                                                                                                                | published via `127.0.0.1`, consumed via `localhost` on a private repo: installs, and every read names `REPO_BASE_URL`                                                       | pass (RPS-1333); bun sends credentials to another tarball origin anyway (pinned in `bun/config.spec.ts`)                             | pass (RPS-1333)                                                                                                                                                                  |
 | 18 abbreviated packument                      | `matrix/abbreviated-metadata.spec.ts`         | RPS-1356 fix; npm skips a mismatched optional dep | RPS-1356 fix; yarn asks for the abbreviated document and still skips the mismatched optional dep                                               | see below                                                                                                                                                                   | RPS-1356 fix: bun INSTALLS the `os:["win32"]` optional dep (it reads the abbreviated document)                                       | RPS-1356 fix; berry sends no `Accept`, reads the full packument and skips the mismatched optional dep                                                                            |
 | 19 wire trace                                 | `matrix/wire.spec.ts`                         | pass; RPS-1358, RPS-1359 fix                      | pass; RPS-1358, RPS-1359 fix; asks for the abbreviated packument, no `npm-command`                                                             | Accept, Authorization scheme (Bearer for a token, Basic for a password), User-Agent, `npm-command`                                                                          | pass; RPS-1358, RPS-1359 fix; abbreviated `Accept`, `Bun/1.3.14`, no `npm-command`                                                   | pass; no `Accept`, User-Agent `got (...)`, no `npm-command`; RPS-1358, RPS-1359 fix                                                                                              |
-| workspaces (11), login (2b), `unpublish` (8)  | --                                            | not in this PR                                    | N/A: no `workspace:` protocol, `yarn login` needs a TTY, no unpublish command                                                                  | 8 is `tests/npm/unpublish.spec.ts`; 11 comes with the pnpm/yarn/bun PRs, 2b is optional                                                                                     | pass (`bun/commands.spec.ts`): `workspace:`/`catalog:` rewritten; login N/A                                                          | 11: pass (`workspace:^` -> `^1.2.3`, `yarn-berry/workspaces.spec.ts`); 2b: not covered (interactive, `--web-login` hangs); 8: no command                                         |
+| workspaces (11), login (2b), `unpublish` (8)  | --                                            | not in the npm baseline                           | N/A: no `workspace:` protocol, `yarn login` needs a TTY, no unpublish command                                                                  | 8 is `tests/npm/unpublish.spec.ts`; 11 comes with the pnpm/yarn/bun PRs, 2b is optional                                                                                     | pass (`bun/commands.spec.ts`): `workspace:`/`catalog:` rewritten; login N/A                                                          | 11: pass (`workspace:^` -> `^1.2.3`, `yarn-berry/workspaces.spec.ts`); 2b: not covered (interactive, `--web-login` hangs); 8: no command                                         |
 
 N/A by design: proxy/remote passthrough (row 12: OS has no npm proxy repository, so no fixture ever
 depends on a public package).
 
-### Hypotheses probed live for this PR (the plan's H-n, observed)
+### Hypotheses probed live (RPS-1330's plan, H-n, observed)
 
 | H             | Plan                                                                                                          | Observed                                                                                                                                                                                          |
 | ------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1247,7 +1249,7 @@ depends on a public package).
 | H-7           | yarn berry needs `npmAlwaysAuth` for an unscoped private read, and scoped uses best-effort auth               | confirmed, asserted (PR 4): unscoped without it is `YN0041` and an anonymous 401; a scoped read still sends the token; see "yarn berry"                                                           |
 | H-20, 18      | `npm login` fallback, npm workspaces                                                                          | not probed here                                                                                                                                                                                   |
 
-### Backend candidates found (npm baseline; file a ticket for each, then replace the placeholder)
+### Backend candidates found (npm baseline; each has its ticket)
 
 - **RPS-1356 (fixed)**: the abbreviated packument (`Accept: application/vnd.npm.install-v1+json`) dropped
   `os`, `cpu`, `libc`, `peerDependenciesMeta` and `funding` (the full one, the control, has all of them).
@@ -4267,6 +4269,7 @@ REPSY_E2E_PROJECT=mine REPSY_E2E_PORT_OFFSET=100 ./run.sh local up   # a private
                               # default one: see "Parallel stacks" (give the same to test/sweep/down)
 ./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby --grep '@smoke'
 ./run.sh test --protocol maven   # one full catalog against H2 -- see "Stack profiles" above
+./run.sh local ps --h2       # the stack's containers ("local logs --h2" prints their logs)
 ./run.sh local down --h2
 ```
 
@@ -4300,7 +4303,8 @@ host-matching uid even though the packages themselves only need to be read.
 ## CI
 
 `.github/workflows/e2e-nightly.yml` ("E2E Nightly") runs this harness on GitHub Actions: the panel UI
-suite, the wire-level protocol runners and the embedded-H2 smoke run. **It runs nightly (01:23 UTC)
+suite, the wire-level protocol runners, the embedded-H2 smoke run plus one rotating full catalog on H2, and
+the scanner-stub UI specs. **It runs nightly (01:23 UTC)
 and on demand only, by the product owner's decision (RPS-1260): it has no `pull_request`, `push` or
 `merge_group` trigger.** PR checks are switched off in this repo on purpose (`pr-checks.yml` is
 `workflow_dispatch` only, `AGENTS.md` "Merging to main"), and this workflow is not a required check.
@@ -4309,8 +4313,9 @@ and on demand only, by the product owner's decision (RPS-1260): it has no `pull_
 
 ```bash
 gh workflow run e2e-nightly.yml                            # everything, like the nightly run
-gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 | scanner | all
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | all
 gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
+gh workflow run e2e-nightly.yml -f suite=h2 -f h2_full=docker   # the full catalog of this runner on H2, not tonight's
 gh workflow run e2e-nightly.yml -f grep=@smoke             # a Playwright --grep for every leg
 gh workflow run e2e-nightly.yml -f keep_stack_logs=true    # upload the container logs of a green run too
 gh workflow run e2e-nightly.yml --ref some-branch -f suite=ui   # a branch (the file must exist there)
@@ -4318,18 +4323,20 @@ gh run watch                                               # follow the run star
 ```
 
 `suite=ui` with `protocol=maven` selects nothing and fails the plan job with a message. A scheduled
-run is always "everything". Only one run is active at a time (`concurrency: e2e-nightly`, no
+run is always "everything". `h2_full` names the runner of the `h2-full` leg and applies whatever `protocol`
+says; without it the leg takes tonight's runner of the rotation and `protocol` filters it like any other. Only one run is active at a time (`concurrency: e2e-nightly`, no
 cancelling): a second one waits.
 
 ### What runs
 
-| Job / leg | Stack                                       | Runs                                                                                                                          | Timeout |
-| --------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `image`   |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                | 40 min  |
-| `ui`      | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                     | 60 min  |
-| `wire`    | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, one `run.sh test` each | 120 min |
-| `h2`      | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui` (the "Scope decision" above: the catalogs are not repeated per database)             | 90 min  |
-| `scanner` | PostgreSQL + the stub scanner overlay       | `REPSY_UI_OPT_IN=scanner`, `--protocol ui --grep @scanner` only (20 tests, "Scanner stack" above), never the whole `ui` suite | 45 min  |
+| Job / leg | Stack                                       | Runs                                                                                                                                                                                                        | Timeout |
+| --------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `image`   |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                              | 40 min  |
+| `ui`      | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                   | 60 min  |
+| `wire`    | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                       | 150 min |
+| `h2`      | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                       | 90 min  |
+| `h2-full` | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another | 60 min  |
+| `scanner` | PostgreSQL + the stub scanner overlay       | `REPSY_UI_OPT_IN=scanner`, `--protocol ui --grep @scanner` only (20 tests, "Scanner stack" above), never the whole `ui` suite                                                                               | 45 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
 others. Every leg does the same: load the image, `./run.sh local up [--h2]` (with `REPSY_IMAGE` set, so
@@ -4337,9 +4344,15 @@ others. Every leg does the same: load the image, `./run.sh local up [--h2]` (wit
 <runner>` per runner, `./run.sh sweep --all --dry-run` as a **leak check**, a job summary, the
 artifacts, and `./run.sh local down`. The leg fails when a runner fails, **or** when the leak check
 lists an `e2e-*` repository or user that a run left behind (the dry run always exits 0, so the step
-greps its `[dry-run] would delete` lines). `CI=true` reaches the `ui` runner (`retries: 1`,
-`forbidOnly`, `trace: on-first-retry`); a test that only passes on its retry is listed in the summary
-as a flake candidate and should get a ticket, it is not a pass to ignore.
+greps its `[dry-run] would delete` lines). `CI=true` reaches the `ui` runner alone (`retries: 1`,
+`forbidOnly`, `trace: on-first-retry`); the protocol runners never retry. A test that only passes on its retry
+does not fail the leg, but it is visible twice: the step "Flag the tests that needed a retry" turns every
+`*-retry*` directory of `test-results/` into a `Flaky test` warning annotation on the run, and the job summary
+lists it as a flake candidate. Give each one a ticket; it is not a pass to ignore.
+
+A leg's default `--grep` can be replaced for single runners: the plan job's `RUNNER_GREP` (`{"stack": ""}` on
+`h2`) makes that runner take another pattern, `""` meaning its whole catalog. The `grep` input, when given,
+overrides it, being the person's choice.
 
 The `scanner` leg starts the stack with `./run.sh local up --scanner` (Repsy with the scanner enabled plus the
 stub of `repsy-scanner-trivy`, built from `runners/scanner-stub.Dockerfile` on the runner) and ignores the
@@ -4375,14 +4388,17 @@ The workflow only calls `run.sh`; nothing in it is CI-specific. From `e2e/`, wit
 ```bash
 ./run.sh local up                                          # postgres profile; add --h2 for the H2 one
 ./run.sh test --target ci --protocol ui                    # the `ui` leg
-for p in skeleton maven npm cargo nuget docker helm pypi golang ruby; do ./run.sh test --target ci --protocol "$p"; done
+for p in skeleton maven npm npm-clients cargo nuget docker helm pypi golang ruby stack; do ./run.sh test --target ci --protocol "$p"; done
 ./run.sh sweep --all --dry-run                             # the leak check: it must print no "would delete" line
 ./run.sh local down
 CI=true ./run.sh test --protocol ui --grep @smoke          # with the CI retry/trace behaviour of the ui runner
 ```
 
-The `h2` leg is the same with `./run.sh local up --h2` and `--grep @smoke` on every runner (and `ui`).
-To run against an image you already built, set `REPSY_IMAGE` to its tag.
+The `h2` leg is the same with `./run.sh local up --h2` and `--grep @smoke` on every runner (and `ui`, and no
+`--grep` for `stack`); `h2-full` is `./run.sh local up --h2` and one `./run.sh test --target ci --protocol <runner>`
+without `--grep`. The stack logs of a failed leg are `./run.sh local ps [--h2|--scanner]` and
+`./run.sh local logs [--h2|--scanner]` (the step "Collect the stack logs" calls them, so a new stack flag needs
+no change in the workflow). To run against an image you already built, set `REPSY_IMAGE` to its tag.
 
 ### Runner requirements and the Chromium sandbox
 
@@ -4418,9 +4434,11 @@ of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays o
 
 ### Not covered yet
 
-A `scanner` leg (the Trivy stub profile and the `REPSY_UI_OPT_IN=scanner` tests, RPS-1270) is a
-placeholder comment in the workflow's `workflow_dispatch` inputs; nothing runs it. The H2 leg runs
-`@smoke` only, not one full catalog on H2.
+- **Stacks shaped differently** (TLS, tuned limits, a restart, an upgrade from the previous release): the
+  backend e2e epic RPS-1473 adds them; each story adds its own leg to "What runs" when it lands.
+- **H2 gets one full catalog a night**, not all ten: a protocol's whole catalog meets H2 every ten nights
+  (`h2-full`), its `@smoke` subset every night (`h2`).
+- **The `ui` runner is the only one that retries**, so a flaky protocol test fails its leg outright.
 
 ## Panel API facts this step verified against a running instance
 

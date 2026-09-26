@@ -61,6 +61,7 @@ usage() {
   cat <<'EOF'
 Usage:
   run.sh local up|down [--h2] [--scanner] [--force]
+  run.sh local logs|ps [--h2] [--scanner]
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
@@ -87,6 +88,10 @@ combinable with --h2): Repsy starts with SECURITY_SCANNER=enabled pointed at a d
 repsy-scanner-trivy, which the @scanner UI specs need (REPSY_UI_OPT_IN=scanner; with REPSY_E2E_SCANNER=1
 "run.sh test" adds that opt-in itself). The default stack never starts a scanner. Give "down" the same
 flags as "up". See README.md "Scanner stack".
+
+"local logs" prints the container logs (with timestamps) and "local ps" lists the containers (stopped ones
+too) of the stack that "local up" started with the same flags. The nightly workflow collects its stack
+logs with them, so a stack file added here needs no change there.
 
 Parallel stacks (README.md "Parallel stacks"): the stack is the compose project --project NAME
 (default repsy-e2e) with its host ports moved up by --port-offset N (default 0: panel API 8080, repo
@@ -357,6 +362,21 @@ cmd_local_down() {
   REPSY_ADMIN_PASSWORD="${REPSY_ADMIN_PASSWORD:-unused}" docker compose "${STACK_ARGS[@]}" down
 }
 
+# "local logs" and "local ps": read-only views of the stack "local up" started with the same flags. They
+# take no ownership guard, since they change nothing. Like "down", compose needs some value for the
+# required REPSY_ADMIN_PASSWORD to interpolate the stack file.
+cmd_local_logs() {
+  parse_stack_flags logs "$@"
+  stack_args
+  REPSY_ADMIN_PASSWORD="${REPSY_ADMIN_PASSWORD:-unused}" docker compose "${STACK_ARGS[@]}" logs --no-color --timestamps
+}
+
+cmd_local_ps() {
+  parse_stack_flags ps "$@"
+  stack_args
+  REPSY_ADMIN_PASSWORD="${REPSY_ADMIN_PASSWORD:-unused}" docker compose "${STACK_ARGS[@]}" ps -a
+}
+
 cmd_test() {
   require_admin_password
   ensure_runner_dirs
@@ -480,6 +500,14 @@ main() {
         down)
           shift || true
           cmd_local_down "$@"
+          ;;
+        logs)
+          shift || true
+          cmd_local_logs "$@"
+          ;;
+        ps)
+          shift || true
+          cmd_local_ps "$@"
           ;;
         *)
           usage

@@ -7,7 +7,7 @@ name: E2E Nightly
 # this repo (see pr-checks.yml and AGENTS.md "Merging to main"). Do not add one here; a PR gate is a
 # separate, later decision (README.md "CI" says how to add a smoke gate).
 #
-# Run it by hand: gh workflow run e2e-nightly.yml [-f suite=ui] [-f protocol=maven,npm] [-f grep=@smoke]
+# Run it by hand: gh workflow run e2e-nightly.yml [-f suite=ui] [-f protocol=maven,npm] [-f grep=@smoke] [-f h2_full=docker]
 permissions:
   contents: read
 
@@ -18,16 +18,20 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack), scanner (the @scanner UI specs against the stub scanner stack) or all"
+        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack, plus the full catalog of one rotating runner), scanner (the @scanner UI specs against the stub scanner stack) or all"
         type: choice
         options: [all, ui, wire, h2, scanner]
         default: all
       protocol:
-        description: "Only these runner services, comma separated (skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby,ui). Empty: every runner of the chosen legs"
+        description: "Only these runner services, comma separated (skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,golang,ruby,stack,ui). Empty: every runner of the chosen legs"
         type: string
         default: ""
       grep:
         description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 leg then keeps its default, @smoke). The scanner leg ignores it and always runs @scanner"
+        type: string
+        default: ""
+      h2_full:
+        description: "The one runner whose FULL catalog the h2-full leg runs on the embedded-H2 stack (any runner name above). Empty: the runner that is next in the nightly rotation. It applies whatever the protocol input says"
         type: string
         default: ""
       keep_stack_logs:
@@ -65,23 +69,38 @@ jobs:
           SUITE: ${{ inputs.suite || 'all' }}
           ONLY: ${{ inputs.protocol }}
           GREP: ${{ inputs.grep }}
+          H2_FULL: ${{ inputs.h2_full }}
         run: |
           python3 - <<'PY'
-          import json, os, re, sys
+          import datetime, json, os, re, sys
 
-          WIRE = "skeleton maven npm cargo nuget docker helm pypi golang ruby".split()
+          WIRE = "skeleton maven npm npm-clients cargo nuget docker helm pypi golang ruby stack".split()
+          # The runner whose full catalog runs on H2 tonight: one protocol runner per night, in turn
+          # (the date, so every runner comes round every len(ROTATION) days). Not skeleton (the harness
+          # proof) and not stack (its @local-only cases already run in full in the h2 leg).
+          ROTATION = [r for r in WIRE if r not in ("skeleton", "stack")]
+          H2_FULL = os.environ["H2_FULL"].strip()
+          h2_full_runner = H2_FULL or ROTATION[datetime.datetime.now(datetime.timezone.utc).toordinal() % len(ROTATION)]
           # leg -> (suite it belongs to, stack flag for run.sh local up, runners, default --grep, timeout,
           # REPSY_UI_OPT_IN, whether the --grep input may replace the default)
           LEGS = {
               "ui": ("ui", "", ["ui"], "", 60, "", True),
-              "wire": ("wire", "", WIRE, "", 120, "", True),
+              "wire": ("wire", "", WIRE, "", 150, "", True),
               # Embedded H2: @smoke of every runner (README.md "Scope decision"), not the catalogs.
               "h2": ("h2", "--h2", WIRE + ["ui"], "@smoke", 90, "", True),
+              # One full catalog on H2 per night, rotating (README.md "CI"): @smoke alone let RPS-1385 (a
+              # native CTE that broke Docker on H2 while every IT passed) through.
+              "h2-full": ("h2", "--h2", [h2_full_runner], "", 60, "", True),
               # The stub scanner overlay (README.md "Scanner stack"): only the opted-in @scanner specs.
               # Never the whole ui suite there (its @mocked specs assume the scanner is off), so the
               # grep input does not apply to this leg.
               "scanner": ("scanner", "--scanner", ["ui"], "@scanner", 45, "scanner", False),
           }
+
+          # leg -> {runner: --grep} where a runner must not take the leg's default grep ("" is the whole
+          # catalog). Ignored when the grep input is given: that one is the person's choice. The stack
+          # runner has no @smoke test, so `--grep @smoke` would fail it with "No tests found".
+          RUNNER_GREP = {"h2": {"stack": ""}}
 
           def fail(msg):
               print(f"::error::{msg}")
@@ -92,12 +111,16 @@ jobs:
           unknown = [p for p in only if p not in WIRE + ["ui"]]
           if unknown:
               fail(f"unknown protocol(s): {', '.join(unknown)}")
+          if H2_FULL and H2_FULL not in WIRE + ["ui"]:
+              fail(f"unknown h2_full runner: {H2_FULL}")
 
           include = []
           for leg, (owner, stack, runners, default_grep, timeout, opt_in, grep_input) in LEGS.items():
               if suite not in ("all", owner):
                   continue
-              runners = [r for r in runners if not only or r in only]
+              # An explicit h2_full input names the runner outright; only the rotation obeys `protocol`.
+              explicit = leg == "h2-full" and bool(H2_FULL)
+              runners = [r for r in runners if not only or r in only or explicit]
               if not runners:
                   continue
               include.append({
@@ -106,6 +129,7 @@ jobs:
                   "protocols": " ".join(runners),
                   "ui": "ui" in runners,
                   "grep": (os.environ["GREP"] if grep_input else "") or default_grep,
+                  "runner_grep": {} if os.environ["GREP"] and grep_input else RUNNER_GREP.get(leg, {}),
                   "opt_in": opt_in,
                   "timeout": timeout,
               })
@@ -257,6 +281,9 @@ jobs:
         env:
           PROTOCOLS: ${{ matrix.protocols }}
           GREP: ${{ matrix.grep }}
+          # {runner: pattern} for the runners that must not take GREP (plan job, RUNNER_GREP); "" runs
+          # the whole catalog of that runner.
+          RUNNER_GREP: ${{ toJSON(matrix.runner_grep) }}
           # The opt-in UI suites (README.md "UI suite"): `scanner` on the scanner leg, empty elsewhere.
           # The ui runner reads it (docker-compose.runners.yml) and the @scanner specs skip without it.
           REPSY_UI_OPT_IN: ${{ matrix.opt_in }}
@@ -264,12 +291,13 @@ jobs:
           # forwards it to the ui runner only. GitHub sets it already; explicit for the reader.
           CI: "true"
         run: |
-          grep_args=()
-          if [ -n "$GREP" ]; then
-            grep_args=(--grep "$GREP")
-          fi
           failed=0
           for protocol in $PROTOCOLS; do
+            pattern="$(python3 -c 'import json, os, sys; print(json.loads(os.environ["RUNNER_GREP"]).get(sys.argv[1], os.environ["GREP"]), end="")' "$protocol")"
+            grep_args=()
+            if [ -n "$pattern" ]; then
+              grep_args=(--grep "$pattern")
+            fi
             echo "::group::$protocol"
             ./run.sh test --target ci --protocol "$protocol" "${grep_args[@]}" || failed=1
             mkdir -p "$ARTIFACTS/$protocol"
@@ -279,6 +307,31 @@ jobs:
             echo "::endgroup::"
           done
           exit "$failed"
+
+      # A test that only passed on its retry is a flake to ticket. The job summary lists them, but a
+      # list in a summary is easy to miss, so each one also becomes a warning annotation on the run.
+      # It is its own step: workflow commands are ignored in the step whose stdout is redirected into
+      # the summary. Playwright keeps a directory per retry attempt (`<test>-retry1`), and only the ui
+      # runner retries (CI reaches it alone, playwright.config.ts retries: isCI ? 1 : 0). The leg
+      # stays green: a retry is a warning, not a verdict (RPS-1485).
+      - name: Flag the tests that needed a retry
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
+        run: |
+          python3 - <<'PY'
+          import glob, os
+
+          def escape(text):
+              return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+          base = os.environ["ARTIFACTS"]
+          flaky = 0
+          for folder in sorted(glob.glob(f"{base}/*/")):
+              runner = os.path.basename(folder.rstrip("/"))
+              for path in sorted(glob.glob(f"{folder}test-results/*-retry[0-9]*")):
+                  flaky += 1
+                  print(f"::warning title=Flaky test::{escape(runner)}: {escape(os.path.basename(path))} ran a retry attempt (flaky test, or a failing one)")
+          print(f"{flaky} retried test(s)")
+          PY
 
       # The @scanner specs skip themselves unless the opt-in reached the runner, and a skipped test
       # is not a failure, so a broken opt-in would leave this leg green with 20 skipped tests. Fail
@@ -378,14 +431,11 @@ jobs:
         env:
           STACK: ${{ matrix.stack }}
         run: |
-          # The same -f files as `run.sh local up $STACK` (run.sh stack_args): the stack file, plus the
-          # stub scanner overlay on the scanner leg, or the compose project would list no scanner-stub.
-          files=(-f docker-compose.stack.yml)
-          [ "$STACK" = "--h2" ] && files=(-f docker-compose.stack-h2.yml)
-          [ "$STACK" = "--scanner" ] && files+=(-f docker-compose.stack-scanner.yml)
+          # run.sh knows which compose files a stack has, so this step needs no list of them.
+          read -ra stack_args <<< "$STACK"
           mkdir -p stack-logs
-          docker compose "${files[@]}" ps -a > stack-logs/ps.txt 2>&1 || true
-          docker compose "${files[@]}" logs --no-color --timestamps > stack-logs/stack.log 2>&1 || true
+          ./run.sh local ps "${stack_args[@]}" > stack-logs/ps.txt 2>&1 || true
+          ./run.sh local logs "${stack_args[@]}" > stack-logs/stack.log 2>&1 || true
 
       - name: Upload the reports
         if: ${{ !cancelled() }}
