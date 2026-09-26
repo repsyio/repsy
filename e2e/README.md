@@ -661,6 +661,49 @@ five worked examples.
    entry's `protocols` field, or override its `expect` for your protocol via `expectByProtocol`
    (`scenarios/types.ts`'s `expectationFor`) when the real, probed status differs from maven's.
 
+### Manage matrix (RPS-1475)
+
+The publish/consume loop cannot express an operation that changes a registry after the publish, so the
+permission of those has its own catalog and runner: `scenarios/manage-catalog.ts` (the model, and the
+rule that derives an expectation) and `scenarios/manage-matrix.ts` (`registerManageMatrix(operations)`).
+A protocol contributes a `ManageOperation` list from `clients/<protocol>-manage.ts` and one spec,
+`tests/<protocol>/manage-matrix.spec.ts`, that registers it (npm: `clients/npm-manage.ts`,
+`tests/npm/manage-matrix.spec.ts`). Every operation runs once per credential, in a repo of its own
+(private; public for `anonymous`), as `<protocol> manage > <operation> > <credential>` with the tag
+`@manage` (and `@negative` for a refused cell, which reserves the remote failed-auth budget like the
+loop does):
+
+| Permission                                                    | admin-password                                                              | user-password | token-rw | token-ro | anonymous |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------- | -------- | -------- | --------- |
+| `WRITE` (publishing-level: deprecate, dist-tag, yank, unlist) | ok                                                                          | ok            | ok       | 401      | 401       |
+| `MANAGE` (removes stored files: unpublish, package delete)    | ok                                                                          | 401           | 401      | 401      | 401       |
+| `NO_ROUTE` (the protocol has no such wire operation)          | the operation's own probed status for every credential, and nothing changes |               |          |          |           |
+
+The permissions are the ones the handlers declare (`getProperties()`), decided in RPS-1424 and
+RPS-1317: a deploy token is never granted MANAGE, and an operation that only changes what is advertised
+stays WRITE. A cell whose real answer differs from the table lists it in the operation's `expectByCell`
+(`{ allowed?, status? }`) with a comment; `refusedStatus` changes the status of a refused cell.
+
+- **An allowed cell** seeds the state with the admin credential, runs the REAL client, requires exit 0
+  and hands the fingerprint before and after to the operation's `expectEffect`.
+- **A refused cell** requires a non-zero client exit, then replays the wire request the client sends
+  as raw HTTP (`probe`) and pins the status (a client hides it behind its exit code), and requires the
+  fingerprint (packument, dist-tags, deprecations and every tarball's bytes) to be exactly what it was.
+- To add an operation, write `prepare(seeder, repo)` (seed as admin, return `bindPrepared({ run, probe,
+fingerprint, expectEffect })`) in the protocol's `clients/<protocol>-manage.ts`; it needs no change
+  to the framework. A credential is made with `fixtures.ts`'s `materializeCredentialKind`.
+- The existing pins of single cells stay where they are (`tests/npm/unpublish.spec.ts`, the Helm R14
+  case, the Ruby, Cargo and crane-delete ones); the matrix adds the other credentials and the
+  "nothing changed" half.
+
+npm (25 cells, `./run.sh test --protocol npm --grep "npm manage"`): `unpublish-version` (`npm unpublish
+<pkg>@<v>`) and `unpublish-package` (`npm unpublish <pkg> --force`) are MANAGE, `deprecate` (`npm
+deprecate`) and `dist-tag-add`/`dist-tag-rm` (`npm dist-tag`) are WRITE. Probed live: a USER account
+on unpublish answers 401, not 403; an anonymous caller on a public repo gets 401 on every operation
+(the real client, given no credential at all, fails on its own, and the raw replay without an
+`Authorization` header is refused with 401); a raw replay as admin of each wire request changes the
+package exactly like the client does, so the replays are faithful.
+
 ## Maven runner
 
 `runners/maven.Dockerfile` adds a pinned Eclipse Temurin JDK and Apache Maven (build args
