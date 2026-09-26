@@ -358,6 +358,12 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring-boot.version}</version>
+                <configuration>
+                    <!-- Only the run goal reads this: activates application-dev.yml (RPS-1590). -->
+                    <profiles>
+                        <profile>dev</profile>
+                    </profiles>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>

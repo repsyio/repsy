@@ -225,9 +225,11 @@ admin:
   initial-password: ${ADMIN_INITIAL_PASSWORD:}
 
 app:
-  # Origins the panel API accepts cross-origin, credentialed requests from. Empty (the default)
-  # keeps today's behaviour: any origin is allowed. Comma-separated, exact origins only (e.g.
-  # https://panel.example.com), once set. See CorsGlobalConfiguration.
+  # Origins the panel API accepts cross-origin, credentialed requests from. Empty (the default) means
+  # same-origin only: no CORS header at all (RPS-1590), which is what the Docker image needs (the SPA
+  # and the API share an origin). Comma-separated, exact origins only (e.g. https://panel.example.com),
+  # for a SPA served from elsewhere. `mvn spring-boot:run` sets http://localhost:4200 through
+  # application-dev.yml. See CorsGlobalConfiguration.
   # The repository-serving (protocol) port sends no CORS header at all (RPS-1514).
   allowed-origins: ${APP_ALLOWED_ORIGINS:}
 

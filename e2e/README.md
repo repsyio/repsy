@@ -82,6 +82,7 @@ e2e/
   docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
   docker-compose.stack-trivy.yml  # OPT-IN overlay on either stack: the REAL repsy-scanner-trivy (built from ../repsy-scanner-trivy) + Repsy with the scanner enabled, `run.sh local up|down --trivy`, see "Real scanner stack"
   docker-compose.stack-limits.yml  # OPT-IN overlay on either stack: every configurable upload limit at 64 KiB, `run.sh local up|down --limits`, see "Size-limit leg"
+  docker-compose.stack-cors.yml    # OPT-IN overlay on either stack: APP_ALLOWED_ORIGINS set to two origins, `run.sh local up|down --cors`, see "CORS leg"
   docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" and "api"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle/sbt/Ant + Ivy and gpg; see "Adding a protocol adapter" below
@@ -275,7 +276,7 @@ e2e/
     api/
       port-separation.spec.ts   # RPS-1480 /api/** is not served on the protocol port (404 unknownPath); /v2/ and a Maven path on the api port are the SPA, not the protocol
       forwarded-headers.spec.ts # RPS-1480 X-Forwarded-Proto/Host/Port drive the Docker realm, the Cargo config.json and the PyPI simple links
-      cors-csp.spec.ts          # RPS-1480 CSP on the SPA and never on /api or the protocol port; the default (unset APP_ALLOWED_ORIGINS) CORS of the panel API; RPS-1514 no CORS on the protocol port, nosniff/Referrer-Policy/XFO, no HSTS over http
+      cors-csp.spec.ts          # RPS-1480 CSP on the SPA and never on /api or the protocol port; the default (unset APP_ALLOWED_ORIGINS: same-origin only, no CORS header, RPS-1590) CORS of the panel API and, with the `--cors` overlay, `@cors` ("CORS leg"); RPS-1514 no CORS on the protocol port, nosniff/Referrer-Policy/XFO, no HSTS over http
 ```
 
 ## Setup
@@ -312,6 +313,7 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_E2E_SCANNER`           | _(unset)_                           | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_E2E_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                    |
 | `REPSY_E2E_THROTTLE`          | _(unset)_                           | `1` makes `local up\|down` include the auth-throttle overlay (same as `--throttle`) and `test` add `throttle` to `REPSY_E2E_OPT_IN`, see "Auth-throttle leg"                                                                                                                                                                                                                                                                             |
 | `REPSY_E2E_LIMITS`            | _(unset)_                           | `1` makes `local up\|down` include the tiny-upload-limit overlay (same as `--limits`) and `test` add `limits` to `REPSY_E2E_OPT_IN`, see "Size-limit leg"                                                                                                                                                                                                                                                                                |
+| `REPSY_E2E_CORS`              | _(unset)_                           | `1` makes `local up\|down` include the APP_ALLOWED_ORIGINS overlay (same as `--cors`) and `test` add `cors` to `REPSY_E2E_OPT_IN`, see "CORS leg"                                                                                                                                                                                                                                                                                        |
 | `REPSY_E2E_TRIVY`             | _(unset)_                           | `1` makes `local up\|down` include the real-scanner overlay (same as `--trivy`) and `test` add `trivy` to `REPSY_E2E_OPT_IN`, see "Real scanner stack"                                                                                                                                                                                                                                                                                   |
 | `REPSY_E2E_SCANNER_PORT`      | `8090` + offset                     | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_SCANNER_STUB_URL`      | `http://localhost:8090`             | ui runner only: where the `@scanner` specs reach that API (follows `REPSY_E2E_SCANNER_PORT`)                                                                                                                                                                                                                                                                                                                                             |
@@ -4329,6 +4331,7 @@ and is never part of the default stack.
 | `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                            |
 | `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang), "TLS stack"; nightly `@smoke` of all clients |
 | `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                 |
+| `cors`     | `--cors`                | `REPSY_E2E_CORS=1`     | `docker-compose.stack-cors.yml`     | `cors`      | `APP_ALLOWED_ORIGINS` set to two origins (default: unset)  | `@cors` (api), "CORS leg"                                               |
 | `upgrade`  | `--upgrade`             | `REPSY_E2E_UPGRADE=1`  | `docker-compose.stack-upgrade.yml`  | `upgrade`   | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                      |
 | `trivy`    | `--trivy`               | `REPSY_E2E_TRIVY=1`    | `docker-compose.stack-trivy.yml`    | `trivy`     | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                                    |
 
@@ -4824,6 +4827,24 @@ Flip checks: raising all five values to 1 MB in the overlay fails every over-lim
 cases) and keeps every under-limit one green; running the specs on the default stack with `REPSY_E2E_OPT_IN=limits`
 does the same (every push succeeds); without the opt-in every `@limits` test skips, and the nightly leg fails on a skip.
 
+### CORS leg (RPS-1590)
+
+With `APP_ALLOWED_ORIGINS` unset (the default stack) the panel API is same-origin only: no CORS header for any
+origin, no answer to a preflight, and no `403` either (the request is served, the browser refuses the page the
+response). Setting the variable is the only thing that opens CORS, for exactly the listed origins. The default
+stack proves the unset half (`@smoke`, `tests/api/cors-csp.spec.ts`); the overlay `docker-compose.stack-cors.yml`
+sets `APP_ALLOWED_ORIGINS=http://allowed.e2e.test,http://second-allowed.e2e.test` for the other half (`@cors`, same
+file): each listed origin is reflected with `Access-Control-Allow-Credentials: true` on a preflight and on a
+request, any other origin gets `403` and no header, the protocol port sends nothing even for a listed origin,
+and the CSP `connect-src` names both. No other suite may run there (the `@smoke` CORS and CSP specs assert the
+unset default and skip themselves when the `cors` opt-in is on).
+
+```bash
+./run.sh local up --cors                                        # (or REPSY_E2E_CORS=1) add --h2 for H2
+REPSY_E2E_CORS=1 ./run.sh test --protocol api --grep @cors
+./run.sh local down --cors
+```
+
 ## API suite (RPS-1480)
 
 Raw `fetch` against the two ports of a Repsy, no package client and no browser: what the HTTP edge
@@ -4862,12 +4883,11 @@ What it pins, as observed on the built image:
   and not on the protocol port. `Strict-Transport-Security` is opt-in (`APP_HSTS_MAX_AGE`, off by
   default): the default stack never sends it, and the TLS overlay sets it so `tls-listeners.spec.ts`
   can prove it goes out on the two https listeners and on neither http one. With `APP_ALLOWED_ORIGINS`
-  unset (the default; the repository README's `APP_ALLOWED_ORIGINS` row) the panel API answers a
-  preflight from any origin with that origin and `Access-Control-Allow-Credentials: true`, and a request
-  without an `Origin` gets no CORS header; the protocol port sends no CORS header at all, for a
-  preflight or a plain request (flipping the any-origin default is RPS-1590). The restricted-origin half
-  (a foreign origin refused, the allowed one reflected, `connect-src` naming it) needs a stack that sets
-  the variable.
+  unset (the default; the repository README's `APP_ALLOWED_ORIGINS` row) the panel API is same-origin
+  only (RPS-1590): a preflight or a request from a foreign origin gets no CORS header (and is still served,
+  no `403`), as does a request without an `Origin`; the protocol port sends no CORS header at all, for a
+  preflight or a plain request. The configured half (a foreign origin refused, the allowed one reflected,
+  `connect-src` naming it) needs a stack that sets the variable: the `cors` overlay ("CORS leg").
 
 ## Role sweep and Maven browser (RPS-1483)
 
@@ -6090,7 +6110,7 @@ and on demand only, by the product owner's decision (RPS-1260): it has no `pull_
 
 ```bash
 gh workflow run e2e-nightly.yml                            # everything, like the nightly run
-gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | upgrade (both) | trivy | tls | all
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | cors | upgrade (both) | trivy | tls | all
 gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
 gh workflow run e2e-nightly.yml -f suite=upgrade -f upgrade_from=26.08.3   # the upgrade legs from another release
 gh workflow run e2e-nightly.yml -f suite=h2 -f h2_full=docker   # the full catalog of this runner on H2, not tonight's
@@ -6117,6 +6137,7 @@ says; without it the leg takes tonight's runner of the rotation and `protocol` f
 | `scanner`    | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite                    | 60 min  |
 | `throttle`   | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                                   | 30 min  |
 | `limits`     | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                                     | 60 min  |
+| `cors`       | PostgreSQL + the CORS overlay               | `REPSY_E2E_OPT_IN=cors`, `--grep @cors` on `api`, "CORS leg": the configured origins are reflected, any other refused                                                                                                                       | 30 min  |
 | `upgrade`    | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                                                | 30 min  |
 | `upgrade-h2` | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                                    | 30 min  |
 | `trivy`      | PostgreSQL + the real scanner overlay       | `REPSY_E2E_OPT_IN=trivy`, `--grep @trivy` on `api`, 10 tests, "Real scanner stack": the contract the stub mimics and one real scan of an npm package and of a Docker image                                                                  | 45 min  |
@@ -6266,8 +6287,8 @@ CI=true ./run.sh test --protocol ui --grep @smoke          # with the CI behavio
 
 The `h2` leg is the same with `./run.sh local up --h2` and `--grep @smoke` on every runner (and `ui`, and no
 `--grep` for `stack`); `h2-full` is `./run.sh local up --h2` and one `./run.sh test --target ci --protocol <runner>`
-without `--grep`. The stack logs of a failed leg are `./run.sh local ps [--h2|--scanner|--throttle|--limits|--tls]` and
-`./run.sh local logs [--h2|--scanner|--throttle|--limits|--tls]` (the step "Collect the stack logs" calls them, so a new stack flag needs
+without `--grep`. The stack logs of a failed leg are `./run.sh local ps [--h2|--scanner|--throttle|--limits|--cors|--tls]` and
+`./run.sh local logs [--h2|--scanner|--throttle|--limits|--cors|--tls]` (the step "Collect the stack logs" calls them, so a new stack flag needs
 no change in the workflow). To run against an image you already built, set `REPSY_IMAGE` to its tag.
 
 ### Runner requirements and the Chromium sandbox
@@ -6306,7 +6327,7 @@ of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays o
 
 ### Not covered yet
 
-- **Stacks shaped differently** are covered by the `tls`, `limits`, `upgrade` and `upgrade-h2` legs of
+- **Stacks shaped differently** are covered by the `tls`, `limits`, `cors`, `upgrade` and `upgrade-h2` legs of
   "What runs" and, for a restart, by `tests/stack/persistence.spec.ts` (RPS-1476, the `stack` runner). A
   new stack shape gets its own row there.
 - **H2 gets one full catalog a night**, not all ten: a protocol's whole catalog meets H2 every ten nights
