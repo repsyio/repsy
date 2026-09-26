@@ -87,12 +87,12 @@ public class DockerApiFacade implements ProtocolApiFacade {
     this.dockerStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
-  // Event is published after the DB image delete but before the storage manifest delete. If
-  // deleteManifests() below fails and the transaction rolls back, the DB image record comes
-  // back, but the VulnerabilityScan cleanup triggered by this event has already committed
-  // (ArtifactScanListener.handleArtifactVersionDeleted runs synchronously, in its own
-  // transaction) and will not be undone — a known limitation inherited from the equivalent
-  // repsy-cloud code path, out of scope for this change.
+  // The event is published after the DB image delete but before the storage manifest delete, and
+  // that is safe: this facade is @Transactional, and the listener
+  // (ArtifactScanListener.handleArtifactVersionDeleted) is synchronous and calls a @Transactional
+  // (REQUIRED) method, so the scan cleanup joins this transaction. If deleteManifests() below
+  // fails, the exception rolls back the image, tag and manifest rows and the scan rows together
+  // (DockerDeleteStorageFailureIT), and the usage is only updated by the caller once this returns.
   public @NonNull BaseUsages deleteImage(
       final @NonNull RepoInfo repoInfo, final @NonNull String imageName) {
 
