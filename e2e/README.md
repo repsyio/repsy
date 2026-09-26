@@ -216,6 +216,7 @@ e2e/
       publish-consume.spec.ts   # registerPublishConsumeLoop(dockerAdapter) + D1-D4 real-client tests (OCI family, auth login, by-digest, retag)
       registry-rules.spec.ts    # raw-HTTP pins R1-R15: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type, sha512 digests, protocol DELETE
       image-lifecycle.spec.ts   # crane: the last tag keeps the image (manifest pullable by digest), the last manifest removes it, a new push recreates it (RPS-1288)
+      crane-delete.spec.ts      # crane delete: password deletes by tag and by digest, a deploy token is refused, an older crane's insufficient_scope round trip (RPS-1440)
     helm/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
@@ -1868,7 +1869,12 @@ that one directory, and Debian 12 is a supported .NET 10 OS, so the copy works u
 `node:24-bookworm-slim` base every other runner uses.
 `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` avoids coupling the image to a specific ICU package
 version (this harness's rendered packages/projects carry no culture-sensitive data), the same
-approach the official Alpine .NET images take. `clients/nuget.ts` builds a `.nupkg` directly with
+approach the official Alpine .NET images take. The image also pre-creates `/tmp/.dotnet/shm/keep`:
+.NET creates and removes its named-mutex directories there on every `dotnet` command, the shm directory
+itself when it is empty, and two `dotnet` processes starting together (Playwright's two workers on their
+first tests) race that and exit 1 with `System.IO.IOException: The system cannot open the device or file
+specified. : 'NuGet-Migrations' ... mkdir("/tmp/.dotnet/shm/...") == -1` (RPS-1455); a placeholder keeps
+the directory alive. `clients/nuget.ts` builds a `.nupkg` directly with
 `fflate` (`nuget-raw.ts`'s `buildNupkg` — **no `dotnet pack`, no build, no `[Content_Types].xml`**:
 a zip containing a root `<id>.nuspec` and `content/e2e-marker.txt`, which is all the server's own
 `.nuspec`-extraction regex and the real client's package reader need) and runs the real `dotnet`
