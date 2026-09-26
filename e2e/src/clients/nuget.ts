@@ -104,30 +104,44 @@ async function renderTemplate(
 }
 
 /**
- * `nuget.config` in `home`, rendered fresh per invocation (never `dotnet`'s own machine-wide config,
- * which this harness never touches): `<clear/>` plus one `repsy` source pointed at the service index,
+ * `nuget.config` in `home` (or `opts.destination`), rendered fresh per invocation (never `dotnet`'s
+ * own machine-wide config, which this harness never touches): `<clear/>` plus one `repsy` source pointed at the service index,
  * `allowInsecureConnections="true"` (plain HTTP, this harness's own stack). `packageSourceCredentials`
  * is rendered whenever `credential.transport === 'basic'` (both `token`- and `password`-kind
  * credentials carry a username + secret pair the same shape) AND `includeCredentials` (default
  * `true`) is not turned off -- `tests/nuget/publish-consume.spec.ts`'s "api-key-only push" test turns
- * it off to exercise a pure `X-NuGet-ApiKey` push with no `packageSourceCredentials` fallback at all.
- * Exported for that test; every adapter call above goes through this same function, so the
- * credential-rendering logic never drifts between the two.
+ * it off to exercise a pure `X-NuGet-ApiKey` push with no `packageSourceCredentials` fallback at all;
+ * `includeSource: false` leaves the `<packageSources>` out (the panel's user-level file holds the
+ * credentials only, the source is in the project's `NuGet.Config`). Exported for those tests; every
+ * adapter call above goes through this same function, so the credential-rendering logic never drifts
+ * between them.
  */
 export async function renderNugetConfig(
   home: string,
   repoName: string,
   credential: MaterializedCredential,
-  opts?: { includeCredentials?: boolean },
+  opts?: { includeCredentials?: boolean; includeSource?: boolean; destination?: string },
 ): Promise<string> {
-  const cfgPath = path.join(home, 'nuget.config');
+  const cfgPath = opts?.destination ?? path.join(home, 'nuget.config');
+  await fs.mkdir(path.dirname(cfgPath), { recursive: true });
   await renderTemplate('nuget.config.template.xml', cfgPath, {
     serviceIndexUrl: serviceIndexUrl(repoName),
+    hasSource: opts?.includeSource !== false,
     hasBasic: credential.transport === 'basic' && opts?.includeCredentials !== false,
     username: credential.username ?? '',
     password: credential.password ?? '',
   });
   return cfgPath;
+}
+
+/**
+ * Where `dotnet` reads the user-level `NuGet.Config` from (`$HOME/.nuget/NuGet/NuGet.Config`), the
+ * file the panel's "Option A" tells users to put their credentials into. `dotnet nuget delete` and
+ * `dotnet add package` take no `--configfile`, so a real client of those commands finds the
+ * credentials here (RPS-1486).
+ */
+export function userNugetConfigPath(home: string): string {
+  return path.join(home, '.nuget', 'NuGet', 'NuGet.Config');
 }
 
 /** Renders the consumer classlib project (`consumer.csproj.template.xml`) into `work`. Exported for

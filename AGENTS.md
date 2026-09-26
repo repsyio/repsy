@@ -41,6 +41,31 @@ Repsy is spread over three repositories under the `repsyio` GitHub organisation:
 - `README.md` here covers installation, configuration and operation. Protocol usage guides live in
   `repsy-docs`, so link to them instead of copying them into `README.md`.
 
+### Repsy OS and Repsy Cloud: one codebase, worked on in both directions
+
+Repsy Cloud (the `repsy-cloud` application in the [`repsy-mono`](https://github.com/repsyio/repsy-mono)
+repository, usually checked out at `../repsy-mono/repsy/repsy-cloud`) serves the same package
+formats and panel API as this repository. Treat the two as **one codebase with two homes**: an
+improvement made on either side belongs on the other too.
+
+- **Look across before you finish.** When you fix a bug, tighten a validation, add an e2e case or
+  write a better test helper here, check whether Cloud has the same defect or gap. If it does, apply
+  the change there as well, or file a Jira story for it (search first) and name it in the PR. A
+  protocol fix that lands on one side only is a divergence someone pays for later.
+- **The reverse holds.** When Cloud has something better (a fix, a protocol edge case, an e2e
+  scenario, a helper, a documented behaviour), bring it here instead of rediscovering it. A Cloud test
+  that finds a bug is evidence about code Cloud shares with this repository, so it becomes a test or a
+  ticket here.
+- **Change shared contracts on both sides.** SPI changes in the protocol modules and `libs/`, and
+  panel API changes, have to reach Cloud (the "Cloud sync" stories track them): do not change such a
+  contract here and leave Cloud to find out.
+- **Say so when a difference is deliberate.** Cloud-only concerns (hosted storage, tenancy) are not
+  ported here, and OS-only ones (embedded H2, single-node install) are not forced onto Cloud. Note
+  the reason in the code or the PR so a deliberate difference does not read as drift.
+- **The repositories stay separate.** A change lands through the pull request flow of the repository
+  it belongs to, under that repository's review and merge rules. Do not merge in the other repository
+  without the owner's go-ahead.
+
 ## Architecture
 
 ### Runtime shape

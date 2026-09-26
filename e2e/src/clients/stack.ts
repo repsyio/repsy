@@ -313,3 +313,37 @@ export async function dataMount(container?: string): Promise<string | undefined>
   );
   return out === '' ? undefined : out;
 }
+
+// ---------------------------------------------------------------------------------------------------
+// The upgrade path (RPS-1487, tests/stack/upgrade.spec.ts): which image a container runs, and waiting for
+// a line the application logs some time after it is healthy (a background job).
+// ---------------------------------------------------------------------------------------------------
+
+/** The image reference the container was created from (`docker inspect .Config.Image`). */
+export async function containerImage(container?: string): Promise<string> {
+  const id = container ?? (await findRepsyContainer());
+  return docker(['inspect', '--format', '{{.Config.Image}}', id], 'docker-inspect-image');
+}
+
+/**
+ * The container's log lines matching `pattern`, polled until at least one does or `timeoutMs` passes
+ * (then the last, possibly empty, result). Only the matching lines are returned, so a password another
+ * line carries stays out of the test's output.
+ */
+export async function waitForLogLines(
+  container: string,
+  pattern: RegExp,
+  timeoutMs = 60_000,
+): Promise<string[]> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const result = await run('docker', ['logs', container], { cwd: '/tmp', label: 'docker-logs' });
+    const lines = `${result.stdout}\n${result.stderr}`
+      .split('\n')
+      .filter((line) => pattern.test(line));
+    if (lines.length > 0 || Date.now() >= deadline) {
+      return lines;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+}
