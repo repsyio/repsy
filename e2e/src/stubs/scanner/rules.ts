@@ -71,6 +71,21 @@ export interface StubFinding {
   cvssVector: string | null;
 }
 
+/**
+ * What a script (`PUT /control/scripts`) can say about one finding beyond its severity: which package
+ * and version it is on (the default is a made-up `stub-lib-<severity>-<n>`), its CVE id and its
+ * description (a panel row's text, and the title of an npm advisory). Unset fields keep the default.
+ * Naming the finding's package is what lets a real client's audit of a published package show it
+ * (RPS-1484): npm advisories match on the package name and version of the finding.
+ */
+export interface StubFindingSpec {
+  severity: StubSeverity;
+  packageName?: string;
+  packageVersion?: string;
+  cveId?: string;
+  description?: string;
+}
+
 export type StubOutcome = 'completed' | 'failed' | 'unavailable';
 
 /** What one scan does: the phases in seconds, and how it ends. */
@@ -82,6 +97,11 @@ export interface ScanPlan {
   outcome: StubOutcome;
   /** Reported by a `completed` scan, worst first. */
   severities: StubSeverity[];
+  /**
+   * Set by a script only (`resolvePlan`): what the script says about each finding, parallel to
+   * `severities` (a script finding given as a bare severity has `{}`).
+   */
+  overrides?: Array<Omit<StubFindingSpec, 'severity'>>;
   /** Reported by a `failed` scan. */
   errorMessage: string;
 }
@@ -199,23 +219,28 @@ const CVSS: Record<StubSeverity, number | null> = {
  * The findings for a list of severities, in that order. The n-th finding of a severity is always the
  * same one: CVE id `CVE-2099-<rank><nnn>` (CRITICAL 1001, 1002; HIGH 2001 ...), package
  * `stub-lib-<severity>-<n>` at `1.<n>.0`, fixed in `1.<n>.1` (UNKNOWN has no fix and is AFFECTED).
- * So a test can name the exact row it expects.
+ * So a test can name the exact row it expects. A script can replace the package, version, CVE id and
+ * description of a finding (`overrides[i]` is the i-th finding's, see `StubFindingSpec`).
  */
-export function findingsFor(severities: readonly StubSeverity[]): StubFinding[] {
+export function findingsFor(
+  severities: readonly StubSeverity[],
+  overrides: ReadonlyArray<Omit<StubFindingSpec, 'severity'>> = [],
+): StubFinding[] {
   const seen: Partial<Record<StubSeverity, number>> = {};
-  return severities.map((severity) => {
+  return severities.map((severity, index) => {
     const n = (seen[severity] ?? 0) + 1;
     seen[severity] = n;
-    const cveId = `CVE-2099-${RANK[severity]}${String(n).padStart(3, '0')}`;
+    const override = overrides[index] ?? {};
+    const cveId = override.cveId ?? `CVE-2099-${RANK[severity]}${String(n).padStart(3, '0')}`;
     const known = severity !== 'UNKNOWN';
     const score = CVSS[severity];
     return {
       cveId,
       severity,
-      packageName: `stub-lib-${severity.toLowerCase()}-${n}`,
-      packageVersion: `1.${n}.0`,
+      packageName: override.packageName ?? `stub-lib-${severity.toLowerCase()}-${n}`,
+      packageVersion: override.packageVersion ?? `1.${n}.0`,
       fixedVersion: known ? `1.${n}.1` : null,
-      description: `Stub ${severity.toLowerCase()} finding ${cveId}`,
+      description: override.description ?? `Stub ${severity.toLowerCase()} finding ${cveId}`,
       referenceUrl: `https://scanner-stub.invalid/advisories/${cveId}`,
       fixStatus: known ? 'FIXED' : 'AFFECTED',
       cvssScore: score,

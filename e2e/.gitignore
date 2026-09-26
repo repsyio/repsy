@@ -3,3 +3,4 @@ test-results/
 playwright-report/
 src/api/generated/
 .env
+.tls/

@@ -89,12 +89,12 @@ e2e/
   runners/npm-clients.Dockerfile  # + pinned pnpm, yarn classic, yarn berry (npm --prefix /opt/clients/<name>) and bun (copied from oven/bun); see "npm-family clients"
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
   runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
-  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image; no daemon, no socket
+  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image, `skopeo` (built statically from its pinned tag) and `regctl` (pinned release binary); no daemon, no socket
   runners/helm.Dockerfile      # + the static `helm` binary + the cm-push plugin installed at build time; no daemon, no socket
   runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
   runners/ruby.Dockerfile      # + a pinned Ruby toolchain (ruby/gem/bundle/bundler + stdlib) copied out of the official ruby image
-  runners/stack.Dockerfile     # + the static `docker` CLI copied out of docker-cli; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
+  runners/stack.Dockerfile     # + the static `docker` CLI and its compose plugin copied out of docker-cli, a JDK + Maven, crane and npm; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
   runners/ui.Dockerfile        # + Playwright's own headless Chromium (build-time install, /ms-playwright); the "ui" runner, see "UI suite"
   runners/scanner-stub.Dockerfile  # the stub scanner of the scanner stack (src/stubs/scanner/ on node:24, no dependencies, no build)
   runners/ui-seccomp.json      # Playwright's seccomp profile, so Chromium's sandbox works as a non-root uid in Docker
@@ -125,7 +125,7 @@ e2e/
       sbt-extras.ts             # registerSbtExtras(): the sbt-only checks (file set, cross-build, .credentials, defaults, panel), RPS-134
     ui/                        # the panel UI suite's plumbing (fixtures, session seeding, page objects) -- see "UI suite"
     clients/
-      stack.ts                  # findRepsyContainer()/dockerExec()/logLinesContaining(): docker exec + docker logs against the local stack's Repsy container ("Stack runner")
+      stack.ts                  # findRepsyContainer()/dockerExec()/logLinesContaining(), restartRepsy()/crashRepsy()/recreateRepsy()/restoreStack(): docker exec, logs, restart and compose recreate of the local stack's Repsy container ("Stack runner")
       exec.ts                   # execa wrapper: isolated work dir/HOME, redacted logs, attach-on-fail, an explicit env is the child's whole env
       client-env.ts             # clientEnv(): the allow-list environment every client runs in (RPS-1446); env-probe.ts reads it back for the sealed-env specs
       raw-http.ts                # shared raw-HTTP building blocks: RawResponse, adminCredential(), authHeader(), sha256Hex, 429 backoff
@@ -157,6 +157,11 @@ e2e/
       docker-image.ts                # hand-assembled OCI image layout builder (layer tar+gzip, config, manifest, index.json, oci-layout)
       docker-raw.ts                  # docker-specific raw HTTP: the two-hop token dance, manifest/blob PUT/GET/HEAD, OCI error envelope
       docker.ts                      # the docker client + dockerAdapter: publish()/resolve()/seedPublish(), crane push/pull
+      docker-copy-adapter.ts         # the scenario-loop adapter of the copy clients (CopyClient -> ProtocolAdapter) + openSession, RPS-1478 part B
+      docker-skopeo.ts               # skopeo: skopeoAdapter (skopeo copy), its env/auth file, the dir: reader
+      docker-regctl.ts               # regctl: regctlAdapter (regctl image copy), its regctl.json renderer
+      docker-tls.ts                  # the ONE place skopeo/regctl's TLS setting is decided (plain HTTP today; the HTTPS leg switches it here)
+      docker-client-tests.ts         # seeding + raw comparison helpers of the skopeo/regctl specs
       helm-chart.ts                   # hand-assembled Helm chart .tgz builder (Chart.yaml + values.yaml + marker, ustar+gzip)
       helm-raw.ts                     # raw HTTP for BOTH Helm protocols: OCI manifest/blob PUT/GET/HEAD + classic index/chart/upload/delete
       helm.ts                         # the OCI client + helmAdapter: publish()/resolve()/seedPublish(), helm push/pull --plain-http
@@ -164,7 +169,7 @@ e2e/
       pypi-raw.ts                     # pypi-specific raw POST/GET (upload/simple page/root index/download), buildWheel (fflate)
       pypi.ts                          # the pypi client + pypiAdapter: publish()/resolve()/seedPublish(), python3 -m twine/pip
       golang-raw.ts                     # golang-specific raw PUT/GET (@v/list, @latest, .info/.mod/.zip), buildModuleZip (fflate), dirhashHash1
-      golang-tls-shim.ts                 # in-process HTTPS reverse proxy for a credentialed consume (a real `go` refuses plain-http creds)
+      golang-tls-shim.ts                 # in-process HTTPS reverse proxy for a credentialed consume (a real `go` refuses plain-http creds; not used on a TLS stack)
       golang.ts                          # the golang client + golangAdapter: publish()/resolve()/seedPublish(), real curl -T / go mod download
       ruby-raw.ts                          # ruby-specific raw POST/GET/DELETE (gems/yank/versions/info/names/specs.4.8.gz), buildGem (buildTar + node:zlib)
       ruby.ts                              # the ruby client + rubyAdapter: publish()/resolve()/seedPublish(), real gem push / bundle install
@@ -231,6 +236,11 @@ e2e/
       image-lifecycle.spec.ts   # crane: the last tag keeps the image (manifest pullable by digest), the last manifest removes it, a new push recreates it (RPS-1288)
       crane-delete.spec.ts      # crane delete: password deletes by tag and by digest, a deploy token is refused, an older crane's insufficient_scope round trip (RPS-1440)
       registry-api.spec.ts      # raw-HTTP pins RA1-RA6 of what the Docker server does not implement: tags/list, _catalog, referrers (404 no route), the referrers tag-schema fallback, mount= (202 fallback) (RPS-1478)
+      skopeo-catalog.spec.ts    # registerPublishConsumeLoop(skopeoAdapter): the whole catalog through skopeo copy (RPS-1478 part B)
+      regctl-catalog.spec.ts    # registerPublishConsumeLoop(regctlAdapter): the whole catalog through regctl image copy
+      skopeo.spec.ts            # skopeo: copy between two repos, inspect, delete (scope *), multi-arch --all
+      regctl.spec.ts            # regctl: manifest get/head, image inspect, copy between repos, tag/manifest delete, sha512, multi-arch
+      client-tag-list.spec.ts   # crane ls/catalog, skopeo list-tags/inspect, regctl tag ls/repo ls against the missing tags/list (RPS-1489)
     helm/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
@@ -2566,6 +2576,62 @@ is in the PR that added this file.
 ./run.sh test --protocol docker -b   # -b the first time: builds the docker runner image
 ```
 
+### Second and third Docker client: `skopeo` and `regctl` (RPS-1478 part B)
+
+`runners/docker.Dockerfile` adds two more daemonless clients next to `crane`, both pinned by ARG (also in
+`docker-compose.runners.yml`) and checked at build time (`skopeo --version`, `regctl version`):
+`skopeo` v1.24.1, built statically (`CGO_ENABLED=0`, tags `containers_image_openpgp
+exclude_graphdriver_btrfs exclude_graphdriver_devicemapper containers_image_docker_daemon_stub`) from the
+tag in a throwaway `golang:<GO_VERSION>-bookworm` stage (it publishes no binary, and the distro package
+is years old), and `regctl` v0.11.6, the release binary verified against a pinned sha256 per
+architecture. Only the binaries are copied into the runner. `--insecure-policy` makes skopeo need no
+`policy.json`/`registries.d`, and nothing else is configured system-wide.
+
+The catalog (password, USER, tokens rw/ro, anonymous public/private, expired/revoked/rotated, override
+and no-override) runs unchanged through each client: `skopeo-catalog.spec.ts` and
+`regctl-catalog.spec.ts` register `skopeoAdapter`/`regctlAdapter` (`docker-copy-adapter.ts`), titles
+`docker[skopeo] > <scenario>`, tags `@skopeo`/`@regctl`. The adapters reuse `docker.ts` for everything
+that does not depend on the client (the raw re-PUT/GET probes that give the `Outcome`, the fingerprint,
+the round-trip checks) and add only the client's command lines. The published image is the same
+hand-built layout `crane push` sends, pushed with its manifest digest pinned (`skopeo copy
+--preserve-digests oci:<dir>`, `regctl image copy ocidir://<dir>@sha256:...`; the layout's
+`index.json` has no `ref.name`, so regctl needs the digest), so "the consumer got the very image" is the
+same digest comparison as for crane. Consuming: skopeo copies into a `dir:` (the registry's manifest
+bytes as they are: an `oci:` target would convert a Docker-schema2 manifest and change its digest),
+regctl into an `ocidir://`.
+
+Credentials are files, never argv: skopeo reads `REGISTRY_AUTH_FILE` (the `config.json` shape
+`renderDockerConfig` already renders), regctl `REGCTL_CONFIG` (`regctl.json`, `{"hosts": {"<host>":
+{"tls", "user", "pass"}}}`, mode 0600). The clients run in `clientEnv` allow-list environments
+(`sealed-env.spec.ts` has a cell for each). **TLS is decided in one place**, `clients/docker-tls.ts`:
+today the stack is plain HTTP, so skopeo gets `--tls-verify=false` (it tries `https://` first and falls
+back to `http://` only with it, confirmed: "server gave HTTP response to HTTPS client") and regctl `"tls":
+"disabled"` (neither treats `localhost` as insecure the way crane does); an `https:` repo URL turns both
+back on, `REPSY_E2E_INSECURE_REGISTRY` makes them skip verification only.
+
+Probed live (skopeo 1.24.1, regctl 0.11.6):
+
+| Behaviour                           | skopeo                                                                                                                                                                                           | regctl                                                                                                                                                                                                 |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Token scope                         | `pull,push` for a copy in, `pull` out; `*` for `delete`, accepted for the admin at the first request (no round trip)                                                                             | `pull,push`; never asks for `delete` first                                                                                                                                                             |
+| Delete                              | `delete <tag>` resolves the digest and deletes it: the manifest and EVERY tag go (crane deletes the tag only)                                                                                    | `tag delete` removes the tag only; `manifest delete` needs a digest and removes the manifest and its tags; both get one `401 insufficient_scope` naming `repository:<repo>/<image>:delete`, then `202` |
+| Deploy token (rw)                   | delete refused, `unauthorized`, nothing removed                                                                                                                                                  | both deletes refused, nothing removed                                                                                                                                                                  |
+| Blob upload                         | `POST` + one `PATCH` + `PUT ?digest=`                                                                                                                                                            | asks for a mount first and logs `Failed to mount blob ... blob mount returned a location to upload` (WARN, RA5), then uploads                                                                          |
+| Copy between two repos of one Repsy | destination has the identical manifest bytes and blobs (`SK1`)                                                                                                                                   | same (`RC2`)                                                                                                                                                                                           |
+| Anonymous                           | a public repo pulls (the token endpoint answers `200` to an anonymous `pull` token of a public repo, `401` + `Basic` for a private one); its anonymous push is refused by the catalog's own cell | same                                                                                                                                                                                                   |
+| Tag listing                         | `list-tags` fails (`name unknown: unknownPath`); **`skopeo inspect <tag>` also fails** because it lists the tags: `--no-tags` is needed (RPS-1489)                                               | `tag ls`/`repo ls` fail with the `404` envelope (RPS-1489)                                                                                                                                             |
+| Multi-arch                          | `copy --all` keeps the index digest and children; `inspect --override-arch` picks the child                                                                                                      | `image copy` copies the list and its children; `--platform` resolves the child                                                                                                                         |
+| sha512 (RPS-1244)                   | not exercised                                                                                                                                                                                    | an image addressed by its sha512 digest (`regctl image mod --digest-algo sha512`) copies in by that digest and is served under it (`RC4`)                                                              |
+
+`client-tag-list.spec.ts` pins what `crane ls`/`catalog`, `skopeo list-tags`/`inspect` and `regctl tag
+ls`/`repo ls` do against RA1/RA2 (fail with the registry's `unknownPath`): the story that adds `tags/list`
+(RPS-1489) flips it. Not covered: `oras` (RPS-1478 part C), the HTTPS leg (RPS-1474).
+
+```bash
+./run.sh test --protocol docker -b               # -b the first time this runner image changes
+./run.sh test --protocol docker --grep "@skopeo"  # or "@regctl"
+```
+
 ## Helm runner
 
 Repsy implements **two independent wire protocols** for Helm on the same protocol port: OCI
@@ -3587,11 +3653,12 @@ differently, so each of them is an **opt-in overlay**: a compose file layered on
 PostgreSQL one or the H2 one) with one more `-f`, that changes what Repsy runs with for one nightly leg
 and is never part of the default stack.
 
-| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                              | Specs                                        |
-| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | -------------------------------------------- | -------------------------------------------- |
-| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`     | `@scanner` (ui), "Scanner stack"             |
-| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client | `@throttle` (stack, ui), "Auth-throttle leg" |
-| `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB    | `@limits` (7 runners), "Size-limit leg"      |
+| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                              | Specs                                                              |
+| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | -------------------------------------------- | ------------------------------------------------------------------ |
+| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`     | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack" |
+| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client | `@throttle` (stack, ui), "Auth-throttle leg"                       |
+| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443        | `@tls` (skeleton, golang), "TLS stack"                             |
+| `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB    | `@limits` (7 runners), "Size-limit leg"                            |
 
 How it fits together, so a later overlay is one row:
 
@@ -3651,6 +3718,60 @@ the test's own users are read, so no other password is ever printed. Flip check:
 <repsy> chown root:root /app/data/password-reset` (the Dockerfile bug the case guards against) makes
 all four tests fail on the owner assertion or on `touch: Permission denied`.
 
+### Restart, crash and recreate: persistence (RPS-1476)
+
+`tests/stack/persistence.spec.ts` (`@local-only`, serial) proves what outlives the Repsy container, on
+the PostgreSQL stack and on the H2 stack alike (`./run.sh local up [--h2]`, then
+`./run.sh test --protocol stack --grep persistence`; both legs are the same spec, only the H2-file
+assertion is profile specific). RPS-1401 put the default storage on the `/app/data` volume without a test
+that a package outlives its container, and the H2 file database (same volume) is the riskier half.
+
+It publishes a Maven artifact (`mvn deploy`), an npm package (`npm publish`) and a Docker image
+(`crane push`) into one repo each, with the scenario adapters' `seedPublish` (the real client, no raw
+probe), takes a deploy token per repo and a panel user, and after each event checks that every package is
+consumed again by the real client with the admin password AND with the deploy token, byte for byte, that
+the panel lists it (Maven versions, the npm latest version, the Docker image digest) and that the user and
+the admin still log in:
+
+1. control: `/app/data` is a volume (not the container layer), `STORAGE_BASE_PATH` is under it, the
+   storage holds files, and on H2 `/app/data/repsy.mv.db` exists;
+2. `docker restart` (SIGTERM): same container, everything there;
+3. recreate (`docker compose up --force-recreate`): a new container, the SAME `/app/data` volume, everything
+   there;
+4. crash (`docker kill --signal KILL`, `docker start`): nothing committed is lost;
+5. sessions: with `OS_APP_JWT_SECRET` unset (every stack file) a restart and a recreate each end a session:
+   the access token and the refresh token from before are answered 401 `accessNotAllowed`; recreated with
+   `docker-compose.stack-jwt.yml` and a secret (`REPSY_E2E_JWT_SECRET`, random per run), both stay valid
+   across a restart and a recreate, and go back to 401 when the stack is restored to no secret.
+
+The helpers are reusable (RPS-1487, the upgrade path, recreates on another image with them),
+`src/clients/stack.ts`:
+
+- `restartRepsy(stopTimeoutSeconds?)`, `crashRepsy()`: same container; wait for the healthcheck;
+- `recreateRepsy({ env, extraFiles, files })`: `docker compose -p <project> -f <files> up -d --no-deps
+--no-build --force-recreate --wait repsy`, from the compose files the container was created from (its
+  `com.docker.compose.project.config_files` label) plus overlays, with `env` added to what the stack files
+  interpolate (`REPSY_IMAGE` for another image, `REPSY_E2E_JWT_SECRET`), and returns the new container id.
+  Take `currentComposeFiles()` BEFORE an overlay recreate and pass it to `restoreStack()` (or as `files`)
+  to go back; after an overlay the labels name the overlay too. Anonymous volumes are carried over, which
+  is what makes it a recreate "on the same volume"; `dataMount()` names the volume to prove it;
+- how compose runs inside the runner: it mounts the e2e directory read-only at its HOST path
+  (`REPSY_E2E_HOST_DIR`, exported by `run.sh`), so the labels' absolute paths resolve, and forwards the
+  ports, `REPSY_E2E_IMAGE_TAG` and `REPSY_IMAGE` the stack files interpolate. `run()` with
+  `extendEnv: true` accepts `REPSY_*` variables (a harness tool, not a client).
+
+Every panel session the harness holds dies with a restart of a stack without a fixed secret, so
+`relogin()` (a fresh `PanelApi.login`) comes before any further panel call and before the seeder's cleanup;
+a Basic-auth client authenticates per request and never notices. The runner runs with
+`REPSY_E2E_WORKERS=1` (`playwright.config.ts`), never against a shared stack. The stack runner image is
+about 1.5 GB (JDK, Maven, crane, compose plugin; versions pinned in `docker-compose.runners.yml` next to
+the maven and docker runners' and to be kept equal to them).
+
+Flip checks (each made the named test fail, then reverted): `--renew-anon-volumes` on the recreate (the
+volume is another one), the secret set in the "unset" case (the token after the restart is accepted),
+`STORAGE_BASE_PATH=/home/appuser/.repsy` in the stack file (control test: the path is not under `/app/data`;
+without it the recreate test: Maven 404).
+
 ### Auth-throttle leg (RPS-1477)
 
 The auth throttle (`AuthFailureThrottle`, RPS-1092) is a CPU defence: after `AUTH_THROTTLE_MAX_FAILURES`
@@ -3697,6 +3818,96 @@ Flip checks: `AUTH_THROTTLE_ENABLED: 'false'` in the overlay fails all eight cas
 shorter than the window in the reset case fails it with a 429 where the right password should pass.
 The throttle is per client and never per username, so a leg like this cannot be run by other suites in
 parallel: any client that fails authentication three times is locked out for ten seconds.
+
+## TLS stack (RPS-1474, part a)
+
+Repsy has optional HTTPS listeners of its own (the main README's "HTTPS / SSL": `API_SSL_*` for 8443 next to
+the panel API, `REPO_SSL_*` for 9443 next to the package protocols; HTTP stays open). Every other suite
+talks plain HTTP to a stack behind no proxy, so the `tls` overlay (`docker-compose.stack-tls.yml`, see
+"Stack overlays") is what proves those listeners with real clients: each runner reaches Repsy over https and
+has to trust its certificate in its own way.
+
+```bash
+./run.sh local up --tls                                   # (or REPSY_E2E_TLS=1) add --h2 for H2
+REPSY_E2E_TLS=1 ./run.sh test --protocol skeleton,api,golang,docker,npm --grep @smoke
+./run.sh local down --tls
+```
+
+Give `test` and `sweep` the switch (`REPSY_E2E_TLS=1`) as well as `up`: `test` cannot see the stack, so the
+switch is what makes it use the https URLs. A plain `test` against a TLS stack still reaches the http ports,
+but npm and NuGet then follow the https `REPO_BASE_URL` they name (below) without a trusted CA.
+
+**Certificates.** Nothing is committed. A one-shot `tls-init` service (`eclipse-temurin:25-jre`, `keytool`
+only, run as the invoking user) writes into `e2e/.tls/<project>` (git-ignored; `run.sh` creates the
+directory, since Docker would create it as root) once and reuses it after that, because a running Repsy
+holds the keystore; delete the directory for new ones:
+
+| File             | What                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `ca.pem`         | the throwaway CA (`CN=Repsy e2e CA`, 10 years) every client trusts                                                       |
+| `leaf.pem`       | what Repsy serves, signed by it: `CN=localhost`, SANs `localhost`, `repsy` (the compose service), `127.0.0.1`, `::1`     |
+| `keystore.p12`   | the leaf key and chain, mounted into Repsy at `/app/certs` (the README's documented path); password `changeit`           |
+| `truststore.p12` | the CA as a Java truststore for the JVM clients (`REPSY_E2E_TLS_TRUSTSTORE`, password `changeit`); no runner uses it yet |
+
+**Ports and URLs.** The https ports are 8443/9443 plus the port offset (`REPSY_E2E_API_TLS_PORT`,
+`REPSY_E2E_REPO_TLS_PORT`); the offset cap is now computed on 9443. Offsets that differ by a multiple of 1000 collide (8443 + 1000 is 9443), so keep to
+100..900. With TLS on, `run.sh` exports
+`REPSY_API_BASE_URL`/`REPSY_REPO_BASE_URL` as the **https** URLs (a value the user set still wins), and keeps
+the http ones in `REPSY_E2E_PLAIN_API_BASE_URL`/`REPSY_E2E_PLAIN_REPO_BASE_URL` (`env.plainApiBaseUrl`,
+`env.plainRepoBaseUrl`, equal to the normal ones without TLS). The repo URL is also the stack's `REPO_BASE_URL`.
+
+**How every runner trusts the CA.** Not in `docker-compose.runners.yml`: `run.sh test|sweep` adds them to
+`docker compose run` for every runner it starts (`tls_run_args`), so a runner added later needs nothing, and a
+stack without TLS sets none of them (an empty `SSL_CERT_FILE` would replace the system trust store). It mounts
+`e2e/.tls/<project>` at `/tls` and sets, each read by the clients that use it: `SSL_CERT_FILE` (Go, OpenSSL,
+.NET on Linux), `NODE_EXTRA_CA_CERTS` (Node: the harness's own `fetch`, npm, pnpm, yarn, bun), `REQUESTS_CA_BUNDLE`
+(Python: pip, twine), `CARGO_HTTP_CAINFO` (Cargo), `CURL_CA_BUNDLE` (curl), plus `REPSY_E2E_TLS_CA_FILE`,
+`REPSY_E2E_TLS_TRUSTSTORE(_PASSWORD)` for the specs and the JVM clients (which take a truststore through their
+own flags: part b). A client's environment is an allow-list, so the names are in `TRUST_VARIABLES`
+(`src/clients/client-env.ts`) and the npm-family's `sealedEnv` copies them too. The `ui` runner is left out
+of the TLS leg (Chromium would need `ignoreHTTPSErrors` and a config change).
+
+**`tests/skeleton/tls-listeners.spec.ts`** (`@tls`, `@smoke`, skipped without the overlay) pins:
+
+| Case                       | Asserted                                                                                                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Listeners                  | the panel API and the protocols answer on the https and the http port; a token issued over https works on the http port; plain http to a TLS port is Tomcat's `400`, TLS to a plain port is refused |
+| Certificate                | chain to the CA (`authorized`), the SANs above, valid for `127.0.0.1` too; a Node child **without** `NODE_EXTRA_CA_CERTS` gets `SELF_SIGNED_CERT_IN_CHAIN` (the control), with it `401`             |
+| Cargo `config.json`        | `dl` and `api` follow the listener: https on 9443, http on 9090 (built from the request)                                                                                                            |
+| Docker `WWW-Authenticate`  | the realm follows the listener the same way                                                                                                                                                         |
+| npm `dist.tarball`         | the configured `REPO_BASE_URL` (https) on **both** listeners: it wins over the request (README "npm tarball URLs")                                                                                  |
+| NuGet service index `@id`s | the same: every `@id` names the https `REPO_BASE_URL`, also when asked on the http port                                                                                                             |
+| Panel snippets             | `static-env.js` carries the https repo URL                                                                                                                                                          |
+
+**Go without the shim.** On a TLS stack the target is https, so `goEnv` embeds the credentials in an https `GOPROXY`
+and Go trusts the CA through `SSL_CERT_FILE`; the in-process shim is never started. In
+`tests/golang/publish-consume.spec.ts` the plain-http refusal case (H3) runs against the plain port
+(`plainRepoBaseUrl`, still there), and the shim wire-sequence case (H8/H19) has an https twin: a credentialed
+`go mod download -json` straight at Repsy's TLS listener, whose `Info`, `GoMod` and `Zip` files exist and
+whose zip is the published one, with the shim's trace unchanged.
+
+**Runs of this part** (own stack, offset 200, image of main): skeleton `@tls` 12/12, `api` `@smoke` 18/18,
+golang full 43 passed and 1 skipped (the shim case), docker full 56/56, npm full with the RPS-1559 cases as expected failures (below).
+Flip checks: with `SSL_CERT_FILE` withheld from the runner the golang `@smoke` cases fail with `tls: failed to verify
+certificate`; with `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE` withheld every npm and docker case fails with `self-signed
+certificate in certificate chain`; the untrusted-child case above pins the same thing permanently.
+
+**RPS-1559: Repsy's own https connectors miss settings the plain ones get.** `SslConnectorCustomizer` builds a bare
+connector, without `EncodedSolidusHandling.DECODE` and the connection timeout that `TomcatMultiPortConfiguration`
+sets on the others, and response compression does not reach it. Observed on 9443 against 9090: a request path
+with `%2F` (an npm **scoped** package, `@scope%2Fname`, which is how `npm publish`/`install` spell it) is answered
+by Tomcat with a bodyless `400 Bad Request`, and a large packument is not gzipped for `Accept-Encoding: gzip`.
+On a TLS stack (`optedIn('tls')`) these `tests/npm` cases carry a `test.fail(..., 'RPS-1559: ...')`, so they are
+expected failures there and unchanged on the default stack; the fix turns them into "expected to fail but
+passed", which is the reminder to delete the line:
+
+- `publish-consume.spec.ts`: the scoped package real client round trip (RPS-1205);
+- `packument-read.spec.ts`: the publish body (RPS-1390), HEAD (RPS-1358) and tarball download (RPS-1363) cases, which
+  publish a scoped name, and the large packument compression case (RPS-1359);
+- `unpublish.spec.ts`: unpublishing one version of a scoped package, and the only version of a scoped package (the
+  unscoped one passes).
+
+Part b's `@smoke` leg meets the first of them.
 
 ### Size-limit leg (RPS-1482)
 
@@ -3802,6 +4013,53 @@ What it pins, as observed on the built image:
 
 Deliberately not asserted, because they are open product questions rather than contracts: what CORS
 does on the protocol port, and the absence of `X-Content-Type-Options`, `Referrer-Policy` and HSTS.
+
+## Role sweep and Maven browser (RPS-1483)
+
+Two more specs of the `api` runner (`./run.sh test --protocol api`, see "API suite"), both raw HTTP:
+
+- **Role sweep** (`tests/api/role-sweep.spec.ts`). The operation list is not written down: `src/api/spec-ops.ts`
+  reads `repsy-backend/src/main/resources/openapi/openapi-spec.yaml` (mounted read-only into the runners) with the
+  existing `yaml` dependency. The spec declares `403 Forbidden` on exactly the operations a plain USER may not
+  call: the `@RepoOperation(MANAGE)` routes and the `requireAdmin` ones (48 of 122 today). The sweep pins:
+  1. every operation declaring 403, called as a USER Bearer, answers `403 accessDenied`. With placeholder
+     path parameters that cannot exist (a nil UUID, `e2e-sweep-no-such-repo`) the 403 comes BEFORE the 404 on every
+     one of them, so the sweep needs no data. Bodies are valid but inert, because `PUT /api/users/{id}`,
+     `POST /api/users` and `POST /api/repos` validate the body first (an empty `{}` gets a USER a 400);
+  2. the same 48 on real data: one private repo per protocol, each with a seeded package, a deploy token, a key
+     store, a PGP key and a second user. The USER gets 403 everywhere and every repo-scoped read operation of the
+     spec, called as admin before and after (plus the run's users and repos), answers the same (`errorCode`, a
+     fresh correlation id per error, is dropped from the comparison);
+  3. an anonymous caller gets 401 on every operation that is not `security: []`, on placeholders and on real
+     private repos; the public ones (`login`, `refreshToken`, `checkGolangSumdbSupported`,
+     `getSupportedRepoTypes`) are not 401;
+  4. the reverse: every OTHER operation, called as a USER, is not 403, so a MANAGE route that forgot to document its
+     403 fails the build. `REVERSE_SKIP` holds `deleteProfile`, `updateUsername`, `updatePassword`, `login` and
+     `refreshToken` with a reason each, and a test that every entry exists in the spec.
+
+  A floor (at least 48 forbidden operations, at least 120 operations) and a check of names that must be in the set
+  (all of `/api/users*`, `createRepository`, the settings, token, key store and rename routes, and every `DELETE`
+  but `deleteProfile`) stop a parser bug from emptying the sweep.
+
+  **RPS-1558** (found by the sweep): `GET /api/mvn/groups/{repo}/{group}` (`getMavenGroupSummary`) needs no
+  credentials on a PRIVATE repo (200 with the artifact and version counts), and answers 404 rather than 401 for a
+  repo that does not exist, because `ProtocolEndpointDispatcher.addInterceptors` lacks `/api/mvn/groups/**`. The
+  operation is in `ANONYMOUS_KNOWN_GAPS`, out of the anonymous sweeps, and two `test.fail()` tests under
+  "RPS-1558" assert the correct answer (401 in both cases): they pass today and go red when the fix lands, so the
+  fix removes the entry and the two `test.fail()` calls in the same PR.
+
+  Two low observations, NOT pinned: `PUT /api/users/{id}`, `POST /api/users` and `POST /api/repos` validate the
+  body before authorization (a USER with an empty body gets 400 `validationError`, not 403, which is why the sweep
+  sends valid inert bodies), and an anonymous 401 has two `msgId`s (`loginRequired` on repo routes,
+  `missingRequestHeader` elsewhere, so the sweep asserts the status only).
+
+- **Maven browser** (`tests/api/maven-browser.spec.ts`). `GET /api/repos/{repo}/contents?path=` lists a
+  directory (names, sizes, directory flag, matched against the bytes the wire serves; `400 invalidStoragePath` for
+  `../x`, `404` for a path that is not there). `POST /api/repos/{repo}/download-token?path=` gives a one-minute
+  token that opens ONE path of ONE repo on the protocol port to a caller with no credentials: refused for another
+  path of the repo, for the same path in another repo, for a garbage token, for a `PUT` (repo unchanged), and as a
+  Bearer or `?downloadToken=` on the panel API and on the protocol port. The expiry test waits 61 s and is tagged
+  `@slow` (`--grep '^((?!@slow).)*$'` leaves it out).
 
 ## Remote hardening
 
@@ -4627,12 +4885,12 @@ pins the table.
 `scanner` fixture): behind the same API key, and published on loopback only, it lets a test read what the
 backend handed the scanner and override one artifact's result.
 
-| Call                                      | Effect                                                                                                                                                              |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /control/calls[?artifactName=]`      | every `POST /scan` seen: scan id, type, name, version, file name and size (or the Docker reference), accepted or refused                                            |
-| `PUT /control/scripts`                    | `{artifactName, script: {submitSeconds, queueSeconds, runSeconds, outcome, findings: [severity...], errorMessage}}`: every later scan of that exact name follows it |
-| `DELETE /control/scripts[?artifactName=]` | drops one script or all                                                                                                                                             |
-| `POST /control/reset`                     | forgets scripts, calls and jobs (a running scan then reads as "job lost"): never from a test that runs beside others                                                |
+| Call                                      | Effect                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /control/calls[?artifactName=]`      | every `POST /scan` seen: scan id, type, name, version, file name and size (or the Docker reference), accepted or refused                                                                                                                                                                                                                                  |
+| `PUT /control/scripts`                    | `{artifactName, script: {submitSeconds, queueSeconds, runSeconds, outcome, findings: [severity or {severity, packageName?, packageVersion?, cveId?, description?}...], errorMessage}}`: every later scan of that exact name follows it. A finding given as an object can name the package (and version) it is on, see "Wire clients on the scanner stack" |
+| `DELETE /control/scripts[?artifactName=]` | drops one script or all                                                                                                                                                                                                                                                                                                                                   |
+| `POST /control/reset`                     | forgets scripts, calls and jobs (a running scan then reads as "job lost"): never from a test that runs beside others                                                                                                                                                                                                                                      |
 
 Tests are independent because every name carries the test's run id, so a script or a `calls` filter only
 ever touches its own package. `SCANNER_STUB_CONTROL=disabled` turns `/control` off.
@@ -4648,6 +4906,39 @@ What `tests/ui/security-real/` covers (20 tests, all `@scanner`, nothing stubbed
 | `security-page.spec.ts` | `/security` for one repo (rows, outcomes, severity and type filters, row navigation), the distribution card equals the backend's summary, the dashboard's Security Overview equals the backend's count                                                                        |
 
 A run of the whole `@scanner` set takes about two and a half minutes with two workers.
+
+#### Wire clients on the scanner stack (RPS-1484)
+
+The `@scanner` specs are not only the ui runner's. The runners with a real client publish a package and
+read what the scanner made of it, on the same stack (`REPSY_E2E_SCANNER=1 ./run.sh local up`, then
+`REPSY_E2E_SCANNER=1 ./run.sh test --protocol <runner> --grep @scanner`; `run.sh test` gives every runner the
+opt-in, and `docker-compose.runners.yml` gives every runner the stub's control URL and key,
+`REPSY_SCANNER_STUB_URL` / `REPSY_SCANNER_API_KEY`). Their `test` is `src/scenarios/scanner-fixtures.ts`
+(the scenario suite's fixtures plus the `scanner` client, no browser); the ui runner keeps its own.
+
+| Spec                                             | Client                     | What it proves                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tests/npm-clients/matrix/audit-scanner.spec.ts` | npm, pnpm, yarn berry, bun | `lib@1.0.0` published with a scripted HIGH finding on itself, `lib@2.0.0` published clean. `audit` of a `1.0.0` consumer exits non-zero and reports the advisory (severity `high`, title `CVE-2099-7001: Prototype pollution in lib`, the finding's url, vulnerable version `1.0.0`) in the client's own report; a threshold above `high` exits 0; a `2.0.0` consumer audits clean with exit 0. Every client asks `POST /<repo>/-/npm/v1/security/advisories/bulk` (pnpm too) with its token, once per audit. npm alone also flips the repository scan setting: off reports nothing, on reports the advisory again |
+| `tests/maven/scanner.spec.ts`                    | `mvn deploy`               | one scan per deploy, of `groupId:artifactId` and the version, with the jar as the file; the panel API holds the COMPLETED scan and its findings                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `tests/pypi/scanner.spec.ts`                     | `twine upload`             | one scan of the name and version, with the wheel as the file; the panel API holds the scan and its findings                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `tests/docker/scanner.spec.ts`                   | `crane push`               | the scanner gets no file but the image reference `<registry>/<repo>/<image>:<tag>` and a registry token; the panel API holds the scan and its findings                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+
+The audit needs the stub to name the published package: Repsy matches an advisory on the finding's package
+name and version (`NpmAdvisorySourceImpl`), and the stub's own findings are made-up `stub-lib-*` packages. So
+a script's `findings` may hold `{severity, packageName, packageVersion, cveId, description}` (only the
+severity is required; the rest keep the defaults above), and the spec registers one for the exact name it
+is about to publish (`scanner.script(name, {findings: [{severity: 'HIGH', packageName: name, packageVersion:
+'1.0.0'}]})`). The finding's description is the advisory's title.
+
+Client differences the audit spec pins (probed live): `npm audit --audit-level=critical` still prints the
+high advisory but exits 0; `pnpm audit --audit-level critical` prints none; `yarn npm audit --severity
+critical` prints `No audit suggestions`; `bun audit --json --audit-level=critical` still lists the advisory
+and exits 1 (the flag only takes effect in text mode, so the spec runs bun's threshold in text mode).
+Berry's JSON report is empty, so its advisory is read from its own text report.
+
+The Docker, Maven and PyPI specs script a finding list by name (`SCRIPTED_SEVERITIES`) because the catalog's
+names carry no directive. The scanner leg of the nightly runs `ui`, `npm-clients`, `docker`, `maven` and `pypi`;
+its step "Check the opt-in specs ran" fails a runner that skipped or ran nothing.
 
 ## Running
 
@@ -4740,16 +5031,16 @@ cancelling): a second one waits.
 
 ### What runs
 
-| Job / leg  | Stack                                       | Runs                                                                                                                                                                                                        | Timeout |
-| ---------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `image`    |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                              | 40 min  |
-| `ui`       | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                   | 60 min  |
-| `wire`     | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                       | 150 min |
-| `h2`       | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                       | 90 min  |
-| `h2-full`  | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another | 60 min  |
-| `scanner`  | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--protocol ui --grep @scanner` only (20 tests, "Scanner stack" above), never the whole `ui` suite                                                                              | 45 min  |
-| `throttle` | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                   | 30 min  |
-| `limits`   | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                     | 60 min  |
+| Job / leg  | Stack                                       | Runs                                                                                                                                                                                                                     | Timeout |
+| ---------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| `image`    |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                                           | 40 min  |
+| `ui`       | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                | 60 min  |
+| `wire`     | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                                    | 150 min |
+| `h2`       | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                    | 90 min  |
+| `h2-full`  | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another              | 60 min  |
+| `scanner`  | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite | 60 min  |
+| `throttle` | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                | 30 min  |
+| `limits`   | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                  | 60 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
 others. Every leg does the same: load the image, `./run.sh local up [--h2]` (with `REPSY_IMAGE` set, so

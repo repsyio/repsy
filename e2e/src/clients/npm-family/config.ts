@@ -41,6 +41,7 @@ import { fileURLToPath } from 'node:url';
 import mustache from 'mustache';
 
 import { env } from '../../env.js';
+import { TRUST_VARIABLES } from '../client-env.js';
 import { run, type RunOptions, type RunResult } from '../exec.js';
 import type { MaterializedCredential } from '../../scenarios/world.js';
 import type { RegistryBinding } from './client.js';
@@ -87,6 +88,13 @@ export function sealedEnv(home: string, extra: NodeJS.ProcessEnv = {}): NodeJS.P
   };
   if (process.env.TMPDIR) {
     sealed.TMPDIR = process.env.TMPDIR;
+  }
+  // The trusted CA of a TLS stack (RPS-1474), the one thing besides the proxy seal the network needs.
+  for (const name of TRUST_VARIABLES) {
+    const value = process.env[name];
+    if (value !== undefined) {
+      sealed[name] = value;
+    }
   }
   return sealed;
 }

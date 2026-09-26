@@ -36,6 +36,7 @@ import {
   rawGetTarballCanonical,
 } from '../../src/clients/npm-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
+import { optedIn } from '../../src/stack-overlays.js';
 import type { MaterializedCredential } from '../../src/scenarios/world.js';
 import type { Scenario } from '../../src/scenarios/types.js';
 import type { World } from '../../src/scenarios/world.js';
@@ -104,6 +105,10 @@ test.describe('npm unpublish (real client, RPS-1289)', () => {
     test(title, { tag: tags }, async ({ seeder }) => {
       const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
       const packageName = nameFor(seeder.runId);
+      test.fail(
+        optedIn('tls') && packageName.startsWith('@'),
+        'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
+      );
       const kept = npmAdapter.version('release');
       const removed = npmAdapter.version('release');
 
@@ -138,6 +143,10 @@ test.describe('npm unpublish (real client, RPS-1289)', () => {
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
+      test.fail(
+        optedIn('tls'),
+        'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
+      );
       const packageName = `@e2e-${seeder.runId}/only-version`;
       const version = npmAdapter.version('release');
       await npm.seedPublish(worldFor(repo.name, packageName, version));

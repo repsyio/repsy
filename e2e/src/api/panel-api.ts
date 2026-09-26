@@ -40,6 +40,7 @@ import type { SecurityScansSummary } from './generated/models/SecurityScansSumma
 import type { TokenInfo } from './generated/models/TokenInfo.js';
 import type { UserCreateForm } from './generated/models/UserCreateForm.js';
 import type { UserResponse } from './generated/models/UserResponse.js';
+import type { VulnerabilityFindingInfo } from './generated/models/VulnerabilityFindingInfo.js';
 import type { VulnerabilityScanInfo } from './generated/models/VulnerabilityScanInfo.js';
 
 export { ApiError, RepoType, UserRole };
@@ -59,6 +60,7 @@ export type {
   TokenInfo,
   UserCreateForm,
   UserResponse,
+  VulnerabilityFindingInfo,
   VulnerabilityScanInfo,
 };
 
@@ -245,6 +247,16 @@ export class PanelApi {
     }
     const body = (await res.json()) as { data?: { content?: VulnerabilityScanInfo[] } };
     return body.data?.content ?? [];
+  }
+
+  /** `GET /api/repos/{repo}/scans/{scanId}/findings`: the findings of one scan (up to 100), worst first. */
+  async listScanFindings(repoName: string, scanId: string): Promise<VulnerabilityFindingInfo[]> {
+    const res = await this.client.vulnerabilityScanController.getVulnerabilityScanFindings({
+      repoName,
+      scanId,
+      size: 100,
+    });
+    return unwrap(res.data, 'getVulnerabilityScanFindings').content ?? [];
   }
 
   /** `GET /api/security/scans/summary`: findings per severity over the latest completed scan of every version (admin only). */

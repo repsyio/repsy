@@ -1,0 +1,90 @@
+# Copyright 2026 the original author or authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# OPT-IN overlay that gives the e2e stack Repsy's own HTTPS listeners (RPS-1474), the ones the README's
+# "HTTPS / SSL" section documents: 8443 next to the panel API on 8080 and 9443 next to the package
+# protocols on 9090. HTTP stays open next to them, as it does in production. The runners are pointed at
+# the https ports (run.sh makes REPSY_API_BASE_URL/REPSY_REPO_BASE_URL https, and keeps the http ones in
+# REPSY_E2E_PLAIN_*), and every one of them trusts the certificate below in its own client's way.
+#
+# Nothing is committed: a one-shot `tls-init` service generates a throwaway CA and a leaf certificate
+# (keytool only, from a JRE image) into REPSY_E2E_TLS_DIR (e2e/.tls/<project>, git-ignored, which run.sh
+# creates as the invoking user), and Repsy waits for it. It is generated once per stack directory and
+# reused, since a running Repsy holds the keystore. Delete the directory to get a new one.
+#
+#   ca.pem           the CA the clients trust (SSL_CERT_FILE, NODE_EXTRA_CA_CERTS, ...)
+#   leaf.pem         the certificate Repsy serves (SANs: localhost, 127.0.0.1, ::1 and the service name "repsy")
+#   keystore.p12     leaf key + chain, mounted into Repsy at /app/certs (the README's documented path)
+#   truststore.p12   the CA as a Java truststore, for the JVM clients (password: changeit)
+#
+# Like every overlay it changes nothing unless it is passed as an extra -f, which
+# `./run.sh local up --tls` (or REPSY_E2E_TLS=1) does, on top of the postgres or the H2 stack. Give
+# "down" the same flags as "up". See README.md "TLS stack".
+services:
+  tls-init:
+    image: eclipse-temurin:25-jre
+    user: '${HOST_UID:-1000}:${HOST_GID:-1000}'
+    volumes:
+      - ${REPSY_E2E_TLS_DIR:?run.sh sets REPSY_E2E_TLS_DIR; start the stack with ./run.sh local up --tls}:/certs
+    working_dir: /certs
+    entrypoint: ['/bin/sh', '-ec']
+    command:
+      - |
+        if [ -s keystore.p12 ] && [ -s truststore.p12 ] && [ -s ca.pem ] && [ -s leaf.pem ]; then
+          echo "tls-init: reusing the certificates in /certs"
+          exit 0
+        fi
+        rm -f ca.p12 ca.pem leaf.pem leaf.csr keystore.p12 truststore.p12
+        PASS=changeit
+        # The CA (bc:c makes it a certificate authority) and the leaf it signs.
+        keytool -genkeypair -alias ca -keyalg RSA -keysize 2048 -validity 3650 \
+          -dname "CN=Repsy e2e CA, O=Repsy" -ext bc:c -ext KeyUsage=keyCertSign,cRLSign \
+          -keystore ca.p12 -storetype PKCS12 -storepass "$$PASS" -keypass "$$PASS"
+        keytool -exportcert -rfc -alias ca -keystore ca.p12 -storepass "$$PASS" -file ca.pem
+        keytool -genkeypair -alias repsy -keyalg RSA -keysize 2048 -validity 3650 \
+          -dname "CN=localhost, O=Repsy e2e" \
+          -keystore keystore.p12 -storetype PKCS12 -storepass "$$PASS" -keypass "$$PASS"
+        keytool -certreq -alias repsy -keystore keystore.p12 -storepass "$$PASS" -file leaf.csr
+        keytool -gencert -alias ca -keystore ca.p12 -storepass "$$PASS" -validity 3650 -rfc \
+          -ext "SAN=DNS:localhost,DNS:repsy,IP:127.0.0.1,IP:0:0:0:0:0:0:0:1" \
+          -ext EKU=serverAuth -infile leaf.csr -outfile leaf.pem
+        # The reply is imported with the CA already in the keystore, so the stored chain is leaf + CA.
+        keytool -importcert -noprompt -alias ca -file ca.pem -keystore keystore.p12 -storepass "$$PASS"
+        keytool -importcert -alias repsy -file leaf.pem -keystore keystore.p12 -storepass "$$PASS"
+        keytool -importcert -noprompt -alias repsy-e2e-ca -file ca.pem \
+          -keystore truststore.p12 -storetype PKCS12 -storepass "$$PASS"
+        rm -f ca.p12 leaf.csr
+        chmod a+r ca.pem leaf.pem keystore.p12 truststore.p12
+        echo "tls-init: generated ca.pem, leaf.pem, keystore.p12 and truststore.p12 in /certs"
+
+  repsy:
+    depends_on:
+      tls-init:
+        condition: service_completed_successfully
+    ports:
+      # Added to the 8080/9090 of the stack file (compose appends lists); the container ports are
+      # Repsy's defaults (API_SSL_PORT, REPO_SSL_PORT).
+      - '${REPSY_E2E_API_TLS_PORT:-8443}:8443'
+      - '${REPSY_E2E_REPO_TLS_PORT:-9443}:9443'
+    volumes:
+      - ${REPSY_E2E_TLS_DIR:?run.sh sets REPSY_E2E_TLS_DIR; start the stack with ./run.sh local up --tls}:/app/certs:ro
+    environment:
+      API_SSL_ENABLED: 'true'
+      API_SSL_KEY_STORE_PATH: file:/app/certs/keystore.p12
+      API_SSL_KEY_STORE_PASSWORD: changeit
+      REPO_SSL_ENABLED: 'true'
+      REPO_SSL_KEY_STORE_PATH: file:/app/certs/keystore.p12
+      REPO_SSL_KEY_STORE_PASSWORD: changeit
+      # REPO_BASE_URL (the base file's) is the https URL of the repo port here, because run.sh exports
+      # REPSY_REPO_BASE_URL as https for a TLS stack: the address npm and NuGet name in their URLs.

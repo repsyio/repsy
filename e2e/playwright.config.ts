@@ -25,6 +25,11 @@ const isCI = Boolean(process.env.CI);
 // without a .env. Only the ui runner sets REPSY_UI_WORKERS (docker-compose.runners.yml), so the
 // protocol runners keep Playwright's default worker count; `workers` is config-wide, not per project.
 const uiWorkers = process.env.REPSY_UI_WORKERS ? Number(process.env.REPSY_UI_WORKERS) : undefined;
+// The stack runner sets REPSY_E2E_WORKERS=1 (docker-compose.runners.yml): its persistence spec restarts
+// the one Repsy container of the stack, so no other spec may run beside it.
+const e2eWorkers = process.env.REPSY_E2E_WORKERS
+  ? Number(process.env.REPSY_E2E_WORKERS)
+  : undefined;
 // The SPA is served on the API port (8080), not the protocol port (9090).
 const uiBaseUrl =
   process.env.REPSY_UI_BASE_URL || process.env.REPSY_API_BASE_URL || 'http://localhost:8080';
@@ -47,7 +52,7 @@ export default defineConfig({
   // tight for it.
   timeout: 120_000,
   expect: { timeout: 10_000 },
-  workers: uiWorkers,
+  workers: uiWorkers ?? e2eWorkers,
   projects: [
     {
       name: 'skeleton',
