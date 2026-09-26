@@ -309,13 +309,33 @@ services:
       dockerfile: runners/stack.Dockerfile
       args:
         DOCKER_CLI_VERSION: '29.8.1'
+        # The persistence spec (RPS-1476) publishes with real clients: the same JDK/Maven as the maven
+        # runner and the same crane as the docker runner. Keep these equal to theirs.
+        TEMURIN_VERSION: '21'
+        MAVEN_VERSION: '3.9.9'
+        CRANE_VERSION: 'v0.22.1'
     group_add:
       - '${DOCKER_GID:-999}'
     environment:
       <<: *runner-environment
       REPSY_E2E_STACK_PROJECT: ${REPSY_E2E_STACK_PROJECT:-repsy-e2e}
+      MAVEN_SHARED_REPO_DIR: /app/.maven-shared-m2
+      # What clients/stack.ts recreateRepsy needs to run the stack's own `docker compose up` again from
+      # inside this container: the ports and image the stack files interpolate (run.sh exports them),
+      # and the host directory of the compose files (mounted below at the same path, so the compose
+      # labels of the running container name files this runner can read).
+      REPSY_E2E_API_PORT: ${REPSY_E2E_API_PORT:-8080}
+      REPSY_E2E_REPO_PORT: ${REPSY_E2E_REPO_PORT:-9090}
+      REPSY_E2E_SCANNER_PORT: ${REPSY_E2E_SCANNER_PORT:-8090}
+      REPSY_E2E_IMAGE_TAG: ${REPSY_E2E_IMAGE_TAG:-local}
+      REPSY_IMAGE: ${REPSY_IMAGE:-}
+      REPSY_E2E_HOST_DIR: ${REPSY_E2E_HOST_DIR:-${PWD}}
+      # The spec restarts and recreates the one Repsy container of its stack, so it never runs in parallel.
+      REPSY_E2E_WORKERS: '1'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ${REPSY_E2E_HOST_DIR:-${PWD}}:${REPSY_E2E_HOST_DIR:-${PWD}}:ro
+      - maven_m2_shared:/app/.maven-shared-m2
       - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
       - ./src:/app/src
       - ./tests:/app/tests:ro
