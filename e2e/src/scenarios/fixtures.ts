@@ -33,7 +33,7 @@ import { env } from '../env.js';
 import { perTestRunId } from '../seed/run-id.js';
 import { Seeder } from '../seed/seeder.js';
 import type { ProtocolAdapter } from './adapter.js';
-import type { Scenario } from './types.js';
+import type { CredentialKind, Scenario } from './types.js';
 import { expectationFor } from './types.js';
 import type { Coordinates, MaterializedCredential, World } from './world.js';
 
@@ -75,7 +75,7 @@ const REPO_TYPE_BY_PROTOCOL: Record<string, RepoType> = {
   ruby: RepoType.RUBY,
 };
 
-function repoTypeForProtocol(protocol: string): RepoType {
+export function repoTypeForProtocol(protocol: string): RepoType {
   const repoType = REPO_TYPE_BY_PROTOCOL[protocol];
   if (!repoType) {
     throw new Error(`world(): unknown protocol "${protocol}"`);
@@ -89,7 +89,21 @@ async function materializeCredential(
   repoName: string,
   repoType: RepoType,
 ): Promise<MaterializedCredential> {
-  switch (scenario.credential) {
+  return materializeCredentialKind(seeder, scenario.credential, repoName, repoType);
+}
+
+/**
+ * Turns a `CredentialKind` into a credential that exists (a seeded user, a token of `repoName`...),
+ * for a caller that has no `Scenario`: the manage matrix (`manage-matrix.ts`, RPS-1475) runs one
+ * operation with each credential of one repo.
+ */
+export async function materializeCredentialKind(
+  seeder: Seeder,
+  kind: CredentialKind,
+  repoName: string,
+  repoType: RepoType,
+): Promise<MaterializedCredential> {
+  switch (kind) {
     case 'admin-password':
       return ADMIN_CREDENTIAL;
 
