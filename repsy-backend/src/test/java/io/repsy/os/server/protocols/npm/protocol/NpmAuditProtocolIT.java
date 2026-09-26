@@ -23,6 +23,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.jayway.jsonpath.JsonPath;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.security.scan.dtos.FixStatus;
 import io.repsy.os.server.security.scan.dtos.ScanStatus;
@@ -36,16 +39,30 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.zip.GZIPOutputStream;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
 
 /**
@@ -54,6 +71,11 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * them, and every request goes through the real router, the way each client sends it: plain JSON
  * (pnpm, yarn) or gzip (npm, bun) to the bulk endpoint, and the legacy tree to {@code /audits} and
  * {@code /audits/quick}.
+ *
+ * <p>RPS-1612: the audit also asks the scanner's vulnerability database. The scanner is enabled
+ * here and pointed at {@link #SCANNER}, a stand-in that a test scripts, so the real client, its
+ * timeout and its fallback are what runs. By default it answers no advisories at all, so the tests
+ * above that never mention it are unchanged by it.
  */
 @DisplayName("npm wire protocol audit endpoints")
 class NpmAuditProtocolIT extends AbstractIntegrationTest {
@@ -64,8 +86,96 @@ class NpmAuditProtocolIT extends AbstractIntegrationTest {
   private static final Instant T0 = Instant.parse("2026-09-01T10:00:00Z");
   private static final String LODASH = "lodash";
 
+  private static final HttpServer SCANNER = startScanner();
+  private static final String LOOKUP_KEY = "it-scanner-key";
+  private static final String EMPTY_LOOKUP =
+      "{\"dbUpdatedAt\":\"2026-09-26T19:03:57Z\",\"findings\":[]}";
+
+  /** What the scanner stand-in does with a lookup; set per test, reset before each one. */
+  private static volatile HttpHandler scannerBehaviour;
+
+  private static final List<String> LOOKUP_BODIES = Collections.synchronizedList(new ArrayList<>());
+  private static volatile CountDownLatch hold = new CountDownLatch(1);
+
   @Autowired private VulnerabilityScanRepository scanRepository;
   @Autowired private VulnerabilityFindingRepository findingRepository;
+
+  private static HttpServer startScanner() {
+    try {
+      final var server =
+          HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+      server.createContext(
+          "/advisories",
+          exchange -> {
+            LOOKUP_BODIES.add(
+                new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            scannerBehaviour.handle(exchange);
+          });
+      server.setExecutor(Executors.newCachedThreadPool());
+      server.start();
+
+      return server;
+    } catch (final IOException exception) {
+      throw new UncheckedIOException(exception);
+    }
+  }
+
+  /** The scanner is enabled, with a request timeout of 1 s, and is the stand-in above. */
+  @DynamicPropertySource
+  static void registerScanner(final DynamicPropertyRegistry registry) {
+    registry.add("repsy.security.scanner", () -> "enabled");
+    registry.add(
+        "repsy.security.trivy.scanner-base-url",
+        () -> "http://127.0.0.1:" + SCANNER.getAddress().getPort());
+    registry.add("repsy.security.trivy.api-key", () -> LOOKUP_KEY);
+    registry.add("repsy.security.trivy.request-timeout-seconds", () -> "1");
+  }
+
+  private static void answer(final int status, final String body) {
+    scannerBehaviour = exchange -> reply(exchange, status, body);
+  }
+
+  private static void reply(final HttpExchange exchange, final int status, final String body)
+      throws IOException {
+    final var bytes = body.getBytes(StandardCharsets.UTF_8);
+    exchange.getResponseHeaders().add("Content-Type", "application/json");
+    exchange.sendResponseHeaders(status, bytes.length);
+    exchange.getResponseBody().write(bytes);
+    exchange.close();
+  }
+
+  private static String lookupFinding(
+      final String cve, final String name, final String version, final String description) {
+    return "{\"cveId\":\""
+        + cve
+        + "\",\"severity\":\"CRITICAL\",\"packageName\":\""
+        + name
+        + "\",\"packageVersion\":\""
+        + version
+        + "\",\"fixedVersion\":\"9.9.9\",\"description\":\""
+        + description
+        + "\",\"referenceUrl\":null,\"fixStatus\":\"FIXED\",\"cvssScore\":9.8,"
+        + "\"cvssVector\":null}";
+  }
+
+  private static String lookupAnswer(final String... findings) {
+    return "{\"dbUpdatedAt\":\"2026-09-26T19:03:57Z\",\"scannerVersion\":\"0.66.0\","
+        + "\"findings\":["
+        + String.join(",", findings)
+        + "]}";
+  }
+
+  @BeforeEach
+  void resetScanner() {
+    LOOKUP_BODIES.clear();
+    hold = new CountDownLatch(1);
+    answer(200, EMPTY_LOOKUP);
+  }
+
+  @AfterEach
+  void releaseScanner() {
+    hold.countDown();
+  }
 
   private MockHttpServletResponse protocol(final AbstractMockHttpServletRequestBuilder<?> request)
       throws Exception {
@@ -567,5 +677,145 @@ class NpmAuditProtocolIT extends AbstractIntegrationTest {
     assertThat(this.gzipped(BULK, repo, deep).getStatus()).isEqualTo(400);
     assertThat(this.gzipped(BULK, repo, names.toString()).getStatus()).isEqualTo(400);
     assertThat(this.gzipped(AUDITS, repo, deep).getStatus()).isEqualTo(400);
+  }
+
+  @Test
+  @DisplayName("bulk and legacy report what the scanner's database knows about a pair no scan has")
+  void lookupReportsAPairNoStoredScanKnows() throws Exception {
+    final var repo = this.repo(false);
+    answer(
+        200,
+        lookupAnswer(lookupFinding("CVE-2021-44906", "minimist", "1.2.0", "Prototype pollution")));
+
+    final var bulk =
+        this.plain(BULK, repo, "{\"minimist\":[\"1.2.0\",\"1.2.8\"],\"left-pad\":[\"1.3.0\"]}")
+            .getContentAsString();
+
+    assertThat(JsonPath.<Map<String, Object>>read(bulk, "$")).containsOnlyKeys("minimist");
+    assertThat(JsonPath.<String>read(bulk, "$.minimist[0].title"))
+        .isEqualTo("CVE-2021-44906: Prototype pollution");
+    assertThat(JsonPath.<String>read(bulk, "$.minimist[0].vulnerable_versions")).isEqualTo("1.2.0");
+    assertThat(JsonPath.<String>read(bulk, "$.minimist[0].severity")).isEqualTo("critical");
+    assertThat(LOOKUP_BODIES).hasSize(1);
+    assertThat(JsonPath.<List<String>>read(LOOKUP_BODIES.getFirst(), "$.packages[*].name"))
+        .containsExactlyInAnyOrder("minimist", "minimist", "left-pad");
+
+    final var legacy =
+        this.plain(AUDITS, repo, "{\"dependencies\":{\"minimist\":{\"version\":\"1.2.0\"}}}")
+            .getContentAsString();
+
+    assertThat(JsonPath.<Map<String, Object>>read(legacy, "$.advisories")).hasSize(1);
+    assertThat(JsonPath.<Integer>read(legacy, "$.metadata.vulnerabilities.critical")).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("the audit reports the stored findings and the lookup's, once each; the stored wins")
+  void lookupIsMergedWithTheStoredFindings() throws Exception {
+    final var repo = this.repo(false);
+    this.seedLodash(repo);
+    answer(
+        200,
+        lookupAnswer(
+            lookupFinding("CVE-2021-23337", LODASH, "4.17.20", "From the scanner database"),
+            lookupFinding(
+                "CVE-2020-8203", LODASH, "4.17.20", "Prototype pollution in zipObjectDeep"),
+            // Not asked about: never reported.
+            lookupFinding("CVE-2019-10744", LODASH, "4.17.11", "Another version")));
+
+    final var json = this.plain(BULK, repo, "{\"lodash\":[\"4.17.20\"]}").getContentAsString();
+
+    assertThat(JsonPath.<List<String>>read(json, "$.lodash[*].title"))
+        .containsExactlyInAnyOrder(
+            "CVE-2021-23337: Lodash versions prior to 4.17.21 are vulnerable",
+            "CVE-2020-8203: Prototype pollution in zipObjectDeep");
+    assertThat(JsonPath.<List<String>>read(json, "$.lodash[*].vulnerable_versions"))
+        .containsOnly("4.17.20");
+  }
+
+  @ParameterizedTest(name = "the audit answers from the stored findings when the scanner says {0}")
+  @DisplayName("the audit is answered from the stored findings when the scanner answers non-200")
+  @ValueSource(ints = {400, 401, 413, 415, 500, 503, 504})
+  void nonOkLookupFallsBackToTheStoredFindings(final int status) throws Exception {
+    final var repo = this.repo(false);
+    this.seedLodash(repo);
+    answer(status, "{\"message\":\"busy\"}");
+    final var body = "{\"lodash\":[\"4.17.20\"],\"minimist\":[\"1.2.0\"]}";
+
+    final var bulk = this.plain(BULK, repo, body);
+
+    assertThat(LOOKUP_BODIES).hasSize(1);
+    assertThat(bulk.getStatus()).isEqualTo(200);
+    assertThat(JsonPath.<Map<String, Object>>read(bulk.getContentAsString(), "$"))
+        .containsOnlyKeys(LODASH);
+
+    final var legacy =
+        this.plain(AUDITS, repo, "{\"dependencies\":{\"lodash\":{\"version\":\"4.17.20\"}}}");
+
+    assertThat(legacy.getStatus()).isEqualTo(200);
+    assertThat(JsonPath.<Map<String, Object>>read(legacy.getContentAsString(), "$.advisories"))
+        .hasSize(1);
+  }
+
+  @Test
+  @DisplayName("the audit is answered from the stored findings when the scanner does not answer")
+  void slowLookupFallsBackToTheStoredFindings() throws Exception {
+    final var repo = this.repo(false);
+    this.seedLodash(repo);
+    scannerBehaviour =
+        exchange -> {
+          try {
+            hold.await();
+          } catch (final InterruptedException _) {
+            Thread.currentThread().interrupt();
+          }
+          exchange.close();
+        };
+
+    final var start = System.nanoTime();
+    final var response = this.plain(BULK, repo, "{\"lodash\":[\"4.17.20\"]}");
+    final var elapsed = Duration.ofNanos(System.nanoTime() - start);
+
+    assertThat(response.getStatus()).isEqualTo(200);
+    assertThat(JsonPath.<Map<String, Object>>read(response.getContentAsString(), "$"))
+        .containsOnlyKeys(LODASH);
+    assertThat(elapsed).isLessThan(Duration.ofSeconds(5));
+  }
+
+  @Test
+  @DisplayName("the audit is answered from the stored findings when the answer is not the contract")
+  void garbledLookupFallsBackToTheStoredFindings() throws Exception {
+    final var repo = this.repo(false);
+    this.seedLodash(repo);
+    answer(200, "<html>a proxy in front of the scanner</html>");
+
+    final var response = this.plain(BULK, repo, "{\"lodash\":[\"4.17.20\"]}");
+
+    assertThat(response.getStatus()).isEqualTo(200);
+    assertThat(JsonPath.<Map<String, Object>>read(response.getContentAsString(), "$"))
+        .containsOnlyKeys(LODASH);
+  }
+
+  @Test
+  @DisplayName("a repo whose security scan is off reports nothing and does not ask the scanner")
+  void scanOffDoesNotLookUp() throws Exception {
+    final var repo = this.setSecurityScan(this.repo(false), false);
+    answer(200, lookupAnswer(lookupFinding("CVE-2021-44906", "minimist", "1.2.0", "Pollution")));
+
+    assertThat(this.plain(BULK, repo, "{\"minimist\":[\"1.2.0\"]}").getContentAsString())
+        .isEqualTo("{}");
+    final var legacy =
+        this.plain(AUDITS, repo, "{\"dependencies\":{\"minimist\":{\"version\":\"1.2.0\"}}}")
+            .getContentAsString();
+    assertThat(JsonPath.<Map<String, Object>>read(legacy, "$.advisories")).isEmpty();
+    assertThat(LOOKUP_BODIES).isEmpty();
+  }
+
+  @Test
+  @DisplayName("an audit with no package asks the scanner for nothing")
+  void emptyAuditDoesNotLookUp() throws Exception {
+    final var repo = this.repo(false);
+
+    assertThat(this.plain(BULK, repo, "{}").getContentAsString()).isEqualTo("{}");
+    assertThat(LOOKUP_BODIES).isEmpty();
   }
 }

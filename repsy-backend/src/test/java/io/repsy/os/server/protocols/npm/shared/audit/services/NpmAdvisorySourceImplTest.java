@@ -26,10 +26,14 @@ import io.repsy.os.server.security.scan.dtos.FixStatus;
 import io.repsy.os.server.security.scan.dtos.KnownVulnerabilityRow;
 import io.repsy.os.server.security.scan.dtos.Severity;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
+import io.repsy.os.server.security.scanner.VulnerabilityAdvisoryLookup;
+import io.repsy.os.server.security.scanner.dtos.AdvisoryLookupResult;
+import io.repsy.os.server.security.scanner.dtos.ScannerFinding;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -39,7 +43,12 @@ import org.junit.jupiter.api.Test;
 class NpmAdvisorySourceImplTest {
 
   private final VulnerabilityScanTxService scans = mock(VulnerabilityScanTxService.class);
-  private final NpmAdvisorySourceImpl source = new NpmAdvisorySourceImpl(this.scans);
+  private final VulnerabilityAdvisoryLookup lookup = mock(VulnerabilityAdvisoryLookup.class);
+  private final NpmAdvisorySourceImpl source = new NpmAdvisorySourceImpl(this.scans, this.lookup);
+
+  {
+    when(this.lookup.lookupNpm(any())).thenReturn(Optional.empty());
+  }
 
   private static BaseRepoInfo<UUID> repo(final boolean scanEnabled) {
     return BaseRepoInfo.<UUID>builder()
@@ -68,6 +77,7 @@ class NpmAdvisorySourceImplTest {
 
     assertThat(advisories).isEmpty();
     verify(this.scans, never()).findKnownVulnerabilities(any(), any());
+    verify(this.lookup, never()).lookupNpm(any());
   }
 
   @Test
@@ -90,5 +100,122 @@ class NpmAdvisorySourceImplTest {
   void noPackages() {
     assertThat(this.source.findAdvisories(repo(true), Map.of())).isEmpty();
     verify(this.scans, never()).findKnownVulnerabilities(any(), any());
+    verify(this.lookup, never()).lookupNpm(any());
+  }
+
+  private static ScannerFinding finding(
+      final String cveId, final String name, final String version, final FixStatus fixStatus) {
+    return new ScannerFinding(
+        cveId,
+        Severity.HIGH,
+        name,
+        version,
+        "9.9.9",
+        "from the scanner",
+        null,
+        fixStatus,
+        null,
+        null);
+  }
+
+  private static AdvisoryLookupResult answer(final ScannerFinding... findings) {
+    return new AdvisoryLookupResult(Instant.parse("2026-09-26T19:03:57Z"), List.of(findings));
+  }
+
+  @Test
+  @DisplayName("reports what the lookup knows about a pair that no stored scan has")
+  void lookupAddsAPairNoScanKnows() {
+    final var repo = repo(true);
+    final var requested = Map.of("lodash", Set.of("4.17.20"), "minimist", Set.of("1.2.0"));
+    final var stored = row();
+    when(this.scans.findKnownVulnerabilities(repo.getStorageKey(), requested))
+        .thenReturn(List.of(stored));
+    when(this.lookup.lookupNpm(requested))
+        .thenReturn(Optional.of(answer(finding("CVE-2", "minimist", "1.2.0", FixStatus.FIXED))));
+
+    final var advisories = this.source.findAdvisories(repo, requested);
+
+    assertThat(advisories)
+        .extracting(a -> a.packageName())
+        .containsExactlyInAnyOrder("lodash", "minimist");
+    final var minimist =
+        advisories.stream()
+            .filter(a -> a.packageName().equals("minimist"))
+            .findFirst()
+            .orElseThrow();
+    assertThat(minimist.vulnerableVersions()).containsExactly("1.2.0");
+    assertThat(minimist.reportedBy()).isEqualTo("trivy");
+    assertThat(minimist.updated()).isEqualTo(Instant.parse("2026-09-26T19:03:57Z"));
+  }
+
+  @Test
+  @DisplayName("reports a finding of both sources once, and the stored one wins")
+  void storedWinsOverTheLookup() {
+    final var repo = repo(true);
+    final var requested = Map.of("lodash", Set.of("4.17.20"));
+    final var stored = row();
+    when(this.scans.findKnownVulnerabilities(repo.getStorageKey(), requested))
+        .thenReturn(List.of(stored));
+    when(this.lookup.lookupNpm(requested))
+        .thenReturn(Optional.of(answer(finding("CVE-1", "lodash", "4.17.20", FixStatus.FIXED))));
+
+    final var advisories = this.source.findAdvisories(repo, requested);
+
+    assertThat(advisories).hasSize(1);
+    // The stored row has no description or fix, the lookup's has: the stored one is reported.
+    assertThat(advisories.getFirst().overview()).isEmpty();
+    assertThat(advisories.getFirst().vulnerableVersions()).containsExactly("4.17.20");
+    assertThat(advisories.getFirst().patchedVersions()).isNull();
+  }
+
+  @Test
+  @DisplayName("a finding of the lookup for a version that was not asked about is not reported")
+  void lookupFindingsOfOtherVersionsAreIgnored() {
+    final var repo = repo(true);
+    final var requested = Map.of("lodash", Set.of("4.17.20"));
+    when(this.scans.findKnownVulnerabilities(repo.getStorageKey(), requested))
+        .thenReturn(List.of());
+    when(this.lookup.lookupNpm(requested))
+        .thenReturn(Optional.of(answer(finding("CVE-2", "lodash", "4.17.19", FixStatus.FIXED))));
+
+    assertThat(this.source.findAdvisories(repo, requested)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a finding of the lookup that says the version is not affected is not reported")
+  void notAffectedFindingsOfTheLookupAreIgnored() {
+    final var repo = repo(true);
+    final var requested = Map.of("lodash", Set.of("4.17.20"));
+    when(this.lookup.lookupNpm(requested))
+        .thenReturn(
+            Optional.of(answer(finding("CVE-2", "lodash", "4.17.20", FixStatus.NOT_AFFECTED))));
+
+    assertThat(this.source.findAdvisories(repo, requested)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("answers from the stored findings alone when the lookup has no answer")
+  void noLookupAnswer() {
+    final var repo = repo(true);
+    final var requested = Map.of("lodash", Set.of("4.17.20"));
+    final var stored = row();
+    when(this.scans.findKnownVulnerabilities(repo.getStorageKey(), requested))
+        .thenReturn(List.of(stored));
+    when(this.lookup.lookupNpm(requested)).thenReturn(Optional.empty());
+
+    assertThat(this.source.findAdvisories(repo, requested)).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("answers from the stored findings alone, and does not fail, when the lookup throws")
+  void lookupThrows() {
+    final var repo = repo(true);
+    final var requested = Map.of("lodash", Set.of("4.17.20"));
+    final var stored = row();
+    when(this.scans.findKnownVulnerabilities(repo.getStorageKey(), requested))
+        .thenReturn(List.of(stored));
+    when(this.lookup.lookupNpm(requested)).thenThrow(new IllegalStateException("scanner is down"));
+
+    assertThat(this.source.findAdvisories(repo, requested)).hasSize(1);
   }
 }
