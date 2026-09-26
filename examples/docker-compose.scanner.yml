@@ -1,0 +1,86 @@
+# Copyright 2026 the original author or authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Repsy with PostgreSQL and the vulnerability scanner (README.md "Vulnerability Scanning").
+#
+#   export TRIVY_SCANNER_API_KEY="$(openssl rand -hex 32)"
+#   docker compose -f docker-compose.scanner.yml up -d
+#
+# TRIVY_SCANNER_API_KEY is the shared secret: the compose file hands it to the application as
+# TRIVY_SCANNER_API_KEY and to the scanner as SCANNER_API_KEY, and refuses to start without it.
+# REPSY_VERSION selects the release of BOTH images (for example 26.10.0, a release tag without the
+# leading "v"). Run the application and the scanner of the same release: the HTTP contract between
+# them is not versioned, so a mismatched pair is not supported. "latest" moves both together.
+services:
+  postgres:
+    container_name: repsy-postgres
+    hostname: repsy-postgres
+    image: postgres:18
+    environment:
+      - POSTGRES_DB=repsy
+      - POSTGRES_USER=repsy
+      - POSTGRES_PASSWORD=repsy123
+    volumes:
+      - repsy-pgdata:/var/lib/postgresql
+    networks:
+      - repsy-network
+
+  repsy:
+    container_name: repsy
+    hostname: repsy
+    image: repo.repsy.io/repsy/os/repsy:${REPSY_VERSION:-latest}
+    depends_on:
+      - postgres
+      - repsy-scanner-trivy
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      - DB_URL=jdbc:postgresql://repsy-postgres:5432/repsy
+      - DB_USERNAME=repsy
+      - DB_PASSWORD=repsy123
+      - ADMIN_INITIAL_PASSWORD=YourSecurePassword123
+      # Vulnerability scanning: off unless SECURITY_SCANNER is "enabled".
+      - SECURITY_SCANNER=enabled
+      - TRIVY_SCANNER_BASE_URL=http://repsy-scanner-trivy:8090
+      - TRIVY_SCANNER_API_KEY=${TRIVY_SCANNER_API_KEY:?set TRIVY_SCANNER_API_KEY to a shared secret}
+      # Resolved by the SCANNER container, to pull Docker images from this instance's own registry
+      # (the main port, 9090): the service name of this container, never localhost.
+      - DOCKER_INTERNAL_REGISTRY_BASE_URL=http://repsy:9090
+    volumes:
+      - repsy-data:/app/data
+    networks:
+      - repsy-network
+
+  repsy-scanner-trivy:
+    container_name: repsy-scanner-trivy
+    hostname: repsy-scanner-trivy
+    image: repo.repsy.io/repsy/os/repsy-scanner-trivy:${REPSY_VERSION:-latest}
+    environment:
+      - SCANNER_API_KEY=${TRIVY_SCANNER_API_KEY:?set TRIVY_SCANNER_API_KEY to a shared secret}
+    volumes:
+      # Trivy's vulnerability databases: keeps them across container recreation, so a restart does
+      # not download them again. The image pre-creates this directory for its non-root user.
+      - trivy-cache:/home/appuser/.cache/trivy
+    networks:
+      - repsy-network
+
+networks:
+  repsy-network:
+    driver: bridge
+
+volumes:
+  repsy-data:
+  repsy-pgdata:
+  trivy-cache:
