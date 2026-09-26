@@ -214,4 +214,31 @@ test.describe('AUTH-07 admin-only routes for a USER', () => {
     // The control: the same layout does render the link for an admin (Security also needs a scanner).
     await expect(admin.sidebar.users).toBeVisible();
   });
+
+  // RPS-1456: "/" renders the dashboard inside the OnPush AuthRedirectComponent, and the sidebar takes
+  // its role from its own GET /api/profile. The dashboard asks for the profile too, so two answers come
+  // back; whichever arrives last on a slow host used to leave the sidebar without Users until the next
+  // change detection (the nightly run on a CI runner). Holding back one answer at a time, after
+  // everything else has arrived, pins both orders.
+  for (const heldBack of [1, 2]) {
+    test(`the admin sidebar shows Users when profile answer ${heldBack} of 2 arrives last`, async ({
+      adminPage,
+    }) => {
+      let asked = 0;
+      await adminPage.route('**/api/profile', async (route) => {
+        asked += 1;
+        if (asked === heldBack) {
+          await new Promise((resolve) => setTimeout(resolve, 1_500));
+        }
+        await route.fallback();
+      });
+      const admin = new Shell(adminPage);
+
+      await new DashboardPage(adminPage).goto();
+
+      await expect(admin.sidebar.users).toBeVisible();
+      await expect(admin.sidebar.repositories).toBeVisible();
+      expect(asked).toBe(2);
+    });
+  }
 });
