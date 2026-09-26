@@ -48,10 +48,12 @@ import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestList;
 import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
+import io.repsy.protocols.docker.shared.tag.dtos.TagPage;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
 import io.repsy.protocols.docker.shared.utils.DockerConstants;
 import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
 import io.repsy.protocols.docker.shared.utils.DockerPushGuards;
+import io.repsy.protocols.docker.shared.utils.DockerTagPaging;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -204,6 +206,22 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
     return this.performDatabaseLookupForManifest(
         context, manifestReference, imageName, requestPath);
+  }
+
+  @Override
+  public TagPage listTags(
+      final ProtocolContext context,
+      final String imageName,
+      final @Nullable Integer limit,
+      final @Nullable String last) {
+
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+
+    final var imageInfo =
+        this.imageService.findImageInfoByRepoIdAndName(repoInfo.getId(), imageName);
+
+    return DockerTagPaging.page(
+        this.manifestService.findTagNamesByImageId(imageInfo.getId()), limit, last);
   }
 
   private BaseUsages createManifest(

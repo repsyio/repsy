@@ -40,7 +40,7 @@
  *    decided in RPS-1607: the sha256 answer stays and this test documents it.
  *  - RC5 a multi-platform Docker manifest list copies as a whole (children included), `--platform`
  *    resolves the right child through the served index, and it copies back unchanged.
- *  - `regctl tag ls` / `repo ls` (Repsy has no `tags/list`/`_catalog`, RPS-1489) are in
+ *  - `regctl tag ls` (RPS-1489) and `repo ls` (still no `_catalog`) are in
  *    `client-tag-list.spec.ts`.
  */
 import fs from 'node:fs/promises';

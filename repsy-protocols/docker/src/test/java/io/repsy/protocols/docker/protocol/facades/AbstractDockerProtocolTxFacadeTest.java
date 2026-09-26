@@ -531,4 +531,28 @@ class AbstractDockerProtocolTxFacadeTest {
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("tagNotFound");
   }
+
+  @Test
+  @DisplayName("listTags() pages the tags of the image in lexical order (RPS-1489)")
+  void listTagsPagesTheTagsOfTheImage() {
+    final var imageInfo = this.stubImage();
+    when(this.manifestService.findTagNamesByImageId(imageInfo.getId()))
+        .thenReturn(List.of("v2", "latest", "v1", "alpha"));
+
+    final var page = this.facade().listTags(newContext(), IMAGE_NAME, 2, "alpha");
+
+    assertThat(page.tags()).containsExactly("latest", "v1");
+    assertThat(page.hasMore()).isTrue();
+  }
+
+  @Test
+  @DisplayName("listTags() refuses an image the repo does not have (RPS-1489)")
+  void listTagsRefusesAnUnknownImage() {
+    when(this.imageService.findImageInfoByRepoIdAndName(REPO_ID, IMAGE_NAME))
+        .thenThrow(new ItemNotFoundException("imageNotFound"));
+
+    assertThatThrownBy(() -> this.facade().listTags(newContext(), IMAGE_NAME, null, null))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("imageNotFound");
+  }
 }

@@ -36,6 +36,8 @@ public enum OciErrorCode {
   NAME_INVALID,
   /** The repository name is not known to the registry. */
   NAME_UNKNOWN,
+  /** The number of results a listing asked for ({@code n}) is not a non-negative integer. */
+  PAGINATION_NUMBER_INVALID,
   /** The manifest tag is invalid. */
   TAG_INVALID,
   /** The provided length did not match the content length. */

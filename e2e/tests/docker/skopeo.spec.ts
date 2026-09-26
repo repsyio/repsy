@@ -24,8 +24,8 @@
  *    result, not the transport, is what is asserted.
  *  - SK2 `skopeo inspect`: the raw manifest is the stored one (its sha256 is the digest), the
  *    decoded form reports the config's platform and the layer list, by tag and by digest.
- *    `--no-tags` is needed: a plain `skopeo inspect <tag>` also lists the repository's tags and fails on
- *    Repsy's missing `tags/list` (RPS-1489, pinned in `client-tag-list.spec.ts`).
+ *    `--no-tags` is kept here to inspect the manifest alone: a plain `skopeo inspect <tag>` also lists
+ *    the repository's tags, which works since `tags/list` exists (RPS-1489, `client-tag-list.spec.ts`).
  *  - SK3 `skopeo delete`: asks scope `*` (`repository:<repo>/<image>:*`), which RPS-1434's rule accepts
  *    for the admin at the first request (no `insufficient_scope` round trip, unlike `regctl`); a tag
  *    reference is resolved to its digest first, so the manifest AND every tag of it go (`crane delete`
@@ -33,7 +33,7 @@
  *    token is refused and nothing is removed (a delete is MANAGE).
  *  - SK4 a multi-platform index copied with `--all` keeps its digest and its children, and reads back
  *    into a layout, and `--override-arch` picks the right child through the served index.
- *  - `skopeo list-tags` (Repsy has no `tags/list`, RPS-1489) is in `client-tag-list.spec.ts`.
+ *  - `skopeo list-tags` (RPS-1489) is in `client-tag-list.spec.ts`.
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';

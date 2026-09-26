@@ -54,6 +54,10 @@ public interface TagRepository extends JpaRepository<Tag, UUID> {
   @Query("select t.name from Tag t where t.image.id = :imageId and t.digest = :digest")
   List<String> findNamesByImageIdAndDigest(UUID imageId, String digest);
 
+  /** The names of the tags of an image, for a listing that sorts and pages them itself. */
+  @Query("select t.name from Tag t where t.image.id = :imageId")
+  List<String> findNamesByImageId(UUID imageId);
+
   /** The manifests the tags of an image point at. */
   @Query("select distinct t.manifest.id from Tag t where t.image.id = :imageId")
   List<UUID> findManifestIdsByImageId(UUID imageId);
