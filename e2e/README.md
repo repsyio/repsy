@@ -3736,6 +3736,42 @@ What it pins, as observed on the built image:
 Deliberately not asserted, because they are open product questions rather than contracts: what CORS
 does on the protocol port, and the absence of `X-Content-Type-Options`, `Referrer-Policy` and HSTS.
 
+## Role sweep and Maven browser (RPS-1483)
+
+Two more specs of the `api` runner (`./run.sh test --protocol api`, see "API suite"), both raw HTTP:
+
+- **Role sweep** (`tests/api/role-sweep.spec.ts`). The operation list is not written down: `src/api/spec-ops.ts`
+  reads `repsy-backend/src/main/resources/openapi/openapi-spec.yaml` (mounted read-only into the runners) with the
+  existing `yaml` dependency. The spec declares `403 Forbidden` on exactly the operations a plain USER may not
+  call: the `@RepoOperation(MANAGE)` routes and the `requireAdmin` ones (48 of 122 today). The sweep pins:
+  1. every operation declaring 403, called as a USER Bearer, answers `403 accessDenied`. With placeholder
+     path parameters that cannot exist (a nil UUID, `e2e-sweep-no-such-repo`) the 403 comes BEFORE the 404 on every
+     one of them, so the sweep needs no data. Bodies are valid but inert, because `PUT /api/users/{id}`,
+     `POST /api/users` and `POST /api/repos` validate the body first (an empty `{}` gets a USER a 400);
+  2. the same 48 on real data: one private repo per protocol, each with a seeded package, a deploy token, a key
+     store, a PGP key and a second user. The USER gets 403 everywhere and every repo-scoped read operation of the
+     spec, called as admin before and after (plus the run's users and repos), answers the same (`errorCode`, a
+     fresh correlation id per error, is dropped from the comparison);
+  3. an anonymous caller gets 401 on every operation that is not `security: []`, on placeholders and on real
+     private repos; the public ones (`login`, `refreshToken`, `checkGolangSumdbSupported`,
+     `getSupportedRepoTypes`) are not 401;
+  4. the reverse: every OTHER operation, called as a USER, is not 403, so a MANAGE route that forgot to document its
+     403 fails the build. `REVERSE_SKIP` holds `deleteProfile`, `updateUsername`, `updatePassword`, `login` and
+     `refreshToken` with a reason each, and a test that every entry exists in the spec.
+
+  A floor (at least 48 forbidden operations, at least 120 operations) and a check of names that must be in the set
+  (all of `/api/users*`, `createRepository`, the settings, token, key store and rename routes, and every `DELETE`
+  but `deleteProfile`) stop a parser bug from emptying the sweep. `ANONYMOUS_KNOWN_GAPS` lists an operation kept out
+  of the anonymous sweeps because of a defect the sweep found; remove the entry when it is fixed.
+
+- **Maven browser** (`tests/api/maven-browser.spec.ts`). `GET /api/repos/{repo}/contents?path=` lists a
+  directory (names, sizes, directory flag, matched against the bytes the wire serves; `400 invalidStoragePath` for
+  `../x`, `404` for a path that is not there). `POST /api/repos/{repo}/download-token?path=` gives a one-minute
+  token that opens ONE path of ONE repo on the protocol port to a caller with no credentials: refused for another
+  path of the repo, for the same path in another repo, for a garbage token, for a `PUT` (repo unchanged), and as a
+  Bearer or `?downloadToken=` on the panel API and on the protocol port. The expiry test waits 61 s and is tagged
+  `@slow` (`--grep '^((?!@slow).)*$'` leaves it out).
+
 ## Remote hardening
 
 On a `remote` target (`target.isRemote`, see `src/target.ts`), `AUTH_THROTTLE_MAX_FAILURES` cannot
