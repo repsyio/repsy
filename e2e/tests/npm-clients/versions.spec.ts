@@ -100,8 +100,10 @@ test.describe('npm-family config renderers, read back by the client', () => {
       },
     },
   ];
-  const registryA = repoUrl('repo-a', '');
-  const registryB = repoUrl('repo-b', '');
+  // Functions, not constants: the describe body runs when the file is loaded (`playwright test --list`
+  // too), and on an owner-scoped target `repoUrl` needs REPSY_REPO_OWNER, which a listing may not have (RPS-1500).
+  const registryA = (): string => repoUrl('repo-a', '');
+  const registryB = (): string => repoUrl('repo-b', '');
 
   test('pnpm reads the rendered .npmrc', { tag: ['@pnpm', '@versions'] }, async () => {
     const { home, work } = await isolatedWorkDir('npmc-cfg-pnpm');
@@ -113,7 +115,7 @@ test.describe('npm-family config renderers, read back by the client', () => {
       redact: ['tok', 'pw'],
     });
     expect(defaults.exitCode, defaults.stderr).toBe(0);
-    expect(defaults.stdout.trim()).toBe(registryA);
+    expect(defaults.stdout.trim()).toBe(registryA());
 
     const scoped = await runSealed(CLIENT_BINARIES.pnpm, ['config', 'get', '@scoped:registry'], {
       cwd: work,
@@ -121,7 +123,7 @@ test.describe('npm-family config renderers, read back by the client', () => {
       redact: ['tok', 'pw'],
     });
     expect(scoped.exitCode, scoped.stderr).toBe(0);
-    expect(scoped.stdout.trim()).toBe(registryB);
+    expect(scoped.stdout.trim()).toBe(registryB());
   });
 
   test(
@@ -142,7 +144,7 @@ test.describe('npm-family config renderers, read back by the client', () => {
       expect(registry.exitCode, registry.stderr).toBe(0);
       // Yarn 1 clears the line with ANSI escapes even when its output is not a terminal.
       // eslint-disable-next-line no-control-regex
-      expect(registry.stdout.replace(/\u001b\[[0-9;]*[A-Za-z]/g, '').trim()).toBe(registryA);
+      expect(registry.stdout.replace(/\u001b\[[0-9;]*[A-Za-z]/g, '').trim()).toBe(registryA());
     },
   );
 
@@ -169,7 +171,7 @@ test.describe('npm-family config renderers, read back by the client', () => {
         },
       );
       expect(registry.exitCode, registry.stderr).toBe(0);
-      expect(registry.stdout.trim()).toBe(registryA);
+      expect(registry.stdout.trim()).toBe(registryA());
 
       const scopes = await runSealed(
         CLIENT_BINARIES['yarn-berry'],
@@ -181,7 +183,10 @@ test.describe('npm-family config renderers, read back by the client', () => {
         },
       );
       expect(scopes.exitCode, scopes.stderr).toBe(0);
-      expect(JSON.parse(scopes.stdout)).toHaveProperty(['scoped', 'npmRegistryServer'], registryB);
+      expect(JSON.parse(scopes.stdout)).toHaveProperty(
+        ['scoped', 'npmRegistryServer'],
+        registryB(),
+      );
     },
   );
 });

@@ -108,18 +108,23 @@ RUN case "${TARGETARCH:-amd64}" in \
 # already-proven "skeleton" service untouched.
 FROM node:24-bookworm-slim
 
+# The harness's directory in the build context (RPS-1500): `.` when the context is e2e/ (docker-compose.runners.yml),
+# a path such as `repsy-os/e2e` when another repository builds from a parent directory. Every COPY of the
+# harness's own files below is relative to it. Declared after FROM, so it is in scope for this stage only.
+ARG HARNESS_DIR=.
+
 RUN npm install -g --ignore-scripts pnpm@12.5.1
 
 WORKDIR /app
 RUN chmod 777 /app
 
-COPY package.json pnpm-lock.yaml ./
+COPY ${HARNESS_DIR}/package.json ${HARNESS_DIR}/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
-COPY tsconfig.json playwright.config.ts ./
-COPY src ./src
-COPY tests ./tests
-COPY runners/entrypoint.sh ./entrypoint.sh
+COPY ${HARNESS_DIR}/tsconfig.json ${HARNESS_DIR}/playwright.config.ts ./
+COPY ${HARNESS_DIR}/src ./src
+COPY ${HARNESS_DIR}/tests ./tests
+COPY ${HARNESS_DIR}/runners/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
 # --- docker-specific layers ---
