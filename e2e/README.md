@@ -704,6 +704,17 @@ on unpublish answers 401, not 403; an anonymous caller on a public repo gets 401
 `Authorization` header is refused with 401); a raw replay as admin of each wire request changes the
 package exactly like the client does, so the replays are faithful.
 
+Cargo, NuGet and Ruby (`clients/{cargo,nuget,ruby}-manage.ts`, `tests/<protocol>/manage-matrix.spec.ts`;
+`./run.sh test --protocol cargo,nuget,ruby --grep " manage "`) are all WRITE: Cargo `yank`/`unyank`
+(`cargo yank [--undo]`) and `owner-add`/`owner-remove` (`cargo owner --add|--remove`, 20 cells), NuGet
+`unlist`/`relist` (raw `DELETE`/`POST /v3/package/<id>/<version>`, 10 cells; `dotnet nuget delete` is
+RPS-1486's), Ruby `yank` (`gem yank`, 5 cells). Probed live: the owner calls are accepted and change
+nothing (Repsy has no owners below the repository), so their allowed cell asserts an unchanged crate;
+a USER password may yank/unlist (RPS-1317); an anonymous caller on a public repo gets 401 everywhere.
+`gem yank` exits 0 even when it is refused (RubyGems 4.0 `yank_command.rb` prints the body and never
+checks the status), so `ruby-manage.ts` reads the outcome from the server's "Successfully yanked gem"
+message instead of the exit code.
+
 ## Maven runner
 
 `runners/maven.Dockerfile` adds a pinned Eclipse Temurin JDK and Apache Maven (build args
