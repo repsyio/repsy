@@ -89,7 +89,7 @@ e2e/
   runners/npm-clients.Dockerfile  # + pinned pnpm, yarn classic, yarn berry (npm --prefix /opt/clients/<name>) and bun (copied from oven/bun); see "npm-family clients"
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
   runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
-  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image, `skopeo` (built statically from its pinned tag) and `regctl` (pinned release binary); no daemon, no socket
+  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image, `skopeo` (built statically from its pinned tag), `regctl` and `oras` (pinned release binaries, sha256 per arch); no daemon, no socket
   runners/helm.Dockerfile      # + the static `helm` binary + the cm-push plugin installed at build time; no daemon, no socket
   runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time; the static uv binary copied out of Astral's image
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
@@ -160,7 +160,8 @@ e2e/
       docker-copy-adapter.ts         # the scenario-loop adapter of the copy clients (CopyClient -> ProtocolAdapter) + openSession, RPS-1478 part B
       docker-skopeo.ts               # skopeo: skopeoAdapter (skopeo copy), its env/auth file, the dir: reader
       docker-regctl.ts               # regctl: regctlAdapter (regctl image copy), its regctl.json renderer
-      docker-tls.ts                  # the ONE place skopeo/regctl's TLS setting is decided (plain HTTP today; the HTTPS leg switches it here)
+      docker-oras.ts                 # oras: openOrasSession (oras login --password-stdin into an isolated --registry-config file), REFERRERS_TAG, RPS-1478 part C
+      docker-tls.ts                  # the ONE place skopeo/regctl/oras's TLS setting is decided (plain HTTP today; the HTTPS leg switches it here)
       docker-client-tests.ts         # seeding + raw comparison helpers of the skopeo/regctl specs
       helm-chart.ts                   # hand-assembled Helm chart .tgz builder (Chart.yaml + values.yaml + marker, ustar+gzip)
       helm-raw.ts                     # raw HTTP for BOTH Helm protocols: OCI manifest/blob PUT/GET/HEAD + classic index/chart/upload/delete
@@ -242,6 +243,7 @@ e2e/
       skopeo.spec.ts            # skopeo: copy between two repos, inspect, delete (scope *), multi-arch --all
       regctl.spec.ts            # regctl: manifest get/head, image inspect, copy between repos, tag/manifest delete, sha512, multi-arch
       client-tag-list.spec.ts   # crane ls/catalog, skopeo list-tags/inspect, regctl tag ls/repo ls against the missing tags/list (RPS-1489)
+      oras.spec.ts              # oras: push/pull/blob/manifest of OCI artifacts, attach + the referrers tag-schema fallback, discover, copy, delete, the RPS-1490 test.fail pins (RPS-1478 part C)
     helm/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
@@ -2573,7 +2575,7 @@ is in the PR that added this file.
   whose config digest is also one of its layers (`{}` twice, as `oras attach`/`oras push
 --config` without files produces) is answered `404` `MANIFEST_BLOB_UNKNOWN` `layerNotFound`
   (observed live while probing; the OCI artifact manifest with a distinct layer is `201`). It
-  belongs to part C, which decides how to pin it.
+  is pinned in part C as `test.fail` under RPS-1490 (see "Fourth Docker client: `oras`").
 
 ```bash
 ./run.sh test --protocol docker -b   # -b the first time: builds the docker runner image
@@ -2628,11 +2630,52 @@ Probed live (skopeo 1.24.1, regctl 0.11.6):
 
 `client-tag-list.spec.ts` pins what `crane ls`/`catalog`, `skopeo list-tags`/`inspect` and `regctl tag
 ls`/`repo ls` do against RA1/RA2 (fail with the registry's `unknownPath`): the story that adds `tags/list`
-(RPS-1489) flips it. Not covered: `oras` (RPS-1478 part C), the HTTPS leg (RPS-1474).
+(RPS-1489) flips it. `oras` is in its own section below; not covered: the HTTPS leg (RPS-1474).
 
 ```bash
 ./run.sh test --protocol docker -b               # -b the first time this runner image changes
 ./run.sh test --protocol docker --grep "@skopeo"  # or "@regctl"
+```
+
+### Fourth Docker client: `oras` (RPS-1478 part C)
+
+`oras` v1.3.4 (`ORAS_VERSION`, `ORAS_SHA256_AMD64`/`ORAS_SHA256_ARM64` in `runners/docker.Dockerfile` and
+`docker-compose.runners.yml`; a release tarball checked against its sha256, `oras version` checked at build
+time) is the OCI ARTIFACT client: it pushes arbitrary files with an `artifactType`, attaches referrers (an
+SBOM, a signature) to an image and copies them. `clients/docker-oras.ts` opens a session per credential:
+`oras login --password-stdin` into an isolated `--registry-config` file inside the invocation's private `HOME`
+(oras's own auth store, the secret on stdin and never in argv), `clientEnv` allow-list environment
+(`sealed-env.spec.ts` has a cell), TLS from `docker-tls.ts` (`--plain-http` today; `--from-plain-http`/
+`--to-plain-http` for `copy`). It has no scenario-loop adapter: `tests/docker/oras.spec.ts` (tag `@oras`) pins
+what it does that the image clients never reach. Probed live (oras 1.3.4):
+
+| Behaviour                                               | What oras does against Repsy                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `push` / `pull` / `manifest fetch` / `blob fetch` (OR1) | an OCI artifact manifest (`artifactType`, config `application/vnd.oci.empty.v1+json`, a file layer with a custom media type and a `title` annotation) is stored as sent and reads back byte-identical, by tag and by digest; `--config <file>:<type>` stores that config and the type becomes the artifact type                                                                                                                              |
+| `attach` (OR2)                                          | never asks the referrers API: the `201` of the referrer PUT has no `OCI-Subject` header, which oras-go reads as "no referrers API", so it takes the spec's FALLBACK: `GET manifests/sha256-<hex>` (`404`, then the existing index), `PUT` an OCI image index under that tag listing the referrer                                                                                                                                             |
+| the fallback index tag (OR2)                            | an ordinary tag (RA4): raw HTTP and `crane manifest <repo>/<image>:sha256-<hex>` read the same bytes; a read-write deploy token can attach, a read-only one is refused (`401`) and the index does not change                                                                                                                                                                                                                                 |
+| `discover` (OR3)                                        | **fails** by default: it asks `GET .../referrers/<digest>`, gets `404` WITH `NAME_UNKNOWN` (RA3) and oras-go reads that code as "repository not found", not as "API unsupported". `--distribution-spec v1.1-referrers-tag` works (`--format json`, `--artifact-type` filter)                                                                                                                                                                 |
+| `copy` (OR4)                                            | between two repos of one Repsy the artifact arrives byte-identical (oras asks for a mount, gets the `202` fallback of RA5, uploads); `-r` fails like `discover` unless `--from-distribution-spec` and `--to-distribution-spec` are both `v1.1-referrers-tag`, then the referrer and its index tag are copied                                                                                                                                 |
+| `manifest delete` (OR5)                                 | deletes by digest (a tag reference resolves first: every tag of the manifest goes), asked for the `delete` scope up front (token scope `repository:<repo>/<image>:delete,pull`, seen through a logging proxy: no `insufficient_scope` round trip, unlike crane/regctl); a rw deploy token is refused. Deleting a REFERRER fails on the same referrers-API probe unless the tag schema is forced, which also removes its entry from the index |
+| `repo tags` / `repo ls` (OR7)                           | fail with `unknownPath` (RA1/RA2, RPS-1489)                                                                                                                                                                                                                                                                                                                                                                                                  |
+
+Backend follow-up (RPS-1489 already lists the referrers API): implementing `GET /v2/<repo>/<image>/referrers/<digest>`
+(or, at the least, answering the missing route with a `404` that does not carry `NAME_UNKNOWN`) makes
+`oras discover`, `oras copy -r` and `oras manifest delete` of a referrer work without forcing the tag
+schema; the `discover`/`copy -r`/referrer-delete halves of OR3/OR4/OR5 then flip on purpose (with RA3).
+
+**RPS-1490 (`test.fail`, OR6).** A manifest whose config digest equals one of its layer digests, or that
+lists the same layer digest twice, is answered `404 MANIFEST_BLOB_UNKNOWN / layerNotFound` on `PUT
+manifests/<ref>` although every blob is stored (`AbstractDockerProtocolTxFacade.verifyLayers` adds the
+config digest to the layer digest list and `LayerTxService.isAllExistsByRepoIdAndDigests` compares the
+list's size with the number of distinct rows found). The OCI spec allows both. Real clients hit it in three
+places, each a `test.fail` here: `oras push --artifact-type X` without files and `oras attach` with only an
+annotation (both send `{}` as the config AND the one layer), `oras push` of two files with identical bytes;
+OR6d reproduces it with raw HTTP. The fix flips all four.
+
+```bash
+./run.sh test --protocol docker -b               # -b the first time this runner image changes
+./run.sh test --protocol docker --grep "@oras"
 ```
 
 ## Helm runner
