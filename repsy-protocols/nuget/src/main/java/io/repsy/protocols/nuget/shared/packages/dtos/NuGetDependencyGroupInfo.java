@@ -13,25 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.nuget.shared.dtos;
+package io.repsy.protocols.nuget.shared.packages.dtos;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * One {@code <group targetFramework="...">} of a nuspec. A group can declare no dependency at all
+ * ({@code <group targetFramework="net10.0"/>}): that is a statement that the framework needs
+ * nothing, so it is kept and not merged into another group (RPS-1555). A group without a target
+ * framework applies to every framework.
+ */
 @NullMarked
-@JsonInclude(Include.NON_NULL)
-public record NuGetDependencyGroup(
-    @JsonProperty("@type") String type,
-    @Nullable String targetFramework,
-    @Nullable List<NuGetCatalogDependency> dependencies) {
-
-  public static NuGetDependencyGroup of(
-      final @Nullable String targetFramework,
-      final @Nullable List<NuGetCatalogDependency> dependencies) {
-    return new NuGetDependencyGroup("PackageDependencyGroup", targetFramework, dependencies);
-  }
-}
+public record NuGetDependencyGroupInfo(
+    @Nullable String targetFramework, List<NuGetDependencyInfo> dependencies) {}

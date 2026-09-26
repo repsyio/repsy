@@ -25,8 +25,9 @@
  *  - the flat container `.nuspec` (`v3/package/<id>/<ver>/<id>.<ver>.nuspec`), which is what
  *    `dotnet restore` reads (`RemoteV3FindPackageByIdResource`, no registration request at all,
  *    H17 below), and
- *  - the registration leaf's `catalogEntry.dependencyGroups` (`NuGetResponseMapper.buildDependencyGroups`),
- *    what NuGet clients that resolve through the registration (Visual Studio, `nuget.exe`) read.
+ *  - the `catalogEntry.dependencyGroups` of the registration leaf and of the leaves inlined into the
+ *    registration index (`NuGetResponseMapper.buildDependencyGroups`), what NuGet clients that
+ *    resolve through the registration (Visual Studio, `nuget.exe`) read.
  *
  * Probed live BEFORE the assertions were written (the exact outputs are in the description of the RPS-1479 PR, #717):
  *
@@ -38,15 +39,13 @@
  *    accepted) each apply to their own consumer target only; a group without `targetFramework`
  *    applies to every target that has no nearer group.
  *  - Empty group (confirmed): a nuspec's empty `<group targetFramework="net10.0"/>` ("nothing for
- *    net10.0") is honoured by the restore, because it reads the nuspec. It is NOT in the
- *    registration's `dependencyGroups` (`buildDependencyGroups` only sees dependencies, and an
- *    empty group has none): the RPS-1479 PR proposed a story, so nothing here pins the
- *    registration's handling of an empty group.
- *  - Registration INDEX (probed, not asserted): the per-leaf documents (`v3/registration/<id>/
- *    <ver>.json`) carry `catalogEntry.dependencyGroups`, but the leaves inlined into the registration
- *    index's pages (`toLeafItem` over `toVersionInfo`, which ignores the dependencies) never do. The
- *    NuGet registration spec has them there too; proposed as a story in the RPS-1479 PR, so this file
- *    reads the per-leaf documents only.
+ *    net10.0") is honoured by the restore, because it reads the nuspec. The registration keeps it
+ *    too (RPS-1555, it used to be dropped): a `PackageDependencyGroup` with its `targetFramework`
+ *    and, as on nuget.org, no `dependencies` property, so a client resolving through the
+ *    registration does not fall back to another group.
+ *  - Registration INDEX (RPS-1555, asserted): the leaves inlined into the registration index's
+ *    pages carry the same `catalogEntry.dependencyGroups` as the per-leaf documents (they used to
+ *    carry none: `toVersionInfo` ignored the dependencies).
  *  - Unlisted dependency (confirmed): `unlist` (WRITE) only flips `listed` on the registration; the
  *    flat container keeps offering the version and the client does not look at `listed`, so an
  *    unlisted B still satisfies `[1.0.0, )` (lowest applicable), as on nuget.org.
@@ -65,10 +64,12 @@ import {
   buildNupkg,
   nugetApiKey,
   normalizeVersion,
+  parseIndexDependencyGroups,
   parseLeafDependencyGroups,
   parseSearchResponse,
   rawDownloadNupkg,
   rawDownloadNuspec,
+  rawGetRegistrationIndex,
   rawGetRegistrationLeaf,
   rawSearch,
   rawUnlist,
@@ -358,6 +359,11 @@ test.describe('nuget transitive dependency resolution (real dotnet restore)', ()
         // without a target framework.
         { dependencies: [{ id: b }] },
       ]);
+
+      // The registration index inlines the very same groups (RPS-1555).
+      const index = await rawGetRegistrationIndex(l.repoName, admin, a);
+      expect(index.status, 'GET registration index').toBe(200);
+      expect(parseIndexDependencyGroups(index.body, '1.0.0'), 'the index leaf').toEqual(groups);
     },
   );
 
@@ -399,7 +405,7 @@ test.describe('nuget transitive dependency resolution (real dotnet restore)', ()
 
       // E: a group without targetFramework applies to every target ("any"), and the empty
       // net10.0 group says "nothing for net10.0" -- the nuspec, which restore reads, is honoured
-      // (the registration drops an empty group, see the file header).
+      // (and so does the registration, RPS-1555, see the file header).
       const e = `${l.prefix}-e`;
       await pushPackage(l, {
         id: e,
@@ -437,6 +443,25 @@ test.describe('nuget transitive dependency resolution (real dotnet restore)', ()
         [f]: '1.0.0',
         [c]: '1.0.0',
       });
+
+      // RPS-1555: a client that resolves through the registration must see the same: the empty
+      // net10.0 group is there (no dependencies), on the leaf and on the index page.
+      const admin = adminCredential();
+      // (In the order of the nuspec, where `buildNupkg` writes the empty groups last.)
+      const expectedGroups = [
+        { targetFramework: '.NETStandard2.0', dependencies: [{ id: c, range: '[1.0.0, )' }] },
+        { targetFramework: 'net10.0', dependencies: [] },
+      ];
+      const leaf = await rawGetRegistrationLeaf(l.repoName, admin, f, '1.0.0');
+      expect(leaf.status, 'GET registration leaf').toBe(200);
+      expect(parseLeafDependencyGroups(leaf.body), 'leaf dependencyGroups').toEqual(
+        expectedGroups,
+      );
+      const index = await rawGetRegistrationIndex(l.repoName, admin, f);
+      expect(index.status, 'GET registration index').toBe(200);
+      expect(parseIndexDependencyGroups(index.body, '1.0.0'), 'index dependencyGroups').toEqual(
+        expectedGroups,
+      );
     },
   );
 
