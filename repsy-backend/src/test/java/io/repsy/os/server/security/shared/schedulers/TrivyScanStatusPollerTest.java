@@ -62,7 +62,7 @@ class TrivyScanStatusPollerTest {
             this.txService,
             this.statusClient,
             new TrivyScannerProperties(
-                "http://scanner", "key", 5, 3000, MAX_SCAN_DURATION_SECONDS));
+                "http://scanner", "key", 5, 3000, MAX_SCAN_DURATION_SECONDS, 3, 15, 60));
   }
 
   @Test

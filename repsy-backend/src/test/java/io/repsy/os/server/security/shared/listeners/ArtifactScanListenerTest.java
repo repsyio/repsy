@@ -24,6 +24,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -41,27 +42,43 @@ import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
 import io.repsy.os.server.security.scanner.VulnerabilityScanner;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.server.security.scanner.dtos.ScanRequest;
+import io.repsy.os.server.security.scanner.trivy.TrivyScannerProperties;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
+import java.net.ConnectException;
+import java.net.URI;
 import java.sql.SQLException;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ArtifactScanListener")
@@ -76,7 +93,12 @@ class ArtifactScanListenerTest {
   @Mock private RepoTxService repoTxService;
   @Mock private DockerScanTokenIssuer dockerScanTokenIssuer;
   @Mock private Executor scanTaskExecutor;
+  @Mock private TaskScheduler taskScheduler;
   @Mock private VulnerabilityScanner scanner;
+
+  private static final Instant NOW = Instant.parse("2026-09-26T10:00:00Z");
+  private static final TrivyScannerProperties PROPERTIES =
+      new TrivyScannerProperties("http://scanner", "key", 10, 3000, 330, 3, 15, 60);
 
   private ArtifactScanListener listener;
   private Logger listenerLogger;
@@ -98,6 +120,8 @@ class ArtifactScanListenerTest {
             this.scanTxService,
             this.repoTxService,
             this.dockerScanTokenIssuer,
+            this.taskScheduler,
+            PROPERTIES,
             this.scanTaskExecutor,
             Map.<String, StorageStrategy>of());
   }
@@ -322,6 +346,217 @@ class ArtifactScanListenerTest {
     final var request = this.capturedScanRequest();
     assertThat(request.dockerRegistryReference()).isEqualTo("repo/image:1.0");
     assertThat(request.registryAuthToken()).isEqualTo("token");
+  }
+
+  @Test
+  @DisplayName(
+      "retries a scanner that cannot be reached after 15 s and 60 s, then records the failure"
+          + " naming the attempts")
+  void retriesAnUnreachableScannerTwiceThenFails() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    this.givenSchedulerAt(NOW);
+    when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(true);
+    doThrow(unreachable()).when(this.scanner).scan(any());
+
+    this.listener.handleArtifactPushed(this.dockerEvent());
+
+    verify(this.scanTxService, never()).recordScanFailure(any(), any());
+    final var firstRetry = this.captureScheduled(1);
+    assertThat(firstRetry.instants().getFirst()).isEqualTo(NOW.plusSeconds(15));
+
+    firstRetry.tasks().getFirst().run();
+
+    verify(this.scanTxService, never()).recordScanFailure(any(), any());
+    final var secondRetry = this.captureScheduled(2);
+    assertThat(secondRetry.instants().get(1)).isEqualTo(NOW.plusSeconds(60));
+
+    secondRetry.tasks().get(1).run();
+
+    verify(this.scanner, times(3)).scan(any());
+    verify(this.taskScheduler, times(2)).schedule(any(Runnable.class), any(Instant.class));
+    final var message = ArgumentCaptor.forClass(String.class);
+    verify(this.scanTxService).recordScanFailure(eq(SCAN_ID), message.capture());
+    assertThat(message.getValue()).contains("Connection refused").endsWith("(after 3 attempts)");
+    assertThat(this.logAppender.list)
+        .filteredOn(logEvent -> logEvent.getLevel() == Level.WARN)
+        .hasSize(2)
+        .allMatch(logEvent -> logEvent.getFormattedMessage().contains("Retrying in"));
+  }
+
+  @Test
+  @DisplayName("keeps the retries, all their waits and their requests, within the poller's limit")
+  void retryBudgetStaysBelowTheMaximumScanDuration() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    this.givenSchedulerAt(NOW);
+    when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(true);
+    doThrow(unreachable()).when(this.scanner).scan(any());
+
+    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.captureScheduled(1).tasks().getFirst().run();
+    final var scheduled = this.captureScheduled(2);
+    scheduled.tasks().get(1).run();
+
+    final var totalWait =
+        Duration.between(NOW, scheduled.instants().getFirst())
+            .plus(Duration.between(NOW, scheduled.instants().get(1)));
+
+    assertThat(totalWait.toSeconds()).isEqualTo(75);
+    assertThat(PROPERTIES.submitRetryBudgetSeconds())
+        .isEqualTo(totalWait.toSeconds() + 3 * PROPERTIES.requestTimeoutSeconds())
+        .isLessThan(PROPERTIES.maxScanDurationSeconds());
+  }
+
+  @Test
+  @DisplayName("records no failure and completes one scan when the second submit succeeds")
+  void succeedsOnTheSecondAttempt() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    this.givenSchedulerAt(NOW);
+    when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(true);
+    doThrow(unreachable()).doNothing().when(this.scanner).scan(any());
+
+    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.captureScheduled(1).tasks().getFirst().run();
+
+    verify(this.scanner, times(2)).scan(any());
+    verify(this.taskScheduler, times(1)).schedule(any(Runnable.class), any(Instant.class));
+    verify(this.scanTxService, never()).recordScanFailure(any(), any());
+    assertThat(this.logAppender.list)
+        .noneMatch(logEvent -> logEvent.getLevel().isGreaterOrEqual(Level.ERROR));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("failuresThatAreNotRetried")
+  @DisplayName("does not retry a scanner error, a submit timeout or an unreadable artifact")
+  void doesNotRetryOtherFailures(final String name, final RuntimeException failure) {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    doThrow(failure).when(this.scanner).scan(any());
+
+    this.listener.handleArtifactPushed(this.dockerEvent());
+
+    verify(this.scanner, times(1)).scan(any());
+    verifyNoInteractions(this.taskScheduler);
+    verify(this.scanTxService).recordScanFailure(SCAN_ID, failure.getMessage());
+  }
+
+  static Stream<Arguments> failuresThatAreNotRetried() {
+    return Stream.of(
+        Arguments.of(
+            "5xx from the scanner",
+            new IllegalArgumentException(
+                "Scanner adapter returned error: 503 SERVICE_UNAVAILABLE")),
+        Arguments.of(
+            "block() timeout",
+            new IllegalStateException("Timeout on blocking read for 10000000000 NANOSECONDS")),
+        Arguments.of(
+            "unreadable artifact",
+            new IllegalArgumentException("Failed to read artifact content")));
+  }
+
+  @Test
+  @DisplayName("records the failure when the executor is saturated at the time of the retry")
+  void savesFailureWhenTheRetryIsRejected() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    this.givenSchedulerAt(NOW);
+    doThrow(unreachable()).when(this.scanner).scan(any());
+
+    this.listener.handleArtifactPushed(this.dockerEvent());
+    doThrow(new RejectedExecutionException()).when(this.scanTaskExecutor).execute(any());
+    this.captureScheduled(1).tasks().getFirst().run();
+
+    verify(this.scanner, times(1)).scan(any());
+    verify(this.scanTxService).recordScanFailure(SCAN_ID, SATURATED_MESSAGE);
+    assertThat(this.logAppender.list)
+        .anyMatch(
+            logEvent ->
+                logEvent.getLevel() == Level.WARN
+                    && logEvent.getFormattedMessage().contains("Giving up on the retry"));
+  }
+
+  @Test
+  @DisplayName("records the failure when the retry cannot be scheduled")
+  void recordsFailureWhenTheSchedulerRejects() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    this.givenSchedulerAt(NOW);
+    doThrow(new RejectedExecutionException("scheduler shut down"))
+        .when(this.taskScheduler)
+        .schedule(any(Runnable.class), any(Instant.class));
+    doThrow(unreachable()).when(this.scanner).scan(any());
+
+    this.listener.handleArtifactPushed(this.dockerEvent());
+
+    final var message = ArgumentCaptor.forClass(String.class);
+    verify(this.scanTxService).recordScanFailure(eq(SCAN_ID), message.capture());
+    assertThat(message.getValue()).endsWith("(the retry could not be scheduled)");
+  }
+
+  @Test
+  @DisplayName("does not submit the retry of a scan whose row is gone")
+  void skipsTheRetryWhenTheScanRowIsGone() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    this.givenSchedulerAt(NOW);
+    when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(false);
+    doThrow(unreachable()).when(this.scanner).scan(any());
+
+    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.captureScheduled(1).tasks().getFirst().run();
+
+    verify(this.scanner, times(1)).scan(any());
+    verify(this.scanTxService, never()).recordScanFailure(any(), any());
+    assertThat(this.logAppender.list)
+        .anyMatch(logEvent -> logEvent.getFormattedMessage().contains("scan row no longer exists"));
+  }
+
+  @Test
+  @DisplayName("does not retry, and does not mention attempts, when the retry is switched off")
+  void recordsTheFailureAtOnceWhenOneAttemptIsConfigured() {
+    final var listener =
+        new ArtifactScanListener(
+            this.scannerRegistry,
+            this.scanTxService,
+            this.repoTxService,
+            this.dockerScanTokenIssuer,
+            this.taskScheduler,
+            new TrivyScannerProperties("http://scanner", "key", 10, 3000, 330, 1, 15, 60),
+            this.scanTaskExecutor,
+            Map.<String, StorageStrategy>of());
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    final var failure = unreachable();
+    doThrow(failure).when(this.scanner).scan(any());
+
+    listener.handleArtifactPushed(this.dockerEvent());
+
+    verifyNoInteractions(this.taskScheduler);
+    verify(this.scanTxService).recordScanFailure(SCAN_ID, failure.getMessage());
+  }
+
+  private void givenSchedulerAt(final Instant now) {
+    when(this.taskScheduler.getClock()).thenReturn(Clock.fixed(now, ZoneOffset.UTC));
+  }
+
+  private ScheduledRetries captureScheduled(final int expected) {
+    final var tasks = ArgumentCaptor.forClass(Runnable.class);
+    final var instants = ArgumentCaptor.forClass(Instant.class);
+    verify(this.taskScheduler, times(expected)).schedule(tasks.capture(), instants.capture());
+    return new ScheduledRetries(
+        new ArrayList<>(tasks.getAllValues()), new ArrayList<>(instants.getAllValues()));
+  }
+
+  private record ScheduledRetries(List<Runnable> tasks, List<Instant> instants) {}
+
+  private static WebClientRequestException unreachable() {
+    return new WebClientRequestException(
+        new ConnectException("Connection refused: scanner/10.0.0.1:8090"),
+        HttpMethod.POST,
+        URI.create("http://scanner:8090/scan"),
+        HttpHeaders.EMPTY);
   }
 
   private static ObjectOptimisticLockingFailureException optimisticLockFailure() {

@@ -28,10 +28,12 @@ import io.repsy.os.server.security.scanner.ResourceArtifactContent;
 import io.repsy.os.server.security.scanner.VulnerabilityScanner;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.server.security.scanner.dtos.ScanRequest;
+import io.repsy.os.server.security.scanner.trivy.TrivyScannerProperties;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.utils.BlobDigests;
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -44,7 +46,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 
 @Slf4j
 @Service
@@ -59,6 +63,8 @@ public class ArtifactScanListener {
   private final @NonNull VulnerabilityScanTxService scanTxService;
   private final @NonNull RepoTxService repoTxService;
   private final @NonNull DockerScanTokenIssuer dockerScanTokenIssuer;
+  private final @NonNull TaskScheduler taskScheduler;
+  private final @NonNull TrivyScannerProperties scannerProperties;
 
   @Qualifier("scanTaskExecutor")
   private final @NonNull Executor scanTaskExecutor;
@@ -132,13 +138,14 @@ public class ArtifactScanListener {
       return;
     }
 
-    this.runScan(event, scanId, scanner);
+    this.runScan(event, scanId, scanner, 1);
   }
 
   private void runScan(
       final @NonNull ArtifactPushedEvent event,
       final @NonNull UUID scanId,
-      final @NonNull VulnerabilityScanner scanner) {
+      final @NonNull VulnerabilityScanner scanner,
+      final int attempt) {
 
     try {
       final var scanInputs = this.resolveScanInputs(event, scanId);
@@ -163,6 +170,8 @@ public class ArtifactScanListener {
     } catch (final ObjectOptimisticLockingFailureException
         | DataIntegrityViolationException exception) {
       this.handleScanWriteConflict(event, scanId, exception);
+    } catch (final WebClientRequestException exception) {
+      this.handleScannerUnreachable(event, scanId, scanner, attempt, exception);
     } catch (final Exception exception) {
       this.handleScanFailure(event, scanId, exception);
     }
@@ -227,17 +236,120 @@ public class ArtifactScanListener {
         && !ConstraintViolations.isForeignKeyViolation(violation);
   }
 
+  /**
+   * The scanner could not be reached ({@link WebClientRequestException}: connection refused, DNS
+   * failure, connection reset), which is what a scanner that is restarting, cold-starting or being
+   * upgraded looks like. The submit is tried again a bounded number of times, {@code
+   * repsy.security.trivy.submit-max-attempts} in all, after a growing delay.
+   *
+   * <p>Only this failure is retried. A 5xx answer, the {@code block()} timeout of the submit
+   * ({@link IllegalStateException}) and an unreadable artifact mean the scanner was reached, or the
+   * upload was under way, and re-sending an artifact of up to hundreds of megabytes to a slow
+   * scanner would only make it slower. Those stay a recorded failure that can be re-run by hand.
+   *
+   * <p>The delay is not slept on the scan thread: the retry is handed to the {@link TaskScheduler},
+   * which only queues it on the scan executor again when the time comes, so the scan thread is free
+   * meanwhile and a saturated executor rejects the retry like any other scan. The row stays {@code
+   * PENDING} in between, and the status poller ignores a {@code PENDING} scan the scanner does not
+   * know yet. The scanner keeps one job per scan id, so a submit that landed but was never answered
+   * is safe to send again.
+   *
+   * <p>A retry that is waiting lives in memory only. When the backend restarts meanwhile it is
+   * lost, and {@code TrivyScanStatusPoller} fails the row once {@code max-scan-duration-seconds}
+   * have passed since it was created, which is the same recovery as for any other stuck scan. The
+   * retry budget ({@link TrivyScannerProperties#submitRetryBudgetSeconds()}) is well below that.
+   */
+  private void handleScannerUnreachable(
+      final @NonNull ArtifactPushedEvent event,
+      final @NonNull UUID scanId,
+      final @NonNull VulnerabilityScanner scanner,
+      final int attempt,
+      final @NonNull WebClientRequestException exception) {
+
+    final var maxAttempts = this.scannerProperties.submitMaxAttempts();
+
+    if (attempt >= maxAttempts) {
+      this.handleScanFailure(
+          event, scanId, exception, maxAttempts > 1 ? " (after " + maxAttempts + " attempts)" : "");
+      return;
+    }
+
+    final var delay = this.scannerProperties.submitRetryDelay(attempt);
+
+    log.warn(
+        "Vulnerability scanner unreachable for {}@{} (repo={}), attempt {} of {}: {}. Retrying in"
+            + " {} s",
+        event.artifactName(),
+        event.artifactVersion(),
+        event.repoName(),
+        attempt,
+        maxAttempts,
+        exception.getMessage(),
+        delay.toSeconds());
+
+    try {
+      this.taskScheduler.schedule(
+          () -> this.requeueScan(event, scanId, scanner, attempt + 1),
+          Instant.now(this.taskScheduler.getClock()).plus(delay));
+    } catch (final RejectedExecutionException _) {
+      this.handleScanFailure(event, scanId, exception, " (the retry could not be scheduled)");
+    }
+  }
+
+  /** Runs on the scheduler thread, so it only hands the retry to the scan executor. */
+  private void requeueScan(
+      final @NonNull ArtifactPushedEvent event,
+      final @NonNull UUID scanId,
+      final @NonNull VulnerabilityScanner scanner,
+      final int attempt) {
+
+    try {
+      this.scanTaskExecutor.execute(() -> this.retryScan(event, scanId, scanner, attempt));
+    } catch (final RejectedExecutionException _) {
+      this.scanTxService.recordScanFailure(scanId, "Scan executor is saturated; retry later");
+      log.warn(
+          "Giving up on the retry of the vulnerability scan for {}@{} (repo={}): scan executor is"
+              + " saturated",
+          event.artifactName(),
+          event.artifactVersion(),
+          event.repoName());
+    }
+  }
+
+  private void retryScan(
+      final @NonNull ArtifactPushedEvent event,
+      final @NonNull UUID scanId,
+      final @NonNull VulnerabilityScanner scanner,
+      final int attempt) {
+
+    if (!this.scanTxService.scanExists(scanId)) {
+      this.logScanRowGone(event);
+      return;
+    }
+
+    this.runScan(event, scanId, scanner, attempt);
+  }
+
   private void handleScanFailure(
       final @NonNull ArtifactPushedEvent event,
       final @NonNull UUID scanId,
       final @NonNull Exception exception) {
+
+    this.handleScanFailure(event, scanId, exception, "");
+  }
+
+  private void handleScanFailure(
+      final @NonNull ArtifactPushedEvent event,
+      final @NonNull UUID scanId,
+      final @NonNull Exception exception,
+      final @NonNull String messageSuffix) {
 
     log.error(
         "Vulnerability scan failed for {}@{}",
         event.artifactName(),
         event.artifactVersion(),
         exception);
-    this.scanTxService.recordScanFailure(scanId, resolveFailureMessage(exception));
+    this.scanTxService.recordScanFailure(scanId, resolveFailureMessage(exception) + messageSuffix);
   }
 
   private @Nullable ScanInputs resolveScanInputs(

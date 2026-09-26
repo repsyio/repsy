@@ -176,6 +176,11 @@ repsy:
       request-timeout-seconds: ${TRIVY_REQUEST_TIMEOUT_SECONDS:10}
       poll-interval-ms: ${TRIVY_POLL_INTERVAL_MS:3000}
       max-scan-duration-seconds: ${TRIVY_MAX_SCAN_DURATION_SECONDS:330}
+      # A submit that cannot reach the scanner (restart, cold start, upgrade) is retried after
+      # min(initial * 4^(n-1), max) seconds; attempts counts the first submit (1 = no retry).
+      submit-max-attempts: ${TRIVY_SUBMIT_MAX_ATTEMPTS:3}
+      submit-retry-initial-delay-seconds: ${TRIVY_SUBMIT_RETRY_INITIAL_DELAY_SECONDS:15}
+      submit-retry-max-delay-seconds: ${TRIVY_SUBMIT_RETRY_MAX_DELAY_SECONDS:60}
     docker:
       internal-registry-base-url: ${DOCKER_INTERNAL_REGISTRY_BASE_URL:http://localhost:9090}
 
