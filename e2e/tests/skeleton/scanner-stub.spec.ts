@@ -40,6 +40,15 @@ import {
 } from '../../src/stubs/scanner/rules.ts';
 import { CONTRACT_CASES, expectFindingShape } from '../../src/stubs/scanner/contract.ts';
 import { createScannerStub, type StubOptions } from '../../src/stubs/scanner/server.ts';
+import {
+  ADVISORY_MAX_BODY_BYTES,
+  GARBLED_BODY,
+  STUB_DB_UPDATED_AT,
+  advisoryFindingsFor,
+  outcomeFor,
+  parseAdvisoryRequest,
+  type AdvisoryScript,
+} from '../../src/stubs/scanner/advisories.ts';
 
 const KEY = 'unit-test-key';
 
@@ -667,6 +676,212 @@ test.describe('stub scanner HTTP contract', () => {
     expect(await response.json()).toEqual({ message: 'No endpoint GET /elsewhere' });
   });
 });
+
+test.describe('stub scanner advisory lookup (POST /advisories, RPS-1613)', () => {
+  let s: Started;
+
+  test.beforeEach(async () => {
+    s = await start();
+  });
+
+  test.afterEach(async () => {
+    await s.close();
+  });
+
+  const lookup = (body: unknown, headers: Record<string, string> = {}) =>
+    fetch(`${s.base}/advisories`, {
+      method: 'POST',
+      headers: { 'x-scanner-api-key': KEY, 'content-type': 'application/json', ...headers },
+      body: typeof body === 'string' ? body : JSON.stringify(body),
+    });
+  const pairs = (...items: Array<[string, string]>) => ({
+    ecosystem: 'npm',
+    packages: items.map(([name, version]) => ({ name, version })),
+  });
+
+  test('a pair no script mentions has no finding; the answer names the stub database and scanner', async () => {
+    const response = await lookup(pairs(['lodash', '4.17.20']));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      dbUpdatedAt: STUB_DB_UPDATED_AT,
+      scannerVersion: SCANNER_VERSION,
+      findings: [],
+    });
+  });
+
+  test('a scripted finding is reported on the exact pair it was scripted for, in the scanner finding shape', async () => {
+    await s.client.advisories('lib', {
+      findings: [
+        { version: '1.0.0', severity: 'HIGH', cveId: 'CVE-2099-7100', description: 'Lookup one' },
+        { version: '2.0.0', severity: 'LOW' },
+      ],
+    });
+
+    const response = await lookup(pairs(['lib', '1.0.0'], ['lib', '3.0.0'], ['other', '1.0.0']));
+    const body = (await response.json()) as { findings: Record<string, unknown>[] };
+
+    expect(body.findings).toHaveLength(1);
+    expectFindingShape(body.findings[0] as Record<string, unknown>);
+    expect(body.findings[0]).toMatchObject({
+      cveId: 'CVE-2099-7100',
+      severity: 'HIGH',
+      packageName: 'lib',
+      packageVersion: '1.0.0',
+      description: 'Lookup one',
+      referenceUrl: 'https://scanner-stub.invalid/advisories/CVE-2099-7100',
+    });
+  });
+
+  test('unavailable is a 503, timeout a 504 and garbled a 200 that is not JSON; only for the scripted name', async () => {
+    await s.client.advisories('down', { outcome: 'unavailable', findings: [] });
+    await s.client.advisories('slow', { outcome: 'timeout' });
+    await s.client.advisories('mangled', { outcome: 'garbled' });
+
+    const unavailable = await lookup(pairs(['down', '1.0.0']));
+    expect(unavailable.status).toBe(503);
+    expect(typeof ((await unavailable.json()) as { message: string }).message).toBe('string');
+    expect((await lookup(pairs(['slow', '1.0.0']))).status).toBe(504);
+    const garbled = await lookup(pairs(['mangled', '1.0.0']));
+    expect(garbled.status).toBe(200);
+    expect(garbled.headers.get('content-type')).toContain('application/json');
+    expect(await garbled.text()).toBe(GARBLED_BODY);
+    expect(() => JSON.parse(GARBLED_BODY)).toThrow();
+
+    // A request that names a failing package fails as a whole, one that does not is untouched.
+    expect((await lookup(pairs(['fine', '1.0.0'], ['down', '1.0.0']))).status).toBe(503);
+    expect((await lookup(pairs(['fine', '1.0.0']))).status).toBe(200);
+  });
+
+  test('every readable lookup is recorded with its distinct pairs and how it was answered, filterable by name', async () => {
+    await s.client.advisories('rec', { findings: [{ version: '1.0.0', severity: 'HIGH' }] });
+    await s.client.advisories('rec-down', { outcome: 'unavailable' });
+
+    await lookup(pairs(['rec', '1.0.0'], ['rec', '1.0.0'], ['x', '1.0.0']));
+    await lookup(pairs(['rec-down', '1.0.0']));
+    await lookup(pairs(['unrelated', '1.0.0']));
+    await lookup('not json');
+
+    const calls = await s.client.advisoryCalls('rec');
+    expect(calls).toMatchObject([
+      {
+        packages: [
+          { name: 'rec', version: '1.0.0' },
+          { name: 'x', version: '1.0.0' },
+        ],
+        outcome: 'ok',
+        findings: 1,
+      },
+    ]);
+    expect((await s.client.advisoryCalls('rec-down')).map((call) => call.outcome)).toEqual([
+      'unavailable',
+    ]);
+    expect(await s.client.advisoryCalls()).toHaveLength(3);
+    expect(await s.client.advisoryCalls('never-asked')).toEqual([]);
+  });
+
+  test('clearing a script, and reset, take it away', async () => {
+    await s.client.advisories('a', { outcome: 'timeout' });
+    await s.client.advisories('b', { outcome: 'timeout' });
+    await s.client.clearAdvisories('a');
+    expect((await lookup(pairs(['a', '1.0.0']))).status).toBe(200);
+    expect((await lookup(pairs(['b', '1.0.0']))).status).toBe(504);
+
+    await fetch(`${s.base}/control/reset`, {
+      method: 'POST',
+      headers: { 'x-scanner-api-key': KEY },
+    });
+
+    expect((await lookup(pairs(['b', '1.0.0']))).status).toBe(200);
+    expect(await s.client.advisoryCalls('b')).toHaveLength(1);
+  });
+
+  test('a script is checked: a bad field is a 400', async () => {
+    const put = (body: unknown) =>
+      fetch(`${s.base}/control/advisories`, {
+        method: 'PUT',
+        headers: { 'x-scanner-api-key': KEY, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+    expect((await put({ script: {} })).status).toBe(400);
+    expect((await put({ packageName: 'a', script: { outcome: 'maybe' } })).status).toBe(400);
+    expect((await put({ packageName: 'a', script: { findings: 'HIGH' } })).status).toBe(400);
+    expect(
+      (await put({ packageName: 'a', script: { findings: [{ severity: 'HIGH' }] } })).status,
+    ).toBe(400);
+    expect(
+      (
+        await put({
+          packageName: 'a',
+          script: { findings: [{ version: '1', severity: 'SEVERE' }] },
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (await put({ packageName: 'a', script: { findings: [{ version: '1', severity: 'LOW' }] } }))
+        .status,
+    ).toBe(200);
+  });
+
+  test('the request limits of the real scanner: a body over 10 MiB (by its length, or as it is read) is a 413, and so are more than 20,000 pairs', async () => {
+    const huge = ' '.repeat(ADVISORY_MAX_BODY_BYTES + 1);
+    expect((await lookup(huge)).status).toBe(413);
+
+    const many = pairs(
+      ...Array.from({ length: 20_001 }, (_, i): [string, string] => ['p', `1.0.${i}`]),
+    );
+    expect((await lookup(many)).status).toBe(413);
+    const atLimit = pairs(
+      ...Array.from({ length: 20_000 }, (_, i): [string, string] => ['p', `1.0.${i}`]),
+    );
+    expect((await lookup(atLimit)).status).toBe(200);
+  });
+
+  test('a body of an other type than JSON is a 415, a missing key a 401', async () => {
+    expect((await lookup('x', { 'content-type': 'text/plain' })).status).toBe(415);
+    const anonymous = await fetch(`${s.base}/advisories`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    expect(anonymous.status).toBe(401);
+  });
+});
+
+test.describe('stub scanner advisory rules (pure)', () => {
+  test('a request is read like the real scanner reads it: repeats collapse, the order stays', () => {
+    expect(
+      parseAdvisoryRequest(
+        JSON.stringify(pairsOf(['@a/b', '1.0.0'], ['c', '2.0.0'], ['@a/b', '1.0.0'])),
+      ),
+    ).toEqual([
+      { name: '@a/b', version: '1.0.0' },
+      { name: 'c', version: '2.0.0' },
+    ]);
+  });
+
+  test('the outcome of a request is the first failing script among its names; findings need the same version', () => {
+    const scripts = new Map<string, AdvisoryScript>([
+      ['ok-lib', { findings: [{ version: '1.0.0', severity: 'MEDIUM' }] }],
+      ['bad-lib', { outcome: 'timeout' }],
+    ]);
+    const asked = [
+      { name: 'ok-lib', version: '1.0.0' },
+      { name: 'ok-lib', version: '1.0.1' },
+    ];
+
+    expect(outcomeFor(asked, scripts)).toBe('ok');
+    expect(outcomeFor([...asked, { name: 'bad-lib', version: '1' }], scripts)).toBe('timeout');
+    expect(advisoryFindingsFor(asked, scripts)).toMatchObject([
+      { severity: 'MEDIUM', packageName: 'ok-lib', packageVersion: '1.0.0' },
+    ]);
+  });
+});
+
+function pairsOf(...items: Array<[string, string]>): unknown {
+  return { ecosystem: 'npm', packages: items.map(([name, version]) => ({ name, version })) };
+}
 
 test.describe('stub scanner with the control API disabled', () => {
   test('/control is a 404 while /scan still works', async () => {

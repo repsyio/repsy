@@ -30,6 +30,10 @@
  *  - `GET /scan/{scanId}` -> `{"scanId","status":QUEUED|RUNNING|COMPLETED|FAILED,"result":
  *    {"findings":[...],"scannerVersion"}|null,"errorMessage":string|null}`; 404 `{"message"}` for an
  *    unknown job (which the backend reads as "not submitted yet" while PENDING, "job lost" after).
+ *  - `POST /advisories` (JSON `{"ecosystem":"npm","packages":[{"name","version"}]}`, RPS-1610/RPS-1613) ->
+ *    `{"dbUpdatedAt","scannerVersion","findings":[...]}`; 400 for a malformed request, 413 for more than
+ *    20,000 pairs or a body over 10 MiB, 415 for a body that is not JSON, 503/504 as the real scanner
+ *    answers while it is busy or slow. What it finds is scripted (`advisories.ts`).
  *
  * `tests/api/trivy-contract.spec.ts` runs the same raw calls (`contract.ts`) against the real scanner
  * (`docker-compose.stack-trivy.yml`), and the skeleton spec against this stub, so the two cannot drift.
@@ -44,6 +48,11 @@
  *  - `PUT /control/scripts` `{"artifactName", "script": StubScript}` overrides the name rules for
  *    every later scan of that exact artifact name (a test names its artifacts after its run id, so a
  *    parallel test never sees it); `DELETE /control/scripts[?artifactName=]` removes one or all.
+ *  - `PUT /control/advisories` `{"packageName", "script": AdvisoryScript}` says how `POST /advisories` answers
+ *    the pairs of that exact package name (findings per version; `outcome` ok, unavailable = 503, timeout
+ *    = 504, garbled = 200 with a body that is not JSON); `DELETE /control/advisories[?packageName=]`
+ *    removes one or all; `GET /control/advisory-calls[?packageName=]` -> `{"calls":[RecordedAdvisoryCall]}`
+ *    lists the lookups seen, so a test can prove Repsy did, or did not, ask.
  *  - `POST /control/reset` forgets scripts, calls AND jobs (the backend then reads a running scan as
  *    "job lost"): for a whole-session reset, never from a test that runs beside others.
  * `SCANNER_STUB_CONTROL=disabled` turns `/control` off (404).
@@ -51,6 +60,21 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
 
+import {
+  ADVISORY_MAX_BODY_BYTES,
+  ADVISORY_TIMEOUT_MESSAGE,
+  ADVISORY_UNAVAILABLE_MESSAGE,
+  AdvisoryRequestError,
+  GARBLED_BODY,
+  STUB_DB_UPDATED_AT,
+  advisoryFindingsFor,
+  outcomeFor,
+  parseAdvisoryRequest,
+  parseAdvisoryScriptRequest,
+  type AdvisoryOutcome,
+  type AdvisoryPair,
+  type AdvisoryScript,
+} from './advisories.ts';
 import { boundaryOf, parseMultipart } from './multipart.ts';
 import {
   SCANNER_VERSION,
@@ -98,6 +122,17 @@ export interface RecordedCall {
   /** `accepted`, `refused` (the 503 of `unavailable`) or `rejected` (a 400 for a bad request). */
   result: 'accepted' | 'refused' | 'rejected';
   plan: ScanPlan | null;
+  at: string;
+}
+
+/** One `POST /advisories` the stub received and could read. */
+export interface RecordedAdvisoryCall {
+  /** The distinct pairs asked for, in the order given. */
+  packages: AdvisoryPair[];
+  /** How it was answered: `ok` (200), `unavailable` (503), `timeout` (504) or `garbled` (200, no JSON). */
+  outcome: AdvisoryOutcome;
+  /** How many findings the 200 carried (0 for the other outcomes). */
+  findings: number;
   at: string;
 }
 
@@ -291,7 +326,9 @@ export function createScannerStub(options: StubOptions): ScannerStub {
 
   const jobs = new Map<string, Job>();
   const scripts = new Map<string, StubScript>();
+  const advisoryScripts = new Map<string, AdvisoryScript>();
   let calls: RecordedCall[] = [];
+  let advisoryCalls: RecordedAdvisoryCall[] = [];
 
   async function submit(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const boundary = boundaryOf(request.headers['content-type']);
@@ -356,6 +393,64 @@ export function createScannerStub(options: StubOptions): ScannerStub {
     sendJson(response, 200, { scanId: call.scanId, status: 'QUEUED' });
   }
 
+  /** `POST /advisories`: the validation of the real scanner, then the scripted answer. */
+  async function advisories(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    if (!/^application\/json(\s*;|$)/i.test(request.headers['content-type'] ?? '')) {
+      throw new HttpError(415, 'Content-Type must be application/json');
+    }
+    const tooLarge = new HttpError(
+      413,
+      `The body must not be larger than ${ADVISORY_MAX_BODY_BYTES} bytes`,
+    );
+    if (Number(request.headers['content-length'] ?? 0) > ADVISORY_MAX_BODY_BYTES) {
+      throw tooLarge;
+    }
+    let raw: Buffer;
+    try {
+      raw = await readBody(request, ADVISORY_MAX_BODY_BYTES);
+    } catch (error) {
+      throw error instanceof HttpError && error.status === 400 ? tooLarge : error;
+    }
+    let pairs: AdvisoryPair[];
+    try {
+      pairs = parseAdvisoryRequest(raw.toString('utf8'));
+    } catch (error) {
+      throw error instanceof AdvisoryRequestError
+        ? new HttpError(error.status, error.message)
+        : error;
+    }
+
+    const outcome = outcomeFor(pairs, advisoryScripts);
+    const findings = outcome === 'ok' ? advisoryFindingsFor(pairs, advisoryScripts) : [];
+    advisoryCalls.push({
+      packages: pairs,
+      outcome,
+      findings: findings.length,
+      at: new Date(now()).toISOString(),
+    });
+
+    if (outcome === 'unavailable') {
+      throw new HttpError(503, ADVISORY_UNAVAILABLE_MESSAGE);
+    }
+    if (outcome === 'timeout') {
+      throw new HttpError(504, ADVISORY_TIMEOUT_MESSAGE);
+    }
+    if (outcome === 'garbled') {
+      response.writeHead(200, {
+        'content-type': 'application/json',
+        'content-length': Buffer.byteLength(GARBLED_BODY),
+      });
+      response.end(GARBLED_BODY);
+      return;
+    }
+    sendJson(response, 200, {
+      // Like the real service: null only while it has no database, and an empty list needs no lookup.
+      dbUpdatedAt: STUB_DB_UPDATED_AT,
+      scannerVersion: SCANNER_VERSION,
+      findings,
+    });
+  }
+
   async function control(
     request: IncomingMessage,
     response: ServerResponse,
@@ -387,10 +482,46 @@ export function createScannerStub(options: StubOptions): ScannerStub {
       sendJson(response, 200, { scripts: scripts.size });
       return;
     }
+    if (method === 'GET' && url.pathname === '/control/advisory-calls') {
+      const packageName = url.searchParams.get('packageName');
+      sendJson(response, 200, {
+        calls: packageName
+          ? advisoryCalls.filter((call) => call.packages.some((pair) => pair.name === packageName))
+          : advisoryCalls,
+      });
+      return;
+    }
+    if (method === 'PUT' && url.pathname === '/control/advisories') {
+      let parsed: ReturnType<typeof parseAdvisoryScriptRequest>;
+      try {
+        parsed = parseAdvisoryScriptRequest(
+          (await readBody(request, maxBodyBytes)).toString('utf8'),
+        );
+      } catch (error) {
+        throw error instanceof AdvisoryRequestError
+          ? new HttpError(error.status, error.message)
+          : error;
+      }
+      advisoryScripts.set(parsed.packageName, parsed.script);
+      sendJson(response, 200, parsed);
+      return;
+    }
+    if (method === 'DELETE' && url.pathname === '/control/advisories') {
+      const packageName = url.searchParams.get('packageName');
+      if (packageName) {
+        advisoryScripts.delete(packageName);
+      } else {
+        advisoryScripts.clear();
+      }
+      sendJson(response, 200, { scripts: advisoryScripts.size });
+      return;
+    }
     if (method === 'POST' && url.pathname === '/control/reset') {
       scripts.clear();
+      advisoryScripts.clear();
       jobs.clear();
       calls = [];
+      advisoryCalls = [];
       sendJson(response, 200, { reset: true });
       return;
     }
@@ -418,6 +549,10 @@ export function createScannerStub(options: StubOptions): ScannerStub {
     }
     if (method === 'POST' && url.pathname === '/scan') {
       await submit(request, response);
+      return;
+    }
+    if (method === 'POST' && url.pathname === '/advisories') {
+      await advisories(request, response);
       return;
     }
     const scanId = /^\/scan\/([^/]+)$/.exec(url.pathname)?.[1];
