@@ -88,7 +88,7 @@ e2e/
   runners/npm-clients.Dockerfile  # + pinned pnpm, yarn classic, yarn berry (npm --prefix /opt/clients/<name>) and bun (copied from oven/bun); see "npm-family clients"
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
   runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
-  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image; no daemon, no socket
+  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image, `skopeo` (built statically from its pinned tag) and `regctl` (pinned release binary); no daemon, no socket
   runners/helm.Dockerfile      # + the static `helm` binary + the cm-push plugin installed at build time; no daemon, no socket
   runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
@@ -156,6 +156,11 @@ e2e/
       docker-image.ts                # hand-assembled OCI image layout builder (layer tar+gzip, config, manifest, index.json, oci-layout)
       docker-raw.ts                  # docker-specific raw HTTP: the two-hop token dance, manifest/blob PUT/GET/HEAD, OCI error envelope
       docker.ts                      # the docker client + dockerAdapter: publish()/resolve()/seedPublish(), crane push/pull
+      docker-copy-adapter.ts         # the scenario-loop adapter of the copy clients (CopyClient -> ProtocolAdapter) + openSession, RPS-1478 part B
+      docker-skopeo.ts               # skopeo: skopeoAdapter (skopeo copy), its env/auth file, the dir: reader
+      docker-regctl.ts               # regctl: regctlAdapter (regctl image copy), its regctl.json renderer
+      docker-tls.ts                  # the ONE place skopeo/regctl's TLS setting is decided (plain HTTP today; the HTTPS leg switches it here)
+      docker-client-tests.ts         # seeding + raw comparison helpers of the skopeo/regctl specs
       helm-chart.ts                   # hand-assembled Helm chart .tgz builder (Chart.yaml + values.yaml + marker, ustar+gzip)
       helm-raw.ts                     # raw HTTP for BOTH Helm protocols: OCI manifest/blob PUT/GET/HEAD + classic index/chart/upload/delete
       helm.ts                         # the OCI client + helmAdapter: publish()/resolve()/seedPublish(), helm push/pull --plain-http
@@ -230,6 +235,11 @@ e2e/
       image-lifecycle.spec.ts   # crane: the last tag keeps the image (manifest pullable by digest), the last manifest removes it, a new push recreates it (RPS-1288)
       crane-delete.spec.ts      # crane delete: password deletes by tag and by digest, a deploy token is refused, an older crane's insufficient_scope round trip (RPS-1440)
       registry-api.spec.ts      # raw-HTTP pins RA1-RA6 of what the Docker server does not implement: tags/list, _catalog, referrers (404 no route), the referrers tag-schema fallback, mount= (202 fallback) (RPS-1478)
+      skopeo-catalog.spec.ts    # registerPublishConsumeLoop(skopeoAdapter): the whole catalog through skopeo copy (RPS-1478 part B)
+      regctl-catalog.spec.ts    # registerPublishConsumeLoop(regctlAdapter): the whole catalog through regctl image copy
+      skopeo.spec.ts            # skopeo: copy between two repos, inspect, delete (scope *), multi-arch --all
+      regctl.spec.ts            # regctl: manifest get/head, image inspect, copy between repos, tag/manifest delete, sha512, multi-arch
+      client-tag-list.spec.ts   # crane ls/catalog, skopeo list-tags/inspect, regctl tag ls/repo ls against the missing tags/list (RPS-1489)
     helm/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
@@ -2562,6 +2572,62 @@ is in the PR that added this file.
 
 ```bash
 ./run.sh test --protocol docker -b   # -b the first time: builds the docker runner image
+```
+
+### Second and third Docker client: `skopeo` and `regctl` (RPS-1478 part B)
+
+`runners/docker.Dockerfile` adds two more daemonless clients next to `crane`, both pinned by ARG (also in
+`docker-compose.runners.yml`) and checked at build time (`skopeo --version`, `regctl version`):
+`skopeo` v1.24.1, built statically (`CGO_ENABLED=0`, tags `containers_image_openpgp
+exclude_graphdriver_btrfs exclude_graphdriver_devicemapper containers_image_docker_daemon_stub`) from the
+tag in a throwaway `golang:<GO_VERSION>-bookworm` stage (it publishes no binary, and the distro package
+is years old), and `regctl` v0.11.6, the release binary verified against a pinned sha256 per
+architecture. Only the binaries are copied into the runner. `--insecure-policy` makes skopeo need no
+`policy.json`/`registries.d`, and nothing else is configured system-wide.
+
+The catalog (password, USER, tokens rw/ro, anonymous public/private, expired/revoked/rotated, override
+and no-override) runs unchanged through each client: `skopeo-catalog.spec.ts` and
+`regctl-catalog.spec.ts` register `skopeoAdapter`/`regctlAdapter` (`docker-copy-adapter.ts`), titles
+`docker[skopeo] > <scenario>`, tags `@skopeo`/`@regctl`. The adapters reuse `docker.ts` for everything
+that does not depend on the client (the raw re-PUT/GET probes that give the `Outcome`, the fingerprint,
+the round-trip checks) and add only the client's command lines. The published image is the same
+hand-built layout `crane push` sends, pushed with its manifest digest pinned (`skopeo copy
+--preserve-digests oci:<dir>`, `regctl image copy ocidir://<dir>@sha256:...`; the layout's
+`index.json` has no `ref.name`, so regctl needs the digest), so "the consumer got the very image" is the
+same digest comparison as for crane. Consuming: skopeo copies into a `dir:` (the registry's manifest
+bytes as they are: an `oci:` target would convert a Docker-schema2 manifest and change its digest),
+regctl into an `ocidir://`.
+
+Credentials are files, never argv: skopeo reads `REGISTRY_AUTH_FILE` (the `config.json` shape
+`renderDockerConfig` already renders), regctl `REGCTL_CONFIG` (`regctl.json`, `{"hosts": {"<host>":
+{"tls", "user", "pass"}}}`, mode 0600). The clients run in `clientEnv` allow-list environments
+(`sealed-env.spec.ts` has a cell for each). **TLS is decided in one place**, `clients/docker-tls.ts`:
+today the stack is plain HTTP, so skopeo gets `--tls-verify=false` (it tries `https://` first and falls
+back to `http://` only with it, confirmed: "server gave HTTP response to HTTPS client") and regctl `"tls":
+"disabled"` (neither treats `localhost` as insecure the way crane does); an `https:` repo URL turns both
+back on, `REPSY_E2E_INSECURE_REGISTRY` makes them skip verification only.
+
+Probed live (skopeo 1.24.1, regctl 0.11.6):
+
+| Behaviour                           | skopeo                                                                                                                                                                                           | regctl                                                                                                                                                                                                 |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Token scope                         | `pull,push` for a copy in, `pull` out; `*` for `delete`, accepted for the admin at the first request (no round trip)                                                                             | `pull,push`; never asks for `delete` first                                                                                                                                                             |
+| Delete                              | `delete <tag>` resolves the digest and deletes it: the manifest and EVERY tag go (crane deletes the tag only)                                                                                    | `tag delete` removes the tag only; `manifest delete` needs a digest and removes the manifest and its tags; both get one `401 insufficient_scope` naming `repository:<repo>/<image>:delete`, then `202` |
+| Deploy token (rw)                   | delete refused, `unauthorized`, nothing removed                                                                                                                                                  | both deletes refused, nothing removed                                                                                                                                                                  |
+| Blob upload                         | `POST` + one `PATCH` + `PUT ?digest=`                                                                                                                                                            | asks for a mount first and logs `Failed to mount blob ... blob mount returned a location to upload` (WARN, RA5), then uploads                                                                          |
+| Copy between two repos of one Repsy | destination has the identical manifest bytes and blobs (`SK1`)                                                                                                                                   | same (`RC2`)                                                                                                                                                                                           |
+| Anonymous                           | a public repo pulls (the token endpoint answers `200` to an anonymous `pull` token of a public repo, `401` + `Basic` for a private one); its anonymous push is refused by the catalog's own cell | same                                                                                                                                                                                                   |
+| Tag listing                         | `list-tags` fails (`name unknown: unknownPath`); **`skopeo inspect <tag>` also fails** because it lists the tags: `--no-tags` is needed (RPS-1489)                                               | `tag ls`/`repo ls` fail with the `404` envelope (RPS-1489)                                                                                                                                             |
+| Multi-arch                          | `copy --all` keeps the index digest and children; `inspect --override-arch` picks the child                                                                                                      | `image copy` copies the list and its children; `--platform` resolves the child                                                                                                                         |
+| sha512 (RPS-1244)                   | not exercised                                                                                                                                                                                    | an image addressed by its sha512 digest (`regctl image mod --digest-algo sha512`) copies in by that digest and is served under it (`RC4`)                                                              |
+
+`client-tag-list.spec.ts` pins what `crane ls`/`catalog`, `skopeo list-tags`/`inspect` and `regctl tag
+ls`/`repo ls` do against RA1/RA2 (fail with the registry's `unknownPath`): the story that adds `tags/list`
+(RPS-1489) flips it. Not covered: `oras` (RPS-1478 part C), the HTTPS leg (RPS-1474).
+
+```bash
+./run.sh test --protocol docker -b               # -b the first time this runner image changes
+./run.sh test --protocol docker --grep "@skopeo"  # or "@regctl"
 ```
 
 ## Helm runner

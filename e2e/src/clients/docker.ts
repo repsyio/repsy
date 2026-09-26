@@ -149,7 +149,7 @@ function insecureFlag(): string[] {
   return env.insecureRegistry ? ['--insecure'] : [];
 }
 
-function stripSha256Prefix(digest: string): string {
+export function stripSha256Prefix(digest: string): string {
   return digest.startsWith('sha256:') ? digest.slice('sha256:'.length) : digest;
 }
 
@@ -241,7 +241,7 @@ export async function seedPublish(world: World): Promise<SeedResult> {
  *  `index.json`'s one descriptor -- also verifies the blob's OWN sha256 matches the filename it is
  *  stored under, the same "prove the bytes are what they claim to be" step every other adapter's
  *  `find*`/`resolved` helper does. */
-async function readResolvedImage(
+export async function readResolvedImage(
   pulledDir: string,
 ): Promise<{ hex: string; file: string } | undefined> {
   let indexRaw: string;
