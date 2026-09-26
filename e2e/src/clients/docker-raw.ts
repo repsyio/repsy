@@ -86,6 +86,7 @@
  *    READ/WRITE on ANY repo (the RPS-939 model, same as every other protocol here).
  */
 import { env } from '../env.js';
+import { imageRef, registryHost, repoPath, v2RepoUrl, v2Url } from '../repo-url.js';
 import { withBackoff429 } from '../scenarios/remote-throttle.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
@@ -98,6 +99,9 @@ import {
 } from './raw-http.js';
 
 export { adminCredential, authHeader, ociErrorOf, sha256Hex, type RawResponse };
+// The image reference, the registry host and the `/v2` URLs are built in `src/repo-url.ts`, which
+// knows the URL scheme (`owner/repo`); re-exported so the docker specs keep importing them from here.
+export { imageRef, registryHost, v2Url };
 
 /** Every raw manifest GET/HEAD's `Accept` header -- the four types this protocol understands. */
 export const MANIFEST_ACCEPT = [
@@ -107,25 +111,11 @@ export const MANIFEST_ACCEPT = [
   'application/vnd.oci.image.index.v1+json',
 ].join(', ');
 
-/** `registryHost()` -- the host:port segment every image reference is built from
- *  (`<host>/<repo>/<image>:<tag>`), read off `env.repoBaseUrl` rather than hard-coded. */
-export function registryHost(): string {
-  return new URL(env.repoBaseUrl).host;
-}
-
 /** `e2e-<runid>-<slugified scenario id>` -- lower-case, one path segment, matches Repsy's own
  *  `IMAGE_NAME_PATTERN` (`[a-zA-Z0-9_\-]+`, no `/`) AND Docker's own (stricter) `[a-z0-9]+
  *  (?:[._-][a-z0-9]+)*`, and `ProtocolAdapter.packageName`'s signature. */
 export function imageName(runId: string, scenario: Scenario): string {
   return `e2e-${runId}-${scenario.id.replace(/[^a-z0-9]/gi, '-').toLowerCase()}`;
-}
-
-export function imageRef(repoName: string, image: string, tag: string): string {
-  return `${registryHost()}/${repoName}/${image}:${tag}`;
-}
-
-export function v2Url(pathSuffix: string): string {
-  return `${env.repoBaseUrl}/v2${pathSuffix}`;
 }
 
 /** Like `raw-http.ts`'s `withBackoff429Response`, but keeps the response `Headers` object too
@@ -194,11 +184,11 @@ async function challengeRealmAndService(): Promise<{ realm: string; service: str
 }
 
 export function pushScope(repoName: string, image: string): string {
-  return `repository:${repoName}/${image}:push,pull`;
+  return `repository:${repoPath(repoName)}/${image}:push,pull`;
 }
 
 export function pullScope(repoName: string, image: string): string {
-  return `repository:${repoName}/${image}:pull`;
+  return `repository:${repoPath(repoName)}/${image}:pull`;
 }
 
 /** The scope that lets a token delete a manifest (RPS-1216, RPS-1434). Current `crane` asks for
@@ -206,7 +196,7 @@ export function pullScope(repoName: string, image: string): string {
  *  for `push,pull` first and add `delete` only after the registry's `insufficient_scope` challenge
  *  names this scope. */
 export function deleteScope(repoName: string, image: string): string {
-  return `repository:${repoName}/${image}:delete`;
+  return `repository:${repoPath(repoName)}/${image}:delete`;
 }
 
 export interface TokenResult {
@@ -295,7 +285,7 @@ export async function rawPutManifest(
   contentType: string,
 ): Promise<RawResponse & { hop: 'token' | 'request'; location?: string; digestHeader?: string }> {
   const res = await dockerRequest(credential, pushScope(repoName, image), (headers) =>
-    rawFetch(v2Url(`/${repoName}/${image}/manifests/${ref}`), {
+    rawFetch(v2RepoUrl(repoName, `${image}/manifests/${ref}`), {
       method: 'PUT',
       headers: { ...headers, 'Content-Type': contentType },
       body: new Uint8Array(bytes),
@@ -321,7 +311,7 @@ export async function rawGetManifest(
   RawResponse & { hop: 'token' | 'request'; digestHeader?: string; contentType?: string }
 > {
   const res = await dockerRequest(credential, pullScope(repoName, image), (headers) =>
-    rawFetch(v2Url(`/${repoName}/${image}/manifests/${ref}`), {
+    rawFetch(v2RepoUrl(repoName, `${image}/manifests/${ref}`), {
       headers: { ...headers, Accept: MANIFEST_ACCEPT },
     }),
   );
@@ -343,7 +333,7 @@ export async function rawHeadManifest(
   ref: string,
 ): Promise<RawResponse & { hop: 'token' | 'request'; digestHeader?: string }> {
   const res = await dockerRequest(credential, pullScope(repoName, image), (headers) =>
-    rawFetch(v2Url(`/${repoName}/${image}/manifests/${ref}`), { method: 'HEAD', headers }),
+    rawFetch(v2RepoUrl(repoName, `${image}/manifests/${ref}`), { method: 'HEAD', headers }),
   );
   return {
     status: res.status,
@@ -365,7 +355,7 @@ export async function rawDeleteManifest(
   scope: string = deleteScope(repoName, image),
 ): Promise<RawResponse & { hop: 'token' | 'request'; wwwAuthenticate?: string }> {
   const res = await dockerRequest(credential, scope, (headers) =>
-    rawFetch(v2Url(`/${repoName}/${image}/manifests/${ref}`), { method: 'DELETE', headers }),
+    rawFetch(v2RepoUrl(repoName, `${image}/manifests/${ref}`), { method: 'DELETE', headers }),
   );
   return {
     status: res.status,
@@ -385,7 +375,7 @@ export async function rawHeadBlob(
   RawResponse & { hop: 'token' | 'request'; contentLength?: string; contentType?: string }
 > {
   const res = await dockerRequest(credential, pullScope(repoName, image), (headers) =>
-    rawFetch(v2Url(`/${repoName}/${image}/blobs/${digest}`), { method: 'HEAD', headers }),
+    rawFetch(v2RepoUrl(repoName, `${image}/blobs/${digest}`), { method: 'HEAD', headers }),
   );
   return {
     status: res.status,
@@ -404,7 +394,7 @@ export async function rawGetBlob(
   digest: string,
 ): Promise<RawResponse & { hop: 'token' | 'request'; contentType?: string }> {
   const res = await dockerRequest(credential, pullScope(repoName, image), (headers) =>
-    rawFetch(v2Url(`/${repoName}/${image}/blobs/${digest}`), { headers }),
+    rawFetch(v2RepoUrl(repoName, `${image}/blobs/${digest}`), { headers }),
   );
   return {
     status: res.status,
@@ -423,7 +413,7 @@ export async function rawStartUpload(
   image: string,
 ): Promise<RawResponse & { hop: 'token' | 'request'; location?: string }> {
   const res = await dockerRequest(credential, pushScope(repoName, image), (headers) =>
-    rawFetch(v2Url(`/${repoName}/${image}/blobs/uploads/`), { method: 'POST', headers }),
+    rawFetch(v2RepoUrl(repoName, `${image}/blobs/uploads/`), { method: 'POST', headers }),
   );
   return {
     status: res.status,
@@ -461,7 +451,7 @@ export async function rawUploadBlob(
   opts?: { mode?: 'monolithic' | 'patch' },
 ): Promise<RawResponse & { hop: 'token' | 'request'; digestHeader?: string }> {
   const res = await dockerRequest(credential, pushScope(repoName, image), async (headers) => {
-    const startRes = await rawFetch(v2Url(`/${repoName}/${image}/blobs/uploads/`), {
+    const startRes = await rawFetch(v2RepoUrl(repoName, `${image}/blobs/uploads/`), {
       method: 'POST',
       headers,
     });
@@ -532,9 +522,9 @@ export async function rawTagsList(
   image: string,
   query?: string,
 ): Promise<RawResponse & { hop: 'token' | 'request'; contentType?: string }> {
-  const suffix = `/${repoName}/${image}/tags/list${query ? `?${query}` : ''}`;
+  const rel = `${image}/tags/list${query ? `?${query}` : ''}`;
   const res = await dockerRequest(credential, pullScope(repoName, image), (headers) =>
-    rawFetch(v2Url(suffix), { headers }),
+    rawFetch(v2RepoUrl(repoName, rel), { headers }),
   );
   return {
     status: res.status,
@@ -565,11 +555,11 @@ export async function rawReferrers(
   digest: string,
   artifactType?: string,
 ): Promise<RawResponse & { hop: 'token' | 'request' }> {
-  const suffix = `/${repoName}/${image}/referrers/${digest}${
+  const rel = `${image}/referrers/${digest}${
     artifactType ? `?artifactType=${encodeURIComponent(artifactType)}` : ''
   }`;
   const res = await dockerRequest(credential, pullScope(repoName, image), (headers) =>
-    rawFetch(v2Url(suffix), { headers }),
+    rawFetch(v2RepoUrl(repoName, rel), { headers }),
   );
   return { status: res.status, body: res.body, hop: res.hop };
 }
@@ -614,7 +604,7 @@ export async function rawMountUpload(
   let finalize: (RawResponse & { headers: Headers }) | undefined;
   let start: (RawResponse & { headers: Headers }) | undefined;
   const res = await dockerRequest(credential, pushScope(repoName, image), async (headers) => {
-    start = await rawFetch(v2Url(`/${repoName}/${image}/blobs/uploads/?${query}`), {
+    start = await rawFetch(v2RepoUrl(repoName, `${image}/blobs/uploads/?${query}`), {
       method: 'POST',
       headers,
     });

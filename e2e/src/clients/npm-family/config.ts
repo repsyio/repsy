@@ -41,6 +41,7 @@ import { fileURLToPath } from 'node:url';
 import mustache from 'mustache';
 
 import { env } from '../../env.js';
+import { repoPath } from '../../repo-url.js';
 import { TRUST_VARIABLES } from '../client-env.js';
 import { run, type RunOptions, type RunResult } from '../exec.js';
 import type { MaterializedCredential } from '../../scenarios/world.js';
@@ -119,7 +120,7 @@ function baseUrlOf(binding: RegistryBinding): string {
 
 /** `<base>/<repo>/`, trailing slash on purpose (RPS-1206): npm's per-path scoping needs it. */
 export function registryUrlOf(binding: RegistryBinding): string {
-  return `${baseUrlOf(binding)}/${binding.repoName}/`;
+  return `${baseUrlOf(binding)}/${repoPath(binding.repoName)}/`;
 }
 
 function basicOf(credential: MaterializedCredential): string {
@@ -177,7 +178,7 @@ export async function writeNpmrc(
       registryKey: binding.scope ? `${binding.scope}:registry` : 'registry',
       registryUrl: registryUrlOf(binding),
       hostAndPort: new URL(baseUrlOf(binding)).host,
-      repoName: binding.repoName,
+      repoName: repoPath(binding.repoName),
       hasToken: hasToken(binding.credential),
       hasBasic: hasBasic(binding.credential),
       token: binding.credential.password ?? '',

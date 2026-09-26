@@ -27,6 +27,7 @@ import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { asDetailPage, registerPackageScenarios } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 import { env } from '../../../src/env.js';
+import { repoPath } from '../../../src/repo-url.js';
 
 const docker = DESCRIPTORS.docker;
 
@@ -53,7 +54,7 @@ test.describe('Docker image, tags, manifests and tag detail', { tag: '@packages'
     await tags.expectRow(one);
     await tags.expectRow(two);
     await expect(tags.installBar).toBeVisible();
-    await expect(tags.installBarText).toContainText(`${host}/${repo.name}/${one.name}`);
+    await expect(tags.installBarText).toContainText(`${host}/${repoPath(repo.name)}/${one.name}`);
 
     // A tag's inner link opens the manifest list of that tag: keyed by the tag, with its own pull command.
     const manifests = await tags.openLink(one, 'manifests');
@@ -81,7 +82,7 @@ test.describe('Docker image, tags, manifests and tag detail', { tag: '@packages'
     );
     await opened.expectLoaded();
     await expect(opened.installText).toContainText(
-      `${host}/${repo.name}/${one.name}:${one.version}`,
+      `${host}/${repoPath(repo.name)}/${one.name}:${one.version}`,
     );
     await expect(opened.name).toHaveText(one.name);
     await expect(opened.byId('pkg-detail-version')).toContainText(one.version);

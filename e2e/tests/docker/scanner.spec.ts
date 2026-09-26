@@ -31,6 +31,7 @@ import {
   test,
 } from '../../src/scenarios/scanner-fixtures.js';
 import { dockerAdapter } from '../../src/clients/docker.js';
+import { repoPath } from '../../src/repo-url.js';
 
 test.describe('a crane push is scanned (stub scanner)', { tag: [SCANNER_TAG] }, () => {
   skipUnlessScannerOptedIn();
@@ -61,7 +62,9 @@ test.describe('a crane push is scanned (stub scanner)', { tag: [SCANNER_TAG] }, 
         fileSize: null,
         hasRegistryAuthToken: true,
       });
-      expect(call.dockerImageReference).toMatch(new RegExp(`/${w.repoName}/${name}:${version}$`));
+      expect(call.dockerImageReference).toMatch(
+        new RegExp(`/${repoPath(w.repoName)}/${name}:${version}$`),
+      );
     },
   );
 });

@@ -45,7 +45,7 @@ import {
 } from '../../../src/clients/npm-family/yarn-berry-client.js';
 import { tarEntries, tarFile } from '../../../src/clients/npm-family/yarn-berry-support.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
-import { env } from '../../../src/env.js';
+import { repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 
 const TAG = '@yarn-berry';
@@ -81,9 +81,7 @@ test.describe('yarn npm publish', () => {
       const packed = await yarnBerryClient.pack(ctx, dir);
       const published = await execYarn(ctx, 'publish', ['npm', 'publish'], dir);
       expect(published.exitCode, `publish: ${published.command}\n${published.stdout}`).toBe(0);
-      expect(published.stdout).toContain(
-        `Publishing to ${env.repoBaseUrl}/${repo.name} with tag latest`,
-      );
+      expect(published.stdout).toContain(`Publishing to ${repoUrl(repo.name)} with tag latest`);
 
       const stored = await rawGetTarballCanonical(repo.name, adminCredential(), name, '1.0.0');
       expect(stored.status).toBe(200);

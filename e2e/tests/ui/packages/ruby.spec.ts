@@ -27,7 +27,7 @@ import {
   rawPublish,
   rawYank,
 } from '../../../src/clients/ruby-raw.js';
-import { env } from '../../../src/env.js';
+import { repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { registerPackageScenarios } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
@@ -117,7 +117,7 @@ test.describe('Ruby gem pages', { tag: '@packages' }, () => {
     expect(res.status, 'gem push').toBeLessThan(300);
     const detail = protocolPages(adminPage, ruby, repo.name).detail({ name, version: '1.2.3' });
     await detail.goto();
-    const source = `${env.repoBaseUrl}/${repo.name}/`;
+    const source = repoUrl(repo.name, '');
 
     await expect(detail.name).toHaveText(name);
     await expect(detail.byId('pkg-detail-version')).toContainText('1.2.3');

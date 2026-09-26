@@ -58,6 +58,7 @@ import {
 } from '../../src/clients/docker-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { MaterializedCredential } from '../../src/scenarios/world.js';
+import { repoPath } from '../../src/repo-url.js';
 
 type RegctlSession = ClientSession & { push(ref: string, marker: string): Promise<string> };
 
@@ -199,10 +200,12 @@ test(
     );
     expect(tagDelete.exitCode, `regctl tag delete: ${tagDelete.stderr}`).toBe(0);
     expect(tagDelete.stderr, 'asks push,pull first').toContain(
-      `scope=repository:${repoName}/${image}:pull,push`,
+      `scope=repository:${repoPath(repoName)}/${image}:pull,push`,
     );
     expect(tagDelete.stderr, 'the registry names the delete scope').toMatch(
-      new RegExp(`error:insufficient_scope[^\\n]*scope:repository:${repoName}/${image}:delete`),
+      new RegExp(
+        `error:insufficient_scope[^\\n]*scope:repository:${repoPath(repoName)}/${image}:delete`,
+      ),
     );
     expect((await rawHeadManifest(repoName, admin, image, 'v2')).status, 'v2 is gone').toBe(404);
     expect(

@@ -60,6 +60,7 @@ import path from 'node:path';
 import { expect } from '@playwright/test';
 
 import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { boundedSemverVersion } from '../scenarios/coordinates.js';
 import { outcomeForStatus } from '../scenarios/types.js';
@@ -345,7 +346,7 @@ async function afterSuccessfulRoundTrip(
 
   // `link.href` carries the `#sha256=...` fragment (this is what `parseSimplePage` reports the
   // fragment hash from); the URL identity check below is about everything BEFORE that fragment.
-  const expectedHref = `${env.repoBaseUrl}/${world.repoName}/${downloadPath(name, filename)}`;
+  const expectedHref = repoUrl(world.repoName, downloadPath(name, filename));
   const hrefWithoutFragment = link?.href.split('#')[0];
   expect(hrefWithoutFragment, 'the href names exactly this repo’s own canonical download URL').toBe(
     expectedHref,

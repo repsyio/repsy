@@ -15,6 +15,7 @@
 
 import type { PackageRef } from '../../../seed/packages.js';
 import { type ProtocolDescriptor, NEWEST_OLDEST, need } from './types.js';
+import { repoPath } from '../../../repo-url.js';
 
 /** `group:artifact` -> [group, artifact]. */
 function coordinates(target: PackageRef | undefined): {
@@ -104,7 +105,7 @@ export const mavenDescriptor: ProtocolDescriptor = {
         ];
       },
       repoUrlIn: 'snippet:repository',
-      repoConfigContains: (repo, url) => [`<url>${url}/${repo}</url>`, '<repositories>'],
+      repoConfigContains: (repo, url) => [`<url>${url}/${repoPath(repo)}</url>`, '<repositories>'],
       installTextElement: 'code',
       snippets: [
         'pom',

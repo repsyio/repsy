@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
+import { repoPath } from '../../../repo-url.js';
 
 /**
  * Go: modules -> versions -> detail, but the routes carry the module path as a QUERY PARAMETER
@@ -67,7 +68,7 @@ export const golangDescriptor: ProtocolDescriptor = {
         return `/${repo}/modules/version?modulePath=${encodeURIComponent(name)}&version=${encodeURIComponent(version)}`;
       },
       installContains: (repo, t) => [
-        `/${repo},off go get ${need(t, 'golang').name}@${need(t, 'golang').version}`,
+        `/${repoPath(repo)},off go get ${need(t, 'golang').name}@${need(t, 'golang').version}`,
       ],
       repoUrlIn: 'install',
       installTextElement: 'span',

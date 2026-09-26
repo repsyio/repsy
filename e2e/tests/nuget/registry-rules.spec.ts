@@ -50,6 +50,7 @@ import {
   type RawResponse,
 } from '../../src/clients/nuget-raw.js';
 import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
 
@@ -345,13 +346,9 @@ test.describe('nuget registry rules (raw HTTP)', () => {
       const resources = parseServiceIndex(res.body);
       const byType = new Map(resources.map((r) => [r.type, r.id]));
 
-      expect(byType.get('PackageBaseAddress/3.0.0')).toBe(
-        `${env.repoBaseUrl}/${repo.name}/v3/package`,
-      );
-      expect(byType.get('PackagePublish/2.0.0')).toBe(`${env.repoBaseUrl}/${repo.name}/v3/package`);
-      expect(byType.get('RegistrationsBaseUrl')).toBe(
-        `${env.repoBaseUrl}/${repo.name}/v3/registration`,
-      );
+      expect(byType.get('PackageBaseAddress/3.0.0')).toBe(repoUrl(repo.name, 'v3/package'));
+      expect(byType.get('PackagePublish/2.0.0')).toBe(repoUrl(repo.name, 'v3/package'));
+      expect(byType.get('RegistrationsBaseUrl')).toBe(repoUrl(repo.name, 'v3/registration'));
 
       // RPS-1213/RPS-1240 (fixed): NuGet.Client's ServiceTypes.cs resolves "RegistrationsBaseUrl" as
       // a bare, unversioned type (among "/Versioned", "/3.0.0-beta", "/3.0.0-rc", "/3.4.0",
@@ -362,11 +359,9 @@ test.describe('nuget registry rules (raw HTTP)', () => {
       // beyond the base semantics is implemented (not "RegistrationsBaseUrl/3.6.0"'s SemVer2
       // registration semantics either). The invented "PackageDelete/2.0.0" is no longer advertised
       // -- unlist/relist live under PackagePublish/2.0.0's own PUT/DELETE, per the NuGet API docs.
-      expect(byType.get('SearchQueryService/3.0.0-beta')).toBe(
-        `${env.repoBaseUrl}/${repo.name}/v3/search`,
-      );
+      expect(byType.get('SearchQueryService/3.0.0-beta')).toBe(repoUrl(repo.name, 'v3/search'));
       expect(byType.get('SearchAutocompleteService/3.0.0-beta')).toBe(
-        `${env.repoBaseUrl}/${repo.name}/v3/autocomplete`,
+        repoUrl(repo.name, 'v3/autocomplete'),
       );
       expect(resources.map((r) => r.type)).toContain('SearchQueryService');
       expect(resources.map((r) => r.type)).toContain('SearchAutocompleteService');

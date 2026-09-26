@@ -32,6 +32,7 @@
  */
 import { expect } from '@playwright/test';
 
+import { v2RepoUrl } from '../repo-url.js';
 import { bindPrepared, type ManageOperation } from '../scenarios/manage-catalog.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import type { SeededRepo, Seeder } from '../seed/seeder.js';
@@ -49,7 +50,6 @@ import {
   rawUploadBlob,
   rawUploadChart,
   sha256Hex,
-  v2Url,
   HELM_MEDIA_TYPES,
 } from './helm-raw.js';
 
@@ -212,7 +212,7 @@ function deleteOciManifest(): ManageOperation {
       );
       expect(put.status, `seed manifest of ${chart}: ${put.msgId ?? ''}`).toBe(201);
 
-      const url = v2Url(`/${repo.name}/${chart}/manifests/${version}`);
+      const url = v2RepoUrl(repo.name, `${chart}/manifests/${version}`);
       return bindPrepared<HelmOciFingerprint>({
         run: async (credential) => {
           const res = await fetch(url, { method: 'DELETE', headers: authHeader(credential) });

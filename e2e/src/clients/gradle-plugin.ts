@@ -33,7 +33,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { AdapterResult } from '../scenarios/adapter.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { SeedResult, World } from '../scenarios/world.js';
@@ -108,7 +108,7 @@ export async function publishPluginWithGradle(
     groupId,
     version,
     pluginId: pluginIdOf(groupId, artifactId),
-    repoUrl: `${env.repoBaseUrl}/${world.repoName}`,
+    repoUrl: repoUrl(world.repoName),
     hasCredential: world.credential.transport === 'basic',
   });
   await writePluginSource(gradle.work);
@@ -179,7 +179,7 @@ export async function applyPlugin(
     artifactId,
     version,
     pluginId: options.pluginId ?? pluginIdOf(groupId, artifactId),
-    repoUrl: `${env.repoBaseUrl}/${world.repoName}`,
+    repoUrl: repoUrl(world.repoName),
     hasCredential: world.credential.transport === 'basic',
     legacy: route === 'legacy',
   };
