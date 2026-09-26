@@ -15,10 +15,11 @@
 ///
 
 import { HttpErrorResponse } from '@angular/common/http';
-import { TestBed } from '@angular/core/testing';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormBuilder } from '@angular/forms';
 import { provideRouter, Router } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
 import { AuthService } from '../service/auth.service';
@@ -132,5 +133,63 @@ describe('LoginComponent', () => {
     expect(toastService.show).not.toHaveBeenCalled();
     expect(component.loading).toBeFalse();
     expect(component.form.enabled).toBeTrue();
+  });
+});
+
+/**
+ * RPS-1459: LoginComponent is OnPush, and at "/" it is created in the view container of the OnPush
+ * AuthRedirectComponent. The answer of the login request is not an event of its template, so the view is only
+ * refreshed if something marks it (today `FormGroup.enable()`, which the request's `finalize` calls). A root
+ * OnPush component is always refreshed by `fixture.detectChanges()`, so it is rendered inside a host, whose
+ * own OnPush view is only refreshed when marked.
+ */
+@Component({
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [LoginComponent],
+  template: '<app-login />',
+})
+class OnPushHostComponent {}
+
+describe('LoginComponent in an OnPush host (RPS-1459)', () => {
+  let fixture: ComponentFixture<OnPushHostComponent>;
+  let answer: Subject<unknown>;
+
+  const query = <T extends HTMLElement>(testId: string): T =>
+    fixture.nativeElement.querySelector(`[data-testid="${testId}"]`) as T;
+  const type = (testId: string, value: string): void => {
+    const input = query<HTMLInputElement>(testId);
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+  };
+
+  beforeEach(() => {
+    answer = new Subject();
+    TestBed.configureTestingModule({
+      imports: [OnPushHostComponent],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: { logIn: () => answer.asObservable() } },
+        { provide: ToastService, useValue: { show: jasmine.createSpy('show') } },
+      ],
+    });
+    fixture = TestBed.createComponent(OnPushHostComponent);
+    fixture.detectChanges();
+    type('login-username', 'someone');
+    type('login-password', 'Passw0rd');
+    fixture.detectChanges();
+  });
+
+  it('enables the submit button again when the credentials are refused, without another event', () => {
+    expect(query<HTMLButtonElement>('login-submit').disabled).toBeFalse();
+    query<HTMLButtonElement>('login-submit').click();
+    fixture.detectChanges();
+    expect(query<HTMLButtonElement>('login-submit').disabled).toBeTrue();
+
+    // The 401 is the last event of the page.
+    answer.error(new HttpErrorResponse({ status: 401, error: null }));
+    fixture.detectChanges();
+
+    expect(query<HTMLButtonElement>('login-submit').disabled).toBeFalse();
   });
 });
