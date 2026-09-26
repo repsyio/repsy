@@ -28,7 +28,7 @@
  *  - the registration leaf's `catalogEntry.dependencyGroups` (`NuGetResponseMapper.buildDependencyGroups`),
  *    what NuGet clients that resolve through the registration (Visual Studio, `nuget.exe`) read.
  *
- * Probed live BEFORE the assertions were written (the exact outputs are in this PR's description):
+ * Probed live BEFORE the assertions were written (the exact outputs are in the description of the RPS-1479 PR, #717):
  *
  *  - H17 (confirmed): restore resolves through the flat container. Multi-targeted consumers work
  *    without a targeting pack from nuget.org because `DisableImplicitFrameworkReferences=true`
@@ -40,12 +40,12 @@
  *  - Empty group (confirmed): a nuspec's empty `<group targetFramework="net10.0"/>` ("nothing for
  *    net10.0") is honoured by the restore, because it reads the nuspec. It is NOT in the
  *    registration's `dependencyGroups` (`buildDependencyGroups` only sees dependencies, and an
- *    empty group has none): the report of this PR proposes a story, so nothing here pins the
+ *    empty group has none): the RPS-1479 PR proposed a story, so nothing here pins the
  *    registration's handling of an empty group.
  *  - Registration INDEX (probed, not asserted): the per-leaf documents (`v3/registration/<id>/
  *    <ver>.json`) carry `catalogEntry.dependencyGroups`, but the leaves inlined into the registration
  *    index's pages (`toLeafItem` over `toVersionInfo`, which ignores the dependencies) never do. The
- *    NuGet registration spec has them there too; proposed as a story in the report, so this file
+ *    NuGet registration spec has them there too; proposed as a story in the RPS-1479 PR, so this file
  *    reads the per-leaf documents only.
  *  - Unlisted dependency (confirmed): `unlist` (WRITE) only flips `listed` on the registration; the
  *    flat container keeps offering the version and the client does not look at `listed`, so an

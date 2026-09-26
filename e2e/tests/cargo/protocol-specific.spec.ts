@@ -32,7 +32,7 @@
  * underscore-only here since renaming every crate in this suite is not otherwise motivated.
  *
  * HC-1/HC-2/HC-6 were probed live against a running local stack BEFORE this file was written (see
- * this PR's own report for the exact commands/output):
+ * the description of the RPS-294 PR that added this file for the exact commands/output):
  *
  *  - HC-1: real `cargo yank`/`cargo yank --undo`/`cargo search --registry repsy`/`cargo owner --list
  *    --registry repsy` all reach the server and get a real response. Yank/unyank/search work exactly
@@ -59,7 +59,7 @@
  * same cloud harness (`protocols/cargo/dependency_tree`, `.../platform_deps`, `.../workspace`),
  * again real `cargo` binaries + hand-built `World`-less crate layouts, never that harness's own
  * `npx tsx subprocess`/`shelljs` structure. Three more hypotheses were probed live against a running
- * local stack BEFORE this suite was written (exact commands/output in this PR's own report):
+ * local stack BEFORE this suite was written (exact commands/output in the description of the RPS-294 PR that added it):
  *
  *  - HC-2: `packageCrate()`'s `cargo package --no-verify --offline` (the step used by `publish()`'s
  *    plain, dependency-free marker crate) CANNOT package a crate that declares a real dependency on

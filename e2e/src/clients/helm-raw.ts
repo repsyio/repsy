@@ -72,10 +72,10 @@
  *  - OCI manifest pull: looks up ONLY the exact `(repo, name, reference)` a manifest was pushed
  *    under -- a manifest pushed by TAG is not resolvable by digest (GET/HEAD both `404`
  *    `MANIFEST_UNKNOWN`), unlike Docker (RPS-1215 is HEAD-only there).
- *  - **B-H3 (candidate)**, confirmed live: there is NO `GET /v2/<repo>/<name>/tags/list` handler at
- *    all (`404` with OCI code `NAME_UNKNOWN`, msgId `unknownPath`) -- so a real `helm pull
+ *  - **B-H3** (fixed by RPS-1219): `GET /v2/<repo>/<name>/tags/list` used to have no handler at all
+ *    (`404` with OCI code `NAME_UNKNOWN`, msgId `unknownPath`), so a real `helm pull
  *    oci://.../<chart>` WITHOUT an exact `--version` (Helm's own `ValidateReference` calls `Tags(...)`
- *    whenever the version is empty or a semver CONSTRAINT) fails outright against Repsy.
+ *    whenever the version is empty or a semver CONSTRAINT) failed outright. It is served now (`200`).
  *  - **B-H1 (candidate)**, confirmed live cleanly (a chart name that NEVER touched the classic
  *    route): `index.yaml` (`generateIndex`) lists every `helm_chart_version` row of the repo,
  *    INCLUDING ones that only ever went through the OCI route, at `charts/<name>-<version>.tgz` --
@@ -330,7 +330,7 @@ export async function rawUploadBlob(
   return toOciResponse(finalRes);
 }
 
-/** `GET /v2/<repo>/<chart>/tags/list` -- pins **B-H3**: no such handler exists (404 `NAME_UNKNOWN`). */
+/** `GET /v2/<repo>/<chart>/tags/list` -- pins **B-H3** (fixed by RPS-1219): the route is served (`200`). */
 export async function rawGetTagsList(
   repoName: string,
   credential: MaterializedCredential,

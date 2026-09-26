@@ -393,7 +393,7 @@ export async function resolve(world: World): Promise<AdapterResult> {
 }
 
 /** A snapshot of one TAG's own content, for `ProtocolAdapter.fingerprint`/`expectNothingStored`:
- *  Helm has no `tags/list` route on Repsy (**B-H3**, confirmed live), so "nothing changed for
+ *  Helm's `tags/list` (**B-H3**, RPS-1219) lists a chart's tags, not a tag's content, so "nothing changed for
  *  consumers of this tag" is the honest, tag-scoped invariant, not a whole-repo one -- the same
  *  reasoning as `docker.ts`'s `DockerFingerprint`. */
 export interface HelmFingerprint {

@@ -81,8 +81,9 @@ export const BASE_VARIABLES: readonly string[] = [
  * becomes the `javax.net.ssl.trustStore*` system properties of `JAVA_TOOL_OPTIONS`, which every JVM a
  * client starts reads (mvn and its forked plugins, the gradle client and its daemon, sbt, ant/ivy) whatever
  * its own options file says. It is empty without a TLS stack, so a default stack sees no
- * "Picked up JAVA_TOOL_OPTIONS" line on stderr. The truststore replaces the JDK's own for the process,
- * which is fine: every URL a client of this harness reaches is Repsy's.
+ * "Picked up JAVA_TOOL_OPTIONS" line on stderr. The truststore is the JDK's own `cacerts` plus
+ * the CA (`docker-compose.stack-tls.yml`, RPS-1474 #738), so a JVM that also reaches another HTTPS host
+ * keeps trusting the public roots.
  */
 export function jvmTrustEnv(): NodeJS.ProcessEnv {
   const store = process.env.REPSY_E2E_TLS_TRUSTSTORE;

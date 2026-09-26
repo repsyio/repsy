@@ -31,7 +31,7 @@
  *    `_authToken` (Bearer) and as `_auth` of `<username>:<token>` (Basic), like every other client.
  *  - `DENO_AUTH_TOKENS` is NOT a way to authenticate to an npm registry: Deno sends the token on its
  *    first packument request only, and asks the next ones with no `Authorization` at all (a 401 for a
- *    private repository, `tests/npm-clients/deno/auth.spec.ts` pins it). Cells configure `.npmrc`.
+ *    private repository, `tests/npm-clients/deno/config.spec.ts` pins it). Cells configure `.npmrc`.
  *  - A `minimumDependencyAge` gate (24 h by default) refuses a version published less than a day ago
  *    and makes Deno ask for the FULL packument (`Accept: *`+`/*`, to read `time`) instead of the
  *    abbreviated `application/vnd.npm.install-v1+json` one. Every test publishes seconds before it

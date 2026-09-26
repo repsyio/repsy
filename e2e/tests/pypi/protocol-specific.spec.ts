@@ -52,7 +52,7 @@
  *    `--only-binary=:all:`, the flag the catalog loop's own `resolve()` always passes) against a
  *    package that has ONLY an sdist. Confirmed live, running the REAL suite (this superseded an
  *    earlier, incomplete manual probe that used a hand-built sdist WITH a `setup.py`, predicting a
- *    build-isolation/`setuptools`-fetch failure instead -- see this PR's own report for both probes):
+ *    build-isolation/`setuptools`-fetch failure instead -- the description of the RPS-294 PR that added this suite has both probes):
  *    pip finds and downloads the `.tar.gz` fine, then refuses to install it OUTRIGHT -- `ERROR:
  *    e2e-.../<file>.tar.gz#sha256=... does not appear to be a Python project: neither 'setup.py' nor
  *    'pyproject.toml' found`, exit `1` -- because `buildSdist` (`pypi-raw.ts`) deliberately never
@@ -247,7 +247,7 @@ test(
 
     // Confirmed live (PS-2, this file's own header -- this exact message only surfaced running the
     // REAL suite, not the manual probe that predicted a build-isolation/setuptools failure instead,
-    // see this PR's own report): pip downloads the sdist fine, then refuses to install it OUTRIGHT
+    // see the description of the RPS-294 PR that added this suite): pip downloads the sdist fine, then refuses to install it OUTRIGHT
     // -- "does not appear to be a Python project: neither 'setup.py' nor 'pyproject.toml' found" --
     // because `buildSdist` deliberately never writes either file (this story's own "own the exact
     // bytes, no setuptools" constraint, `pypi-raw.ts`'s file header). pip's own legacy-vs-PEP-517

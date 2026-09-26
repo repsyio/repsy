@@ -355,7 +355,7 @@ apply_tls_env() {
 # certificate directory and, for each client, the variable it reads its trusted CA from (README.md "TLS
 # stack"). Done here rather than in docker-compose.runners.yml so that a new runner needs nothing, and
 # so that a stack without the overlay sets none of them (an empty SSL_CERT_FILE would replace the system
-# trust store). The Java truststore is for the JVM clients to be pointed at with their own flags.
+# trust store). The Java truststore reaches the JVM clients through JAVA_TOOL_OPTIONS (client-env.ts's jvmTrustEnv).
 TLS_RUN_ARGS=()
 tls_run_args() {
   TLS_RUN_ARGS=()

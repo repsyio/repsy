@@ -29,7 +29,7 @@
  * use for read-side checks.
  *
  * HN-1/HN-2/HN-3 were probed live against a running local stack BEFORE this file was written (see
- * this PR's own report for the exact commands/output):
+ * the description of the RPS-294 PR that added this file for the exact commands/output):
  *
  *  - HN-1 (gating): the server source (`AbstractNuGetUnlistProtocolMethodHandler`/
  *    `AbstractNuGetRelistProtocolMethodHandler`, whose `UNLIST_PATTERN`/`RELIST_PATTERN` match

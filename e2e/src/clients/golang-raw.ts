@@ -41,10 +41,10 @@
  *    (case-preserved, not lower-cased -- a missing entry is `400 goModNotFoundInZip`, confirmed live
  *    for a non-zip body too) -> `GoModFileValidator` (empty -> `400 goModFileEmpty`; no `^module\s+\S+`
  *    line -> `400 goModMissingModuleDirective`; first path segment without a `.` -> `400
- *    goModInvalidModulePath`; **the directive's value is never compared against the URL's own module
- *    path**, confirmed live/G2: a go.mod naming a completely different module still uploads) -> **no
- *    version-string validation of ANY kind** (confirmed live/G1: `banana`, `v1`, `1.0.0` are all
- *    accepted, stored, and listed) -> the DB duplicate-version check (`ItemAlreadyExistException
+ *    goModInvalidModulePath`; the directive's value must equal the URL's own module path,
+ *    else `400 goModModulePathMismatch`, RPS-1228, #447) -> the version string must be valid Go
+ *    semver, else `400 invalidModuleVersion` (RPS-1227, #447; before the fix `banana`, `v1`,
+ *    `1.0.0` were accepted, stored, and listed) -> the DB duplicate-version check (`ItemAlreadyExistException
  *    ("goModuleVersionAlreadyExists")` -> `409`, confirmed live/H9 -- unconditional: `allowOverride`
  *    is never read anywhere in either Go package, grep-confirmed, so `no-override` AND `override` both
  *    pin `409` in `catalog.ts`) -> only then the THREE storage writes (`.mod`, `.zip` verbatim, then a
