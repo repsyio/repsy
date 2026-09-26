@@ -16,9 +16,9 @@
 
 /**
  * RPS-1475: the wire permission matrix for NuGet (README "Manage matrix"). `unlist` and `relist` of
- * a version, both WRITE (ADMIN, USER, read-write token), with every credential. There is no real
- * client operation for them here (`dotnet nuget delete` is RPS-1486): the cells are raw requests,
- * and a refused cell must answer 401 and leave the registration exactly as it was.
+ * a version, both WRITE (ADMIN, USER, read-write token), with every credential. `unlist` and `relist`
+ * are raw requests; `unlist-client` (RPS-1486) is the real `dotnet nuget delete` (`dotnet` has no
+ * relist command). A refused cell must answer 401 and leave the registration exactly as it was.
  */
 import { NUGET_MANAGE_OPERATIONS } from '../../src/clients/nuget-manage.js';
 import { registerManageMatrix } from '../../src/scenarios/manage-matrix.js';

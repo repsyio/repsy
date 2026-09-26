@@ -23,11 +23,17 @@
  *    `AbstractNuGetRelistProtocolMethodHandler`): ADMIN, USER and a read-write token may, a read-only
  *    token and an anonymous caller get a 401.
  *
- * Both run as RAW requests, `client: 'raw'`: the `dotnet nuget delete` client of the delete route is
- * the job of RPS-1486, not of this matrix. A raw request is faithful here because the operation is a
- * single, header-authenticated request; it carries the credential the way `dotnet nuget push` does
- * (`nugetPublishHeaders`: `X-NuGet-ApiKey` for a token, Basic for a password, nothing for
- * anonymous), and a refused cell reads its status straight from that request.
+ *  - `unlist-client` (`dotnet nuget delete <id> <version> --source <index.json> --api-key <key>
+ *    --non-interactive`, the documented unlist route, RPS-1486): the same `DELETE`, sent by the real
+ *    client, so the credential reaches the server the way a user's does (`--api-key` from
+ *    `nugetApiKey`, the `NuGet.Config` credentials of the isolated HOME for the Basic retry). The
+ *    client hides the status behind its exit code, so a refused cell replays the request raw (`probe`).
+ *    `dotnet` has no relist command, so `relist` has no client cell.
+ *
+ * `unlist` and `relist` run as RAW requests, `client: 'raw'`. A raw request is faithful here because
+ * the operation is a single, header-authenticated request; it carries the credential the way `dotnet
+ * nuget push` does (`nugetPublishHeaders`: `X-NuGet-ApiKey` for a token, Basic for a password, nothing
+ * for anonymous), and a refused cell reads its status straight from that request.
  *
  * Every cell seeds two versions of a package with the admin credential (a raw `PUT`), acts on one of
  * them (`unlist`; for `relist` the seed unlists it first) and reads back, as admin, the registration
@@ -39,11 +45,13 @@ import { expect } from '@playwright/test';
 import { bindPrepared, type ManageOperation } from '../scenarios/manage-catalog.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import type { SeededRepo, Seeder } from '../seed/seeder.js';
-import { nugetAdapter } from './nuget.js';
+import { isolatedWorkDir, run, type RunResult } from './exec.js';
+import { nugetAdapter, nugetEnv, renderNugetConfig, userNugetConfigPath } from './nuget.js';
 import {
   adminCredential,
   buildNupkg,
   normalizeVersion,
+  nugetApiKey,
   parseRegistrationIndex,
   parseVersions,
   rawDownloadNupkg,
@@ -52,6 +60,7 @@ import {
   rawPublish,
   rawRelist,
   rawUnlist,
+  serviceIndexUrl,
   sha256Hex,
 } from './nuget-raw.js';
 
@@ -124,27 +133,76 @@ async function fingerprint(subject: NuGetSubject): Promise<NuGetManageFingerprin
   };
 }
 
-function unlist(): ManageOperation {
+const CLIENT_TIMEOUT_MS = 60_000;
+
+/**
+ * A real `dotnet nuget delete <id> <version> --source <index.json> --non-interactive` (NuGet's unlist
+ * command: Repsy answers the `DELETE` with 204 and only flips `listed`). The command has no
+ * `--configfile`, so the credential goes where a user puts it: the user-level `NuGet.Config` of the
+ * isolated HOME (a token or password as `packageSourceCredentials`, the panel's "Option A") plus the
+ * `--api-key` a push uses (`nugetApiKey`: the token itself, `any` for a password, none for an
+ * anonymous caller). Nothing secret is on the command line but the api key, which `run` redacts.
+ */
+export async function dotnetNugetDelete(
+  repoName: string,
+  credential: MaterializedCredential,
+  packageId: string,
+  version: string,
+): Promise<RunResult> {
+  const { home, work } = await isolatedWorkDir('nuget-delete');
+  await renderNugetConfig(home, repoName, credential, {
+    destination: userNugetConfigPath(home),
+  });
+  const apiKey = nugetApiKey(credential);
+  const args = [
+    'nuget',
+    'delete',
+    packageId,
+    version,
+    '--source',
+    serviceIndexUrl(repoName),
+    '--non-interactive',
+  ];
+  if (apiKey !== undefined) {
+    args.push('--api-key', apiKey);
+  }
+  return run('dotnet', args, {
+    cwd: work,
+    env: nugetEnv(home),
+    timeoutMs: CLIENT_TIMEOUT_MS,
+    redact: [credential.password, apiKey].filter((s): s is string => Boolean(s)),
+    label: 'nuget-delete',
+  });
+}
+
+function unlistOperation(id: string, client: string, viaClient: boolean): ManageOperation {
   return {
     protocol: 'nuget',
-    id: 'unlist',
+    id,
     permission: 'WRITE',
-    client: 'raw DELETE /v3/package/<id>/<version>',
+    client,
     async prepare(seeder, repo) {
-      const subject = await seedSubject(seeder, repo, 'unlist');
+      const subject = await seedSubject(seeder, repo, id);
+      const raw = async (credential: MaterializedCredential): Promise<number> =>
+        (await rawUnlist(subject.repoName, credential, subject.idLower, subject.target)).status;
       return bindPrepared<NuGetManageFingerprint>({
         run: async (credential: MaterializedCredential) => {
-          const res = await rawUnlist(
-            subject.repoName,
-            credential,
-            subject.idLower,
-            subject.target,
-          );
+          if (viaClient) {
+            const res = await dotnetNugetDelete(
+              subject.repoName,
+              credential,
+              subject.idLower,
+              subject.target,
+            );
+            return { clientExitCode: res.exitCode, command: res.command };
+          }
           return {
-            status: res.status,
+            status: await raw(credential),
             command: `DELETE v3/package/${subject.idLower}/${subject.target} (${credential.kind})`,
           };
         },
+        // A refused client cell replays the wire request: the client only shows an exit code.
+        probe: viaClient ? raw : undefined,
         fingerprint: () => fingerprint(subject),
         expectEffect: (before, after) => {
           expect(before.listed, 'both versions were listed').toEqual({
@@ -163,6 +221,14 @@ function unlist(): ManageOperation {
       });
     },
   };
+}
+
+function unlist(): ManageOperation {
+  return unlistOperation('unlist', 'raw DELETE /v3/package/<id>/<version>', false);
+}
+
+function unlistClient(): ManageOperation {
+  return unlistOperation('unlist-client', 'dotnet nuget delete', true);
 }
 
 function relist(): ManageOperation {
@@ -208,4 +274,8 @@ function relist(): ManageOperation {
 }
 
 /** The NuGet operations of the manage matrix (`tests/nuget/manage-matrix.spec.ts`). */
-export const NUGET_MANAGE_OPERATIONS: readonly ManageOperation[] = [unlist(), relist()];
+export const NUGET_MANAGE_OPERATIONS: readonly ManageOperation[] = [
+  unlist(),
+  relist(),
+  unlistClient(),
+];

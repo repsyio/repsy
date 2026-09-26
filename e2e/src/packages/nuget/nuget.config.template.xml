@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
+{{#hasSource}}
   <packageSources>
     <clear />
     <add key="repsy" value="{{{serviceIndexUrl}}}" protocolVersion="3" allowInsecureConnections="true" />
   </packageSources>
+{{/hasSource}}
 {{#hasBasic}}
   <packageSourceCredentials>
     <repsy>

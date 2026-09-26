@@ -231,6 +231,7 @@ e2e/
       publish-consume.spec.ts   # registerPublishConsumeLoop(nugetAdapter) + api-key-only-push and mixed-case-id real-client tests
       registry-rules.spec.ts    # raw-HTTP pins of the 409/422 override & version-kind rules, service index, X-NuGet-ApiKey (H7)
       transitive-resolution.spec.ts # a real `dotnet restore` of a project that references only A resolves A's nuspec dependencies (ranges, target-framework groups, unlisted, SemVer 2.0.0) from Repsy (RPS-1479)
+      client-commands.spec.ts   # `dotnet add package` (the panel snippets), `dotnet nuget delete` (unlist), a real `dotnet pack --include-symbols` round trip and the `.snupkg` push (RPS-1486)
     docker/
       publish-consume.spec.ts   # registerPublishConsumeLoop(dockerAdapter) + D1-D4 real-client tests (OCI family, auth login, by-digest, retag)
       registry-rules.spec.ts    # raw-HTTP pins R1-R15: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type, sha512 digests, protocol DELETE
@@ -727,8 +728,9 @@ package exactly like the client does, so the replays are faithful.
 Cargo, NuGet and Ruby (`clients/{cargo,nuget,ruby}-manage.ts`, `tests/<protocol>/manage-matrix.spec.ts`;
 `./run.sh test --protocol cargo,nuget,ruby --grep " manage "`) are all WRITE: Cargo `yank`/`unyank`
 (`cargo yank [--undo]`) and `owner-add`/`owner-remove` (`cargo owner --add|--remove`, 20 cells), NuGet
-`unlist`/`relist` (raw `DELETE`/`POST /v3/package/<id>/<version>`, 10 cells; `dotnet nuget delete` is
-RPS-1486's), Ruby `yank` (`gem yank`, 5 cells). Probed live: the owner calls are accepted and change
+`unlist`/`relist` (raw `DELETE`/`POST /v3/package/<id>/<version>`, 10 cells) and `unlist-client` (the
+same `DELETE` sent by `dotnet nuget delete`, 5 cells; `dotnet` has no relist command), Ruby `yank`
+(`gem yank`, 5 cells). Probed live: the owner calls are accepted and change
 nothing (Repsy has no owners below the repository), so their allowed cell asserts an unchanged crate;
 a USER password may yank/unlist (RPS-1317); an anonymous caller on a public repo gets 401 everywhere.
 `gem yank` exits 0 even when it is refused (RubyGems 4.0 `yank_command.rb` prints the body and never
@@ -2234,6 +2236,37 @@ unsatisfiable range fails the restore and names the package. The registration's
 `catalogEntry.dependencyGroups` (`NuGetResponseMapper.buildDependencyGroups`) is asserted on the
 per-version leaf document (`v3/registration/<id>/<ver>.json`); the leaves inlined into the
 registration INDEX carry none, and an empty group is dropped from it, which the suite does not pin.
+
+### NuGet client commands (RPS-1486)
+
+`tests/nuget/client-commands.spec.ts` runs the real `dotnet` commands that no other spec reaches:
+
+- **`dotnet add package`** in an isolated empty `net10.0` project, with the credential where the
+  panel's "Option A" puts it: a user-level `NuGet.Config` (`$HOME/.nuget/NuGet/NuGet.Config`,
+  `packageSourceCredentials` with `ClearTextPassword`, never on the command line). Cells: the direct-URL
+  form, the plain form that takes the source from the project's `NuGet.Config`, a public repository,
+  no `--version` (highest stable) and `--prerelease`, plus two refused ones (no credential, a version
+  that does not exist) that must leave the csproj untouched. Asserted: the `PackageReference` line the
+  panel's own snippet shows, `obj/project.assets.json` (`libraries`, `projectFileDependencyGroups`) and
+  the restored `.nupkg` against the served one.
+- **`dotnet nuget delete <id> <version> --source <index.json> --api-key <key> --non-interactive`**,
+  NuGet's unlist command: `204`, `listed: false` in the registration, the flat container still lists and
+  serves the version byte for byte, and `dotnet restore` of `[version]` still resolves it. It is also a
+  client cell of the permission matrix, `unlist-client` (`nuget-manage.ts`, `dotnetNugetDelete`), for
+  every credential: WRITE, a read-only token and an anonymous caller get a 401.
+- **Symbol packages.** A real `dotnet pack --include-symbols -p:SymbolPackageFormat=snupkg` output
+  round-trips (`dotnet nuget push x.nupkg` sends the `.nupkg` alone, the package restores and a
+  consumer compiles against it: the first real, not hand-built, package of the suite).
+  `dotnet nuget push x.snupkg --source repsy` exits 0 and sends nothing, because Repsy's service index has no
+  `SymbolPackagePublish` resource. A `PUT` of a `.snupkg` sent some other way is NOT pinned: the server
+  accepts it (201) and replaces the stored `.nupkg` of that id and version with the symbol package
+  (`allowOverride`, the default), which breaks the package; it is proposed as a backend story.
+
+Probed live and not pinned (panel text, proposed as a story): the panel's Option A install snippet
+`dotnet add package <id> --version <v> --source repsy` fails with `NU1301: The local source
+'<cwd>/repsy' doesn't exist` (`dotnet add package --source` takes a URL or a folder, not a source
+name), and over plain HTTP the direct-URL snippet needs the source configured with
+`allowInsecureConnections="true"` (`NU1302`), so "no NuGet.Config needed" only holds over HTTPS.
 
 ## Docker runner
 
