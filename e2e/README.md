@@ -2656,7 +2656,7 @@ what it does that the image clients never reach. Probed live (oras 1.3.4):
 | `manifest delete` (OR5)                                 | deletes by digest (a tag reference resolves first: every tag of the manifest goes), asked for the `delete` scope up front (token scope `repository:<repo>/<image>:delete,pull`, seen through a logging proxy: no `insufficient_scope` round trip, unlike crane/regctl); a rw deploy token is refused. Deleting a REFERRER fails on the same referrers-API probe unless the tag schema is forced, which also removes its entry from the index |
 | `repo tags` / `repo ls` (OR7)                           | fail with `unknownPath` (RA1/RA2, RPS-1489)                                                                                                                                                                                                                                                                                                                                                                                                  |
 
-Proposed backend story (not filed by this PR): implementing `GET /v2/<repo>/<image>/referrers/<digest>`
+Backend follow-up (RPS-1489 already lists the referrers API): implementing `GET /v2/<repo>/<image>/referrers/<digest>`
 (or, at the least, answering the missing route with a `404` that does not carry `NAME_UNKNOWN`) makes
 `oras discover`, `oras copy -r` and `oras manifest delete` of a referrer work without forcing the tag
 schema; the `discover`/`copy -r`/referrer-delete halves of OR3/OR4/OR5 then flip on purpose (with RA3).
