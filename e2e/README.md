@@ -3176,8 +3176,8 @@ run `uv publish --trusted-publishing never --publish-url <repo>/`, `resolve` run
   under `REPSY_E2E_INSECURE_REGISTRY`, like pip's `PIP_TRUSTED_HOST`. The keyring provider needs the
   `keyring` executable, which the runner does not carry: not covered.
 - **`uv publish` sends `sha256_digest`** (and `blake2_256_digest`, ignored server-side), so the
-  `sha256DigestMissing` refusal of RPS-1224 does not affect it: it is accepted like twine (
-  captured off a local server in U1). A wheel and an sdist in one call are both stored (U2).
+  `sha256DigestMissing` refusal of RPS-1224 does not affect it: it is accepted like twine (captured
+  off a local server in U1). A wheel and an sdist in one call are both stored (U2).
 - **An anonymous publish** would make uv try "trusted publishing" first (an OIDC request to
   `https://<repo host>/_/oidc/audience`, three retries, then `Missing credentials`); the adapter passes
   `--trusted-publishing never`, so it fails client-side at once, like twine's non-interactive preflight,
