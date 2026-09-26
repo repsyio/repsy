@@ -16,6 +16,9 @@
 package io.repsy.os.server.security.scanner.trivy;
 
 import io.netty.channel.ChannelOption;
+import io.netty.handler.timeout.WriteTimeoutHandler;
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +26,17 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 
+/**
+ * The HTTP client Repsy uses to talk to the scanner.
+ *
+ * <p>{@code repsy.security.trivy.request-timeout-seconds} is not a bound on a whole request, since
+ * an artifact of up to hundreds of megabytes is streamed to the scanner and that takes as long as
+ * it takes. It bounds each wait instead: the {@code responseTimeout} runs from the moment the
+ * request has been written in full until the scanner answers (and between the chunks of the
+ * answer), and the write-idle timeout fails an upload the scanner has stopped reading for that
+ * long. An upload that keeps moving is only bounded by {@code max-scan-duration-seconds}, see
+ * {@link TrivyVulnerabilityScanner}.
+ */
 @Configuration
 public class TrivyScannerWebClientConfig {
 
@@ -30,10 +44,19 @@ public class TrivyScannerWebClientConfig {
   private static final int MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
 
   @Bean
-  public @NonNull WebClient trivyScannerWebClient() {
+  public @NonNull WebClient trivyScannerWebClient(
+      final @NonNull TrivyScannerProperties properties) {
+
+    final var requestTimeout = Duration.ofSeconds(properties.requestTimeoutSeconds());
 
     final var httpClient =
-        HttpClient.create().option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MS);
+        HttpClient.create()
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MS)
+            .responseTimeout(requestTimeout)
+            .doOnConnected(
+                connection ->
+                    connection.addHandlerLast(
+                        new WriteTimeoutHandler(requestTimeout.toMillis(), TimeUnit.MILLISECONDS)));
 
     return WebClient.builder()
         .clientConnector(new ReactorClientHttpConnector(httpClient))

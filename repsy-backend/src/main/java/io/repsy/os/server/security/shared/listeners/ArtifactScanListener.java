@@ -242,10 +242,11 @@ public class ArtifactScanListener {
    * upgraded looks like. The submit is tried again a bounded number of times, {@code
    * repsy.security.trivy.submit-max-attempts} in all, after a growing delay.
    *
-   * <p>Only this failure is retried. A 5xx answer, the {@code block()} timeout of the submit
-   * ({@link IllegalStateException}) and an unreadable artifact mean the scanner was reached, or the
-   * upload was under way, and re-sending an artifact of up to hundreds of megabytes to a slow
-   * scanner would only make it slower. Those stay a recorded failure that can be re-run by hand.
+   * <p>Only this failure is retried. A 5xx answer, a scanner that did not answer or stopped reading
+   * the upload in time (a {@code TrivyScanException}, so not a {@link WebClientRequestException})
+   * and an unreadable artifact mean the scanner was reached, or the upload was under way, and
+   * re-sending an artifact of up to hundreds of megabytes to a slow scanner would only make it
+   * slower. Those stay a recorded failure that can be re-run by hand.
    *
    * <p>The delay is not slept on the scan thread: the retry is handed to the {@link TaskScheduler},
    * which only queues it on the scan executor again when the time comes, so the scan thread is free
