@@ -31,8 +31,12 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 /**
- * RPS-1131: the filter only sends the header on the API port, and only for requests that are not
- * the JSON API ({@code /api/**}); it honours {@code enabled}, {@code reportOnly} and the {@code
+ * RPS-1514: the filter also sends {@code X-Content-Type-Options} everywhere, {@code
+ * Referrer-Policy} and {@code X-Frame-Options} on the API port, and an opt-in {@code
+ * Strict-Transport-Security}.
+ *
+ * <p>RPS-1131: the filter only sends the CSP header on the API port, and only for requests that are
+ * not the JSON API ({@code /api/**}); it honours {@code enabled}, {@code reportOnly} and the {@code
  * policy} override.
  */
 @DisplayName("SecurityHeadersFilter")
@@ -56,9 +60,10 @@ class SecurityHeadersFilterTest {
 
     final var filter =
         new SecurityHeadersFilter(
-            this.multiPortProperties,
+            new ApiPortMatcher(this.multiPortProperties),
             new AppCorsProperties(null),
-            new ContentSecurityPolicyProperties(true, false, null));
+            new ContentSecurityPolicyProperties(true, false, null),
+            new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/repos/some-repo/overview");
     final var response = Mockito.mock(HttpServletResponse.class);
@@ -76,9 +81,10 @@ class SecurityHeadersFilterTest {
 
     final var filter =
         new SecurityHeadersFilter(
-            this.multiPortProperties,
+            new ApiPortMatcher(this.multiPortProperties),
             new AppCorsProperties(null),
-            new ContentSecurityPolicyProperties(true, true, null));
+            new ContentSecurityPolicyProperties(true, true, null),
+            new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/");
     final var response = Mockito.mock(HttpServletResponse.class);
@@ -95,16 +101,18 @@ class SecurityHeadersFilterTest {
 
     final var filter =
         new SecurityHeadersFilter(
-            this.multiPortProperties,
+            new ApiPortMatcher(this.multiPortProperties),
             new AppCorsProperties(null),
-            new ContentSecurityPolicyProperties(true, false, null));
+            new ContentSecurityPolicyProperties(true, false, null),
+            new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/api/profile");
     final var response = Mockito.mock(HttpServletResponse.class);
 
     filter.doFilterInternal(request, response, this.filterChain);
 
-    verify(response, never()).setHeader(any(), any());
+    verify(response, never()).setHeader(Mockito.eq("Content-Security-Policy"), any());
+    verify(response, never()).setHeader(Mockito.eq("Content-Security-Policy-Report-Only"), any());
   }
 
   @Test
@@ -113,16 +121,18 @@ class SecurityHeadersFilterTest {
 
     final var filter =
         new SecurityHeadersFilter(
-            this.multiPortProperties,
+            new ApiPortMatcher(this.multiPortProperties),
             new AppCorsProperties(null),
-            new ContentSecurityPolicyProperties(true, false, null));
+            new ContentSecurityPolicyProperties(true, false, null),
+            new AppHstsProperties(0));
 
     final var request = request(OTHER_PORT, "/");
     final var response = Mockito.mock(HttpServletResponse.class);
 
     filter.doFilterInternal(request, response, this.filterChain);
 
-    verify(response, never()).setHeader(any(), any());
+    verify(response, never()).setHeader(Mockito.eq("Content-Security-Policy"), any());
+    verify(response, never()).setHeader(Mockito.eq("Content-Security-Policy-Report-Only"), any());
   }
 
   @Test
@@ -131,16 +141,18 @@ class SecurityHeadersFilterTest {
 
     final var filter =
         new SecurityHeadersFilter(
-            this.multiPortProperties,
+            new ApiPortMatcher(this.multiPortProperties),
             new AppCorsProperties(null),
-            new ContentSecurityPolicyProperties(false, false, null));
+            new ContentSecurityPolicyProperties(false, false, null),
+            new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/");
     final var response = Mockito.mock(HttpServletResponse.class);
 
     filter.doFilterInternal(request, response, this.filterChain);
 
-    verify(response, never()).setHeader(any(), any());
+    verify(response, never()).setHeader(Mockito.eq("Content-Security-Policy"), any());
+    verify(response, never()).setHeader(Mockito.eq("Content-Security-Policy-Report-Only"), any());
   }
 
   @Test
@@ -149,9 +161,10 @@ class SecurityHeadersFilterTest {
 
     final var filter =
         new SecurityHeadersFilter(
-            this.multiPortProperties,
+            new ApiPortMatcher(this.multiPortProperties),
             new AppCorsProperties(null),
-            new ContentSecurityPolicyProperties(true, false, "default-src 'none'"));
+            new ContentSecurityPolicyProperties(true, false, "default-src 'none'"),
+            new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/");
     final var response = Mockito.mock(HttpServletResponse.class);
@@ -167,9 +180,10 @@ class SecurityHeadersFilterTest {
 
     final var filter =
         new SecurityHeadersFilter(
-            this.multiPortProperties,
+            new ApiPortMatcher(this.multiPortProperties),
             new AppCorsProperties(null),
-            new ContentSecurityPolicyProperties(true, false, null));
+            new ContentSecurityPolicyProperties(true, false, null),
+            new AppHstsProperties(0));
 
     final var request = request(8443, "/");
     final var response = Mockito.mock(HttpServletResponse.class);
@@ -185,9 +199,10 @@ class SecurityHeadersFilterTest {
 
     final var filter =
         new SecurityHeadersFilter(
-            this.multiPortProperties,
+            new ApiPortMatcher(this.multiPortProperties),
             new AppCorsProperties("https://panel.example.com,https://staging.example.com"),
-            new ContentSecurityPolicyProperties(true, false, null));
+            new ContentSecurityPolicyProperties(true, false, null),
+            new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/");
     final var response = Mockito.mock(HttpServletResponse.class);
@@ -216,9 +231,10 @@ class SecurityHeadersFilterTest {
 
     final var filter =
         new SecurityHeadersFilter(
-            this.multiPortProperties,
+            new ApiPortMatcher(this.multiPortProperties),
             new AppCorsProperties(null),
-            new ContentSecurityPolicyProperties(true, false, null));
+            new ContentSecurityPolicyProperties(true, false, null),
+            new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/");
     final var response = Mockito.mock(HttpServletResponse.class);
@@ -240,6 +256,122 @@ class SecurityHeadersFilterTest {
         .contains("font-src 'self' data:;")
         .contains("img-src 'self' data:;")
         .contains("connect-src 'self';");
+  }
+
+  @Test
+  @DisplayName("sends nosniff on every response of both ports, JSON API and protocol port included")
+  void sendsNosniffEverywhere() throws Exception {
+
+    final var filter = this.defaultFilter(0);
+
+    for (final var target :
+        new Object[][] {{API_PORT, "/"}, {API_PORT, "/api/profile"}, {OTHER_PORT, "/v2/"}}) {
+      final var response = Mockito.mock(HttpServletResponse.class);
+
+      filter.doFilterInternal(
+          request((int) target[0], (String) target[1]), response, this.filterChain);
+
+      verify(response).setHeader("X-Content-Type-Options", "nosniff");
+    }
+  }
+
+  @Test
+  @DisplayName("sends nosniff even when the CSP is disabled")
+  void sendsNosniffWhenCspDisabled() throws Exception {
+
+    final var filter =
+        new SecurityHeadersFilter(
+            new ApiPortMatcher(this.multiPortProperties),
+            new AppCorsProperties(null),
+            new ContentSecurityPolicyProperties(false, false, null),
+            new AppHstsProperties(0));
+    final var response = Mockito.mock(HttpServletResponse.class);
+
+    filter.doFilterInternal(request(OTHER_PORT, "/x"), response, this.filterChain);
+
+    verify(response).setHeader("X-Content-Type-Options", "nosniff");
+  }
+
+  @Test
+  @DisplayName(
+      "sends Referrer-Policy and X-Frame-Options on every path of the API port, and the TLS alias")
+  void sendsReferrerAndFrameOptionsOnApiPort() throws Exception {
+
+    final var filter = this.defaultFilter(0);
+
+    for (final var target :
+        new Object[][] {{API_PORT, "/"}, {API_PORT, "/api/profile"}, {8443, "/api/profile"}}) {
+      final var response = Mockito.mock(HttpServletResponse.class);
+
+      filter.doFilterInternal(
+          request((int) target[0], (String) target[1]), response, this.filterChain);
+
+      verify(response).setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+      verify(response).setHeader("X-Frame-Options", "DENY");
+    }
+  }
+
+  @Test
+  @DisplayName("does not send Referrer-Policy or X-Frame-Options on the protocol port")
+  void doesNotSendReferrerOrFrameOptionsOnProtocolPort() throws Exception {
+
+    final var response = Mockito.mock(HttpServletResponse.class);
+
+    this.defaultFilter(0).doFilterInternal(request(OTHER_PORT, "/v2/"), response, this.filterChain);
+
+    verify(response, never()).setHeader(Mockito.eq("Referrer-Policy"), any());
+    verify(response, never()).setHeader(Mockito.eq("X-Frame-Options"), any());
+  }
+
+  @Test
+  @DisplayName("never sends Strict-Transport-Security by default, even on a secure request")
+  void hstsIsOffByDefault() throws Exception {
+
+    final var request = request(API_PORT, "/");
+    Mockito.when(request.isSecure()).thenReturn(true);
+    final var response = Mockito.mock(HttpServletResponse.class);
+
+    this.defaultFilter(0).doFilterInternal(request, response, this.filterChain);
+
+    verify(response, never()).setHeader(Mockito.eq("Strict-Transport-Security"), any());
+  }
+
+  @Test
+  @DisplayName("sends Strict-Transport-Security on a secure request when a max-age is set")
+  void hstsIsSentOnSecureRequest() throws Exception {
+
+    for (final var port : new int[] {8443, OTHER_PORT}) {
+      final var request = request(port, "/");
+      Mockito.when(request.isSecure()).thenReturn(true);
+      final var response = Mockito.mock(HttpServletResponse.class);
+
+      this.defaultFilter(31_536_000).doFilterInternal(request, response, this.filterChain);
+
+      verify(response).setHeader("Strict-Transport-Security", "max-age=31536000");
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "never sends Strict-Transport-Security on a plain request, even when a max-age is set")
+  void hstsIsNotSentOnPlainRequest() throws Exception {
+
+    final var request = request(API_PORT, "/");
+    Mockito.when(request.isSecure()).thenReturn(false);
+    final var response = Mockito.mock(HttpServletResponse.class);
+
+    this.defaultFilter(31_536_000).doFilterInternal(request, response, this.filterChain);
+
+    verify(response, never()).setHeader(Mockito.eq("Strict-Transport-Security"), any());
+  }
+
+  private SecurityHeadersFilter defaultFilter(final long hstsMaxAge) {
+
+    return new SecurityHeadersFilter(
+        new ApiPortMatcher(this.multiPortProperties),
+        new AppCorsProperties(null),
+        new ContentSecurityPolicyProperties(true, false, null),
+        new AppHstsProperties(hstsMaxAge));
   }
 
   private static HttpServletRequest request(final int localPort, final String uri) {

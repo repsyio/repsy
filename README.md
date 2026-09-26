@@ -17,6 +17,7 @@
 - [Configuration](#configuration)
 - [Content Security Policy](#content-security-policy)
 - [Cross-Origin Requests (CORS)](#cross-origin-requests-cors)
+- [Security headers](#security-headers)
 - [Usage](#usage)
 - [Reverse Proxy](#reverse-proxy)
 - [Troubleshooting](#troubleshooting)
@@ -495,6 +496,7 @@ Deleting `1.0.0+a` when there is no such entry (the usual case) still deletes `1
 | `RUBY_MAX_GEM_SIZE` | Largest gem a `gem push` may carry (the raw request body, so the multipart limits do not apply to it). A larger gem is answered with `413`. The gem is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. Accepts a size such as `100MB` or `1GB` | `500MB` |
 | `CARGO_MAX_CRATE_SIZE` | Largest `.crate` a `cargo publish` may carry (a length-prefixed field inside Cargo's own wire format, so neither the multipart limits nor `MULTIPART_MAX_FILE_SIZE` apply to it). A larger crate is answered with `413`. The crate is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. crates.io itself defaults to `10MB`; raise this if you publish larger internal crates. Accepts a size such as `100MB` or `1GB` | `100MB` |
 | `APP_ALLOWED_ORIGINS` | Comma-separated list of exact origins (e.g. `https://panel.example.com,https://panel-staging.example.com`) the panel API accepts cross-origin, credentialed requests from. Unset keeps today's behaviour: any origin is allowed. Set it once the panel is reachable from a known, fixed set of origins | *(empty, any origin allowed)* |
+| `APP_HSTS_MAX_AGE` | `max-age` in seconds of a `Strict-Transport-Security` header. `0` or unset never sends it (the default). When positive, it is sent only on a secure request (a TLS listener, or a reverse proxy that forwards `X-Forwarded-Proto: https`), on both ports. HSTS applies to a whole host, not a port, so leave it off when the same host also serves the panel over plain HTTP (for example `:8080` plain beside `:8443` TLS). See [Security headers](#security-headers) | `0` (off) |
 | `APP_CSP_ENABLED` | Send a `Content-Security-Policy` header with the panel SPA and its static assets (JSON API responses are unaffected). See [Content Security Policy](#content-security-policy) | `true` |
 | `APP_CSP_REPORT_ONLY` | Send `Content-Security-Policy-Report-Only` instead of the enforcing header: violations are reported (in a browser that supports the Reporting API and is told where to send reports), nothing is blocked. Useful while rolling out a widened or replaced policy | `false` |
 | `APP_CSP_POLICY` | Overrides the built-in Content-Security-Policy outright, so an operator can widen it (for example to allow a CDN or font host) without a rebuild. See [Content Security Policy](#content-security-policy) for the built-in policy | *(empty, built-in policy)* |
@@ -549,6 +551,28 @@ matches the documented setups where the frontend and the API are served from dif
 `APP_ALLOWED_ORIGINS` to a comma-separated list of exact origins (for example
 `https://panel.example.com`) to restrict this once the panel is reachable from a known, fixed set
 of origins. A preflight from any other origin is then rejected.
+
+This applies to the panel API port only. The repository port (`9090`, the one `mvn`, `npm`, `docker`
+and the other package-manager clients talk to) sends no CORS headers at all: no browser calls it
+cross-origin and the clients never send an `Origin`, so nothing is answered there whatever
+`APP_ALLOWED_ORIGINS` says.
+
+### Security headers
+
+Besides the [Content Security Policy](#content-security-policy), Repsy sends these browser-facing
+headers:
+
+| Header | Where |
+| --- | --- |
+| `X-Content-Type-Options: nosniff` | Every response, on both ports (the repository port serves user-uploaded files) |
+| `Referrer-Policy: strict-origin-when-cross-origin` | Every response on the panel API port |
+| `X-Frame-Options: DENY` | Every response on the panel API port (the legacy twin of the CSP's `frame-ancestors 'none'`) |
+| `Strict-Transport-Security: max-age=<APP_HSTS_MAX_AGE>` | Only when `APP_HSTS_MAX_AGE` is set to a positive number of seconds, and only on a secure request |
+
+HSTS is opt-in because it is scoped to a host, not to a port: a browser that has seen it for a host
+upgrades `http://host:8080` to HTTPS too, which would break the documented setup that serves the
+panel on plain `:8080` and on TLS `:8443` of one host. Set it when everything on the host is HTTPS
+only; a reverse proxy in front of Repsy normally owns it, and then it needs no setting here.
 
 ### Reverse Proxy
 

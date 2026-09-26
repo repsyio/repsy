@@ -118,6 +118,23 @@ test.describe('the https listeners next to the http ones', { tag: ['@tls', '@smo
   });
 });
 
+test.describe('Strict-Transport-Security (RPS-1514)', { tag: ['@tls', '@smoke'] }, () => {
+  // The overlay sets APP_HSTS_MAX_AGE (opt-in, off on the default stack): HSTS is per host, not per
+  // port, so it goes out only where the request itself was secure.
+  test('is sent on both https listeners and on neither http one', async () => {
+    for (const base of [tlsApi, tlsRepo]) {
+      const res = await edgeRequest(`${originOf(base)}/`);
+      expect(res.headers.get('strict-transport-security'), base.origin).toBe('max-age=31536000');
+      expect(res.headers.get('x-content-type-options'), base.origin).toBe('nosniff');
+    }
+    for (const base of [plainApi, plainRepo]) {
+      const res = await edgeRequest(`${originOf(base)}/`);
+      expect(res.headers.get('strict-transport-security'), base.origin).toBeNull();
+      expect(res.headers.get('x-content-type-options'), base.origin).toBe('nosniff');
+    }
+  });
+});
+
 test.describe('the certificate', { tag: ['@tls', '@smoke'] }, () => {
   const caFile = process.env.REPSY_E2E_TLS_CA_FILE ?? '';
 
