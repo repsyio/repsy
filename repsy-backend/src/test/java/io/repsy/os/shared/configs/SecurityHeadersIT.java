@@ -17,6 +17,7 @@ package io.repsy.os.shared.configs;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -28,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
@@ -89,5 +91,57 @@ class SecurityHeadersIT extends AbstractIntegrationTest {
   void doesNotSendPolicyOnJsonApi() throws Exception {
 
     this.perform(get("/api/profile")).andExpect(header().doesNotExist("Content-Security-Policy"));
+  }
+
+  // RPS-1514
+  @Test
+  @DisplayName("nosniff, Referrer-Policy and X-Frame-Options are on the SPA and on the JSON API")
+  void sendsHardeningHeadersOnApiPort() throws Exception {
+
+    for (final var path : new String[] {"/", "/repos/some-repo/overview", "/api/profile"}) {
+      this.perform(get(path))
+          .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+          .andExpect(header().string("Referrer-Policy", "strict-origin-when-cross-origin"))
+          .andExpect(header().string("X-Frame-Options", "DENY"));
+    }
+  }
+
+  // RPS-1514: the repository port serves user-uploaded bytes, so it gets nosniff, and nothing that
+  // only makes sense for the panel (no CSP, no framing or referrer policy, no CORS).
+  @Test
+  @DisplayName("the protocol port gets nosniff only, and no CSP, CORS, Referrer-Policy or XFO")
+  void protocolPortGetsNosniffOnly() throws Exception {
+
+    this.mockMvc
+        .perform(get("/v2/").with(protocolPort()).header(HttpHeaders.ORIGIN, "https://evil.test"))
+        .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+        .andExpect(header().doesNotExist("Content-Security-Policy"))
+        .andExpect(header().doesNotExist("Referrer-Policy"))
+        .andExpect(header().doesNotExist("X-Frame-Options"))
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN))
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+  }
+
+  // RPS-1514: even the response a CORS rejection would produce carries the headers, because the
+  // filter runs before the CORS one. Here the unset default reflects any origin, so use OPTIONS.
+  @Test
+  @DisplayName("a preflight on the API port carries the hardening headers too")
+  void preflightCarriesHardeningHeaders() throws Exception {
+
+    this.perform(
+            options("/api/auth/login")
+                .header(HttpHeaders.ORIGIN, "https://anything.example.com")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
+        .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+        .andExpect(header().string("X-Frame-Options", "DENY"));
+  }
+
+  @Test
+  @DisplayName("no Strict-Transport-Security by default, even over a secure request (RPS-1514)")
+  void noHstsByDefault() throws Exception {
+
+    this.perform(get("/").secure(true))
+        .andExpect(status().isOk())
+        .andExpect(header().doesNotExist("Strict-Transport-Security"));
   }
 }

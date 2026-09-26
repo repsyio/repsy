@@ -25,7 +25,7 @@
  */
 import path from 'node:path';
 
-import { ApiError, RepoType } from '../../src/api/panel-api.js';
+import { PanelHttpError, RepoType } from '../../src/api/panel-backend.js';
 import { craneEnv, renderDockerConfig } from '../../src/clients/docker.js';
 import { buildImage } from '../../src/clients/docker-image.js';
 import {
@@ -102,8 +102,8 @@ test(
       'the manifest is gone',
     ).toBe(404);
     const gone = await panelApi.getDockerImageSummary(repo.name, image).catch((e: unknown) => e);
-    expect(gone).toBeInstanceOf(ApiError);
-    expect((gone as ApiError).status, 'the image went with its last manifest').toBe(404);
+    expect(gone).toBeInstanceOf(PanelHttpError);
+    expect((gone as PanelHttpError).status, 'the image went with its last manifest').toBe(404);
 
     // A push of a new tag afterwards works and creates the image again.
     const second = await push('v2', 'lifecycle-two');
@@ -143,7 +143,7 @@ test(
     const afterFailure = await panelApi
       .getDockerImageSummary(repo.name, image)
       .catch((e: unknown) => e);
-    expect(afterFailure, 'no image after a failed first push').toBeInstanceOf(ApiError);
-    expect((afterFailure as ApiError).status).toBe(404);
+    expect(afterFailure, 'no image after a failed first push').toBeInstanceOf(PanelHttpError);
+    expect((afterFailure as PanelHttpError).status).toBe(404);
   },
 );

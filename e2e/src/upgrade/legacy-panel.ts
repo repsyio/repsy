@@ -21,7 +21,7 @@
  * and not `POST /api/repos`, users are searched with `?search=` and not `?q=`, and so on. The envelope,
  * `POST /api/auth/login`, `POST /api/users` and `POST /api/repos/{repo}/deploy-tokens` are the same, so this
  * covers only what the upgrade spec seeds: a login, repositories, users and deploy tokens. Everything after
- * the upgrade goes through the current `PanelApi`.
+ * the upgrade goes through the current `PanelBackend`.
  */
 
 interface Envelope<T> {

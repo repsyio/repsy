@@ -25,6 +25,11 @@
  * Docker manifest migration of V0024 only apply to a release before them, so a release that already has
  * both would need the spec's per-release expectations revisited (README.md "Upgrade path").
  * `REPSY_E2E_UPGRADE_FROM=<tag>` overrides it for one run.
+ *
+ * AFTER A RELEASE (releases are cut by hand, no checklist lists this: README.md "Upgrade path", "After a
+ * release", RPS-1600): once the new tag's image is pullable, change the line below, read the spec's
+ * per-release expectations again (`PREVIOUS_SCHEMA_VERSION`, V0017, V0024) and run
+ * `gh workflow run e2e-nightly.yml -f suite=upgrade`.
  */
 export const PREVIOUS_RELEASE = '26.08.4';
 

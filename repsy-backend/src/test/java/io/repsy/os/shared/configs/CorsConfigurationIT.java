@@ -15,6 +15,7 @@
  */
 package io.repsy.os.shared.configs;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -45,5 +46,38 @@ class CorsConfigurationIT extends AbstractIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin))
         .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
+  }
+
+  // RPS-1514: the repository port sends no CORS header at all, whatever the origin.
+  @Test
+  @DisplayName("sends no CORS header on the protocol port, for a preflight or a plain request")
+  void sendsNoCorsHeaderOnProtocolPort() throws Exception {
+
+    final var origin = "https://anything.example.com";
+
+    this.mockMvc
+        .perform(
+            options("/v2/")
+                .with(protocolPort())
+                .header(HttpHeaders.ORIGIN, origin)
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN))
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS))
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS));
+
+    this.mockMvc
+        .perform(get("/v2/").with(protocolPort()).header(HttpHeaders.ORIGIN, origin))
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN))
+        .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+  }
+
+  @Test
+  @DisplayName("still reflects the origin on a plain API request, not only on a preflight")
+  void reflectsOriginOnPlainApiRequest() throws Exception {
+
+    final var origin = "https://anything.example.com";
+
+    this.perform(get("/api/profile").header(HttpHeaders.ORIGIN, origin))
+        .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin));
   }
 }

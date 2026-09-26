@@ -228,7 +228,15 @@ app:
   # Origins the panel API accepts cross-origin, credentialed requests from. Empty (the default)
   # keeps today's behaviour: any origin is allowed. Comma-separated, exact origins only (e.g.
   # https://panel.example.com), once set. See CorsGlobalConfiguration.
+  # The repository-serving (protocol) port sends no CORS header at all (RPS-1514).
   allowed-origins: ${APP_ALLOWED_ORIGINS:}
+
+  # Strict-Transport-Security max-age in seconds (SecurityHeadersFilter). 0 (the default) never
+  # sends the header. When positive it is sent only on a secure request (TLS listener, or a proxy
+  # that forwards X-Forwarded-Proto: https). HSTS is per host, not per port: with plain :8080 and
+  # TLS :8443 on one host, enabling it would make browsers upgrade http://host:8080, so it is
+  # opt-in for TLS-only deployments (a reverse proxy normally owns it).
+  hsts-max-age: ${APP_HSTS_MAX_AGE:0}
 
   csp:
     # Sends a Content-Security-Policy header (SecurityHeadersFilter) with the panel SPA and its

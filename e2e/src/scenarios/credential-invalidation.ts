@@ -46,8 +46,8 @@
  * exchanges its Basic credentials again, so the stale token is only visible to a client that holds one:
  * the probes here are raw HTTP with the stored token, and for npm the real `npm publish` sends it as `_authToken`.
  */
-import { PanelApi, RepoType } from '../api/panel-api.js';
-import { env } from '../env.js';
+import { createPanelBackend } from '../api/backend-registry.js';
+import { RepoType } from '../api/panel-api.js';
 import type { ProtocolAdapter } from './adapter.js';
 import { expect, test } from './fixtures.js';
 import type { Scenario } from './types.js';
@@ -139,7 +139,7 @@ export function registerCredentialInvalidation<F>(
         // Warm the cache: a successful deploy with the password that is about to stop working.
         await accepted(oldCredential, first);
 
-        const userApi = new PanelApi(env.apiBaseUrl);
+        const userApi = await createPanelBackend();
         await userApi.login(user.username, user.password);
         const newPassword = `${user.password}${NEW_PASSWORD_SUFFIX}`;
         await userApi.changeOwnPassword(newPassword);
@@ -161,7 +161,7 @@ export function registerCredentialInvalidation<F>(
 
       await accepted(credential, adapter.version('release'));
 
-      await panelApi.deleteUser(user.id);
+      await panelApi.deleteRepoUser(user.id);
 
       await refused(credential, adapter.version('release'));
     });
