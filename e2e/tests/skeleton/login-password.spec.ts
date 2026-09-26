@@ -21,6 +21,8 @@
  * policy. The complexity rule stays where a password is set (create user, change password). That an
  * account whose password breaks the creation rule can log in cannot be seeded here (creation
  * enforces the rule): `AuthControllerIT` proves it against the database.
+ *
+ * `@cloud-skip` (RPS-1498): this is Repsy OS's `POST /api/auth/login`; Repsy Cloud has its own login.
  */
 import { env } from '../../src/env.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
@@ -39,7 +41,7 @@ async function login(
 
 test(
   'a wrong password answers 401 invalidCredentials whatever its strength',
-  { tag: ['@smoke'] },
+  { tag: ['@smoke', '@cloud-skip'] },
   async ({ seeder }) => {
     const user = await seeder.createUser();
     const unknown = seeder.reserveUsername();
@@ -65,25 +67,27 @@ test(
   },
 );
 
-test('the right password still logs in, and a malformed form is still a 400', async ({
-  seeder,
-}) => {
-  const user = await seeder.createUser();
+test(
+  'the right password still logs in, and a malformed form is still a 400',
+  { tag: '@cloud-skip' },
+  async ({ seeder }) => {
+    const user = await seeder.createUser();
 
-  const ok = await login(user.username, user.password);
-  expect(ok.status).toBe(200);
-  expect(ok.body.msgId).toBe('loginSucceeded');
+    const ok = await login(user.username, user.password);
+    expect(ok.status).toBe(200);
+    expect(ok.body.msgId).toBe('loginSucceeded');
 
-  // Missing or empty password, one over 72 characters, and one over 72 bytes (37 two-byte characters).
-  for (const password of ['', 'x'.repeat(73), 'é'.repeat(37)]) {
-    const answer = await login(user.username, password);
+    // Missing or empty password, one over 72 characters, and one over 72 bytes (37 two-byte characters).
+    for (const password of ['', 'x'.repeat(73), 'é'.repeat(37)]) {
+      const answer = await login(user.username, password);
 
-    expect(answer.status, password).toBe(400);
-  }
-  const missing = await fetch(`${env.apiBaseUrl}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: user.username }),
-  });
-  expect(missing.status).toBe(400);
-});
+      expect(answer.status, password).toBe(400);
+    }
+    const missing = await fetch(`${env.apiBaseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user.username }),
+    });
+    expect(missing.status).toBe(400);
+  },
+);

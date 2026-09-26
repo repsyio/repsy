@@ -27,9 +27,13 @@
 ARG DOCKER_CLI_VERSION=29.8.1
 # crane, copied the way docker.Dockerfile does it (a named stage, only a `COPY --from` source).
 ARG CRANE_VERSION=v0.22.1
-FROM docker:${DOCKER_CLI_VERSION}-cli AS docker-cli
+# The digests have no default on purpose (RPS-1597): docker-compose.runners.yml is their single source and
+# runners/bump-pins.sh keeps them (README.md "Runner images and pins"), so a build without them fails loudly.
+ARG DOCKER_CLI_IMAGE_DIGEST
+ARG CRANE_IMAGE_DIGEST
+FROM docker:${DOCKER_CLI_VERSION}-cli@${DOCKER_CLI_IMAGE_DIGEST} AS docker-cli
 
-FROM gcr.io/go-containerregistry/crane:${CRANE_VERSION} AS crane
+FROM gcr.io/go-containerregistry/crane:${CRANE_VERSION}@${CRANE_IMAGE_DIGEST} AS crane
 
 FROM node:24-bookworm-slim
 
@@ -60,8 +64,12 @@ RUN chmod a+rx /usr/local/bin/docker /usr/local/libexec/docker/cli-plugins/docke
 # Temurin JDK and Maven (the same download as maven.Dockerfile; keep the versions equal, runners.yml
 # pins both), crane (docker.Dockerfile's copy) and npm, which comes with node. The stack runner drives
 # the same adapters as the protocol runners, so a package is published and consumed by the real tool.
-ARG TEMURIN_VERSION=21
+# The same exact JDK and Maven, verified the same way, as maven.Dockerfile (see there); keep the four values equal
+# to the maven service's in docker-compose.runners.yml (runners/bump-pins.sh fails when they differ).
+ARG TEMURIN_VERSION=21.0.12.1+1
+ARG TEMURIN_SHA256
 ARG MAVEN_VERSION=3.9.9
+ARG MAVEN_SHA512
 ENV JAVA_HOME="/opt/java/temurin"
 ENV MAVEN_HOME="/opt/maven"
 ENV PATH="${JAVA_HOME}/bin:${MAVEN_HOME}/bin:${PATH}"
@@ -72,12 +80,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/java \
-    && curl -fsSL "https://api.adoptium.net/v3/binary/latest/${TEMURIN_VERSION}/ga/linux/x64/jdk/hotspot/normal/eclipse?project=jdk" \
-    | tar -xzC /opt/java \
+    && curl -fsSL -o /tmp/temurin.tgz "https://api.adoptium.net/v3/binary/version/jdk-${TEMURIN_VERSION}/linux/x64/jdk/hotspot/normal/eclipse" \
+    && echo "${TEMURIN_SHA256}  /tmp/temurin.tgz" | sha256sum -c - \
+    && tar -xzf /tmp/temurin.tgz -C /opt/java \
+    && rm /tmp/temurin.tgz \
     && mv /opt/java/jdk-* "${JAVA_HOME}"
 
-RUN curl -fsSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
-    | tar -xzC /opt \
+RUN curl -fsSL -o /tmp/maven.tgz "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
+    && echo "${MAVEN_SHA512}  /tmp/maven.tgz" | sha512sum -c - \
+    && tar -xzf /tmp/maven.tgz -C /opt \
+    && rm /tmp/maven.tgz \
     && mv "/opt/apache-maven-${MAVEN_VERSION}" "${MAVEN_HOME}" \
     && chmod -R a+rX "${JAVA_HOME}" "${MAVEN_HOME}"
 

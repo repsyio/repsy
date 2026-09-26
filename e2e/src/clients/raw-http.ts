@@ -29,8 +29,11 @@ import { env } from '../env.js';
 import { withBackoff429 } from '../scenarios/remote-throttle.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 
-/** The harness's admin credential, for looking at a repo regardless of the scenario's credential. */
-export function adminCredential(): MaterializedCredential {
+/**
+ * The credential of the account the harness runs as, for looking at a repo regardless of the
+ * scenario's credential: the `admin` user on Repsy OS, the tenant owner on Repsy Cloud (RPS-1498).
+ */
+export function ownerCredential(): MaterializedCredential {
   return {
     transport: 'basic',
     username: env.adminUsername,
@@ -38,6 +41,9 @@ export function adminCredential(): MaterializedCredential {
     kind: 'password',
   };
 }
+
+/** The former name of `ownerCredential`, kept so the callers need no change. */
+export const adminCredential = ownerCredential;
 
 /** An `Authorization` header for a Basic credential; none at all for `anonymous`. */
 export function authHeader(credential: MaterializedCredential): Record<string, string> {

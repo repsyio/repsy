@@ -183,7 +183,7 @@ async function expectSessionRefused(
 
 test.describe.serial(
   'persistence across restart and recreate (RPS-1476)',
-  { tag: '@local-only' },
+  { tag: ['@local-only', '@cloud-skip'] },
   () => {
     test.skip(
       !target.ownsStack || target.isRemote,
