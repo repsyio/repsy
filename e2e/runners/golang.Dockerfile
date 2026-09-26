@@ -21,8 +21,11 @@
 # A named build stage (not the final image), only used below as a `COPY --from` source -- a normal
 # build-time reference, not a Docker Compose sibling-service dependency (see maven.Dockerfile's/
 # nuget.Dockerfile's headers for why that distinction matters here).
+# The digest has no default on purpose (RPS-1597): docker-compose.runners.yml is its single source and
+# runners/bump-pins.sh keeps it (README.md "Runner images and pins"), so a build without it fails loudly.
 ARG GO_VERSION=1.27.1
-FROM golang:${GO_VERSION}-bookworm AS go-toolchain
+ARG GO_IMAGE_DIGEST
+FROM golang:${GO_VERSION}-bookworm@${GO_IMAGE_DIGEST} AS go-toolchain
 
 # The golang runner: the harness itself (see base.Dockerfile) plus the Go toolchain copied in from
 # the stage above, `curl` (the real publisher, `clients/golang.ts`'s file header) and a build-time-

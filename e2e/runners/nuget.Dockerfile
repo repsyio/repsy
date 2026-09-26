@@ -20,8 +20,11 @@
 # A named build stage (not the final image), only used below as a `COPY --from` source for the
 # toolchain directory -- a normal build-time reference, not a Docker Compose sibling-service
 # dependency (see the comment right before the final `FROM` for why that distinction matters here).
+# The digest has no default on purpose (RPS-1597): docker-compose.runners.yml is its single source and
+# runners/bump-pins.sh keeps it (README.md "Runner images and pins"), so a build without it fails loudly.
 ARG DOTNET_SDK_VERSION=10.0.401
-FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_SDK_VERSION}-noble AS dotnet-sdk
+ARG DOTNET_SDK_IMAGE_DIGEST
+FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_SDK_VERSION}-noble@${DOTNET_SDK_IMAGE_DIGEST} AS dotnet-sdk
 
 # The nuget runner: the harness itself (see base.Dockerfile) plus the toolchain copied in from the
 # stage above, nothing else. Its first layers intentionally repeat base.Dockerfile's rather than

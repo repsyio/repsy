@@ -23,8 +23,11 @@
 # image), only used below as a `COPY --from` source -- a normal build-time reference, not a Docker
 # Compose sibling-service dependency (see maven.Dockerfile's/nuget.Dockerfile's headers for why that
 # distinction matters here).
+# The digest has no default on purpose (RPS-1597): docker-compose.runners.yml is its single source and
+# runners/bump-pins.sh keeps it (README.md "Runner images and pins"), so a build without it fails loudly.
 ARG RUBY_VERSION=4.0.7
-FROM ruby:${RUBY_VERSION}-slim-bookworm AS ruby-toolchain
+ARG RUBY_IMAGE_DIGEST
+FROM ruby:${RUBY_VERSION}-slim-bookworm@${RUBY_IMAGE_DIGEST} AS ruby-toolchain
 
 # The ruby runner: the harness itself (see base.Dockerfile) plus the Ruby toolchain copied in from
 # the stage above. Its first layers intentionally repeat base.Dockerfile's rather than `FROM` a

@@ -90,7 +90,7 @@ e2e/
   runners/npm-clients.Dockerfile  # + pinned pnpm, yarn classic, yarn berry (npm --prefix /opt/clients/<name>) and bun (copied from oven/bun); see "npm-family clients"
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
   runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
-  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image, `skopeo` (built statically from its pinned tag), `regctl` and `oras` (pinned release binaries, sha256 per arch); no daemon, no socket
+  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image, `skopeo` (built statically from its pinned tag and commit), `regctl` and `oras` (release binaries, sha256 per arch); no daemon, no socket
   runners/helm.Dockerfile      # + the static `helm` binary + the cm-push plugin installed at build time; no daemon, no socket
   runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time; the static uv binary copied out of Astral's image
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
@@ -98,6 +98,7 @@ e2e/
   runners/stack.Dockerfile     # + the static `docker` CLI and its compose plugin copied out of docker-cli, a JDK + Maven, crane and npm; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
   runners/ui.Dockerfile        # + Playwright's own headless Chromium (build-time install, /ms-playwright); the "ui" runner, see "UI suite"
   runners/scanner-stub.Dockerfile  # the stub scanner of the scanner stack (src/stubs/scanner/ on node:24, no dependencies, no build)
+  runners/bump-pins.sh         # re-resolves every content pin of docker-compose.runners.yml (image digests, checksums, skopeo's commit) and prints or writes what differs, see "Runner images and pins"
   runners/ui-seccomp.json      # Playwright's seccomp profile, so Chromium's sandbox works as a non-root uid in Docker
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
@@ -860,7 +861,8 @@ file is still served byte for byte. Removing those is a panel action.
 ## Maven runner
 
 `runners/maven.Dockerfile` adds a pinned Eclipse Temurin JDK and Apache Maven (build args
-`TEMURIN_VERSION`, `MAVEN_VERSION`), a pinned Gradle (`GRADLE_VERSION`, with its published
+`TEMURIN_VERSION`, the exact release such as `21.0.12.1+1`, with its `TEMURIN_SHA256`, and `MAVEN_VERSION` with
+its `MAVEN_SHA512`, RPS-1597; the `stack` runner repeats the four), a pinned Gradle (`GRADLE_VERSION`, with its published
 `GRADLE_SHA256`, checked at build time), a pinned sbt (`SBT_VERSION`, `SBT_SHA256`, RPS-134), a pinned
 Apache Ant and the Apache Ivy jar (`ANT_VERSION`/`ANT_SHA512`, `IVY_VERSION`/`IVY_SHA512`, RPS-135) and `gpg`
 (Debian's GnuPG 2.2, no key server tooling) to the harness image; `gpg` is only for
@@ -1376,8 +1378,9 @@ checked against each client's own `--version` at build time and by `tests/npm-cl
 | bun          | `COPY --from=oven/bun:<v>-debian /usr/local/bin/bun /opt/clients/bun/bin/bun` (the cargo/golang/ruby "copy the toolchain" pattern; a glibc binary runs on bookworm-slim) | `BUN_VERSION` = **1.3.14**                                                                           | the newest `1.3.x-debian` tag of `oven/bun`       |
 | deno         | `COPY --from=denoland/deno:bin-<v> /deno /opt/clients/deno/bin/deno` (the `bin-<version>` image holds just that glibc binary; consume-only, see "Deno")                  | `DENO_VERSION` = **2.9.7**                                                                           | the newest `bin-2.x.y` tag of `denoland/deno`     |
 
-To bump one: change its build arg in `docker-compose.runners.yml`, `./run.sh test --protocol
-npm-clients -b` (the Dockerfile fails the build when a client reports another version), then re-run the
+To bump one: change its build arg in `docker-compose.runners.yml` (for bun or deno also run
+`runners/bump-pins.sh --write`, which refreshes their `*_IMAGE_DIGEST`, "Runner images and pins"), `./run.sh test
+--protocol npm-clients -b` (the Dockerfile fails the build when a client reports another version), then re-run the
 suite and read what changed. Every install is `--ignore-scripts`; `/opt/clients` is root-owned and
 world-readable, and the runner uses it as the host uid.
 
@@ -2873,7 +2876,8 @@ is in the PR that added this file.
 `skopeo` v1.24.1, built statically (`CGO_ENABLED=0`, tags `containers_image_openpgp
 exclude_graphdriver_btrfs exclude_graphdriver_devicemapper containers_image_docker_daemon_stub`) from the
 tag in a throwaway `golang:<GO_VERSION>-bookworm` stage (it publishes no binary, and the distro package
-is years old), and `regctl` v0.11.6, the release binary verified against a pinned sha256 per
+is years old; the build checks out the tag, fails unless `git rev-parse HEAD` is the pinned
+`SKOPEO_COMMIT`, and compiles offline from skopeo's own `vendor/`, RPS-1597), and `regctl` v0.11.6, the release binary verified against a pinned sha256 per
 architecture. Only the binaries are copied into the runner. `--insecure-policy` makes skopeo need no
 `policy.json`/`registries.d`, and nothing else is configured system-wide.
 
@@ -5743,6 +5747,63 @@ come out owned by that user on the host, not root. `entrypoint.sh` calls the ins
 directly (`node_modules/.bin/...`) rather than through `pnpm run`/`pnpm exec`: pnpm's script runner
 re-verifies `node_modules` against its store on every invocation, which fails under that non-root,
 host-matching uid even though the packages themselves only need to be read.
+
+## Runner images and pins (RPS-1597)
+
+A green run has to mean the same thing tomorrow, so a runner image is built from bytes a reviewer can name: what
+a tag or a URL resolves to today must not be able to change under a build without failing it. One policy for
+every client of every `runners/*.Dockerfile`; `docker-compose.runners.yml` (`build.args`) is the single source of
+the values and `runners/bump-pins.sh` keeps them fresh.
+
+| What the runner gets                                                                                     | How it is pinned                                                                                                                                                                                                                                         | Where                                                                                                                                                                                                                                              |
+| -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a release binary or tarball (regctl, oras, helm, Temurin, Maven, Gradle, sbt, Ant, Ivy)                  | version ARG + a checksum in this repository (per arch where the file is), `sha256sum -c`/`sha512sum -c` fails the build on a mismatch. Never a checksum fetched from the host that serves the file, never `latest`                                       | `REGCTL_`/`ORAS_`/`HELM_SHA256_AMD64`/`_ARM64`, `TEMURIN_SHA256` (x64 only, as before), `MAVEN_SHA512`, `GRADLE_SHA256`, `ANT_SHA512`, `IVY_SHA512`; `SBT_SHA256` lives in `maven.Dockerfile` (with `runners/sbt-warmup/project/build.properties`) |
+| a toolchain copied out of an image (crane, Go, Rust, .NET, CPython, uv, Ruby, bun, deno, the docker CLI) | `FROM <image>:<tag>@sha256:<digest>`: the tag says what a human means, the digest of the multi-arch LIST (so arm64 builds keep working) is what is pulled. The `--version` checks after the copy stay                                                    | `*_IMAGE_DIGEST` args, no default in the Dockerfile on purpose: a build without one fails                                                                                                                                                          |
+| skopeo (a source build: it publishes no binary)                                                          | the tag AND its commit: the build fails unless `git rev-parse HEAD` is `SKOPEO_COMMIT`; it compiles with `GOFLAGS=-mod=vendor GOPROXY=off GOTOOLCHAIN=local` from skopeo's own `vendor/`, so nothing is fetched                                          | `SKOPEO_VERSION`, `SKOPEO_COMMIT`, `docker.Dockerfile`                                                                                                                                                                                             |
+| a client installed from npm (pnpm, yarn classic, yarn berry) or PyPI (pip, twine)                        | an exact version; the registry verifies integrity. No content pin: accepted as is                                                                                                                                                                        | `PNPM_CLIENT_VERSION`, `YARN_*`, `PIP_VERSION`, `TWINE_VERSION`                                                                                                                                                                                    |
+| the Helm `cm-push` plugin                                                                                | an exact version, installed with `--verify=false`: the plugin publishes no signature or checksum for its release. **The one client whose bytes are not pinned**; an in-repo checksum of its per-arch tarball is the way to close it if that ever matters | `HELM_PUSH_VERSION`                                                                                                                                                                                                                                |
+
+**What floats on purpose** (none of it is a client under test, or it is one a moving base decides):
+
+- `node:24-bookworm-slim`, the base of every runner (the harness itself), and with it **npm**, the baseline client
+  of the npm runners (`tests/npm-clients/versions.spec.ts` asserts its major, 11, not its exact version), and
+  Debian's own packages installed with `apt` (`curl`, `gpg` 2.2 for the signed-deploy specs, `git`, `gcc`, the
+  libraries the copied toolchains link against). The `debian:bookworm-slim` download stages of `docker.Dockerfile`
+  and `helm.Dockerfile` only fetch a file that is then checked against its checksum, so they float too.
+- The harness's own `pnpm` (an exact version, `pnpm@12.5.1`, matching `pnpm-lock.yaml`) and the transitive
+  dependencies of pip, twine and the npm-installed clients, which their registries resolve.
+- Whatever a client downloads at run time from the internet (Maven and Gradle plugins from Maven Central, the
+  Scala compilers sbt resolves at build time, Playwright's Chromium in the `ui` runner, whose version follows
+  `pnpm-lock.yaml`).
+
+A floating part re-resolves whenever the image is rebuilt from scratch, which is what every nightly run does (a
+fresh GitHub runner has no layer cache): **when one of them breaks something, the nightly (`e2e-nightly.yml`)
+is what tells you**, on the `wire` leg of the runner concerned. Locally a cached image keeps the old bytes until
+`./run.sh test --protocol <p> -b`.
+
+### Bumping a client
+
+1. Change the version arg in `docker-compose.runners.yml` (`*_VERSION`). A Dockerfile default (`ARG X_VERSION=`)
+   that repeats it is changed with it; the digests and checksums have no Dockerfile default.
+2. `runners/bump-pins.sh --write` re-resolves every pin for the versions now in the file (image digests with
+   `docker buildx imagetools inspect`, checksums from the publisher's checksum file, skopeo's commit from
+   `git ls-remote <tag>^{}`, regctl's by hashing the release binary) and rewrites what differs. Read
+   `git diff`: for a new checksum the version and the checksum must move together; a digest that moved WITHOUT
+   a version change means a tag was re-published, and taking it is a decision.
+3. `./run.sh test --protocol <runner> -b --grep @smoke`, then the full runner if the client's behaviour is
+   what the suite pins (`--version` checks in the Dockerfile and `tests/npm-clients/versions.spec.ts` must
+   agree with the new version; `src/clients/helm.ts` and `src/packages/maven/plugin-pom.template.xml` name
+   Helm's and Maven's versions in comments and fixtures).
+4. `runners/bump-pins.sh` with no argument prints `ok`/`DIFFERS` per pin and exits 1 when anything differs. Run
+   it now and then without touching a version: it answers "was a tag I pin moved or an image re-published?".
+   It talks to public registries only (anonymous Docker Hub pulls are rate limited: `429` is reported as an
+   error, never as an ok), needs `docker buildx`, `curl` and `git`, and fails when a Dockerfile uses a digest arg
+   that compose does not set, when two services disagree on a repeated value (`TEMURIN_*`, `MAVEN_*`,
+   `GO_*`, `CRANE_*`: the `stack` and `maven` runners, the `docker` and `golang` runners), or when a pin has no
+   resolver, so a new pin cannot be added without a way to keep it fresh.
+
+Dependabot cannot do this: its Docker ecosystem does not read a `FROM` line that is built from `ARG`s, and the
+checksums are not dependencies to it. Nothing here adds a PR check; the script is run by whoever bumps a client.
 
 ## CI
 
