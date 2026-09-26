@@ -176,7 +176,10 @@ class CargoCrateServiceTest {
       assertThat(savedCrate.getOriginalName()).isEqualTo("my-Crate");
       assertThat(savedCrate.getMaxVersion()).isEqualTo("1.0.0");
 
-      verify(CargoCrateServiceTest.this.crateIndexRepository).save(any(CargoCrateIndex.class));
+      // The publish time orders the sparse index (RPS-1605).
+      final var indexCaptor = ArgumentCaptor.forClass(CargoCrateIndex.class);
+      verify(CargoCrateServiceTest.this.crateIndexRepository).save(indexCaptor.capture());
+      assertThat(indexCaptor.getValue().getCreatedAt()).isNotNull();
       verify(CargoCrateServiceTest.this.crateMetaRepository).save(any(CargoCrateMeta.class));
     }
 

@@ -412,7 +412,7 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
       assertThat(
               CargoCrateControllerIT.this
                   .crateIndexRepository
-                  .findAllByCrateRepoIdAndName(repo.getId(), "rich_crate")
+                  .findAllByCrateRepoIdAndNameOrderByCreatedAtAscIdAsc(repo.getId(), "rich_crate")
                   .getFirst()
                   .isYanked())
           .isTrue();

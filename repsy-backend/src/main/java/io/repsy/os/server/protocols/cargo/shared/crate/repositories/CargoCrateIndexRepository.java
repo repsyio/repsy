@@ -27,7 +27,9 @@ import org.springframework.stereotype.Repository;
 @NullMarked
 public interface CargoCrateIndexRepository extends JpaRepository<CargoCrateIndex, UUID> {
 
-  List<CargoCrateIndex> findAllByCrateRepoIdAndName(UUID repoId, String name);
+  /** The versions in publish order: the order of the sparse index. */
+  List<CargoCrateIndex> findAllByCrateRepoIdAndNameOrderByCreatedAtAscIdAsc(
+      UUID repoId, String name);
 
   List<CargoCrateIndex> findAllByCrateId(UUID crateId);
 
