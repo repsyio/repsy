@@ -546,7 +546,7 @@ test.describe('docker registry rules (raw HTTP)', () => {
   );
 
   test(
-    'R12/B5: a config blob missing os/architecture crashes the manifest push (500)',
+    'R12/B5: a config blob missing os/architecture is refused with 400 MANIFEST_INVALID (RPS-1116)',
     {
       tag: ['@negative'],
     },

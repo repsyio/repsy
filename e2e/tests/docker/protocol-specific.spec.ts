@@ -30,7 +30,7 @@
  * `crane` binary this harness already uses for every other docker test (`clients/docker.ts`'s file
  * header) can build a genuine multi-arch index on its own, via its `index append` sub-command --
  * confirmed LIVE, before this file was written, against a running local stack (`./run.sh local up`,
- * see this PR's own report for the exact transcript):
+ * see the description of the RPS-294 PR that added this file for the exact transcript):
  *
  *  - HD-1 (gating, CONFIRMED): `crane index append -m <ref1> -m <ref2> -t <indexRef>` is entirely
  *    daemon-free and needs nothing beyond the plain manifest-PUT wire calls this server already

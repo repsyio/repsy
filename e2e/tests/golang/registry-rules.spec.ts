@@ -23,13 +23,15 @@
  * (see `golang-raw.ts`'s file header and `README.md`'s "Go runner" section for the raw evidence and
  * every H/G number these tests reference).
  *
- * Two backend bugs were found and confirmed live while building this suite (not fixed here -- each
- * is now its own Jira story, per this repo's e2e process):
- *  - **RPS-1227**: no version-string validation of any kind -- `banana`/`v1`/`1.0.0` are all
- *    accepted, stored immutably, and listed by `@v/list`.
- *  - **RPS-1228**: the go.mod `module` directive is never compared against the URL's own module
- *    path -- a zip whose go.mod names a completely different module still uploads successfully (a
- *    real `go get` of the URL's own path then fails, `publish-consume.spec.ts`'s own test).
+ * Two backend bugs were found and confirmed live while building this suite; both are fixed
+ * (RPS-1227, RPS-1228, #447), and the tests below pin the corrected behaviour:
+ *  - **RPS-1227**: the version string was never validated -- `banana`/`v1`/`1.0.0` were all
+ *    accepted, stored immutably, and listed by `@v/list`. It is now refused with a `400
+ *    invalidModuleVersion`.
+ *  - **RPS-1228**: the go.mod `module` directive was never compared against the URL's own module
+ *    path -- a zip whose go.mod named a completely different module uploaded successfully (a real
+ *    `go get` of the URL's own path then failed, `publish-consume.spec.ts`'s own test). It is now
+ *    refused with a `400 goModModulePathMismatch`.
  *
  * A third, **RPS-1232** (module paths were lower-cased for storage/lookup, so `GoProbe` and
  * `goprobe` collided as the SAME module even though Go itself treats module paths as
@@ -308,8 +310,8 @@ test.describe('golang registry rules (raw HTTP)', () => {
   );
 
   test(
-    'a go.mod whose module directive names a completely different module still uploads -- the ' +
-      'URL path is never compared against it (RPS-1228)',
+    'a go.mod whose module directive names a different module than the URL path is refused with ' +
+      '400 goModModulePathMismatch (RPS-1228)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'mismatch');
@@ -330,7 +332,7 @@ test.describe('golang registry rules (raw HTTP)', () => {
   );
 
   test(
-    'a non-semver version string is accepted, stored immutably, and listed (RPS-1227)',
+    'a non-semver version string is refused with 400 invalidModuleVersion (RPS-1227)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'nonsemver');

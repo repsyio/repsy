@@ -2587,10 +2587,11 @@ createdAt DESC`, could pick a DB-only "this manifest is also part of that multi-
 - **H12** (running the whole `docker` suite twice without resetting the stack): confirmed — both
   runs passed identically (29/29, the same 4 tests showing their expected `test.fail` glyph), no
   leftover-state interference.
-- **H13** (an unsupported manifest `Content-Type` → 500, after the `Image` row was already created):
+- **H13** (an unsupported manifest `Content-Type` → 500, after the `Image` row was already created;
+  RPS-1110 has since fixed it, the 500 below is the historical finding and R5 now pins a `4xx`):
   confirmed live — `text/plain` with an otherwise-valid manifest body answers a flat
   `500 {"errors":[{"code":"UNKNOWN",...,"detail":"errorOccurred"}]}`, not a `4xx` — **B4 (RPS-1110, pre-existing -- see below)**
-  (R5). A config blob missing `os`/`architecture` answers the same flat `500` — **B5 (RPS-1116, pre-existing -- see below)** (R12).
+  (R5). A config blob missing `os`/`architecture` answered the same flat `500` — **B5 (RPS-1116, fixed since: R12 pins `400 MANIFEST_INVALID`)** (R12).
 - **H14** (`Seeder.cleanup()` on a docker repo with images/tags/layers succeeds; a sweep afterwards
   lists nothing): confirmed — every catalog scenario's own repo (images, tags, layers included)
   deleted cleanly in `afterEach`, and `./run.sh sweep --dry-run` found nothing left behind after a
@@ -2632,14 +2633,14 @@ createdAt DESC`, could pick a DB-only "this manifest is also part of that multi-
   push's `Location`) carry the algorithm the client used: a reference by `sha512` gets the `sha512` digest
   back, a tag or a `sha256` reference the `sha256`. A push by digest never creates a tag. A wrong `sha512`
   reference is still `400 DIGEST_INVALID`. `registry-rules.spec.ts`'s R14 pins it with raw HTTP.
-- **B4 (pre-existing story, [RPS-1110](https://zyfera.atlassian.net/browse/RPS-1110) — commented with
+- **B4 (fixed by RPS-1110, #461; R5 now pins the refusal; the text below is the original finding) (pre-existing story, [RPS-1110](https://zyfera.atlassian.net/browse/RPS-1110) — commented with
   this live evidence, not a new ticket)** — An unknown manifest `Content-Type` (anything outside the
   5 known docker/OCI types) answers a flat `500 UNKNOWN`, not a `4xx`: `saveManifest`'s `switch`
   throws a bare `IllegalArgumentException("unsupportedMediaType")`, which has no `ErrorHandler`
   mapping. The repo's `Image` row for that image name is ALSO already created by this point
   (`findOrCreateImage` runs before the `Content-Type` switch), so even the failed attempt leaves
   a row behind. Confirmed live: `registry-rules.spec.ts`'s R5.
-- **B5 (pre-existing story, [RPS-1116](https://zyfera.atlassian.net/browse/RPS-1116) — commented with
+- **B5 (fixed by RPS-1116; R12 now pins `400 MANIFEST_INVALID`; the text below is the original finding) (pre-existing story, [RPS-1116](https://zyfera.atlassian.net/browse/RPS-1116) — commented with
   this live evidence, not a new ticket)** — A config blob missing BOTH `os` and `architecture`
   crashes the manifest push with the same flat `500`: `extractPlatform`'s `org.json`
   `getString("os")`/`getString("architecture")` throws a bare `JSONException`, also unmapped. Low
@@ -2938,8 +2939,8 @@ layer digest always equals `sha256(tgzBytes)`).
 BOTH modes): the `/v2/` ping is Docker's own, not Helm's (R1); the OCI auth matrix — single-hop
 Basic, no token exchange (R2); blob upload flows — monolithic, chunked, wrong digest, dedup (R3);
 OCI manifest push validation — missing blob, malformed JSON, empty layers, a MISSING (not merely
-empty) `Content-Type` (R4, **B-H7**); the OCI override rule (R5); `GET tags/list` has no handler at
-all (R8, **B-H3**); classic upload rules — missing `chart` part (plain text, no envelope),
+empty) `Content-Type` (R4, **B-H7**); the OCI override rule (R5); `GET tags/list` is served (`200`, R8,
+**B-H3**, RPS-1219); classic upload rules — missing `chart` part (plain text, no envelope),
 Chart.yaml validation, uppercase names, both classic routes accepting the same request (R11);
 classic read auth — bare 401 on a private repo, 200 with credentials, anonymous 200 on a public one
 (R12); `index.yaml`'s shape (R13, **B-H8**); and `DELETE` removing a chart from both the classic
@@ -2992,7 +2993,7 @@ verification` (Helm 4 verifies a plugin's signature by default, and this plugin 
 - **H12 (B-H2)** (OCI override leaves `index.yaml`'s digest at the old layer): confirmed live —
   "HL5".
 - **H13 (B-H3)** (`GET tags/list` → 404; `helm pull oci://` without `--version` fails): confirmed
-  live — "HL2", "R8".
+  live, then fixed by RPS-1219 — "HL2" and "R8" now pin the working behaviour (`200`; the pull succeeds).
 - **H14** (timing fits 120s per test; the whole suite twice without a stack reset passes
   identically): confirmed — 43/43 both runs, ~8s wall time each across 12 workers.
 - **H15** (`Seeder.cleanup()` deletes a Helm repo with classic charts, OCI blobs and manifests;
@@ -3063,7 +3064,8 @@ search`/`install`/`pull <repo>/<chart>`, or a raw `helm pull --repo`) 404s (`cha
   OCI override (`allowOverride:true`, different chart bytes, same name:version) updates only the
   manifest row in place; the chart VERSION row (and therefore `index.yaml`'s `digest` field, and the
   panel's own version-detail DTO) stays at the OLD layer digest. Confirmed live: "HL5".
-- **B-H3 (filed as [RPS-1219](https://zyfera.atlassian.net/browse/RPS-1219))** — There is no
+- **B-H3 (filed as [RPS-1219](https://zyfera.atlassian.net/browse/RPS-1219), fixed; the text below is the
+  original finding)** — There was no
   `GET /v2/<repo>/<name>/tags/list` handler at all (`404` with OCI code `NAME_UNKNOWN`, msgId
   `unknownPath`), although `HelmFacade.listTags`/`HelmOciTagListDto` exist (used only by the panel's
   own `GET /api/helm/charts/{repo}/{chartName}/tags`). Helm's own `ValidateReference` calls `Tags(...)`
@@ -3533,15 +3535,18 @@ BEFORE any adapter code was written — H1-H4 and H12 gated the whole design.
 
 ### Backend bug candidates found while reading and confirmed live (do not fix here)
 
-- **RPS-1227** — `AbstractGoProtocolFacade.upload` never validates the version string against
+RPS-1227 and RPS-1228 are fixed (#447): `registry-rules.spec.ts` now pins `400 invalidModuleVersion` and
+`400 goModModulePathMismatch`; the two entries below are the original findings.
+
+- **RPS-1227** — `AbstractGoProtocolFacade.upload` never validated the version string against
   Go's own semver grammar at all: `banana` is accepted (`200`), stored immutably and listed by
   `@v/list`, even though it is not a valid Go semver string a real `go` command's own parser would
-  ever produce or accept. Confirmed live: `registry-rules.spec.ts`'s non-semver test (`test.fail()`).
-- **RPS-1228** — `GoModFileValidator` never compares the go.mod `module` directive against the
+  ever produce or accept. Was confirmed live by a `test.fail()`; that test now pins the `400`.
+- **RPS-1228** — `GoModFileValidator` never compared the go.mod `module` directive against the
   URL's own module path: a zip whose go.mod names a COMPLETELY DIFFERENT module still uploads
   successfully under the URL's path. A real `go get` of that path then fails once it validates the
-  downloaded go.mod against the path it asked for. Confirmed live: `registry-rules.spec.ts`'s
-  mismatch test (`test.fail()`).
+  downloaded go.mod against the path it asked for. Was confirmed live by a `test.fail()`; that test
+  now pins the `400`.
 - **RPS-1231** (observation only, not wire-observable, no test) — `GoModuleHashCalculator`'s
   stored `h1:` hashes are NOT `golang.org/x/mod/sumdb/dirhash.Hash1`-compatible: the real algorithm's
   inner line is `"%x  %s\n"` (hex digest, TWO spaces, then the file/entry name, entries sorted by
@@ -5757,8 +5762,9 @@ of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays o
 
 ### Not covered yet
 
-- **Stacks shaped differently** (TLS, tuned limits, a restart, an upgrade from the previous release): the
-  backend e2e epic RPS-1473 adds them; each story adds its own leg to "What runs" when it lands.
+- **Stacks shaped differently** are covered by the `tls`, `limits`, `upgrade` and `upgrade-h2` legs of
+  "What runs" and, for a restart, by `tests/stack/persistence.spec.ts` (RPS-1476, the `stack` runner). A
+  new stack shape gets its own row there.
 - **H2 gets one full catalog a night**, not all ten: a protocol's whole catalog meets H2 every ten nights
   (`h2-full`), its `@smoke` subset every night (`h2`).
 - **The `ui` runner is the only one that retries**, so a flaky protocol test fails its leg outright.

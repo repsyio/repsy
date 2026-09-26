@@ -80,8 +80,9 @@
  *    abstract handler/writer exist in `repsy-protocols/ruby`). Breaks `gem install`/`gem fetch`
  *    (H12/RPS-1233 via `gem`, confirmed live below), but -- per H1's refutation -- NOT `bundle install`.
  *  - `DELETE /<repo>/api/v1/gems/yank` (form-encoded `gem_name`, `version`, optional `platform`
- *    default `ruby`): `MANAGE` permission (admin, or any non-read-only deploy token -- a read-only
- *    token or a `USER`-role password gets `401`, confirmed live). `200 text/plain "Successfully
+ *    default `ruby`): `WRITE` permission (RPS-1317, RPS-1424: it used to be `MANAGE`; ADMIN, a
+ *    `USER`-role password and a read-write deploy token may yank, a read-only token gets `401`,
+ *    confirmed live). `200 text/plain "Successfully
  *    yanked gem: ..."`; already yanked -> `400 gemVersionAlreadyYanked`; unknown -> `404`. A yanked
  *    version's `.gem` file stays downloadable (`200`, unchanged bytes), matching real rubygems.org,
  *    where yank only unpublishes from the index so existing lockfiles still resolve (RPS-1238,
