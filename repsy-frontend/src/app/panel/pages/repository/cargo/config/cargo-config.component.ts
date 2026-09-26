@@ -71,8 +71,11 @@ global-credential-providers = ["cargo:token"]
 You should use a Deploy Token. If you do not have one, go to \`settings > Deploy Tokens\` to create it.
 
 \`\`\`bash
-cargo login --registry repsy <YOUR_DEPLOY_TOKEN>
+cargo login --registry repsy
 \`\`\`
+
+Cargo asks for the token: paste it and press Enter. It is saved in \`$HOME/.cargo/credentials.toml\`.
+In CI, set \`CARGO_REGISTRIES_REPSY_TOKEN\` instead (see the docs).
 
 **Publish:**
 

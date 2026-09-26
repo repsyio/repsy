@@ -2092,7 +2092,7 @@ in this registry"}"}`, since Repsy has no ownership model finer than the reposit
 `tests/cargo/install-add.spec.ts` runs the commands the panel's Cargo pages tell a user to run,
 literally: the registry page's `$HOME/.cargo/config.toml` (`clients/cargo.ts` `renderPanelCargoConfig`,
 from `src/packages/cargo/panel-config.template.toml`, with and without the `[registry]` section the
-page says a public repo may skip) and `cargo login --registry repsy <token>`, the crate page's
+page says a public repo may skip) and `cargo login --registry repsy` (the token is pasted at the prompt), the crate page's
 `cargo install <crate> --version <v> --registry repsy` and `cargo add <crate>@<v> --registry repsy`.
 `cargoPanelEnv` leaves `CARGO_HOME` unset (so the config, `credentials.toml` and the installed binary
 live under `$HOME/.cargo`) and sets `CARGO_REGISTRIES_REPSY_TOKEN` only when a test gives it a token.
@@ -2115,8 +2115,8 @@ hypothesis was probed live before it was pinned:
 - **Credentials.** A private repo without a token stops in the client ("no token found for `repsy`,
   please run `cargo login --registry repsy`": `config.json` says `auth-required`), a wrong token gets
   Repsy's 401 ("token rejected"), a public repo needs no token and no `[registry]` section, and stores no
-  `credentials.toml`. `cargo login` (argument form, deprecated by cargo 1.98 in favour of stdin, both are
-  run) saves the token verbatim into `[registries.repsy]` of a mode-0600 `credentials.toml`; install and
+  `credentials.toml`. `cargo login` (the stdin form is the panel's command; the argument form is deprecated by cargo 1.98, both
+  are run) saves the token verbatim into `[registries.repsy]` of a mode-0600 `credentials.toml`; install and
   publish then work without the environment variable, and `cargo logout` closes the repo again. It never
   asks the server, so a read-only token logs in, installs and gets a 401 on publish (nothing stored).
 - **`cargo add`.** Writes `{ version = "1.1.0", registry = "repsy" }`; with no version the newest not
