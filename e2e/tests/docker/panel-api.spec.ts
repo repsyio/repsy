@@ -82,7 +82,6 @@ const EXERCISED = [
 ];
 
 const CRANE_INSECURE = env.insecureRegistry ? ['--insecure'] : [];
-const ADMIN = adminCredential();
 
 interface Session {
   repoName: string;
@@ -94,7 +93,7 @@ interface Session {
 async function newSession(seeder: Seeder, label: string): Promise<Session> {
   const repoName = await newDockerRepo(seeder);
   const { home, work } = await isolatedWorkDir(`${label}-${seeder.runId}`);
-  await renderDockerConfig(home, ADMIN);
+  await renderDockerConfig(home, adminCredential());
   return {
     repoName,
     work,
@@ -143,10 +142,10 @@ async function pullExitCode(session: Session, image: string, tag: string): Promi
 }
 
 const manifestStatus = async (session: Session, image: string, reference: string) =>
-  (await rawGetManifest(session.repoName, ADMIN, image, reference)).status;
+  (await rawGetManifest(session.repoName, adminCredential(), image, reference)).status;
 
 const blobStatus = async (session: Session, image: string, digest: string) =>
-  (await rawHeadBlob(session.repoName, ADMIN, image, digest)).status;
+  (await rawHeadBlob(session.repoName, adminCredential(), image, digest)).status;
 
 const values = (session: Session, imageName: string, more: Record<string, string> = {}) => ({
   repoName: session.repoName,
@@ -627,7 +626,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
     await craneOk(session, ['tag', session.ref(imageA, 'v1'), 'v1b'], 'panel-tag-v1b');
     await push(session, other.dir, imageA, 'latest');
     await push(session, shared.dir, imageB, 'x');
-    const tagsListBefore = await rawTagsList(session.repoName, ADMIN, imageA);
+    const tagsListBefore = await rawTagsList(session.repoName, adminCredential(), imageA);
     // tags/list is not served (RPS-1489 adds it, and flips this pin with `registry-api.spec.ts`).
     expect(tagsListBefore.status).toBe(404);
 
@@ -661,7 +660,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
       tagCount: 2,
       untaggedManifestCount: 0,
     });
-    expect((await rawTagsList(session.repoName, ADMIN, imageA)).status).toBe(404);
+    expect((await rawTagsList(session.repoName, adminCredential(), imageA)).status).toBe(404);
 
     // Delete the last tag of that manifest: the manifest stays, untagged, pullable by digest only.
     expectContract(
