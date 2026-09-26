@@ -59,7 +59,7 @@ import { fileURLToPath } from 'node:url';
 
 import mustache from 'mustache';
 
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { AdapterResult } from '../scenarios/adapter.js';
 import { withBackoff429 } from '../scenarios/remote-throttle.js';
 import { outcomeForStatus } from '../scenarios/types.js';
@@ -189,7 +189,7 @@ export async function rawPublishCheck(
  * replicating Maven's server-negotiated timestamped SNAPSHOT filename to find the right path to GET.
  */
 export async function rawConsumeCheck(world: World): Promise<number> {
-  const url = `${env.repoBaseUrl}/${world.repoName}/`;
+  const url = repoUrl(world.repoName, '');
   return withBackoff429(async () => {
     const res = await fetch(url, { headers: authHeader(world.credential) });
     await res.arrayBuffer().catch(() => undefined);
@@ -290,14 +290,14 @@ export async function deploy(
   const { home, work } = await isolatedWorkDir(`mvn-pub-${world.scenario.id}`);
   const [groupId, artifactId] = splitPackageName(world.publishTarget.packageName);
   const version = world.publishTarget.version;
-  const repoUrl = `${env.repoBaseUrl}/${world.repoName}`;
+  const repositoryUrl = repoUrl(world.repoName);
 
   await renderTemplate('pom.template.xml', path.join(work, 'pom.xml'), {
     groupId,
     artifactId,
     version,
     withDistribution: true,
-    repoUrl,
+    repoUrl: repositoryUrl,
     pomPadding: opts.pomPadding,
   });
   await renderTemplate(
@@ -380,7 +380,7 @@ async function dependencyGet(
 
   const { home, work } = await isolatedWorkDir(`mvn-con-${world.scenario.id}`);
   const [groupId, artifactId] = splitPackageName(world.consumeTarget.packageName);
-  const repoUrl = `${env.repoBaseUrl}/${world.repoName}`;
+  const repositoryUrl = repoUrl(world.repoName);
 
   // A minimal, source-free consumer project: dependency:get resolves the explicit -Dartifact below,
   // so this pom declares no dependency of its own and names no repository -- it exists only so
@@ -409,7 +409,7 @@ async function dependencyGet(
       '-ntp',
       'dependency:get',
       `-Dartifact=${groupId}:${artifactId}:${requestedVersion}:jar`,
-      `-DremoteRepositories=repsy::default::${repoUrl}`,
+      `-DremoteRepositories=repsy::default::${repositoryUrl}`,
       '-s',
       'settings.xml',
       `-Dmaven.repo.local=${localRepo}`,

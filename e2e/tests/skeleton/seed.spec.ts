@@ -23,7 +23,7 @@
  * way).
  */
 import { RepoType } from '../../src/api/panel-api.js';
-import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 
 const UNAUTHORIZED = 401;
@@ -33,7 +33,7 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 async function repoRootStatus(repoName: string, token: string): Promise<number> {
   // Any username is accepted alongside a deploy token as the Basic password (ProtocolAuthService).
   const credentials = Buffer.from(`e2e-probe:${token}`).toString('base64');
-  const res = await fetch(`${env.repoBaseUrl}/${repoName}/`, {
+  const res = await fetch(repoUrl(repoName, ''), {
     headers: { Authorization: `Basic ${credentials}` },
   });
   return res.status;

@@ -47,6 +47,7 @@ import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../../src/seed/seeder.js';
+import { repoPath } from '../../../src/repo-url.js';
 
 /** Output without colour codes (pnpm colours part of a wrapped message) and without line breaks. */
 function plain(output: string): string {
@@ -220,7 +221,9 @@ test(
       ).toBeUndefined();
 
       const accepts = recorder.entries
-        .filter((entry) => entry.method === 'GET' && entry.path === `/${repoName}/${name}`)
+        .filter(
+          (entry) => entry.method === 'GET' && entry.path === `/${repoPath(repoName)}/${name}`,
+        )
         .map((entry) => entry.accept);
       expect(
         accepts,

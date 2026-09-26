@@ -57,6 +57,7 @@ import {
 } from '../../src/clients/docker-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { MaterializedCredential } from '../../src/scenarios/world.js';
+import { repoPath } from '../../src/repo-url.js';
 
 const dockerUrl = (ref: string): string => `docker://${ref}`;
 
@@ -202,11 +203,11 @@ test(
     expect(deleted.exitCode, `skopeo delete: ${deleted.command}\n${deleted.stderr}`).toBe(0);
     const log = decodeURIComponent(deleted.stderr);
     expect(log, 'skopeo asks for every action on the repository').toContain(
-      `scope=repository:${repoName}/${image}:*`,
+      `scope=repository:${repoPath(repoName)}/${image}:*`,
     );
     expect(log, 'no insufficient_scope round trip').not.toContain('insufficient_scope');
     expect(log, 'the tag was resolved and the DELETE went to the digest').toMatch(
-      new RegExp(`DELETE \\S+/v2/${repoName}/${image}/manifests/${digest}`),
+      new RegExp(`DELETE \\S+/v2/${repoPath(repoName)}/${image}/manifests/${digest}`),
     );
     expect(
       (await rawGetManifest(repoName, admin, image, digest)).status,

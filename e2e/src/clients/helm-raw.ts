@@ -103,6 +103,7 @@
 import { parse as parseYaml } from 'yaml';
 
 import { env } from '../env.js';
+import { registryHost, repoPath, repoUrl, v2RepoUrl } from '../repo-url.js';
 import { withBackoff429 } from '../scenarios/remote-throttle.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
@@ -116,6 +117,8 @@ import {
 } from './raw-http.js';
 
 export { adminCredential, authHeader, msgIdOf, ociErrorOf, sha256Hex, type RawResponse };
+// The registry host is derived in `src/repo-url.ts` with every other URL; re-exported for the helm specs.
+export { registryHost };
 // The `/v2/` ping and its Bearer-challenge parser are Docker's own (see this file's header): reused
 // here, never reimplemented, so a probe that reads them is checking the one real thing.
 export { rawPing, parseBearerChallenge } from './docker-raw.js';
@@ -131,11 +134,6 @@ export const HELM_MEDIA_TYPES = {
   prov: 'application/vnd.cncf.helm.chart.provenance.v1.prov',
 } as const;
 
-/** `registryHost()` -- the host:port segment `oci://<host>/<repo>/<chart>` is built from. */
-export function registryHost(): string {
-  return new URL(env.repoBaseUrl).host;
-}
-
 /** `e2e-<runid>-<slugified scenario id>` -- lower-case, matches Repsy's own chart-name pattern
  *  (`^[a-z0-9][a-z0-9-]*$`), Helm's own chart-name rule and the OCI path-component grammar. */
 export function chartName(runId: string, scenario: Scenario): string {
@@ -147,7 +145,7 @@ export function chartFileName(name: string, version: string): string {
 }
 
 export function ociRepoRef(repoName: string): string {
-  return `oci://${registryHost()}/${repoName}`;
+  return `oci://${registryHost()}/${repoPath(repoName)}`;
 }
 
 export function ociChartRef(repoName: string, chart: string): string {
@@ -155,11 +153,7 @@ export function ociChartRef(repoName: string, chart: string): string {
 }
 
 export function classicRepoUrl(repoName: string): string {
-  return `${env.repoBaseUrl}/${repoName}`;
-}
-
-export function v2Url(pathSuffix: string): string {
-  return `${env.repoBaseUrl}/v2${pathSuffix}`;
+  return repoUrl(repoName);
 }
 
 async function rawFetch(
@@ -212,7 +206,7 @@ export async function rawPutManifest(
   bytes: Buffer,
   contentType?: string,
 ): Promise<OciResponse> {
-  const res = await rawFetch(v2Url(`/${repoName}/${chart}/manifests/${reference}`), {
+  const res = await rawFetch(v2RepoUrl(repoName, `${chart}/manifests/${reference}`), {
     method: 'PUT',
     headers: { ...authHeader(credential), ...(contentType ? { 'Content-Type': contentType } : {}) },
     body: new Uint8Array(bytes),
@@ -226,7 +220,7 @@ export async function rawGetManifest(
   chart: string,
   reference: string,
 ): Promise<OciResponse> {
-  const res = await rawFetch(v2Url(`/${repoName}/${chart}/manifests/${reference}`), {
+  const res = await rawFetch(v2RepoUrl(repoName, `${chart}/manifests/${reference}`), {
     headers: { ...authHeader(credential), Accept: MANIFEST_ACCEPT },
   });
   return toOciResponse(res);
@@ -238,7 +232,7 @@ export async function rawHeadManifest(
   chart: string,
   reference: string,
 ): Promise<OciResponse> {
-  const res = await rawFetch(v2Url(`/${repoName}/${chart}/manifests/${reference}`), {
+  const res = await rawFetch(v2RepoUrl(repoName, `${chart}/manifests/${reference}`), {
     method: 'HEAD',
     headers: authHeader(credential),
   });
@@ -251,7 +245,7 @@ export async function rawHeadBlob(
   chart: string,
   digest: string,
 ): Promise<OciResponse> {
-  const res = await rawFetch(v2Url(`/${repoName}/${chart}/blobs/${digest}`), {
+  const res = await rawFetch(v2RepoUrl(repoName, `${chart}/blobs/${digest}`), {
     method: 'HEAD',
     headers: authHeader(credential),
   });
@@ -264,7 +258,7 @@ export async function rawGetBlob(
   chart: string,
   digest: string,
 ): Promise<OciResponse> {
-  const res = await rawFetch(v2Url(`/${repoName}/${chart}/blobs/${digest}`), {
+  const res = await rawFetch(v2RepoUrl(repoName, `${chart}/blobs/${digest}`), {
     headers: authHeader(credential),
   });
   return toOciResponse(res);
@@ -277,7 +271,7 @@ export async function rawStartUpload(
   credential: MaterializedCredential,
   chart: string,
 ): Promise<OciResponse> {
-  const res = await rawFetch(v2Url(`/${repoName}/${chart}/blobs/uploads/`), {
+  const res = await rawFetch(v2RepoUrl(repoName, `${chart}/blobs/uploads/`), {
     method: 'POST',
     headers: authHeader(credential),
   });
@@ -296,7 +290,7 @@ export async function rawUploadBlob(
   opts?: { mode?: 'monolithic' | 'patch'; contentType?: string },
 ): Promise<OciResponse> {
   const headers = authHeader(credential);
-  const startRes = await rawFetch(v2Url(`/${repoName}/${chart}/blobs/uploads/`), {
+  const startRes = await rawFetch(v2RepoUrl(repoName, `${chart}/blobs/uploads/`), {
     method: 'POST',
     headers,
   });
@@ -336,7 +330,7 @@ export async function rawGetTagsList(
   credential: MaterializedCredential,
   chart: string,
 ): Promise<OciResponse> {
-  const res = await rawFetch(v2Url(`/${repoName}/${chart}/tags/list`), {
+  const res = await rawFetch(v2RepoUrl(repoName, `${chart}/tags/list`), {
     headers: authHeader(credential),
   });
   return toOciResponse(res);
@@ -434,7 +428,7 @@ export async function rawUploadChart(
   const base =
     opts?.route === 'chartmuseum'
       ? `${classicRepoUrl(repoName)}/api/charts`
-      : `${env.repoBaseUrl}/api/${repoName}/charts`;
+      : `${env.repoBaseUrl}/api/${repoPath(repoName)}/charts`;
   const url = opts?.force ? `${base}?force=true` : base;
   const form = new FormData();
   form.append('chart', new Blob([new Uint8Array(tgzBytes)]), fileName);
@@ -449,7 +443,7 @@ export async function rawUploadChartMissingPart(
 ): Promise<RawResponse> {
   const form = new FormData();
   form.append('notchart', new Blob([new Uint8Array(Buffer.from('x'))]), 'x.txt');
-  return rawFetch(`${env.repoBaseUrl}/api/${repoName}/charts`, {
+  return rawFetch(`${env.repoBaseUrl}/api/${repoPath(repoName)}/charts`, {
     method: 'POST',
     headers: authHeader(credential),
     body: form,

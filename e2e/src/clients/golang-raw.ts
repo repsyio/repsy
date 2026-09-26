@@ -105,7 +105,7 @@ import { fileURLToPath } from 'node:url';
 import { zipSync } from 'fflate';
 import mustache from 'mustache';
 
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import { boundedSemverVersion, slugify } from '../scenarios/coordinates.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
@@ -182,7 +182,7 @@ export function escapeModulePath(modulePath: string): string {
 }
 
 export function moduleBaseUrl(repoName: string, modulePath: string): string {
-  return `${env.repoBaseUrl}/${repoName}/${modulePath}`;
+  return repoUrl(repoName, modulePath);
 }
 
 export function listRelPath(modulePath: string): string {
@@ -224,7 +224,7 @@ export function uploadUrl(
   version: string,
   opts?: { suffix?: '.zip' | '.mod' | '.info' | '' },
 ): string {
-  return `${env.repoBaseUrl}/${repoName}/${uploadRelPath(modulePath, version, opts)}`;
+  return repoUrl(repoName, uploadRelPath(modulePath, version, opts));
 }
 
 /** One `<hex sha256>  <name>\n` line of a real `golang.org/x/mod/sumdb/dirhash.Hash1` computation --
@@ -417,7 +417,7 @@ export async function rawPut(
   if (opts?.contentType !== undefined) {
     headers['Content-Type'] = opts.contentType;
   }
-  const res = await rawFetch(`${env.repoBaseUrl}/${repoName}/${relPath}`, {
+  const res = await rawFetch(repoUrl(repoName, relPath), {
     method: 'PUT',
     headers,
     body: new Uint8Array(bytes),
@@ -455,7 +455,7 @@ export async function rawGet(
   credential: MaterializedCredential,
   relPath: string,
 ): Promise<GoRawResponse> {
-  const res = await rawFetch(`${env.repoBaseUrl}/${repoName}/${relPath}`, {
+  const res = await rawFetch(repoUrl(repoName, relPath), {
     headers: authHeader(credential),
   });
   return toGoResponse(res);
@@ -468,7 +468,7 @@ export async function rawHead(
   credential: MaterializedCredential,
   relPath: string,
 ): Promise<GoRawResponse> {
-  const res = await rawFetch(`${env.repoBaseUrl}/${repoName}/${relPath}`, {
+  const res = await rawFetch(repoUrl(repoName, relPath), {
     method: 'HEAD',
     headers: authHeader(credential),
   });

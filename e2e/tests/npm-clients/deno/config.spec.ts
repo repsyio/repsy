@@ -45,6 +45,7 @@ import {
 import { npmClient } from '../../../src/clients/npm-family/npm-client.js';
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
 import { env } from '../../../src/env.js';
+import { repoPath } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../../src/seed/seeder.js';
 
@@ -119,11 +120,12 @@ test.describe('deno credentials and the wire', () => {
           expect(await denoClient.readInstalledFile(consumer, name, MARKER_FILENAME)).toBe(marker);
 
           const packuments = recorder.entries.filter(
-            (entry) => entry.method === 'GET' && entry.path === `/${repoName}/${name}`,
+            (entry) => entry.method === 'GET' && entry.path === `/${repoPath(repoName)}/${name}`,
           );
           const tarballs = recorder.entries.filter(
             (entry) =>
-              entry.method === 'GET' && entry.path === `/${repoName}/${name}/-/${name}-1.0.0.tgz`,
+              entry.method === 'GET' &&
+              entry.path === `/${repoPath(repoName)}/${name}/-/${name}-1.0.0.tgz`,
           );
           expect(packuments.length, 'the packument was asked for').toBeGreaterThanOrEqual(1);
           expect(tarballs, 'one tarball GET, through the recorder').toHaveLength(1);
@@ -178,7 +180,7 @@ test.describe('deno credentials and the wire', () => {
         expect(`${result.stdout}\n${result.stderr}`).toContain('401');
 
         const packuments = recorder.entries.filter(
-          (entry) => entry.path === `/${repoName}/${name}`,
+          (entry) => entry.path === `/${repoPath(repoName)}/${name}`,
         );
         expect(
           packuments.some((entry) => entry.authScheme === 'Bearer' && entry.status === 200),
@@ -248,8 +250,8 @@ test.describe('deno scoped routing', () => {
 
         const tokenA = `Bearer ${readerA.credential.password}`;
         const tokenB = `Bearer ${readerB.credential.password}`;
-        const toA = recorder.under(`/${repoA.name}/`);
-        const toB = recorder.under(`/${repoB.name}/`);
+        const toA = recorder.under(`/${repoPath(repoA.name)}/`);
+        const toB = recorder.under(`/${repoPath(repoB.name)}/`);
         expect(
           toA.some((entry) => entry.path.includes('/-/')),
           "A's tarball crossed the recorder",

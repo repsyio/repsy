@@ -50,6 +50,7 @@ import {
 } from '../../../src/clients/npm-family/fixtures.js';
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
 import { env } from '../../../src/env.js';
+import { repoPath, repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import { optedIn } from '../../../src/stack-overlays.js';
 import type { Seeder } from '../../../src/seed/seeder.js';
@@ -107,14 +108,14 @@ for (const kind of ['token', 'password'] as const) {
 
         const [packument, ...rest] = recorder.entries;
         expect(rest, 'one tarball GET after the packument GET').toHaveLength(1);
-        expect(packument?.path).toBe(`/${repo.name}/${name}`);
+        expect(packument?.path).toBe(`/${repoPath(repo.name)}/${name}`);
         expect(packument?.authScheme, 'the packument GET carries the .npmrc credential').toBe(
           scheme,
         );
         expect(packument?.accept, 'the abbreviated packument, as with a bunfig').toBe(
           BUN_INSTALL_ACCEPT,
         );
-        expect(rest[0]?.path).toBe(`/${repo.name}/${name}/-/${name}-1.0.0.tgz`);
+        expect(rest[0]?.path).toBe(`/${repoPath(repo.name)}/${name}/-/${name}-1.0.0.tgz`);
         expect(rest[0]?.authScheme, 'and so does the tarball GET, on the same host').toBe(scheme);
 
         // The same .npmrc drives `whoami` (it needs credentials, RPS-1329).
@@ -179,8 +180,8 @@ test(
         publishedB.marker,
       );
 
-      const toA = recorder.under(`/${repoA.name}/`);
-      const toB = recorder.under(`/${repoB.name}/`);
+      const toA = recorder.under(`/${repoPath(repoA.name)}/`);
+      const toB = recorder.under(`/${repoPath(repoB.name)}/`);
       expect(toA.length, 'packument and tarball of A').toBeGreaterThanOrEqual(2);
       expect(toB.length, 'packument and tarball of B').toBeGreaterThanOrEqual(2);
       expect(
@@ -319,9 +320,11 @@ test(
         published.marker,
       );
 
-      const tarballUrl = `${env.repoBaseUrl}/${repo.name}/${name}/-/${name}-1.0.0.tgz`;
+      const tarballUrl = repoUrl(repo.name, `${name}/-/${name}-1.0.0.tgz`);
       expect(tarballUrl.startsWith(recorder.baseUrl), 'a different origin').toBe(false);
-      expect(recorder.entries.map((entry) => entry.path)).toEqual([`/${repo.name}/${name}`]);
+      expect(recorder.entries.map((entry) => entry.path)).toEqual([
+        `/${repoPath(repo.name)}/${name}`,
+      ]);
 
       // `--verbose` prints each request bun makes with its headers: the tarball's carries the token.
       const lines = added.stderr.split('\n');

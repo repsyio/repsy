@@ -59,7 +59,7 @@ import {
   TEMPLATES_DIR,
 } from '../../src/clients/ruby-raw.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
-import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import { registerPublishConsumeLoop } from '../../src/scenarios/loop.js';
 
@@ -80,15 +80,7 @@ test('ruby > gem install succeeds using the quick/Marshal.4.8/*.gemspec.rz route
   const { home, work } = await isolatedWorkDir(`ruby-geminstall-${seeder.runId}`);
   const result = await run(
     'gem',
-    [
-      'install',
-      '--source',
-      `${env.repoBaseUrl}/${repo.name}`,
-      name,
-      '-v',
-      version,
-      '--no-document',
-    ],
+    ['install', '--source', repoUrl(repo.name), name, '-v', version, '--no-document'],
     { cwd: work, env: gemEnv(home, {}), timeoutMs: 60_000, label: 'ruby-geminstall' },
   );
 
@@ -126,7 +118,7 @@ test(
     const { home, work } = await isolatedWorkDir(`ruby-gemfetch-${seeder.runId}`);
     const result = await run(
       'gem',
-      ['fetch', '--source', `${env.repoBaseUrl}/${repo.name}`, name, '-v', version],
+      ['fetch', '--source', repoUrl(repo.name), name, '-v', version],
       { cwd: work, env: gemEnv(home, {}), timeoutMs: 60_000, label: 'ruby-gemfetch' },
     );
 
@@ -155,17 +147,13 @@ test(
     const before = await rawGet(repo.name, admin, infoRelPath(name));
     expect(before.status, 'nothing published yet').toBe(404);
 
-    const result = await run(
-      'gem',
-      ['push', gemFile, '--host', `${env.repoBaseUrl}/${repo.name}`],
-      {
-        cwd: work,
-        env: gemEnv(home, {}),
-        timeoutMs: 30_000,
-        label: 'ruby-anonpush',
-        input: '',
-      },
-    );
+    const result = await run('gem', ['push', gemFile, '--host', repoUrl(repo.name)], {
+      cwd: work,
+      env: gemEnv(home, {}),
+      timeoutMs: 30_000,
+      label: 'ruby-anonpush',
+      input: '',
+    });
     expect(result.exitCode, 'gem push with no credentials configured exits non-zero').not.toBe(0);
 
     const after = await rawGet(repo.name, admin, infoRelPath(name));
@@ -194,11 +182,12 @@ test(
     expect(publishRes.status, 'seed publish').toBe(200);
 
     const { home, work } = await isolatedWorkDir(`ruby-yank-${seeder.runId}`);
-    const result = await run(
-      'gem',
-      ['yank', name, '-v', version, '--host', `${env.repoBaseUrl}/${repo.name}`],
-      { cwd: work, env: gemEnv(home, credential), timeoutMs: 30_000, label: 'ruby-yank' },
-    );
+    const result = await run('gem', ['yank', name, '-v', version, '--host', repoUrl(repo.name)], {
+      cwd: work,
+      env: gemEnv(home, credential),
+      timeoutMs: 30_000,
+      label: 'ruby-yank',
+    });
     expect(result.exitCode, `gem yank: ${result.command}`).toBe(0);
 
     const infoRes = await rawGet(repo.name, admin, infoRelPath(name));
@@ -230,11 +219,12 @@ test(
     const gemFile = `${work}/${built.filename}`;
     await fs.writeFile(gemFile, built.bytes);
 
-    const result = await run(
-      'gem',
-      ['push', gemFile, '--host', `${env.repoBaseUrl}/${repo.name}`],
-      { cwd: work, env: gemEnv(home, credential), timeoutMs: 30_000, label: 'ruby-userpush' },
-    );
+    const result = await run('gem', ['push', gemFile, '--host', repoUrl(repo.name)], {
+      cwd: work,
+      env: gemEnv(home, credential),
+      timeoutMs: 30_000,
+      label: 'ruby-userpush',
+    });
     expect(result.exitCode, `gem push: ${result.command}`).toBe(0);
 
     const admin = adminCredential();
@@ -261,7 +251,7 @@ test(
     await fs.writeFile(
       path.join(work, 'Gemfile'),
       mustache.render(gemfileTemplate, {
-        repoUrl: `${env.repoBaseUrl}/${repo.name}`,
+        repoUrl: repoUrl(repo.name),
         name,
         version,
       }),

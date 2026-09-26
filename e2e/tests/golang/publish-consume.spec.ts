@@ -51,6 +51,7 @@ import { shimTraceSoFar } from '../../src/clients/golang-tls-shim.js';
 import { clientEnv } from '../../src/clients/client-env.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { env } from '../../src/env.js';
+import { repoPath } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import { registerPublishConsumeLoop } from '../../src/scenarios/loop.js';
 
@@ -124,7 +125,7 @@ test(
 
     // Exactly the panel's own documented incantation (golang-config.component.ts): userinfo
     // embedded directly in a PLAIN http:// GOPROXY URL -- deliberately bypassing the TLS shim.
-    const insecureProxy = `http://token:${token.token}@${new URL(env.plainRepoBaseUrl).host}/${repo.name},off`;
+    const insecureProxy = `http://token:${token.token}@${new URL(env.plainRepoBaseUrl).host}/${repoPath(repo.name)},off`;
 
     const { home, work } = await isolatedWorkDir(`golang-plainhttpcreds-${seeder.runId}`);
     const result = await run('go', ['mod', 'download', '-json', `${modulePath}@${version}`], {
@@ -320,7 +321,7 @@ test(
     // SSL_CERT_FILE the runner was given.
     const goGetEnv = await goEnv(home, credential, repo.name);
     expect(goGetEnv.GOPROXY, 'the proxy is Repsy itself, over TLS').toMatch(
-      new RegExp(`^https://[^@]+@${new URL(env.repoBaseUrl).host}/${repo.name},off$`),
+      new RegExp(`^https://[^@]+@${new URL(env.repoBaseUrl).host}/${repoPath(repo.name)},off$`),
     );
     const result = await run('go', ['mod', 'download', '-json', `${modulePath}@${version}`], {
       cwd: work,

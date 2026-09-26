@@ -35,6 +35,7 @@ import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import { optedIn } from '../../../src/stack-overlays.js';
+import { repoPath } from '../../../src/repo-url.js';
 
 for (const client of clientsWith('publish')) {
   test(
@@ -96,8 +97,8 @@ for (const client of clientsWith('publish')) {
 
         const tokenA = `Bearer ${readerA.credential.password}`;
         const tokenB = `Bearer ${readerB.credential.password}`;
-        const toA = recorder.under(`/${repoA.name}/`);
-        const toB = recorder.under(`/${repoB.name}/`);
+        const toA = recorder.under(`/${repoPath(repoA.name)}/`);
+        const toB = recorder.under(`/${repoPath(repoB.name)}/`);
         expect(
           toA.length,
           'requests reached repository A (packument and tarball)',

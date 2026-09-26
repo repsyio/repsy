@@ -68,6 +68,7 @@ import {
   waitForLogLines,
 } from '../../src/clients/stack.js';
 import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import { perTestRunId } from '../../src/seed/run-id.js';
 import { Seeder } from '../../src/seed/seeder.js';
@@ -219,14 +220,11 @@ async function manifestFiles(): Promise<string[]> {
 async function npmTarballSha(pkg: Package, credential: MaterializedCredential): Promise<string> {
   const { repoName } = pkg.world;
   const { packageName, version } = pkg.world.publishTarget;
-  const res = await fetch(
-    `${env.repoBaseUrl}/${repoName}/${packageName}/-/${packageName}-${version}.tgz`,
-    {
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${credential.username}:${credential.password}`).toString('base64')}`,
-      },
+  const res = await fetch(repoUrl(repoName, `${packageName}/-/${packageName}-${version}.tgz`), {
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${credential.username}:${credential.password}`).toString('base64')}`,
     },
-  );
+  });
   expect(res.status, `npm tarball of ${packageName} as ${credential.kind}`).toBe(200);
   return sha256Hex(Buffer.from(await res.arrayBuffer()));
 }

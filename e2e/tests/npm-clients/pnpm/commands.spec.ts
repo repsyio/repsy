@@ -58,11 +58,12 @@ import {
 } from '../../../src/clients/npm-family/wire-recorder.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { env } from '../../../src/env.js';
+import { repoPath, repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 
 /** `METHOD /path` of an entry, without the repository prefix and the search text. */
 function shape(entry: WireEntry, repoName: string): string {
-  return `${entry.method} ${entry.path.replace(`/${repoName}`, '').replace(/\?text=.*/, '?text=<term>')}`;
+  return `${entry.method} ${entry.path.replace(`/${repoPath(repoName)}`, '').replace(/\?text=.*/, '?text=<term>')}`;
 }
 
 /**
@@ -193,7 +194,7 @@ test(
       expect(
         Object.keys((JSON.parse(packument.body.toString('utf8')) as { versions: object }).versions),
       ).toEqual(['1.0.0']);
-      const tarball = await fetch(`${env.repoBaseUrl}/${repo.name}/${name}/-/${name}-1.1.0.tgz`, {
+      const tarball = await fetch(repoUrl(repo.name, `${name}/-/${name}-1.1.0.tgz`), {
         headers: npmAuthHeader(adminCredential()),
       });
       expect(tarball.status, 'the removed version cannot be downloaded any more').toBe(404);
@@ -226,7 +227,7 @@ test(
     expect(
       Object.keys((JSON.parse(packument.body.toString('utf8')) as { versions: object }).versions),
     ).toEqual(['1.0.0', '1.1.0']);
-    const tarball = await fetch(`${env.repoBaseUrl}/${repo.name}/${name}/-/${name}-1.1.0.tgz`, {
+    const tarball = await fetch(repoUrl(repo.name, `${name}/-/${name}-1.1.0.tgz`), {
       headers: npmAuthHeader(adminCredential()),
     });
     expect(tarball.status, 'the version is still downloadable').toBe(200);

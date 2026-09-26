@@ -48,6 +48,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
@@ -126,7 +127,7 @@ export function uvEnv(
 
 /** The simple-index URL of a repo, without a credential (`uv` gets that from its own variables). */
 export function simpleIndexUrl(repoName: string): string {
-  return `${env.repoBaseUrl}/${repoName}/simple/`;
+  return repoUrl(repoName, 'simple/');
 }
 
 /** The `pyproject.toml` of the isolated consumer project: one pinned dependency, the repo as the

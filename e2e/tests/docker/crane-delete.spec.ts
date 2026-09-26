@@ -43,6 +43,7 @@ import {
 } from '../../src/clients/docker-raw.js';
 import { isolatedWorkDir, run, type RunResult } from '../../src/clients/exec.js';
 import { env } from '../../src/env.js';
+import { repoPath } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { MaterializedCredential } from '../../src/scenarios/world.js';
 
@@ -113,7 +114,7 @@ test(
     );
     expect(byTag.exitCode, `crane delete by tag: ${byTag.command}\n${byTag.stderr}`).toBe(0);
     expect(decodeURIComponent(byTag.stderr), 'crane asks for delete on its own').toContain(
-      `scope=repository:${repo.name}/${image}:push,pull,delete`,
+      `scope=repository:${repoPath(repo.name)}/${image}:push,pull,delete`,
     );
     expect((await rawGetManifest(repo.name, admin, image, 'v2')).status, 'v2 is gone').toBe(404);
     expect((await rawGetManifest(repo.name, admin, image, 'v1')).status, 'v1 stays').toBe(200);
@@ -205,7 +206,7 @@ test(
     expect(first.status, 'first attempt').toBe(401);
     expect(first.wwwAuthenticate, 'insufficient_scope').toContain('error="insufficient_scope"');
     const challenge = parseBearerChallenge(first.wwwAuthenticate ?? '');
-    expect(challenge.scope).toBe(`repository:${repo.name}/${image}:delete`);
+    expect(challenge.scope).toBe(`repository:${repoPath(repo.name)}/${image}:delete`);
     expect((await rawGetManifest(repo.name, admin, image, digest)).status, 'still there').toBe(200);
 
     // It asks again for the challenge's scope plus its old one, and is accepted.

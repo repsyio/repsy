@@ -41,7 +41,7 @@ import {
   writeYarnClassicRc,
 } from '../../src/clients/npm-family/config.js';
 import { INSTALLED_CLIENTS, versionOf } from '../../src/clients/npm-family/registry.js';
-import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 
 test.describe('npm-family client versions', () => {
@@ -100,8 +100,8 @@ test.describe('npm-family config renderers, read back by the client', () => {
       },
     },
   ];
-  const registryA = `${env.repoBaseUrl}/repo-a/`;
-  const registryB = `${env.repoBaseUrl}/repo-b/`;
+  const registryA = repoUrl('repo-a', '');
+  const registryB = repoUrl('repo-b', '');
 
   test('pnpm reads the rendered .npmrc', { tag: ['@pnpm', '@versions'] }, async () => {
     const { home, work } = await isolatedWorkDir('npmc-cfg-pnpm');

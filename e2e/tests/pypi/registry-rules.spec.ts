@@ -78,7 +78,7 @@ import {
   wheelFilename,
   type RawResponse,
 } from '../../src/clients/pypi-raw.js';
-import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
 
@@ -172,7 +172,7 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       const version = pypiAdapter.version('release');
       const built = buildWheel({ name: layout.packageName, version });
 
-      const noSlashUrl = `${env.repoBaseUrl}/${layout.repoName}`;
+      const noSlashUrl = repoUrl(layout.repoName);
       const form = new FormData();
       form.append('name', built.name);
       form.append('version', built.version);
@@ -194,7 +194,7 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       // hits this path. `/simple` itself remains the read-only "simple index" route (used for `pip`'s
       // `--extra-index-url`, see `installation` in `pypi-packages-version-detail.component.ts`), so
       // `POST` there is correctly refused -- this is no longer a bug, just documented behaviour.
-      const simpleIndexUrl = `${env.repoBaseUrl}/${layout.repoName}/simple`;
+      const simpleIndexUrl = repoUrl(layout.repoName, 'simple');
       const built2 = buildWheel({
         name: layout.packageName,
         version: pypiAdapter.version('release'),
@@ -427,7 +427,7 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       // is now the request's own absolute repo URI plus one repo segment, matching the real
       // project page (and the per-project page's own href shape, H8).
       expect(link?.href, 'the root index links to the real, working project page').toBe(
-        `${env.repoBaseUrl}/${layout.repoName}/simple/${layout.packageName}/`,
+        repoUrl(layout.repoName, `simple/${layout.packageName}/`),
       );
 
       // The link must itself resolve, not just look plausible.
@@ -453,7 +453,7 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       const noFollow = await rawGetSimplePageNoFollow(layout.repoName, admin, mixedCaseName);
       expect(noFollow.status, 'a non-normalized name redirects').toBe(307);
       expect(noFollow.location, 'redirects to the normalized, trailing-slashed project page').toBe(
-        `${env.repoBaseUrl}/${layout.repoName}/simple/${normalizedName}/`,
+        repoUrl(layout.repoName, `simple/${normalizedName}/`),
       );
 
       const followed = await rawGetSimplePage(layout.repoName, admin, mixedCaseName);
