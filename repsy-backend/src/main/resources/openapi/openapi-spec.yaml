@@ -83,6 +83,8 @@ paths:
           "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete a user
   "/api/repos/{repoName}/settings":
     get:
@@ -442,6 +444,8 @@ paths:
           "$ref": "#/components/responses/Forbidden"
         '409':
           "$ref": "#/components/responses/Conflict"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Create a new repository
   "/api/repos/counts":
     get:
@@ -796,6 +800,8 @@ paths:
           "$ref": "#/components/responses/Conflict"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Rename a repository
     parameters:
       - name: repoName
@@ -1163,6 +1169,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete a specific PyPI package release
     parameters:
       - name: repoName
@@ -1223,6 +1231,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete a PyPI package
     parameters:
       - name: repoName
@@ -1364,6 +1374,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete a specific npm package version
     parameters:
       - name: repoName
@@ -1444,6 +1456,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete a specific scoped npm package version
     parameters:
       - name: repoName
@@ -1504,6 +1518,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete an npm package
     parameters:
       - name: repoName
@@ -1574,6 +1590,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete a scoped npm package
     parameters:
       - name: repoName
@@ -2492,6 +2510,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete a Go module
     parameters:
       - name: repoName
@@ -2573,6 +2593,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete Go module versions
     parameters:
       - name: repoName
@@ -2743,6 +2765,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete orphan layers for a Docker repository
     parameters:
       - name: repoName
@@ -2783,6 +2807,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete the untagged manifests of a Docker repository
     parameters:
       - name: repoName
@@ -3021,6 +3047,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete a Docker image
     parameters:
       - name: repoName
@@ -3091,6 +3119,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete a Docker image tag
     parameters:
       - name: repoName
@@ -3652,6 +3682,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete all versions of a chart
     parameters:
       - name: repoName
@@ -3741,6 +3773,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete a specific chart version
     parameters:
       - name: repoName
@@ -3778,6 +3812,8 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete a repository
     parameters:
       - name: repoName
@@ -3942,6 +3978,8 @@ paths:
           "$ref": "#/components/responses/Conflict"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
       summary: Manually trigger a vulnerability re-scan for an artifact version
       description: >-
         Scans the version regardless of the repository's `securityScanEnabled` setting: that setting
@@ -4388,6 +4426,26 @@ components:
       headers:
         Retry-After:
           description: Seconds until the client may try again
+          schema:
+            type: integer
+            format: int64
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    ServiceUnavailable:
+      description: >-
+        The request could not be served right now, and repeating it after a moment is expected to
+        work. `msgId` says why: `resourceBusy` (a row the request needs is locked by another
+        request, or the database picked this one as the loser of a deadlock),
+        `concurrentModification` (on the protocol ports, the package-format endpoints of the main
+        port and the Docker and Helm OCI endpoints, another request changed the same item at the
+        same moment; the panel API answers that one with 409 `Conflict`) and
+        `scanExecutorSaturated` (the vulnerability-scan queue is full). Nothing of the failed
+        request was stored.
+      headers:
+        Retry-After:
+          description: Seconds after which the request may be repeated
           schema:
             type: integer
             format: int64

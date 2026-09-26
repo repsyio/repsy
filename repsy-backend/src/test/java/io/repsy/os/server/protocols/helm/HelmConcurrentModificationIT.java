@@ -102,8 +102,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * /api/helm/charts/{repo}/{chart}/{version}} deletes a row that carries a {@code @Version}, and
  * when another request has changed the row since it was read the panel answers 409 {@code
  * concurrentModification} (no {@code Retry-After}: the client re-reads and repeats), where RPS-1325
- * pinned that mapping with a stub controller only. It is one class so that it shares one Spring
- * context (and one connection pool) with the OCI tests.
+ * pinned that mapping with a stub controller only. RPS-1355: the classic chart upload on the
+ * protocol port loses the same race with 503 and {@code Retry-After}, since a package client treats
+ * a 409 as "this version exists". It is one class so that it shares one Spring context (and one
+ * connection pool) with the OCI tests.
  *
  * <p>RPS-1365: a push takes the chart row first and then the version and manifest rows, so a delete
  * of that chart (the panel's, one version or all of them, or the classic protocol's) must take the
@@ -625,6 +627,20 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
     assertThat(this.rows("helm_oci_blob", repo)).as("one row for the one blob").isEqualTo(1);
   }
 
+  /** Pushes {@code content} of {@code name} 1.0.0 through the classic chart upload. */
+  private MockHttpServletResponse classicPush(
+      final Repo repo, final String name, final byte[] content, final String token)
+      throws Exception {
+    return this.mockMvc
+        .perform(
+            multipart(UPLOAD_PATH, repo.getName())
+                .part(new MockPart("chart", "chart.tgz", content))
+                .header(AUTHORIZATION, token)
+                .with(protocolPort()))
+        .andReturn()
+        .getResponse();
+  }
+
   private void pushClassicChart(final Repo repo, final String name, final String token)
       throws Exception {
     final var request =
@@ -701,6 +717,37 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
         .as("the same request repeated without contention")
         .isZero();
     assertThat(chartFile).doesNotExist();
+  }
+
+  @Test
+  @DisplayName(
+      "a classic override push that loses the version row's race is answered 503, not 409"
+          + " (RPS-1355)")
+  void classicPushOfAConcurrentlyUpdatedVersionAnswersRetryLater() throws Exception {
+    final var repo = this.overridableHelmRepo();
+    final var name = "race-classic";
+    final var token = this.protocolBearerTokenFor(this.admin());
+    this.pushClassicChart(repo, name, token);
+    final var chartFile = storageDirOf(repo).resolve("charts").resolve(name + "-1.0.0.tgz");
+    final var before = this.chartDigest(repo, name);
+    // The override reads the version row once, then updates it with the @Version it read.
+    this.bumpAfterRead(VERSION_READ, BUMP_VERSION, repo, 1, 1);
+
+    final var lost = this.classicPush(repo, name, chart(name, "1.0.0", "2", null), token);
+
+    assertThat(lost.getStatus()).as("a protocol port asks the client to retry").isEqualTo(503);
+    assertThat(lost.getHeader("Retry-After")).isEqualTo("1");
+    assertThat(lost.getContentAsString()).contains("concurrentModification");
+    assertThat(this.bumps).as("the race was forced").hasValue(1);
+    assertThat(this.chartDigest(repo, name)).as("the losing push stored nothing").isEqualTo(before);
+    assertThat(chartFile).exists();
+
+    AFTER_READ.set(null);
+
+    assertThat(this.classicPush(repo, name, chart(name, "1.0.0", "2", null), token).getStatus())
+        .as("the same push repeated without contention")
+        .isEqualTo(201);
+    assertThat(this.chartDigest(repo, name)).isNotEqualTo(before);
   }
 
   /** What the push and the delete of a race answered, and how often the push ran its unit. */

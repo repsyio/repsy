@@ -45,6 +45,11 @@ export const errorHandlerInterceptor: HttpInterceptorFn = (req, next) => {
         displayMessage = 'Connection error';
       } else if (error.status === 403) {
         displayMessage = message || 'Access denied';
+      } else if (error.status === 503 && message) {
+        // The backend answers 503 for "try again shortly" (`resourceBusy`, `scanExecutorSaturated`)
+        // and its `text` says so in plain words, so it is shown; any other 5xx stays generic
+        // (RPS-1355).
+        displayMessage = message;
       } else if (error.status >= 500) {
         displayMessage = 'Server error';
       } else if (error.status >= 400) {
