@@ -33,6 +33,7 @@ import path from 'node:path';
 import { run } from '../../src/clients/exec.js';
 import type { ClientCtx, ClientId } from '../../src/clients/npm-family/client.js';
 import { bunExec } from '../../src/clients/npm-family/bun-client.js';
+import { denoExec } from '../../src/clients/npm-family/deno-client.js';
 import { runNpm } from '../../src/clients/npm-family/npm-client.js';
 import { runPnpm } from '../../src/clients/npm-family/pnpm-client.js';
 import { runSealed } from '../../src/clients/npm-family/config.js';
@@ -59,6 +60,9 @@ const EXEC: Record<
   'yarn-classic': (ctx, label, args) => runYarn(ctx, label, args),
   'yarn-berry': (ctx, label, args) => execYarn(ctx, label, args),
   bun: (ctx, label, args) => bunExec(ctx, label, args),
+  // Deno runs a package.json script as `deno task <name>`: there is no `run` of one.
+  deno: (ctx, label, args) =>
+    denoExec(ctx, label, args[0] === 'run' ? ['task', ...args.slice(1)] : args),
 };
 
 /** Commands a client needs before `run` works: berry refuses a script of a workspace its lockfile lacks. */
