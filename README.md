@@ -13,6 +13,7 @@
     - [Using Docker (PostgreSQL)](#option-2-docker-with-postgresql)
     - [Using Docker Compose (PostgreSQL)](#option-3-docker-compose-with-postgresql)
     - [Manual Installation](#manual-installation)
+- [Backward incompatible changes in this release](#backward-incompatible-changes-in-this-release)
 - [Upgrading](#upgrading)
 - [Configuration](#configuration)
 - [Content Security Policy](#content-security-policy)
@@ -333,6 +334,143 @@ Access at:
 - **Backend API**: http://localhost:8080
 - **Repository Operations**: http://localhost:9090
 
+## Backward incompatible changes in this release
+
+This is the first release after `v26.08.4`. Read this section before you upgrade: some steps have to be done
+**before** the new version starts for the first time.
+
+### Before you upgrade
+
+- **Back up the database and the storage directory. There is no downgrade.** The upgrade runs database
+  migrations V0012 to V0030 that cannot be undone (they drop `users.salt` and `repo.searchable` and restructure the
+  Docker manifest tables) and renames stored Docker manifest files. `v26.08.4` cannot run on the migrated data: to go
+  back, restore the backup. (RPS-1033, RPS-1216, RPS-1427)
+- **Every user password is reset on the first start.** All passwords stored by `v26.08.4` use the old SHA-256 hash,
+  which cannot be converted, so the upgrade clears them. For each `ADMIN` account a new random password is logged
+  once, at startup, as `Admin password has been reset for user <name>. New password: <password>`: keep the log
+  (`docker logs repsy 2>&1 | grep "Admin password"`) and sign in with it. `ADMIN_INITIAL_PASSWORD` is not applied
+  again. Every other user cannot sign in until an admin resets the password (Users page, or
+  `POST /api/users/{userId}/actions/reset-password`). Package clients that use a username and password (Maven
+  `settings.xml`, npm `_auth`, `docker login`, pip, twine, cargo, NuGet, gem, Go) get `401` until they are given the
+  new password. Deploy tokens keep working. (RPS-961, RPS-1033)
+- **`DB_HOST`, `DB_PORT` and `DB_DATABASE` are no longer read.** Only `DB_URL` selects the database, and the Docker
+  image now defaults it to an embedded H2 file. An installation that set only those three variables starts on a new,
+  empty H2 database (the PostgreSQL data is untouched; a `WARN` is logged). Set
+  `DB_URL=jdbc:postgresql://<host>:<port>/<database>` (with `DB_USERNAME` and `DB_PASSWORD`). (RPS-1173, RPS-1423)
+- **Artifact files in the Docker image moved to `/app/data/storage`.** Earlier images kept them in
+  `/home/appuser/.repsy`, inside the container and not on the `/app/data` volume, unless you set
+  `STORAGE_BASE_PATH` or mounted that directory. If you did neither, copy the files out of the old container
+  **before** you replace it (`docker cp repsy:/home/appuser/.repsy/. ./repsy-storage`) and put them into
+  `/app/data/storage` on the volume; replacing the container loses them. If you mount `/home/appuser/.repsy`, the new
+  image keeps using it (and logs a `WARN`) until you move the files or set `STORAGE_BASE_PATH` explicitly.
+  (RPS-1401)
+- **Deleted items are now removed for good after 7 days, starting 15 minutes after the upgrade.** A deleted
+  repository, package or version is moved to a `trash/` directory, which nothing emptied until now. A daily job now
+  deletes trash older than `TRASH_RETENTION` (default `P7D`), and its first run deletes everything that has piled up.
+  To keep the trash, set `TRASH_CLEANUP_ENABLED=false` or a longer `TRASH_RETENTION` (for example `P90D`) before the
+  first start. (RPS-1096)
+
+### Permissions
+
+- **Only `ADMIN` users can create repositories** (panel and API); a `USER` gets `403`. (RPS-891, RPS-1268)
+- **Removing stored files over the wire needs an `ADMIN` account:** Helm `DELETE /api/charts/<name>/<version>` and
+  `npm unpublish`. A deploy token, read-write or read-only, is refused (`401`) for every such manage operation in every
+  format. `npm deprecate`, `npm dist-tag`, `cargo yank`, NuGet unlist/relist and `gem yank` still need only write
+  access (and `gem yank` no longer needs `ADMIN`). (RPS-1424, RPS-1317)
+- **HTTP Basic realm renamed to `Repsy`** (was `Repsy Managed Repository`, `Repsy Managed Registry` or
+  `Repsy Go Module Proxy`). Apache Ivy and sbt, which look credentials up by realm, need `realm="Repsy"` in
+  `ivysettings.xml` or `Credentials("Repsy", host, user, password)`. (RPS-1372)
+- **A credential in the `?token=` query parameter is no longer accepted** on the repository port. Send it in the
+  `Authorization` header. (RPS-1044)
+- **Panel tokens and package-client tokens are no longer interchangeable.** A token from the web UI login is refused
+  by the package endpoints and a token from `npm login`, `docker login` or `cargo login` is refused by the panel
+  API. (RPS-915)
+
+### Panel REST API (`/api`, marked beta) — scripts and generated clients
+
+- Removed: `GET /api/repos/{type}/info`, `GET /api/repos/{type}/count` and `POST /api/repos/{type}` (now `404`).
+  Use `GET /api/repos?type=`, `GET /api/repos/counts` and `POST /api/repos` with `type` in the body; these accept a
+  panel Bearer token only, not HTTP Basic. (RPS-1268)
+- Deploy token rotation moved from `PUT /api/repos/{repo}/deploy-tokens/{id}` to
+  `POST /api/repos/{repo}/deploy-tokens/{id}/actions/rotate`. (RPS-1269)
+- npm scope lists moved to `GET /api/npm/scopes/{repo}/packages` and `GET /api/npm/scopes/{repo}/{scope}/packages`.
+  (RPS-1010)
+- Every list takes its text filter as `q`; the old names (`name`, `query`, `search`, `version`, `groupName`,
+  `artifactName`) are ignored, so the list comes back unfiltered. Paging is `page`, `size` (1 to 100; more is `400`)
+  and `sort` (an unknown property is `400`). Cargo, NuGet and Ruby lists default to 10 per page (was 20). (RPS-1269,
+  RPS-885, RPS-933)
+- Deploy token JSON is camelCase: `readOnly`, `expirationDate`, `createdAt` (a body with `read_only` or
+  `expiration_date` is `400`). The Cargo panel responses are camelCase too (`maxVersion`, `updatedAt`,
+  `packageName`, ...). An expiration date more than 365 days ahead is `400`. (RPS-1269, RPS-1435)
+- Status codes: a failed login is `401` (was `403`); a missing, invalid or expired token is `401` (was `403`); a
+  signed-in user without the `ADMIN` role is `403 accessDenied` (was `401`). (RPS-924, RPS-981, RPS-1284)
+- `GET /api/repos/{repo}/format` answers the upper-case type (`MAVEN`, not `maven`). (RPS-1269)
+- Repository settings: `releases`/`snapshots` are refused (`400`) for types other than Maven and NuGet, the PGP
+  settings for types other than Maven, and a field left out of `PUT .../settings` now keeps its value instead of being
+  reset to `false`. `searchable` is gone. (RPS-1210, RPS-1188, RPS-1200, RPS-1427)
+
+### Behaviour changes
+
+- **Failed sign-ins are rate limited:** 20 failed password or token checks per client address per minute, then
+  `429 Too Many Requests` with `Retry-After`. Behind a reverse proxy, make it a trusted proxy that appends
+  `X-Forwarded-For`, or every client shares one limit. Tune with `AUTH_THROTTLE_*`. (RPS-1092, RPS-1209)
+- **Sessions:** everybody signs in to the web UI again once after the upgrade; a web UI session now ends after 24
+  hours at most; changing a password or username ends that user's `docker login`, `npm login` and `cargo login`
+  tokens at once. (RPS-916, RPS-972, RPS-1552)
+- **Browser security headers:** the repository port (9090) sends no CORS headers any more, so a web page that reads
+  packages from it cross-origin stops working. The panel gets `X-Frame-Options: DENY` (it cannot be embedded in a
+  frame), `Referrer-Policy` and a `Content-Security-Policy`; every response gets `X-Content-Type-Options: nosniff`.
+  If the panel's `API_BASE_URL` points at another origin than the one serving the panel, set `APP_CSP_POLICY` (or
+  `APP_CSP_ENABLED=false`). HSTS is opt-in (`APP_HSTS_MAX_AGE`). (RPS-1514, RPS-1131, RPS-1402)
+- **`REPO_BASE_URL` now also sets the URLs the npm registry (`dist.tarball`) and the NuGet service index serve.**
+  Check that it is your public repository URL; when it is unset they are derived from the request (`Host` and
+  `X-Forwarded-*`). (RPS-1333, RPS-1432)
+- **Upload size limits:** multipart uploads (PyPI, Helm, NuGet) up to 500 MB (`MULTIPART_MAX_*`), `gem push` 500 MB
+  (`RUBY_MAX_GEM_SIZE`), Go module zips 500 MB (`GO_MAX_MODULE_ZIP_SIZE`), crates 100 MB (`CARGO_MAX_CRATE_SIZE`);
+  larger is `413`. Maven POM and `maven-metadata.xml` are limited to 10 MiB and a signature to 64 KiB. (RPS-1049,
+  RPS-1055, RPS-1119, RPS-1121)
+- **Docker:** manifests are stored by digest and a tag is a pointer. Re-pushing a tag or deleting a tag keeps the old
+  manifest (pullable by digest) and its layers on disk until you run **Delete untagged manifests** in the repository
+  settings, and an image whose last tag is deleted stays listed as "No tags". Old manifest files are renamed by a
+  background job 10 minutes after start. `DELETE /v2/<name>/manifests/<ref>` is new and needs an `ADMIN` and a
+  token with the `delete` scope. (RPS-1216, RPS-1288, RPS-1434)
+- **Maven uploads are checked more strictly:** a path outside the Maven layout, a POM whose `groupId` differs from its
+  path, or an empty body is `400` (instead of `200` with nothing or an empty file stored); checksums follow the rules
+  of their file; switching releases or snapshots off also refuses redeploys (`403`); a signature by an expired or
+  revoked key is `422`; `HEAD` answers like `GET` (`404` for a missing file). Repsy now serves a generated
+  `maven-metadata.xml` where none is stored and adds newly registered versions to a stored one. (RPS-1182, RPS-1193,
+  RPS-1443, RPS-1183, RPS-1174, RPS-1202, RPS-1368, RPS-1369, RPS-1437)
+- **npm:** the `name` in a publish body must match the URL (`400`); served packuments carry tarball URLs of this
+  registry and no base64 `_attachments`. (RPS-1207, RPS-1333, RPS-1390)
+- **PyPI:** an upload must carry a `sha256_digest` that matches the file (`400` otherwise). (RPS-1224, RPS-1225)
+- **Go:** module paths are case-sensitive; a version must be valid Go semver and the `go.mod` module line must match
+  the URL (`400`); `@v/list` of a module without versions is `404`, so `go` tries the next `GOPROXY` entry.
+  (RPS-1232, RPS-1227, RPS-1228, RPS-1428)
+- **NuGet:** `1.0.0+build` is the same version as `1.0.0` (versions stored with build metadata are moved at startup;
+  see README "Upgrading" for conflicts); search and autocomplete leave SemVer 2.0.0-only versions out unless the client
+  sends `semVerLevel=2.0.0`; a negative `skip` is `400` and `take` is capped at 1000; a nuspec that is not well-formed
+  XML or carries a DOCTYPE is `400`. (RPS-996, RPS-1059, RPS-1275, RPS-1120, RPS-1075)
+- **Helm:** an OCI push whose repository name differs from the chart name in `Chart.yaml` is `400`; manifests stored
+  under such a name are moved to the chart name at startup. (RPS-978, RPS-1038)
+- **Ruby:** a yanked version is left out of `/info` but its `.gem` stays downloadable. **Cargo:** crates are served
+  under the name they were published with, index lines in publish order. (RPS-1235, RPS-1238, RPS-1212, RPS-1605)
+- A request that loses a concurrent update is answered `503` with `Retry-After` on the repository port (clients
+  retry). JSON on the repository port is gzip-compressed (`SERVER_COMPRESSION_ENABLED=false` turns it off).
+  (RPS-1355, RPS-1359)
+- New or renamed repositories cannot use a reserved name (`login`, `profile`, `repositories`, `users`, `security`,
+  `not-found`, `api`, `assets`, `favicon.ico`, `counts`, `security-summary`) or start with `-`; usernames an admin
+  creates or renames must be lower-case (`a-z`, `0-9`, `_`, `-`). Existing names keep working. (RPS-1158, RPS-1268,
+  RPS-1100, RPS-1037)
+- A user's password can be reset by creating a file named after the user in `/app/data/password-reset` (enabled by
+  default; anyone who can write to that directory can reset passwords; `PASSWORD_RESET_MARKER_ENABLED=false` turns it
+  off). (RPS-1107)
+- The vulnerability scanner is now published as `repo.repsy.io/repsy/os/repsy-scanner-trivy` with the same tags as
+  the application; run both images of the same release. (RPS-1400)
+- The upgrade jobs (Docker manifest rename, NuGet version move) log their progress at `INFO`, which the default log
+  level (`WARN`) hides; set `LOGGING_LEVEL_IO_REPSY=INFO` to follow them.
+
+<!-- Maintainer, before publishing the release notes: (1) RPS-1615 replaces the password reset with verify-once-and-upgrade-to-BCrypt-on-login; when it merges, remove the "Every user password is reset" item and the reset section under Upgrading. (2) RPS-1590 makes an unset APP_ALLOWED_ORIGINS same-origin only; add an item under "Browser security headers" when it merges. (3) Re-check commits merged after the audit (main 7ed2c6839, 2026-09-26). -->
+
 ## Upgrading
 
 ### Artifact storage moved to `/app/data/storage` in the Docker image (RPS-1401)
@@ -361,8 +499,8 @@ When the effective database is H2 it adds that Repsy is starting on the embedded
 
 The first release that contains both RPS-961 (hashing passwords with BCrypt) and RPS-1033
 (retiring the legacy salted SHA-256 verification path) resets the password of every account that
-has not logged in since RPS-961 shipped. The latest release, `v26.08.4`, contains neither change,
-so this applies starting with the next release.
+has not logged in since RPS-961 shipped. The latest release, `v26.08.4`, contains neither change and
+stores every password with the old hash, so upgrading from it resets every account.
 
 **What happens:** a SHA-256 hash cannot be converted to BCrypt without the plain-text password,
 so migration `V0017__Drop_User_Salt.sql` sets the empty-hash password-reset marker on every
