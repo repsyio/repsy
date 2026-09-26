@@ -41,8 +41,6 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
 
   boolean existsByGemIdAndVersion(UUID gemId, String version);
 
-  boolean existsByGemIdAndVersionAndYankedFalse(UUID gemId, String version);
-
   @Query(
       """
       select gv.version as version, gv.platform as platform,

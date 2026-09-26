@@ -45,6 +45,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
@@ -265,6 +266,138 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
             get("/{repo}/quick/Marshal.4.8/pushed-gem-9.9.9.gemspec.rz", repo.getName())
                 .header(AUTHORIZATION, this.adminProtocolBearerToken()))
         .andExpect(status().isNotFound());
+  }
+
+  /**
+   * RPS-1553: the gemspec route stripped only the last {@code -segment} of {@code
+   * <version>-<platform>}, so a multi-segment platform ({@code x86_64-linux}) never matched a row
+   * and {@code gem install} of a platform gem failed; the gemspec also always said platform {@code
+   * ruby}, which makes RubyGems ask for {@code <name>-<version>.gem} instead of the platform file.
+   */
+  @Nested
+  @DisplayName("gemspec.rz of a platform gem (RPS-1553)")
+  class PlatformGemspec {
+
+    private static final String QUICK = "/{repo}/quick/Marshal.4.8/{file}.gemspec.rz";
+
+    private byte[] gemspec(final Repo repo, final String file) throws Exception {
+      final var body =
+          protocol(
+                  get(QUICK, repo.getName(), file)
+                      .header(AUTHORIZATION, adminProtocolBearerToken()))
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsByteArray();
+      try (var inflater = new InflaterInputStream(new ByteArrayInputStream(body))) {
+        return inflater.readAllBytes();
+      }
+    }
+
+    /** How many times the gemspec carries {@code text} as a Marshal string (name, platform...). */
+    private int occurrences(final byte[] gemspec, final String text) {
+      final var haystack = new String(gemspec, StandardCharsets.ISO_8859_1);
+      return haystack.split(java.util.regex.Pattern.quote(text), -1).length - 1;
+    }
+
+    private void expectHead(final Repo repo, final String file, final int status) throws Exception {
+      protocol(head(QUICK, repo.getName(), file).header(AUTHORIZATION, adminProtocolBearerToken()))
+          .andExpect(status().is(status));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"x86_64-linux", "arm64-darwin", "universal-darwin", "java"})
+    @DisplayName(
+        "GET and HEAD resolve the row of a platform gem and the gemspec names the platform")
+    void servesAPlatformGem(final String platform) throws Exception {
+      final var repo = seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+      push(
+              repo.getName(),
+              gem("platform-gem", "1.5.0", platform, "fixture"),
+              adminProtocolBearerToken())
+          .andExpect(status().isOk());
+      final var file = "platform-gem-1.5.0-" + platform;
+
+      final var gemspec = gemspec(repo, file);
+
+      assertThat(occurrences(gemspec, platform))
+          .as("original_platform and new_platform")
+          .isEqualTo(2);
+      assertThat(occurrences(gemspec, "\u0004ruby")).isZero();
+      expectHead(repo, file, 200);
+    }
+
+    @Test
+    @DisplayName("a pure gem and a platform gem of one version each resolve to their own row")
+    void pureAndPlatformOfOneVersion() throws Exception {
+      final var repo = seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+      push(repo.getName(), gem("pair-gem", "1.5.0"), adminProtocolBearerToken())
+          .andExpect(status().isOk());
+      push(
+              repo.getName(),
+              gem("pair-gem", "1.5.0", "x86_64-linux", "fixture"),
+              adminProtocolBearerToken())
+          .andExpect(status().isOk());
+
+      final var pure = gemspec(repo, "pair-gem-1.5.0");
+      final var native_ = gemspec(repo, "pair-gem-1.5.0-x86_64-linux");
+
+      assertThat(occurrences(pure, "x86_64-linux")).isZero();
+      assertThat(occurrences(native_, "x86_64-linux")).isEqualTo(2);
+      assertThat(pure).isNotEqualTo(native_);
+    }
+
+    @Test
+    @DisplayName("a gem name with a hyphen-digit and a multi-segment platform resolves")
+    void hyphenDigitNameWithPlatform() throws Exception {
+      final var repo = seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+      push(
+              repo.getName(),
+              gem("x-2fa", "1.0.0", "x86_64-linux", "fixture"),
+              adminProtocolBearerToken())
+          .andExpect(status().isOk());
+
+      final var gemspec = gemspec(repo, "x-2fa-1.0.0-x86_64-linux");
+
+      assertThat(occurrences(gemspec, "x-2fa")).isEqualTo(1);
+      expectHead(repo, "x-2fa-1.0.0-x86_64-linux", 200);
+    }
+
+    @Test
+    @DisplayName("a platform that was never pushed, or a yanked one, is 404 on GET and HEAD")
+    void unknownAndYankedPlatformAreNotFound() throws Exception {
+      final var repo = seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+      final var token = adminProtocolBearerToken();
+      push(repo.getName(), gem("yank-gem", "1.5.0", "x86_64-linux", "fixture"), token)
+          .andExpect(status().isOk());
+      push(repo.getName(), gem("yank-gem", "1.5.0", "arm64-darwin", "fixture"), token)
+          .andExpect(status().isOk());
+
+      // Neither the pure gem nor another platform of the version was pushed.
+      for (final var file : List.of("yank-gem-1.5.0", "yank-gem-1.5.0-java")) {
+        protocol(get(QUICK, repo.getName(), file).header(AUTHORIZATION, token))
+            .andExpect(status().isNotFound());
+        expectHead(repo, file, 404);
+      }
+
+      protocol(
+              delete("/{repo}/api/v1/gems/yank", repo.getName())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                  .param("gem_name", "yank-gem")
+                  .param("version", "1.5.0")
+                  .param("platform", "x86_64-linux"))
+          .andExpect(status().isOk());
+
+      protocol(
+              get(QUICK, repo.getName(), "yank-gem-1.5.0-x86_64-linux")
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isNotFound());
+      expectHead(repo, "yank-gem-1.5.0-x86_64-linux", 404);
+      // The other platform of the same version is untouched.
+      assertThat(occurrences(gemspec(repo, "yank-gem-1.5.0-arm64-darwin"), "arm64-darwin"))
+          .isEqualTo(2);
+    }
   }
 
   @Test

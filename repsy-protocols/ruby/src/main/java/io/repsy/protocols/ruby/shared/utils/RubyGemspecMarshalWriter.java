@@ -100,19 +100,18 @@ public class RubyGemspecMarshalWriter {
   // 0x06=1 ivar entry, 0x3b=symbol link, 0x00=index 0 ("E"), 0x54=true (UTF-8 encoding)
   private static final byte[] IVAR_SUFFIX_E_TRUE = {0x06, 0x3b, 0x00, 0x54};
 
-  // Everything after name and version:
+  // After name and version, up to original_platform (array slots 4..7):
   //   date (Time.utc(2000,1,1)), summary=nil,
-  //   required_ruby_version([">= 0"]), required_rubygems_version([">= 0"] via object ref 11),
-  //   original_platform=nil, dependencies=[], rubyforge_project="",
-  //   email=nil, authors=[], description=nil, homepage=nil, has_rdoc=true,
-  //   new_platform="ruby", licenses=[], metadata={}
+  //   required_ruby_version([">= 0"]), required_rubygems_version([">= 0"] via object ref 11).
+  // Then come original_platform, TAIL_MIDDLE, new_platform and TAIL_END, which no object or
+  // symbol reference points into, so the platform strings can vary in length freely.
   //
   // Symbol indices used here (in order of first appearance in the full inner stream):
   //   [0]="E"  [1]="Gem::Version"  [2]="Time"  [3]="zone"  [4]="Gem::Requirement"
   //
   // Object indices used here (objects 0-7 are from the variable prefix):
   //   [11] = Array[">=" Gem::Version("0")] from required_ruby_version → reused via 0x40 0x10
-  private static final byte[] FIXED_TAIL = {
+  private static final byte[] TAIL_HEAD = {
     // date: IVAR u :Time {8 bytes = 2000-01-01 UTC} 1ivar :zone IVAR-String "UTC" 1ivar ;E false
     0x49,
     0x75,
@@ -207,9 +206,16 @@ public class RubyGemspecMarshalWriter {
     0x5b,
     0x06, // Array[1]
     0x40,
-    0x10, // object ref index 11 (16 - 5 = 11) = Array[">=", Gem::Version("0")]
-    // original_platform = nil
-    0x30,
+    0x10 // object ref index 11 (16 - 5 = 11) = Array[">=", Gem::Version("0")]
+  };
+
+  // original_platform (array slot 8) of a pure gem: nil. RubyGems' Gem::Specification._load does
+  // `spec.platform = array[8]`, so this slot decides the platform the client derives
+  // `<name>-<version>-<platform>.gem` from (RPS-1553); slot 16 is not read back by _load.
+  private static final byte[] ORIGINAL_PLATFORM_NIL = {0x30};
+
+  // dependencies = [] up to has_rdoc = true (array slots 9..15)
+  private static final byte[] TAIL_MIDDLE = {
     // dependencies = []
     0x5b,
     0x00,
@@ -231,19 +237,16 @@ public class RubyGemspecMarshalWriter {
     // homepage = nil
     0x30,
     // has_rdoc = true
-    0x54,
-    // new_platform = "ruby"
-    0x49,
-    0x22,
-    0x09,
-    'r',
-    'u',
-    'b',
-    'y', // IVAR String "ruby" (4 chars)
-    0x06,
-    0x3b,
-    0x00,
-    0x54, // 1 ivar ;E true
+    0x54
+  };
+
+  // new_platform "ruby" (array slot 16) of a pure gem: IVAR String "ruby" (4 chars), 1 ivar ;E true
+  private static final byte[] NEW_PLATFORM_RUBY = {
+    0x49, 0x22, 0x09, 'r', 'u', 'b', 'y', 0x06, 0x3b, 0x00, 0x54
+  };
+
+  // licenses = [] and metadata = {} (array slots 17..18)
+  private static final byte[] TAIL_END = {
     // licenses = []
     0x5b,
     0x00,
@@ -252,11 +255,24 @@ public class RubyGemspecMarshalWriter {
     0x00
   };
 
+  private static final String DEFAULT_PLATFORM = "ruby";
+
+  /** The gemspec of a pure-Ruby gem: platform {@code ruby}. */
   public static byte[] dumpGemspec(final String name, final String version) {
+    return dumpGemspec(name, version, DEFAULT_PLATFORM);
+  }
+
+  /**
+   * The gemspec of {@code name} at {@code version} for {@code platform}. RubyGems derives the
+   * {@code .gem} file it downloads from the spec's full name ({@code <name>-<version>-<platform>}),
+   * so a platform gem's gemspec has to carry its platform (RPS-1553). {@code ruby} (a pure gem)
+   * leaves the bytes as they always were.
+   */
+  public static byte[] dumpGemspec(final String name, final String version, final String platform) {
     try {
       final var nameBytes = name.getBytes(StandardCharsets.UTF_8);
       final var versionBytes = version.getBytes(StandardCharsets.UTF_8);
-      final var inner = buildInner(nameBytes, versionBytes);
+      final var inner = buildInner(nameBytes, versionBytes, platform);
       final var out = new ByteArrayOutputStream(OUTER_PREFIX.length + 3 + inner.length);
       out.write(OUTER_PREFIX);
       RubyMarshalWriter.writePackedInt(out, inner.length);
@@ -267,28 +283,50 @@ public class RubyGemspecMarshalWriter {
     }
   }
 
-  private static byte[] buildInner(final byte[] nameBytes, final byte[] versionBytes)
-      throws IOException {
+  private static byte[] buildInner(
+      final byte[] nameBytes, final byte[] versionBytes, final String platform) throws IOException {
+    final var pure = DEFAULT_PLATFORM.equals(platform);
+    final var platformBytes = platform.getBytes(StandardCharsets.UTF_8);
     final var out =
         new ByteArrayOutputStream(
             INNER_PREFIX.length
                 + nameBytes.length
                 + VERSION_PREFIX.length
                 + versionBytes.length
-                + FIXED_TAIL.length
-                + 12);
+                + TAIL_HEAD.length
+                + TAIL_MIDDLE.length
+                + TAIL_END.length
+                + 2 * platformBytes.length
+                + 32);
     out.write(INNER_PREFIX);
     // name: IVAR String {len} {bytes} 1ivar ;E true
-    out.write(IVAR_STRING_HEADER);
-    RubyMarshalWriter.writePackedInt(out, nameBytes.length);
-    out.write(nameBytes);
-    out.write(IVAR_SUFFIX_E_TRUE);
+    writeString(out, nameBytes);
     // version: U :Gem::Version Array[1] IVAR String {len} {bytes} 1ivar ;E true
     out.write(VERSION_PREFIX);
     RubyMarshalWriter.writePackedInt(out, versionBytes.length);
     out.write(versionBytes);
     out.write(IVAR_SUFFIX_E_TRUE);
-    out.write(FIXED_TAIL);
+    out.write(TAIL_HEAD);
+    if (pure) {
+      out.write(ORIGINAL_PLATFORM_NIL);
+      out.write(TAIL_MIDDLE);
+      out.write(NEW_PLATFORM_RUBY);
+    } else {
+      // Both slots carry the platform string: slot 8 is what _load reads, slot 16 is what a
+      // reader that does not go through _load would see (the real dump has a Gem::Platform).
+      writeString(out, platformBytes);
+      out.write(TAIL_MIDDLE);
+      writeString(out, platformBytes);
+    }
+    out.write(TAIL_END);
     return out.toByteArray();
+  }
+
+  private static void writeString(final ByteArrayOutputStream out, final byte[] bytes)
+      throws IOException {
+    out.write(IVAR_STRING_HEADER);
+    RubyMarshalWriter.writePackedInt(out, bytes.length);
+    out.write(bytes);
+    out.write(IVAR_SUFFIX_E_TRUE);
   }
 }

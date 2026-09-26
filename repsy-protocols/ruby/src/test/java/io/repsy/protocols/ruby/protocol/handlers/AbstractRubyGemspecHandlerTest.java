@@ -139,7 +139,7 @@ class AbstractRubyGemspecHandlerTest {
   @Test
   @DisplayName("splits a plain name-version filename and answers 200 octet-stream")
   void splitsPlainFilename() {
-    when(this.facade.getGemspec(any(), eq("demo"), eq("1.2.3")))
+    when(this.facade.getGemspec(any(), eq("demo-1.2.3")))
         .thenReturn("stub".getBytes(StandardCharsets.UTF_8));
 
     final var response =
@@ -152,13 +152,13 @@ class AbstractRubyGemspecHandlerTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getHeaders().getContentType())
         .isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
-    verify(this.facade).getGemspec(any(), eq("demo"), eq("1.2.3"));
+    verify(this.facade).getGemspec(any(), eq("demo-1.2.3"));
   }
 
   @Test
   @DisplayName("names the download after the .gemspec.rz file instead of f.txt (RPS-1442)")
   void namesTheGemspecFile() {
-    when(this.facade.getGemspec(any(), eq("demo"), eq("1.2.3"))).thenReturn(new byte[0]);
+    when(this.facade.getGemspec(any(), eq("demo-1.2.3"))).thenReturn(new byte[0]);
 
     final var response =
         this.handler()
@@ -171,46 +171,30 @@ class AbstractRubyGemspecHandlerTest {
         .isEqualTo("attachment; filename=\"demo-1.2.3.gemspec.rz\"");
   }
 
-  @Test
-  @DisplayName("strips a platform suffix from the version")
-  void stripsPlatformSuffix() {
-    when(this.facade.getGemspec(any(), eq("demo"), eq("1.2.3"))).thenReturn(new byte[0]);
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "demo-1.2.3-java",
+        "demo-1.2.3-x86_64-linux",
+        "demo-1.2.3-arm64-darwin",
+        "demo-1.2.3-universal-darwin",
+        "demo-1.2.3-universal-darwin-20",
+        "foo-2fa-1.0.0",
+        "foo-2fa-1.0.0-x86_64-linux",
+      })
+  @DisplayName("hands the whole name-version[-platform] to the facade to resolve (RPS-1553)")
+  void passesTheWholeGemspecName(final String gemspecName) {
+    when(this.facade.getGemspec(any(), eq(gemspecName))).thenReturn(new byte[0]);
 
-    this.handler()
-        .handle(
-            contextFor("/quick/Marshal.4.8/demo-1.2.3-java.gemspec.rz"),
-            new MockHttpServletRequest(),
-            new MockHttpServletResponse());
-
-    verify(this.facade).getGemspec(any(), eq("demo"), eq("1.2.3"));
-  }
-
-  @Test
-  @DisplayName("finds the last name/version boundary so a name containing digits stays whole")
-  void findsLastBoundary() {
-    when(this.facade.getGemspec(any(), eq("foo-2fa"), eq("1.0.0"))).thenReturn(new byte[0]);
-
-    this.handler()
-        .handle(
-            contextFor("/quick/Marshal.4.8/foo-2fa-1.0.0.gemspec.rz"),
-            new MockHttpServletRequest(),
-            new MockHttpServletResponse());
-
-    verify(this.facade).getGemspec(any(), eq("foo-2fa"), eq("1.0.0"));
-  }
-
-  @Test
-  @DisplayName("404s a filename with no name/version boundary, without calling the facade")
-  void answersNotFoundWhenNoBoundary() {
     final var response =
         this.handler()
             .handle(
-                contextFor("/quick/Marshal.4.8/noboundary.gemspec.rz"),
+                contextFor("/quick/Marshal.4.8/" + gemspecName + ".gemspec.rz"),
                 new MockHttpServletRequest(),
                 new MockHttpServletResponse());
 
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-    verifyNoInteractions(this.facade);
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    verify(this.facade).getGemspec(any(), eq(gemspecName));
   }
 
   @Test
@@ -218,7 +202,7 @@ class AbstractRubyGemspecHandlerTest {
       "deflates the facade's bytes with raw-zlib framing that InflaterInputStream reads back")
   void deflatesRawZlib() throws Exception {
     final var raw = "the-gemspec-marshal-bytes".repeat(20).getBytes(StandardCharsets.UTF_8);
-    when(this.facade.getGemspec(any(), eq("demo"), eq("1.2.3"))).thenReturn(raw);
+    when(this.facade.getGemspec(any(), eq("demo-1.2.3"))).thenReturn(raw);
 
     final var response =
         this.handler()
@@ -237,7 +221,7 @@ class AbstractRubyGemspecHandlerTest {
   @Test
   @DisplayName("maps a facade ItemNotFoundException to 404")
   void mapsNotFoundExceptionTo404() {
-    when(this.facade.getGemspec(any(), eq("demo"), eq("1.2.3")))
+    when(this.facade.getGemspec(any(), eq("demo-1.2.3")))
         .thenThrow(new ItemNotFoundException("gemVersionNotFound"));
 
     final var response =

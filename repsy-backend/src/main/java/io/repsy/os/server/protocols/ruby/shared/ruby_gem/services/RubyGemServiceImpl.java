@@ -129,17 +129,6 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   }
 
   @Override
-  public boolean hasNonYankedVersion(
-      final BaseRepoInfo<UUID> repoInfo, final String gemName, final String version) {
-    return this.gemRepository
-        .findByRepoIdAndName(repoInfo.getId(), gemName)
-        .map(
-            gem ->
-                this.versionRepository.existsByGemIdAndVersionAndYankedFalse(gem.getId(), version))
-        .orElse(false);
-  }
-
-  @Override
   @Transactional(rollbackFor = IOException.class)
   public BaseUsages publishGem(
       final BaseRepoInfo<UUID> repoInfo,

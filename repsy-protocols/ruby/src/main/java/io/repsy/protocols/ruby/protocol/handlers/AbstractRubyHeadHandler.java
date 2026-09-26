@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -126,42 +125,9 @@ public abstract class AbstractRubyHeadHandler implements ProtocolMethodHandler {
 
     final var gemspecMatcher = GEMSPEC_PATTERN.matcher(relativePath);
     if (gemspecMatcher.matches()) {
-      final var parsed = parseGemspecFilename(gemspecMatcher.group(1));
-      return parsed != null && this.facade.gemspecExists(context, parsed[0], parsed[1]);
+      return this.facade.gemspecExists(context, gemspecMatcher.group(1));
     }
 
     return false;
-  }
-
-  /**
-   * Same name/version split {@link AbstractRubyGemspecHandler} uses for the GET route: the last
-   * {@code -<digit>} boundary gives the name (so a hyphen-digit gem name resolves correctly), and a
-   * trailing non-digit-initial {@code -<segment>} is a platform suffix stripped from the version.
-   */
-  private static String @Nullable [] parseGemspecFilename(final String fullName) {
-    final var nameEnd = findNameVersionBoundary(fullName);
-    if (nameEnd < 0) {
-      return null;
-    }
-    final var name = fullName.substring(0, nameEnd);
-    final var version = stripPlatformSuffix(fullName.substring(nameEnd + 1));
-    return new String[] {name, version};
-  }
-
-  private static int findNameVersionBoundary(final String fullName) {
-    for (var i = fullName.length() - 2; i >= 1; i--) {
-      if (fullName.charAt(i) == '-' && Character.isDigit(fullName.charAt(i + 1))) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  private static String stripPlatformSuffix(final String versionWithPlatform) {
-    final var dash = versionWithPlatform.lastIndexOf('-');
-    if (dash > 0 && !Character.isDigit(versionWithPlatform.charAt(dash + 1))) {
-      return versionWithPlatform.substring(0, dash);
-    }
-    return versionWithPlatform;
   }
 }

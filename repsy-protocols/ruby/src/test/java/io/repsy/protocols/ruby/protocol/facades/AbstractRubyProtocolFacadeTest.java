@@ -33,6 +33,7 @@ import io.repsy.protocols.ruby.shared.gem.dtos.GemCompactEntry;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
 import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
 import io.repsy.protocols.ruby.shared.storage.services.RubyStorageService;
+import io.repsy.protocols.ruby.shared.utils.RubyGemspecMarshalWriter;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import io.repsy.protocols.shared.utils.SpooledUpload;
@@ -338,10 +339,58 @@ class AbstractRubyProtocolFacadeTest {
   }
 
   @Test
-  @DisplayName("gemspecExists() delegates to the service's non-yanked-version check")
-  void gemspecExistsDelegates() {
-    when(this.gemService.hasNonYankedVersion(any(), eq("demo"), eq("1.0.0"))).thenReturn(true);
+  @DisplayName("gemspecExists() resolves the name as the .gem filename of a stored row")
+  void gemspecExistsResolvesTheFilename() {
+    when(this.gemService.findByGemFilename(any(), eq("demo-1.0.0-x86_64-linux.gem")))
+        .thenReturn(Optional.of(entry("demo", "1.0.0", "x86_64-linux", false)));
+    when(this.gemService.findByGemFilename(any(), eq("demo-1.0.0-arm64-darwin.gem")))
+        .thenReturn(Optional.empty());
 
-    assertThat(this.facade.gemspecExists(this.context, "demo", "1.0.0")).isTrue();
+    assertThat(this.facade.gemspecExists(this.context, "demo-1.0.0-x86_64-linux")).isTrue();
+    assertThat(this.facade.gemspecExists(this.context, "demo-1.0.0-arm64-darwin")).isFalse();
+  }
+
+  @Test
+  @DisplayName("gemspecExists() does not count a yanked version")
+  void gemspecExistsIgnoresAYankedVersion() {
+    when(this.gemService.findByGemFilename(any(), eq("demo-1.0.0.gem")))
+        .thenReturn(Optional.of(entry("demo", "1.0.0", "ruby", true)));
+
+    assertThat(this.facade.gemspecExists(this.context, "demo-1.0.0")).isFalse();
+  }
+
+  @Test
+  @DisplayName("getGemspec() of a platform gem carries the platform of the stored row (RPS-1553)")
+  void getGemspecCarriesThePlatform() {
+    when(this.gemService.findByGemFilename(any(), eq("demo-1.5.0-x86_64-linux.gem")))
+        .thenReturn(Optional.of(entry("demo", "1.5.0", "x86_64-linux", false)));
+
+    assertThat(this.facade.getGemspec(this.context, "demo-1.5.0-x86_64-linux"))
+        .isEqualTo(RubyGemspecMarshalWriter.dumpGemspec("demo", "1.5.0", "x86_64-linux"))
+        .isNotEqualTo(RubyGemspecMarshalWriter.dumpGemspec("demo", "1.5.0"));
+  }
+
+  @Test
+  @DisplayName("getGemspec() of a pure gem is the platform-less gemspec")
+  void getGemspecOfAPureGem() {
+    when(this.gemService.findByGemFilename(any(), eq("foo-2fa-1.0.0.gem")))
+        .thenReturn(Optional.of(entry("foo-2fa", "1.0.0", "ruby", false)));
+
+    assertThat(this.facade.getGemspec(this.context, "foo-2fa-1.0.0"))
+        .isEqualTo(RubyGemspecMarshalWriter.dumpGemspec("foo-2fa", "1.0.0"));
+  }
+
+  @Test
+  @DisplayName("getGemspec() answers not found for an unknown or a yanked version")
+  void getGemspecNotFound() {
+    when(this.gemService.findByGemFilename(any(), eq("demo-9.9.9.gem")))
+        .thenReturn(Optional.empty());
+    when(this.gemService.findByGemFilename(any(), eq("demo-1.0.0.gem")))
+        .thenReturn(Optional.of(entry("demo", "1.0.0", "ruby", true)));
+
+    assertThatThrownBy(() -> this.facade.getGemspec(this.context, "demo-9.9.9"))
+        .isInstanceOf(ItemNotFoundException.class);
+    assertThatThrownBy(() -> this.facade.getGemspec(this.context, "demo-1.0.0"))
+        .isInstanceOf(ItemNotFoundException.class);
   }
 }
