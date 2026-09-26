@@ -34,7 +34,6 @@ import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.error_handling.exceptions.InvalidPagingParameterException;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
-import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import jakarta.persistence.LockTimeoutException;
 import jakarta.persistence.OptimisticLockException;
@@ -841,17 +840,20 @@ public class ErrorHandler {
    * it is not a server error (RPS-1325, RPS-1342). Both answers carry the same {@code
    * concurrentModification} message id.
    *
-   * <p>A panel or other protocol request gets 409: the client re-reads and repeats. A request on
-   * the OCI {@code /v2/} endpoints gets 503 with a {@code Retry-After} instead. The distribution
-   * specification maps a 409 to {@code DENIED}, which tells the user they lack access, and a client
-   * that retries anything retries a 5xx. Checked against real clients (RPS-1342): {@code crane}
-   * repeats a manifest PUT that was answered 503 (after its own 1 s and 3 s backoff, it does not
-   * read the {@code Retry-After} value) and the push then succeeds; the {@code docker} CLI does not
-   * repeat the manifest PUT, it stops with {@code received unexpected HTTP status: 503}, and the
-   * user pushes again. The push handler already repeats the save a few times, so this answer means
-   * a heavily contended tag, which is exactly what a later retry resolves. The body stays in the
-   * distribution format through {@link OciErrorBodyAdvice}. 429 was not chosen because nothing here
-   * is rate limiting.
+   * <p>A panel API request gets 409: the client re-reads and repeats. A request on a protocol port
+   * (the OCI {@code /v2/} endpoints and every other package format) gets 503 with a {@code
+   * Retry-After} instead (RPS-1355). On a package protocol 409 already means "this version exists",
+   * so {@code twine --skip-existing} and {@code dotnet nuget push --skip-duplicate} would take a
+   * lost race for a duplicate and skip the push, while npm, pip, Maven, Cargo, NuGet and {@code
+   * crane} retry a 503. On the OCI endpoints the distribution specification maps a 409 to {@code
+   * DENIED}, which tells the user they lack access, and a client that retries anything retries a
+   * 5xx. Checked against real clients (RPS-1342): {@code crane} repeats a manifest PUT that was
+   * answered 503 (after its own 1 s and 3 s backoff, it does not read the {@code Retry-After}
+   * value) and the push then succeeds; the {@code docker} CLI does not repeat the manifest PUT, it
+   * stops with {@code received unexpected HTTP status: 503}, and the user pushes again. The push
+   * handler already repeats the save a few times, so this answer means a heavily contended tag,
+   * which is exactly what a later retry resolves. The body stays in the distribution format through
+   * {@link OciErrorBodyAdvice}. 429 was not chosen because nothing here is rate limiting.
    *
    * @param ex Thrown exception
    * @return REST response
@@ -869,7 +871,7 @@ public class ErrorHandler {
 
     log.warn("Optimistic lock failure: {}", exceptionToString(ex, request));
 
-    if (OciErrors.isOciRequest(request)) {
+    if (!isPanelRequest(request)) {
       return retryLater(this.resp.error(ERR_CONCURRENT_MODIFICATION));
     }
 
@@ -945,6 +947,7 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
         .contentType(MediaType.APPLICATION_JSON)
+        .header(HttpHeaders.RETRY_AFTER, LOCK_FAILURE_RETRY_AFTER)
         .body(this.resp.error(ERR_SCAN_EXECUTOR_SATURATED, ex.getMessage()));
   }
 

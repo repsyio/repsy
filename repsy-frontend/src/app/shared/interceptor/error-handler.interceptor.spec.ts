@@ -105,6 +105,18 @@ describe('errorHandlerInterceptor', () => {
     expect(toastService.show).toHaveBeenCalledWith('Server error', 'error');
   });
 
+  it('shows the server text for a 503 that carries one (a lock race or a full scan queue)', () => {
+    fail(503, {
+      msgId: 'resourceBusy',
+      text: 'The item is in use by another request. Please try again shortly.',
+    });
+
+    expect(toastService.show).toHaveBeenCalledOnceWith(
+      'The item is in use by another request. Please try again shortly.',
+      'error',
+    );
+  });
+
   it('shows the server text for other 4xx errors and falls back to a generic message', () => {
     fail(400, { text: 'Repository name is taken' });
     expect(toastService.show).toHaveBeenCalledWith('Repository name is taken', 'error');

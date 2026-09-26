@@ -406,10 +406,10 @@ class ErrorHandlerTest {
   }
 
   @Test
-  @DisplayName("answers 409 concurrentModification for a lost optimistic-lock race (RPS-1325)")
+  @DisplayName("answers 409 concurrentModification to a panel request that lost a race (RPS-1325)")
   void optimisticLockFailure() throws Exception {
     this.mockMvc
-        .perform(get("/optimistic-lock"))
+        .perform(get("/panel/optimistic-lock"))
         .andExpect(status().isConflict())
         .andExpect(header().doesNotExist(HttpHeaders.RETRY_AFTER))
         .andExpect(jsonPath("$.msgId").value("concurrentModification"))
@@ -422,10 +422,10 @@ class ErrorHandlerTest {
   }
 
   @Test
-  @DisplayName("answers 409 for the plain OptimisticLockingFailureException as well")
+  @DisplayName("answers 409 for the plain OptimisticLockingFailureException on the panel as well")
   void plainOptimisticLockFailure() throws Exception {
     this.mockMvc
-        .perform(get("/optimistic-lock/plain"))
+        .perform(get("/panel/optimistic-lock/plain"))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.msgId").value("concurrentModification"));
   }
@@ -442,10 +442,24 @@ class ErrorHandlerTest {
         .andExpect(jsonPath("$.msgId").value("concurrentModification"));
   }
 
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"/api/repo/charts", "/api/repo/charts/plain", "/api/repo/charts/jpa"})
+  @DisplayName(
+      "answers 503 with Retry-After to a package protocol request that lost a race (RPS-1355)")
+  void optimisticLockFailureOnProtocolPath(final String path) throws Exception {
+    this.mockMvc
+        .perform(get(path))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "1"))
+        .andExpect(jsonPath("$.msgId").value("concurrentModification"))
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(jsonPath("$.data").doesNotExist());
+  }
+
   @Test
   @DisplayName("logs a lost optimistic-lock race as a warning, not as an error")
   void optimisticLockFailureIsLoggedAsWarning() throws Exception {
-    this.mockMvc.perform(get("/optimistic-lock")).andExpect(status().isConflict());
+    this.mockMvc.perform(get("/panel/optimistic-lock")).andExpect(status().isConflict());
 
     assertThat(this.logEvents.list)
         .filteredOn(event -> event.getLevel().isGreaterOrEqual(Level.WARN))
@@ -469,7 +483,7 @@ class ErrorHandlerTest {
   @DisplayName("answers 409 concurrentModification for a raw JPA optimistic-lock exception")
   void rawOptimisticLockFailure() throws Exception {
     this.mockMvc
-        .perform(get("/lock/optimistic-jpa"))
+        .perform(get("/panel/lock/optimistic-jpa"))
         .andExpect(status().isConflict())
         .andExpect(header().doesNotExist(HttpHeaders.RETRY_AFTER))
         .andExpect(jsonPath("$.msgId").value("concurrentModification"));
@@ -547,6 +561,7 @@ class ErrorHandlerTest {
     this.mockMvc
         .perform(get("/retryable"))
         .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "1"))
         .andExpect(jsonPath("$.msgId").value("scanExecutorSaturated"))
         .andExpect(jsonPath("$.text").value("Vulnerability scanning is busy. Please retry later."));
   }
@@ -837,14 +852,20 @@ class ErrorHandlerTest {
       throw new MfaException(null);
     }
 
-    @GetMapping("/optimistic-lock")
-    String optimisticLock() {
+    /** A package protocol path that is neither OCI nor panel, like the Helm classic charts API. */
+    @GetMapping("/api/repo/charts")
+    String protocolOptimisticLock() {
       throw new ObjectOptimisticLockingFailureException(Object.class, "id");
     }
 
-    @GetMapping("/optimistic-lock/plain")
-    String plainOptimisticLock() {
+    @GetMapping("/api/repo/charts/plain")
+    String protocolPlainOptimisticLock() {
       throw new OptimisticLockingFailureException("stale");
+    }
+
+    @GetMapping("/api/repo/charts/jpa")
+    String protocolJpaOptimisticLock() {
+      throw new OptimisticLockException("stale");
     }
 
     @GetMapping("/v2/repo/app/manifests/latest")
@@ -864,7 +885,6 @@ class ErrorHandlerTest {
 
     private static RuntimeException lockException(final String kind) {
       return switch (kind) {
-        case "optimistic-jpa" -> new OptimisticLockException("stale");
         case "cannot-acquire-lock" -> new CannotAcquireLockException("lock wait timeout");
         case "deadlock-loser" -> new DeadlockLoserDataAccessException("deadlock", null);
         case "cannot-serialize" -> new CannotSerializeTransactionException("serialization failure");
@@ -936,6 +956,21 @@ class ErrorHandlerTest {
     @GetMapping("/unauthorized/plain")
     String unauthorizedPlain() {
       throw new UnAuthorizedException("unAuthorized");
+    }
+
+    @GetMapping("/optimistic-lock")
+    String optimisticLock() {
+      throw new ObjectOptimisticLockingFailureException(Object.class, "id");
+    }
+
+    @GetMapping("/optimistic-lock/plain")
+    String plainOptimisticLock() {
+      throw new OptimisticLockingFailureException("stale");
+    }
+
+    @GetMapping("/lock/optimistic-jpa")
+    String rawOptimisticLock() {
+      throw new OptimisticLockException("stale");
     }
 
     @GetMapping("/unauthorized/basic")
