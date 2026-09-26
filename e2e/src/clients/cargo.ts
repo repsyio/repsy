@@ -80,6 +80,7 @@ import {
 } from './cargo-raw.js';
 import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
+import { randomPadding } from './padding.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.resolve(__dirname, '../packages/cargo');
@@ -115,11 +116,14 @@ export async function renderCargoConfig(work: string, repoName: string): Promise
   });
 }
 
-/** Renders the tiny publishable crate (Cargo.toml, src/lib.rs, a fresh random marker file). */
-async function renderCrate(
+/** Renders the tiny publishable crate (Cargo.toml, src/lib.rs, a fresh random marker file). `padBytes`
+ *  adds a file of random bytes (`e2e-padding.bin`, `padding.ts`) for the size-limit leg (RPS-1482), which
+ *  renders the crate itself to publish it over the limit. */
+export async function renderCrate(
   work: string,
   crate: string,
   version: string,
+  padBytes?: number,
 ): Promise<{ marker: string }> {
   await renderTemplate('Cargo.template.toml', path.join(work, 'Cargo.toml'), {
     crateName: crate,
@@ -130,6 +134,9 @@ async function renderCrate(
   await renderTemplate('lib.template.rs', path.join(srcDir, 'lib.rs'), {});
   const marker = randomUUID();
   await fs.writeFile(path.join(work, MARKER_FILENAME), marker, 'utf8');
+  if (padBytes !== undefined) {
+    await fs.writeFile(path.join(work, 'e2e-padding.bin'), randomPadding(padBytes));
+  }
   return { marker };
 }
 

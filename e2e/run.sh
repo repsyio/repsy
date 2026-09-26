@@ -63,8 +63,8 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--force]
-  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls]
+  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--force]
+  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits]
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
@@ -110,6 +110,11 @@ generated into e2e/.tls/<project> (docker-compose.stack-tls.yml). With the switc
 client trust that CA in its own way. Give "test" the same switch as "up" (REPSY_E2E_TLS=1). The ui runner
 is left out. See README.md "TLS stack".
 
+--limits (or REPSY_E2E_LIMITS=1) is the fourth overlay: Repsy starts with tiny upload size limits, 64 KiB for a
+PyPI/Helm/NuGet upload, a gem, a crate and a Go module zip (docker-compose.stack-limits.yml), for the @limits
+specs of the pypi, helm, nuget, ruby, cargo, golang and api runners: an over-limit push gets a 413. No other
+suite may run there. See README.md "Size-limit leg".
+
 Parallel stacks (README.md "Parallel stacks"): the stack is the compose project --project NAME
 (default repsy-e2e) with its host ports moved up by --port-offset N (default 0: panel API 8080, repo
 protocols 9090, stub scanner 8090). Two checkouts that run stacks at the same time each need their
@@ -129,6 +134,7 @@ OVERLAYS=(
   "scanner|--scanner|REPSY_E2E_SCANNER|docker-compose.stack-scanner.yml"
   "throttle|--throttle|REPSY_E2E_THROTTLE|docker-compose.stack-throttle.yml"
   "tls|--tls|REPSY_E2E_TLS|docker-compose.stack-tls.yml"
+  "limits|--limits|REPSY_E2E_LIMITS|docker-compose.stack-limits.yml"
 )
 
 # Field $2 (1 name, 2 flag, 3 env switch, 4 file) of the overlay row $1.
@@ -486,6 +492,9 @@ cmd_local_up() {
   fi
   if overlay_active throttle; then
     echo "Throttle overlay on: 3 failed password checks per 10 s per client; run REPSY_E2E_THROTTLE=1 ./run.sh test --protocol stack,ui --grep @throttle (the ui runner last: AUTH-11 locks the docker gateway's bucket)"
+  fi
+  if overlay_active limits; then
+    echo "Limits overlay on: uploads over 64 KiB are refused (413); run REPSY_E2E_LIMITS=1 ./run.sh test --protocol pypi,helm,nuget,ruby,cargo,golang,api --grep @limits, one runner per call"
   fi
   if overlay_active scanner; then
     echo "Scanner enabled: run the @scanner specs with REPSY_UI_OPT_IN=scanner (or REPSY_E2E_SCANNER=1) ./run.sh test --protocol ui --grep @scanner"
