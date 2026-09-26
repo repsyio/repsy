@@ -11,6 +11,7 @@
       [checked]="!this.parentForm.get('privateRepository').value"
       checkedLabel="Public"
       uncheckedLabel="Private"
+      [disabled]="saving"
       (checkedChange)="changePrivacy($event)"
     />
 

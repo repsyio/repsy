@@ -111,7 +111,7 @@ test.describe('Repository settings: visibility', { tag: SETTINGS }, () => {
         .poll(async () => (await panelApi.getSettings(repo.name)).privateRepo)
         .toBe(false);
 
-      // The toggle PUTs the whole form: nothing else on the repo may have moved with it.
+      // The toggle PUTs only its own field: nothing else on the repo may have moved with it (all of them: SET-12).
       const afterPublic = await panelApi.getSettings(repo.name);
       expect(afterPublic).toMatchObject({ allowOverride: false, releases: true, snapshots: false });
       // Public means the repo port serves an anonymous reader, so this is not just a stored flag.
@@ -310,7 +310,7 @@ test.describe('Repository settings: version allowance', { tag: SETTINGS }, () =>
     await settings.shell.toasts.expectSuccess('Version allowance has changed to all packages');
     await expectStored(true, true);
 
-    // The other settings were carried along untouched.
+    // The other settings were not touched (the selector sends only snapshots and releases, RPS-1619).
     expect(await panelApi.getSettings(repo.name)).toMatchObject({
       privateRepo: true,
       allowOverride: true,

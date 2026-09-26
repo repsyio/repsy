@@ -22,7 +22,7 @@ import { ProtocolRepoControllerService, RepoSettingsForm } from '../../../../../
 import { SelectorComponent } from '../../../../shared/components/selector/selector.component';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { RepoSupport, RepoType } from '../../../../shared/dto/repo/repo-type';
-import { MavenService } from '../../maven/service/maven.service';
+import { saveRepoSetting } from '../save-repo-setting';
 
 @Component({
   selector: 'app-maven-version-allowence',
@@ -40,11 +40,16 @@ export class VersionAllowanceComponent implements OnInit {
   public selectedOption: RepoSupport = RepoSupport.ALL;
   public repoOptions: RepoSupport[] = [];
 
+  /** A save is on its way: the selector is locked, so a double click sends one request (RPS-1618). */
+  public saving = false;
+
+  /** The option the repository has, to go back to when a save fails. */
+  private savedOption: RepoSupport = RepoSupport.ALL;
+
   private readonly MAVEN_OPTIONS = [RepoSupport.ALL, RepoSupport.SNAPSHOTS, RepoSupport.RELEASES];
   private readonly NUGET_OPTIONS = [RepoSupport.ALL, RepoSupport.PRE_RELEASE, RepoSupport.STABLE];
 
   constructor(
-    private readonly mavenService: MavenService,
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly toastService: ToastService,
   ) {}
@@ -55,6 +60,7 @@ export class VersionAllowanceComponent implements OnInit {
     const snapshots = this.parentForm.get('snapshots')!.value;
     const releases = this.parentForm.get('releases')!.value;
     this.selectedOption = this.resolveSelectedOption(snapshots, releases);
+    this.savedOption = this.selectedOption;
   }
 
   public selectType(option: string) {
@@ -62,30 +68,20 @@ export class VersionAllowanceComponent implements OnInit {
       option === RepoSupport.SNAPSHOTS || option === RepoSupport.PRE_RELEASE || option === RepoSupport.ALL;
     const releases = option === RepoSupport.RELEASES || option === RepoSupport.STABLE || option === RepoSupport.ALL;
 
-    const form: RepoSettingsForm = {};
-    form.privateRepo = this.parentForm.get('privateRepository')!.value;
-    form.allowOverride = this.parentForm.get('allowOverride')!.value;
-    form.snapshots = snapshots;
-    form.releases = releases;
-    form.securityScanEnabled = this.parentForm.get('securityScanEnabled')!.value;
+    this.saving = true;
 
-    if (this.repoType === RepoType.NUGET) {
-      this.protocolRepoControllerService.updateRepoSettings(this.repoName, form).subscribe({
-        next: () => {
-          this.fetch.emit();
-          this.toastService.show(`Version allowance has changed to ${option}`, 'success');
-        },
-        error: () => {},
-      });
-    } else {
-      this.mavenService.updateRepoSettings(form).subscribe({
-        next: () => {
-          this.fetch.emit();
-          this.toastService.show(`Version allowance has changed to ${option}`, 'success');
-        },
-        error: () => {},
-      });
-    }
+    // Only the two fields this selector owns are sent (RPS-1619): the rest of the form was loaded when the page opened.
+    const form: RepoSettingsForm = { snapshots, releases };
+
+    saveRepoSetting(this.protocolRepoControllerService.updateRepoSettings(this.repoName, form), {
+      saved: () => {
+        this.savedOption = option as RepoSupport;
+        this.fetch.emit();
+        this.toastService.show(`Version allowance has changed to ${option}`, 'success');
+      },
+      failed: () => (this.selectedOption = this.savedOption),
+      settled: () => (this.saving = false),
+    });
   }
 
   private resolveSelectedOption(snapshots: boolean, releases: boolean): RepoSupport {

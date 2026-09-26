@@ -31,6 +31,8 @@ export class SelectorComponent implements OnInit {
   @Input() public size: 'small' | 'big' = 'small';
   @Input() public options: string[];
   @Input() public selectedOption: string;
+  /** Locks the selector, e.g. while the change it made is being saved. */
+  @Input() public disabled = false;
   @Output() public selectedOptionChange = new EventEmitter<string>();
   @Output() public choose = new EventEmitter<string>();
   public isOpen = false;

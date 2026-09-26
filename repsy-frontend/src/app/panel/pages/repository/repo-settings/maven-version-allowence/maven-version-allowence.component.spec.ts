@@ -14,12 +14,11 @@
 /// limitations under the License.
 ///
 
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 import { ProtocolRepoControllerService } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { RepoSupport, RepoType } from '../../../../shared/dto/repo/repo-type';
-import { MavenService } from '../../maven/service/maven.service';
 import { lastSentForm, releaseAwareParentForm } from '../testing/repo-settings-spec-helpers';
 import { VersionAllowanceComponent } from './maven-version-allowence.component';
 
@@ -27,21 +26,18 @@ const REPO = 'acme-repo';
 
 describe('VersionAllowanceComponent', () => {
   let component: VersionAllowanceComponent;
-  let mavenService: jasmine.SpyObj<MavenService>;
   let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let fetchCount: number;
 
   beforeEach(() => {
-    mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['updateRepoSettings']);
     repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
       'updateRepoSettings',
     ]);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
-    mavenService.updateRepoSettings.and.returnValue(of(undefined));
     repoApi.updateRepoSettings.and.returnValue(of({}) as never);
 
-    component = new VersionAllowanceComponent(mavenService, repoApi, toastService);
+    component = new VersionAllowanceComponent(repoApi, toastService);
     component.repoName = REPO;
     fetchCount = 0;
     component.fetch.subscribe(() => fetchCount++);
@@ -98,88 +94,77 @@ describe('VersionAllowanceComponent', () => {
     });
   });
 
-  describe('selectType on a Maven repository', () => {
-    beforeEach(() => init(RepoType.MAVEN, true, true));
+  [RepoType.MAVEN, RepoType.NUGET].forEach((repoType) => {
+    const cases: [RepoSupport, boolean, boolean][] =
+      repoType === RepoType.MAVEN
+        ? [
+            [RepoSupport.ALL, true, true],
+            [RepoSupport.SNAPSHOTS, true, false],
+            [RepoSupport.RELEASES, false, true],
+          ]
+        : [
+            [RepoSupport.ALL, true, true],
+            [RepoSupport.PRE_RELEASE, true, false],
+            [RepoSupport.STABLE, false, true],
+          ];
 
-    const cases: [RepoSupport, boolean, boolean][] = [
-      [RepoSupport.ALL, true, true],
-      [RepoSupport.SNAPSHOTS, true, false],
-      [RepoSupport.RELEASES, false, true],
-    ];
+    describe(`selectType on a ${repoType} repository`, () => {
+      beforeEach(() => init(repoType, true, true));
 
-    cases.forEach(([option, snapshots, releases]) => {
-      it(`saves snapshots=${snapshots} and releases=${releases} for "${option}", keeping the other settings`, () => {
-        component.selectType(option);
+      cases.forEach(([option, snapshots, releases]) => {
+        it(`sends only snapshots=${snapshots} and releases=${releases} for "${option}" (RPS-1619)`, () => {
+          component.selectType(option);
 
-        expect(repoApi.updateRepoSettings).not.toHaveBeenCalled();
-        expect(mavenService.updateRepoSettings).toHaveBeenCalledTimes(1);
-        expect(lastSentForm(mavenService.updateRepoSettings, 0)).toEqual({
-          privateRepo: true,
-          allowOverride: false,
-          snapshots,
-          releases,
-          securityScanEnabled: false,
+          expect(repoApi.updateRepoSettings).toHaveBeenCalledTimes(1);
+          expect(repoApi.updateRepoSettings.calls.mostRecent().args[0]).toBe(REPO);
+          expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({ snapshots, releases });
         });
       });
-    });
 
-    it('refreshes the settings and toasts once saved', () => {
-      component.selectType(RepoSupport.RELEASES);
+      it('refreshes the settings and toasts once saved', () => {
+        const option = cases[2][0];
 
-      expect(fetchCount).toBe(1);
-      expect(toastService.show).toHaveBeenCalledOnceWith('Version allowance has changed to releases', 'success');
-    });
-
-    it('does nothing further when saving fails, leaving the error to the interceptor', () => {
-      mavenService.updateRepoSettings.and.returnValue(throwError(() => new Error('boom')));
-
-      component.selectType(RepoSupport.RELEASES);
-
-      expect(fetchCount).toBe(0);
-      expect(toastService.show).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('selectType on a NuGet repository', () => {
-    beforeEach(() => init(RepoType.NUGET, true, true));
-
-    const cases: [RepoSupport, boolean, boolean][] = [
-      [RepoSupport.ALL, true, true],
-      [RepoSupport.PRE_RELEASE, true, false],
-      [RepoSupport.STABLE, false, true],
-    ];
-
-    cases.forEach(([option, snapshots, releases]) => {
-      it(`saves snapshots=${snapshots} and releases=${releases} for "${option}" through the repository API`, () => {
         component.selectType(option);
 
-        expect(mavenService.updateRepoSettings).not.toHaveBeenCalled();
-        expect(repoApi.updateRepoSettings).toHaveBeenCalledTimes(1);
-        expect(repoApi.updateRepoSettings.calls.mostRecent().args[0]).toBe(REPO);
-        expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({
-          privateRepo: true,
-          allowOverride: false,
-          snapshots,
-          releases,
-          securityScanEnabled: false,
-        });
+        expect(fetchCount).toBe(1);
+        expect(toastService.show).toHaveBeenCalledOnceWith(`Version allowance has changed to ${option}`, 'success');
       });
-    });
 
-    it('refreshes the settings and toasts once saved', () => {
-      component.selectType(RepoSupport.STABLE);
+      it('locks the selector while the save is on its way and unlocks it afterwards', () => {
+        const inFlight = new Subject<object>();
+        repoApi.updateRepoSettings.and.returnValue(inFlight as never);
 
-      expect(fetchCount).toBe(1);
-      expect(toastService.show).toHaveBeenCalledOnceWith('Version allowance has changed to stable', 'success');
-    });
+        component.selectType(cases[1][0]);
 
-    it('does nothing further when saving fails', () => {
-      repoApi.updateRepoSettings.and.returnValue(throwError(() => new Error('boom')));
+        expect(component.saving).toBeTrue();
 
-      component.selectType(RepoSupport.STABLE);
+        inFlight.next({});
+        inFlight.complete();
 
-      expect(fetchCount).toBe(0);
-      expect(toastService.show).not.toHaveBeenCalled();
+        expect(component.saving).toBeFalse();
+      });
+
+      it('puts the selector back to the stored option, and neither refreshes nor toasts, when saving fails (RPS-1618)', () => {
+        repoApi.updateRepoSettings.and.returnValue(throwError(() => new Error('boom')));
+        component.selectedOption = cases[2][0];
+
+        component.selectType(cases[2][0]);
+
+        expect(component.selectedOption).toBe(RepoSupport.ALL);
+        expect(component.saving).toBeFalse();
+        expect(fetchCount).toBe(0);
+        expect(toastService.show).not.toHaveBeenCalled();
+      });
+
+      it('goes back to the last option that was saved, not to the one shown when the page opened', () => {
+        component.selectType(cases[1][0]);
+        repoApi.updateRepoSettings.and.returnValue(throwError(() => new Error('boom')));
+        component.selectedOption = cases[2][0];
+
+        component.selectType(cases[2][0]);
+
+        expect(component.selectedOption).toBe(cases[1][0]);
+      });
     });
   });
 });

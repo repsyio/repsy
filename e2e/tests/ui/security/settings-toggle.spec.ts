@@ -68,7 +68,7 @@ test.describe('SEC-02c Vulnerability Scanning setting', { tag: MOCKED }, () => {
     });
   }
 
-  test('toggling PUTs securityScanEnabled with the rest of the form, stores it, and it survives a reload', async ({
+  test('toggling PUTs only securityScanEnabled, stores it, and it survives a reload', async ({
     adminPage,
     seeder,
     panelApi,
@@ -88,9 +88,9 @@ test.describe('SEC-02c Vulnerability Scanning setting', { tag: MOCKED }, () => {
     );
     await scanning.flip();
 
-    // The request: the whole general form, with the one field that changed.
+    // The request: the one field that changed and nothing else (RPS-1619), so it cannot undo another admin's change.
     const body = (await put).postDataJSON();
-    expect(body).toEqual({ privateRepo: false, allowOverride: true, securityScanEnabled: false });
+    expect(body).toEqual({ securityScanEnabled: false });
     await settings.shell.toasts.expectSuccess('Automatic security scanning is now disabled');
     await scanning.expectChecked(false);
     await expect(scanning.root).toContainText('Pushes will not trigger a scan.');
@@ -119,7 +119,7 @@ test.describe('SEC-02c Vulnerability Scanning setting', { tag: MOCKED }, () => {
     });
   });
 
-  test('Maven and NuGet send their release and snapshot switches along', async ({
+  test('Maven and NuGet send only the scan switch and keep their release and snapshot switches as stored', async ({
     adminPage,
     seeder,
     panelApi,
@@ -149,11 +149,12 @@ test.describe('SEC-02c Vulnerability Scanning setting', { tag: MOCKED }, () => {
 
       await scanning.flip();
 
-      expect((await put).postDataJSON()).toEqual({ ...expected, securityScanEnabled: false });
+      expect((await put).postDataJSON()).toEqual({ securityScanEnabled: false });
       await settings.shell.toasts.expectSuccess('Automatic security scanning is now disabled');
       await expect
         .poll(async () => (await panelApi.getSettings(repo.name)).securityScanEnabled)
         .toBe(false);
+      expect(await panelApi.getSettings(repo.name)).toMatchObject(expected);
     }
   });
 });

@@ -34,6 +34,7 @@ import { DangerModalService } from '../../../../shared/components/modals/danger-
 import { SelectorComponent } from '../../../../shared/components/selector/selector.component';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
+import { saveRepoSetting } from '../save-repo-setting';
 
 @Component({
   selector: 'app-signature',
@@ -54,6 +55,8 @@ export class SignatureComponent implements OnInit {
   public serverLabels: string[] = [];
   public selectedServerLabel = '';
   public isSubmitting = false;
+  /** A settings save is on its way: both toggles are locked, so a double click sends one request (RPS-1618). */
+  public saving = false;
   public docsBaseUrl: string;
 
   public readonly wellKnownServers = [
@@ -108,13 +111,16 @@ export class SignatureComponent implements OnInit {
     message: string,
     revert: () => void,
   ): void {
-    this.protocolRepoControllerService.updateRepoSettings(this.activeRepository.repoName, form).subscribe({
-      next: () => {
+    this.saving = true;
+
+    saveRepoSetting(this.protocolRepoControllerService.updateRepoSettings(this.activeRepository.repoName, form), {
+      saved: () => {
         this.parentForm?.get(controlName)?.setValue(form[controlName]);
         this.toastService.show(message, 'success');
         this.fetch.emit();
       },
-      error: () => revert(),
+      failed: revert,
+      settled: () => (this.saving = false),
     });
   }
 
