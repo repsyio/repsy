@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 import mustache from 'mustache';
 
 import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import { gradleEnv } from './gradle.js';
 import { gpgEnv, type GpgKey } from './gpg.js';
 import { isolatedWorkDir, run } from './exec.js';
@@ -150,7 +151,7 @@ export async function mavenGpgDeploy(opts: SigningDeployOptions): Promise<Signin
     groupId: opts.groupId,
     artifactId: opts.artifactId,
     version: opts.version,
-    repoUrl: `${env.repoBaseUrl}/${opts.repoName}`,
+    repoUrl: repoUrl(opts.repoName),
     gpgPluginVersion: GPG_PLUGIN_VERSION,
     sourcePluginVersion: SOURCE_PLUGIN_VERSION,
   });
@@ -211,7 +212,7 @@ export async function gradleSigningPublish(
     groupId: opts.groupId,
     artifactId: opts.artifactId,
     version: opts.version,
-    repoUrl: `${env.repoBaseUrl}/${opts.repoName}`,
+    repoUrl: repoUrl(opts.repoName),
     signed: opts.key !== undefined,
   };
   await render(

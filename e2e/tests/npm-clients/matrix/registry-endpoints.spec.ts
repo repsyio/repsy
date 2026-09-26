@@ -52,6 +52,7 @@ import { clientsWith, ENABLED_CLIENTS } from '../../../src/clients/npm-family/re
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { env } from '../../../src/env.js';
+import { repoPath, repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 
 /**
@@ -169,7 +170,7 @@ test(
   },
   async ({ seeder }) => {
     const publicRepo = await newRepo(seeder, false);
-    const url = `${env.repoBaseUrl}/${publicRepo.name}/-/whoami`;
+    const url = repoUrl(publicRepo.name, '-/whoami');
 
     const anonymous = await fetch(url);
     expect(anonymous.status, 'anonymous whoami on a public repository').toBe(401);
@@ -347,7 +348,7 @@ for (const client of clientsWith('auditCmd')) {
         expect(posts.length, 'the client asked the registry for an audit').toBeGreaterThan(0);
         for (const post of posts) {
           expect(
-            post.path.startsWith(`/${repo.name}/-/npm/v1/security/`),
+            post.path.startsWith(`/${repoPath(repo.name)}/-/npm/v1/security/`),
             'of THIS repository',
           ).toBe(true);
           expect(post.status, `${post.method} ${post.path}`).toBe(200);
@@ -367,7 +368,7 @@ test(
   async ({ seeder }) => {
     const repo = await newRepo(seeder);
     const headers = { ...npmAuthHeader(adminCredential()), 'Content-Type': 'application/json' };
-    const base = `${env.repoBaseUrl}/${repo.name}/-/npm/v1/security`;
+    const base = repoUrl(repo.name, '-/npm/v1/security');
 
     const bulk = await fetch(`${base}/advisories/bulk`, {
       method: 'POST',

@@ -36,7 +36,7 @@ import {
 } from '../../../src/clients/npm-family/fixtures.js';
 import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
-import { env } from '../../../src/env.js';
+import { repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import { target } from '../../../src/target.js';
 
@@ -81,7 +81,7 @@ for (const client of clientsWith('viewCmd')) {
       expect(doc.versions).toEqual(['1.0.0']);
       expect(doc.description).toBe('viewed by the matrix');
       expect(doc.dist.tarball, 'dist.tarball is the registry address (RPS-1333)').toBe(
-        `${env.repoBaseUrl}/${repo.name}/${name}/-/${name}-1.0.0.tgz`,
+        repoUrl(repo.name, `${name}/-/${name}-1.0.0.tgz`),
       );
 
       expect(doc.time['1.0.0'], 'the publish time is ISO-8601 UTC').toMatch(ISO_UTC);

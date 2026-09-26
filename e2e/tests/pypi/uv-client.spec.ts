@@ -85,6 +85,7 @@ import {
   simpleIndexUrl,
 } from '../../src/clients/uv.js';
 import { env } from '../../src/env.js';
+import { repoPath, repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Scenario } from '../../src/scenarios/types.js';
 import type { World } from '../../src/scenarios/world.js';
@@ -365,7 +366,7 @@ test.describe('pypi uv client', () => {
       expect(locked?.source, 'the registry, with no credential in it').toBe(
         simpleIndexUrl(layout.repoName),
       );
-      const base = `${env.repoBaseUrl}/${layout.repoName}`;
+      const base = repoUrl(layout.repoName);
       expect(
         [...(locked?.files ?? [])].sort((a, b) => a.url.localeCompare(b.url)),
         'every file locked with the canonical download URL and the published sha256',
@@ -654,7 +655,7 @@ test.describe('pypi uv client', () => {
       );
       expect(uvAccept, 'with HTML fallbacks').toContain('text/html');
 
-      const url = `${env.repoBaseUrl}/${layout.repoName}/${simplePagePath(layout.packageName)}`;
+      const url = repoUrl(layout.repoName, simplePagePath(layout.packageName));
       for (const accept of [uvAccept, 'application/vnd.pypi.simple.v1+json']) {
         const res = await fetch(url, { headers: { ...authHeader(credential), Accept: accept } });
         expect(res.status, `Accept: ${accept}`).toBe(200);
@@ -678,7 +679,7 @@ test.describe('pypi uv client', () => {
       await panelApi.updateSettings(layout.repoName, { privateRepo: true, allowOverride: false });
       const admin = layout.world.credential;
       const host = new URL(env.repoBaseUrl);
-      const checkUrl = `${host.protocol}//${admin.username}:${encodeURIComponent(admin.password ?? '')}@${host.host}/${layout.repoName}/simple/`;
+      const checkUrl = `${host.protocol}//${admin.username}:${encodeURIComponent(admin.password ?? '')}@${host.host}/${repoPath(layout.repoName)}/simple/`;
       const { home, work } = await isolatedWorkDir('uv-checkurl');
       const publish = async (wheel: BuiltWheel, check: string | undefined) => {
         const [file] = await writeDist(work, [{ name: wheel.filename, bytes: wheel.bytes }]);
@@ -719,7 +720,7 @@ test.describe('pypi uv client', () => {
       expect(mismatch.stderr).toContain('Local file and index file do not match');
       secrets(mismatch.stderr);
 
-      const blind = await publish(built, `${env.repoBaseUrl}/${layout.repoName}/simple/`);
+      const blind = await publish(built, repoUrl(layout.repoName, 'simple/'));
       expect(
         blind.exitCode,
         'no credential in the check URL: uv uploads and the repo refuses',
@@ -741,7 +742,7 @@ test.describe('pypi uv client', () => {
       const credential = layout.world.credential;
       const filePath = downloadPath(layout.packageName, built.filename);
 
-      const url = `${env.repoBaseUrl}/${layout.repoName}/${filePath}`;
+      const url = repoUrl(layout.repoName, filePath);
       const ranged = await fetch(url, {
         headers: { ...authHeader(credential), Range: 'bytes=0-9' },
       });

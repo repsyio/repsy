@@ -27,7 +27,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { World } from '../scenarios/world.js';
 import {
   buildFileName,
@@ -89,7 +89,7 @@ export class GradleConsumer {
       'locking-consumer',
       path.join(this.gradle.work, buildFileName(dsl)),
       {
-        repoUrl: `${env.repoBaseUrl}/${world.repoName}`,
+        repoUrl: repoUrl(world.repoName),
         hasCredential: world.credential.transport === 'basic',
         locking,
         strict,

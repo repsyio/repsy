@@ -112,7 +112,7 @@ import zlib from 'node:zlib';
 
 import mustache from 'mustache';
 
-import { env } from '../env.js';
+import { repoUrl as repositoryUrl } from '../repo-url.js';
 import { boundedSemverVersion } from '../scenarios/coordinates.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
@@ -133,7 +133,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const TEMPLATES_DIR = path.resolve(__dirname, '../packages/ruby');
 
 function repoUrl(repoName: string): string {
-  return `${env.repoBaseUrl}/${repoName}`;
+  return repositoryUrl(repoName);
 }
 
 /**

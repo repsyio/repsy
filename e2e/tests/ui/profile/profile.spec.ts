@@ -25,7 +25,7 @@
  * real login form, so the outcome is what the server accepts, not what the tab remembers.
  */
 import { RepoType } from '../../../src/api/panel-api.js';
-import { env } from '../../../src/env.js';
+import { repoUrl } from '../../../src/repo-url.js';
 import {
   MISMATCH_TEXT,
   PASSWORD_TEXT,
@@ -177,7 +177,7 @@ test.describe('PRO-02 change username', () => {
       const token = await seeder.createToken(repo.name);
       const repoRoot = async () =>
         (
-          await fetch(`${env.repoBaseUrl}/${repo.name}/`, {
+          await fetch(repoUrl(repo.name, ''), {
             headers: {
               Authorization: `Basic ${Buffer.from(`e2e-probe:${token.token}`).toString('base64')}`,
             },

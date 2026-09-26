@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 import { NEWEST_OLDEST_NAME, NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
+import { repoPath } from '../../../repo-url.js';
 
 /**
  * Cargo: crates -> versions -> detail. Read from the components, not yet run in a browser (RPS-1257).
@@ -59,7 +60,10 @@ export const cargoDescriptor: ProtocolDescriptor = {
       },
       installContains: (_repo, t) => [`${need(t, 'cargo').name}@${need(t, 'cargo').version}`],
       repoUrlIn: 'snippet:cargo-config',
-      repoConfigContains: (repo, url) => ['[registries]', `index = "sparse+${url}/${repo}/"`],
+      repoConfigContains: (repo, url) => [
+        '[registries]',
+        `index = "sparse+${url}/${repoPath(repo)}/"`,
+      ],
       installTextElement: 'span',
       snippets: ['cargo-config', 'cargo-toml'],
       extraIds: ['pkg-detail-version', 'pkg-detail-published'],

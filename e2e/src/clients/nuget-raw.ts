@@ -84,7 +84,7 @@
  */
 import { zipSync } from 'fflate';
 
-import { env } from '../env.js';
+import { repoUrl as repositoryUrl } from '../repo-url.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import { randomPadding } from './padding.js';
@@ -100,7 +100,7 @@ import {
 export { adminCredential, authHeader, sha256Hex, type RawResponse };
 
 function repoUrl(repoName: string): string {
-  return `${env.repoBaseUrl}/${repoName}/`;
+  return repositoryUrl(repoName, '');
 }
 
 /** `e2e-<runid>-<slugified scenario id>` -- matches `ProtocolAdapter.packageName`'s signature. */

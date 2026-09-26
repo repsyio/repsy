@@ -64,6 +64,7 @@ import {
   type GoRawResponse,
 } from '../../src/clients/golang-raw.js';
 import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
 
@@ -426,7 +427,7 @@ test.describe('golang registry rules (raw HTTP)', () => {
       const layout = await newRepo(seeder, 'malformed');
       const admin = adminCredential();
 
-      const res = await fetch(`${env.repoBaseUrl}/${layout.repoName}/${layout.modulePath}`, {
+      const res = await fetch(repoUrl(layout.repoName, layout.modulePath), {
         method: 'PUT',
         headers: authHeader(admin),
         body: new Uint8Array(Buffer.from('irrelevant')),
@@ -466,14 +467,11 @@ test.describe('golang registry rules (raw HTTP)', () => {
 
       // > 512 chars after the domain -- MAX_MODULE_PATH_LENGTH.
       const longPath = `${MODULE_DOMAIN}/${'x'.repeat(520)}`;
-      const longPathRes = await fetch(
-        `${env.repoBaseUrl}/${layout.repoName}/${longPath}/@v/v0.0.1`,
-        {
-          method: 'PUT',
-          headers: authHeader(admin),
-          body: new Uint8Array(Buffer.from('irrelevant')),
-        },
-      );
+      const longPathRes = await fetch(repoUrl(layout.repoName, `${longPath}/@v/v0.0.1`), {
+        method: 'PUT',
+        headers: authHeader(admin),
+        body: new Uint8Array(Buffer.from('irrelevant')),
+      });
       expectMsgId(
         { status: longPathRes.status, body: Buffer.from(await longPathRes.arrayBuffer()) },
         400,
@@ -483,7 +481,7 @@ test.describe('golang registry rules (raw HTTP)', () => {
       // > 100 chars -- MAX_VERSION_LENGTH.
       const longVersion = `v0.0.${'1'.repeat(100)}`;
       const longVersionRes = await fetch(
-        `${env.repoBaseUrl}/${layout.repoName}/${layout.modulePath}/@v/${longVersion}`,
+        repoUrl(layout.repoName, `${layout.modulePath}/@v/${longVersion}`),
         {
           method: 'PUT',
           headers: authHeader(admin),

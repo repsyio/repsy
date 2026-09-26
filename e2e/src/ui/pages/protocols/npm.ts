@@ -16,6 +16,7 @@
 
 import type { PackageRef } from '../../../seed/packages.js';
 import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
+import { repoPath } from '../../../repo-url.js';
 
 /** The route segment of an unscoped package: `/:repo/~/:package`. */
 const UNSCOPED = '~';
@@ -110,7 +111,7 @@ export const npmDescriptor: ProtocolDescriptor = {
       // The trailing slash matters to npm (RPS-1206); a scoped package gets its scope's line.
       repoConfigContains: (repo, url, t) => {
         const { scope } = split(t);
-        return [`${scope ? `@${scope}:` : ''}registry=${url}/${repo}/`];
+        return [`${scope ? `@${scope}:` : ''}registry=${url}/${repoPath(repo)}/`];
       },
       installTextElement: 'span',
       snippets: ['npmrc'],

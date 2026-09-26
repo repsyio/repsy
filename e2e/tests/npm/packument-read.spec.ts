@@ -27,6 +27,7 @@ import zlib from 'node:zlib';
 
 import { RepoType } from '../../src/api/panel-api.js';
 import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { optedIn } from '../../src/stack-overlays.js';
 import {
   adminCredential,
@@ -59,7 +60,7 @@ async function newRepo(seeder: Seeder): Promise<string> {
 }
 
 function urlOf(repoName: string, path: string): string {
-  return `${env.repoBaseUrl}/${repoName}/${path}`;
+  return repoUrl(repoName, path);
 }
 
 /**
@@ -265,7 +266,7 @@ test.describe('npm registry reads (raw HTTP)', () => {
         );
       }
 
-      const noRepo = await fetch(`${env.repoBaseUrl}/e2e-${seeder.runId}-norepo/x`, {
+      const noRepo = await fetch(repoUrl(`e2e-${seeder.runId}-norepo`, 'x'), {
         method: 'HEAD',
         headers,
       });

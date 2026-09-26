@@ -73,6 +73,7 @@ import {
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { MaterializedCredential } from '../../src/scenarios/world.js';
 import type { Seeder } from '../../src/seed/seeder.js';
+import { repoPath } from '../../src/repo-url.js';
 
 interface Layout {
   repoName: string;
@@ -178,15 +179,15 @@ test.describe('docker registry API gaps (raw HTTP, pinned at current behaviour)'
       expectNoRoute(noRepo, 'tags/list of an unknown repo');
 
       // Anonymous: a 404 with no challenge, unlike a KNOWN route which answers 401 + Bearer challenge.
-      const anon = await rawGetAnonymous(`/${layout.repoName}/${layout.image}/tags/list`);
+      const anon = await rawGetAnonymous(`/${repoPath(layout.repoName)}/${layout.image}/tags/list`);
       expectNoRoute(anon, 'anonymous tags/list');
       const anonHead = await rawGetAnonymous(
-        `/${layout.repoName}/${layout.image}/tags/list`,
+        `/${repoPath(layout.repoName)}/${layout.image}/tags/list`,
         'HEAD',
       );
       expect(anonHead.status, 'anonymous HEAD tags/list').toBe(404);
       const anonManifest = await rawGetAnonymous(
-        `/${layout.repoName}/${layout.image}/manifests/v1`,
+        `/${repoPath(layout.repoName)}/${layout.image}/manifests/v1`,
       );
       expect(anonManifest.status, 'control: a known route, anonymous, is challenged').toBe(401);
       expect(anonManifest.wwwAuthenticate ?? '', 'control: with a Bearer challenge').toMatch(
@@ -232,8 +233,8 @@ test.describe('docker registry API gaps (raw HTTP, pinned at current behaviour)'
     expectNoRoute(anon, 'anonymous GET /v2/_catalog');
 
     // A per-repo catalog is no route either.
-    const perRepo = await rawGetAnonymous(`/${layout.repoName}/_catalog`);
-    expectNoRoute(perRepo, `GET /v2/${layout.repoName}/_catalog`);
+    const perRepo = await rawGetAnonymous(`/${repoPath(layout.repoName)}/_catalog`);
+    expectNoRoute(perRepo, `GET /v2/${repoPath(layout.repoName)}/_catalog`);
   });
 
   test(
@@ -271,7 +272,7 @@ test.describe('docker registry API gaps (raw HTTP, pinned at current behaviour)'
       expectNoRoute(unknown, 'referrers of an unknown digest');
 
       const anon = await rawGetAnonymous(
-        `/${layout.repoName}/${layout.image}/referrers/${built.manifestDigest}`,
+        `/${repoPath(layout.repoName)}/${layout.image}/referrers/${built.manifestDigest}`,
       );
       expectNoRoute(anon, 'anonymous referrers');
     },
@@ -344,7 +345,7 @@ test.describe('docker registry API gaps (raw HTTP, pinned at current behaviour)'
       expect(mount.status, 'the spec fallback, never a 201 mount').toBe(202);
       expect(mount.hop).toBe('request');
       expect(mount.location, 'an upload session Location').toContain(
-        `/v2/${destination.repoName}/${destination.image}/blobs/uploads/`,
+        `/v2/${repoPath(destination.repoName)}/${destination.image}/blobs/uploads/`,
       );
       expect(mount.uploadUuid, 'Docker-Upload-UUID names the session').toBeTruthy();
       expect(mount.location, 'the session id is the UUID').toContain(mount.uploadUuid ?? '?');

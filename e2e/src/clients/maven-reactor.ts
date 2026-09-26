@@ -28,7 +28,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import { isolatedWorkDir, run, type RunResult } from './exec.js';
 import {
@@ -118,14 +118,14 @@ export async function deployReactor(
 ): Promise<DeployedReactor> {
   await ensureSharedCacheWarm();
   const { home, work } = await isolatedWorkDir('mvn-reactor-deploy');
-  const repoUrl = `${env.repoBaseUrl}/${repoName}`;
+  const repositoryUrl = repoUrl(repoName);
   const { groupId, version, parentArtifactId } = layout;
 
   await renderTemplate('pom.parent.template.xml', path.join(work, 'pom.xml'), {
     groupId,
     artifactId: parentArtifactId,
     version,
-    repoUrl,
+    repoUrl: repositoryUrl,
   });
 
   const libDir = path.join(work, 'lib');
@@ -188,7 +188,7 @@ export async function deployWar(
   const { home, work } = await isolatedWorkDir('mvn-war-deploy');
   await renderTemplate('pom.war.template.xml', path.join(work, 'pom.xml'), {
     ...opts,
-    repoUrl: `${env.repoBaseUrl}/${repoName}`,
+    repoUrl: repoUrl(repoName),
   });
   await renderWebXml(work, opts.artifactId);
   await renderSettings(work, credential);
@@ -224,7 +224,7 @@ export async function consume(
     libArtifactId: layout.libArtifactId,
     webArtifactId: layout.webArtifactId,
     version: layout.version,
-    repoUrl: `${env.repoBaseUrl}/${repoName}`,
+    repoUrl: repoUrl(repoName),
   });
   await renderSettings(work, credential);
 

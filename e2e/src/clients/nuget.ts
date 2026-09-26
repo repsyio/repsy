@@ -62,7 +62,7 @@ import { fileURLToPath } from 'node:url';
 import { expect } from '@playwright/test';
 import mustache from 'mustache';
 
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { boundedSemverVersion } from '../scenarios/coordinates.js';
 import { outcomeForStatus } from '../scenarios/types.js';
@@ -444,7 +444,7 @@ async function afterSuccessfulRoundTrip(
   expect(leaf, `a registration leaf for version "${verLower}"`).toBeDefined();
   expect(leaf?.listed, 'a freshly published version is listed').toBe(true);
 
-  const expectedContentUrl = `${env.repoBaseUrl}/${world.repoName}/${nupkgPath(idLower, verLower)}`;
+  const expectedContentUrl = repoUrl(world.repoName, nupkgPath(idLower, verLower));
   expect(leaf?.packageContent, 'packageContent names the canonical download URL').toBe(
     expectedContentUrl,
   );
@@ -465,7 +465,7 @@ async function afterSuccessfulRoundTrip(
   expect(
     packageBaseAddress?.id,
     'PackageBaseAddress/3.0.0 names exactly this repo’s own package-base URL',
-  ).toBe(`${env.repoBaseUrl}/${world.repoName}/v3/package`);
+  ).toBe(repoUrl(world.repoName, 'v3/package'));
 }
 
 export const nugetAdapter: ProtocolAdapter<NuGetFingerprint> = {

@@ -22,6 +22,7 @@
  * the API instead of trusting the UI to show its own state back.
  */
 import { env } from '../../../env.js';
+import { repoUrl } from '../../../repo-url.js';
 
 /** The `{ data: ... }` envelope of a panel REST response. */
 interface Envelope<T> {
@@ -109,7 +110,7 @@ export async function repoRootStatus(
     const basic = Buffer.from(`${credential.username}:${credential.token}`).toString('base64');
     headers.Authorization = `Basic ${basic}`;
   }
-  const res = await fetch(`${env.repoBaseUrl}/${encodeURIComponent(repoName)}/`, { headers });
+  const res = await fetch(repoUrl(repoName, ''), { headers });
   await res.arrayBuffer();
   return res.status;
 }

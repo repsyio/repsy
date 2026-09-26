@@ -66,7 +66,7 @@ import {
   sha256Hex,
 } from '../../src/clients/cargo-raw.js';
 import { clientEnv } from '../../src/clients/client-env.js';
-import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { isolatedWorkDir, run, type RunResult } from '../../src/clients/exec.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
@@ -94,7 +94,7 @@ async function newRegistry(seeder: Seeder, label: string, privateRepo = true): P
   await renderPanelCargoConfig(home, repo.name, privateRepo);
   return {
     repoName: repo.name,
-    url: `${env.repoBaseUrl}/${repo.name}/`,
+    url: repoUrl(repo.name, ''),
     token: token.token,
     home,
     work,

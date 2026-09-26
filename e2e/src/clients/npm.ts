@@ -53,6 +53,7 @@ import { expect } from '@playwright/test';
 import mustache from 'mustache';
 
 import { env } from '../env.js';
+import { repoPath, repoUrl } from '../repo-url.js';
 import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { boundedSemverVersion, slugify } from '../scenarios/coordinates.js';
 import { outcomeForStatus } from '../scenarios/types.js';
@@ -104,9 +105,9 @@ async function renderTemplate(
 function npmrcView(repoName: string, credential: MaterializedCredential): Record<string, unknown> {
   const hostAndPort = new URL(env.repoBaseUrl).host;
   return {
-    registryUrl: `${env.repoBaseUrl}/${repoName}/`,
+    registryUrl: repoUrl(repoName, ''),
     hostAndPort,
-    repoName,
+    repoName: repoPath(repoName),
     hasToken: credential.kind === 'token',
     hasBasic: credential.kind === 'password',
     token: credential.password ?? '',
