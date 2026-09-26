@@ -255,6 +255,38 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
       },
     );
 
+    /**
+     * RPS-1604: the name a user had is freed by a rename and registered again. A fresh user starts at
+     * `token_version` 0, which is what the old token carries (the rename moved only the old user's
+     * version), so only the token's subject (the user id) tells the two users apart.
+     */
+    test('a reused username does not inherit the login token of its former owner', async ({
+      seeder,
+    }) => {
+      const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
+      const former = await seeder.createUser();
+      const token = await protocol.login(repo.name, former.username, former.password);
+      await accepted(repo.name, token, 'the login token before the rename');
+
+      const formerApi = await createPanelBackend();
+      await formerApi.login(former.username, former.password);
+      const renamed = await formerApi.rawRequest('PUT', '/api/profile/username', {
+        username: seeder.reserveUsername(),
+      });
+      expect(renamed.status, `rename: ${JSON.stringify(renamed.body)}`).toBe(200);
+
+      const successor = await seeder.createUser({ username: former.username });
+
+      await endedSession(
+        repo.name,
+        token,
+        'the old login token, the name now belongs to another user',
+      );
+
+      const fresh = await protocol.login(repo.name, successor.username, successor.password);
+      await accepted(repo.name, fresh, 'the token of the new owner of the name');
+    });
+
     test('an admin password reset ends the login token at once', async ({ seeder, panelApi }) => {
       const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
       const user = await seeder.createUser();

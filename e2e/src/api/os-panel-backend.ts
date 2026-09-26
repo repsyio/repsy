@@ -246,7 +246,7 @@ export class OsPanelBackend implements PanelBackend {
    * answer is the HTTP status and the JSON envelope.
    */
   async rawRequest(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PUT',
     path: string,
     body?: unknown,
   ): Promise<{ status: number; body: { data?: unknown } }> {

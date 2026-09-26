@@ -76,7 +76,7 @@ class ProfileControllerTest {
     final var userInfo = UserInfo.builder().id(userId).username("alice").build();
     final var form = new UpdateUsernameForm().username("alice2");
     when(this.jwtUtils.extractPanelClaims(AUTH_HEADER))
-        .thenReturn(new PanelTokenClaims("alice", 0, sessionStart));
+        .thenReturn(new PanelTokenClaims(userId, "alice", 0, sessionStart));
     when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
     when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
 
@@ -97,7 +97,7 @@ class ProfileControllerTest {
     final var userInfo = UserInfo.builder().id(userId).username("alice").tokenVersion(3).build();
     final var form = new PasswordForm().password("NewPassword2@");
     when(this.jwtUtils.extractPanelClaims(AUTH_HEADER))
-        .thenReturn(new PanelTokenClaims("alice", 3, sessionStart));
+        .thenReturn(new PanelTokenClaims(userId, "alice", 3, sessionStart));
     when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
     when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
 
@@ -111,12 +111,12 @@ class ProfileControllerTest {
   @Test
   @DisplayName("updatePassword rejects a token issued before the last token-version bump")
   void updatePasswordRejectsAStaleTokenVersion() {
+    final var userId = UUID.randomUUID();
     final var user = new User();
-    final var userInfo =
-        UserInfo.builder().id(UUID.randomUUID()).username("alice").tokenVersion(4).build();
+    final var userInfo = UserInfo.builder().id(userId).username("alice").tokenVersion(4).build();
     final var form = new PasswordForm().password("NewPassword2@");
     when(this.jwtUtils.extractPanelClaims(AUTH_HEADER))
-        .thenReturn(new PanelTokenClaims("alice", 3, Instant.now()));
+        .thenReturn(new PanelTokenClaims(userId, "alice", 3, Instant.now()));
     when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
     when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
 
@@ -131,7 +131,7 @@ class ProfileControllerTest {
   @DisplayName("deleteProfile answers unAuthorized when the token's user no longer exists")
   void deleteProfileTokenUserNoLongerExists() {
     when(this.jwtUtils.extractPanelClaims(AUTH_HEADER))
-        .thenReturn(new PanelTokenClaims("ghost", 0, Instant.now()));
+        .thenReturn(new PanelTokenClaims(UUID.randomUUID(), "ghost", 0, Instant.now()));
 
     assertThatThrownBy(() -> this.controller.deleteProfile(AUTH_HEADER))
         .isExactlyInstanceOf(UnAuthorizedException.class)

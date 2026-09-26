@@ -33,6 +33,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.dtos.PanelTokenClaims;
 import io.repsy.os.shared.auth.dtos.ProtocolUserClaims;
 import io.repsy.os.shared.auth.services.RevokedProtocolTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -610,7 +611,7 @@ class ProtocolAuthServiceTest {
       when(this.jwt.extractAuthenticationType(anyString(), any(TokenRealm.class)))
           .thenReturn(AuthenticationType.USERNAME_PASSWORD);
       when(this.jwt.extractProtocolUserClaims(anyString()))
-          .thenReturn(new ProtocolUserClaims("dave", null));
+          .thenReturn(new ProtocolUserClaims(this.dave.getId(), "dave", null));
       when(this.users.getAuthenticatedUserByUsername("dave")).thenReturn(this.dave);
 
       this.bearer(Permission.WRITE);
@@ -692,7 +693,9 @@ class ProtocolAuthServiceTest {
 
     TokenUserNoLongerExists() {
       when(this.jwtUtils.extractProtocolUserClaims(anyString()))
-          .thenReturn(new ProtocolUserClaims("ghost", null));
+          .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), "ghost", null));
+      when(this.jwtUtils.extractPanelClaims(anyString()))
+          .thenReturn(new PanelTokenClaims(UUID.randomUUID(), "ghost", 0, Instant.now()));
     }
 
     @Test
@@ -740,7 +743,7 @@ class ProtocolAuthServiceTest {
           .thenReturn(this.tokenId);
       // The claim names a real user; it must not be looked at.
       when(this.jwtUtils.extractProtocolUserClaims(anyString()))
-          .thenReturn(new ProtocolUserClaims(USERNAME, null));
+          .thenReturn(new ProtocolUserClaims(ALICE.getId(), USERNAME, null));
     }
 
     private void storeToken(final boolean readOnly, final Instant expirationDate) {
@@ -1134,7 +1137,7 @@ class ProtocolAuthServiceTest {
     RevokedProtocolJwt() {
       this.service.setRevokedTokens(this.revoked);
       when(this.jwtUtils.extractProtocolUserClaims(anyString()))
-          .thenReturn(new ProtocolUserClaims(USERNAME, null));
+          .thenReturn(new ProtocolUserClaims(ALICE.getId(), USERNAME, null));
       when(this.users.getAuthenticatedUserByUsername(USERNAME)).thenReturn(ALICE);
     }
 
@@ -1230,7 +1233,7 @@ class ProtocolAuthServiceTest {
 
     private void tokenCarries(final Integer version) {
       when(this.jwtUtils.extractProtocolUserClaims(anyString()))
-          .thenReturn(new ProtocolUserClaims(USERNAME, version));
+          .thenReturn(new ProtocolUserClaims(ALICE.getId(), USERNAME, version));
     }
 
     @Test
@@ -1276,6 +1279,48 @@ class ProtocolAuthServiceTest {
           .doesNotThrowAnyException();
     }
 
+    /**
+     * RPS-1604: the name of a renamed or deleted user is registered again, and a fresh user starts
+     * at the version the old token may carry. Only the subject tells the two users apart.
+     */
+    @Test
+    @DisplayName("a token of another user is refused although it has the current version")
+    void tokenOfAnotherUserWithTheSameNameIsRefused() {
+      when(this.jwtUtils.extractProtocolUserClaims(anyString()))
+          .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), USERNAME, 4));
+
+      assertThatThrownBy(
+              () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
+          .isExactlyInstanceOf(UnAuthorizedException.class)
+          .hasMessage(ErrorConstants.SESSION_EXPIRED);
+      verify(this.throttle, never()).recordFailure();
+      verify(this.throttle, never()).checkAllowed();
+    }
+
+    @Test
+    @DisplayName("a token of another user is refused even without a version claim (grace tokens)")
+    void claimlessTokenOfAnotherUserIsRefused() {
+      when(this.jwtUtils.extractProtocolUserClaims(anyString()))
+          .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), USERNAME, null));
+
+      assertThatThrownBy(
+              () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
+          .isExactlyInstanceOf(UnAuthorizedException.class)
+          .hasMessage(ErrorConstants.SESSION_EXPIRED);
+    }
+
+    @Test
+    @DisplayName("a token whose subject is not an id is refused")
+    void tokenWithoutAUserIdIsRefused() {
+      when(this.jwtUtils.extractProtocolUserClaims(anyString()))
+          .thenReturn(new ProtocolUserClaims(null, USERNAME, 4));
+
+      assertThatThrownBy(
+              () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
+          .isExactlyInstanceOf(UnAuthorizedException.class)
+          .hasMessage(ErrorConstants.SESSION_EXPIRED);
+    }
+
     @Test
     @DisplayName("a user that no longer exists is still unAuthorized, whatever the version")
     void deletedUser() {
@@ -1285,6 +1330,76 @@ class ProtocolAuthServiceTest {
 
       assertUnauthorized(
           () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
+    }
+  }
+
+  /**
+   * RPS-1604: a panel access token used on a {@code @RepoOperation} route is bound to the user's
+   * token version and id, like it is on the profile routes ({@code PanelAuthHelper}). Before, only
+   * the username claim was read there, so the token outlived a password change by up to 30 minutes.
+   */
+  @Nested
+  @DisplayName("a panel bearer token is bound to the token version and the id of its user")
+  class PanelBearerBinding {
+
+    private static final String BEARER = "Bearer signed.jwt.token";
+
+    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final UserTxService users = Mockito.mock(UserTxService.class);
+    private final AuthFailureThrottle throttle = Mockito.mock(AuthFailureThrottle.class);
+
+    private final ProtocolAuthService service =
+        new ProtocolAuthService(
+            this.users,
+            this.jwtUtils,
+            Mockito.mock(DeployTokenService.class),
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            this.throttle);
+
+    private final UserInfo user =
+        UserInfo.builder()
+            .id(UUID.randomUUID())
+            .username(USERNAME)
+            .role(UserRole.ADMIN)
+            .tokenVersion(4)
+            .build();
+
+    PanelBearerBinding() {
+      when(this.users.getAuthenticatedUserByUsername(USERNAME)).thenReturn(this.user);
+    }
+
+    private void tokenCarries(final UUID userId, final int version) {
+      when(this.jwtUtils.extractPanelClaims(BEARER))
+          .thenReturn(new PanelTokenClaims(userId, USERNAME, version, Instant.now()));
+    }
+
+    @Test
+    @DisplayName("authenticateUser accepts a token of the user's id and version")
+    void currentTokenIsAccepted() {
+      this.tokenCarries(this.user.getId(), 4);
+
+      assertThat(this.service.authenticateUser(BEARER)).isSameAs(this.user);
+    }
+
+    @ParameterizedTest(name = "authenticateUser refuses a token of version {0} with sessionExpired")
+    @ValueSource(ints = {3, 5, 0})
+    void otherVersionIsRefused(final int version) {
+      this.tokenCarries(this.user.getId(), version);
+
+      assertThatThrownBy(() -> this.service.authenticateUser(BEARER))
+          .isExactlyInstanceOf(UnAuthorizedException.class)
+          .hasMessage(ErrorConstants.SESSION_EXPIRED);
+    }
+
+    @Test
+    @DisplayName("authenticateUser refuses a token of another user of the same name and version")
+    void otherUserIsRefused() {
+      this.tokenCarries(UUID.randomUUID(), 4);
+
+      assertThatThrownBy(() -> this.service.authenticateUser(BEARER))
+          .isExactlyInstanceOf(UnAuthorizedException.class)
+          .hasMessage(ErrorConstants.SESSION_EXPIRED);
+      verify(this.throttle, never()).recordFailure();
     }
   }
 }

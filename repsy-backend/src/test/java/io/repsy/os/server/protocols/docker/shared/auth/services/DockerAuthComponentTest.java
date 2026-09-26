@@ -20,6 +20,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,6 +35,7 @@ import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.dtos.PanelTokenClaims;
 import io.repsy.os.shared.auth.dtos.ProtocolUserClaims;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
@@ -46,6 +49,7 @@ import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.temporal.TemporalAmount;
 import java.util.Base64;
 import java.util.List;
@@ -116,7 +120,8 @@ class DockerAuthComponentTest {
   @DisplayName("authenticateUser answers unAuthorized for a bearer token whose user is gone")
   void authenticateUserTokenUserNoLongerExists() {
     final var jwtUtils = Mockito.mock(JwtUtils.class);
-    when(jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class))).thenReturn("ghost");
+    when(jwtUtils.extractPanelClaims(anyString()))
+        .thenReturn(new PanelTokenClaims(UUID.randomUUID(), "ghost", 0, Instant.now()));
     // A real UserTxService over an empty repository: the lookup itself is under test.
     final var component =
         new DockerAuthComponent(
@@ -128,6 +133,71 @@ class DockerAuthComponentTest {
             new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
     assertUnauthorized(() -> component.authenticateUser("Bearer signed.jwt.token"));
+  }
+
+  /**
+   * RPS-1604: the Docker panel routes take a panel access token, and it is bound to the token
+   * version and the id of its user like it is on every other panel route.
+   */
+  @Nested
+  @DisplayName("authenticateUser binds a panel bearer token to its user")
+  class PanelBearerBinding {
+
+    private static final String BEARER = "Bearer signed.jwt.token";
+
+    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final UserTxService users = Mockito.mock(UserTxService.class);
+    private final UserInfo user =
+        UserInfo.builder()
+            .id(UUID.randomUUID())
+            .username(USERNAME)
+            .role(UserRole.USER)
+            .tokenVersion(2)
+            .build();
+    private final DockerAuthComponent component =
+        new DockerAuthComponent(
+            this.users,
+            this.jwtUtils,
+            Mockito.mock(DeployTokenService.class),
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+
+    PanelBearerBinding() {
+      when(this.users.getAuthenticatedUserByUsername(USERNAME)).thenReturn(this.user);
+    }
+
+    private void tokenCarries(final UUID userId, final int version) {
+      when(this.jwtUtils.extractPanelClaims(BEARER))
+          .thenReturn(new PanelTokenClaims(userId, USERNAME, version, Instant.now()));
+    }
+
+    @Test
+    @DisplayName("a token of the user's id and version is accepted")
+    void currentTokenIsAccepted() {
+      this.tokenCarries(this.user.getId(), 2);
+
+      assertThat(this.component.authenticateUser(BEARER)).isSameAs(this.user);
+    }
+
+    @Test
+    @DisplayName("a token issued before a credential change is refused with sessionExpired")
+    void staleVersionIsRefused() {
+      this.tokenCarries(this.user.getId(), 1);
+
+      assertThatThrownBy(() -> this.component.authenticateUser(BEARER))
+          .isExactlyInstanceOf(UnAuthorizedException.class)
+          .hasMessage(ErrorConstants.SESSION_EXPIRED);
+    }
+
+    @Test
+    @DisplayName("a token of another user of the same name is refused with sessionExpired")
+    void otherUserIsRefused() {
+      this.tokenCarries(UUID.randomUUID(), 2);
+
+      assertThatThrownBy(() -> this.component.authenticateUser(BEARER))
+          .isExactlyInstanceOf(UnAuthorizedException.class)
+          .hasMessage(ErrorConstants.SESSION_EXPIRED);
+    }
   }
 
   /**
@@ -306,13 +376,19 @@ class DockerAuthComponentTest {
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
+    private final UUID ghostId = UUID.randomUUID();
+
     DeletedUserToken() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
           .thenReturn(AuthenticationType.USERNAME_PASSWORD);
       when(this.jwtUtils.extractProtocolUserClaims(anyString()))
-          .thenReturn(new ProtocolUserClaims("ghost", null));
+          .thenReturn(new ProtocolUserClaims(this.ghostId, "ghost", null));
       when(DockerAuthComponentTest.this.userTxService.getUserByUsernameOptional("ghost"))
           .thenReturn(Optional.empty());
+      // What the real service does for a name nobody has.
+      doThrow(new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED))
+          .when(DockerAuthComponentTest.this.userTxService)
+          .getAuthenticatedUserByUsername("ghost");
     }
 
     @Test
@@ -327,13 +403,9 @@ class DockerAuthComponentTest {
     @Test
     @DisplayName("handleBearerAuth still lets the token of an existing user through")
     void existingUserStillAuthorized() {
-      when(DockerAuthComponentTest.this.userTxService.getAuthenticatedUserByUsername("ghost"))
-          .thenReturn(
-              UserInfo.builder()
-                  .id(UUID.randomUUID())
-                  .username("ghost")
-                  .role(UserRole.USER)
-                  .build());
+      doReturn(UserInfo.builder().id(this.ghostId).username("ghost").role(UserRole.USER).build())
+          .when(DockerAuthComponentTest.this.userTxService)
+          .getAuthenticatedUserByUsername("ghost");
 
       assertThatCode(
               () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
@@ -369,7 +441,7 @@ class DockerAuthComponentTest {
           .thenReturn(AuthenticationType.ANONYMOUS);
       // The claim names a real admin; it must not be looked at.
       when(this.jwtUtils.extractProtocolUserClaims(anyString()))
-          .thenReturn(new ProtocolUserClaims("anonymous", null));
+          .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), "anonymous", null));
       when(DockerAuthComponentTest.this.userTxService.getUserByUsernameOptional("anonymous"))
           .thenReturn(
               Optional.of(

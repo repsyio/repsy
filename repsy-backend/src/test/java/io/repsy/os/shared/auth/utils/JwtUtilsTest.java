@@ -448,15 +448,34 @@ class JwtUtilsTest {
   @Test
   @DisplayName("extractPanelClaims reads username, token version and session start of one token")
   void extractPanelClaimsReadsEveryClaim() {
+    final var userId = UUID.randomUUID();
     final var accessToken =
         this.jwtUtils.createSessionAccessToken(
-            UUID.randomUUID(), "testuser", Duration.ofMinutes(15), SESSION_START, TOKEN_VERSION);
+            userId, "testuser", Duration.ofMinutes(15), SESSION_START, TOKEN_VERSION);
 
     final var result = this.jwtUtils.extractPanelClaims(AuthUtils.AUTH_BEARER + accessToken);
 
+    assertThat(result.userId()).isEqualTo(userId);
     assertThat(result.username()).isEqualTo("testuser");
     assertThat(result.tokenVersion()).isEqualTo(TOKEN_VERSION);
     assertThat(result.sessionStart()).isEqualTo(SESSION_START);
+  }
+
+  @Test
+  @DisplayName("extractPanelClaims has no user id for a subject that is not one (RPS-1604)")
+  void extractPanelClaimsWithoutAUserId() {
+    for (final var subject : new String[] {null, "not-a-uuid"}) {
+      final var builder =
+          JWT.create()
+              .withAudience("panel")
+              .withClaim("username", "testuser")
+              .withExpiresAt(Instant.now().plus(Duration.ofMinutes(15)));
+      final var token =
+          (subject == null ? builder : builder.withSubject(subject))
+              .sign(Algorithm.HMAC512(TEST_SECRET));
+
+      assertThat(this.jwtUtils.extractPanelClaims(AuthUtils.AUTH_BEARER + token).userId()).isNull();
+    }
   }
 
   @Test
@@ -895,15 +914,17 @@ class JwtUtilsTest {
   @Test
   @DisplayName("extractProtocolUserClaims reads back the username and the token version")
   void extractProtocolUserClaimsRoundTrip() {
-    final var plain =
-        this.jwtUtils.createProtocolToken(UUID.randomUUID(), "alice", Duration.ofDays(1), 7);
+    final var userId = UUID.randomUUID();
+    final var plain = this.jwtUtils.createProtocolToken(userId, "alice", Duration.ofDays(1), 7);
     final var withGrants =
         this.jwtUtils.createProtocolToken(
-            UUID.randomUUID(), "alice", Duration.ofMinutes(30), 3, List.of("repo/app:pull"));
+            userId, "alice", Duration.ofMinutes(30), 3, List.of("repo/app:pull"));
 
     final var plainClaims = this.jwtUtils.extractProtocolUserClaims("Bearer " + plain);
     final var grantClaims = this.jwtUtils.extractProtocolUserClaims("Bearer " + withGrants);
 
+    assertThat(plainClaims.userId()).isEqualTo(userId);
+    assertThat(grantClaims.userId()).isEqualTo(userId);
     assertThat(plainClaims.username()).isEqualTo("alice");
     assertThat(plainClaims.tokenVersion()).isEqualTo(7);
     assertThat(grantClaims.tokenVersion()).isEqualTo(3);
@@ -915,10 +936,11 @@ class JwtUtilsTest {
   @Test
   @DisplayName("extractProtocolUserClaims of a token without the claim has no version (grace)")
   void extractProtocolUserClaimsWithoutTheClaim() {
+    final var userId = UUID.randomUUID();
     final var claimless =
         JWT.create()
             .withJWTId(UUID.randomUUID().toString())
-            .withSubject(UUID.randomUUID().toString())
+            .withSubject(userId.toString())
             .withAudience(TokenRealm.PROTOCOL.getAudience())
             .withClaim("username", "alice")
             .withExpiresAt(Instant.now().plus(Duration.ofMinutes(5)))
@@ -928,6 +950,44 @@ class JwtUtilsTest {
 
     assertThat(claims.username()).isEqualTo("alice");
     assertThat(claims.tokenVersion()).isNull();
+    assertThat(claims.userId()).isEqualTo(userId);
+  }
+
+  /**
+   * RPS-1604: the token of the release before realms and versions (v26.08.4, {@code
+   * createTokenWithDuration}) has neither an audience nor a {@code tv} claim, but its subject is
+   * the user id, which is why the 90-day npm grace for it survives binding tokens to the id.
+   */
+  @Test
+  @DisplayName("extractProtocolUserClaims reads the user id of a token of v26.08.4")
+  void extractProtocolUserClaimsOfAV260804Token() {
+    final var userId = UUID.randomUUID();
+    final var legacy =
+        JWT.create()
+            .withSubject(userId.toString())
+            .withClaim("username", "alice")
+            .withExpiresAt(Instant.now().plus(Duration.ofDays(90)))
+            .sign(Algorithm.HMAC512(TEST_SECRET));
+
+    final var claims = this.jwtUtils.extractProtocolUserClaims("Bearer " + legacy);
+
+    assertThat(claims.userId()).isEqualTo(userId);
+    assertThat(claims.tokenVersion()).isNull();
+  }
+
+  @Test
+  @DisplayName("extractProtocolUserClaims has no user id for a subject that is not one")
+  void extractProtocolUserClaimsWithAForeignSubject() {
+    final var token =
+        JWT.create()
+            .withSubject("not-a-uuid")
+            .withAudience(TokenRealm.PROTOCOL.getAudience())
+            .withClaim("username", "alice")
+            .withClaim("tv", 1)
+            .withExpiresAt(Instant.now().plus(Duration.ofMinutes(5)))
+            .sign(Algorithm.HMAC512(TEST_SECRET));
+
+    assertThat(this.jwtUtils.extractProtocolUserClaims("Bearer " + token).userId()).isNull();
   }
 
   @Test

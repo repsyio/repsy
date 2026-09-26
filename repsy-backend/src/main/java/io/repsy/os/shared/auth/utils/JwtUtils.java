@@ -74,6 +74,12 @@ public class JwtUtils {
     }
   }
 
+  /**
+   * Verifies a token and reads the username claim, and nothing else. It says nothing about which
+   * user row the token was issued to, so it must not authenticate a request: use {@link
+   * #extractPanelClaims} or {@link #extractProtocolUserClaims} and check {@code issuedTo} against
+   * the user (RPS-1604).
+   */
   public @NonNull String verifyAndExtractUsername(
       final @NonNull String authHeader, final @NonNull TokenRealm realm) {
     return this.verifyAndDecode(this.getToken(authHeader), realm)
@@ -402,6 +408,7 @@ public class JwtUtils {
     final var decodedJWT = this.verifyAndDecode(this.getToken(authHeader), TokenRealm.PANEL);
 
     return new PanelTokenClaims(
+        subjectOrNull(decodedJWT),
         decodedJWT.getClaim(CLAIM_USERNAME).asString(),
         tokenVersion(decodedJWT),
         sessionStart(decodedJWT));
@@ -421,8 +428,9 @@ public class JwtUtils {
 
   /**
    * Verifies a protocol token that a user logged in with and reads the claims that identify the
-   * user, from one decode. The caller re-reads the user by name and compares {@link
-   * ProtocolUserClaims#tokenVersion()} with the stored version (RPS-1552).
+   * user, from one decode. The caller re-reads the user by name and checks {@link
+   * ProtocolUserClaims#issuedTo}: the stored version (RPS-1552) and the user id in the subject
+   * (RPS-1604).
    */
   public @NonNull ProtocolUserClaims extractProtocolUserClaims(final @NonNull String authHeader) {
     final var decodedJWT = this.verifyAndDecode(this.getToken(authHeader), TokenRealm.PROTOCOL);
@@ -434,7 +442,7 @@ public class JwtUtils {
       throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
-    return new ProtocolUserClaims(username, tokenVersion);
+    return new ProtocolUserClaims(subjectOrNull(decodedJWT), username, tokenVersion);
   }
 
   public @NonNull RefreshTokenClaims verifyRefreshToken(final @NonNull String token) {
@@ -467,6 +475,14 @@ public class JwtUtils {
           tokenVersion);
     } catch (final IllegalArgumentException _) {
       throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+  }
+
+  private static @Nullable UUID subjectOrNull(final @NonNull DecodedJWT decodedJWT) {
+    try {
+      return UUID.fromString(decodedJWT.getSubject());
+    } catch (final IllegalArgumentException | NullPointerException _) {
+      return null;
     }
   }
 

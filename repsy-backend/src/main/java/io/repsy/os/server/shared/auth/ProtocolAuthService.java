@@ -429,14 +429,20 @@ public class ProtocolAuthService {
    * an expired token, does not count against {@link AuthFailureThrottle}: the token is one Repsy
    * issued, not a guess. A token without the claim was minted before it existed and is accepted
    * until it expires.
+   *
+   * <p>The token is also bound to the user's id (RPS-1604): its subject must be the id of the row
+   * found by the username claim. Without it, a user that was renamed or deleted and whose name
+   * somebody else registered afterwards, whose {@code token_version} starts at the same 0, would
+   * hand its token to the new owner of the name. Every token a user logged in with carries the id
+   * as its subject, the ones of the releases before the version claim too, so the grace for those
+   * is kept.
    */
   protected @NonNull UserInfo authenticateJwtUser(final @NonNull String authHeader) {
 
     final var claims = this.jwtUtils.extractProtocolUserClaims(authHeader);
     final var userInfo = this.userTxService.getAuthenticatedUserByUsername(claims.username());
-    final var tokenVersion = claims.tokenVersion();
 
-    if (tokenVersion != null && tokenVersion != userInfo.getTokenVersion()) {
+    if (!claims.issuedTo(userInfo)) {
       throw new UnAuthorizedException(ErrorConstants.SESSION_EXPIRED);
     }
 
@@ -542,9 +548,27 @@ public class ProtocolAuthService {
 
   private @NonNull UserInfo authenticateWithBearer(final @NonNull String authHeader) {
 
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PANEL);
+    return this.authenticatePanelBearer(authHeader);
+  }
 
-    return this.userTxService.getAuthenticatedUserByUsername(username);
+  /**
+   * Resolves the user a panel access token was issued to, for the {@code @RepoOperation} routes. It
+   * applies the same two checks as {@code PanelAuthHelper}: the token's {@code token_version} must
+   * be the user's (a password change, a username change or an admin edit ends the token at once,
+   * not when its 30 minutes are over) and its subject must be the user's id (RPS-1604). A mismatch
+   * answers {@code sessionExpired}, which makes the SPA swap the token through its refresh token,
+   * and does not count against {@link AuthFailureThrottle}.
+   */
+  protected @NonNull UserInfo authenticatePanelBearer(final @NonNull String authHeader) {
+
+    final var claims = this.jwtUtils.extractPanelClaims(authHeader);
+    final var userInfo = this.userTxService.getAuthenticatedUserByUsername(claims.username());
+
+    if (!claims.issuedTo(userInfo)) {
+      throw new UnAuthorizedException(ErrorConstants.SESSION_EXPIRED);
+    }
+
+    return userInfo;
   }
 
   /**

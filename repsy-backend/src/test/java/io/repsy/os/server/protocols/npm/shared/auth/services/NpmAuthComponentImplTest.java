@@ -230,12 +230,13 @@ class NpmAuthComponentImplTest {
   @Test
   @DisplayName("resolveUsername answers the user of a protocol JWT")
   void whoamiUserJwt() {
+    final var id = UUID.randomUUID();
     when(this.jwtUtils.extractAuthenticationType("Bearer jwt", TokenRealm.PROTOCOL))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
     when(this.jwtUtils.extractProtocolUserClaims("Bearer jwt"))
-        .thenReturn(new ProtocolUserClaims(USERNAME, null));
+        .thenReturn(new ProtocolUserClaims(id, USERNAME, null));
     when(this.userTxService.getAuthenticatedUserByUsername(USERNAME))
-        .thenReturn(UserInfo.builder().id(UUID.randomUUID()).username(USERNAME).build());
+        .thenReturn(UserInfo.builder().id(id).username(USERNAME).build());
 
     assertThat(this.authComponent.resolveUsername(this.repo, "Bearer jwt")).isEqualTo(USERNAME);
   }
@@ -303,7 +304,7 @@ class NpmAuthComponentImplTest {
     when(this.jwtUtils.extractAuthenticationType("Bearer jwt", TokenRealm.PROTOCOL))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
     when(this.jwtUtils.extractProtocolUserClaims("Bearer jwt"))
-        .thenReturn(new ProtocolUserClaims("ghost", null));
+        .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), "ghost", null));
     when(this.userTxService.getAuthenticatedUserByUsername("ghost"))
         .thenThrow(new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
 
@@ -335,13 +336,13 @@ class NpmAuthComponentImplTest {
   @Test
   @DisplayName("resolveUsername refuses the JWT of a user whose token version moved on")
   void whoamiRefusesAStaleVersion() {
+    final var id = UUID.randomUUID();
     when(this.jwtUtils.extractAuthenticationType("Bearer jwt", TokenRealm.PROTOCOL))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
     when(this.jwtUtils.extractProtocolUserClaims("Bearer jwt"))
-        .thenReturn(new ProtocolUserClaims(USERNAME, 1));
+        .thenReturn(new ProtocolUserClaims(id, USERNAME, 1));
     when(this.userTxService.getAuthenticatedUserByUsername(USERNAME))
-        .thenReturn(
-            UserInfo.builder().id(UUID.randomUUID()).username(USERNAME).tokenVersion(2).build());
+        .thenReturn(UserInfo.builder().id(id).username(USERNAME).tokenVersion(2).build());
 
     assertThatThrownBy(() -> this.authComponent.resolveUsername(this.repo, "Bearer jwt"))
         .isExactlyInstanceOf(UnAuthorizedException.class)
@@ -367,7 +368,7 @@ class NpmAuthComponentImplTest {
     when(this.jwtUtils.extractAuthenticationType("Bearer " + jwt, TokenRealm.PROTOCOL))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
     when(this.jwtUtils.extractProtocolUserClaims("Bearer " + jwt))
-        .thenReturn(new ProtocolUserClaims(USERNAME, null));
+        .thenReturn(new ProtocolUserClaims(id, USERNAME, null));
     when(this.userTxService.getAuthenticatedUserByUsername(USERNAME))
         .thenReturn(UserInfo.builder().id(id).username(USERNAME).build());
     return id;
