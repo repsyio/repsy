@@ -25,7 +25,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -123,8 +122,7 @@ class MavenChecksumRulesIT extends AbstractIntegrationTest {
 
   private User admin() {
     final var userInfo =
-        this.userTxService.create(
-            uniqueUsername("mvn-admin"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+        this.userTxService.create(uniqueUsername("mvn-admin"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(userInfo.getId());
 
     return this.userRepository.findById(userInfo.getId()).orElseThrow();

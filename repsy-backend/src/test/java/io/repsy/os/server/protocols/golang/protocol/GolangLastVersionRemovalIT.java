@@ -32,7 +32,6 @@ import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.golang.shared.storage.services.GolangStorageService;
 import io.repsy.os.server.protocols.golang.ui.facades.GolangApiFacade;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -115,8 +114,7 @@ class GolangLastVersionRemovalIT extends AbstractIntegrationTest {
   @BeforeEach
   void createAdmin() {
     final var info =
-        this.userTxService.create(
-            uniqueUsername("go-rm"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+        this.userTxService.create(uniqueUsername("go-rm"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(info.getId());
     this.panelToken = this.bearerTokenFor(info.getId(), info.getUsername());
     this.protocolToken =

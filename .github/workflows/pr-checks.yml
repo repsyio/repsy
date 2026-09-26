@@ -44,7 +44,11 @@ jobs:
 
   java-checks:
     name: Repsy check
-    runs-on: warp-ubuntu-latest-x64-2x
+    # RPS-1453: the integration tests of repsy-backend, about nine tenths of the build, run in
+    # several test JVMs at once (see "Build and Verify" below) and are CPU-bound, so this job uses
+    # the 4x runner: about the same vCPU-minutes per run as the 2x runner took for the 14 minutes
+    # of the serial build, in a bit more than half the time.
+    runs-on: warp-ubuntu-latest-x64-4x
     # The SonarCloud scan below reads the frontend coverage report the frontend job produces (there
     # is one analysis per project, so the scan cannot be split per language). The two jobs run in
     # parallel; the scan step waits for the report, which is long done by the time the Java build
@@ -75,8 +79,11 @@ jobs:
       - name: Install core modules
         run: mvn -B -ntp install -f core/pom.xml -DskipTests -Drat.skip=true -Dcheckstyle.skip=true
 
+      # -T 1C builds independent modules in parallel. it.fork.count is the number of test JVMs the
+      # integration tests of repsy-backend are spread over: one per vCPU of the runner, each with a
+      # postgres:18 container of its own (AbstractIntegrationTest), so none shares a database.
       - name: Build and Verify
-        run: mvn -B -ntp verify
+        run: mvn -B -ntp -T 1C verify -Dit.fork.count=4
 
       # The frontend job runs beside this one and normally uploads its report within a minute. Wait
       # for it (at most 10 minutes), but stop as soon as that job has finished without one, that

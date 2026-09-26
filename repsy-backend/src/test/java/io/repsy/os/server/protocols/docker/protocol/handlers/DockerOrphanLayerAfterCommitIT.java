@@ -30,7 +30,6 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.ui.facades.DockerApiFacade;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -76,8 +75,7 @@ class DockerOrphanLayerAfterCommitIT extends AbstractIntegrationTest {
   @BeforeEach
   void setUpWire() {
     final var info =
-        this.userTxService.create(
-            uniqueUsername("orphan"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+        this.userTxService.create(uniqueUsername("orphan"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(info.getId());
     this.wire =
         new DockerWire(

@@ -22,7 +22,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.ArrayList;
@@ -81,7 +80,7 @@ class RepoNameRaceIT extends AbstractIntegrationTest {
    */
   private String committedAdminToken() {
     final var username = uniqueUsername("race");
-    final var hash = PasswordHasher.hash(VALID_PASSWORD);
+    final var hash = VALID_PASSWORD_HASH;
     final var userInfo = this.userTxService.create(username, UserRole.ADMIN, hash);
     this.createdUserIds.add(userInfo.getId());
     return this.bearerTokenFor(userInfo.getId(), username);

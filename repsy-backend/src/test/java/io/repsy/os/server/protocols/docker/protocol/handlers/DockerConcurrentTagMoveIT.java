@@ -23,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -132,8 +131,7 @@ class DockerConcurrentTagMoveIT extends AbstractIntegrationTest {
   @BeforeEach
   void setUpWire() {
     final var info =
-        this.userTxService.create(
-            uniqueUsername("tagmove"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+        this.userTxService.create(uniqueUsername("tagmove"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(info.getId());
     final var user = this.userRepository.findById(info.getId()).orElseThrow();
     this.wire =

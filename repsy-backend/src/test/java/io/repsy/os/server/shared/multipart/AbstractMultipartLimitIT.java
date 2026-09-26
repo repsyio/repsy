@@ -18,7 +18,6 @@ package io.repsy.os.server.shared.multipart;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -115,8 +114,7 @@ abstract class AbstractMultipartLimitIT extends AbstractIntegrationTest {
     this.helmStorageService.createRepo(repo.getId());
 
     final var userInfo =
-        this.userTxService.create(
-            uniqueUsername("mp-admin"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+        this.userTxService.create(uniqueUsername("mp-admin"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(userInfo.getId());
     final var token =
         this.protocolBearerTokenFor(this.userRepository.findById(userInfo.getId()).orElseThrow());

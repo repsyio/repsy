@@ -22,7 +22,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.UserRole;
 import java.util.ArrayList;
 import java.util.List;
@@ -73,8 +72,7 @@ class BasicAuthCacheIT extends AbstractIntegrationTest {
 
   private String createAdmin() {
     final var username = uniqueUsername("cache");
-    final var userInfo =
-        this.userTxService.create(username, UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+    final var userInfo = this.userTxService.create(username, UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(userInfo.getId());
 
     return username;

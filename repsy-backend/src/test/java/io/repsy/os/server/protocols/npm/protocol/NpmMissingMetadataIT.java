@@ -36,7 +36,6 @@ import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.os.server.protocols.npm.ui.facades.NpmApiFacade;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -165,8 +164,7 @@ class NpmMissingMetadataIT extends AbstractIntegrationTest {
 
   private String adminToken() {
     final var userInfo =
-        this.userTxService.create(
-            uniqueUsername("npm-admin"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+        this.userTxService.create(uniqueUsername("npm-admin"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(userInfo.getId());
 
     return this.protocolBearerTokenFor(

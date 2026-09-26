@@ -124,6 +124,17 @@ public abstract class AbstractIntegrationTest {
   protected static final int PROTOCOL_PORT = 9090;
 
   protected static final String VALID_PASSWORD = "Password1!";
+
+  /**
+   * The BCrypt hash of {@link #VALID_PASSWORD}, made once per JVM. A BCrypt hash at the production
+   * work factor costs about 100 ms of CPU, and before this every test that made a user paid for
+   * one: it was about 60% of the CPU time of a full integration run (RPS-1453). Users made here
+   * share this hash, which is harmless because it is only ever the hash of the known test password.
+   * A test that needs a hash of its own (a different password, or a stale work factor) still calls
+   * {@link PasswordHasher#hash}.
+   */
+  protected static final String VALID_PASSWORD_HASH = PasswordHasher.hash(VALID_PASSWORD);
+
   protected static final String SEEDED_ADMIN_USERNAME = "admin";
   protected static final String SEEDED_ADMIN_PASSWORD = "SeededAdmin1!";
   protected static final String UUID_PATTERN =
@@ -306,8 +317,7 @@ public abstract class AbstractIntegrationTest {
    * generator that only assigns a value once the INSERT is flushed, so flush before re-reading.
    */
   protected User createUser(final String username, final UserRole role) {
-    final var hash = PasswordHasher.hash(VALID_PASSWORD);
-    final var userInfo = this.userTxService.create(username, role, hash);
+    final var userInfo = this.userTxService.create(username, role, VALID_PASSWORD_HASH);
     this.entityManager.flush();
     return this.userRepository.findById(userInfo.getId()).orElseThrow();
   }

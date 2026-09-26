@@ -41,7 +41,6 @@ import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVers
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciBlobRepository;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestRepository;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -255,8 +254,7 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
 
   private User admin() {
     final var info =
-        this.userTxService.create(
-            uniqueUsername("helm-race"), UserRole.ADMIN, PasswordHasher.hash(VALID_PASSWORD));
+        this.userTxService.create(uniqueUsername("helm-race"), UserRole.ADMIN, VALID_PASSWORD_HASH);
     this.createdUserIds.add(info.getId());
 
     return this.userRepository.findById(info.getId()).orElseThrow();
