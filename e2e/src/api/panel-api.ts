@@ -505,6 +505,12 @@ export class PanelApi {
     await this.client.keyStoreController.deleteMavenPgpPublicKey({ repoName, publicKeyId: id });
   }
 
+  /** Deletes one PyPI release (`DELETE /api/pypi/packages/{repoName}/{packageName}/releases/{version}`):
+   *  PyPI has no wire delete, so this panel call is the only way a published file goes away. */
+  async deletePypiRelease(repoName: string, packageName: string, version: string): Promise<void> {
+    await this.client.pypiPackageController.deletePypiRelease({ repoName, packageName, version });
+  }
+
   /**
    * Deletes one Go module version (`DELETE /api/go/modules/{repoName}/versions?modulePath=&
    * version=`, step 4d/RPS-294 R14/G8). Called directly with `fetch`, like {@link

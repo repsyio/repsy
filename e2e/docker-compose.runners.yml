@@ -247,6 +247,7 @@ services:
         PYTHON_VERSION: '3.14.7'
         PIP_VERSION: '26.2.1'
         TWINE_VERSION: '7.0.0'
+        UV_VERSION: '0.12.19'
     environment:
       <<: *runner-environment
     volumes:

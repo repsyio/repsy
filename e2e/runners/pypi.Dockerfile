@@ -25,6 +25,12 @@
 ARG PYTHON_VERSION=3.14.7
 ARG PIP_VERSION=26.2.1
 ARG TWINE_VERSION=7.0.0
+# uv (RPS-1486): the second PyPI client, a static binary (`uv publish`, `uv pip`, `uv lock`) copied out
+# of Astral's own image the way the toolchains above are, a named stage used only as a `COPY --from`
+# source. It is never given a Python of its own to download (UV_PYTHON_DOWNLOADS=never below): it
+# uses the CPython copied in from `python-toolchain`.
+ARG UV_VERSION=0.12.19
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv-binary
 FROM python:${PYTHON_VERSION}-slim-bookworm AS python-toolchain
 ARG PIP_VERSION
 ARG TWINE_VERSION
@@ -81,8 +87,17 @@ RUN ln -s python3.14 /usr/local/bin/python3 \
 # that other user at runtime, same reasoning as /app itself above.
 RUN chmod -R a+rX /usr/local/lib/python3.14 && chmod a+rx /usr/local/bin/python3.14
 
+# uv and uvx, the two static binaries of Astral's image; UV_PYTHON pins the interpreter the harness
+# copied in above and UV_PYTHON_DOWNLOADS=never forbids fetching one from the network. Every uv
+# invocation of the harness still gets its own allow-listed environment (clients/uv.ts), so these two
+# only make a manual `docker run` of the image behave.
+COPY --from=uv-binary /uv /uvx /usr/local/bin/
+ENV UV_PYTHON=/usr/local/bin/python3.14 \
+    UV_PYTHON_DOWNLOADS=never
+
 RUN python3 -c "import ssl, hashlib, zlib, bz2, lzma, sqlite3, ctypes, uuid" \
     && python3 -m pip --version \
-    && python3 -m twine --version
+    && python3 -m twine --version \
+    && uv --version
 
 CMD ["./entrypoint.sh", "pypi"]
