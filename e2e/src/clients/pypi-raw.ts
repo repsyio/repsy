@@ -114,6 +114,7 @@ import { env } from '../env.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import { buildTar } from './docker-image.js';
+import { randomPadding } from './padding.js';
 import {
   adminCredential,
   authHeader,
@@ -220,6 +221,9 @@ export function buildWheel(opts: {
   version: string;
   marker?: string;
   requiresPython?: string;
+  /** Bytes of random padding stored in one extra file (`<dist>/e2e_padding.bin`), for the size-limit
+   *  leg (RPS-1482, `padding.ts`); it is not listed in `RECORD`, which no consumer checks. */
+  padBytes?: number;
 }): BuiltWheel {
   const requiresPython = opts.requiresPython ?? '>=3.9';
   const marker = opts.marker ?? `e2e ${opts.name}@${opts.version}`;
@@ -252,6 +256,9 @@ export function buildWheel(opts: {
     zipEntries[path] = new TextEncoder().encode(content);
   }
   zipEntries[recordPath] = new TextEncoder().encode(recordText);
+  if (opts.padBytes !== undefined) {
+    zipEntries[`${dist}/e2e_padding.bin`] = randomPadding(opts.padBytes);
+  }
 
   const bytes = Buffer.from(zipSync(zipEntries, { level: 0 }));
 

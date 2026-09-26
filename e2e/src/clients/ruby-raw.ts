@@ -116,6 +116,7 @@ import { boundedSemverVersion } from '../scenarios/coordinates.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import { buildTar } from './docker-image.js';
+import { randomPadding } from './padding.js';
 import {
   adminCredential,
   authHeader,
@@ -299,6 +300,9 @@ export async function buildGem(opts: {
   requiredRubyVersion?: string;
   /** Declared dependencies (`Gem::Dependency` entries of the gemspec YAML); none by default. */
   dependencies?: GemDependencySpec[];
+  /** Bytes of random padding stored in `e2e-padding.bin` of the data archive, for the size-limit leg
+   *  (RPS-1482, `padding.ts`); the checksums cover it, so `gem push` still verifies the gem. */
+  padBytes?: number;
 }): Promise<BuiltGem> {
   const platform = opts.platform ?? 'ruby';
   const marker = opts.marker ?? createHash('sha256').update(`${Math.random()}`).digest('hex');
@@ -317,6 +321,9 @@ export async function buildGem(opts: {
   const dataTar = buildTar([
     { name: `lib/${opts.name}.rb`, data: Buffer.from(libRb, 'utf8') },
     { name: 'e2e-marker.txt', data: Buffer.from(`${marker}\n`, 'utf8') },
+    ...(opts.padBytes === undefined
+      ? []
+      : [{ name: 'e2e-padding.bin', data: randomPadding(opts.padBytes) }]),
   ]);
   const dataTarGz = zlib.gzipSync(dataTar);
 
