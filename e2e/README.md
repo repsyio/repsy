@@ -80,6 +80,7 @@ e2e/
   docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
   docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
   docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
+  docker-compose.stack-trivy.yml  # OPT-IN overlay on either stack: the REAL repsy-scanner-trivy (built from ../repsy-scanner-trivy) + Repsy with the scanner enabled, `run.sh local up|down --trivy`, see "Real scanner stack"
   docker-compose.stack-limits.yml  # OPT-IN overlay on either stack: every configurable upload limit at 64 KiB, `run.sh local up|down --limits`, see "Size-limit leg"
   docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" and "api"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
@@ -301,6 +302,7 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_E2E_SCANNER`           | _(unset)_                  | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_E2E_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                    |
 | `REPSY_E2E_THROTTLE`          | _(unset)_                  | `1` makes `local up\|down` include the auth-throttle overlay (same as `--throttle`) and `test` add `throttle` to `REPSY_E2E_OPT_IN`, see "Auth-throttle leg"                                                                                                                                                                                                                                                                             |
 | `REPSY_E2E_LIMITS`            | _(unset)_                  | `1` makes `local up\|down` include the tiny-upload-limit overlay (same as `--limits`) and `test` add `limits` to `REPSY_E2E_OPT_IN`, see "Size-limit leg"                                                                                                                                                                                                                                                                                |
+| `REPSY_E2E_TRIVY`             | _(unset)_                  | `1` makes `local up\|down` include the real-scanner overlay (same as `--trivy`) and `test` add `trivy` to `REPSY_E2E_OPT_IN`, see "Real scanner stack"                                                                                                                                                                                                                                                                                   |
 | `REPSY_E2E_SCANNER_PORT`      | `8090` + offset            | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_SCANNER_STUB_URL`      | `http://localhost:8090`    | ui runner only: where the `@scanner` specs reach that API (follows `REPSY_E2E_SCANNER_PORT`)                                                                                                                                                                                                                                                                                                                                             |
 | `REPSY_SCANNER_API_KEY`       | `e2e-scanner-key`          | the shared secret of the stub scanner and the backend's scanner client                                                                                                                                                                                                                                                                                                                                                                   |
@@ -3917,6 +3919,7 @@ and is never part of the default stack.
 | `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang), "TLS stack"                             |
 | `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                            |
 | `upgrade`  | `--upgrade`             | `REPSY_E2E_UPGRADE=1`  | `docker-compose.stack-upgrade.yml`  | `upgrade`   | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                 |
+| `trivy`    | `--trivy`               | `REPSY_E2E_TRIVY=1`    | `docker-compose.stack-trivy.yml`    | `trivy`     | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                               |
 
 How it fits together, so a later overlay is one row:
 
@@ -5332,6 +5335,70 @@ The Docker, Maven and PyPI specs script a finding list by name (`SCRIPTED_SEVERI
 names carry no directive. The scanner leg of the nightly runs `ui`, `npm-clients`, `docker`, `maven` and `pypi`;
 its step "Check the opt-in specs ran" fails a runner that skipped or ran nothing.
 
+### Real scanner stack (RPS-1484): `repsy-scanner-trivy` itself, once
+
+The stub scanner above stands in for `repsy-scanner-trivy`, so nothing but a mirror of its contract keeps the two
+alike. `./run.sh local up --trivy` (or `REPSY_E2E_TRIVY=1`, `docker-compose.stack-trivy.yml`) runs the REAL
+service instead: the image built from `../repsy-scanner-trivy` (Trivy 0.66 inside), started with
+`SCANNER_API_KEY` (`REPSY_SCANNER_API_KEY`, default `e2e-scanner-key`, the same value the backend gets as
+`TRIVY_SCANNER_API_KEY`), and Repsy with `SECURITY_SCANNER=enabled`, `TRIVY_SCANNER_BASE_URL=http://scanner-trivy:8090`,
+`DOCKER_INTERNAL_REGISTRY_BASE_URL=http://repsy:9090` (so the scanner can pull a Docker image from Repsy over the
+compose network, plain http, hence `--insecure`) and `TRIVY_MAX_SCAN_DURATION_SECONDS=900` (default 330). It is an
+alternative to `--scanner`, never combined with it (`run.sh` refuses the pair): both publish the scanner port
+(`REPSY_E2E_SCANNER_PORT`, 8090 + offset) and set the backend's scanner URL. The `@scanner` specs need the stub's
+`/control` API and do not run on it.
+
+```bash
+export REPSY_E2E_PROJECT=rps-1484 REPSY_E2E_PORT_OFFSET=900   # optional, "Parallel stacks"
+./run.sh local up --trivy          # about 3 minutes on a cold cache (network needed, see below)
+REPSY_E2E_TRIVY=1 ./run.sh test --protocol api --grep @trivy
+./run.sh local down --trivy        # keeps the trivy-cache volume; `docker compose ... down -v` drops it
+```
+
+**The network.** Trivy keeps its vulnerability databases (the general one and the Java one, about 1.4 GB on disk) in
+the `trivy-cache` volume of the compose project and downloads them from `ghcr.io` (falling back to `mirror.gcr.io`)
+when the scanner starts. The scanner holds its readiness (`/actuator/health/readiness`) until that is done, so
+`local up --wait` returns when the first scan can run (about 2 minutes of the 3), and the spec waits for readiness
+too (5 minutes at most, its message names the download). A download that keeps failing does not stop the scanner from
+starting: its first scan retries (5 attempts, 5 s doubling) and then ends FAILED with Trivy's own message. **A red leg
+whose failure reads `scan failed: trivy exited with code 1: ... FATAL ... failed to download vulnerability DB: OCI
+artifact error ... connection refused / unexpected status code / toomanyrequests` is the registry not answering (a
+network hiccup or a rate limit), not a Repsy fault: run the leg again. `TRIVY_DB_REPOSITORY` and
+`TRIVY_JAVA_DB_REPOSITORY` of the scanner point it at a mirror.**
+
+`tests/api/trivy-contract.spec.ts` (`@trivy`, opt-in `trivy`, the `api` runner, 10 tests):
+
+- **The contract cases the stub is held to as well** (`src/stubs/scanner/contract.ts`, run by this spec against the real
+  scanner and by `tests/skeleton/scanner-stub.spec.ts` against the stub): `GET /health` needs no key; a call without
+  the right key is a 401 `{"message":"unauthorized"}`; a submit without a required field, or with an empty or missing
+  file, is a 400 (the empty-file one with `{"message":"file must not be empty"}`) and makes no job; a body that is not
+  multipart is a 415; an unknown scan id is a 404 `{"message":"No scan job found for scanId: <id>"}`; an accepted scan
+  is `{"scanId","status":"QUEUED"}`, every answer has the job shape (`scanId`, `status`, `result`, `errorMessage`),
+  and it ends COMPLETED with a `findings` list. The text of a 400/415 body is Spring's, and differs, so it is not compared.
+  The first run of this list found two drifts, now fixed in the stub: the 404 message and the 415 for a body that is not
+  multipart (the stub said 400). A third, the text of the 400 of a missing field (the stub had a message, the real one
+  has none of its own), is why 400 bodies are not compared.
+- **A real scan, directly**: a tarball that bundles `lodash@4.17.20` ends COMPLETED, every finding has the fields of
+  `ScannerFinding` in the service's order, and `CVE-2021-23337` is HIGH, fixed in 4.17.21.
+- **A real scan through Repsy, npm**: the same tarball published to an npm repository; the panel's
+  `listVersionScans` shows a COMPLETED scan (HIGH, scanner `trivy`, not the stub's version) whose findings hold that CVE.
+- **A real scan through Repsy, Docker, by reference**: an image pushed with raw HTTP whose one layer holds
+  `app/node_modules/lodash/package.json`; the scanner pulls it from `repsy:9090/<repo>/<image>:<tag>` with the
+  registry token the backend gives it, and the same CVE is in the panel.
+
+What the probes showed (Trivy 0.66.0), so the spec is built the way it is:
+
+- The scanner runs `trivy rootfs` on the extracted tarball. It reads the **installed** packages (a `node_modules/*/package.json`),
+  **not lockfiles**: a `package-lock.json` in the tarball that pins `lodash@4.17.20` finds nothing (COMPLETED, no findings),
+  and neither does a `package.json` that only declares the dependency. So the npm scan sees a vulnerable dependency
+  only when the package bundles it.
+- Trivy's JSON has no `Trivy` object, which is where the scanner reads `scannerVersion` from, so a real scan reports
+  `scannerVersion: null` (the panel omits it) and `scannerName: trivy`. The spec asserts only that it is not the stub's version.
+
+The trivy leg of the nightly runs this spec (`api` runner, `--grep @trivy`, the step "Check the opt-in specs ran"
+fails it when the spec skipped) and takes 45 minutes at most: the scanner image is built on the runner (a Maven build,
+about 3 minutes) and the databases downloaded (about 2).
+
 ## Running
 
 ```bash
@@ -5398,7 +5465,7 @@ host-matching uid even though the packages themselves only need to be read.
 
 `.github/workflows/e2e-nightly.yml` ("E2E Nightly") runs this harness on GitHub Actions: the panel UI
 suite, the wire-level protocol runners, the embedded-H2 smoke run plus one rotating full catalog on H2, and
-the scanner-stub UI specs. **It runs nightly (01:23 UTC)
+the scanner-stub UI specs, and the real-scanner contract spec. **It runs nightly (01:23 UTC)
 and on demand only, by the product owner's decision (RPS-1260): it has no `pull_request`, `push` or
 `merge_group` trigger.** PR checks are switched off in this repo on purpose (`pr-checks.yml` is
 `workflow_dispatch` only, `AGENTS.md` "Merging to main"), and this workflow is not a required check.
@@ -5407,7 +5474,7 @@ and on demand only, by the product owner's decision (RPS-1260): it has no `pull_
 
 ```bash
 gh workflow run e2e-nightly.yml                            # everything, like the nightly run
-gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | upgrade (both) | all
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | upgrade (both) | trivy | all
 gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
 gh workflow run e2e-nightly.yml -f suite=upgrade -f upgrade_from=26.08.3   # the upgrade legs from another release
 gh workflow run e2e-nightly.yml -f suite=h2 -f h2_full=docker   # the full catalog of this runner on H2, not tonight's
@@ -5436,6 +5503,7 @@ cancelling): a second one waits.
 | `limits`     | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                  | 60 min  |
 | `upgrade`    | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                             | 30 min  |
 | `upgrade-h2` | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                 | 30 min  |
+| `trivy`      | PostgreSQL + the real scanner overlay       | `REPSY_E2E_OPT_IN=trivy`, `--grep @trivy` on `api`, 10 tests, "Real scanner stack": the contract the stub mimics and one real scan of an npm package and of a Docker image                                               | 45 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
 others. Every leg does the same: load the image, `./run.sh local up [--h2]` (with `REPSY_IMAGE` set, so

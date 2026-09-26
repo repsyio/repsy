@@ -63,8 +63,8 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--upgrade] [--force]
-  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--upgrade]
+  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--upgrade] [--trivy] [--force]
+  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--upgrade] [--trivy]
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
@@ -92,6 +92,11 @@ combinable with --h2): Repsy starts with SECURITY_SCANNER=enabled pointed at a d
 repsy-scanner-trivy, which the @scanner UI specs need (REPSY_E2E_OPT_IN=scanner; with REPSY_E2E_SCANNER=1
 "run.sh test" adds that opt-in itself). The default stack never starts a scanner. Give "down" the same
 flags as "up". See README.md "Scanner stack".
+
+--trivy (or REPSY_E2E_TRIVY=1) is the alternative to --scanner: the REAL repsy-scanner-trivy service, built from
+../repsy-scanner-trivy, with Repsy pointed at it (docker-compose.stack-trivy.yml, RPS-1484), for the @trivy
+contract spec of the api runner. It needs the network (Trivy downloads its vulnerability database) and cannot
+be combined with --scanner. See README.md "Real scanner stack".
 
 "local logs" prints the container logs (with timestamps) and "local ps" lists the containers (stopped ones
 too) of the stack that "local up" started with the same flags. The nightly workflow collects its stack
@@ -142,6 +147,7 @@ OVERLAYS=(
   "tls|--tls|REPSY_E2E_TLS|docker-compose.stack-tls.yml"
   "limits|--limits|REPSY_E2E_LIMITS|docker-compose.stack-limits.yml"
   "upgrade|--upgrade|REPSY_E2E_UPGRADE|docker-compose.stack-upgrade.yml"
+  "trivy|--trivy|REPSY_E2E_TRIVY|docker-compose.stack-trivy.yml"
 )
 
 # Field $2 (1 name, 2 flag, 3 env switch, 4 file) of the overlay row $1.
@@ -398,6 +404,7 @@ guard_stack_owner() {
 
   local -a ports=("$REPSY_E2E_API_PORT" "$REPSY_E2E_REPO_PORT")
   overlay_active scanner && ports+=("$REPSY_E2E_SCANNER_PORT")
+  overlay_active trivy && ports+=("$REPSY_E2E_SCANNER_PORT")
   overlay_active tls && ports+=("$REPSY_E2E_API_TLS_PORT" "$REPSY_E2E_REPO_TLS_PORT")
   local port line name project
   for port in "${ports[@]}"; do
@@ -431,6 +438,11 @@ stack_args() {
       STACK_ARGS+=(-f "$(overlay_field "$row" 4)")
     fi
   done
+  # Two scanners cannot share the scanner port or the backend's scanner URL.
+  if overlay_active scanner && overlay_active trivy; then
+    echo "--scanner (the stub) and --trivy (the real scanner) are alternatives, pick one" >&2
+    exit 1
+  fi
 }
 
 require_admin_password() {
@@ -542,6 +554,9 @@ cmd_local_up() {
   fi
   if overlay_active upgrade; then
     echo "Upgrade overlay on: run REPSY_E2E_UPGRADE=1 ./run.sh test --protocol stack --grep @upgrade (the stack ends on the image under test)"
+  fi
+  if overlay_active trivy; then
+    echo "Real Trivy scanner on http://localhost:$REPSY_E2E_SCANNER_PORT: run REPSY_E2E_TRIVY=1 ./run.sh test --protocol api --grep @trivy (needs the network: Trivy downloads its vulnerability database)"
   fi
   if overlay_active scanner; then
     echo "Scanner enabled: run the @scanner specs with REPSY_UI_OPT_IN=scanner (or REPSY_E2E_SCANNER=1) ./run.sh test --protocol ui --grep @scanner"

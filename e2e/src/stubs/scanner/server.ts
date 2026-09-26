@@ -25,10 +25,14 @@
  *  - Everything else needs the header `X-Scanner-Api-Key` (else 401 `{"message":"unauthorized"}`).
  *  - `POST /scan` (multipart: `scanId`, `repoType`, `artifactName`, `artifactVersion`, then either a
  *    `file` part or `dockerImageReference` [+ `registryAuthToken`, `registryInsecure`]) ->
- *    `{"scanId","status":"QUEUED"}`; 400 `{"message"}` for a missing field or an empty file.
+ *    `{"scanId","status":"QUEUED"}`; 400 for a missing field or an empty file, 415 for a body that is not
+ *    multipart.
  *  - `GET /scan/{scanId}` -> `{"scanId","status":QUEUED|RUNNING|COMPLETED|FAILED,"result":
  *    {"findings":[...],"scannerVersion"}|null,"errorMessage":string|null}`; 404 `{"message"}` for an
  *    unknown job (which the backend reads as "not submitted yet" while PENDING, "job lost" after).
+ *
+ * `tests/api/trivy-contract.spec.ts` runs the same raw calls (`contract.ts`) against the real scanner
+ * (`docker-compose.stack-trivy.yml`), and the skeleton spec against this stub, so the two cannot drift.
  *
  * What a scan reports is decided by the artifact's name and version (`rules.ts`, documented in
  * `e2e/README.md`), with no clock or randomness: a job's status is a pure function of the plan and the
@@ -292,7 +296,7 @@ export function createScannerStub(options: StubOptions): ScannerStub {
   async function submit(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const boundary = boundaryOf(request.headers['content-type']);
     if (!boundary) {
-      throw new HttpError(400, 'Content-Type must be multipart/form-data');
+      throw new HttpError(415, 'Content-Type must be multipart/form-data');
     }
     const form = parseMultipart(await readBody(request, maxBodyBytes), boundary);
     const file = form.files.find((part) => part.fieldName === 'file');
@@ -420,7 +424,7 @@ export function createScannerStub(options: StubOptions): ScannerStub {
     if (method === 'GET' && scanId !== undefined) {
       const job = jobs.get(decodeURIComponent(scanId));
       if (!job) {
-        throw new HttpError(404, `Scan job not found: ${decodeURIComponent(scanId)}`);
+        throw new HttpError(404, `No scan job found for scanId: ${decodeURIComponent(scanId)}`);
       }
       sendJson(response, 200, jobResponse(job, now()));
       return;
