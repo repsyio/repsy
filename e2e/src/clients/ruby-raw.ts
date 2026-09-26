@@ -297,6 +297,7 @@ export async function buildGem(opts: {
   version: string;
   platform?: string;
   marker?: string;
+  /** One `Gem::Requirement` clause of the gemspec's `required_ruby_version` (`'>= 2.7'`); `'>= 0'` by default. */
   requiredRubyVersion?: string;
   /** Declared dependencies (`Gem::Dependency` entries of the gemspec YAML); none by default. */
   dependencies?: GemDependencySpec[];
@@ -307,6 +308,8 @@ export async function buildGem(opts: {
   const platform = opts.platform ?? 'ruby';
   const marker = opts.marker ?? createHash('sha256').update(`${Math.random()}`).digest('hex');
 
+  // `required_ruby_version`: one clause (`>= 2.7`), `>= 0` (any Ruby) unless given.
+  const rubyRequirement = (opts.requiredRubyVersion ?? '>= 0').trim().split(/\s+/);
   const template = await metadataTemplate();
   const metadataYaml = mustache.render(template, {
     name: opts.name,
@@ -314,6 +317,8 @@ export async function buildGem(opts: {
     platform,
     marker,
     dependenciesYaml: renderDependenciesYaml(opts.dependencies ?? []),
+    rubyOperator: rubyRequirement[0],
+    rubyVersion: rubyRequirement.slice(1).join(' '),
   });
   const metadataGz = zlib.gzipSync(Buffer.from(metadataYaml, 'utf8'));
 

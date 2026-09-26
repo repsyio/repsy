@@ -26,9 +26,9 @@ require_paths:
 - lib
 required_ruby_version: !ruby/object:Gem::Requirement
   requirements:
-  - - ">="
+  - - "{{{rubyOperator}}}"
     - !ruby/object:Gem::Version
-      version: '0'
+      version: '{{{rubyVersion}}}'
 required_rubygems_version: !ruby/object:Gem::Requirement
   requirements:
   - - ">="

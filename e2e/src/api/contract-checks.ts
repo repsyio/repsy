@@ -112,14 +112,23 @@ export interface PagingSweep<T> {
   values: Readonly<Record<string, string>>;
   /** How many rows the list holds (the test seeded them). */
   total: number;
+  /** Query parameters every request of the sweep carries (`modulePath=...`, for an operation that names its subject there). */
+  baseQuery?: string;
   /** A key that identifies one row. */
   keyOf: (item: T) => string;
   /** Sort properties that order the seeded rows the same way in any collation (names that differ only in a trailing number). */
   sorts: SortCheck<T>[];
 }
 
+/** `query` with the sweep's `baseQuery` in front. */
+function withBase<T>(sweep: PagingSweep<T>, query: string): string {
+  return [sweep.baseQuery, query].filter((part) => part).join('&');
+}
+
 async function page<T>(sweep: PagingSweep<T>, query: string): Promise<Page<T>> {
-  const res = await callOperation(sweep.operationId, sweep.values, { query });
+  const res = await callOperation(sweep.operationId, sweep.values, {
+    query: withBase(sweep, query),
+  });
   return expectContract(sweep.operationId, res) as Page<T>;
 }
 
@@ -186,7 +195,9 @@ export async function expectPagingSweep<T>(sweep: PagingSweep<T>): Promise<void>
     ['sort=noSuchProperty,asc', 'sort'],
     [`sort=${sweep.sorts[0]?.property ?? 'id'},sideways`, 'sort'],
   ] as const) {
-    const res = await callOperation(sweep.operationId, sweep.values, { query });
+    const res = await callOperation(sweep.operationId, sweep.values, {
+      query: withBase(sweep, query),
+    });
     expectFailure(sweep.operationId, res, 400, 'validationError');
     expect((res.json as { data?: string }).data, `${query}: the offending parameter`).toBe(
       offending,

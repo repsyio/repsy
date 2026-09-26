@@ -4489,6 +4489,32 @@ same `expectCovers`). What is specific to them:
 ./run.sh test --protocol docker,helm --grep "panel API"
 ```
 
+## Panel API contract specs: NuGet, Cargo, Ruby and Go (RPS-1483 part B5)
+
+`tests/{nuget,cargo,ruby,golang}/panel-api.spec.ts`, each in its own runner (`--protocol nuget|cargo|ruby|golang`), built
+like the Maven, npm and PyPI ones (same helpers, same five kinds of check: coverage, facts, failures, paging, deletes):
+
+```bash
+./run.sh test --protocol nuget,cargo,ruby,golang --grep "panel API"
+```
+
+| Protocol | Published with                                                                                                                     | Facts matched to the client                                                                                                                                                                                                                           | After the panel DELETE                                                                                                                                                     |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| NuGet    | `dotnet nuget push` of a nupkg with a nuspec of our own (`buildNupkg({ metadata, dependencies })`)                                 | flat-container versions, registration `listed` (flipped by a real `dotnet nuget delete`), title, tags, URLs, README, dependencies per target framework, downloads after a `dotnet restore`, `3.0.0.0` read as `3.0.0`                                 | `v3/package/<id>/index.json`, the registration and the `.nupkg` drop it (404 for the last version), `dotnet restore` fails, the sibling restores to its bytes              |
+| Cargo    | `cargo publish` (the adapter's crate, and a manifest of our own with a normal and a dev dependency)                                | sparse-index versions and `yanked` (flipped by `cargo yank` and `--undo`), `cksum`, description, authors, keywords, categories, URLs, license, edition, `rust-version`, README, `deps` of each kind, downloads after a `cargo fetch`, `-` read as `_` | the sparse index and the `.crate` drop it, `cargo fetch` fails, the sibling fetches its bytes; the last version takes the crate                                            |
+| Ruby     | `gem push` (the adapter's gem; gems of our own with platforms `java` and `x86_64-linux`, dependencies and `required_ruby_version`) | `/info` lines and checksums (the panel's `checksum`, the `/info` one and the digest of the `.gem` served are the same), platforms, gemspec metadata, runtime and development dependencies, `gem yank`                                                 | `/info` drops the version, `platform=java` removes that variant only, the `.gem` answers 404, `bundle install` fails, the sibling installs its bytes                       |
+| Go       | `curl -T` (the adapter's `seedPublish`; a `/v2` module beside the module)                                                          | `@v/list`, `@latest`, the `go` directive of the zipped `go.mod`, the module path (query parameter `modulePath`), `checkGolangSumdbSupported` (a bare 404, no credentials)                                                                             | `@v/list` and the `.zip` drop it, `go mod download` fails, the sibling downloads its bytes, deleting the module leaves the `/v2` module; the last version takes the module |
+
+Helpers extended for this (signatures stable): `expectPagingSweep` takes an optional `baseQuery` (Go names its module in
+the query string), `buildNupkg` an optional `metadata`, and `buildGem`'s `requiredRubyVersion` (declared, never applied
+before) now reaches the gemspec.
+
+Notes: no operation of these four protocols answers a property its schema does not declare. `gem install` and `gem fetch`
+are not used as the consumer (RPS-1233, RPS-1234, see `tests/ruby/publish-consume.spec.ts`), `bundle install` is. Go has no
+`go get` here: `go mod download` is the adapter's consumer and the same request. The panel's package id of NuGet is the
+lower-cased one in the list (the registration spells it that way too, H8) and follows the request's spelling in the details,
+so the spec compares it case-insensitively.
+
 ## Remote hardening
 
 On a `remote` target (`target.isRemote`, see `src/target.ts`), `AUTH_THROTTLE_MAX_FAILURES` cannot

@@ -276,16 +276,28 @@ export function buildNupkg(opts: {
   /** Bytes of random padding stored in `content/e2e-padding.bin`, for the size-limit leg (RPS-1482,
    *  `padding.ts`). */
   padBytes?: number;
+  /** Extra nuspec metadata (RPS-1483, what the panel's package and version details show); none by default. */
+  metadata?: NuspecExtraMetadata;
 }): Buffer {
   const marker = opts.marker ?? `e2e ${opts.packageId}@${opts.version}`;
+  const extra = opts.metadata ?? {};
   const nuspec =
     '<?xml version="1.0" encoding="utf-8"?>\n' +
     '<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">\n' +
     '  <metadata>\n' +
     `    <id>${opts.packageId}</id>\n` +
     `    <version>${opts.version}</version>\n` +
+    (extra.title === undefined ? '' : `    <title>${extra.title}</title>\n`) +
     '    <authors>repsy-e2e</authors>\n' +
     `    <description>e2e ${opts.packageId}@${opts.version}</description>\n` +
+    (extra.tags === undefined ? '' : `    <tags>${extra.tags}</tags>\n`) +
+    (extra.iconUrl === undefined ? '' : `    <iconUrl>${extra.iconUrl}</iconUrl>\n`) +
+    (extra.licenseUrl === undefined ? '' : `    <licenseUrl>${extra.licenseUrl}</licenseUrl>\n`) +
+    (extra.projectUrl === undefined ? '' : `    <projectUrl>${extra.projectUrl}</projectUrl>\n`) +
+    (extra.repositoryUrl === undefined
+      ? ''
+      : `    <repository type="git" url="${extra.repositoryUrl}" />\n`) +
+    (extra.readme === undefined ? '' : '    <readme>README.md</readme>\n') +
     renderNuspecDependencies(opts.dependencies ?? [], opts.emptyGroups ?? []) +
     '  </metadata>\n' +
     '</package>\n';
@@ -294,11 +306,26 @@ export function buildNupkg(opts: {
     [`${opts.packageId}.nuspec`]: new TextEncoder().encode(nuspec),
     'content/e2e-marker.txt': new TextEncoder().encode(marker),
   };
+  if (extra.readme !== undefined) {
+    entries['README.md'] = new TextEncoder().encode(extra.readme);
+  }
   if (opts.padBytes !== undefined) {
     entries['content/e2e-padding.bin'] = randomPadding(opts.padBytes);
   }
   const zipped = zipSync(entries, { level: 0 });
   return Buffer.from(zipped);
+}
+
+/** The optional nuspec elements of `buildNupkg({ metadata })` (RPS-1483); `readme` is the text of the `README.md` the
+ *  nuspec's `<readme>` names. */
+export interface NuspecExtraMetadata {
+  title?: string;
+  tags?: string;
+  iconUrl?: string;
+  licenseUrl?: string;
+  projectUrl?: string;
+  repositoryUrl?: string;
+  readme?: string;
 }
 
 /** One `<dependency id="..." version="...">` of a nuspec (RPS-1479). `range` is a NuGet version
