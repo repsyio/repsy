@@ -20,6 +20,7 @@ import static org.awaitility.Awaitility.await;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
@@ -35,15 +36,21 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * RPS-961: a user whose password hash was made with an older BCrypt work factor can log in, and the
  * hash is replaced by a current one on the way, through the panel login and through HTTP Basic
- * alike. Since RPS-1033 a hash without an algorithm id, such as the salted SHA-256 of RPS-961 and
- * before, no longer verifies at all.
+ * alike.
+ *
+ * <p>RPS-1615: an account of release v26.08.4 still has a salted SHA-256 hash and its salt. Its
+ * owner logs in with the old password on every path that checks one (panel login, HTTP Basic, the
+ * Docker token endpoint, npm login, Cargo login), and the hash becomes BCrypt with no salt while
+ * the sessions stay valid.
  *
  * <p>The upgrade runs in its own transaction, and {@code UserLoginListener} is {@code @Async}, so
  * neither can see rows that are still uncommitted inside a test transaction. The class therefore
@@ -116,7 +123,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
 
     final var after = this.reload(user.getId());
     assertThat(after.getHash()).startsWith(BCRYPT_PREFIX).isNotEqualTo(user.getHash());
-    assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash())).isTrue();
+    assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash(), null)).isTrue();
     assertThat(after.getTokenVersion())
         .as("the password did not change, so the refresh tokens stay valid")
         .isEqualTo(user.getTokenVersion());
@@ -155,7 +162,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
 
     final var after = this.reload(user.getId());
     assertThat(after.getHash()).startsWith(BCRYPT_PREFIX).isNotEqualTo(user.getHash());
-    assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash())).isTrue();
+    assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash(), null)).isTrue();
 
     this.basicRequest(user.getUsername(), VALID_PASSWORD, AUTHENTICATED);
   }
@@ -182,16 +189,225 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
     assertThat(this.reload(user.getId()).getHash()).isEqualTo(user.getHash());
   }
 
+  private static final String SALT = "0123456789abcdef";
+
+  /** A user as release v26.08.4 stored it: {@code sha256Hex(password + salt)} and the salt. */
+  private User createLegacyUser(final String password) {
+    final var user = this.commitUser(DigestUtils.sha256Hex(password + SALT));
+
+    this.jdbcTemplate.update("update users set salt = ? where id = ?", SALT, user.getId());
+
+    return this.reload(user.getId());
+  }
+
+  private void assertUpgraded(final User legacy, final String password) {
+    final var after = this.reload(legacy.getId());
+
+    assertThat(after.getHash()).startsWith(BCRYPT_PREFIX).isNotEqualTo(legacy.getHash());
+    assertThat(after.getSalt()).as("BCrypt keeps its salt in the hash").isNull();
+    assertThat(PasswordHasher.matches(password, after.getHash(), after.getSalt())).isTrue();
+    assertThat(after.getTokenVersion())
+        .as("the password did not change, so the sessions stay valid")
+        .isEqualTo(legacy.getTokenVersion());
+  }
+
+  private MockHttpServletResponse protocol(final AbstractMockHttpServletRequestBuilder<?> request)
+      throws Exception {
+    return this.mockMvc.perform(request.with(protocolPort())).andReturn().getResponse();
+  }
+
+  private MockHttpServletResponse npmLogin(
+      final String username, final String password, final int expectedStatus) throws Exception {
+    final var response =
+        this.protocol(
+            put("/npm/-/user/org.couchdb.user:{name}", username)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"%s\",\"password\":\"%s\"}".formatted(username, password)));
+
+    assertThat(response.getStatus()).isEqualTo(expectedStatus);
+
+    return response;
+  }
+
   @Test
-  @DisplayName("a salted SHA-256 hash no longer logs in, whatever the password")
-  void sha256HashIsRejected() throws Exception {
-    final var salt = "0123456789abcdef";
-    final var user = this.commitUser(DigestUtils.sha256Hex(VALID_PASSWORD + salt));
+  @DisplayName("panel login with a legacy SHA-256 hash succeeds and stores BCrypt without a salt")
+  void panelLoginUpgradesLegacyHash() throws Exception {
+    final var user = this.createLegacyUser(VALID_PASSWORD);
+
+    this.panelLogin(user.getUsername(), VALID_PASSWORD, 200);
+
+    this.assertUpgraded(user, VALID_PASSWORD);
+    this.panelLogin(user.getUsername(), VALID_PASSWORD, 200);
+    this.panelLogin(user.getUsername(), "Other1234!", 401);
+  }
+
+  @Test
+  @DisplayName("HTTP Basic with a legacy SHA-256 hash succeeds and stores BCrypt without a salt")
+  void basicAuthUpgradesLegacyHash() throws Exception {
+    final var user = this.createLegacyUser(VALID_PASSWORD);
+
+    this.basicRequest(user.getUsername(), VALID_PASSWORD, AUTHENTICATED);
+
+    this.assertUpgraded(user, VALID_PASSWORD);
+    this.basicRequest(user.getUsername(), VALID_PASSWORD, AUTHENTICATED);
+    this.basicRequest(user.getUsername(), "Other1234!", 401);
+  }
+
+  @Test
+  @DisplayName("Maven wire read with a legacy SHA-256 hash succeeds and stores BCrypt")
+  void mavenWireUpgradesLegacyHash() throws Exception {
+    final var user = this.createLegacyUser(VALID_PASSWORD);
+    final var url = "/maven/com/example/lib/1.0/lib-1.0.pom";
+
+    assertThat(this.protocol(get(url)).getStatus()).isEqualTo(401);
+    assertThat(
+            this.protocol(get(url).header(AUTHORIZATION, basicAuth(user.getUsername(), "Nope1!")))
+                .getStatus())
+        .isEqualTo(401);
+    assertThat(
+            this.protocol(
+                    get(url).header(AUTHORIZATION, basicAuth(user.getUsername(), VALID_PASSWORD)))
+                .getStatus())
+        .isEqualTo(404);
+
+    this.assertUpgraded(user, VALID_PASSWORD);
+  }
+
+  @Test
+  @DisplayName("the Docker token endpoint with a legacy SHA-256 hash issues a token and upgrades")
+  void dockerTokenUpgradesLegacyHash() throws Exception {
+    final var user = this.createLegacyUser(VALID_PASSWORD);
+    final var token =
+        get("/v2/token")
+            .param("scope", "repository:docker/image:pull")
+            .header(AUTHORIZATION, basicAuth(user.getUsername(), VALID_PASSWORD));
+
+    assertThat(this.protocol(token).getStatus()).isEqualTo(200);
+
+    this.assertUpgraded(user, VALID_PASSWORD);
+  }
+
+  @Test
+  @DisplayName("the Docker password grant with a legacy SHA-256 hash issues a token and upgrades")
+  void dockerPasswordGrantUpgradesLegacyHash() throws Exception {
+    final var user = this.createLegacyUser(VALID_PASSWORD);
+    final var grant =
+        post("/v2/token")
+            .param("grant_type", "password")
+            .param("username", user.getUsername())
+            .param("password", VALID_PASSWORD)
+            .param("scope", "repository:docker/image:pull");
+
+    assertThat(this.protocol(grant).getStatus()).isEqualTo(200);
+
+    this.assertUpgraded(user, VALID_PASSWORD);
+  }
+
+  @Test
+  @DisplayName("npm login with a legacy SHA-256 hash succeeds and stores BCrypt without a salt")
+  void npmLoginUpgradesLegacyHash() throws Exception {
+    final var user = this.createLegacyUser(VALID_PASSWORD);
+
+    this.npmLogin(user.getUsername(), "Other1234!", 401);
+    assertThat(this.reload(user.getId()).getHash()).isEqualTo(user.getHash());
+
+    this.npmLogin(user.getUsername(), VALID_PASSWORD, 201);
+
+    this.assertUpgraded(user, VALID_PASSWORD);
+    this.npmLogin(user.getUsername(), VALID_PASSWORD, 201);
+  }
+
+  @Test
+  @DisplayName("Cargo login with a legacy SHA-256 hash succeeds and stores BCrypt without a salt")
+  void cargoLoginUpgradesLegacyHash() throws Exception {
+    final var user = this.createLegacyUser(VALID_PASSWORD);
+    final var me = get("/cargo/me");
+
+    assertThat(
+            this.protocol(me.header(AUTHORIZATION, basicAuth(user.getUsername(), "Nope1!")))
+                .getStatus())
+        .isEqualTo(401);
+    assertThat(
+            this.protocol(
+                    get("/cargo/me")
+                        .header(AUTHORIZATION, basicAuth(user.getUsername(), VALID_PASSWORD)))
+                .getStatus())
+        .isEqualTo(200);
+
+    this.assertUpgraded(user, VALID_PASSWORD);
+  }
+
+  @Test
+  @DisplayName("a wrong password leaves a legacy hash and its salt as they are")
+  void wrongPasswordLeavesLegacyHash() throws Exception {
+    final var user = this.createLegacyUser(VALID_PASSWORD);
+
+    this.panelLogin(user.getUsername(), "Other1234!", 401);
+    this.basicRequest(user.getUsername(), "Other1234!", 401);
+
+    final var after = this.reload(user.getId());
+    assertThat(after.getHash()).isEqualTo(user.getHash());
+    assertThat(after.getSalt()).isEqualTo(SALT);
+  }
+
+  @Test
+  @DisplayName("a legacy hash without its salt does not log in")
+  void legacyHashWithoutSaltIsRejected() throws Exception {
+    final var user = this.commitUser(DigestUtils.sha256Hex(VALID_PASSWORD + SALT));
 
     this.panelLogin(user.getUsername(), VALID_PASSWORD, 401);
     this.basicRequest(user.getUsername(), VALID_PASSWORD, 401);
 
     assertThat(this.reload(user.getId()).getHash()).isEqualTo(user.getHash());
+  }
+
+  @Test
+  @DisplayName("a legacy password too long for BCrypt is refused by the panel and stays legacy")
+  void overlongLegacyPasswordIsNotUpgraded() throws Exception {
+    final var password = "Aa1!" + "x".repeat(80);
+    final var user = this.createLegacyUser(password);
+
+    this.panelLogin(user.getUsername(), password, 400);
+    this.basicRequest(user.getUsername(), password, AUTHENTICATED);
+
+    assertThat(this.reload(user.getId()).getHash()).isEqualTo(user.getHash());
+  }
+
+  @Test
+  @DisplayName("a legacy upgrade that lost a race with a password change does not undo the change")
+  void staleLegacyUpgradeDoesNotOverwriteANewPassword() {
+    final var user = this.createLegacyUser(VALID_PASSWORD);
+    final var staleView = this.userTxService.getUserById(user.getId());
+
+    this.userTxService.updatePassword(user.getId(), PasswordHasher.hash("NewPassword2@"));
+    final var changed = this.reload(user.getId());
+
+    this.userTxService.upgradePasswordHash(staleView, VALID_PASSWORD);
+
+    assertThat(this.reload(user.getId()).getHash()).isEqualTo(changed.getHash());
+    assertThat(changed.getSalt()).as("a new password carries no salt").isNull();
+  }
+
+  @Test
+  @DisplayName("changing the password of a legacy account clears its salt")
+  void updatePasswordClearsTheSalt() {
+    final var user = this.createLegacyUser(VALID_PASSWORD);
+
+    this.userTxService.updatePassword(user.getId(), PasswordHasher.hash("NewPassword2@"));
+
+    assertThat(this.reload(user.getId()).getSalt()).isNull();
+  }
+
+  @Test
+  @DisplayName("resetting the password of a legacy account clears its salt")
+  void resetPasswordClearsTheSalt() {
+    final var user = this.createLegacyUser(VALID_PASSWORD);
+
+    final var newPassword = this.userTxService.resetUserPassword(user.getId());
+
+    final var after = this.reload(user.getId());
+    assertThat(after.getSalt()).isNull();
+    assertThat(PasswordHasher.matches(newPassword, after.getHash(), after.getSalt())).isTrue();
   }
 
   @Test
@@ -216,7 +432,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
     this.userTxService.upgradePasswordHash(staleView, VALID_PASSWORD);
 
     assertThat(this.reload(user.getId()).getHash()).isEqualTo(changed.getHash());
-    assertThat(PasswordHasher.matches("NewPassword2@", changed.getHash())).isTrue();
+    assertThat(PasswordHasher.matches("NewPassword2@", changed.getHash(), null)).isTrue();
   }
 
   @Test

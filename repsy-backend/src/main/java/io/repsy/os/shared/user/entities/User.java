@@ -52,6 +52,14 @@ public class User {
   @Column(name = "hash", nullable = false, length = 128)
   private String hash;
 
+  /**
+   * The salt of a pre-BCrypt SHA-256 hash (RPS-1615). BCrypt keeps its salt inside the hash, so
+   * this is null for every hash written by the current code and cleared when a legacy hash is
+   * upgraded.
+   */
+  @Column(name = "salt", length = 16)
+  private String salt;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "role", nullable = false, length = 20)
   private UserRole role;

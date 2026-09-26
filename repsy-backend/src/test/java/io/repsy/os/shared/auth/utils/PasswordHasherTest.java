@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import java.util.Locale;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -32,8 +33,10 @@ class PasswordHasherTest {
 
   private static final String PASSWORD = "Password1!";
 
-  /** The salted SHA-256 of RPS-961 and before, which migration V0017 (RPS-1033) retired. */
-  private static final String SHA256_HASH = DigestUtils.sha256Hex(PASSWORD + "0123456789abcdef");
+  private static final String SALT = "0123456789abcdef";
+
+  /** The salted SHA-256 of RPS-961 and before, which still verifies once (RPS-1615). */
+  private static final String SHA256_HASH = DigestUtils.sha256Hex(PASSWORD + SALT);
 
   @Nested
   @DisplayName("hash")
@@ -63,7 +66,7 @@ class PasswordHasherTest {
     void acceptsTheLimit() {
       final var password = "a".repeat(PasswordHasher.MAX_PASSWORD_BYTES);
 
-      assertThat(PasswordHasher.matches(password, PasswordHasher.hash(password))).isTrue();
+      assertThat(PasswordHasher.matches(password, PasswordHasher.hash(password), null)).isTrue();
     }
 
     @Test
@@ -121,51 +124,102 @@ class PasswordHasherTest {
     @Test
     @DisplayName("accepts the password of a BCrypt hash")
     void acceptsBcrypt() {
-      assertThat(PasswordHasher.matches(PASSWORD, PasswordHasher.hash(PASSWORD))).isTrue();
+      assertThat(PasswordHasher.matches(PASSWORD, PasswordHasher.hash(PASSWORD), null)).isTrue();
     }
 
     @Test
     @DisplayName("rejects another password on a BCrypt hash")
     void rejectsWrongPasswordOnBcrypt() {
-      assertThat(PasswordHasher.matches("Wrong1!", PasswordHasher.hash(PASSWORD))).isFalse();
+      assertThat(PasswordHasher.matches("Wrong1!", PasswordHasher.hash(PASSWORD), null)).isFalse();
     }
 
     @Test
     @DisplayName("does not tell a password apart from the same one with a different tail")
     void isNotPrefixMatch() {
-      assertThat(PasswordHasher.matches(PASSWORD + "x", PasswordHasher.hash(PASSWORD))).isFalse();
+      assertThat(PasswordHasher.matches(PASSWORD + "x", PasswordHasher.hash(PASSWORD), null))
+          .isFalse();
     }
 
     @Test
-    @DisplayName("no longer accepts the right password on a salted SHA-256 hash")
-    void rejectsSha256() {
-      assertThat(PasswordHasher.matches(PASSWORD, SHA256_HASH)).isFalse();
+    @DisplayName("accepts the password of a salted SHA-256 hash with its salt (RPS-1615)")
+    void acceptsLegacySha256() {
+      assertThat(PasswordHasher.matches(PASSWORD, SHA256_HASH, SALT)).isTrue();
+    }
+
+    @Test
+    @DisplayName("rejects another password, another salt and a lower-case hash on a SHA-256 hash")
+    void rejectsWrongLegacyCredentials() {
+      assertThat(PasswordHasher.matches("Wrong1!", SHA256_HASH, SALT)).isFalse();
+      assertThat(PasswordHasher.matches(PASSWORD, SHA256_HASH, "fedcba9876543210")).isFalse();
+      assertThat(PasswordHasher.matches(PASSWORD, SHA256_HASH.toUpperCase(Locale.ROOT), SALT))
+          .isFalse();
+    }
+
+    @Test
+    @DisplayName("never verifies a SHA-256 hash without its salt")
+    void rejectsLegacyWithoutSalt() {
+      assertThat(PasswordHasher.matches(PASSWORD, SHA256_HASH, null)).isFalse();
+      assertThat(PasswordHasher.matches(PASSWORD, DigestUtils.sha256Hex(PASSWORD), null)).isFalse();
+      assertThat(PasswordHasher.matches(PASSWORD, DigestUtils.sha256Hex(PASSWORD + "null"), null))
+          .isFalse();
+    }
+
+    @Test
+    @DisplayName("verifies a legacy password over 72 bytes, which BCrypt could not take")
+    void acceptsOverlongLegacyPassword() {
+      final var password = "a".repeat(100);
+
+      assertThat(PasswordHasher.matches(password, DigestUtils.sha256Hex(password + SALT), SALT))
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("ignores the salt of a BCrypt hash")
+    void bcryptIgnoresSalt() {
+      assertThat(PasswordHasher.matches(PASSWORD, PasswordHasher.hash(PASSWORD), SALT)).isTrue();
+    }
+
+    @Test
+    @DisplayName("a wrong password on a legacy hash costs a BCrypt check, like on a BCrypt hash")
+    void wrongLegacyPasswordSpendsADummyCheck() {
+      // Warm up, then compare orders of magnitude only: a SHA-256 alone takes microseconds, a
+      // BCrypt check tens of milliseconds.
+      PasswordHasher.matches("warm-up", SHA256_HASH, SALT);
+
+      final var start = System.nanoTime();
+      PasswordHasher.matches("Wrong1!", SHA256_HASH, SALT);
+      final var elapsedMillis = (System.nanoTime() - start) / 1_000_000;
+
+      assertThat(elapsedMillis).isGreaterThanOrEqualTo(5);
     }
 
     @Test
     @DisplayName("rejects every password on the empty hash of a password reset")
     void rejectsEmptyHash() {
-      assertThat(PasswordHasher.matches(PASSWORD, "")).isFalse();
-      assertThat(PasswordHasher.matches("", "")).isFalse();
+      assertThat(PasswordHasher.matches(PASSWORD, "", null)).isFalse();
+      assertThat(PasswordHasher.matches(PASSWORD, "", SALT)).isFalse();
+      assertThat(PasswordHasher.matches("", "", null)).isFalse();
+      assertThat(PasswordHasher.matches(DigestUtils.sha256Hex(SALT), "", SALT)).isFalse();
     }
 
     @Test
     @DisplayName("rejects a missing hash")
     void rejectsNullHash() {
-      assertThat(PasswordHasher.matches(PASSWORD, null)).isFalse();
+      assertThat(PasswordHasher.matches(PASSWORD, null, null)).isFalse();
     }
 
     @ParameterizedTest(name = "\"{0}\"")
     @ValueSource(strings = {"{noop}Password1!", "{md5}anything", "{bcrypt", "{}x", "{bcrypt}"})
     @DisplayName("rejects a hash of an algorithm this build does not verify")
     void rejectsUnknownAlgorithm(final String hash) {
-      assertThat(PasswordHasher.matches(PASSWORD, hash)).isFalse();
+      assertThat(PasswordHasher.matches(PASSWORD, hash, null)).isFalse();
     }
 
     @Test
     @DisplayName("rejects a password over 72 bytes on a BCrypt hash without failing")
     void rejectsOverlongPasswordOnBcrypt() {
-      assertThat(PasswordHasher.matches("a".repeat(200), PasswordHasher.hash(PASSWORD))).isFalse();
+      assertThat(PasswordHasher.matches("a".repeat(200), PasswordHasher.hash(PASSWORD), null))
+          .isFalse();
     }
 
     @Test
@@ -173,8 +227,9 @@ class PasswordHasherTest {
     void doesNotIgnoreBytesPastTheLimit() {
       final var hashed = "a".repeat(PasswordHasher.MAX_PASSWORD_BYTES);
 
-      assertThat(PasswordHasher.matches(hashed + "tail", PasswordHasher.hash(hashed))).isFalse();
-      assertThat(PasswordHasher.matches("é".repeat(37), PasswordHasher.hash("é".repeat(36))))
+      assertThat(PasswordHasher.matches(hashed + "tail", PasswordHasher.hash(hashed), null))
+          .isFalse();
+      assertThat(PasswordHasher.matches("é".repeat(37), PasswordHasher.hash("é".repeat(36)), null))
           .isFalse();
     }
   }
@@ -186,7 +241,7 @@ class PasswordHasherTest {
     @Test
     @DisplayName("leaves a current BCrypt hash alone")
     void leavesCurrentBcrypt() {
-      assertThat(PasswordHasher.needsUpgrade(PasswordHasher.hash(PASSWORD))).isFalse();
+      assertThat(PasswordHasher.needsUpgrade(PasswordHasher.hash(PASSWORD), PASSWORD)).isFalse();
     }
 
     @Test
@@ -194,7 +249,28 @@ class PasswordHasherTest {
     void flagsWeakerWorkFactor() {
       final var weak = "{bcrypt}$2a$04$" + PasswordHasher.hash(PASSWORD).substring(15);
 
-      assertThat(PasswordHasher.needsUpgrade(weak)).isTrue();
+      assertThat(PasswordHasher.needsUpgrade(weak, PASSWORD)).isTrue();
+    }
+
+    @Test
+    @DisplayName("flags a salted SHA-256 hash, whose owner just proved the password (RPS-1615)")
+    void flagsLegacySha256() {
+      assertThat(PasswordHasher.needsUpgrade(SHA256_HASH, PASSWORD)).isTrue();
+    }
+
+    @Test
+    @DisplayName("leaves a legacy hash alone when its password is too long for BCrypt")
+    void leavesOverlongLegacyPassword() {
+      final var password = "a".repeat(PasswordHasher.MAX_PASSWORD_BYTES + 1);
+
+      assertThat(PasswordHasher.needsUpgrade(DigestUtils.sha256Hex(password + SALT), password))
+          .isFalse();
+    }
+
+    @Test
+    @DisplayName("has nothing to upgrade on the empty hash of a password reset")
+    void leavesEmptyHash() {
+      assertThat(PasswordHasher.needsUpgrade("", PASSWORD)).isFalse();
     }
   }
 

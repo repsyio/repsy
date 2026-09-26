@@ -473,7 +473,7 @@ public class ProtocolAuthService {
     }
 
     // Hashes from an older algorithm or work factor are replaced now that the password is known.
-    if (PasswordHasher.needsUpgrade(userInfo.getHash())) {
+    if (PasswordHasher.needsUpgrade(userInfo.getHash(), password)) {
       this.userTxService.upgradePasswordHash(userInfo, password);
     }
 

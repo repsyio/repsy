@@ -135,6 +135,7 @@ public class UserTxService {
 
     final var user = this.findUserById(userId);
     user.setHash(newHash);
+    user.setSalt(null);
     user.revokeRefreshTokens();
     this.userRepository.save(user);
   }
@@ -197,6 +198,7 @@ public class UserTxService {
     final var newPassword = PasswordGeneratorUtil.generatePassword();
 
     user.setHash(PasswordHasher.hash(newPassword));
+    user.setSalt(null);
     user.revokeRefreshTokens();
 
     this.userRepository.save(user);
@@ -220,10 +222,10 @@ public class UserTxService {
 
   /**
    * Replaces the hash of a user who just logged in with a hash from the current algorithm
-   * (RPS-961). Call it only when {@link PasswordHasher#needsUpgrade} is true, and only after the
-   * password was verified against {@code user}'s hash. The password is not changing, so sessions
-   * stay valid. If the password was changed in the meantime the stored hash no longer matches
-   * {@code user} and nothing is written.
+   * (RPS-961), and clears the salt of a legacy SHA-256 hash (RPS-1615). Call it only when {@link
+   * PasswordHasher#needsUpgrade} is true, and only after the password was verified against {@code
+   * user}'s hash. The password is not changing, so sessions stay valid. If the password was changed
+   * in the meantime the stored hash no longer matches {@code user} and nothing is written.
    *
    * <p>It runs in its own transaction: the caller may hold a read-only one (protocol facades do),
    * which could not write, and a failed upgrade must not roll the caller back.

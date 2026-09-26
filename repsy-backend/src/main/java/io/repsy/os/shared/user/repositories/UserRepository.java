@@ -83,13 +83,15 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   /**
    * Swaps a user's password hash only while it still holds {@code oldHash}, so a password change
-   * that committed in the meantime is never overwritten by a re-hash of the old password. Written
-   * as a bulk update because a full-row entity save would also write back every stale column.
+   * that committed in the meantime is never overwritten by a re-hash of the old password. It also
+   * clears the salt, which only a legacy SHA-256 hash reads (RPS-1615). Written as a bulk update
+   * because a full-row entity save would also write back every stale column.
    *
    * @return 1 if the hash was replaced, 0 if the user is gone or the hash had changed
    */
   @Modifying(flushAutomatically = true, clearAutomatically = true)
-  @Query("update User u set u.hash = :newHash where u.id = :id and u.hash = :oldHash")
+  @Query(
+      "update User u set u.hash = :newHash, u.salt = null where u.id = :id and u.hash = :oldHash")
   int replaceHash(
       @NonNull @Param("id") UUID id,
       @NonNull @Param("oldHash") String oldHash,

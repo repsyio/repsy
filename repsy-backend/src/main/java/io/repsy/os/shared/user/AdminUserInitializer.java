@@ -65,9 +65,9 @@ public class AdminUserInitializer implements ApplicationRunner {
     }
 
     // users.hash is NOT NULL, so an empty hash is the marker an operator sets by hand to recover a
-    // lost password (see the README). Migration V0017 (RPS-1033) sets it on every account that
-    // still
-    // had a pre-BCrypt hash. It applies to every admin that carries it.
+    // lost password (see the README). It applies to every admin that carries it. A pre-BCrypt hash
+    // is not a marker: it still verifies and turns into BCrypt on its owner's first login
+    // (RPS-1615).
     adminUsers.stream()
         .filter(AdminUserInitializer::isPasswordReset)
         .forEach(this::resetAdminPassword);
@@ -84,6 +84,7 @@ public class AdminUserInitializer implements ApplicationRunner {
     final var hash = PasswordHasher.hash(newPassword);
 
     adminUser.setHash(hash);
+    adminUser.setSalt(null);
     this.userRepository.save(adminUser);
 
     log.warn(

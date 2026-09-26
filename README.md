@@ -342,17 +342,14 @@ This is the first release after `v26.08.4`. Read this section before you upgrade
 ### Before you upgrade
 
 - **Back up the database and the storage directory. There is no downgrade.** The upgrade runs database
-  migrations V0012 to V0030 that cannot be undone (they drop `users.salt` and `repo.searchable` and restructure the
-  Docker manifest tables) and renames stored Docker manifest files. `v26.08.4` cannot run on the migrated data: to go
-  back, restore the backup. (RPS-1033, RPS-1216, RPS-1427)
-- **Every user password is reset on the first start.** All passwords stored by `v26.08.4` use the old SHA-256 hash,
-  which cannot be converted, so the upgrade clears them. For each `ADMIN` account a new random password is logged
-  once, at startup, as `Admin password has been reset for user <name>. New password: <password>`: keep the log
-  (`docker logs repsy 2>&1 | grep "Admin password"`) and sign in with it. `ADMIN_INITIAL_PASSWORD` is not applied
-  again. Every other user cannot sign in until an admin resets the password (Users page, or
-  `POST /api/users/{userId}/actions/reset-password`). Package clients that use a username and password (Maven
-  `settings.xml`, npm `_auth`, `docker login`, pip, twine, cargo, NuGet, gem, Go) get `401` until they are given the
-  new password. Deploy tokens keep working. (RPS-961, RPS-1033)
+  migrations V0012 to V0031 that cannot be undone (they drop `repo.searchable` and restructure the Docker manifest
+  tables) and renames stored Docker manifest files. `v26.08.4` cannot run on the migrated data: to go
+  back, restore the backup. (RPS-1216, RPS-1427)
+- **Passwords keep working.** `v26.08.4` stores passwords with a salted SHA-256 hash. Repsy still verifies such a
+  hash and replaces it with a BCrypt hash the first time its owner signs in (panel, or a package client with a
+  username and password), so nobody has to reset a password and no client needs a new one. An account keeps its
+  SHA-256 hash, and its `users.salt` value, until that first sign-in. A later release will retire this legacy check
+  and announce how, so sign in once with every account you still need before you move to it. (RPS-1615)
 - **`DB_HOST`, `DB_PORT` and `DB_DATABASE` are no longer read.** Only `DB_URL` selects the database, and the Docker
   image now defaults it to an embedded H2 file. An installation that set only those three variables starts on a new,
   empty H2 database (the PostgreSQL data is untouched; a `WARN` is logged). Set
@@ -476,7 +473,7 @@ This is the first release after `v26.08.4`. Read this section before you upgrade
 - The upgrade jobs (Docker manifest rename, NuGet version move) log their progress at `INFO`, which the default log
   level (`WARN`) hides; set `LOGGING_LEVEL_IO_REPSY=INFO` to follow them.
 
-<!-- Maintainer, before publishing the release notes: (1) RPS-1615 replaces the password reset with verify-once-and-upgrade-to-BCrypt-on-login; when it merges, remove the "Every user password is reset" item and the reset section under Upgrading. (2) Re-check commits merged after the audit (main 7ed2c6839, 2026-09-26). -->
+<!-- Maintainer, before publishing the release notes: (1) RPS-1615 is done: passwords are verified once with the legacy SHA-256 hash and upgraded to BCrypt on login; docs must say "no password reset when upgrading from v26.08.4", and the release that retires the legacy path needs its own announced reset. (2) Re-check commits merged after the audit (main 7ed2c6839, 2026-09-26). -->
 
 ## Upgrading
 
@@ -501,36 +498,6 @@ The environment variables DB_HOST, DB_PORT are no longer read: only DB_URL selec
 ```
 
 When the effective database is H2 it adds that Repsy is starting on the embedded H2 database, not PostgreSQL. It never prints `DB_URL` itself, since that may carry credentials. Repsy still starts.
-
-### Password reset when upgrading past the BCrypt migration (RPS-961 / RPS-1033)
-
-The first release that contains both RPS-961 (hashing passwords with BCrypt) and RPS-1033
-(retiring the legacy salted SHA-256 verification path) resets the password of every account that
-has not logged in since RPS-961 shipped. The latest release, `v26.08.4`, contains neither change and
-stores every password with the old hash, so upgrading from it resets every account.
-
-**What happens:** a SHA-256 hash cannot be converted to BCrypt without the plain-text password,
-so migration `V0017__Drop_User_Salt.sql` sets the empty-hash password-reset marker on every
-account whose hash is not already BCrypt, revokes that account's refresh tokens, and drops the
-now-unused `users.salt` column. An account that has already logged in since RPS-961 shipped
-already has a BCrypt hash and is unaffected. This is a one-time migration: it does not run again
-on later upgrades.
-
-**What you'll see:** on startup, `AdminUserInitializer` generates a new password for every admin
-account left with the reset marker and logs it at `WARN`:
-
-```
-Admin password has been reset for user <username>. New password: <password>
-```
-
-Copy that password from the log right after the upgrade; it is not stored anywhere and is not
-logged again.
-
-**Resetting other users:** a non-admin account left with the reset marker cannot log in until an
-admin resets its password, either from the users page in the web UI or directly with
-`POST /api/users/{userId}/actions/reset-password`. If no admin can sign in either, a
-[password reset marker file](#forgot-admin-password) resets the password of any account, not only
-an admin's, from inside the container.
 
 ### `npm unpublish` and Helm chart delete need the `ADMIN` role (RPS-1424)
 

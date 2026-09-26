@@ -22,8 +22,8 @@
  * before is consumed again by the real client (with the admin's password and a deploy token), the
  * Docker manifest layout repair renamed the legacy manifest files (pull by tag AND by digest), the
  * startup warnings an operator relies on are logged, the panel lists everything, and the accounts of
- * the old release have to use the passwords Repsy prints (V0017: the SHA-256 hashes cannot become
- * BCrypt, so every password is reset).
+ * the old release keep their passwords (RPS-1615: the SHA-256 hashes are verified once and replaced by
+ * BCrypt on the first login, so no password is reset and nothing is printed).
  *
  * It needs a stack started for it: `./run.sh local up --upgrade [--h2]` (docker-compose.stack-upgrade.yml
  * and the previous release's image, src/upgrade/previous-release.ts), and is opted in by
@@ -34,15 +34,15 @@
  *
  * Serial, one worker: the container is recreated under the spec. It runs on whichever database the stack
  * has, PostgreSQL (the postgres volume outlives the recreate, `--no-deps`) or embedded H2 (the file is in
- * the `/app/data` volume): the assertions are the same. The admin's password is reset by the upgrade, so
- * the spec puts `REPSY_ADMIN_PASSWORD` back before it ends: every other runner of the stack needs it.
+ * the `/app/data` volume): the assertions are the same. No password changes, so every other runner of
+ * the stack keeps using `REPSY_ADMIN_PASSWORD`.
  *
  * `@local-only` (it recreates the container of a stack this harness owns) and `@upgrade`.
  */
 import path from 'node:path';
 
 import { createPanelBackend, loginPanel } from '../../src/api/backend-registry.js';
-import { PanelHttpError, type PanelBackend, RepoType } from '../../src/api/panel-backend.js';
+import { type PanelBackend, RepoType } from '../../src/api/panel-backend.js';
 import type { MaterializedCredential } from '../../src/scenarios/world.js';
 import { craneEnv, renderDockerConfig } from '../../src/clients/docker.js';
 import { buildImage } from '../../src/clients/docker-image.js';
@@ -86,7 +86,6 @@ const TO_IMAGE =
 /** What the previous release's Flyway had applied last (the release's `db/migration`, V0011). */
 const PREVIOUS_SCHEMA_VERSION = 11;
 const REPAIR_TIMEOUT_MS = 120_000;
-const RESET_LINE = /Admin password has been reset for user (\S+)\. New password: (\S+)/;
 
 interface DockerImages {
   /** The repo holding the images below. */
@@ -106,8 +105,6 @@ const packages: Package[] = [];
 let docker: DockerImages;
 let secondAdmin: LegacyUser;
 let plainUser: LegacyUser;
-/** The passwords the upgraded Repsy printed, by username. */
-const printed = new Map<string, string>();
 let upgraded = false;
 let legacyManifestFiles: string[] = [];
 
@@ -349,7 +346,6 @@ test.describe.serial(
       if (!upgraded) {
         return;
       }
-      await restoreAdminPassword();
       await panelApi.login(env.adminUsername, env.adminPassword);
       await seeder.cleanup();
     });
@@ -421,23 +417,11 @@ test.describe.serial(
       ).toEqual([]);
     });
 
-    test('every account of the previous release was reset: the old passwords are refused, the printed ones work', async () => {
-      const lines = await logLinesContaining(container, 'Admin password has been reset for user');
-      for (const line of lines) {
-        const match = RESET_LINE.exec(line);
-        expect(
-          match,
-          `the reset line has the documented shape: ${line.replace(/New password: \S+/, '')}`,
-        ).not.toBeNull();
-        printed.set(match?.[1] ?? '', match?.[2] ?? '');
-      }
+    test('every account of the previous release keeps its password: the first login converts the hash', async () => {
       expect(
-        [...printed.keys()].sort(),
-        'exactly the admin accounts are reset and printed',
-      ).toEqual([env.adminUsername, secondAdmin.username].sort());
-      for (const [name, password] of printed) {
-        expect(password.length, `the new password of ${name} is not blank`).toBeGreaterThan(5);
-      }
+        await logLinesContaining(container, 'Admin password has been reset'),
+        'no password is reset, so none is printed',
+      ).toEqual([]);
 
       // Everything the harness created is the harness's to delete again, by name and id.
       seeder.adoptUser(secondAdmin.id);
@@ -446,49 +430,39 @@ test.describe.serial(
         seeder.adoptRepo(pkg.world.repoName);
       }
 
-      // The old passwords (the SHA-256 hashes could not be converted) are refused on every door.
+      // The FIRST login of the admin is a package client on the wire (HTTP Basic): the SHA-256 hash of
+      // the previous release verifies and is replaced by BCrypt on the way.
+      const maven = packages.find((pkg) => pkg.adapter.protocol === 'maven') as Package;
+      const wire = await maven.adapter.resolve({ ...maven.world, credential: ADMIN });
+      expect(wire.httpStatus, 'a Maven client with the old admin password').toBe(200);
+      await expectEverythingConsumable('after the upgrade, first login on the wire', 'admin', true);
+
+      // The first login of the other two accounts is the panel; the admin's second one runs on BCrypt.
       for (const [username, password] of [
         [env.adminUsername, env.adminPassword],
         [secondAdmin.username, secondAdmin.password],
         [plainUser.username, plainUser.password],
       ]) {
+        const info = await loginPanel(username, password);
+        expect(
+          info.token,
+          `${username} signs in with the password of the previous release`,
+        ).toBeTruthy();
+      }
+      for (const [username, password] of [
+        [secondAdmin.username, secondAdmin.password],
+        [plainUser.username, plainUser.password],
+      ]) {
+        const info = await loginPanel(username, password);
+        expect(info.token, `${username} signs in again, now on BCrypt`).toBeTruthy();
         await expect(
-          loginPanel(username, password),
-          `${username} with the password of the previous release`,
+          loginPanel(username, `${password}-wrong`),
+          `${username} with a wrong password`,
         ).rejects.toMatchObject({ status: 401 });
       }
-      const maven = packages.find((pkg) => pkg.adapter.protocol === 'maven') as Package;
-      const wire = await maven.adapter.resolve({ ...maven.world, credential: ADMIN });
-      expect(wire.httpStatus, 'a Maven client with the old admin password').toBe(401);
 
-      // The printed passwords work, and only they.
-      for (const [username, password] of printed) {
-        const info = await loginPanel(username, password);
-        expect(info.token, `${username} signs in with the printed password`).toBeTruthy();
-      }
-
-      // A deploy token is not a password: it keeps working through the reset.
-      await expectEverythingConsumable(
-        'after the upgrade, before any password is restored',
-        'token',
-        true,
-      );
-
-      // A plain user has no printed password: an admin resets it (the README's second way).
-      await panelApi.login(env.adminUsername, printed.get(env.adminUsername) as string);
-      const reset = await panelApi.rawRequest(
-        'POST',
-        `/api/users/${plainUser.id}/actions/reset-password`,
-      );
-      expect(reset.status, 'an admin resets the user').toBe(200);
-      const newPassword = reset.body.data as string;
-      expect(typeof newPassword).toBe('string');
-      const info = await loginPanel(plainUser.username, newPassword);
-      expect(info.token, 'the plain user signs in with the password the admin got').toBeTruthy();
-
-      // The harness needs its admin password back for everything that follows (and for every other runner).
-      await panelApi.changeOwnPassword(env.adminPassword);
-      await loginPanel(env.adminUsername, env.adminPassword);
+      // A deploy token is not a password and is not touched.
+      await expectEverythingConsumable('after the upgrade, with the token', 'token', true);
     });
 
     test('everything published before is consumed again with the real clients and listed by the panel', async () => {
@@ -588,7 +562,7 @@ test.describe.serial(
       }
       expect(
         await logLinesContaining(container, 'Admin password has been reset'),
-        'the reset password is printed once, by the start that migrated',
+        'no password was reset by the start that migrated, or by this one',
       ).toEqual([]);
 
       await expectEverythingConsumable('after the layout repair', 'admin', true);
@@ -597,7 +571,7 @@ test.describe.serial(
   },
 );
 
-/** The container's whole log (stdout and stderr): read it once, do not print it (it carries the reset passwords). */
+/** The container's whole log (stdout and stderr): read it once, do not print it (it may carry credentials). */
 async function fullLog(id: string): Promise<string> {
   const result = await run('docker', ['logs', id], { cwd: '/tmp', label: 'docker-logs' });
   return `${result.stdout}\n${result.stderr}`;
@@ -627,32 +601,4 @@ async function migrationVersions(id: string): Promise<number[]> {
     PREVIOUS_SCHEMA_VERSION,
   );
   return versions;
-}
-
-/** Puts the admin's password back to `REPSY_ADMIN_PASSWORD` (the upgrade reset it), from the printed one. */
-async function restoreAdminPassword(): Promise<void> {
-  try {
-    await loginPanel(env.adminUsername, env.adminPassword);
-    return;
-  } catch (err) {
-    if (!(err instanceof PanelHttpError)) {
-      throw err;
-    }
-  }
-  let password = printed.get(env.adminUsername);
-  if (!password) {
-    // A failed test may not have read it yet: the log of the container that migrated still has it.
-    const lines = await logLinesContaining(container, 'Admin password has been reset for user');
-    password = lines
-      .map((line) => RESET_LINE.exec(line))
-      .find((m) => m?.[1] === env.adminUsername)?.[2];
-  }
-  if (!password) {
-    throw new Error(
-      `the admin password was reset and no printed one was read for ${env.adminUsername}`,
-    );
-  }
-  const api = await createPanelBackend();
-  await api.login(env.adminUsername, password);
-  await api.changeOwnPassword(env.adminPassword);
 }

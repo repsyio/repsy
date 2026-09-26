@@ -697,7 +697,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var persisted =
           ProfileControllerIT.this.userRepository.findById(user.getId()).orElseThrow();
       assertThat(persisted.getHash()).isEqualTo(hashAfterChange);
-      assertThat(PasswordHasher.matches("NewPassword2@", persisted.getHash())).isTrue();
+      assertThat(PasswordHasher.matches("NewPassword2@", persisted.getHash(), null)).isTrue();
     }
 
     @Test
@@ -729,7 +729,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var persisted =
           ProfileControllerIT.this.userRepository.findById(user.getId()).orElseThrow();
       assertThat(persisted.getHash()).isNotEqualTo(originalHash);
-      assertThat(PasswordHasher.matches(newPassword, persisted.getHash())).isTrue();
+      assertThat(PasswordHasher.matches(newPassword, persisted.getHash(), null)).isTrue();
     }
 
     @Test

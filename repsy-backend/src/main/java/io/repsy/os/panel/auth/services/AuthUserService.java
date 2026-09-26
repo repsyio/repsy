@@ -67,13 +67,13 @@ public class AuthUserService {
       throw new UnAuthorizedException(INVALID_CREDENTIALS);
     }
 
-    if (!PasswordHasher.matches(form.getPassword(), user.getHash())) {
+    if (!PasswordHasher.matches(form.getPassword(), user.getHash(), user.getSalt())) {
       this.authFailureThrottle.recordFailure();
       throw new UnAuthorizedException(INVALID_CREDENTIALS);
     }
 
     // Hashes from an older algorithm or work factor are replaced now that the password is known.
-    if (PasswordHasher.needsUpgrade(user.getHash())) {
+    if (PasswordHasher.needsUpgrade(user.getHash(), form.getPassword())) {
       this.userTxService.upgradePasswordHash(user, form.getPassword());
     }
 

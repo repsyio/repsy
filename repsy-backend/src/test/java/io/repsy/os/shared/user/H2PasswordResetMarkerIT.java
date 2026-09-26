@@ -81,8 +81,8 @@ class H2PasswordResetMarkerIT extends H2IntegrationTest {
     final var newPassword = loggedMarkerPasswordOf(ADMIN_USERNAME, output);
     final var newHash = this.storedHashOfAdmin();
     assertThat(newHash).isNotEqualTo(oldHash);
-    assertThat(PasswordHasher.matches(newPassword, newHash)).isTrue();
-    assertThat(PasswordHasher.matches("H2TestAdmin1!", newHash)).isFalse();
+    assertThat(PasswordHasher.matches(newPassword, newHash, null)).isTrue();
+    assertThat(PasswordHasher.matches("H2TestAdmin1!", newHash, null)).isFalse();
   }
 
   @Test
@@ -94,7 +94,7 @@ class H2PasswordResetMarkerIT extends H2IntegrationTest {
 
     assertThat(marker).doesNotExist();
     final var newPassword = loggedMarkerPasswordOf(ADMIN_USERNAME, output);
-    assertThat(PasswordHasher.matches(newPassword, this.storedHashOfAdmin())).isTrue();
+    assertThat(PasswordHasher.matches(newPassword, this.storedHashOfAdmin(), null)).isTrue();
   }
 
   @Test

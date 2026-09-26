@@ -21,8 +21,8 @@
  * with `sed`, so keep its exact shape (`export const PREVIOUS_RELEASE = '<tag>';`).
  *
  * BUMP IT AFTER EACH RELEASE, to the newest tag that is published (the Git tags are `v26.08.x`, the image
- * tags have no `v`). The spec's expectations hold from that release on: the password reset of V0017 and the
- * Docker manifest migration of V0024 only apply to a release before them, so a release that already has
+ * tags have no `v`). The spec's expectations hold from that release on: the legacy SHA-256 password upgrade (V0017 is a
+ * no-op since RPS-1615) and the Docker manifest migration of V0024 only apply to a release before them, so a release that already has
  * both would need the spec's per-release expectations revisited (README.md "Upgrade path").
  * `REPSY_E2E_UPGRADE_FROM=<tag>` overrides it for one run.
  *

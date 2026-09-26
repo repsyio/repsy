@@ -117,7 +117,7 @@ class PasswordResetMarkerScannerIT extends AbstractIntegrationTest {
     assertThat(marker).doesNotExist();
     final var newPassword = loggedMarkerPasswordOf(user.getUsername(), output);
     final var after = this.reload(user.getId());
-    assertThat(PasswordHasher.matches(newPassword, after.getHash())).isTrue();
+    assertThat(PasswordHasher.matches(newPassword, after.getHash(), null)).isTrue();
     assertThat(after.getTokenVersion()).isEqualTo(versionBefore + 1);
     this.login(user.getUsername(), newPassword, 200);
     this.login(user.getUsername(), VALID_PASSWORD, 401);
