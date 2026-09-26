@@ -88,7 +88,7 @@ e2e/
   runners/npm-clients.Dockerfile  # + pinned pnpm, yarn classic, yarn berry (npm --prefix /opt/clients/<name>) and bun (copied from oven/bun); see "npm-family clients"
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
   runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
-  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image; no daemon, no socket
+  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image, `skopeo` (built statically from its pinned tag) and `regctl` (pinned release binary); no daemon, no socket
   runners/helm.Dockerfile      # + the static `helm` binary + the cm-push plugin installed at build time; no daemon, no socket
   runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time; the static uv binary copied out of Astral's image
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
@@ -156,6 +156,11 @@ e2e/
       docker-image.ts                # hand-assembled OCI image layout builder (layer tar+gzip, config, manifest, index.json, oci-layout)
       docker-raw.ts                  # docker-specific raw HTTP: the two-hop token dance, manifest/blob PUT/GET/HEAD, OCI error envelope
       docker.ts                      # the docker client + dockerAdapter: publish()/resolve()/seedPublish(), crane push/pull
+      docker-copy-adapter.ts         # the scenario-loop adapter of the copy clients (CopyClient -> ProtocolAdapter) + openSession, RPS-1478 part B
+      docker-skopeo.ts               # skopeo: skopeoAdapter (skopeo copy), its env/auth file, the dir: reader
+      docker-regctl.ts               # regctl: regctlAdapter (regctl image copy), its regctl.json renderer
+      docker-tls.ts                  # the ONE place skopeo/regctl's TLS setting is decided (plain HTTP today; the HTTPS leg switches it here)
+      docker-client-tests.ts         # seeding + raw comparison helpers of the skopeo/regctl specs
       helm-chart.ts                   # hand-assembled Helm chart .tgz builder (Chart.yaml + values.yaml + marker, ustar+gzip)
       helm-raw.ts                     # raw HTTP for BOTH Helm protocols: OCI manifest/blob PUT/GET/HEAD + classic index/chart/upload/delete
       helm.ts                         # the OCI client + helmAdapter: publish()/resolve()/seedPublish(), helm push/pull --plain-http
@@ -164,7 +169,7 @@ e2e/
       pypi.ts                          # the pypi client + pypiAdapter: publish()/resolve()/seedPublish(), python3 -m twine/pip
       uv.ts                            # the second pypi client: uvAdapter (uv publish / uv lock + uv sync), uvEnv, runUv, a uv.lock reader
       golang-raw.ts                     # golang-specific raw PUT/GET (@v/list, @latest, .info/.mod/.zip), buildModuleZip (fflate), dirhashHash1
-      golang-tls-shim.ts                 # in-process HTTPS reverse proxy for a credentialed consume (a real `go` refuses plain-http creds)
+      golang-tls-shim.ts                 # in-process HTTPS reverse proxy for a credentialed consume (a real `go` refuses plain-http creds; not used on a TLS stack)
       golang.ts                          # the golang client + golangAdapter: publish()/resolve()/seedPublish(), real curl -T / go mod download
       ruby-raw.ts                          # ruby-specific raw POST/GET/DELETE (gems/yank/versions/info/names/specs.4.8.gz), buildGem (buildTar + node:zlib)
       ruby.ts                              # the ruby client + rubyAdapter: publish()/resolve()/seedPublish(), real gem push / bundle install
@@ -231,6 +236,11 @@ e2e/
       image-lifecycle.spec.ts   # crane: the last tag keeps the image (manifest pullable by digest), the last manifest removes it, a new push recreates it (RPS-1288)
       crane-delete.spec.ts      # crane delete: password deletes by tag and by digest, a deploy token is refused, an older crane's insufficient_scope round trip (RPS-1440)
       registry-api.spec.ts      # raw-HTTP pins RA1-RA6 of what the Docker server does not implement: tags/list, _catalog, referrers (404 no route), the referrers tag-schema fallback, mount= (202 fallback) (RPS-1478)
+      skopeo-catalog.spec.ts    # registerPublishConsumeLoop(skopeoAdapter): the whole catalog through skopeo copy (RPS-1478 part B)
+      regctl-catalog.spec.ts    # registerPublishConsumeLoop(regctlAdapter): the whole catalog through regctl image copy
+      skopeo.spec.ts            # skopeo: copy between two repos, inspect, delete (scope *), multi-arch --all
+      regctl.spec.ts            # regctl: manifest get/head, image inspect, copy between repos, tag/manifest delete, sha512, multi-arch
+      client-tag-list.spec.ts   # crane ls/catalog, skopeo list-tags/inspect, regctl tag ls/repo ls against the missing tags/list (RPS-1489)
     helm/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
@@ -2567,6 +2577,62 @@ is in the PR that added this file.
 ./run.sh test --protocol docker -b   # -b the first time: builds the docker runner image
 ```
 
+### Second and third Docker client: `skopeo` and `regctl` (RPS-1478 part B)
+
+`runners/docker.Dockerfile` adds two more daemonless clients next to `crane`, both pinned by ARG (also in
+`docker-compose.runners.yml`) and checked at build time (`skopeo --version`, `regctl version`):
+`skopeo` v1.24.1, built statically (`CGO_ENABLED=0`, tags `containers_image_openpgp
+exclude_graphdriver_btrfs exclude_graphdriver_devicemapper containers_image_docker_daemon_stub`) from the
+tag in a throwaway `golang:<GO_VERSION>-bookworm` stage (it publishes no binary, and the distro package
+is years old), and `regctl` v0.11.6, the release binary verified against a pinned sha256 per
+architecture. Only the binaries are copied into the runner. `--insecure-policy` makes skopeo need no
+`policy.json`/`registries.d`, and nothing else is configured system-wide.
+
+The catalog (password, USER, tokens rw/ro, anonymous public/private, expired/revoked/rotated, override
+and no-override) runs unchanged through each client: `skopeo-catalog.spec.ts` and
+`regctl-catalog.spec.ts` register `skopeoAdapter`/`regctlAdapter` (`docker-copy-adapter.ts`), titles
+`docker[skopeo] > <scenario>`, tags `@skopeo`/`@regctl`. The adapters reuse `docker.ts` for everything
+that does not depend on the client (the raw re-PUT/GET probes that give the `Outcome`, the fingerprint,
+the round-trip checks) and add only the client's command lines. The published image is the same
+hand-built layout `crane push` sends, pushed with its manifest digest pinned (`skopeo copy
+--preserve-digests oci:<dir>`, `regctl image copy ocidir://<dir>@sha256:...`; the layout's
+`index.json` has no `ref.name`, so regctl needs the digest), so "the consumer got the very image" is the
+same digest comparison as for crane. Consuming: skopeo copies into a `dir:` (the registry's manifest
+bytes as they are: an `oci:` target would convert a Docker-schema2 manifest and change its digest),
+regctl into an `ocidir://`.
+
+Credentials are files, never argv: skopeo reads `REGISTRY_AUTH_FILE` (the `config.json` shape
+`renderDockerConfig` already renders), regctl `REGCTL_CONFIG` (`regctl.json`, `{"hosts": {"<host>":
+{"tls", "user", "pass"}}}`, mode 0600). The clients run in `clientEnv` allow-list environments
+(`sealed-env.spec.ts` has a cell for each). **TLS is decided in one place**, `clients/docker-tls.ts`:
+today the stack is plain HTTP, so skopeo gets `--tls-verify=false` (it tries `https://` first and falls
+back to `http://` only with it, confirmed: "server gave HTTP response to HTTPS client") and regctl `"tls":
+"disabled"` (neither treats `localhost` as insecure the way crane does); an `https:` repo URL turns both
+back on, `REPSY_E2E_INSECURE_REGISTRY` makes them skip verification only.
+
+Probed live (skopeo 1.24.1, regctl 0.11.6):
+
+| Behaviour                           | skopeo                                                                                                                                                                                           | regctl                                                                                                                                                                                                 |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Token scope                         | `pull,push` for a copy in, `pull` out; `*` for `delete`, accepted for the admin at the first request (no round trip)                                                                             | `pull,push`; never asks for `delete` first                                                                                                                                                             |
+| Delete                              | `delete <tag>` resolves the digest and deletes it: the manifest and EVERY tag go (crane deletes the tag only)                                                                                    | `tag delete` removes the tag only; `manifest delete` needs a digest and removes the manifest and its tags; both get one `401 insufficient_scope` naming `repository:<repo>/<image>:delete`, then `202` |
+| Deploy token (rw)                   | delete refused, `unauthorized`, nothing removed                                                                                                                                                  | both deletes refused, nothing removed                                                                                                                                                                  |
+| Blob upload                         | `POST` + one `PATCH` + `PUT ?digest=`                                                                                                                                                            | asks for a mount first and logs `Failed to mount blob ... blob mount returned a location to upload` (WARN, RA5), then uploads                                                                          |
+| Copy between two repos of one Repsy | destination has the identical manifest bytes and blobs (`SK1`)                                                                                                                                   | same (`RC2`)                                                                                                                                                                                           |
+| Anonymous                           | a public repo pulls (the token endpoint answers `200` to an anonymous `pull` token of a public repo, `401` + `Basic` for a private one); its anonymous push is refused by the catalog's own cell | same                                                                                                                                                                                                   |
+| Tag listing                         | `list-tags` fails (`name unknown: unknownPath`); **`skopeo inspect <tag>` also fails** because it lists the tags: `--no-tags` is needed (RPS-1489)                                               | `tag ls`/`repo ls` fail with the `404` envelope (RPS-1489)                                                                                                                                             |
+| Multi-arch                          | `copy --all` keeps the index digest and children; `inspect --override-arch` picks the child                                                                                                      | `image copy` copies the list and its children; `--platform` resolves the child                                                                                                                         |
+| sha512 (RPS-1244)                   | not exercised                                                                                                                                                                                    | an image addressed by its sha512 digest (`regctl image mod --digest-algo sha512`) copies in by that digest and is served under it (`RC4`)                                                              |
+
+`client-tag-list.spec.ts` pins what `crane ls`/`catalog`, `skopeo list-tags`/`inspect` and `regctl tag
+ls`/`repo ls` do against RA1/RA2 (fail with the registry's `unknownPath`): the story that adds `tags/list`
+(RPS-1489) flips it. Not covered: `oras` (RPS-1478 part C), the HTTPS leg (RPS-1474).
+
+```bash
+./run.sh test --protocol docker -b               # -b the first time this runner image changes
+./run.sh test --protocol docker --grep "@skopeo"  # or "@regctl"
+```
+
 ## Helm runner
 
 Repsy implements **two independent wire protocols** for Helm on the same protocol port: OCI
@@ -3641,6 +3707,7 @@ and is never part of the default stack.
 | ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | -------------------------------------------- | ------------------------------------------------------------------ |
 | `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`     | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack" |
 | `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client | `@throttle` (stack, ui), "Auth-throttle leg"                       |
+| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443        | `@tls` (skeleton, golang), "TLS stack"                             |
 
 How it fits together, so a later overlay is one row:
 
@@ -3800,6 +3867,96 @@ Flip checks: `AUTH_THROTTLE_ENABLED: 'false'` in the overlay fails all eight cas
 shorter than the window in the reset case fails it with a 429 where the right password should pass.
 The throttle is per client and never per username, so a leg like this cannot be run by other suites in
 parallel: any client that fails authentication three times is locked out for ten seconds.
+
+## TLS stack (RPS-1474, part a)
+
+Repsy has optional HTTPS listeners of its own (the main README's "HTTPS / SSL": `API_SSL_*` for 8443 next to
+the panel API, `REPO_SSL_*` for 9443 next to the package protocols; HTTP stays open). Every other suite
+talks plain HTTP to a stack behind no proxy, so the `tls` overlay (`docker-compose.stack-tls.yml`, see
+"Stack overlays") is what proves those listeners with real clients: each runner reaches Repsy over https and
+has to trust its certificate in its own way.
+
+```bash
+./run.sh local up --tls                                   # (or REPSY_E2E_TLS=1) add --h2 for H2
+REPSY_E2E_TLS=1 ./run.sh test --protocol skeleton,api,golang,docker,npm --grep @smoke
+./run.sh local down --tls
+```
+
+Give `test` and `sweep` the switch (`REPSY_E2E_TLS=1`) as well as `up`: `test` cannot see the stack, so the
+switch is what makes it use the https URLs. A plain `test` against a TLS stack still reaches the http ports,
+but npm and NuGet then follow the https `REPO_BASE_URL` they name (below) without a trusted CA.
+
+**Certificates.** Nothing is committed. A one-shot `tls-init` service (`eclipse-temurin:25-jre`, `keytool`
+only, run as the invoking user) writes into `e2e/.tls/<project>` (git-ignored; `run.sh` creates the
+directory, since Docker would create it as root) once and reuses it after that, because a running Repsy
+holds the keystore; delete the directory for new ones:
+
+| File             | What                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `ca.pem`         | the throwaway CA (`CN=Repsy e2e CA`, 10 years) every client trusts                                                       |
+| `leaf.pem`       | what Repsy serves, signed by it: `CN=localhost`, SANs `localhost`, `repsy` (the compose service), `127.0.0.1`, `::1`     |
+| `keystore.p12`   | the leaf key and chain, mounted into Repsy at `/app/certs` (the README's documented path); password `changeit`           |
+| `truststore.p12` | the CA as a Java truststore for the JVM clients (`REPSY_E2E_TLS_TRUSTSTORE`, password `changeit`); no runner uses it yet |
+
+**Ports and URLs.** The https ports are 8443/9443 plus the port offset (`REPSY_E2E_API_TLS_PORT`,
+`REPSY_E2E_REPO_TLS_PORT`); the offset cap is now computed on 9443. Offsets that differ by a multiple of 1000 collide (8443 + 1000 is 9443), so keep to
+100..900. With TLS on, `run.sh` exports
+`REPSY_API_BASE_URL`/`REPSY_REPO_BASE_URL` as the **https** URLs (a value the user set still wins), and keeps
+the http ones in `REPSY_E2E_PLAIN_API_BASE_URL`/`REPSY_E2E_PLAIN_REPO_BASE_URL` (`env.plainApiBaseUrl`,
+`env.plainRepoBaseUrl`, equal to the normal ones without TLS). The repo URL is also the stack's `REPO_BASE_URL`.
+
+**How every runner trusts the CA.** Not in `docker-compose.runners.yml`: `run.sh test|sweep` adds them to
+`docker compose run` for every runner it starts (`tls_run_args`), so a runner added later needs nothing, and a
+stack without TLS sets none of them (an empty `SSL_CERT_FILE` would replace the system trust store). It mounts
+`e2e/.tls/<project>` at `/tls` and sets, each read by the clients that use it: `SSL_CERT_FILE` (Go, OpenSSL,
+.NET on Linux), `NODE_EXTRA_CA_CERTS` (Node: the harness's own `fetch`, npm, pnpm, yarn, bun), `REQUESTS_CA_BUNDLE`
+(Python: pip, twine), `CARGO_HTTP_CAINFO` (Cargo), `CURL_CA_BUNDLE` (curl), plus `REPSY_E2E_TLS_CA_FILE`,
+`REPSY_E2E_TLS_TRUSTSTORE(_PASSWORD)` for the specs and the JVM clients (which take a truststore through their
+own flags: part b). A client's environment is an allow-list, so the names are in `TRUST_VARIABLES`
+(`src/clients/client-env.ts`) and the npm-family's `sealedEnv` copies them too. The `ui` runner is left out
+of the TLS leg (Chromium would need `ignoreHTTPSErrors` and a config change).
+
+**`tests/skeleton/tls-listeners.spec.ts`** (`@tls`, `@smoke`, skipped without the overlay) pins:
+
+| Case                       | Asserted                                                                                                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Listeners                  | the panel API and the protocols answer on the https and the http port; a token issued over https works on the http port; plain http to a TLS port is Tomcat's `400`, TLS to a plain port is refused |
+| Certificate                | chain to the CA (`authorized`), the SANs above, valid for `127.0.0.1` too; a Node child **without** `NODE_EXTRA_CA_CERTS` gets `SELF_SIGNED_CERT_IN_CHAIN` (the control), with it `401`             |
+| Cargo `config.json`        | `dl` and `api` follow the listener: https on 9443, http on 9090 (built from the request)                                                                                                            |
+| Docker `WWW-Authenticate`  | the realm follows the listener the same way                                                                                                                                                         |
+| npm `dist.tarball`         | the configured `REPO_BASE_URL` (https) on **both** listeners: it wins over the request (README "npm tarball URLs")                                                                                  |
+| NuGet service index `@id`s | the same: every `@id` names the https `REPO_BASE_URL`, also when asked on the http port                                                                                                             |
+| Panel snippets             | `static-env.js` carries the https repo URL                                                                                                                                                          |
+
+**Go without the shim.** On a TLS stack the target is https, so `goEnv` embeds the credentials in an https `GOPROXY`
+and Go trusts the CA through `SSL_CERT_FILE`; the in-process shim is never started. In
+`tests/golang/publish-consume.spec.ts` the plain-http refusal case (H3) runs against the plain port
+(`plainRepoBaseUrl`, still there), and the shim wire-sequence case (H8/H19) has an https twin: a credentialed
+`go mod download -json` straight at Repsy's TLS listener, whose `Info`, `GoMod` and `Zip` files exist and
+whose zip is the published one, with the shim's trace unchanged.
+
+**Runs of this part** (own stack, offset 200, image of main): skeleton `@tls` 12/12, `api` `@smoke` 18/18,
+golang full 43 passed and 1 skipped (the shim case), docker full 56/56, npm full with the RPS-1559 cases as expected failures (below).
+Flip checks: with `SSL_CERT_FILE` withheld from the runner the golang `@smoke` cases fail with `tls: failed to verify
+certificate`; with `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE` withheld every npm and docker case fails with `self-signed
+certificate in certificate chain`; the untrusted-child case above pins the same thing permanently.
+
+**RPS-1559: Repsy's own https connectors miss settings the plain ones get.** `SslConnectorCustomizer` builds a bare
+connector, without `EncodedSolidusHandling.DECODE` and the connection timeout that `TomcatMultiPortConfiguration`
+sets on the others, and response compression does not reach it. Observed on 9443 against 9090: a request path
+with `%2F` (an npm **scoped** package, `@scope%2Fname`, which is how `npm publish`/`install` spell it) is answered
+by Tomcat with a bodyless `400 Bad Request`, and a large packument is not gzipped for `Accept-Encoding: gzip`.
+On a TLS stack (`optedIn('tls')`) these `tests/npm` cases carry a `test.fail(..., 'RPS-1559: ...')`, so they are
+expected failures there and unchanged on the default stack; the fix turns them into "expected to fail but
+passed", which is the reminder to delete the line:
+
+- `publish-consume.spec.ts`: the scoped package real client round trip (RPS-1205);
+- `packument-read.spec.ts`: the publish body (RPS-1390), HEAD (RPS-1358) and tarball download (RPS-1363) cases, which
+  publish a scoped name, and the large packument compression case (RPS-1359);
+- `unpublish.spec.ts`: unpublishing one version of a scoped package, and the only version of a scoped package (the
+  unscoped one passes).
+
+Part b's `@smoke` leg meets the first of them.
 
 ## API suite (RPS-1480)
 

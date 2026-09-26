@@ -35,6 +35,23 @@
  */
 
 /**
+ * The variables a client reads its trusted CA certificates from, one per client family (RPS-1474: the `tls`
+ * overlay's runners get the throwaway CA of `docker-compose.stack-tls.yml` through them, README.md "TLS
+ * stack"): OpenSSL, Go and curl's own CA bundle (`SSL_CERT_FILE`, `SSL_CERT_DIR`, `CURL_CA_BUNDLE`), Node
+ * (`NODE_EXTRA_CA_CERTS`), Python `requests`/pip/twine (`REQUESTS_CA_BUNDLE`) and Cargo
+ * (`CARGO_HTTP_CAINFO`). The JVM clients have no such variable: they take a truststore through their own
+ * flags, from `REPSY_E2E_TLS_TRUSTSTORE`.
+ */
+export const TRUST_VARIABLES: readonly string[] = [
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'CURL_CA_BUNDLE',
+  'NODE_EXTRA_CA_CERTS',
+  'REQUESTS_CA_BUNDLE',
+  'CARGO_HTTP_CAINFO',
+];
+
+/**
  * Copied from the runner when set. `PATH` is how every client finds its own executables and the
  * tools it shells out to (the runner images put the toolchain there: `/opt/java/.../bin`,
  * `/usr/local/cargo/bin`, `/usr/local/go/bin`, `/usr/share/dotnet`). The rest: locale and time zone
@@ -55,9 +72,7 @@ export const BASE_VARIABLES: readonly string[] = [
   'http_proxy',
   'https_proxy',
   'no_proxy',
-  'SSL_CERT_FILE',
-  'SSL_CERT_DIR',
-  'CURL_CA_BUNDLE',
+  ...TRUST_VARIABLES,
 ];
 
 /** A client's environment: see this file's header. `extra` wins over the copied variables. */

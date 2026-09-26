@@ -31,6 +31,12 @@ const TARGETS: readonly RepsyTarget[] = ['local', 'remote', 'ci'];
 export interface Env {
   apiBaseUrl: string;
   repoBaseUrl: string;
+  /**
+   * The plain-http URLs of the same stack when it also serves TLS (the `tls` overlay, README.md "TLS
+   * stack"), where `apiBaseUrl`/`repoBaseUrl` are https. Equal to them otherwise.
+   */
+  plainApiBaseUrl: string;
+  plainRepoBaseUrl: string;
   adminUsername: string;
   adminPassword: string;
   target: RepsyTarget;
@@ -73,9 +79,13 @@ function parseTarget(value: string | undefined): RepsyTarget {
 }
 
 function loadEnv(): Env {
+  const apiBaseUrl = process.env.REPSY_API_BASE_URL || 'http://localhost:8080';
+  const repoBaseUrl = process.env.REPSY_REPO_BASE_URL || 'http://localhost:9090';
   return {
-    apiBaseUrl: process.env.REPSY_API_BASE_URL || 'http://localhost:8080',
-    repoBaseUrl: process.env.REPSY_REPO_BASE_URL || 'http://localhost:9090',
+    apiBaseUrl,
+    repoBaseUrl,
+    plainApiBaseUrl: process.env.REPSY_E2E_PLAIN_API_BASE_URL || apiBaseUrl,
+    plainRepoBaseUrl: process.env.REPSY_E2E_PLAIN_REPO_BASE_URL || repoBaseUrl,
     adminUsername: process.env.REPSY_ADMIN_USERNAME || 'admin',
     adminPassword: required('REPSY_ADMIN_PASSWORD'),
     target: parseTarget(process.env.REPSY_TARGET),

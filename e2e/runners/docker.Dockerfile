@@ -23,7 +23,46 @@
 # build-time reference, not a Docker Compose sibling-service dependency (see maven.Dockerfile's header
 # for why that distinction matters here).
 ARG CRANE_VERSION=v0.22.1
+ARG GO_VERSION=1.27.1
 FROM gcr.io/go-containerregistry/crane:${CRANE_VERSION} AS crane
+
+# skopeo v1.24.1 (2026-09-16) and regctl v0.11.6 (2026-09-02, regclient) are the second and third
+# daemonless clients of this runner (RPS-1478 part B): they speak the same Registry HTTP API V2 wire
+# protocol as `crane` but with their own token handling, copy engine and delete scope, so the docker
+# catalog runs through each of them (clients/docker-skopeo.ts, clients/docker-regctl.ts).
+#
+# skopeo publishes no binary and the distro package (bookworm 1.9.3) is years old, so it is built
+# statically from the pinned tag in a throwaway Go stage: CGO off, the pure-Go OpenPGP build tag and
+# the graph-driver and Docker-daemon backends left out (this runner only ever talks to a registry or
+# an OCI layout directory, never to a daemon or to containers-storage). Only the one binary is copied out below, the same
+# "copy the tool, not the stage" approach as crane. regctl is one release binary per arch, verified
+# against a pinned sha256 (Docker's TARGETARCH picks the file).
+FROM golang:${GO_VERSION}-bookworm AS skopeo-build
+ARG SKOPEO_VERSION=v1.24.1
+RUN git clone --depth 1 --branch "${SKOPEO_VERSION}" https://github.com/containers/skopeo.git /src/skopeo
+WORKDIR /src/skopeo
+RUN CGO_ENABLED=0 go build -trimpath -o /out/skopeo \
+      -tags "containers_image_openpgp exclude_graphdriver_btrfs exclude_graphdriver_devicemapper containers_image_docker_daemon_stub" \
+      ./cmd/skopeo \
+ && /out/skopeo --version | tee /out/version \
+ && grep -F "${SKOPEO_VERSION#v}" /out/version
+
+FROM debian:bookworm-slim AS regctl-download
+ARG TARGETARCH
+ARG REGCTL_VERSION=v0.11.6
+ARG REGCTL_SHA256_AMD64=8e0e62a497fcdb8048d18aa927a139613176ba0531f412bc541044e28f9856bd
+ARG REGCTL_SHA256_ARM64=a9b71a3ee79b2d1dbbd7d51fd5e8fa214722c192864235d3d8764463c751a1ff
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/*
+RUN case "${TARGETARCH:-amd64}" in \
+      amd64) sha="${REGCTL_SHA256_AMD64}" ;; \
+      arm64) sha="${REGCTL_SHA256_ARM64}" ;; \
+      *) echo "regctl: no pinned checksum for ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+ && curl -fsSL -o /regctl "https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-${TARGETARCH:-amd64}" \
+ && echo "${sha}  /regctl" | sha256sum -c - \
+ && chmod a+rx /regctl
 
 # The docker runner: the harness itself (see base.Dockerfile) plus the `crane` binary copied in from
 # the stage above, nothing else. Its first layers intentionally repeat base.Dockerfile's rather than
@@ -57,5 +96,14 @@ COPY --from=crane /ko-app/crane /usr/local/bin/crane
 RUN chmod a+rx /usr/local/bin/crane
 
 RUN crane version
+
+ARG SKOPEO_VERSION=v1.24.1
+ARG REGCTL_VERSION=v0.11.6
+COPY --from=skopeo-build /out/skopeo /usr/local/bin/skopeo
+COPY --from=regctl-download /regctl /usr/local/bin/regctl
+RUN chmod a+rx /usr/local/bin/skopeo /usr/local/bin/regctl
+
+RUN skopeo --version | grep -F "${SKOPEO_VERSION#v}" \
+ && regctl version | grep -F "${REGCTL_VERSION}"
 
 CMD ["./entrypoint.sh", "docker"]

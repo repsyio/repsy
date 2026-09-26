@@ -26,6 +26,7 @@ import * as npm from '../../src/clients/npm.js';
 import { npmAdapter } from '../../src/clients/npm.js';
 import { adminCredential, rawGetPath, tarballPath } from '../../src/clients/npm-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
+import { optedIn } from '../../src/stack-overlays.js';
 import { registerPublishConsumeLoop } from '../../src/scenarios/loop.js';
 import type { Scenario } from '../../src/scenarios/types.js';
 import type { Coordinates, World } from '../../src/scenarios/world.js';
@@ -47,6 +48,10 @@ test(
   'npm > scoped package real client round trip (RPS-1205, fixed)',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
+    test.fail(
+      optedIn('tls'),
+      'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
+    );
     const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
     const credential = adminCredential();
     const packageName = `@e2e-${seeder.runId}/scoped`;

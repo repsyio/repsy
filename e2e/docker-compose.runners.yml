@@ -202,6 +202,12 @@ services:
       dockerfile: runners/docker.Dockerfile
       args:
         CRANE_VERSION: 'v0.22.1'
+        # RPS-1478 part B: the second and third client of this runner (runners/docker.Dockerfile).
+        GO_VERSION: '1.27.1'
+        SKOPEO_VERSION: 'v1.24.1'
+        REGCTL_VERSION: 'v0.11.6'
+        REGCTL_SHA256_AMD64: '8e0e62a497fcdb8048d18aa927a139613176ba0531f412bc541044e28f9856bd'
+        REGCTL_SHA256_ARM64: 'a9b71a3ee79b2d1dbbd7d51fd5e8fa214722c192864235d3d8764463c751a1ff'
     environment:
       <<: *runner-environment
     volumes:
