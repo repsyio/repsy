@@ -4666,25 +4666,28 @@ and Go trusts the CA through `SSL_CERT_FILE`; the in-process shim is never start
 whose zip is the published one, with the shim's trace unchanged.
 
 **Runs of this part** (own stack, offset 200, image of main): skeleton `@tls` 12/12, `api` `@smoke` 18/18,
-golang full 43 passed and 1 skipped (the shim case), docker full 56/56, npm full with the RPS-1559 cases as expected failures (below).
+golang full 43 passed and 1 skipped (the shim case), docker full 56/56, npm full (its RPS-1559 cases were expected failures until the fix, below).
 Flip checks: with `SSL_CERT_FILE` withheld from the runner the golang `@smoke` cases fail with `tls: failed to verify
 certificate`; with `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE` withheld every npm and docker case fails with `self-signed
 certificate in certificate chain`; the untrusted-child case above pins the same thing permanently.
 
-**RPS-1559: Repsy's own https connectors miss settings the plain ones get.** `SslConnectorCustomizer` builds a bare
-connector, without `EncodedSolidusHandling.DECODE` and the connection timeout that `TomcatMultiPortConfiguration`
-sets on the others, and response compression does not reach it. Observed on 9443 against 9090: a request path
-with `%2F` (an npm **scoped** package, `@scope%2Fname`, which is how `npm publish`/`install` spell it) is answered
-by Tomcat with a bodyless `400 Bad Request`, and a large packument is not gzipped for `Accept-Encoding: gzip`.
-On a TLS stack (`optedIn('tls')`) these `tests/npm` cases carry a `test.fail(..., 'RPS-1559: ...')`, so they are
-expected failures there and unchanged on the default stack; the fix turns them into "expected to fail but
-passed", which is the reminder to delete the line:
+**RPS-1559 (fixed): Repsy's own https connectors used to miss settings the plain ones get.** `SslConnectorCustomizer` built a
+bare connector, without `EncodedSolidusHandling.DECODE` and the connection timeout that `TomcatMultiPortConfiguration`
+sets on the others, and response compression did not reach it (Spring Boot applies its connector customizers, and
+`server.compression`, to the primary connector only). Observed on 9443 against 9090: a request path with `%2F` (an npm
+**scoped** package, `@scope%2Fname`, which is how `npm publish`/`install` spell it) was answered by Tomcat with a bodyless
+`400 Bad Request`, and a large packument was not gzipped for `Accept-Encoding: gzip`. Both connector kinds now take the
+same `RepsyConnectorSettings` (`libs/multiport`); the 9443 connector also compresses like 9090, and the 8443 one is
+uncompressed like 8080 (see `server.compression` in `application.yml`). The `test.fail(optedIn('tls'), 'RPS-1559: ...')`
+marks that these `tests/npm` cases carried on a TLS stack are gone:
 
 - `publish-consume.spec.ts`: the scoped package real client round trip (RPS-1205);
 - `packument-read.spec.ts`: the publish body (RPS-1390), HEAD (RPS-1358) and tarball download (RPS-1363) cases, which
   publish a scoped name, and the large packument compression case (RPS-1359);
-- `unpublish.spec.ts`: unpublishing one version of a scoped package, and the only version of a scoped package (the
-  unscoped one passes).
+- `unpublish.spec.ts`: unpublishing one version of a scoped package, and the only version of a scoped package.
+
+The backend side is pinned by `NpmOverOwnTlsIT` (a real Tomcat with a self-signed certificate: encoded slash, scoped
+publish and gzip over the TLS port, connection timeout) and `SslConnectorCustomizerTest`.
 
 The `@smoke` cases of the other runners meet none of them (no other protocol puts a `%2F` in a path); "Every client over TLS" has the npm-clients cases that do.
 
@@ -4717,16 +4720,15 @@ of the maven runner pass with it.
 upstream was, so on a TLS stack it spoke http to the TLS port and got Tomcat's `400` for every request through it.
 It now uses `https.request` for an https upstream (the runner's Node trusts the CA); its own side stays plain
 http, as the client under test is configured with. The full npm-clients catalog on a TLS stack is green with
-that and the RPS-1559 marks below: 208 passed (the expected failures included), 6 skipped, 0 failed.
+that: 208 passed (with the RPS-1559 expected failures of the time, below), 6 skipped, 0 failed.
 
-**RPS-1559 in npm-clients.** Every npm-family client spells a scoped name `@scope%2Fname`, so the scoped cases of
-`tests/npm-clients` meet the same bodyless `400` as `tests/npm`. On a TLS stack these 13 carry the same
-`test.fail(optedIn('tls'), 'RPS-1559: ...')`: the scoped read/publish of the token-routing matrix (all five clients),
-bun's scoped publish and `.npmrc` scopes cases, yarn berry's scoped read (H-7) and lockfile (H-9) cases, and yarn
-classic's scoped `always-auth` and the three scoped-publish `.yarnrc`/`.npmrc` cases. `yarn berry settings > plain
-http needs unsafeHttpWhitelist (H-6)` has no http registry to refuse on a TLS stack and skips itself there. None of them is
-`@smoke`, so the nightly leg never depends on them; the RPS-1559 fix turns each mark into "expected to fail but
-passed".
+**RPS-1559 in npm-clients (fixed).** Every npm-family client spells a scoped name `@scope%2Fname`, so the scoped cases of
+`tests/npm-clients` met the same bodyless `400` as `tests/npm`, and 13 of them carried
+`test.fail(optedIn('tls'), 'RPS-1559: ...')` on a TLS stack: the scoped read/publish of the token-routing matrix (all five
+clients), bun's scoped publish and `.npmrc` scopes cases, yarn berry's scoped read (H-7) and lockfile (H-9) cases, and yarn
+classic's scoped `always-auth` and the three scoped-publish `.yarnrc`/`.npmrc` cases. The marks are removed with the fix.
+`yarn berry settings > plain http needs unsafeHttpWhitelist (H-6)` has no http registry to refuse on a TLS stack and skips
+itself there.
 
 **URLs that follow a client** (`tests/skeleton/tls-client-urls.spec.ts`, `@tls`, `@smoke`, skipped without the overlay)
 extends the table above to the remaining protocols, each read on 9443 and on 9090:
@@ -4749,10 +4751,10 @@ Whichever adapter comes next needs its own TLS setting decided in that file (or 
 `@smoke` (and full catalog) on a TLS stack recorded under "Runs of this part".
 
 **Runs of this part** (own stack, offset 200, image of main, `REPSY_E2E_TLS=1`): `@smoke` skeleton 21, maven 23, npm 5
-(+1 expected failure), npm-clients 11, cargo 12, nuget 12, docker 8, helm 7, pypi 7, golang 10 + 1 skipped (the shim case),
+(the RPS-1559 expected failure, since fixed, included), npm-clients 11, cargo 12, nuget 12, docker 8, helm 7, pypi 7, golang 10 + 1 skipped (the shim case),
 ruby 7, api 277: all green, none retried (run as the nightly leg runs them, then its opt-in check). The full catalogs on the same stack (not part of the nightly leg, run once for this part):
 maven 238 passed and 1 skipped, cargo 49, nuget 51, helm 63, ruby 51, golang 48 and 1 skipped, npm-clients 208 (the 13 RPS-1559
-expected failures among them) and 6 skipped, and, after merging the skopeo, regctl, oras, uv and deno adapters, docker 106 passed
+expected failures, since fixed, among them) and 6 skipped, and, after merging the skopeo, regctl, oras, uv and deno adapters, docker 106 passed
 and 1 skipped (the 4 RPS-1490 expected failures among them) and pypi 66 passed and 3 skipped; no failure anywhere.
 Flip checks: with the client-side trust withheld and the harness's own kept (`NODE_EXTRA_CA_CERTS` only), maven's `@smoke`
 fails 18 of 20 with `PKIX path building failed`, cargo 11/11 with `SSL peer certificate ... was not OK`, nuget 12/12
@@ -6242,16 +6244,6 @@ There is deliberately no `actions/cache` step for the `trivy-cache` volume: Triv
 again once that has passed, so a cache keyed by week is stale at every nightly and would only save the download on a second run
 of the same day. A cache keyed by day would need the runner to export the docker volume to a directory and back, owned by the
 scanner's uid, for a benefit of one download a day; the mirror variable is the fix that helps. Revisit it if the mirror is not enough.
-
-### The tls leg and RPS-1559
-
-The `tls` leg goes red by design when RPS-1559 (the SSL connectors miss `EncodedSolidusHandling.DECODE`, the connection timeout
-and response compression) is fixed: its one `@smoke` pin, `tests/npm/publish-consume.spec.ts` "scoped package real client
-round trip" (`test.fail(optedIn('tls'), 'RPS-1559: ...')`), then "expected to fail but passed". The fix PR removes every
-`RPS-1559` pin (`grep -rn RPS-1559 e2e/tests`, 14 of them: `tests/npm` `publish-consume`, `packument-read` (4),
-`unpublish` (2), and `tests/npm-clients` `matrix/scoped-routing`, `bun/config`, `bun/commands`, `yarn-berry/install-modes` (2),
-`yarn-classic/publish-consume` (2)) and the notes about them in "TLS stack" above. Only the `publish-consume` one is
-`@smoke`, so it is the one that turns the leg red; the others turn a full run of their runner on a TLS stack red.
 
 ### Reading the result
 

@@ -34,7 +34,6 @@ import {
 import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
-import { optedIn } from '../../../src/stack-overlays.js';
 import { repoPath } from '../../../src/repo-url.js';
 
 for (const client of clientsWith('publish')) {
@@ -44,10 +43,6 @@ for (const client of clientsWith('publish')) {
       tag: [client.tag, '@scopes'],
     },
     async ({ seeder }) => {
-      test.fail(
-        optedIn('tls'),
-        'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
-      );
       const repoA = await newRepo(seeder);
       const repoB = await newRepo(seeder);
       const scope = `@e2e-${seeder.runId}`;

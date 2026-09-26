@@ -82,8 +82,7 @@ public class TomcatMultiPortConfiguration {
 
     connector.setScheme("http");
     connector.setPort(port);
-    connector.setProperty("connectionTimeout", String.valueOf(this.connectionTimeout));
-    connector.setEncodedSolidusHandling(EncodedSolidusHandling.DECODE.getValue());
+    RepsyConnectorSettings.apply(connector, this.connectionTimeout, null);
 
     return connector;
   }
