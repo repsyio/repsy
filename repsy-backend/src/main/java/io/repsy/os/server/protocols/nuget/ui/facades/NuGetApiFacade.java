@@ -73,14 +73,24 @@ public class NuGetApiFacade implements ProtocolApiFacade {
 
   @Transactional(readOnly = true)
   public NuGetPackageInfo getPackage(final RepoInfo repoInfo, final String packageId) {
-    final var versions = this.nugetPackageService.getVersionInfos(repoInfo, packageId);
+    // The list shows a package whose versions are all unlisted, so its detail must not answer 404
+    // (RPS-1580): the newest listed version describes the package, else the newest one.
+    final var versions =
+        this.nugetPackageService.getVersionInfosIncludingUnlisted(repoInfo, packageId);
 
-    if (versions.isEmpty()) {
-      throw new ItemNotFoundException("packageNotFound");
-    }
+    final var latest =
+        versions.stream()
+            .filter(NuGetVersionInfo::listed)
+            .findFirst()
+            .or(() -> versions.stream().findFirst())
+            .orElseThrow(() -> new ItemNotFoundException("packageNotFound"));
 
-    final var latest = versions.getFirst();
-    final long totalDownloads = versions.stream().mapToLong(NuGetVersionInfo::downloadCount).sum();
+    // The downloads of the listed versions, as the list counts them.
+    final long totalDownloads =
+        versions.stream()
+            .filter(NuGetVersionInfo::listed)
+            .mapToLong(NuGetVersionInfo::downloadCount)
+            .sum();
 
     return new NuGetPackageInfo()
         .packageId(latest.packageId())
