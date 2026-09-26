@@ -352,6 +352,22 @@ export async function rawSearch(
   });
 }
 
+/** Raw `GET` crate search with paging parameters (RPS-1486): `cargo search --limit N` sends
+ *  `per_page=N`; `page` is the 1-based page. Values go on the URL as given, so a test can send garbage. */
+export async function rawSearchPage(
+  repoName: string,
+  credential: MaterializedCredential,
+  query: string,
+  paging: { perPage?: string; page?: string },
+): Promise<RawResponse> {
+  const extra =
+    (paging.perPage !== undefined ? `&per_page=${paging.perPage}` : '') +
+    (paging.page !== undefined ? `&page=${paging.page}` : '');
+  return rawRequest(`${repoUrl(repoName)}${searchUrl(query)}${extra}`, {
+    headers: cargoAuthHeader(credential),
+  });
+}
+
 /** Raw `GET` of one crate's owners (step 5b), `permission: WRITE` on Repsy OS's own handler
  *  (`CargoOwnersProtocolMethodHandler` -- see this file's header, distinct from a real crates.io
  *  registry's owners route, which is READ-only for a GET). */

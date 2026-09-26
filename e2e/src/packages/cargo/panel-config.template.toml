@@ -1,0 +1,7 @@
+[registries]
+repsy = { index = "sparse+{{{registryUrl}}}" }
+{{#credentialProviders}}
+
+[registry]
+global-credential-providers = ["cargo:token"]
+{{/credentialProviders}}
