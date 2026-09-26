@@ -18,16 +18,16 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack, plus the full catalog of one rotating runner), scanner (the @scanner specs of the ui runner and of the npm-clients, docker, maven and pypi runners against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack) or all"
+        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack, plus the full catalog of one rotating runner), scanner (the @scanner specs of the ui runner and of the npm-clients, docker, maven and pypi runners against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack), tls (@smoke of every runner but ui and stack over Repsy's own https listeners, every client trusting the generated CA) or all"
         type: choice
-        options: [all, ui, wire, h2, scanner, throttle]
+        options: [all, ui, wire, h2, scanner, throttle, tls]
         default: all
       protocol:
         description: "Only these runner services, comma separated (skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,golang,ruby,stack,api,ui). Empty: every runner of the chosen legs"
         type: string
         default: ""
       grep:
-        description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 leg then keeps its default, @smoke). The scanner and throttle legs ignore it and always run @scanner and @throttle"
+        description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 and tls legs then keep their default, @smoke). The scanner and throttle legs ignore it and always run @scanner and @throttle"
         type: string
         default: ""
       h2_full:
@@ -102,7 +102,20 @@ jobs:
               # itself out). The stack runner goes first and the ui runner LAST: AUTH-11 locks the docker
               # gateway's bucket, admin included, for the window (the step "Wait out the throttle window").
               "throttle": ("throttle", "--throttle", ["stack", "ui"], "@throttle", 30, "throttle", False),
+              # Repsy's own https listeners (README.md "TLS stack"): @smoke of every runner but ui (Chromium
+              # would need ignoreHTTPSErrors) and stack (its cases restart the container and use no client),
+              # each client trusting the generated CA in its own way. The api runner goes with them: it also
+              # reaches the panel over 8443.
+              "tls": ("tls", "--tls", [r for r in WIRE if r != "stack"], "@smoke", 60, "tls", True),
           }
+
+          # leg -> the env switches the `test` step sets (README.md "Stack overlays": `up` takes the flag,
+          # `test` the env switch, and with it the https URLs).
+          SWITCHES = {"tls": "REPSY_E2E_TLS=1"}
+          # leg -> the spec file that proves the opt-in reached a runner: legs whose runners skip cases of
+          # their own (the golang TLS-shim case cannot run over https) cannot demand zero skips, so the check
+          # only fails when THIS file's cases skipped.
+          OPT_IN_PROBE = {"tls": "tls-listeners.spec.ts"}
 
           # leg -> {runner: --grep} where a runner must not take the leg's default grep ("" is the whole
           # catalog). Ignored when the grep input is given: that one is the person's choice. The stack
@@ -138,6 +151,8 @@ jobs:
                   "grep": (os.environ["GREP"] if grep_input else "") or default_grep,
                   "runner_grep": {} if os.environ["GREP"] and grep_input else RUNNER_GREP.get(leg, {}),
                   "opt_in": opt_in,
+                  "switches": SWITCHES.get(leg, ""),
+                  "opt_in_probe": OPT_IN_PROBE.get(leg, ""),
                   "timeout": timeout,
               })
 
@@ -296,10 +311,16 @@ jobs:
           # `throttle`), empty elsewhere. run.sh hands it to every runner (docker-compose.runners.yml) and
           # the specs of that overlay skip without it.
           REPSY_E2E_OPT_IN: ${{ matrix.opt_in }}
+          # NAME=value words `test` needs and `up` does not (the tls leg: REPSY_E2E_TLS=1, which points the
+          # runners at the https URLs and makes each client trust the CA); empty elsewhere.
+          SWITCHES: ${{ matrix.switches }}
           # Read by playwright.config.ts (retries: 1, forbidOnly, trace on first retry); run.sh
           # forwards it to the ui runner only. GitHub sets it already; explicit for the reader.
           CI: "true"
         run: |
+          for switch in $SWITCHES; do
+            export "$switch"
+          done
           failed=0
           for protocol in $PROTOCOLS; do
             pattern="$(python3 -c 'import json, os, sys; print(json.loads(os.environ["RUNNER_GREP"]).get(sys.argv[1], os.environ["GREP"]), end="")' "$protocol")"
@@ -350,6 +371,7 @@ jobs:
         env:
           PROTOCOLS: ${{ matrix.protocols }}
           OPT_IN: ${{ matrix.opt_in }}
+          PROBE: ${{ matrix.opt_in_probe }}
         run: |
           python3 - <<'PY'
           import os, sys
@@ -365,6 +387,15 @@ jobs:
                   bad = True
                   continue
               skipped = [c.get("name") for c in cases if c.find("skipped") is not None]
+              probe = os.environ["PROBE"]
+              if probe:
+                  # A leg whose runners skip cases of their own (README.md "TLS stack"): only the probe spec
+                  # must not skip, and the rest are listed.
+                  skipped_probe = [c.get("name") for c in cases if c.find("skipped") is not None and (c.get("classname") or "").endswith(probe)]
+                  for name in skipped:
+                      if name not in skipped_probe:
+                          print(f"::notice::{runner} skipped by design in the {os.environ['OPT_IN']} leg: {name}")
+                  skipped = skipped_probe
               if not cases or skipped:
                   print(f"::error::{runner} ran {len(cases)} tests and skipped {len(skipped)} in the {os.environ['OPT_IN']} leg: its @{os.environ['OPT_IN']} specs must all run (REPSY_E2E_OPT_IN={os.environ['OPT_IN']})")
                   bad = True

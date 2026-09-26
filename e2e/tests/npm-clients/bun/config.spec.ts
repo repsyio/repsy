@@ -51,6 +51,7 @@ import {
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
 import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
+import { optedIn } from '../../../src/stack-overlays.js';
 import type { Seeder } from '../../../src/seed/seeder.js';
 
 /** bun's own `Accept` for a packument on an install: the abbreviated document first (H-11). */
@@ -133,6 +134,10 @@ test(
     tag: ['@bun', '@config', '@scopes'],
   },
   async ({ seeder }) => {
+    test.fail(
+      optedIn('tls'),
+      'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
+    );
     const repoA = await newRepo(seeder);
     const repoB = await newRepo(seeder);
     const scope = `@e2e-${seeder.runId}`;

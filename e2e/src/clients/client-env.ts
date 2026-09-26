@@ -75,6 +75,30 @@ export const BASE_VARIABLES: readonly string[] = [
   ...TRUST_VARIABLES,
 ];
 
+/**
+ * The JVM clients' way to the same CA (RPS-1474 part b): the JVM reads no CA variable, so the runner's
+ * `REPSY_E2E_TLS_TRUSTSTORE` (the PKCS12 truststore of `docker-compose.stack-tls.yml`, mounted at `/tls`)
+ * becomes the `javax.net.ssl.trustStore*` system properties of `JAVA_TOOL_OPTIONS`, which every JVM a
+ * client starts reads (mvn and its forked plugins, the gradle client and its daemon, sbt, ant/ivy) whatever
+ * its own options file says. It is empty without a TLS stack, so a default stack sees no
+ * "Picked up JAVA_TOOL_OPTIONS" line on stderr. The truststore replaces the JDK's own for the process,
+ * which is fine: every URL a client of this harness reaches is Repsy's.
+ */
+export function jvmTrustEnv(): NodeJS.ProcessEnv {
+  const store = process.env.REPSY_E2E_TLS_TRUSTSTORE;
+  if (!store) {
+    return {};
+  }
+  const password = process.env.REPSY_E2E_TLS_TRUSTSTORE_PASSWORD ?? 'changeit';
+  return {
+    JAVA_TOOL_OPTIONS: [
+      `-Djavax.net.ssl.trustStore=${store}`,
+      '-Djavax.net.ssl.trustStoreType=PKCS12',
+      `-Djavax.net.ssl.trustStorePassword=${password}`,
+    ].join(' '),
+  };
+}
+
 /** A client's environment: see this file's header. `extra` wins over the copied variables. */
 export function clientEnv(
   home: string,
@@ -89,5 +113,5 @@ export function clientEnv(
     }
   }
   result.PATH ??= '/usr/local/bin:/usr/bin:/bin';
-  return { ...result, ...extra };
+  return { ...result, ...jvmTrustEnv(), ...extra };
 }

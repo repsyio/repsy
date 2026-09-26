@@ -49,6 +49,7 @@ import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
+import { optedIn } from '../../../src/stack-overlays.js';
 import { target } from '../../../src/target.js';
 
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
@@ -135,6 +136,10 @@ test(
     tag: ['@bun', '@publish', '@scopes'],
   },
   async ({ seeder }) => {
+    test.fail(
+      optedIn('tls'),
+      'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
+    );
     const repo = await newRepo(seeder);
     const writer = await tokenBinding(seeder, repo.name, { readOnly: false });
     const ctx = await bunClient.prepare('scoped-pub', [writer]);

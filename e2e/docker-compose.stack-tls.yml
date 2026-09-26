@@ -26,7 +26,8 @@
 #   ca.pem           the CA the clients trust (SSL_CERT_FILE, NODE_EXTRA_CA_CERTS, ...)
 #   leaf.pem         the certificate Repsy serves (SANs: localhost, 127.0.0.1, ::1 and the service name "repsy")
 #   keystore.p12     leaf key + chain, mounted into Repsy at /app/certs (the README's documented path)
-#   truststore.p12   the CA as a Java truststore, for the JVM clients (password: changeit)
+#   truststore.p12   the JDK's own trusted roots plus the CA, as a Java truststore for the JVM clients (password:
+#                    changeit); rebuilt from ca.pem on every start
 #
 # Like every overlay it changes nothing unless it is passed as an extra -f, which
 # `./run.sh local up --tls` (or REPSY_E2E_TLS=1) does, on top of the postgres or the H2 stack. Give
@@ -41,32 +42,40 @@ services:
     entrypoint: ['/bin/sh', '-ec']
     command:
       - |
-        if [ -s keystore.p12 ] && [ -s truststore.p12 ] && [ -s ca.pem ] && [ -s leaf.pem ]; then
-          echo "tls-init: reusing the certificates in /certs"
-          exit 0
-        fi
-        rm -f ca.p12 ca.pem leaf.pem leaf.csr keystore.p12 truststore.p12
         PASS=changeit
-        # The CA (bc:c makes it a certificate authority) and the leaf it signs.
-        keytool -genkeypair -alias ca -keyalg RSA -keysize 2048 -validity 3650 \
-          -dname "CN=Repsy e2e CA, O=Repsy" -ext bc:c -ext KeyUsage=keyCertSign,cRLSign \
-          -keystore ca.p12 -storetype PKCS12 -storepass "$$PASS" -keypass "$$PASS"
-        keytool -exportcert -rfc -alias ca -keystore ca.p12 -storepass "$$PASS" -file ca.pem
-        keytool -genkeypair -alias repsy -keyalg RSA -keysize 2048 -validity 3650 \
-          -dname "CN=localhost, O=Repsy e2e" \
-          -keystore keystore.p12 -storetype PKCS12 -storepass "$$PASS" -keypass "$$PASS"
-        keytool -certreq -alias repsy -keystore keystore.p12 -storepass "$$PASS" -file leaf.csr
-        keytool -gencert -alias ca -keystore ca.p12 -storepass "$$PASS" -validity 3650 -rfc \
-          -ext "SAN=DNS:localhost,DNS:repsy,IP:127.0.0.1,IP:0:0:0:0:0:0:0:1" \
-          -ext EKU=serverAuth -infile leaf.csr -outfile leaf.pem
-        # The reply is imported with the CA already in the keystore, so the stored chain is leaf + CA.
-        keytool -importcert -noprompt -alias ca -file ca.pem -keystore keystore.p12 -storepass "$$PASS"
-        keytool -importcert -alias repsy -file leaf.pem -keystore keystore.p12 -storepass "$$PASS"
+        if [ -s keystore.p12 ] && [ -s ca.pem ] && [ -s leaf.pem ]; then
+          echo "tls-init: reusing the certificates in /certs"
+        else
+          rm -f ca.p12 ca.pem leaf.pem leaf.csr keystore.p12
+          # The CA (bc:c makes it a certificate authority) and the leaf it signs.
+          keytool -genkeypair -alias ca -keyalg RSA -keysize 2048 -validity 3650 \
+            -dname "CN=Repsy e2e CA, O=Repsy" -ext bc:c -ext KeyUsage=keyCertSign,cRLSign \
+            -keystore ca.p12 -storetype PKCS12 -storepass "$$PASS" -keypass "$$PASS"
+          keytool -exportcert -rfc -alias ca -keystore ca.p12 -storepass "$$PASS" -file ca.pem
+          keytool -genkeypair -alias repsy -keyalg RSA -keysize 2048 -validity 3650 \
+            -dname "CN=localhost, O=Repsy e2e" \
+            -keystore keystore.p12 -storetype PKCS12 -storepass "$$PASS" -keypass "$$PASS"
+          keytool -certreq -alias repsy -keystore keystore.p12 -storepass "$$PASS" -file leaf.csr
+          keytool -gencert -alias ca -keystore ca.p12 -storepass "$$PASS" -validity 3650 -rfc \
+            -ext "SAN=DNS:localhost,DNS:repsy,IP:127.0.0.1,IP:0:0:0:0:0:0:0:1" \
+            -ext EKU=serverAuth -infile leaf.csr -outfile leaf.pem
+          # The reply is imported with the CA already in the keystore, so the stored chain is leaf + CA.
+          keytool -importcert -noprompt -alias ca -file ca.pem -keystore keystore.p12 -storepass "$$PASS"
+          keytool -importcert -alias repsy -file leaf.pem -keystore keystore.p12 -storepass "$$PASS"
+          rm -f ca.p12 leaf.csr
+          chmod a+r ca.pem leaf.pem keystore.p12
+          echo "tls-init: generated ca.pem, leaf.pem and keystore.p12 in /certs"
+        fi
+        # The JVM clients' truststore (RPS-1474 part b): the JDK's own trusted roots plus the CA, rebuilt on every
+        # start from ca.pem. A truststore of the CA alone would replace the JDK's for the whole process, and
+        # Maven and Gradle also resolve plugins from Maven Central (PKIX path building failed).
+        rm -f truststore.p12
+        cp "$$JAVA_HOME/lib/security/cacerts" truststore.p12
+        chmod u+w truststore.p12
         keytool -importcert -noprompt -alias repsy-e2e-ca -file ca.pem \
-          -keystore truststore.p12 -storetype PKCS12 -storepass "$$PASS"
-        rm -f ca.p12 leaf.csr
-        chmod a+r ca.pem leaf.pem keystore.p12 truststore.p12
-        echo "tls-init: generated ca.pem, leaf.pem, keystore.p12 and truststore.p12 in /certs"
+          -keystore truststore.p12 -storepass "$$PASS"
+        chmod a+r truststore.p12
+        echo "tls-init: truststore.p12 is the JDK roots plus ca.pem"
 
   repsy:
     depends_on:
