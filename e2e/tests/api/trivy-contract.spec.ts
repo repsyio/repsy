@@ -242,7 +242,7 @@ test.describe('the real repsy-scanner-trivy', { tag: ['@trivy'] }, () => {
       const repo = await seeder.createRepo(RepoType.NPM);
       const name = `e2e-${seeder.runId}-own-lodash`;
       const version = '1.0.0';
-      const tarball = plainLodashTarball(name, version);
+      const tarball = plainLodashTarball();
 
       const published = await rawPublish(
         repo.name,
@@ -300,7 +300,7 @@ function bundledLodashTarball(name: string, version: string): Buffer {
 }
 
 /** A plain npm tarball whose own package.json is lodash 4.17.20 (no node_modules, no dependencies). Tests that the tarball's own package vulnerabilities are scanned. */
-function plainLodashTarball(_name: string, _version: string): Buffer {
+function plainLodashTarball(): Buffer {
   return zlib.gzipSync(
     buildTar([
       {
