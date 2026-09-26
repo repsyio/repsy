@@ -27,6 +27,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import io.repsy.libs.storage.core.exceptions.RedirectToSlashEndedLocationException;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.utils.ArtifactMetadataSynthesizer;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -39,6 +40,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -47,13 +49,16 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.maven.artifact.repository.metadata.Metadata;
+import org.apache.maven.artifact.repository.metadata.Plugin;
 import org.apache.maven.artifact.repository.metadata.io.xpp3.MetadataXpp3Writer;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
@@ -78,8 +83,8 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
           METADATA_FILENAME + ".asc.sha512");
 
   /**
-   * The number of locks an artifact's metadata is guarded by. An artifact takes the one its path
-   * hashes to, so two artifacts may share one: it only makes them wait for each other.
+   * The number of locks a stored metadata file is guarded by. A directory takes the one its path
+   * hashes to, so two may share one: it only makes them wait for each other.
    */
   private static final int ARTIFACT_LOCK_STRIPES = 64;
 
@@ -87,10 +92,11 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   private final StorageStrategy storageStrategy;
 
   /**
-   * Serializes every change of an artifact's stored {@code maven-metadata.xml} inside this process:
-   * the append that a registered POM triggers, the rewrite of a version delete and a client's own
-   * upload of the file, which would otherwise each read the file, change it and write it back over
-   * the change of another (RPS-1437). It does not reach another instance that shares the storage.
+   * Serializes every change of an artifact's or a group's stored {@code maven-metadata.xml} inside
+   * this process: the append that a registered POM triggers, the rewrite of a version delete and a
+   * client's own upload of the file, which would otherwise each read the file, change it and write
+   * it back over the change of another (RPS-1437, RPS-1457). It does not reach another instance
+   * that shares the storage.
    */
   private final ReentrantLock[] artifactLocks = newArtifactLocks();
 
@@ -105,9 +111,9 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
     return locks;
   }
 
-  private ReentrantLock lockOf(final UUID storageKey, final Path artifactBasePath) {
+  private ReentrantLock lockOf(final UUID storageKey, final Path metadataDirectory) {
 
-    final var hash = Objects.hash(storageKey, artifactBasePath.toString());
+    final var hash = Objects.hash(storageKey, metadataDirectory.toString());
 
     return this.artifactLocks[Math.floorMod(hash, ARTIFACT_LOCK_STRIPES)];
   }
@@ -161,20 +167,17 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   public BaseUsages writeInputStreamToPath(
       final StoragePath storagePath, final InputStream inputStream, final String repoName) {
 
-    final var artifactMetadata =
-        ArtifactMetadataSynthesizer.parse(storagePath.getRelativePath().getPath());
+    final var metadataDirectory = this.metadataDirectoryOf(storagePath.getRelativePath().getPath());
 
-    if (artifactMetadata == null || artifactMetadata.checksumAlgorithm() != null) {
+    if (metadataDirectory == null) {
       return this.storageStrategy.write(repoName, storagePath, inputStream);
     }
 
-    // A client's own artifact-level maven-metadata.xml replaces the file whole, so it must not land
-    // between the read and the write of an append or a delete rewrite of the same artifact
-    // (RPS-1437).
+    // A client's own maven-metadata.xml (artifact-level or group-level) replaces the file whole, so
+    // it must not land between the read and the write of an append or a delete rewrite of the same
+    // file (RPS-1437, RPS-1457).
     final var lock =
-        this.lockOf(
-            Objects.requireNonNull(storagePath.getStorageKey()),
-            this.getPath(artifactMetadata.groupId(), artifactMetadata.artifactId()));
+        this.lockOf(Objects.requireNonNull(storagePath.getStorageKey()), metadataDirectory);
 
     lock.lock();
 
@@ -183,6 +186,31 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
     } finally {
       lock.unlock();
     }
+  }
+
+  /**
+   * The directory a stored {@code maven-metadata.xml} is guarded by the lock of, {@code null} when
+   * the path is not that file (a checksum of it, a signature and any other file take no lock). A
+   * path of three or more segments is the artifact-level file of {@code <parent>:<last>} (which is
+   * also where the group-level file of the group of the whole path sits, so both name one lock); a
+   * path of two segments, a group of one, is only a group-level file, and is keyed the way {@link
+   * #addPluginsToGroupMetadata} keys it.
+   */
+  private @Nullable Path metadataDirectoryOf(final String relativePath) {
+
+    final var artifactMetadata = ArtifactMetadataSynthesizer.parse(relativePath);
+
+    if (artifactMetadata != null) {
+      return artifactMetadata.checksumAlgorithm() == null
+          ? this.getPath(artifactMetadata.groupId(), artifactMetadata.artifactId())
+          : null;
+    }
+
+    final var groupMetadata = ArtifactMetadataSynthesizer.parseGroupLevel(relativePath);
+
+    return groupMetadata == null || groupMetadata.checksumAlgorithm() != null
+        ? null
+        : this.getPath(groupMetadata.groupId())[0];
   }
 
   @SneakyThrows
@@ -441,10 +469,9 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   /**
    * Reads the artifact's stored {@code maven-metadata.xml} and, when {@code mutate} answers that it
    * changed the versions, stamps {@code lastUpdated}, recomputes {@code latest} and {@code release}
-   * and writes the file back with the checksums and the signature handling of {@link
-   * #writeMetadataAndChecksumsToFile}. Nothing is written when there is no file, when it has no
-   * {@code <versioning>} (so {@code mutate} always finds one), or when {@code mutate} answers
-   * {@code false}. The whole read-change-write holds the artifact's lock.
+   * and writes the file back (see {@link #rewriteStoredMetadata}). Nothing is written when there is
+   * no file, when it has no {@code <versioning>} (so {@code mutate} always finds one), or when
+   * {@code mutate} answers {@code false}.
    */
   private BaseUsages rewriteArtifactMetadata(
       final BaseRepoInfo<ID> repoInfo,
@@ -453,14 +480,87 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
       final Predicate<Metadata> mutate)
       throws IOException {
 
-    final var artifactBasePath = this.getPath(groupId, artifactId);
+    return this.rewriteStoredMetadata(
+        repoInfo,
+        this.getPath(groupId, artifactId),
+        metadata -> {
+          final var versioning = metadata.getVersioning();
+
+          if (versioning == null || !mutate.test(metadata)) {
+            return false;
+          }
+
+          versioning.setLastUpdatedTimestamp(Date.from(Instant.now()));
+
+          ArtifactUtils.setReleaseAndLatest(metadata);
+
+          return true;
+        });
+  }
+
+  /**
+   * Adds to the group-level {@code maven-metadata.xml} that is stored the registered plugins whose
+   * artifactId it does not list (RPS-1457), the {@code <plugins>} analogue of {@link
+   * #addVersionsToMetadata}. It only ever appends: an entry is matched by its artifactId and never
+   * changed or removed, so a prefix Maven wrote (a custom {@code goalPrefix}) is not replaced by
+   * the derived one, and {@code <versioning>} and {@code lastUpdated} are not touched. A file that
+   * has a {@code <versioning>} and no {@code <plugins>} is the artifact-level file of {@code
+   * <parent>:<last>} that has the same path, and is left alone.
+   */
+  @Override
+  public long addPluginsToGroupMetadata(
+      final BaseRepoInfo<ID> repoInfo,
+      final String groupId,
+      final Supplier<? extends Collection<RegisteredPlugin>> registeredPlugins)
+      throws IOException {
+
+    return this.rewriteStoredMetadata(
+            repoInfo,
+            this.getPath(groupId)[0],
+            metadata -> {
+              if (metadata.getVersioning() != null && metadata.getPlugins().isEmpty()) {
+                return false;
+              }
+
+              final var listed =
+                  metadata.getPlugins().stream()
+                      .map(Plugin::getArtifactId)
+                      .collect(Collectors.toCollection(HashSet::new));
+
+              var changed = false;
+
+              for (final var registered : registeredPlugins.get()) {
+                if (listed.add(registered.artifactId())) {
+                  metadata.addPlugin(ArtifactMetadataSynthesizer.toPlugin(registered));
+                  changed = true;
+                }
+              }
+
+              return changed;
+            })
+        .getDiskUsage();
+  }
+
+  /**
+   * Reads the {@code maven-metadata.xml} stored in {@code metadataDirectory} and, when {@code
+   * mutate} answers that it changed it, writes it back with the checksums and the signature
+   * handling of {@link #writeMetadataAndChecksumsToFile}. Nothing is written when there is no file
+   * or when {@code mutate} answers {@code false}, and a file that cannot be parsed fails before a
+   * byte is written. The whole read-change-write holds the lock of the directory, the one a
+   * client's own upload of the file takes too.
+   */
+  private BaseUsages rewriteStoredMetadata(
+      final BaseRepoInfo<ID> repoInfo,
+      final Path metadataDirectory,
+      final Predicate<Metadata> mutate)
+      throws IOException {
 
     final var storagePath =
         StoragePath.of(
-            repoInfo.getStorageKey(), artifactBasePath.resolve(METADATA_FILENAME).toString());
+            repoInfo.getStorageKey(), metadataDirectory.resolve(METADATA_FILENAME).toString());
 
     final var lock =
-        this.lockOf(Objects.requireNonNull(repoInfo.getStorageKey()), artifactBasePath);
+        this.lockOf(Objects.requireNonNull(repoInfo.getStorageKey()), metadataDirectory);
 
     lock.lock();
 
@@ -474,18 +574,12 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
       final var metadata =
           ArtifactUtils.readMetadata(metadataResource.get().getContentAsByteArray());
 
-      final var versioning = metadata.getVersioning();
-
-      if (versioning == null || !mutate.test(metadata)) {
+      if (!mutate.test(metadata)) {
         return BaseUsages.ofDisk(0L);
       }
 
-      versioning.setLastUpdatedTimestamp(Date.from(Instant.now()));
-
-      ArtifactUtils.setReleaseAndLatest(metadata);
-
       return this.writeMetadataAndChecksumsToFile(
-          storagePath, artifactBasePath, metadata, repoInfo.getName());
+          storagePath, metadataDirectory, metadata, repoInfo.getName());
     } finally {
       lock.unlock();
     }

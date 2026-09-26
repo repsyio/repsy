@@ -334,4 +334,32 @@ class ArtifactMetadataSynthesizerTest {
   private static byte[] render(final List<RegisteredVersion> versions) {
     return ArtifactMetadataSynthesizer.metadataXml("com.acme", "lib", versions);
   }
+
+  @Test
+  @DisplayName("turns a registered plugin into a <plugin> entry that keeps its name")
+  void toPluginKeepsTheName() {
+    final var plugin =
+        ArtifactMetadataSynthesizer.toPlugin(
+            new RegisteredPlugin("foo-maven-plugin", "Foo", "foo"));
+
+    assertThat(plugin.getArtifactId()).isEqualTo("foo-maven-plugin");
+    assertThat(plugin.getPrefix()).isEqualTo("foo");
+    assertThat(plugin.getName()).isEqualTo("Foo");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "  "})
+  @DisplayName("leaves the name out of a <plugin> entry when it is blank or missing")
+  void toPluginOmitsABlankName(final String name) {
+    assertThat(
+            ArtifactMetadataSynthesizer.toPlugin(
+                    new RegisteredPlugin("foo-maven-plugin", name, "foo"))
+                .getName())
+        .isNull();
+    assertThat(
+            ArtifactMetadataSynthesizer.toPlugin(
+                    new RegisteredPlugin("foo-maven-plugin", null, "foo"))
+                .getName())
+        .isNull();
+  }
 }
