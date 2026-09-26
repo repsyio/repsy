@@ -41,8 +41,15 @@ RUN chmod +x ./entrypoint.sh
 
 # --- maven-specific layers ---
 
-ARG TEMURIN_VERSION=21
+# Temurin: the exact release (`21.0.12.1+1`, api.adoptium.net names it jdk-<version>) and the SHA-256 of its
+# linux/x64 tarball (the `.sha256.txt` next to it on GitHub = `package.checksum` of api.adoptium.net/v3/assets), not `latest/21/ga`, which moves under a
+# green build (RPS-1597). x64 only, as before. Maven: the SHA-512 next to the tarball on archive.apache.org.
+# The checksums have no default on purpose: docker-compose.runners.yml is their single source and
+# runners/bump-pins.sh keeps them (README.md "Runner images and pins"), so a build without them fails loudly.
+ARG TEMURIN_VERSION=21.0.12.1+1
+ARG TEMURIN_SHA256
 ARG MAVEN_VERSION=3.9.9
+ARG MAVEN_SHA512
 # The published checksum of gradle-${GRADLE_VERSION}-bin.zip (https://gradle.org/release-checksums/);
 # change both together. The build fails on a mismatch.
 ARG GRADLE_VERSION=8.14.3
@@ -84,12 +91,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/java \
-    && curl -fsSL "https://api.adoptium.net/v3/binary/latest/${TEMURIN_VERSION}/ga/linux/x64/jdk/hotspot/normal/eclipse?project=jdk" \
-    | tar -xzC /opt/java \
+    && curl -fsSL -o /tmp/temurin.tgz "https://api.adoptium.net/v3/binary/version/jdk-${TEMURIN_VERSION}/linux/x64/jdk/hotspot/normal/eclipse" \
+    && echo "${TEMURIN_SHA256}  /tmp/temurin.tgz" | sha256sum -c - \
+    && tar -xzf /tmp/temurin.tgz -C /opt/java \
+    && rm /tmp/temurin.tgz \
     && mv /opt/java/jdk-* "${JAVA_HOME}"
 
-RUN curl -fsSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
-    | tar -xzC /opt \
+RUN curl -fsSL -o /tmp/maven.tgz "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
+    && echo "${MAVEN_SHA512}  /tmp/maven.tgz" | sha512sum -c - \
+    && tar -xzf /tmp/maven.tgz -C /opt \
+    && rm /tmp/maven.tgz \
     && mv "/opt/apache-maven-${MAVEN_VERSION}" "${MAVEN_HOME}"
 
 RUN curl -fsSL -o /tmp/gradle.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \

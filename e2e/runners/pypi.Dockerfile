@@ -30,8 +30,12 @@ ARG TWINE_VERSION=7.0.0
 # source. It is never given a Python of its own to download (UV_PYTHON_DOWNLOADS=never below): it
 # uses the CPython copied in from `python-toolchain`.
 ARG UV_VERSION=0.12.19
-FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv-binary
-FROM python:${PYTHON_VERSION}-slim-bookworm AS python-toolchain
+# The digests have no default on purpose (RPS-1597): docker-compose.runners.yml is their single source and
+# runners/bump-pins.sh keeps them (README.md "Runner images and pins"), so a build without them fails loudly.
+ARG UV_IMAGE_DIGEST
+ARG PYTHON_IMAGE_DIGEST
+FROM ghcr.io/astral-sh/uv:${UV_VERSION}@${UV_IMAGE_DIGEST} AS uv-binary
+FROM python:${PYTHON_VERSION}-slim-bookworm@${PYTHON_IMAGE_DIGEST} AS python-toolchain
 ARG PIP_VERSION
 ARG TWINE_VERSION
 RUN python3 -m pip install --no-cache-dir "pip==${PIP_VERSION}" "twine==${TWINE_VERSION}"

@@ -34,22 +34,33 @@
 # `--verify=false` skips that (confirmed live) -- the install itself still goes through the
 # plugin's own `scripts/install_plugin.sh`, which downloads
 # https://github.com/chartmuseum/helm-push/releases/download/v0.11.1/helm-push_0.11.1_linux_<arch>.tar.gz
-# and is trusted the same way `helm plugin install <git-url>` always is (no separate checksum file
-# is published for this release; the crane/helm binaries above ARE checksum-verified since get.helm.sh
-# publishes one).
+# and is trusted the same way `helm plugin install <git-url>` always is: no checksum file is published
+# for this release, so the plugin is the one client of these runners whose bytes are NOT pinned by content
+# (RPS-1597 records that exception in README.md "Runner images and pins"; the version is exact).
+#
+# The `helm` binary itself is pinned by content: the per-arch SHA-256 below lives in this repository (and in
+# docker-compose.runners.yml, its single source), not in a `.sha256sum` fetched from the host that serves the
+# tarball, which would vouch for whatever that host serves. The checksums have no default on purpose, so a
+# build without them fails loudly; runners/bump-pins.sh keeps them.
 ARG HELM_VERSION=v4.3.0
 ARG HELM_PUSH_VERSION=0.11.1
 FROM debian:bookworm-slim AS helm-tools
 ARG HELM_VERSION
 ARG HELM_PUSH_VERSION
+ARG HELM_SHA256_AMD64
+ARG HELM_SHA256_ARM64
 ARG TARGETARCH
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl tar gzip git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
-    && curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz.sha256sum" \
-    && sha256sum -c "helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz.sha256sum" \
+RUN case "${TARGETARCH:-amd64}" in \
+      amd64) sha="${HELM_SHA256_AMD64}" ;; \
+      arm64) sha="${HELM_SHA256_ARM64}" ;; \
+      *) echo "helm: no pinned checksum for ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
+    && echo "${sha}  helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" | sha256sum -c - \
     && tar -xzf "helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
     && install -m 0755 "linux-${TARGETARCH}/helm" /usr/local/bin/helm
 

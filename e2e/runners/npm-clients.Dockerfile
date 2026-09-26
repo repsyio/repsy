@@ -22,14 +22,18 @@
 # distinction matters here).
 ARG BUN_VERSION=1.3.14
 ARG DENO_VERSION=2.9.7
-FROM oven/bun:${BUN_VERSION}-debian AS bun-toolchain
+# The digests have no default on purpose (RPS-1597): docker-compose.runners.yml is their single source and
+# runners/bump-pins.sh keeps them (README.md "Runner images and pins"), so a build without them fails loudly.
+ARG BUN_IMAGE_DIGEST
+ARG DENO_IMAGE_DIGEST
+FROM oven/bun:${BUN_VERSION}-debian@${BUN_IMAGE_DIGEST} AS bun-toolchain
 
 # Deno 2 (RPS-1486), copied the same way from the official `denoland/deno:bin-<version>` image, which
 # holds nothing but the one glibc binary at /deno (the `bin` variant exists for exactly this
 # `COPY --from`). Consume-only in the suite: `deno install` of an `npm:` specifier against a Repsy npm
-# repository (tests/npm-clients/deno/); Deno has no `publish` for npm. Tag-pinned like bun above: the
-# build fails below when the binary reports another version, so a moved tag is visible.
-FROM denoland/deno:bin-${DENO_VERSION} AS deno-toolchain
+# repository (tests/npm-clients/deno/); Deno has no `publish` for npm. Digest-pinned like bun above, and
+# the build also fails below when the binary reports another version.
+FROM denoland/deno:bin-${DENO_VERSION}@${DENO_IMAGE_DIGEST} AS deno-toolchain
 
 # The npm-clients runner: the harness itself (see base.Dockerfile) plus the npm-family package
 # managers that talk to a Repsy npm repository -- npm (the node:24 base's own, the baseline), pnpm,
