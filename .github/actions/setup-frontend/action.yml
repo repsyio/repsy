@@ -33,7 +33,8 @@ runs:
 
     # The one place the workflows' pnpm version lives: bump the literal below and every workflow
     # follows. The Dockerfile's frontend-build stage pins the same version (corepack prepare
-    # pnpm@...), so bump that literal in the same change.
+    # pnpm@...), so bump that literal in the same change. .github/workflows/pnpm-bump.yml does that
+    # weekly and opens the PR (RPS-1167), so a hand edit is only needed for a new major.
     # It is a literal on purpose. SonarCloud (githubactions:S8543) reads the version off this line,
     # so an input or a variable would look unpinned. --ignore-scripts is githubactions:S6505.
     # Not the "packageManager" field of package.json: with it, pnpm 12 rewrites pnpm-lock.yaml
