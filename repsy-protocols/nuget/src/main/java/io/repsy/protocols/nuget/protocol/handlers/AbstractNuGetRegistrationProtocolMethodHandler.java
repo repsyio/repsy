@@ -42,11 +42,11 @@ import org.springframework.http.ResponseEntity;
 public abstract class AbstractNuGetRegistrationProtocolMethodHandler
     implements ProtocolMethodHandler {
 
-  private static final Pattern INDEX_PATTERN =
+  static final Pattern INDEX_PATTERN =
       Pattern.compile(".*/v3/registration/[^/]+/index\\.json$", Pattern.CASE_INSENSITIVE);
 
   /** Matches leaf URLs like /v3/registration/{id}/{version}.json — excludes index.json. */
-  private static final Pattern LEAF_PATTERN =
+  static final Pattern LEAF_PATTERN =
       Pattern.compile(
           ".*/v3/registration/[^/]+/(?!index\\.json$)[^/]+\\.json$", Pattern.CASE_INSENSITIVE);
 

@@ -33,6 +33,12 @@ public interface CargoProtocolFacade {
 
   Resource download(ProtocolContext context);
 
+  /**
+   * The {@code .crate} of {@link #download} without counting a download, for answering {@code HEAD}
+   * (RPS-1465).
+   */
+  Resource getCrate(ProtocolContext context);
+
   void publish(ProtocolContext context, InputStream inputStream) throws IOException;
 
   void yank(ProtocolContext context);

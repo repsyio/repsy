@@ -18,10 +18,12 @@ package io.repsy.protocols.pypi.protocol.handlers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
@@ -38,8 +40,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -101,7 +106,7 @@ class AbstractPypiHeadProtocolMethodHandlerTest {
 
   @Test
   @DisplayName("/simple/ answers 200 without touching the facade's lookup methods")
-  void simpleRootAlwaysExists() {
+  void simpleRootAlwaysExists() throws Exception {
     final var response =
         this.handler()
             .handle(
@@ -116,7 +121,7 @@ class AbstractPypiHeadProtocolMethodHandlerTest {
 
   @Test
   @DisplayName("/simple answers 200 too (trailing slash optional)")
-  void simpleRootWithoutTrailingSlashAlwaysExists() {
+  void simpleRootWithoutTrailingSlashAlwaysExists() throws Exception {
     final var response =
         this.handler()
             .handle(
@@ -128,7 +133,7 @@ class AbstractPypiHeadProtocolMethodHandlerTest {
 
   @Test
   @DisplayName("/simple/<project>/ answers 200 when the package exists")
-  void projectPageExisting() {
+  void projectPageExisting() throws Exception {
     when(this.facade.packageExists(any(), eq("demo"))).thenReturn(true);
 
     final var response =
@@ -143,7 +148,7 @@ class AbstractPypiHeadProtocolMethodHandlerTest {
 
   @Test
   @DisplayName("/simple/<project>/ answers 404 when the package does not exist")
-  void projectPageMissing() {
+  void projectPageMissing() throws Exception {
     when(this.facade.packageExists(any(), eq("missing"))).thenReturn(false);
 
     final var response =
@@ -161,7 +166,7 @@ class AbstractPypiHeadProtocolMethodHandlerTest {
   @DisplayName(
       "/simple/<non-normalized-project>/ mirrors GET's 307 redirect instead of checking existence"
           + " against the raw name")
-  void projectPageNonNormalizedNameRedirects() {
+  void projectPageNonNormalizedNameRedirects() throws Exception {
     final var target = URI.create("http://localhost/pypi/simple/my-pkg/");
 
     final var response =
@@ -177,26 +182,37 @@ class AbstractPypiHeadProtocolMethodHandlerTest {
   }
 
   @Test
-  @DisplayName("/<project>/-/<file> answers 200 when the archive file exists")
-  void archiveFileExisting() {
-    when(this.facade.archiveFileExists(any(), eq("demo"), eq("demo-1.0.0.tar.gz")))
-        .thenReturn(true);
+  @DisplayName(
+      "/<project>/-/<file> answers 200 with the Content-Length, Content-Type, Content-Disposition"
+          + " and Accept-Ranges of the GET (RPS-1562)")
+  void archiveFileExisting() throws Exception {
+    final var bytes = new byte[] {1, 2, 3, 4, 5};
+    when(this.facade.downloadArchiveFile(any(), eq("demo"), eq("demo-1.0.0-py3-none-any.whl")))
+        .thenReturn(new ByteArrayResource(bytes));
 
     final var response =
         this.handler()
             .handle(
-                contextFor("/demo/-/demo-1.0.0.tar.gz"),
+                contextFor("/demo/-/demo-1.0.0-py3-none-any.whl"),
                 new MockHttpServletRequest(),
                 new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody()).isNull();
+    assertThat(response.getHeaders().getContentLength()).isEqualTo(bytes.length);
+    assertThat(response.getHeaders().getContentType())
+        .isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
+    assertThat(response.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
+    assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+        .isEqualTo("attachment; filename=\"demo-1.0.0-py3-none-any.whl\"");
+    verify(this.facade, never()).archiveFileExists(any(), any(), any());
   }
 
   @Test
   @DisplayName("/<project>/-/<file> answers 404 when the archive file does not exist")
-  void archiveFileMissing() {
-    when(this.facade.archiveFileExists(any(), eq("demo"), eq("no-such-file.tar.gz")))
-        .thenReturn(false);
+  void archiveFileMissing() throws Exception {
+    when(this.facade.downloadArchiveFile(any(), eq("demo"), eq("no-such-file.tar.gz")))
+        .thenThrow(new ItemNotFoundException("itemNotFound"));
 
     final var response =
         this.handler()
@@ -206,11 +222,12 @@ class AbstractPypiHeadProtocolMethodHandlerTest {
                 new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).isNull();
   }
 
   @Test
   @DisplayName("an unrecognized path answers 404 without touching the facade")
-  void unknownPathAnswers404() {
+  void unknownPathAnswers404() throws Exception {
     final var response =
         this.handler()
             .handle(
@@ -224,7 +241,7 @@ class AbstractPypiHeadProtocolMethodHandlerTest {
 
   @Test
   @DisplayName("supports only HEAD, and does not bill a download")
-  void supportsOnlyHead() {
+  void supportsOnlyHead() throws Exception {
     final var handler = this.handler();
 
     assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.HEAD);
@@ -233,7 +250,7 @@ class AbstractPypiHeadProtocolMethodHandlerTest {
 
   @Test
   @DisplayName("uses the injected path parser as its own, and registers with the provider")
-  void usesInjectedPathParser() {
+  void usesInjectedPathParser() throws Exception {
     final var handler = this.handler();
 
     assertThat(handler.getPathParser()).isSameAs(this.pathParser);

@@ -68,6 +68,16 @@ public interface NuGetProtocolFacade {
 
   Resource downloadNuPackage(ProtocolContext context);
 
+  /**
+   * The {@code .nupkg} of {@link #downloadNuPackage} without counting a download, for answering
+   * {@code HEAD} (RPS-1465). The resource is lazy: nothing is read from storage until it is
+   * streamed.
+   *
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when there is no such
+   *     package file
+   */
+  Resource getNuPackage(ProtocolContext context);
+
   Resource downloadNuspec(ProtocolContext context);
 
   List<String> getPackageVersions(ProtocolContext context);

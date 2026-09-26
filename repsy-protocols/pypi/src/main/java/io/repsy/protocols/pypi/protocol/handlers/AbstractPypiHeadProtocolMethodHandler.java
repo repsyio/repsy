@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.pypi.protocol.handlers;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
@@ -24,21 +25,33 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /**
  * Answers {@code HEAD} on a PyPI path with the same status the matching {@code GET} route would
- * give: {@code 200} for a resolvable resource, {@code 404} otherwise (RPS-1226). Every check is an
- * existence-only lookup on {@link PypiProtocolFacade} &mdash; never {@code getPackageList} (builds
- * the whole body) or {@code downloadArchiveFile} (opens the storage resource).
+ * give: {@code 200} for a resolvable resource, {@code 404} otherwise (RPS-1226). The project pages
+ * are an existence-only lookup on {@link PypiProtocolFacade}, never {@code getPackageList} (builds
+ * the whole body).
+ *
+ * <p>The answer for a wheel or an sdist carries the headers of its {@code GET}: {@code
+ * Content-Length}, {@code Content-Type}, {@code Content-Disposition} and {@code Accept-Ranges:
+ * bytes}, which the {@code GET} gets from Spring because it serves a resource and a {@code HEAD}
+ * without a body does not (RPS-1562). uv asks with a {@code HEAD} whether the index serves ranges
+ * before it reads the metadata of a wheel by range, and streams the whole wheel when it is not told
+ * so. The file is resolved through {@code downloadArchiveFile}, which is lazy (nothing is read from
+ * storage) and counts no download.
  *
  * <p>The path patterns below intentionally mirror, rather than share, the private patterns in
  * {@link AbstractPypiSimpleProtocolMethodHandler} and {@link
@@ -92,7 +105,8 @@ public abstract class AbstractPypiHeadProtocolMethodHandler<ID> implements Proto
   public ResponseEntity<Object> handle(
       final ProtocolContext context,
       final HttpServletRequest request,
-      final HttpServletResponse response) {
+      final HttpServletResponse response)
+      throws IOException {
 
     final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
 
@@ -103,13 +117,32 @@ public abstract class AbstractPypiHeadProtocolMethodHandler<ID> implements Proto
 
     final var downloadMatcher = DOWNLOAD_PATTERN.matcher(relativePath);
     if (downloadMatcher.matches()) {
-      final var exists =
-          this.facade.archiveFileExists(
-              context, downloadMatcher.group(1), downloadMatcher.group(2));
-      return exists ? ResponseEntity.ok().build() : ResponseEntity.notFound().build();
+      return this.handleArchiveFile(context, downloadMatcher.group(1), downloadMatcher.group(2));
     }
 
     return ResponseEntity.notFound().build();
+  }
+
+  private ResponseEntity<Object> handleArchiveFile(
+      final ProtocolContext context, final String packageName, final String fileName)
+      throws IOException {
+
+    final Resource resource;
+
+    try {
+      resource = this.facade.downloadArchiveFile(context, packageName, fileName);
+    } catch (final ItemNotFoundException _) {
+      return ResponseEntity.notFound().build();
+    }
+
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            AbstractPypiFileDownloadProtocolMethodHandler.contentDisposition(fileName))
+        .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+        .contentLength(resource.contentLength())
+        .build();
   }
 
   private ResponseEntity<Object> handleSimple(

@@ -43,6 +43,6 @@ public interface PypiProtocolFacade<ID> {
   /** Existence-only check, never {@link #getPackageList}: used to answer {@code HEAD}. */
   boolean packageExists(ProtocolContext context, String packageNormalizedName);
 
-  /** Existence-only check, never {@link #downloadArchiveFile}: used to answer {@code HEAD}. */
+  /** Existence-only check, never {@link #downloadArchiveFile}. */
   boolean archiveFileExists(ProtocolContext context, String packageName, String fileName);
 }

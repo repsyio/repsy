@@ -79,13 +79,25 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
     final var crateName = crateNameAndVersionPair.getFirst();
     final var versionName = crateNameAndVersionPair.getSecond();
 
-    final var resource =
-        this.cargoStorageService.getCrate(
-            repoInfo.getStorageKey(), repoInfo.getName(), crateName, versionName);
+    final var resource = this.getCrate(context);
 
     this.cargoCrateService.incrementDownloadCount(repoInfo, crateName, versionName);
 
     return resource;
+  }
+
+  @Override
+  public Resource getCrate(final ProtocolContext context) {
+
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+
+    final var crateNameAndVersionPair = CrateUtils.extractCrateNameAndVersion(context);
+
+    return this.cargoStorageService.getCrate(
+        repoInfo.getStorageKey(),
+        repoInfo.getName(),
+        crateNameAndVersionPair.getFirst(),
+        crateNameAndVersionPair.getSecond());
   }
 
   /**

@@ -31,6 +31,7 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.util.UUID;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -137,6 +139,34 @@ class AbstractRubyHeadHandlerTest {
     when(this.facade.gemFileExists(any(), eq("demo-1.0.0.gem"))).thenReturn(false);
 
     assertThat(this.headOf("/gems/demo-1.0.0.gem")).isNull();
+  }
+
+  @Test
+  @DisplayName("every existing path answers the Content-Type its GET sends (RPS-1465)")
+  void existingPathsMirrorGetContentType() throws Exception {
+    when(this.facade.gemExists(any(), eq("demo"))).thenReturn(true);
+    when(this.facade.gemFileExists(any(), eq("demo-1.0.0.gem"))).thenReturn(true);
+    when(this.facade.gemspecExists(any(), eq("demo-1.0.0"))).thenReturn(true);
+
+    assertThat(this.contentTypeOf("/names")).isEqualTo(MediaType.TEXT_PLAIN);
+    assertThat(this.contentTypeOf("/versions")).isEqualTo(MediaType.TEXT_PLAIN);
+    assertThat(this.contentTypeOf("/info/demo")).isEqualTo(MediaType.TEXT_PLAIN);
+    assertThat(this.contentTypeOf("/gems/demo-1.0.0.gem"))
+        .isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
+    assertThat(this.contentTypeOf("/quick/Marshal.4.8/demo-1.0.0.gemspec.rz"))
+        .isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
+    assertThat(this.contentTypeOf("/specs.4.8.gz")).isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
+    assertThat(this.contentTypeOf("/latest_specs.4.8.gz"))
+        .isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
+    assertThat(this.contentTypeOf("/prerelease_specs.4.8.gz"))
+        .isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
+  }
+
+  private @Nullable MediaType contentTypeOf(final String path) throws Exception {
+    return this.handler()
+        .handle(contextFor(path), new MockHttpServletRequest(), new MockHttpServletResponse())
+        .getHeaders()
+        .getContentType();
   }
 
   private String headOf(final String path) throws Exception {

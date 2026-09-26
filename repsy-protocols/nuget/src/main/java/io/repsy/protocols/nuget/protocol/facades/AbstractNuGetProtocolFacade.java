@@ -164,9 +164,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var packageId = extractPackageId(context);
     final var packageIdVersion = extractPackageIdAndVersion(context);
-    final var resource =
-        this.storageService.getNuPkg(
-            repoInfo.getStorageKey(), packageIdVersion.id(), packageIdVersion.version());
+    final var resource = this.getNuPackage(context);
 
     try {
       this.packageService.incrementDownloadCount(repoInfo, packageId, packageIdVersion.version());
@@ -179,6 +177,16 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
     }
 
     return resource;
+  }
+
+  @Override
+  public Resource getNuPackage(final ProtocolContext context) {
+
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var packageIdVersion = extractPackageIdAndVersion(context);
+
+    return this.storageService.getNuPkg(
+        repoInfo.getStorageKey(), packageIdVersion.id(), packageIdVersion.version());
   }
 
   @Override

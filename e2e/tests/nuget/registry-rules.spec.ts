@@ -32,12 +32,18 @@
  *    so a deploy token works as an api key but a user/admin PASSWORD does not -- H7.
  */
 import { RepoType } from '../../src/api/panel-api.js';
+import { expectHeadMirrorsGet } from '../../src/clients/head-parity.js';
 import { nugetAdapter } from '../../src/clients/nuget.js';
 import {
   adminCredential,
   authHeader,
   buildNupkg,
   nugetErrorMessage,
+  nugetReadHeaders,
+  nupkgPath,
+  nuspecPath,
+  registrationIndexPath,
+  versionsPath,
   normalizeVersion,
   parseServiceIndex,
   parseVersions,
@@ -466,6 +472,63 @@ test.describe('nuget registry rules (raw HTTP)', () => {
       expect(parseVersions((await rawGetVersions(layout.repoName, admin, idLower)).body)).toEqual([
         version,
       ]);
+    },
+  );
+
+  test(
+    'a HEAD answers the status and headers of its GET, for the package files and the JSON routes, ' +
+      'and 404 for what is missing (RPS-1465)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'head');
+      const admin = adminCredential();
+      const version = nugetAdapter.version('release');
+      const bytes = buildNupkg({ packageId: layout.packageId, version, marker: 'head' });
+      expectPublish(await rawPublish(layout.repoName, admin, bytes), 201, undefined);
+      const idLower = layout.packageId.toLowerCase();
+      const verLower = normalizeVersion(version);
+      const headers = nugetReadHeaders(admin);
+      const at = (relPath: string): string => repoUrl(layout.repoName, relPath);
+
+      await expectHeadMirrorsGet('the .nupkg', at(nupkgPath(idLower, verLower)), headers, {
+        contentLength: true,
+      });
+      await expectHeadMirrorsGet('the .nuspec', at(nuspecPath(idLower, verLower)), headers, {
+        contentLength: true,
+      });
+      await expectHeadMirrorsGet('the version list', at(versionsPath(idLower)), headers, {
+        contentLength: false,
+      });
+      await expectHeadMirrorsGet(
+        'the registration index',
+        at(registrationIndexPath(idLower)),
+        headers,
+        { contentLength: false },
+      );
+      // The service index needs no credential, HEAD or GET (a private repo included).
+      await expectHeadMirrorsGet(
+        'the service index',
+        at('v3/index.json'),
+        {},
+        {
+          contentLength: false,
+        },
+      );
+
+      for (const missing of [
+        nupkgPath(idLower, '9.9.9'),
+        nuspecPath(idLower, '9.9.9'),
+        versionsPath(`${idLower}-missing`),
+        registrationIndexPath(`${idLower}-missing`),
+      ]) {
+        const res = await fetch(at(missing), { method: 'HEAD', headers });
+        expect(res.status, `HEAD ${missing} of something never published`).toBe(404);
+        expect(res.headers.get('content-disposition'), 'not named f.txt').toBeNull();
+      }
+
+      // The same credential rules as the GET: no credentials on a private repo is a 401.
+      const anonymous = await fetch(at(nupkgPath(idLower, verLower)), { method: 'HEAD' });
+      expect(anonymous.status, 'HEAD of a private package without credentials').toBe(401);
     },
   );
 });

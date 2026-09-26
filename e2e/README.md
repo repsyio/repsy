@@ -238,11 +238,11 @@ e2e/
       matrix/*.spec.ts          # lockfile, dist-tags, deprecate, view, registry-endpoints (whoami/ping/search/audit), scoped-routing, tarball-host, abbreviated-metadata, wire
     cargo/
       publish-consume.spec.ts   # registerPublishConsumeLoop(cargoAdapter) + a hyphenated-crate-name real-client test
-      registry-rules.spec.ts    # raw-HTTP pins of the duplicate-version/version-validation/config.json/name-normalisation rules
+      registry-rules.spec.ts    # raw-HTTP pins of the duplicate-version/version-validation/config.json/name-normalisation rules, HEAD mirroring GET (RPS-1465)
       install-add.spec.ts       # the commands the panel advertises: `cargo install` of a binary crate (built and run), `cargo add`, `cargo login`/`logout`, `cargo search --limit` (RPS-1486)
     nuget/
       publish-consume.spec.ts   # registerPublishConsumeLoop(nugetAdapter) + api-key-only-push and mixed-case-id real-client tests
-      registry-rules.spec.ts    # raw-HTTP pins of the 409/422 override & version-kind rules, service index, X-NuGet-ApiKey (H7)
+      registry-rules.spec.ts    # raw-HTTP pins of the 409/422 override & version-kind rules, service index, X-NuGet-ApiKey (H7), HEAD mirroring GET (RPS-1465)
       transitive-resolution.spec.ts # a real `dotnet restore` of a project that references only A resolves A's nuspec dependencies (ranges, target-framework groups, unlisted, SemVer 2.0.0) from Repsy (RPS-1479)
       client-commands.spec.ts   # `dotnet add package` (the panel snippets), `dotnet nuget delete` (unlist), a real `dotnet pack --include-symbols` round trip and the `.snupkg` push (RPS-1486)
     docker/
@@ -272,7 +272,7 @@ e2e/
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload) + G1/G2/G10 candidates
     ruby/
       publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install (RPS-1233, fixed)/gem-fetch (RPS-1234, fixed), anonymous-push, yank (RPS-1235, fixed), USER-role-push, bundle-install-e2e real-client tests
-      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow incl. RPS-1238 fixed, specs.4.8.gz gzip framing (RPS-1234, fixed), gemspec.rz (RPS-1233, fixed), HEAD mirrors GET (RPS-1237, fixed), platform gem, RPS-1236 fixed) -- no remaining test.fail() pins
+      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow incl. RPS-1238 fixed, specs.4.8.gz gzip framing (RPS-1234, fixed), gemspec.rz (RPS-1233, fixed), HEAD mirrors GET (RPS-1237, fixed; its Content-Type too, RPS-1465), platform gem, RPS-1236 fixed) -- no remaining test.fail() pins
       transitive-resolution.spec.ts # RPS-1479 gem A -> B -> C: real bundle install/--frozen/update and gem install resolve the graph from Repsy's /info; requirement shapes, yank, platform gem
     api/
       port-separation.spec.ts   # RPS-1480 /api/** is not served on the protocol port (404 unknownPath); /v2/ and a Maven path on the api port are the SPA, not the protocol
@@ -3885,9 +3885,11 @@ run `uv publish --trusted-publishing never --publish-url <repo>/`, `resolve` run
   404, `uv lock` has no solution, an old lock fails on the 404, and a re-published wheel (fresh bytes)
   is refused by the old lock's hash until it is re-locked. A ranged GET of a wheel answers `206` with
   the right slice.
-- Observed, not pinned (no ticket): a `HEAD` of a wheel answers `200` with neither `Content-Length` nor
-  `Accept-Ranges` (the `GET` has both), so uv's range-request fast path logs "Range requests not
-  supported" and streams the whole wheel (`uv pip install -v`). Performance only.
+- **HEAD of a wheel** (U8, U10; RPS-1562, fixed): a `HEAD` answers the `GET`'s `Content-Length`,
+  `Content-Type`, `Content-Disposition` and `Accept-Ranges: bytes`, with no body. Before, it answered `200`
+  with neither `Content-Length` nor `Accept-Ranges`, so uv's range-request fast path logged "Range
+  requests not supported" and streamed the whole wheel; U10 runs `uv pip install -v` and checks the
+  message is gone.
 
 ## Go runner
 
@@ -3944,8 +3946,8 @@ immutability + no storage side effect under BOTH `allowOverride` settings (R4/H9
 errors leaving nothing stored (R5); `@v/list`'s real-semver sort and text/plain-404-for-unknown-module
 shape (R8, RPS-1428); `@latest`'s DB-backed highest-version selection (R9); a malformed module path's bodyless
 400 (R11); `sumdb/supported` 404ing on both ports (R12/G9); over-long module-path/version refusal
-(R13); a deleted version's clean re-upload, never a `410` (R14/RPS-1230); `HEAD` always 404ing,
-the opposite of pypi's always-200 quirk (R15/H17); and that `releases`/`snapshots` are never read
+(R13); a deleted version's clean re-upload, never a `410` (R14/RPS-1230); `HEAD` answering the status
+and headers of its `GET` for every module file (R15/H17, RPS-1465; it was a `404` for every path); and that `releases`/`snapshots` are never read
 (R16). Three backend bug candidates are pinned with `test.fail()` (G1/G2/G10, below).
 
 ### H1-H20, confirmed live
@@ -4000,8 +4002,10 @@ BEFORE any adapter code was written — H1-H4 and H12 gated the whole design.
 - **H16** (`v0.<secs>.<seq>` is accepted by both Repsy and Go; `@latest` returns it when it is the
   only version): confirmed live.
 - **H17** (what the router answers to `HEAD .../@v/<v>.info`): confirmed live — `404`, not pypi's
-  `200` (see R15 above; neither protocol method handler lists `HEAD` among its supported methods, so
-  the router has nothing to dispatch to).
+  `200` (see R15 above; neither protocol method handler listed `HEAD` among its supported methods, so
+  the router had nothing to dispatch to). **RPS-1465 (fixed)**: `AbstractGoHeadProtocolMethodHandler`
+  answers a `HEAD` like the `GET` (status, `Content-Type`, `Content-Disposition`, `Content-Length`,
+  the plain-text `404`), and R15 now pins that.
 - **H18** (a mixed-case module path real round trip): confirmed live —
   `publish-consume.spec.ts`'s dedicated test: a real `go mod download -json` of a module path with a
   mixed-case last segment succeeds and reports back the ORIGINAL (not lower-cased) path in its own
@@ -4326,7 +4330,9 @@ unknownPath`. Broke `gem install --source`/`gem fetch`; did NOT break `bundle in
   (the pypi/nuget analogue). Fixed: `AbstractRubyHeadHandler` now dispatches per path kind with
   existence-only checks (`gemExists`/`gemFileExists`/`gemspecExists` on the facade, the `.gem` case
   reusing RPS-1236's `findByGemFilename` resolver) and mirrors the matching `GET` route's `200`/`404`.
-  `registry-rules.spec.ts`'s dedicated test now asserts the mirrored status directly.
+  `registry-rules.spec.ts`'s dedicated test now asserts the mirrored status directly. **RPS-1465
+  (fixed)**: the `HEAD` answers the `Content-Type` of its `GET` too (`text/plain` for `/names`,
+  `/versions`, `/info/<gem>`, `application/octet-stream` for the rest), which the same test asserts.
 - **RB-7** (observation from source, not independently forced live) — `RubyGemDownloadHandler`'s
   `downloadGem` swallows every exception (`catch (Exception)`) into a bodyless `404`, so a genuine
   server error (a storage backend outage, say) would be indistinguishable from "this gem does not
