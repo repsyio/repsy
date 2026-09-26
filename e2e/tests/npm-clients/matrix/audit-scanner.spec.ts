@@ -37,9 +37,8 @@
  * npm alone also checks that the report follows the repository's scan setting: with it off, the very
  * same audit that just failed reports nothing (README "Auditing npm packages").
  */
-import path from 'node:path';
-
-import { bunClient, bunExec } from '../../../src/clients/npm-family/bun-client.js';
+import { bunClient } from '../../../src/clients/npm-family/bun-client.js';
+import { DRIVERS, type AuditDriver } from '../../../src/clients/npm-family/audit-drivers.js';
 import type { ClientCtx, NpmFamilyClient } from '../../../src/clients/npm-family/client.js';
 import {
   newRepo,
@@ -48,12 +47,9 @@ import {
   renderConsumer,
   tokenBinding,
 } from '../../../src/clients/npm-family/fixtures.js';
-import { npmClient, runNpm } from '../../../src/clients/npm-family/npm-client.js';
-import { runPnpm } from '../../../src/clients/npm-family/pnpm-client.js';
+import { npmClient } from '../../../src/clients/npm-family/npm-client.js';
 import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
-import { execYarn } from '../../../src/clients/npm-family/yarn-berry-client.js';
-import type { RunResult } from '../../../src/clients/exec.js';
 import type { PanelBackend } from '../../../src/api/panel-backend.js';
 import type { Seeder, SeededRepo } from '../../../src/seed/seeder.js';
 import {
@@ -72,131 +68,6 @@ const CVE = 'CVE-2099-7001';
 const DESCRIPTION = 'Prototype pollution in lib';
 const VULNERABLE = '1.0.0';
 const FIXED = '2.0.0';
-
-/** What every client's report says about the one advisory, whatever its format. */
-interface Advisory {
-  severity: string;
-  title: string;
-  url: string;
-  vulnerableVersions: string;
-}
-
-/** A client's audit at a threshold ("nothing below critical counts"), and how it prints its report. */
-interface AuditDriver {
-  /** `<client> audit` with the severity threshold set to `critical`, in the client's own flag. */
-  atCritical(ctx: ClientCtx): Promise<RunResult>;
-  /** The advisories of `package` in the report `client.audit` printed. */
-  advisories(stdout: string, packageName: string): Advisory[];
-  /** Whether the report says the tree has no vulnerability at all. */
-  isClean(stdout: string): boolean;
-}
-
-const NPM_ARGS = (ctx: ClientCtx): string[] => [
-  '--userconfig',
-  path.join(ctx.home, '.npmrc'),
-  '--cache',
-  path.join(ctx.home, 'npm-cache'),
-];
-
-const DRIVERS: Record<string, AuditDriver> = {
-  // npm 7+ report: `vulnerabilities.<name>.via[]` holds the advisories, `metadata.vulnerabilities` the counts.
-  npm: {
-    atCritical: (ctx) =>
-      runNpm(ctx, 'npm-audit-critical', [
-        'audit',
-        '--json',
-        '--audit-level=critical',
-        ...NPM_ARGS(ctx),
-      ]),
-    advisories: (stdout, name) => {
-      const report = JSON.parse(stdout) as {
-        vulnerabilities: Record<
-          string,
-          { via: { title?: string; url?: string; severity: string; range: string }[] }
-        >;
-      };
-      return (report.vulnerabilities[name]?.via ?? []).map((via) => ({
-        severity: via.severity,
-        title: via.title ?? '',
-        url: via.url ?? '',
-        vulnerableVersions: via.range,
-      }));
-    },
-    isClean: (stdout) => {
-      const report = JSON.parse(stdout) as { metadata: { vulnerabilities: { total: number } } };
-      return report.metadata.vulnerabilities.total === 0;
-    },
-  },
-  // pnpm answers the npm 6 report: `advisories.<id>` and per-severity counts.
-  pnpm: {
-    atCritical: (ctx) =>
-      runPnpm(ctx, 'pnpm-audit-critical', ['audit', '--json', '--audit-level', 'critical']),
-    advisories: (stdout, name) => {
-      const report = JSON.parse(stdout) as {
-        advisories: Record<
-          string,
-          {
-            module_name: string;
-            title: string;
-            url: string;
-            severity: string;
-            vulnerable_versions: string;
-          }
-        >;
-      };
-      return Object.values(report.advisories)
-        .filter((advisory) => advisory.module_name === name)
-        .map((advisory) => ({
-          severity: advisory.severity,
-          title: advisory.title,
-          url: advisory.url,
-          vulnerableVersions: advisory.vulnerable_versions,
-        }));
-    },
-    isClean: (stdout) =>
-      Object.keys((JSON.parse(stdout) as { advisories: object }).advisories).length === 0,
-  },
-  // bun prints the bare map `{<name>: [advisory]}`, not npm's report.
-  bun: {
-    // Text mode: `--json --audit-level=critical` still lists the advisory and exits 1 (bun 1.3.14).
-    atCritical: (ctx) => bunExec(ctx, 'bun-audit-critical', ['audit', '--audit-level=critical']),
-    advisories: (stdout, name) => {
-      const report = JSON.parse(stdout) as Record<
-        string,
-        { title: string; url: string; severity: string; vulnerable_versions: string }[]
-      >;
-      return (report[name] ?? []).map((advisory) => ({
-        severity: advisory.severity,
-        title: advisory.title,
-        url: advisory.url,
-        vulnerableVersions: advisory.vulnerable_versions,
-      }));
-    },
-    isClean: (stdout) => Object.keys(JSON.parse(stdout) as object).length === 0,
-  },
-  // berry has no JSON report worth parsing here: its own tree of `Issue:` / `URL:` / ... lines.
-  'yarn-berry': {
-    atCritical: (ctx) =>
-      execYarn(ctx, 'yarn4-audit-critical', ['npm', 'audit', '--severity', 'critical']),
-    advisories: (stdout, name) => {
-      const block = stdout.split(/^└─ |^├─ /m).find((part) => part.startsWith(name));
-      if (!block) {
-        return [];
-      }
-      const field = (label: string): string =>
-        new RegExp(`${label}: (.*)`).exec(block)?.[1]?.trim() ?? '';
-      return [
-        {
-          severity: field('Severity'),
-          title: field('Issue'),
-          url: field('URL'),
-          vulnerableVersions: field('Vulnerable Versions'),
-        },
-      ];
-    },
-    isClean: (stdout) => stdout.includes('No audit suggestions'),
-  },
-};
 
 /** The clients under test: every one whose matrix has an audit, plus bun (its own report shape). */
 const AUDIT_CLIENTS: readonly NpmFamilyClient[] = [...clientsWith('auditCmd'), bunClient];

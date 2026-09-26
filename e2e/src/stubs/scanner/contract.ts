@@ -22,7 +22,8 @@
  * follow fails the trivy leg, and a stub that stops following the list fails the skeleton run.
  *
  * Only what the real service does and the backend depends on is pinned: statuses, the 401 and 404
- * bodies and the JSON shape of a job. The text of a 400/415 body is Spring's own (and differs between the
+ * bodies, the JSON shape of a job and the request checks and answer shape of `POST /advisories`
+ * (RPS-1613; what it FINDS is not common: the real one reads Trivy's database, the stub a script). The text of a 400/415 body is Spring's own (and differs between the
  * two: the real one has none of its own `message` for a missing part), so it is not compared.
  */
 import zlib from 'node:zlib';
@@ -195,6 +196,29 @@ export function expectFindingShape(finding: Record<string, unknown>): void {
   expect(['number', 'object'], 'cvssScore').toContain(typeof finding.cvssScore);
 }
 
+/** `POST /advisories` with the key; `body` as given (a string is sent as is), JSON unless said otherwise. */
+export async function postAdvisories(
+  target: ContractTarget,
+  body: unknown,
+  contentType = 'application/json',
+): Promise<Response> {
+  return fetch(`${target.base}/advisories`, {
+    method: 'POST',
+    headers: { [KEY_HEADER]: target.apiKey, 'content-type': contentType },
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+    signal: AbortSignal.timeout(60_000),
+  });
+}
+
+/** The body of a 200 of `POST /advisories`. */
+export interface AdvisoryBody {
+  dbUpdatedAt: string | null;
+  scannerVersion: string | null;
+  findings: Record<string, unknown>[];
+}
+
+const NPM_PAIR = { name: 'left-pad', version: '1.3.0' };
+
 /** How long the accepted scan of the last case may take (the real scanner runs Trivy on it). */
 export const ACCEPTED_SCAN_TIMEOUT_MS = 180_000;
 
@@ -213,6 +237,7 @@ export const CONTRACT_CASES: ContractCase[] = [
       for (const [method, path] of [
         ['POST', '/scan'],
         ['GET', '/scan/x'],
+        ['POST', '/advisories'],
       ]) {
         const anonymous = await fetch(`${target.base}${path}`, { method });
         expect(anonymous.status, `${method} ${path} without a key`).toBe(401);
@@ -293,6 +318,107 @@ export const CONTRACT_CASES: ContractCase[] = [
       expect(done.status, `an empty package is scanned: ${done.errorMessage}`).toBe('COMPLETED');
       expectJobShape(done, scanId);
       expect(done.result?.findings, 'nothing to find in an empty package').toEqual([]);
+    },
+  },
+  {
+    name: 'POST /advisories: a body that is not JSON is a 415, and every malformed request a 400 with a message',
+    async run(target) {
+      const notJson = await postAdvisories(target, 'ecosystem=npm', 'text/plain');
+      expect(notJson.status, 'a body that is not JSON').toBe(415);
+
+      const requests: Array<[string, unknown]> = [
+        ['a JSON syntax error', '{"ecosystem":'],
+        ['an empty JSON body', ''],
+        ['another ecosystem', { ecosystem: 'maven', packages: [] }],
+        ['no ecosystem', { packages: [] }],
+        ['no packages', { ecosystem: 'npm' }],
+        ['a blank name', { ecosystem: 'npm', packages: [{ name: ' ', version: '1.0.0' }] }],
+        ['a blank version', { ecosystem: 'npm', packages: [{ name: 'a', version: '' }] }],
+        [
+          'a name with a slash and no scope',
+          { ecosystem: 'npm', packages: [{ name: 'a/b', version: '1' }] },
+        ],
+        ['a scope and no name', { ecosystem: 'npm', packages: [{ name: '@a/', version: '1' }] }],
+        ['a second slash', { ecosystem: 'npm', packages: [{ name: '@a/b/c', version: '1' }] }],
+        [
+          'a name of 215 characters',
+          { ecosystem: 'npm', packages: [{ name: 'a'.repeat(215), version: '1' }] },
+        ],
+        [
+          'a version of 257 characters',
+          { ecosystem: 'npm', packages: [{ name: 'a', version: '1'.repeat(257) }] },
+        ],
+        [
+          'a control character in the version',
+          { ecosystem: 'npm', packages: [{ name: 'a', version: '1\u0007' }] },
+        ],
+        ['a null pair', { ecosystem: 'npm', packages: [null] }],
+      ];
+      for (const [label, body] of requests) {
+        const response = await postAdvisories(target, body);
+        expect(response.status, label).toBe(400);
+        const answer = (await response.json()) as { message?: unknown };
+        expect(typeof answer.message, `${label}: the 400 says why`).toBe('string');
+      }
+    },
+  },
+  {
+    name: 'POST /advisories: more than 20,000 pairs, or a body over 10 MiB, is a 413; exactly 20,000 pairs is not',
+    async run(target) {
+      const pairs = (count: number): unknown => ({
+        ecosystem: 'npm',
+        packages: Array.from({ length: count }, (_, index) => ({
+          name: 'contract-many',
+          version: `1.0.${index}`,
+        })),
+      });
+      const tooMany = await postAdvisories(target, pairs(20_001));
+      expect(tooMany.status).toBe(413);
+      expect(typeof ((await tooMany.json()) as { message?: unknown }).message).toBe('string');
+
+      const tooBig = await postAdvisories(target, ' '.repeat(10 * 1024 * 1024 + 1));
+      expect(tooBig.status, 'a body of 10 MiB and a byte').toBe(413);
+
+      // At the limit the request is valid: it is answered (200), or refused as busy (503) by a real
+      // scanner that is running a scan at that moment, but never as too large or malformed.
+      const atLimit = await postAdvisories(target, pairs(20_000));
+      expect([200, 503, 504]).toContain(atLimit.status);
+    },
+  },
+  {
+    name: 'POST /advisories: an empty list is a 200 {dbUpdatedAt, scannerVersion, findings: []}',
+    async run(target) {
+      const response = await postAdvisories(target, { ecosystem: 'npm', packages: [] });
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as AdvisoryBody;
+      expect(Object.keys(body).sort(), 'the fields of the answer').toEqual([
+        'dbUpdatedAt',
+        'findings',
+        'scannerVersion',
+      ]);
+      expect(body.findings).toEqual([]);
+      expect(['string', 'object'], 'dbUpdatedAt').toContain(typeof body.dbUpdatedAt);
+      expect(['string', 'object'], 'scannerVersion').toContain(typeof body.scannerVersion);
+    },
+  },
+  {
+    name: 'POST /advisories: a pair the database knows nothing of is a 200 with no finding, and the answer has the fields of the contract',
+    async run(target) {
+      // Retried for a real scanner that answers 503 while a scan holds its database.
+      let response = await postAdvisories(target, { ecosystem: 'npm', packages: [NPM_PAIR] });
+      for (let attempt = 0; response.status === 503 && attempt < 30; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1_000));
+        response = await postAdvisories(target, { ecosystem: 'npm', packages: [NPM_PAIR] });
+      }
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as AdvisoryBody;
+      expect(Object.keys(body).sort()).toEqual(['dbUpdatedAt', 'findings', 'scannerVersion']);
+      expect(typeof body.dbUpdatedAt, 'a lookup names the database it read').toBe('string');
+      expect(Number.isNaN(Date.parse(body.dbUpdatedAt as string))).toBe(false);
+      expect(body.findings.filter((finding) => finding.packageName === NPM_PAIR.name)).toEqual([]);
+      for (const finding of body.findings) {
+        expectFindingShape(finding);
+      }
     },
   },
 ];

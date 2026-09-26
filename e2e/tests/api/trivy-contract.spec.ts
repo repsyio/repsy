@@ -30,6 +30,11 @@
  *     `repsy:9090/<repo>/<image>:<tag>` and a registry token, and Trivy pulls the image from Repsy
  *     itself (`DOCKER_INTERNAL_REGISTRY_BASE_URL` of the overlay).
  *
+ *  4. One real `npm audit` through the advisory lookup (RPS-1613): a project whose lockfile pins
+ *     `lodash@4.17.20`, a pair that Repsy stores nowhere and never scanned, audited with the real npm client
+ *     against an empty Repsy npm repository, reports CVE-2021-23337 from Trivy's own database. The stub
+ *     leg of the same feature is `tests/npm-clients/matrix/audit-lookup-scanner.spec.ts`.
+ *
  * Needs the network: Trivy keeps its vulnerability database in a volume of the stack and downloads it
  * when the scanner starts (readiness holds until that is done, bounded here by `READY_TIMEOUT_MS`). A
  * red run whose failure message mentions the download ("failed to download", "OCI artifact error",
@@ -53,6 +58,9 @@ import {
   rawUploadBlob,
   sha256Hex,
 } from '../../src/clients/docker-raw.js';
+import { DRIVERS, renderLockfileOnlyConsumer } from '../../src/clients/npm-family/audit-drivers.js';
+import { tokenBinding } from '../../src/clients/npm-family/fixtures.js';
+import { npmClient } from '../../src/clients/npm-family/npm-client.js';
 import { buildPublishDocument, rawPublish } from '../../src/clients/npm-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import { optedIn } from '../../src/stack-overlays.js';
@@ -236,6 +244,59 @@ test.describe('the real repsy-scanner-trivy', { tag: ['@trivy'] }, () => {
 
       expect(response.status).toBe(200);
       expect(response.json.findings).toEqual([]);
+    });
+  });
+
+  // RPS-1613: an audit of a pair that is stored nowhere, answered by the advisory lookup of the REAL
+  // scanner through Repsy (RPS-1612), with the real npm client and no stub anywhere.
+  test.describe('npm audit through the advisory lookup', () => {
+    test('npm audit of a lockfile that pins lodash 4.17.20, which Repsy stores nowhere, reports CVE-2021-23337', async ({
+      panelApi,
+      seeder,
+    }) => {
+      const repo = await seeder.createRepo(RepoType.NPM);
+      expect((await panelApi.getSettings(repo.name)).securityScanEnabled, 'scanning is on').toBe(
+        true,
+      );
+      const consumer = await npmClient.prepare('trivy-audit', [
+        await tokenBinding(seeder, repo.name, { readOnly: true }),
+      ]);
+      await renderLockfileOnlyConsumer('npm', consumer.work, { [LODASH.name]: LODASH.version });
+      const driver = DRIVERS.npm as (typeof DRIVERS)[string];
+
+      // The lookup is best-effort: while the scanner runs a scan it holds its database and answers 503,
+      // and Repsy then answers the audit without it (README "Auditing npm packages"). Audit again then.
+      let last = { exitCode: 0, stdout: '', stderr: '', command: '' };
+      await expect
+        .poll(
+          async () => {
+            const result = await npmClient.audit?.(consumer);
+            last = {
+              exitCode: result?.exitCode ?? -1,
+              stdout: result?.stdout ?? '',
+              stderr: result?.stderr ?? '',
+              command: result?.command ?? '',
+            };
+            return driver.advisories(last.stdout, LODASH.name).length;
+          },
+          {
+            message: `npm audit reports ${LODASH.cve} for ${LODASH.name}@${LODASH.version}`,
+            timeout: 90_000,
+            intervals: [1_000, 2_000, 5_000],
+          },
+        )
+        .toBeGreaterThan(0);
+
+      expect(last.exitCode, `audit: ${last.command}\n${last.stderr}`).not.toBe(0);
+      expect(driver.isClean(last.stdout), 'the report is not clean').toBe(false);
+      const advisories = driver.advisories(last.stdout, LODASH.name);
+      const advisory = advisories.find((candidate) => candidate.title.startsWith(`${LODASH.cve}:`));
+      expect(
+        advisories.map((candidate) => candidate.title),
+        `${LODASH.name}@${LODASH.version} has ${LODASH.cve}`,
+      ).toContainEqual(expect.stringContaining(LODASH.cve));
+      expect(advisory).toMatchObject({ severity: 'high', vulnerableVersions: LODASH.version });
+      expect(advisory?.url, 'the advisory links to its reference').toMatch(/^https?:\/\//);
     });
   });
 

@@ -20,9 +20,10 @@
  * use it, and only when the stack was started with the scanner overlay
  * (`./run.sh local up --scanner`, README.md "Scanner stack").
  */
-import type { RecordedCall, StubScript } from './server.ts';
+import type { AdvisoryScript } from './advisories.ts';
+import type { RecordedAdvisoryCall, RecordedCall, StubScript } from './server.ts';
 
-export type { RecordedCall, StubScript };
+export type { AdvisoryScript, RecordedAdvisoryCall, RecordedCall, StubScript };
 
 /** The API key the overlay gives the stub and the backend unless `REPSY_SCANNER_API_KEY` says otherwise. */
 export const DEFAULT_SCANNER_API_KEY = 'e2e-scanner-key';
@@ -88,5 +89,27 @@ export class ScannerStubClient {
 
   async clearScript(artifactName: string): Promise<void> {
     await this.call('DELETE', `/control/scripts?artifactName=${encodeURIComponent(artifactName)}`);
+  }
+
+  /**
+   * Says how `POST /advisories` answers the pairs of exactly `packageName` from now on (until
+   * `clearAdvisories`): the findings the "database" holds per version, and `outcome` for a 503, 504 or
+   * garbled answer (`src/stubs/scanner/advisories.ts`).
+   */
+  async advisories(packageName: string, script: AdvisoryScript): Promise<void> {
+    await this.call('PUT', '/control/advisories', { packageName, script });
+  }
+
+  async clearAdvisories(packageName: string): Promise<void> {
+    await this.call('DELETE', `/control/advisories?packageName=${encodeURIComponent(packageName)}`);
+  }
+
+  /** Every `POST /advisories` that asked about `packageName` (all lookups when omitted), oldest first. */
+  async advisoryCalls(packageName?: string): Promise<RecordedAdvisoryCall[]> {
+    const query = packageName ? `?packageName=${encodeURIComponent(packageName)}` : '';
+    const body = (await this.call('GET', `/control/advisory-calls${query}`)) as {
+      calls: RecordedAdvisoryCall[];
+    };
+    return body.calls;
   }
 }
