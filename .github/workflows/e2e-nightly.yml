@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack, plus the full catalog of one rotating runner), scanner (the @scanner UI specs against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack) or all"
+        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack, plus the full catalog of one rotating runner), scanner (the @scanner specs of the ui runner and of the npm-clients, docker, maven and pypi runners against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack) or all"
         type: choice
         options: [all, ui, wire, h2, scanner, throttle]
         default: all
@@ -94,8 +94,9 @@ jobs:
               "h2-full": ("h2", "--h2", [h2_full_runner], "", 60, "", True),
               # The stub scanner overlay (README.md "Scanner stack"): only the opted-in @scanner specs.
               # Never the whole ui suite there (its @mocked specs assume the scanner is off), so the
-              # grep input does not apply to this leg.
-              "scanner": ("scanner", "--scanner", ["ui"], "@scanner", 45, "scanner", False),
+              # grep input does not apply to this leg. The wire runners with @scanner specs (real npm,
+              # pnpm, yarn, bun, crane, mvn and twine clients, RPS-1484) run beside the ui one.
+              "scanner": ("scanner", "--scanner", ["ui", "npm-clients", "docker", "maven", "pypi"], "@scanner", 60, "scanner", False),
               # The auth-throttle overlay (README.md "Auth-throttle leg"): 3 failed password checks per
               # 10 s per client, so only the opted-in @throttle specs run there (any other suite would lock
               # itself out). The stack runner goes first and the ui runner LAST: AUTH-11 locks the docker
