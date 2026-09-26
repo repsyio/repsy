@@ -671,6 +671,44 @@ export function parseLeafDependencyGroups(body: Buffer): RegistrationDependencyG
   }));
 }
 
+/**
+ * The `catalogEntry.dependencyGroups` of one version as the registration INDEX inlines it
+ * (`rawGetRegistrationIndex`: `items[*].items[*].catalogEntry`, RPS-1555); `undefined` when the
+ * index has no leaf of that version, `[]` when the leaf carries no groups. A group without
+ * `dependencies` (an empty target-framework group) comes back with `dependencies: []`.
+ */
+export function parseIndexDependencyGroups(
+  body: Buffer,
+  version: string,
+): RegistrationDependencyGroup[] | undefined {
+  const parsed = JSON.parse(body.toString('utf8')) as {
+    items?: {
+      items?: {
+        catalogEntry?: {
+          version?: string;
+          dependencyGroups?: {
+            targetFramework?: string;
+            dependencies?: { id?: string; range?: string }[];
+          }[];
+        };
+      }[];
+    }[];
+  };
+  const leaf = (parsed.items ?? [])
+    .flatMap((page) => page.items ?? [])
+    .find((item) => item.catalogEntry?.version === version);
+  if (leaf === undefined) {
+    return undefined;
+  }
+  return (leaf.catalogEntry?.dependencyGroups ?? []).map((g) => ({
+    ...(g.targetFramework === undefined ? {} : { targetFramework: g.targetFramework }),
+    dependencies: (g.dependencies ?? []).map((d) => ({
+      id: d.id ?? '',
+      ...(d.range === undefined ? {} : { range: d.range }),
+    })),
+  }));
+}
+
 /** Raw `GET` of one version's own registration leaf, `v3/registration/<idLower>/<verLower>.json`
  *  (`NuGetRegistrationLeafResponse`; the registration INDEX inlines its own copy of every leaf). */
 export async function rawGetRegistrationLeaf(

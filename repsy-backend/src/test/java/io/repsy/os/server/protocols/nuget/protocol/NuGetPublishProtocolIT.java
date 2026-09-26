@@ -1800,7 +1800,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
 
       try (var utils = mockStatic(NuGetPackageUtils.class, Mockito.CALLS_REAL_METHODS)) {
         utils
-            .when(() -> NuGetPackageUtils.toDependenciesJson(any()))
+            .when(() -> NuGetPackageUtils.toDependencyGroupsJson(any()))
             .thenThrow(new IllegalStateException("mapper misconfigured"));
 
         NuGetPublishProtocolIT.this

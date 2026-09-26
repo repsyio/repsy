@@ -17,11 +17,14 @@ package io.repsy.protocols.nuget.shared.utils;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.nuget.protocol.facades.dtos.NuspecMetadata;
 import io.repsy.protocols.nuget.protocol.facades.dtos.PackageIdVersion;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafItem;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationPageItem;
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyGroupInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
@@ -37,6 +40,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -543,16 +547,29 @@ public final class NuGetPackageUtils {
   }
 
   /**
-   * Reads the dependencies the nuspec declares. A nuspec without a {@code <dependencies>} element
-   * declares none, so that is an empty list without a warning. A nuspec the XML parser rejects also
-   * yields an empty list, but with a warning naming the package: {@link #readNuspecMetadata(Path)}
-   * refuses such a nuspec before a publish gets here, so this only guards other callers. The
-   * warning carries no nuspec content.
+   * Reads the dependencies the nuspec declares, flattened: every dependency carries the target
+   * framework of its group. A group without dependencies contributes nothing here, use {@link
+   * #extractDependencyGroupsFromNuspec} to keep it.
    */
   public static List<NuGetDependencyInfo> extractDependenciesFromNuspec(
       final String nuspecXml, final String packageId, final String version) {
 
-    final var result = new ArrayList<NuGetDependencyInfo>();
+    return flatten(extractDependencyGroupsFromNuspec(nuspecXml, packageId, version));
+  }
+
+  /**
+   * Reads the dependency groups the nuspec declares, in document order, empty groups included
+   * (RPS-1555). A nuspec with the old flat format ({@code <dependency>} directly under {@code
+   * <dependencies>}) has one group without a target framework. A nuspec without a {@code
+   * <dependencies>} element declares none, so that is an empty list without a warning. A nuspec the
+   * XML parser rejects also yields an empty list, but with a warning naming the package: {@link
+   * #readNuspecMetadata(Path)} refuses such a nuspec before a publish gets here, so this only
+   * guards other callers. The warning carries no nuspec content.
+   */
+  public static List<NuGetDependencyGroupInfo> extractDependencyGroupsFromNuspec(
+      final String nuspecXml, final String packageId, final String version) {
+
+    final var result = new ArrayList<NuGetDependencyGroupInfo>();
 
     try {
       final var doc = parseNuspec(nuspecXml);
@@ -586,32 +603,34 @@ public final class NuGetPackageUtils {
   }
 
   private static void addNewGroupedFormats(
-      final List<NuGetDependencyInfo> result, final NodeList groups) {
+      final List<NuGetDependencyGroupInfo> result, final NodeList groups) {
 
     for (int i = 0; i < groups.getLength(); i++) {
       final var group = (Element) groups.item(i);
       final var tf = group.getAttribute("targetFramework");
       final var targetFramework = tf.isBlank() ? null : tf;
       final var deps = group.getElementsByTagName("dependency");
+      final var members = new ArrayList<NuGetDependencyInfo>();
 
       for (int j = 0; j < deps.getLength(); j++) {
         final var dep = (Element) deps.item(j);
         final var id = dep.getAttribute("id");
         final var version = dep.getAttribute("version");
         if (!id.isBlank()) {
-          final var info =
-              new NuGetDependencyInfo(id, version.isBlank() ? "" : version, targetFramework);
-          result.add(info);
+          members.add(
+              new NuGetDependencyInfo(id, version.isBlank() ? "" : version, targetFramework));
         }
       }
+      result.add(new NuGetDependencyGroupInfo(targetFramework, members));
     }
   }
 
   private static void addOldFlatFormats(
-      final List<NuGetDependencyInfo> result, final Element dependenciesEl) {
+      final List<NuGetDependencyGroupInfo> result, final Element dependenciesEl) {
 
     // Old flat format: <dependency> directly under <dependencies>
     final var deps = dependenciesEl.getElementsByTagName("dependency");
+    final var members = new ArrayList<NuGetDependencyInfo>();
 
     for (int i = 0; i < deps.getLength(); i++) {
       final var dep = (Element) deps.item(i);
@@ -619,32 +638,65 @@ public final class NuGetPackageUtils {
       final var version = dep.getAttribute("version");
 
       if (!id.isBlank()) {
-        result.add(new NuGetDependencyInfo(id, version.isBlank() ? "" : version, null));
+        members.add(new NuGetDependencyInfo(id, version.isBlank() ? "" : version, null));
       }
+    }
+    if (!members.isEmpty()) {
+      result.add(new NuGetDependencyGroupInfo(null, members));
     }
   }
 
+  /** Every dependency of every group, each carrying the target framework of its group. */
+  public static List<NuGetDependencyInfo> flatten(final List<NuGetDependencyGroupInfo> groups) {
+    return groups.stream().flatMap(g -> g.dependencies().stream()).toList();
+  }
+
+  /** The flat, legacy shape of the stored dependencies: {@code [{"packageId":..,...}]}. */
   public static String toDependenciesJson(final List<NuGetDependencyInfo> dependencies) {
     return OBJECT_MAPPER.writeValueAsString(dependencies);
   }
 
   /**
-   * Reads the dependencies stored for a package version. A {@code null} or blank value means the
-   * package declares none. A value that is there but cannot be read is a stored-data problem, not
-   * an absence of dependencies, so it is logged at {@code warn} with the package id and version.
-   * The value itself is left out of the log, and the caller still gets an empty list so one bad
-   * column does not fail the rest of the version.
+   * The value to store for the dependency groups of a package version. When every group has at
+   * least one dependency the flat list of {@link #toDependenciesJson} says everything (each
+   * dependency names its target framework), and that is what is stored, so those rows stay as they
+   * always were and readers that only know the flat list keep working. Only a group without
+   * dependencies needs the grouped shape {@code {"groups":[{"targetFramework":..,
+   * "dependencies":[..]}]}}, which {@link #parseDependencyGroupsJson} reads next to the flat one
+   * (RPS-1555).
    */
+  public static String toDependencyGroupsJson(final List<NuGetDependencyGroupInfo> groups) {
+
+    if (groups.stream().noneMatch(g -> g.dependencies().isEmpty())) {
+      return toDependenciesJson(flatten(groups));
+    }
+    return OBJECT_MAPPER.writeValueAsString(
+        new StoredGroups(groups.stream().map(StoredGroup::of).toList()));
+  }
+
+  /** Same as {@link #parseDependencyGroupsJson}, flattened. */
   public static List<NuGetDependencyInfo> parseDependenciesJson(
+      @Nullable final String json, final String packageId, final String version) {
+
+    return flatten(parseDependencyGroupsJson(json, packageId, version));
+  }
+
+  /**
+   * Reads the dependency groups stored for a package version, from the flat list of earlier
+   * versions (grouped by target framework, in order of first appearance) or from the grouped shape.
+   * A {@code null} or blank value means the package declares none. A value that is there but cannot
+   * be read is a stored-data problem, not an absence of dependencies, so it is logged at {@code
+   * warn} with the package id and version. The value itself is left out of the log, and the caller
+   * still gets an empty list so one bad column does not fail the rest of the version.
+   */
+  public static List<NuGetDependencyGroupInfo> parseDependencyGroupsJson(
       @Nullable final String json, final String packageId, final String version) {
 
     if (json == null || json.isBlank()) {
       return List.of();
     }
     try {
-      final List<NuGetDependencyInfo> dependencies =
-          OBJECT_MAPPER.readValue(json, new TypeReference<>() {});
-      return dependencies == null ? List.of() : dependencies;
+      return readDependencyGroups(json);
     } catch (final Exception e) {
       log.warn(
           "Ignoring unreadable dependencies of NuGet package {} {} ({} characters): {}",
@@ -655,6 +707,73 @@ public final class NuGetPackageUtils {
       return List.of();
     }
   }
+
+  private static List<NuGetDependencyGroupInfo> readDependencyGroups(final String json) {
+
+    final var node = OBJECT_MAPPER.readTree(json);
+
+    if (node.isArray()) {
+      final List<NuGetDependencyInfo> flat =
+          OBJECT_MAPPER
+              .readerFor(new TypeReference<List<NuGetDependencyInfo>>() {})
+              .readValue(node);
+      return groupByTargetFramework(flat);
+    }
+    if (node.path("groups").isArray()) {
+      return OBJECT_MAPPER.treeToValue(node, StoredGroups.class).groups().stream()
+          .map(StoredGroup::toInfo)
+          .toList();
+    }
+    if (node.isNull()) {
+      return List.of();
+    }
+    throw new IllegalArgumentException("Neither a dependency list nor dependency groups");
+  }
+
+  private static List<NuGetDependencyGroupInfo> groupByTargetFramework(
+      final List<NuGetDependencyInfo> flat) {
+
+    final var groups = new LinkedHashMap<String, List<NuGetDependencyInfo>>();
+    for (final var dep : flat) {
+      final var key = dep.targetFramework() != null ? dep.targetFramework() : "";
+      groups.computeIfAbsent(key, k -> new ArrayList<>()).add(dep);
+    }
+    return groups.entrySet().stream()
+        .map(
+            e ->
+                new NuGetDependencyGroupInfo(
+                    e.getKey().isEmpty() ? null : e.getKey(), e.getValue()))
+        .toList();
+  }
+
+  /** The grouped shape of the stored dependencies, see {@link #toDependencyGroupsJson}. */
+  private record StoredGroups(List<StoredGroup> groups) {}
+
+  @JsonInclude(Include.NON_NULL)
+  private record StoredGroup(
+      @Nullable String targetFramework, List<StoredDependency> dependencies) {
+
+    static StoredGroup of(final NuGetDependencyGroupInfo group) {
+      return new StoredGroup(
+          group.targetFramework(),
+          group.dependencies().stream()
+              .map(d -> new StoredDependency(d.packageId(), d.versionRange()))
+              .toList());
+    }
+
+    NuGetDependencyGroupInfo toInfo() {
+      return new NuGetDependencyGroupInfo(
+          this.targetFramework,
+          this.dependencies.stream()
+              .map(
+                  d ->
+                      new NuGetDependencyInfo(
+                          d.packageId(), d.versionRange(), this.targetFramework))
+              .toList());
+    }
+  }
+
+  private record StoredDependency(String packageId, String versionRange) {}
 
   public static List<NuGetRegistrationPageItem> buildRegistrationPages(
       final List<NuGetRegistrationLeafItem> leafItems, final String indexUrl) {

@@ -23,6 +23,7 @@ import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import java.util.Comparator;
 import java.util.List;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
@@ -46,18 +47,35 @@ public interface NuGetPackageConverter {
   @Mapping(source = "v.publishedAt", target = "publishedAt")
   @Mapping(target = "dependencies", ignore = true)
   @Mapping(target = "readme", ignore = true)
+  @Mapping(target = "dependencyGroups", ignore = true)
   NuGetVersionInfo toVersionInfo(NuGetPackageVersion v, String packageId);
 
   @Mapping(source = "version", target = "version")
   @Mapping(source = "downloadCount", target = "downloads")
   NuGetPackageSearchResult.VersionSummary toVersionSummary(NuGetPackageVersion v);
 
+  /**
+   * Adds the dependencies to the version: the registration index pages inline them in every leaf's
+   * catalog entry (RPS-1555). The README stays out, an index page holds up to 64 leaves.
+   */
+  default NuGetVersionInfo toRegistrationInfo(final NuGetPackageVersion v, final String packageId) {
+
+    return this.withDependencies(this.toVersionInfo(v, packageId), v, null);
+  }
+
   /** Adds the fields only the single-version view needs: the dependencies and the README. */
   default NuGetVersionInfo toVersionDetail(final NuGetPackageVersion v, final String packageId) {
 
-    final var base = this.toVersionInfo(v, packageId);
-    final var deps =
-        NuGetPackageUtils.parseDependenciesJson(v.getDependencies(), packageId, v.getVersion());
+    return this.withDependencies(this.toVersionInfo(v, packageId), v, v.getReadme());
+  }
+
+  private NuGetVersionInfo withDependencies(
+      final NuGetVersionInfo base, final NuGetPackageVersion v, final @Nullable String readme) {
+
+    final var groups =
+        NuGetPackageUtils.parseDependencyGroupsJson(
+            v.getDependencies(), base.packageId(), v.getVersion());
+    final var deps = NuGetPackageUtils.flatten(groups);
     return new NuGetVersionInfo(
         base.packageId(),
         base.version(),
@@ -73,7 +91,8 @@ public interface NuGetPackageConverter {
         base.downloadCount(),
         base.publishedAt(),
         deps.isEmpty() ? null : deps,
-        v.getReadme());
+        readme,
+        groups.isEmpty() ? null : groups);
   }
 
   default NuGetPackageSearchResult toSearchResult(

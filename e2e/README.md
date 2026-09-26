@@ -2768,8 +2768,9 @@ satisfies the dependency (`unlist` only flips `listed` on the registration), a S
 (`1.0.0-rc.1`) resolves although search hides it from a client without `semVerLevel`, and an
 unsatisfiable range fails the restore and names the package. The registration's
 `catalogEntry.dependencyGroups` (`NuGetResponseMapper.buildDependencyGroups`) is asserted on the
-per-version leaf document (`v3/registration/<id>/<ver>.json`); the leaves inlined into the
-registration INDEX carry none, and an empty group is dropped from it, which the suite does not pin.
+per-version leaf document (`v3/registration/<id>/<ver>.json`) and on the leaf the registration INDEX
+inlines (`parseIndexDependencyGroups`), an empty target-framework group included (no `dependencies`
+property, as on nuget.org): both used to lack it (RPS-1555).
 
 ### NuGet client commands (RPS-1486)
 

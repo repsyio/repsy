@@ -20,6 +20,12 @@ import java.util.List;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * A package version as the protocol and the panel see it. {@code dependencies} is the flat list
+ * (each dependency names the target framework of its group), {@code dependencyGroups} the groups
+ * the nuspec declared, empty ones included (RPS-1555). Either is {@code null} when the caller did
+ * not ask for dependencies.
+ */
 @NullMarked
 public record NuGetVersionInfo(
     String packageId,
@@ -36,4 +42,5 @@ public record NuGetVersionInfo(
     long downloadCount,
     Instant publishedAt,
     @Nullable List<NuGetDependencyInfo> dependencies,
-    @Nullable String readme) {}
+    @Nullable String readme,
+    @Nullable List<NuGetDependencyGroupInfo> dependencyGroups) {}

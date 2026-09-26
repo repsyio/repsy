@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -404,6 +405,81 @@ class NuGetReadBackProtocolIT extends AbstractIntegrationTest {
       assertThat(leaf.getHeader(CONTENT_DISPOSITION)).isNull();
       assertThat(versions.getHeader(CONTENT_DISPOSITION)).isNull();
       assertThat(index.getHeader(CONTENT_DISPOSITION)).isNull();
+    }
+
+    @Test
+    @DisplayName(
+        "the registration index inlines the dependency groups of every leaf, an empty target "
+            + "framework group included, and the leaf document agrees (RPS-1555)")
+    void registrationIndexCarriesDependencyGroups() throws Exception {
+      final var repo = NuGetReadBackProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var withGroups =
+          new Pkg(
+              id,
+              "1.0.0",
+              "groups",
+              """
+              <dependencies>
+                <group targetFramework="net10.0" />
+                <group targetFramework=".NETStandard2.0">
+                  <dependency id="Newtonsoft.Json" version="[13.0.3, )" />
+                  <dependency id="Serilog" />
+                </group>
+                <group targetFramework="net8.0">
+                  <dependency id="Serilog" version="3.1.1" />
+                </group>
+              </dependencies>
+              """);
+      final var without = new Pkg(id, "2.0.0", "none");
+      final var token = NuGetReadBackProtocolIT.this.adminProtocolBearerToken();
+
+      assertStatus(NuGetReadBackProtocolIT.this.pushAs(repo, withGroups.nupkg(), token), 201);
+      assertStatus(NuGetReadBackProtocolIT.this.pushAs(repo, without.nupkg(), token), 201);
+
+      final var index =
+          NuGetReadBackProtocolIT.this
+              .protocol(
+                  get(
+                          "/{repo}/v3/registration/{id}/index.json",
+                          repo.getName(),
+                          id.toLowerCase(Locale.ROOT))
+                      .header(AUTHORIZATION, token))
+              .andExpect(status().isOk());
+      final var entry = "$.items[0].items[0].catalogEntry";
+
+      index
+          .andExpect(jsonPath(entry + ".version").value("1.0.0"))
+          .andExpect(jsonPath(entry + ".dependencyGroups", hasSize(3)))
+          .andExpect(jsonPath(entry + ".dependencyGroups[0].@type").value("PackageDependencyGroup"))
+          .andExpect(jsonPath(entry + ".dependencyGroups[0].targetFramework").value("net10.0"))
+          .andExpect(jsonPath(entry + ".dependencyGroups[0].dependencies").doesNotExist())
+          .andExpect(
+              jsonPath(entry + ".dependencyGroups[1].targetFramework").value(".NETStandard2.0"))
+          .andExpect(jsonPath(entry + ".dependencyGroups[1].dependencies", hasSize(2)))
+          .andExpect(
+              jsonPath(entry + ".dependencyGroups[1].dependencies[0].id").value("Newtonsoft.Json"))
+          .andExpect(
+              jsonPath(entry + ".dependencyGroups[1].dependencies[0].range").value("[13.0.3, )"))
+          .andExpect(jsonPath(entry + ".dependencyGroups[1].dependencies[1].id").value("Serilog"))
+          .andExpect(jsonPath(entry + ".dependencyGroups[1].dependencies[1].range").doesNotExist())
+          .andExpect(jsonPath(entry + ".dependencyGroups[2].targetFramework").value("net8.0"))
+          .andExpect(jsonPath(entry + ".dependencyGroups[2].dependencies[0].range").value("3.1.1"))
+          .andExpect(jsonPath("$.items[0].items[1].catalogEntry.version").value("2.0.0"))
+          .andExpect(jsonPath("$.items[0].items[1].catalogEntry.dependencyGroups").doesNotExist());
+
+      // The leaf document says the same as the index page.
+      final var indexBody =
+          index.andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+      final var leafBody =
+          NuGetReadBackProtocolIT.this
+              .readRegistrationLeaf(repo, withGroups)
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString(StandardCharsets.UTF_8);
+      assertThat(JsonPath.<Object>read(indexBody, entry + ".dependencyGroups"))
+          .isEqualTo(JsonPath.<Object>read(leafBody, "$.catalogEntry.dependencyGroups"));
     }
 
     @Test

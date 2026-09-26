@@ -25,6 +25,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.repsy.protocols.nuget.shared.dtos.NuGetCatalogEntry;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafItem;
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyGroupInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -562,6 +563,79 @@ class NuGetPackageUtilsTest {
   }
 
   @Nested
+  @DisplayName("stored dependency groups (RPS-1555)")
+  class StoredDependencyGroups {
+
+    private final List<NuGetDependencyGroupInfo> groups =
+        List.of(
+            new NuGetDependencyGroupInfo("net10.0", List.of()),
+            new NuGetDependencyGroupInfo(
+                "net8.0", List.of(new NuGetDependencyInfo("Serilog", "3.1.1", "net8.0"))),
+            new NuGetDependencyGroupInfo(
+                null, List.of(new NuGetDependencyInfo("Newtonsoft.Json", "", null))));
+
+    @Test
+    @DisplayName("keeps a group without dependencies through a store and read round trip")
+    void roundTripKeepsEmptyGroup() {
+      final var json = NuGetPackageUtils.toDependencyGroupsJson(groups);
+
+      assertThat(json).startsWith("{\"groups\":");
+      assertThat(NuGetPackageUtils.parseDependencyGroupsJson(json, "Some.Package", "1.2.3"))
+          .isEqualTo(groups);
+      assertThat(NuGetPackageUtils.parseDependenciesJson(json, "Some.Package", "1.2.3"))
+          .containsExactly(
+              new NuGetDependencyInfo("Serilog", "3.1.1", "net8.0"),
+              new NuGetDependencyInfo("Newtonsoft.Json", "", null));
+      assertThat(warnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("stores the flat list of earlier versions when no group is empty")
+    void storesFlatListWithoutEmptyGroup() {
+      final var full = groups.subList(1, 3);
+
+      assertThat(NuGetPackageUtils.toDependencyGroupsJson(full))
+          .isEqualTo(NuGetPackageUtils.toDependenciesJson(NuGetPackageUtils.flatten(full)))
+          .startsWith("[");
+      assertThat(
+              NuGetPackageUtils.parseDependencyGroupsJson(
+                  NuGetPackageUtils.toDependencyGroupsJson(full), "Some.Package", "1.2.3"))
+          .isEqualTo(full);
+    }
+
+    @Test
+    @DisplayName("reads the flat list of earlier versions as groups, in order of first appearance")
+    void readsLegacyFlatListAsGroups() {
+      final var legacy =
+          """
+          [{"packageId":"A","versionRange":"1.0","targetFramework":"net8.0"},
+           {"packageId":"B","versionRange":"","targetFramework":null},
+           {"packageId":"C","versionRange":"2.0","targetFramework":"net8.0"}]
+          """;
+
+      assertThat(NuGetPackageUtils.parseDependencyGroupsJson(legacy, "Some.Package", "1.2.3"))
+          .containsExactly(
+              new NuGetDependencyGroupInfo(
+                  "net8.0",
+                  List.of(
+                      new NuGetDependencyInfo("A", "1.0", "net8.0"),
+                      new NuGetDependencyInfo("C", "2.0", "net8.0"))),
+              new NuGetDependencyGroupInfo(null, List.of(new NuGetDependencyInfo("B", "", null))));
+      assertThat(warnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("warns for a grouped value whose groups are not a list")
+    void warnsForGroupsThatAreNotAList() {
+      assertThat(
+              NuGetPackageUtils.parseDependencyGroupsJson(
+                  "{\"groups\":\"x\"}", "Some.Package", "1.2.3"))
+          .isEmpty();
+      assertThat(warnings()).singleElement().asString().contains("Some.Package", "1.2.3");
+    }
+  }
+
+  @Nested
   @DisplayName("nuspec dependency extraction")
   class NuspecDependencies {
 
@@ -581,6 +655,30 @@ class NuGetPackageUtilsTest {
               new NuGetDependencyInfo("Serilog", "3.1.1", "net8.0"),
               new NuGetDependencyInfo("Newtonsoft.Json", "13.0.3", null));
       assertThat(warnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("keeps a group without dependencies, apart from the groups that have some")
+    void keepsEmptyGroup() {
+      final var nuspec =
+          """
+          <package><metadata><dependencies>
+            <group targetFramework="net10.0"/>
+            <group targetFramework=".NETStandard2.0"><dependency id="Serilog" version="3.1.1"/></group>
+            <group/>
+          </dependencies></metadata></package>
+          """;
+
+      assertThat(
+              NuGetPackageUtils.extractDependencyGroupsFromNuspec(nuspec, "Some.Package", "1.2.3"))
+          .containsExactly(
+              new NuGetDependencyGroupInfo("net10.0", List.of()),
+              new NuGetDependencyGroupInfo(
+                  ".NETStandard2.0",
+                  List.of(new NuGetDependencyInfo("Serilog", "3.1.1", ".NETStandard2.0"))),
+              new NuGetDependencyGroupInfo(null, List.of()));
+      assertThat(extract(nuspec))
+          .containsExactly(new NuGetDependencyInfo("Serilog", "3.1.1", ".NETStandard2.0"));
     }
 
     @Test

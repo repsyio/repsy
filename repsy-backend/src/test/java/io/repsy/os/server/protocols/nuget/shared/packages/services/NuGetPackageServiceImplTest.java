@@ -45,7 +45,7 @@ import org.mockito.Mockito;
  * dependencies to JSON, warn, and store the version with a {@code null} dependencies column anyway.
  * These tests force that serialization to fail (there is no realistic nuspec input that does, since
  * a dependency is a handful of plain strings, so the failure is injected through a mocked {@link
- * NuGetPackageUtils#toDependenciesJson}) and assert the push now fails instead.
+ * NuGetPackageUtils#toDependencyGroupsJson}) and assert the push now fails instead.
  */
 @DisplayName("NuGetPackageServiceImpl.publishVersion dependency serialization (RPS-1146)")
 class NuGetPackageServiceImplTest {
@@ -90,7 +90,7 @@ class NuGetPackageServiceImplTest {
     try (MockedStatic<NuGetPackageUtils> utils =
         mockStatic(NuGetPackageUtils.class, Mockito.CALLS_REAL_METHODS)) {
       utils
-          .when(() -> NuGetPackageUtils.toDependenciesJson(any()))
+          .when(() -> NuGetPackageUtils.toDependencyGroupsJson(any()))
           .thenThrow(new IllegalStateException("mapper misconfigured"));
 
       assertThatThrownBy(

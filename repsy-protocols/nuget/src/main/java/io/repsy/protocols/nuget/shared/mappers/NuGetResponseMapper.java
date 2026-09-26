@@ -24,6 +24,7 @@ import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafItem;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafResponse;
 import io.repsy.protocols.nuget.shared.dtos.NuGetSearchData;
 import io.repsy.protocols.nuget.shared.dtos.NuGetSearchVersionData;
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyGroupInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
@@ -97,14 +98,50 @@ public final class NuGetResponseMapper {
         v.tags(),
         v.listed(),
         v.publishedAt(),
-        buildDependencyGroups(v.dependencies()));
+        buildDependencyGroups(v));
   }
 
+  /**
+   * The {@code dependencyGroups} of a catalog entry, empty groups included: an empty {@code
+   * net10.0} group tells a client that framework needs nothing, and dropping it makes the client
+   * fall back to another group (RPS-1555). Like nuget.org, a group without dependencies has no
+   * {@code dependencies} property. Without stored groups the flat dependencies are grouped by
+   * target framework.
+   */
   private static @Nullable List<NuGetDependencyGroup> buildDependencyGroups(
+      final NuGetVersionInfo v) {
+
+    final var groups =
+        v.dependencyGroups() != null
+            ? v.dependencyGroups()
+            : groupByTargetFramework(v.dependencies());
+
+    if (groups.isEmpty()) {
+      return null;
+    }
+
+    return groups.stream()
+        .map(
+            g ->
+                NuGetDependencyGroup.of(
+                    g.targetFramework(),
+                    g.dependencies().isEmpty()
+                        ? null
+                        : g.dependencies().stream()
+                            .map(
+                                dep ->
+                                    NuGetCatalogDependency.of(
+                                        dep.packageId(),
+                                        dep.versionRange().isBlank() ? null : dep.versionRange()))
+                            .toList()))
+        .toList();
+  }
+
+  private static List<NuGetDependencyGroupInfo> groupByTargetFramework(
       final @Nullable List<NuGetDependencyInfo> dependencies) {
 
-    if (dependencies == null || dependencies.isEmpty()) {
-      return null;
+    if (dependencies == null) {
+      return List.of();
     }
 
     return dependencies.stream()
@@ -112,15 +149,13 @@ public final class NuGetResponseMapper {
             Collectors.groupingBy(
                 dep -> dep.targetFramework() != null ? dep.targetFramework() : "",
                 LinkedHashMap::new,
-                Collectors.mapping(
-                    dep ->
-                        NuGetCatalogDependency.of(
-                            dep.packageId(),
-                            dep.versionRange().isBlank() ? null : dep.versionRange()),
-                    Collectors.toList())))
+                Collectors.toList()))
         .entrySet()
         .stream()
-        .map(e -> NuGetDependencyGroup.of(e.getKey().isEmpty() ? null : e.getKey(), e.getValue()))
+        .map(
+            e ->
+                new NuGetDependencyGroupInfo(
+                    e.getKey().isEmpty() ? null : e.getKey(), e.getValue()))
         .toList();
   }
 

@@ -186,7 +186,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     return this.packageVersionRepository
         .findByNugetPackageIdOrderByPublishedAtDesc(pkg.getId())
         .stream()
-        .map(v -> this.converter.toVersionInfo(v, packageId))
+        .map(v -> this.converter.toRegistrationInfo(v, packageId))
         .sorted(
             Comparator.comparing(NuGetVersionInfo::version, NuGetPackageUtils.VERSION_COMPARATOR))
         .toList();
@@ -493,14 +493,14 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     pkgVersion.setRepositoryUrl(NuGetPackageUtils.extractRepositoryUrl(nuspecXml));
     pkgVersion.setReadme(readme);
 
-    final var deps =
-        NuGetPackageUtils.extractDependenciesFromNuspec(
+    final var groups =
+        NuGetPackageUtils.extractDependencyGroupsFromNuspec(
             nuspecXml, nugetPackage.getPackageId(), version);
-    if (!deps.isEmpty()) {
+    if (!groups.isEmpty()) {
       // A failure here must fail the push (RPS-1146): the client sent these dependencies, so
       // storing the version without them, silently, would corrupt what was published. This runs
       // before saveAndFlush, so nothing is written when it throws.
-      pkgVersion.setDependencies(NuGetPackageUtils.toDependenciesJson(deps));
+      pkgVersion.setDependencies(NuGetPackageUtils.toDependencyGroupsJson(groups));
     }
 
     return pkgVersion;
