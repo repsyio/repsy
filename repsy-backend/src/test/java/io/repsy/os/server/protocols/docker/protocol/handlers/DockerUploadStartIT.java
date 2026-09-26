@@ -105,8 +105,8 @@ class DockerUploadStartIT extends AbstractIntegrationTest {
 
   /**
    * RPS-1594: {@code POST .../blobs/uploads/?digest-algorithm=sha512} (OCI end-4c) starts an upload
-   * that a {@code sha512:} finalize completes and answers with that digest (serving a stored blob by
-   * its sha512 is {@code DockerBlobPullIT}'s).
+   * that a {@code sha512:} finalize completes and answers with that digest (serving a stored blob
+   * by its sha512 is {@code DockerBlobPullIT}'s).
    */
   @Test
   @DisplayName("a digest-algorithm=sha512 start hint is honoured by a sha512 finalize")
