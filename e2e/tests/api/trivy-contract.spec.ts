@@ -234,6 +234,52 @@ test.describe('the real repsy-scanner-trivy', { tag: ['@trivy'] }, () => {
         `an image with ${LODASH.name}@${LODASH.version} in its node_modules has ${LODASH.cve}`,
       ).toContain(LODASH.cve);
     });
+
+    test("the tarball's own package (not a bundled dependency) is scanned: a tarball of lodash 4.17.20 itself reports CVE-2021-23337", async ({
+      panelApi,
+      seeder,
+    }) => {
+      const repo = await seeder.createRepo(RepoType.NPM);
+      const name = `e2e-${seeder.runId}-own-lodash`;
+      const version = '1.0.0';
+      const tarball = plainLodashTarball(name, version);
+
+      const published = await rawPublish(
+        repo.name,
+        adminCredential(),
+        name,
+        buildPublishDocument({
+          repoName: repo.name,
+          packageName: name,
+          version,
+          tarballBytes: tarball,
+        }),
+      );
+      expect(published.status, `publish: ${published.body.toString('utf8')}`).toBeLessThan(300);
+
+      const scan = await finishedScan(panelApi, repo.name, name, version);
+      expect(scan, 'the scan of the tarball with a vulnerable own package').toMatchObject({
+        repoType: RepoType.NPM,
+        status: 'COMPLETED',
+        highestSeverity: 'HIGH',
+        scannerName: 'trivy',
+      });
+      expect(scan.scannerVersion).toMatch(TRIVY_VERSION);
+
+      const findings = await panelApi.listScanFindings(repo.name, scan.id ?? '');
+      const finding = findings.find((candidate) => candidate.cveId === LODASH.cve);
+      expect(
+        findings.map((candidate) => candidate.cveId),
+        `a tarball whose own package is ${LODASH.name}@${LODASH.version} has ${LODASH.cve}`,
+      ).toContain(LODASH.cve);
+      expect(finding).toMatchObject({
+        severity: 'HIGH',
+        packageName: LODASH.name,
+        packageVersion: LODASH.version,
+        fixedVersion: '4.17.21',
+        fixStatus: 'FIXED',
+      });
+    });
   });
 });
 
@@ -247,6 +293,18 @@ function bundledLodashTarball(name: string, version: string): Buffer {
       },
       {
         name: `package/node_modules/${LODASH.name}/package.json`,
+        data: json({ name: LODASH.name, version: LODASH.version }),
+      },
+    ]),
+  );
+}
+
+/** A plain npm tarball whose own package.json is lodash 4.17.20 (no node_modules, no dependencies). Tests that the tarball's own package vulnerabilities are scanned. */
+function plainLodashTarball(_name: string, _version: string): Buffer {
+  return zlib.gzipSync(
+    buildTar([
+      {
+        name: 'package/package.json',
         data: json({ name: LODASH.name, version: LODASH.version }),
       },
     ]),
