@@ -86,9 +86,14 @@ test.describe('UI harness fixtures', () => {
   // The guard is a fixture error, so this "fails" exactly when adminPage refuses a @credentials test
   // (test.fail() at declaration level, because a fixture error happens before the body runs). If the
   // guard ever stops refusing, the test passes unexpectedly and test.fail() turns that red.
+  //
+  // RPS-1456: Playwright's list reporter prints an expected failure with a red ✘ on every run, and the
+  // nightly run's log showed it next to the one real failure. It is not one: the run counts it as passed
+  // (junit has no <failure>, only the `fail` property, and there is no retry directory), so the title
+  // says so.
   // eslint-disable-next-line playwright/expect-expect
   test.fail(
-    'adminPage refuses a test tagged @credentials',
+    'adminPage refuses a test tagged @credentials (an expected failure: the list reporter shows it as ✘)',
     { tag: ['@credentials'] },
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async ({ adminPage }) => {
