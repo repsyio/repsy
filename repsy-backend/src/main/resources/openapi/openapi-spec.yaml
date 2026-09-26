@@ -2616,8 +2616,6 @@ paths:
             type: string
       security: []
       responses:
-        '200':
-          description: OK
         '404':
           description: >-
             Always. This proxy does not relay checksum database requests, so the Go toolchain
