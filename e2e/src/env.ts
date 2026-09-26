@@ -46,6 +46,12 @@ export interface Env {
    */
   repoOwner?: string;
   adminUsername: string;
+  /**
+   * The password of the account the harness runs as: the OS `admin`, or the tenant owner on a `cloud-*`
+   * target. Required at import on the OS targets. On a `cloud-*` target it may stay unset, so a consumer
+   * that supplies its own panel backend (README.md "Consuming the harness from another repository") can
+   * load the harness without it; reading it then throws.
+   */
   adminPassword: string;
   target: RepsyTarget;
   runId: string;
@@ -78,6 +84,11 @@ function required(name: string): string {
   return value;
 }
 
+/** `cloud-remote` and `cloud-local` (checked on the raw value, before `parseTarget` validates it). */
+function isCloudTarget(value: string | undefined): boolean {
+  return Boolean(value?.startsWith('cloud-'));
+}
+
 function parseTarget(value: string | undefined): RepsyTarget {
   const target = value || 'local';
   if (!TARGETS.includes(target as RepsyTarget)) {
@@ -89,6 +100,11 @@ function parseTarget(value: string | undefined): RepsyTarget {
 function loadEnv(): Env {
   const apiBaseUrl = process.env.REPSY_API_BASE_URL || 'http://localhost:8080';
   const repoBaseUrl = process.env.REPSY_REPO_BASE_URL || 'http://localhost:9090';
+  // RPS-1500: only a cloud target may load without the password. The OS targets still fail here, at
+  // import, exactly as before (a consumer's `playwright test --list` needs no OS variable).
+  const configuredPassword = isCloudTarget(process.env.REPSY_TARGET)
+    ? process.env.REPSY_ADMIN_PASSWORD
+    : required('REPSY_ADMIN_PASSWORD');
   return {
     apiBaseUrl,
     repoBaseUrl,
@@ -96,7 +112,9 @@ function loadEnv(): Env {
     plainRepoBaseUrl: process.env.REPSY_E2E_PLAIN_REPO_BASE_URL || repoBaseUrl,
     repoOwner: process.env.REPSY_REPO_OWNER || undefined,
     adminUsername: process.env.REPSY_ADMIN_USERNAME || 'admin',
-    adminPassword: required('REPSY_ADMIN_PASSWORD'),
+    get adminPassword(): string {
+      return configuredPassword || required('REPSY_ADMIN_PASSWORD');
+    },
     target: parseTarget(process.env.REPSY_TARGET),
     runId: process.env.REPSY_E2E_RUN_ID || randomRunId(),
     insecureRegistry: Boolean(process.env.REPSY_E2E_INSECURE_REGISTRY),

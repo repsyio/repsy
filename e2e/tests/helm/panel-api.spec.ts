@@ -76,13 +76,12 @@ const EXERCISED = [
   'deleteAllHelmChartVersions',
 ];
 
-const ADMIN = adminCredential();
-const CLASSIC_CREDENTIALS = [
-  '--username',
-  ADMIN.username ?? '',
-  '--password',
-  ADMIN.password ?? '',
-];
+// A function, not a constant: a spec file is imported by `playwright test --list` too, and a Repsy Cloud
+// consumer lists it without the owner's password (RPS-1500), which `adminCredential()` reads.
+const classicCredentials = (): string[] => {
+  const admin = adminCredential();
+  return ['--username', admin.username ?? '', '--password', admin.password ?? ''];
+};
 
 const sha256 = (bytes: Buffer): string =>
   `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
@@ -107,7 +106,7 @@ interface Session {
 async function newSession(seeder: Seeder, label: string): Promise<Session> {
   const repo = await seeder.createRepo(RepoType.HELM, { privateRepo: true });
   const { home, work } = await isolatedWorkDir(`${label}-${seeder.runId}`);
-  await renderHelmRegistryConfig(home, ADMIN);
+  await renderHelmRegistryConfig(home, adminCredential());
   return {
     repoName: repo.name,
     work,
@@ -117,7 +116,7 @@ async function newSession(seeder: Seeder, label: string): Promise<Session> {
         env: helmEnv(home),
         timeoutMs: 60_000,
         label: runLabel,
-        redact: [ADMIN.password ?? ''],
+        redact: [adminCredential().password ?? ''],
       }),
   };
 }
@@ -168,7 +167,7 @@ async function pushOci(session: Session, chart: ChartFacts): Promise<string> {
 async function pushClassic(session: Session, chart: ChartFacts): Promise<void> {
   await helmOk(
     session,
-    ['cm-push', chart.tgzFile, classicRepoUrl(session.repoName), ...CLASSIC_CREDENTIALS],
+    ['cm-push', chart.tgzFile, classicRepoUrl(session.repoName), ...classicCredentials()],
     'panel-helm-cm-push',
   );
 }
@@ -198,7 +197,7 @@ async function showChart(
           name,
           '--version',
           version,
-          ...CLASSIC_CREDENTIALS,
+          ...classicCredentials(),
         ];
   return parseYaml(await helmOk(session, args, `panel-helm-show-${variant}`)) as Record<
     string,
@@ -224,7 +223,7 @@ async function pullExitCode(
           name,
           '--version',
           version,
-          ...CLASSIC_CREDENTIALS,
+          ...classicCredentials(),
         ];
   return (await session.helm([...args, '--destination', dest], `panel-helm-pull-${variant}`))
     .exitCode;
@@ -244,7 +243,7 @@ async function pulledBytes(
 }
 
 async function indexOf(session: Session) {
-  const res = await rawGetIndex(session.repoName, ADMIN);
+  const res = await rawGetIndex(session.repoName, adminCredential());
   expect(res.status, 'index.yaml').toBe(200);
   return parseIndex(res.body.toString('utf8'));
 }
@@ -386,7 +385,12 @@ test.describe('the Helm panel API against what helm pushed', () => {
         Date.parse(detail.lastUpdatedAt ?? detail.createdAt),
       );
       // The digest and size are those of the file a client downloads.
-      const download = await rawDownloadChart(session.repoName, ADMIN, chart.name, chart.version);
+      const download = await rawDownloadChart(
+        session.repoName,
+        adminCredential(),
+        chart.name,
+        chart.version,
+      );
       expect(download.status).toBe(200);
       expect({ digest: detail.digest, size: detail.size }, `${chart.version} stored file`).toEqual({
         digest: sha256(download.body),
@@ -549,9 +553,15 @@ test.describe('the Helm panel API against what helm pushed', () => {
     const index = await indexOf(session);
     expect(indexEntry(index, web, '1.0.0'), 'index.yaml drops the version').toBeUndefined();
     expect(indexEntry(index, web, '1.1.0'), 'and keeps the sibling').toBeDefined();
-    expect((await rawDownloadChart(session.repoName, ADMIN, web, '1.0.0')).status).toBe(404);
-    expect((await rawGetManifest(session.repoName, ADMIN, web, '1.0.0')).status).toBe(404);
-    expect((await rawGetManifest(session.repoName, ADMIN, web, digest1)).status).toBe(404);
+    expect((await rawDownloadChart(session.repoName, adminCredential(), web, '1.0.0')).status).toBe(
+      404,
+    );
+    expect((await rawGetManifest(session.repoName, adminCredential(), web, '1.0.0')).status).toBe(
+      404,
+    );
+    expect((await rawGetManifest(session.repoName, adminCredential(), web, digest1)).status).toBe(
+      404,
+    );
     expect(
       await pullExitCode(session, 'oci', web, '1.0.0'),
       'helm pull of the deleted version',
@@ -615,7 +625,9 @@ test.describe('the Helm panel API against what helm pushed', () => {
     const afterVersion = await indexOf(session);
     expect(indexEntry(afterVersion, lib, '0.1.0'), 'index.yaml drops the version').toBeUndefined();
     expect(indexEntry(afterVersion, lib, '0.2.0')).toBeDefined();
-    expect((await rawDownloadChart(session.repoName, ADMIN, lib, '0.1.0')).status).toBe(404);
+    expect((await rawDownloadChart(session.repoName, adminCredential(), lib, '0.1.0')).status).toBe(
+      404,
+    );
     expect(
       await pullExitCode(session, 'classic', lib, '0.1.0'),
       'helm pull of the deleted version',
@@ -650,7 +662,9 @@ test.describe('the Helm panel API against what helm pushed', () => {
     );
     const afterAll = await indexOf(session);
     expect(afterAll.entries[lib] ?? [], 'index.yaml has no version of the chart').toEqual([]);
-    expect((await rawDownloadChart(session.repoName, ADMIN, lib, '0.2.0')).status).toBe(404);
+    expect((await rawDownloadChart(session.repoName, adminCredential(), lib, '0.2.0')).status).toBe(
+      404,
+    );
     expect(await pullExitCode(session, 'classic', lib, '0.2.0')).not.toBe(0);
 
     // The other chart is exactly as it was.

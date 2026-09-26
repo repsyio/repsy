@@ -18,17 +18,25 @@
 # as the host's uid:gid (docker-compose.runners.yml), not the root that built node_modules, and
 # pnpm's own script runner re-verifies the modules directory against its store on every invocation,
 # which fails under that uid mismatch even though the packages themselves only need to be read.
+#
+# REPSY_E2E_OPENAPI_SPEC and REPSY_E2E_GEN_OUT (RPS-1500) name the OpenAPI spec the client is generated
+# from and the directory it goes to, so a runner of another repository (Repsy Cloud's) generates ITS
+# client. The defaults are Repsy OS's own; both are relative to the working directory (/app), where the
+# harness itself is.
 set -eu
+
+spec="${REPSY_E2E_OPENAPI_SPEC:-../repsy-backend/src/main/resources/openapi/openapi-spec.yaml}"
+out="${REPSY_E2E_GEN_OUT:-src/api/generated}"
 
 project="$1"
 shift
 
-rm -rf src/api/generated
+rm -rf "$out"
 ./node_modules/.bin/openapi \
-  --input ../repsy-backend/src/main/resources/openapi/openapi-spec.yaml \
+  --input "$spec" \
   --client axios \
   --name PanelClient \
-  --output src/api/generated \
+  --output "$out" \
   --useOptions \
   --indent 2
 

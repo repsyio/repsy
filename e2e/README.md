@@ -74,7 +74,7 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 
 ```
 e2e/
-  package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
+  package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example   # package.json is also the package `repsy-e2e` a workspace consumer depends on, see "Consuming the harness from another repository"
   playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" (the panel in headless Chromium, see "UI suite") and "api" (raw HTTP at the edge, see "API suite")
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
@@ -100,7 +100,7 @@ e2e/
   runners/scanner-stub.Dockerfile  # the stub scanner of the scanner stack (src/stubs/scanner/ on node:24, no dependencies, no build)
   runners/bump-pins.sh         # re-resolves every content pin of docker-compose.runners.yml (image digests, checksums, skopeo's commit) and prints or writes what differs, see "Runner images and pins"
   runners/ui-seccomp.json      # Playwright's seccomp profile, so Chromium's sandbox works as a non-root uid in Docker
-  runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
+  runners/entrypoint.sh         # regenerates the API client (spec and output dir from REPSY_E2E_OPENAPI_SPEC / REPSY_E2E_GEN_OUT), then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
     target.ts                  # capabilities derived from REPSY_TARGET: OS or Repsy Cloud (`kind`, the URL scheme `repo` | `owner-repo`, token and user model, plan limits), see "Targets"
@@ -294,8 +294,8 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_API_BASE_URL`          | `http://localhost:8080`             | panel API. Unset, it follows `REPSY_E2E_PORT_OFFSET` (`8080 + offset`); a value set here wins over the offset (see "Parallel stacks")                                                                                                                                                                                                                                                                                                    |
 | `REPSY_REPO_BASE_URL`         | `http://localhost:9090`             | repository/protocol operations. Unset, it follows `REPSY_E2E_PORT_OFFSET` (`9090 + offset`); the stack also prints it in the panel's client snippets                                                                                                                                                                                                                                                                                     |
 | `REPSY_ADMIN_USERNAME`        | `admin`                             |                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `REPSY_ADMIN_PASSWORD`        | _(none — required)_                 | must match the target's admin password                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `REPSY_TARGET`                | `local`                             | `local` \| `remote` \| `ci` — see Targets below                                                                                                                                                                                                                                                                                                                                                                                          |
+| `REPSY_ADMIN_PASSWORD`        | _(none — required)_                 | required on `local`/`ci`/`remote`, read on use on `cloud-*` (the tenant owner's password); must match the target's admin password                                                                                                                                                                                                                                                                                                        |
+| `REPSY_TARGET`                | `local`                             | `local` \| `remote` \| `ci` \| `cloud-remote` \| `cloud-local` — see Targets below                                                                                                                                                                                                                                                                                                                                                       | `remote` \| `ci` — see Targets below |
 | `REPSY_E2E_BACKEND_MODULE`    | _(unset — built-in)_                | module that supplies the panel backend instead of the built-in Repsy OS one: a path the runner can read (absolute, or relative to the working directory), a `file:` URL or a package name; exports `createPanelBackend(baseUrl)`. See "Panel backend" below                                                                                                                                                                              |
 | `REPSY_E2E_URL_SCHEME`        | `repo` (`owner-repo` for `cloud-*`) | `repo` \| `owner-repo`: how a repository is addressed in a protocol URL, see "Repository URLs"                                                                                                                                                                                                                                                                                                                                           |
 | `REPSY_REPO_OWNER`            | _(unset)_                           | the `<owner>` of `/<owner>/<repo>/...` URLs; required, and read, only with `REPSY_E2E_URL_SCHEME=owner-repo`                                                                                                                                                                                                                                                                                                                             |
@@ -332,8 +332,10 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
   rate-limits failed authentications, so both count as `isRemote` (the loop runs `@negative` scenarios
   serially on a `RemoteAuthBudget`). A cloud run has no built-in panel backend in this repository: its
   backend is a module (`REPSY_E2E_BACKEND_MODULE`, below) supplied by the repository that owns Repsy Cloud.
-  `env.ts` still requires the OS-only `REPSY_ADMIN_PASSWORD` at import (for a cloud run it is the tenant
-  owner's password); making it optional for `cloud-*` belongs to RPS-1500 (packaging).
+  `env.ts` needs the OS-only `REPSY_ADMIN_PASSWORD` at import on the OS targets only; on a `cloud-*`
+  target it is optional at import (it is the tenant owner's password there, and reading it without a value
+  throws), so a consumer can list the tests without any OS variable (RPS-1500, "Consuming the harness from
+  another repository" below).
   Everything a cloud target needs from the engine lives in the seam described next. The OS targets are
   unchanged: same tests, same titles, same JUnit names.
 
@@ -487,6 +489,200 @@ Adding a client or a probe: build the URL with `repoUrl`/`repoPath`/`imageRef`/`
 mustache template needs the repository, pass it the rendered URL (or `repoPath(name)`), never the bare
 name. `tests/skeleton/repo-url.spec.ts` runs the helpers and a few real call sites (a `gem push`
 command, a raw probe, `.npmrc`, `GOPROXY`) under both schemes, with no stack.
+
+## Consuming the harness from another repository (RPS-1500)
+
+Repsy Cloud lives in [`repsy-mono`](https://github.com/repsyio/repsy-mono), which contains this repository as
+the `repsy/repsy-os` submodule, so the harness is at `repsy/repsy-os/e2e` there. The Cloud e2e package uses
+it in place instead of copying it, which is why `e2e/` is a package (`repsy-e2e`, `private`: it is never
+published, only consumed from a checkout). The consumer points Playwright at the harness's specs, and the
+harness reaches Repsy Cloud through the target seam ("Targets", "Panel backend", "Repository URLs"), not
+through a fork of `catalog.ts`.
+
+### What the package exposes
+
+`package.json` has `exports` for `./src/*` and `./tests/*` (and `./package.json`), and `engines`
+(`node >=24 <25`, `pnpm >=10`; the runner images pin pnpm 12.5.1):
+
+```ts
+import { env } from 'repsy-e2e/src/env.js';
+import { target } from 'repsy-e2e/src/target.js';
+import { SCENARIOS } from 'repsy-e2e/src/scenarios/catalog.js';
+import type { PanelBackend } from 'repsy-e2e/src/api/panel-backend.js';
+```
+
+- **Import with the `.js` specifier**, as the harness does itself: `./src/*.js` maps to `./src/*.ts` (and
+  `./tests/*.js` to `./tests/*.ts`), which TypeScript (`moduleResolution: bundler`), `tsx` and Playwright's
+  loader all follow. A `.ts` specifier works too (`allowImportingTsExtensions`); an extensionless one does not
+  (`exports` targets are exact). Any other file (a `.json`) is reachable through the plain `./src/*` and
+  `./tests/*` patterns.
+- **`moduleResolution: bundler` (and `module: es2022`) is required in the consumer's `tsconfig.json`**: the
+  generated client uses extensionless relative imports, which `nodenext` refuses. That is the harness's own
+  setting.
+- The package is TypeScript source, run by Playwright or `tsx`, never compiled or published: Node does not
+  run it on its own.
+- Only the harness's own `dependencies` (axios, execa, ajv...) and `devDependencies` are its own business; a
+  consumer does not need to declare them, but pnpm has to have installed them (next section).
+
+### Wiring: a pnpm workspace (the supported way)
+
+Put both packages in one workspace, so pnpm installs the harness's dependencies once, next to the
+consumer's, and the two share one `@playwright/test`:
+
+```yaml
+# repsy/pnpm-workspace.yaml
+packages:
+  - repsy-cloud/e2e
+  - repsy-os/e2e
+allowBuilds:
+  esbuild: false # as e2e/pnpm-workspace.yaml: a nested workspace file is not read, so repeat it here
+```
+
+```jsonc
+// repsy/repsy-cloud/e2e/package.json (the consumer must not also be named `repsy-e2e`)
+{
+  "dependencies": { "repsy-e2e": "workspace:*" },
+  "devDependencies": { "@playwright/test": "^1.62.1" },
+}
+```
+
+```ts
+// repsy/repsy-cloud/e2e/playwright.config.ts: a project per harness protocol, no .env needed to list
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  grepInvert: /@cloud-skip/,
+  projects: ['skeleton', 'maven', 'npm'].map((p) => ({
+    name: p,
+    testDir: `../../repsy-os/e2e/tests/${p}`,
+  })),
+});
+```
+
+```bash
+REPSY_TARGET=cloud-remote pnpm exec playwright test --list   # no REPSY_ADMIN_PASSWORD, no .env
+```
+
+Each project's `testDir` is the protocol's own directory, so a project lists what that directory holds. The
+OS config's `testMatch` globs (`npm/**/*.spec.ts`) match a little more or less than a directory does: the OS
+`npm` project also picks up `tests/npm-clients/npm/` (13 tests, which a `testDir` of `tests/npm` leaves to
+the `npm-clients` project), and six `@local-only` tests (`matrix/tarball-host.spec.ts`, one in
+`yarn-berry/install-modes.spec.ts`) are only registered on a local target, so `npm-clients` lists 233 tests
+under `cloud-remote` and 239 under `local`. Every other protocol project lists the same tests as on OS.
+
+**`link:` instead of a workspace.** `pnpm add link:<os>/e2e` only symlinks the directory: it installs
+nothing for it, so `pnpm install` has to have been run in the harness's own directory, and the harness then
+loads the `@playwright/test` of ITS `node_modules`. A consumer that also installs one (any version, the same
+included) has two copies, and Playwright stops with `Requiring @playwright/test second time`. Making the
+consumer's copy the harness's is what works: `pnpm add -D link:<os>/e2e/node_modules/@playwright/test`
+beside `pnpm add link:<os>/e2e`. Prefer the workspace, which needs neither.
+
+### One Playwright copy (needs an OS maintainers' decision)
+
+Playwright refuses two copies in one process, and the two packages declare different ranges: this package
+`@playwright/test ^1.56.1` (locked at 1.63.0 in `pnpm-lock.yaml`), Repsy Cloud's e2e package `^1.62.1`
+(locked at 1.62.1). `package.json` declares it as a `devDependency` (the harness's own install and CI need
+it) and as a `peerDependency` (`^1.56.1`), so a consumer supplies the one copy and the harness uses it.
+What was measured for this section, with the pinned pnpm 10 in a scratch workspace laid out as above:
+
+- One shared lockfile gives one copy: pnpm resolves both importers to the same version (a fresh install: the
+  latest, 1.63.0; a lockfile that already holds the consumer at 1.62.1: 1.62.1 for the harness too, because
+  it satisfies `^1.56.1`). `pnpm why -r @playwright/test` shows one line each.
+- The hazard is a change to ONE importer: bumping the consumer's range to a version the lockfile does not
+  hold leaves the harness on the old one, two copies again (`Requiring @playwright/test second time`).
+  `pnpm dedupe --check` reports it, `pnpm dedupe` fixes it, and so does an `overrides` entry in the
+  workspace's `pnpm-workspace.yaml` (`overrides: { '@playwright/test': 1.63.0 }`), which forces one version
+  for every importer and is then the one place to bump.
+- The `ui` runner (the only image with a browser) installs Chromium with the Playwright of the LOCKFILE that
+  builds it (`ui.Dockerfile`: `playwright install chromium`), so a range edit that does not change the
+  locked version changes nothing about the image; a locked version change needs `./run.sh test --protocol ui -b`.
+  The Cloud harness has no `ui` runner (the OS `ui` suite drives the OS panel).
+- The runner images install from the harness directory's own `package.json` and `pnpm-lock.yaml`, so they
+  carry 1.63.0. A Cloud layer added on top must reuse that copy, not install a second one (RPS-1507).
+
+The two ways to a single, agreed version:
+
+1. **Bump the OS range to `^1.62.1`** (Cloud's). The OS lockfile already resolves 1.63.0, which satisfies it,
+   so no version, image or browser changes: it is a specifier edit in `package.json` and `pnpm-lock.yaml`.
+   Both packages then always share a floor, and Dependabot proposes the same versions for both.
+2. **Pin Cloud down to `^1.56.1`** (the OS range). Nothing forces Cloud below its locked 1.62.1 (it satisfies
+   both), so this gains nothing and gives up newer Playwright releases for Cloud's own suites.
+
+**Recommendation: option 1, plus `overrides` (or `pnpm dedupe --check` in CI) in the consumer's workspace**,
+so that one Dependabot bump of one importer cannot silently produce two copies. This PR does not change the
+version; the maintainers decide.
+
+### The environment of a Cloud run
+
+`REPSY_TARGET=cloud-remote` (or `cloud-local`) selects the Cloud capabilities ("Targets"). Loading the
+harness needs no variable of the OS stack: `REPSY_ADMIN_PASSWORD` is not read at import on a `cloud-*` target
+(it stays the owner's password for `ownerCredential()`, and reading it unset throws, naming the variable),
+and `import 'dotenv/config'` reads a `.env` only if the consumer's working directory has one. RUNNING needs
+what the run uses: `REPSY_API_BASE_URL`, `REPSY_REPO_BASE_URL`, `REPSY_REPO_OWNER` (the `owner-repo` URL
+scheme), the owner's credentials and `REPSY_E2E_BACKEND_MODULE` (the module that supplies the Cloud
+`PanelBackend`, "Panel backend").
+
+**Import time is not run time.** Playwright loads every spec to list it, so nothing a spec or a module does
+at load may need a credential or an owner: a spec file that says `const admin = adminCredential()` at the top
+level breaks `--list` on Cloud, and so does `repoUrl(...)` in a `describe` body. Build such values inside the
+test, or behind a function (RPS-1500 moved the ones that did this).
+
+### `@cloud-skip`: excluding whole specs
+
+`@cloud-skip` (RPS-1498) marks what does not apply to Repsy Cloud: the `tests/stack/**` specs and
+`login-password.spec.ts`, plus any catalog scenario that carries it. Two mechanisms, both by tag:
+
+- **The consumer's config, for whole specs:** `grepInvert: /@cloud-skip/` (config-wide, as above, or on a
+  project), or `--grep-invert @cloud-skip` on the command line. The tagged tests are not listed at all
+  (`skeleton` goes from 117 to 114 tests under `cloud-remote`).
+- **The scenario loop, for catalog scenarios:** a `@cloud-skip` scenario is skipped with a reason on a
+  `cloud-*` target (visible in the report), even without the config. Use the config too when a skipped row is
+  noise.
+
+### The generated client
+
+The panel API types come from a generated client (`src/api/generated`, git-ignored, `pnpm gen:api`). Most
+of the harness imports it as types only. At run time only `OsPanelBackend` (a Repsy OS run), `src/ui/*` and
+`src/upgrade/*` need it, so a Cloud run needs none. `tsc` and the linter do type-check `os-panel-backend.ts`
+though: generate the OS client once for them (`pnpm --filter repsy-e2e gen:api`, whose default spec path
+resolves inside the submodule).
+
+`gen:api` and `runners/entrypoint.sh` take the spec and the output directory from the environment, so a
+runner of another repository generates ITS client (a Cloud backend module imports it from there):
+
+| Variable                 | Default                                                         | Meaning                                                                                                 |
+| ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `REPSY_E2E_OPENAPI_SPEC` | `../repsy-backend/src/main/resources/openapi/openapi-spec.yaml` | the spec the client is generated from, relative to the harness's working directory (`/app`) or absolute |
+| `REPSY_E2E_GEN_OUT`      | `src/api/generated`                                             | where it goes (deleted first), relative to the same directory                                           |
+
+### Runner images from another build context
+
+Every runner Dockerfile takes `ARG HARNESS_DIR=.`: the harness's directory inside the build context. Each
+`COPY` of the harness's own files (`package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `playwright.config.ts`,
+`src`, `tests`, `runners/entrypoint.sh`, and `runners/sbt-warmup` for Maven) is relative to it, so the default
+builds exactly what it always did from `e2e/` (`docker-compose.runners.yml`), and a parent directory can
+build the same files:
+
+```yaml
+# a runners compose file of the consumer, build context = the parent of the submodule
+services:
+  npm:
+    build:
+      context: ../../.. # repsy/
+      dockerfile: repsy-os/e2e/runners/npm.Dockerfile
+      args:
+        HARNESS_DIR: repsy-os/e2e
+    environment:
+      REPSY_TARGET: cloud-remote
+      REPSY_E2E_OPENAPI_SPEC: /repsy-cloud-server/src/main/resources/openapi.yaml # a bind mount
+      REPSY_E2E_GEN_OUT: src/cloud-generated
+```
+
+Things to know: a `.dockerignore` at the context root (not `e2e/.dockerignore`) applies, so ignore
+`node_modules` there, or use `<Dockerfile>.dockerignore` next to the Dockerfile; `scanner-stub.Dockerfile` is
+OS-only and unchanged; the `stack` and `ui` Dockerfiles take the argument too but only make sense against a
+Repsy OS stack; and the image's `pnpm install --frozen-lockfile` uses the harness's lockfile (see "One
+Playwright copy").
 
 ## Stack profiles (postgres and H2)
 
