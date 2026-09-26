@@ -60,6 +60,7 @@ import {
 } from '../../src/clients/docker-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { MaterializedCredential } from '../../src/scenarios/world.js';
+import { repoPath } from '../../src/repo-url.js';
 
 type RegctlSession = ClientSession & { push(ref: string, marker: string): Promise<string> };
 
@@ -202,10 +203,12 @@ test(
     );
     expect(tagDelete.exitCode, `regctl tag delete: ${tagDelete.stderr}`).toBe(0);
     expect(tagDelete.stderr, 'asks push,pull first').toContain(
-      `scope=repository:${repoName}/${image}:pull,push`,
+      `scope=repository:${repoPath(repoName)}/${image}:pull,push`,
     );
     expect(tagDelete.stderr, 'the challenge of the DELETE names the delete scope').toMatch(
-      new RegExp(`Auth request parsed[^\\n]*scope:repository:${repoName}/${image}:delete`),
+      new RegExp(
+        `Auth request parsed[^\\n]*scope:repository:${repoPath(repoName)}/${image}:delete`,
+      ),
     );
     expect(tagDelete.stderr, 'no insufficient_scope round trip is needed').not.toContain(
       'insufficient_scope',

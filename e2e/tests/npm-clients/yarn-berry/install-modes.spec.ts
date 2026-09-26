@@ -60,6 +60,7 @@ import { editRc, publishApp } from '../../../src/clients/npm-family/yarn-berry-s
 import { isolatedWorkDir } from '../../../src/clients/exec.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { env } from '../../../src/env.js';
+import { repoPath, repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import { optedIn } from '../../../src/stack-overlays.js';
 import type { Seeder } from '../../../src/seed/seeder.js';
@@ -166,7 +167,12 @@ test.describe('yarn berry install modes', () => {
       expect(
         metadataGets.true,
         'hardened mode validates every locked resolution against the registry',
-      ).toEqual([`/${graph.repo.name}/${graph.app}`, `/${graph.repo.name}/${graph.lib}`].sort());
+      ).toEqual(
+        [
+          `/${repoPath(graph.repo.name)}/${graph.app}`,
+          `/${repoPath(graph.repo.name)}/${graph.lib}`,
+        ].sort(),
+      );
     },
   );
 
@@ -250,7 +256,9 @@ test.describe('yarn berry settings', () => {
         expect(added.stdout).toContain('Invalid authentication (as an anonymous user)');
 
         const gets = recorder.entries.filter((entry) => entry.method === 'GET');
-        expect(gets.map((entry) => entry.path)).toEqual([`/${graph.repo.name}/${graph.app}`]);
+        expect(gets.map((entry) => entry.path)).toEqual([
+          `/${repoPath(graph.repo.name)}/${graph.app}`,
+        ]);
         expect(gets[0]?.authorization, 'berry sent no credential').toBeUndefined();
         expect(gets[0]?.status, 'so the private repository refused it').toBe(401);
       } finally {
@@ -346,7 +354,7 @@ test.describe('yarn berry settings', () => {
     // `.yarnrc.yml` that names no registry at all: only the latter counts, so berry goes to its
     // default registry, which the seal turns into a refused connection.
     const { home, work } = await isolatedWorkDir('npmc-yarn4-npmrc');
-    const npmrc = `registry=${env.repoBaseUrl}/${graph.repo.name}/\n//${new URL(env.repoBaseUrl).host}/${graph.repo.name}/:_authToken=${graph.reader.credential.password}\n`;
+    const npmrc = `registry=${repoUrl(graph.repo.name, '')}\n//${new URL(env.repoBaseUrl).host}/${repoPath(graph.repo.name)}/:_authToken=${graph.reader.credential.password}\n`;
     await fs.writeFile(path.join(home, '.npmrc'), npmrc);
     await fs.writeFile(path.join(work, '.npmrc'), npmrc);
     await fs.writeFile(path.join(work, YARN_LOCK), '');
@@ -397,7 +405,7 @@ test.describe('yarn berry tarball URLs in the lockfile (H-9)', () => {
       };
       const bare = scoped.split('/')[1];
       expect(doc.versions['1.0.0']?.dist.tarball, 'the served scoped dist.tarball').toBe(
-        `${env.repoBaseUrl}/${graph.repo.name}/${scoped}/-/${bare}-1.0.0.tgz`,
+        repoUrl(graph.repo.name, `${scoped}/-/${bare}-1.0.0.tgz`),
       );
 
       const consumer = await yarnBerryClient.prepare('archive-con', [
@@ -448,7 +456,7 @@ test.describe('yarn berry tarball URLs in the lockfile (H-9)', () => {
 
           const lockfile = await fs.readFile(path.join(consumer.work, YARN_LOCK), 'utf8');
           for (const name of [graph.app, graph.lib]) {
-            const archive = `${env.repoBaseUrl}/${graph.repo.name}/${name}/-/${name}-1.0.0.tgz`;
+            const archive = repoUrl(graph.repo.name, `${name}/-/${name}-1.0.0.tgz`);
             expect(lockfile, `${name} is pinned to the URL the packument named`).toContain(
               `resolution: "${name}@npm:1.0.0::__archiveUrl=${encodeURIComponent(archive)}"`,
             );
@@ -465,7 +473,10 @@ test.describe('yarn berry tarball URLs in the lockfile (H-9)', () => {
             recorder.entries.map((entry) => `${entry.method} ${entry.path}`).sort(),
             'the recorder saw the two packument reads and no tarball',
           ).toEqual(
-            [`GET /${graph.repo.name}/${graph.app}`, `GET /${graph.repo.name}/${graph.lib}`].sort(),
+            [
+              `GET /${repoPath(graph.repo.name)}/${graph.app}`,
+              `GET /${repoPath(graph.repo.name)}/${graph.lib}`,
+            ].sort(),
           );
         } finally {
           await recorder.stop();

@@ -95,7 +95,7 @@
  *    field `users` at line 1 column 81") even though the raw HTTP GET itself answers 200 -- see the
  *    candidate-bug test in `tests/cargo/protocol-specific.spec.ts`.
  */
-import { env } from '../env.js';
+import { repoUrl as repositoryUrl } from '../repo-url.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import {
@@ -144,7 +144,7 @@ export function cargoToken(credential: MaterializedCredential): string | undefin
 }
 
 function repoUrl(repoName: string): string {
-  return `${env.repoBaseUrl}/${repoName}/`;
+  return repositoryUrl(repoName, '');
 }
 
 /**

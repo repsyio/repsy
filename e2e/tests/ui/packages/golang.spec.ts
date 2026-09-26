@@ -21,6 +21,7 @@
  */
 import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
+import { repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import {
   asDetailPage,
@@ -103,13 +104,11 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
     const mod = await seedPackage(repo);
     const detail = protocolPages(adminPage, golang, repo.name).detail(mod);
     await detail.goto();
-    const base = `${env.repoBaseUrl}/${repo.name}/${mod.name}/@v/${mod.version}`;
+    const base = repoUrl(repo.name, `${mod.name}/@v/${mod.version}`);
     for (const suffix of ['.info', '.mod', '.zip']) {
       await expect(detail.byId(`pkg-detail-goproxy-${suffix}`)).toContainText(`${base}${suffix}`);
     }
-    await expect(detail.snippet('go-env')).toContainText(
-      `GOPROXY="${env.repoBaseUrl}/${repo.name},off"`,
-    );
+    await expect(detail.snippet('go-env')).toContainText(`GOPROXY="${repoUrl(repo.name)},off"`);
   });
 
   test('PKG-golang-07 a version that does not exist says so on its detail page', async ({

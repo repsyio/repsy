@@ -110,7 +110,7 @@ import zlib from 'node:zlib';
 
 import { zipSync } from 'fflate';
 
-import { env } from '../env.js';
+import { repoUrl as repositoryUrl } from '../repo-url.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import { buildTar } from './docker-image.js';
@@ -127,7 +127,7 @@ import {
 export { adminCredential, authHeader, msgIdOf, sha256Hex, type RawResponse };
 
 function repoUrl(repoName: string): string {
-  return `${env.repoBaseUrl}/${repoName}/`;
+  return repositoryUrl(repoName, '');
 }
 
 /** `e2e-<runid>-<slugified scenario id>` -- matches `ProtocolAdapter.packageName`'s signature. Every
@@ -173,7 +173,7 @@ export function downloadPath(name: string, fileName: string): string {
  *  `anonymous`. No trailing slash needed (confirmed live/H2: pip resolves `/simple/<project>/`
  *  correctly either way). */
 export function indexUrlFor(repoName: string, credential: MaterializedCredential): string {
-  const base = `${env.repoBaseUrl}/${repoName}/simple`;
+  const base = repositoryUrl(repoName, 'simple');
   if (credential.transport !== 'basic' || !credential.username) {
     return base;
   }

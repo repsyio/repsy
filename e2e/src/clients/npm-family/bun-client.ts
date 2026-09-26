@@ -46,7 +46,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { env } from '../../env.js';
+import { repoUrl } from '../../repo-url.js';
 import { isolatedWorkDir, type RunResult } from '../exec.js';
 import { MARKER_FILENAME } from '../npm.js';
 import {
@@ -161,7 +161,7 @@ async function pack(ctx: ClientCtx, dir: string): Promise<PackedTarball> {
 async function loginToken(binding: RegistryBinding): Promise<string> {
   const { username = '', password = '' } = binding.credential;
   const res = await fetch(
-    `${env.repoBaseUrl}/${binding.repoName}/-/user/org.couchdb.user:${encodeURIComponent(username)}`,
+    repoUrl(binding.repoName, `-/user/org.couchdb.user:${encodeURIComponent(username)}`),
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

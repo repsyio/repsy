@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 
 import mustache from 'mustache';
 
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import { isolatedWorkDir, run, type RunResult } from './exec.js';
 import { credentialView, ensureSharedCacheWarm, mavenEnv, SHARED_M2_DIR } from './maven.js';
@@ -184,7 +184,7 @@ export async function deployPlugin(
     version: PLUGIN_VERSION,
     name: spec.name,
     goalPrefix: spec.goalPrefix,
-    repoUrl: `${env.repoBaseUrl}/${repoName}`,
+    repoUrl: repoUrl(repoName),
   });
   await render(
     'HelloMojo.template.java',
@@ -266,7 +266,7 @@ export async function runPrefixGoal(
   prefix = PLUGIN_PREFIX,
 ): Promise<RunResult> {
   const { home, work } = await isolatedWorkDir('mvn-prefix');
-  const url = `${env.repoBaseUrl}/${repoName}`;
+  const url = repoUrl(repoName);
   const settings =
     '<settings>' +
     '<servers><server><id>repsy</id>' +

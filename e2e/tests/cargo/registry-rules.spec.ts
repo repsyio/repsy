@@ -58,7 +58,7 @@ import {
   type RawResponse,
 } from '../../src/clients/cargo-raw.js';
 import { cargoAdapter } from '../../src/clients/cargo.js';
-import { env } from '../../src/env.js';
+import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
 
@@ -270,9 +270,9 @@ test.describe('cargo registry rules (raw HTTP)', () => {
         'auth-required'?: boolean;
       };
       expect(privateBody.dl).toBe(
-        `${env.repoBaseUrl}/${privateRepo.name}/api/v1/crates/{crate}/{version}/download`,
+        repoUrl(privateRepo.name, 'api/v1/crates/{crate}/{version}/download'),
       );
-      expect(privateBody.api).toBe(`${env.repoBaseUrl}/${privateRepo.name}`);
+      expect(privateBody.api).toBe(repoUrl(privateRepo.name));
       expect(privateBody['auth-required'], 'a private repo advertises auth-required').toBe(true);
 
       const publicRepo = await seeder.createRepo(RepoType.CARGO, { privateRepo: false });

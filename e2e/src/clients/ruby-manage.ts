@@ -34,7 +34,7 @@
  */
 import { expect } from '@playwright/test';
 
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import { bindPrepared, type ManageOperation } from '../scenarios/manage-catalog.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import type { SeededRepo, Seeder } from '../seed/seeder.js';
@@ -153,14 +153,7 @@ function yank(): ManageOperation {
           );
           const result = await run(
             'gem',
-            [
-              'yank',
-              subject.gemName,
-              '-v',
-              subject.target,
-              '--host',
-              `${env.repoBaseUrl}/${subject.repoName}`,
-            ],
+            ['yank', subject.gemName, '-v', subject.target, '--host', repoUrl(subject.repoName)],
             {
               cwd: work,
               env: gemEnv(home, credential),

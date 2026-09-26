@@ -31,6 +31,7 @@
 import { RepoType } from '../../src/api/panel-api.js';
 import { edgeRequest } from '../../src/clients/edge-raw.js';
 import { env } from '../../src/env.js';
+import { repoPath } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import { seedPackage } from '../../src/seed/packages.js';
 import { optedIn } from '../../src/stack-overlays.js';
@@ -47,12 +48,12 @@ test.describe('the URLs of the other clients over TLS', { tag: ['@tls', '@smoke'
     const repo = await seeder.createRepo(RepoType.PYPI, { privateRepo: false });
     const pkg = await seedPackage(repo, seeder);
     for (const base of [tlsRepo, plainRepo]) {
-      const res = await edgeRequest(`${base.origin}/${repo.name}/simple/${pkg.name}/`);
+      const res = await edgeRequest(`${base.origin}/${repoPath(repo.name)}/simple/${pkg.name}/`);
       expect(res.status).toBe(200);
       const hrefs = [...res.text.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '');
       expect(hrefs.length).toBeGreaterThan(0);
       for (const href of hrefs) {
-        expect(href).toMatch(new RegExp(`^${base.origin}/${repo.name}/${pkg.name}/-/`));
+        expect(href).toMatch(new RegExp(`^${base.origin}/${repoPath(repo.name)}/${pkg.name}/-/`));
       }
     }
   });
@@ -63,7 +64,7 @@ test.describe('the URLs of the other clients over TLS', { tag: ['@tls', '@smoke'
     const repo = await seeder.createRepo(RepoType.HELM, { privateRepo: false });
     const chart = await seedPackage(repo, seeder, { variant: 'classic' });
     for (const base of [tlsRepo, plainRepo]) {
-      const res = await edgeRequest(`${base.origin}/${repo.name}/index.yaml`);
+      const res = await edgeRequest(`${base.origin}/${repoPath(repo.name)}/index.yaml`);
       expect(res.status).toBe(200);
       const urls = [...res.text.matchAll(/^\s*-\s+(\S+\.tgz)\s*$/gm)].map((m) => m[1]);
       expect(urls).toEqual([`charts/${chart.name}-${chart.version}.tgz`]);
@@ -75,7 +76,7 @@ test.describe('the URLs of the other clients over TLS', { tag: ['@tls', '@smoke'
     const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: false });
     await seedPackage(repo, seeder);
     for (const base of [tlsRepo, plainRepo]) {
-      const res = await edgeRequest(`${base.origin}/${repo.name}/`);
+      const res = await edgeRequest(`${base.origin}/${repoPath(repo.name)}/`);
       expect(res.status).toBe(200);
       const hrefs = [...res.text.matchAll(/href="([^"]+)"/g)].map((m) => m[1] ?? '');
       expect(hrefs.length).toBeGreaterThan(0);
@@ -94,10 +95,10 @@ test.describe('the URLs of the other clients over TLS', { tag: ['@tls', '@smoke'
     const goModule = await seedPackage(modules, seeder);
     for (const base of [tlsRepo, plainRepo]) {
       for (const url of [
-        `${base.origin}/${gems.name}/versions`,
-        `${base.origin}/${gems.name}/info/${gem.name}`,
-        `${base.origin}/${modules.name}/${goModule.name}/@v/list`,
-        `${base.origin}/${modules.name}/${goModule.name}/@latest`,
+        `${base.origin}/${repoPath(gems.name)}/versions`,
+        `${base.origin}/${repoPath(gems.name)}/info/${gem.name}`,
+        `${base.origin}/${repoPath(modules.name)}/${goModule.name}/@v/list`,
+        `${base.origin}/${repoPath(modules.name)}/${goModule.name}/@latest`,
       ]) {
         const res = await edgeRequest(url);
         expect(res.status, url).toBe(200);

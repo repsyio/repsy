@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import type { Page } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
-import { env } from '../../../src/env.js';
+import { repoUrl } from '../../../src/repo-url.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import {
   artifactDir,
@@ -425,7 +425,7 @@ test.describe('Maven version detail', { tag: '@packages' }, () => {
   const SNIPPETS = (group: string, artifact: string, version: string, repoName: string) =>
     [
       ['pom', 'Pom XML', `<artifactId>${artifact}</artifactId>`],
-      ['repository', 'Apache Maven Repository', `<url>${env.repoBaseUrl}/${repoName}</url>`],
+      ['repository', 'Apache Maven Repository', `<url>${repoUrl(repoName)}</url>`],
       ['gradle-groovy', 'Gradle Groovy DSL', 'Gradle Groovy DSL'], // content: see the RPS-1261 test below
       ['gradle-kotlin', 'Gradle Kotlin DSL', `implementation("${group}:${artifact}:${version}")`],
       ['sbt', 'Scala SBT', `libraryDependencies += "${group}" % "${artifact}" % "${version}"`],

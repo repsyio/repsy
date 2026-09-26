@@ -37,6 +37,11 @@ export interface Env {
    */
   plainApiBaseUrl: string;
   plainRepoBaseUrl: string;
+  /**
+   * The owner segment of `owner/repo` URLs (`REPSY_REPO_OWNER`). Unset on Repsy OS, whose repositories
+   * live at `/<repo>`; read only when `target.urlScheme` is `owner-repo` (`src/repo-url.ts`).
+   */
+  repoOwner?: string;
   adminUsername: string;
   adminPassword: string;
   target: RepsyTarget;
@@ -86,6 +91,7 @@ function loadEnv(): Env {
     repoBaseUrl,
     plainApiBaseUrl: process.env.REPSY_E2E_PLAIN_API_BASE_URL || apiBaseUrl,
     plainRepoBaseUrl: process.env.REPSY_E2E_PLAIN_REPO_BASE_URL || repoBaseUrl,
+    repoOwner: process.env.REPSY_REPO_OWNER || undefined,
     adminUsername: process.env.REPSY_ADMIN_USERNAME || 'admin',
     adminPassword: required('REPSY_ADMIN_PASSWORD'),
     target: parseTarget(process.env.REPSY_TARGET),

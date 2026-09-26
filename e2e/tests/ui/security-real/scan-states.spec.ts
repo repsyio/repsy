@@ -36,6 +36,7 @@ import {
   test,
 } from '../../../src/ui/scanner-fixtures.js';
 import { Severity } from '../../../src/ui/security-stubs.js';
+import { repoPath } from '../../../src/repo-url.js';
 
 test.describe('SEC-01 scan states', { tag: SCANNER_TAG }, () => {
   skipUnlessScannerOptedIn();
@@ -166,6 +167,8 @@ test.describe('SEC-01 scan states', { tag: SCANNER_TAG }, () => {
     await expect(section.headerBadge()).toHaveAttribute('data-severity', 'LOW');
     await expect(section.findingsCount).toHaveText('1 finding');
     const [call] = await scanner.calls(pkg.name);
-    expect(call.dockerImageReference).toContain(`/${repo.name}/${pkg.name}:${pkg.version}`);
+    expect(call.dockerImageReference).toContain(
+      `/${repoPath(repo.name)}/${pkg.name}:${pkg.version}`,
+    );
   });
 });

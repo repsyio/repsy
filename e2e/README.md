@@ -102,7 +102,8 @@ e2e/
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
-    target.ts                  # capabilities derived from REPSY_TARGET
+    target.ts                  # capabilities derived from REPSY_TARGET, and the URL scheme (`repo` | `owner-repo`)
+    repo-url.ts                # repoPath/repoUrl/imageRef/v2Url/v2RepoUrl: the one place a repository's protocol URL is built, see "Repository URLs"
     api/
       panel-backend.ts         # the `PanelBackend` interface every panel operation goes through, plus `RepoType`, `UserRole`, `UserSpec`, `PanelHttpError`, `UnsupportedPanelOperation` (no runtime import of the generated client)
       os-panel-backend.ts      # `OsPanelBackend implements PanelBackend`: hand-written wrapper around the generated client, which it imports lazily
@@ -294,6 +295,8 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_ADMIN_PASSWORD`        | _(none — required)_        | must match the target's admin password                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_TARGET`                | `local`                    | `local` \| `remote` \| `ci` — see Targets below                                                                                                                                                                                                                                                                                                                                                                                          |
 | `REPSY_E2E_BACKEND_MODULE`    | _(unset — built-in)_       | module that supplies the panel backend instead of the built-in Repsy OS one: a path the runner can read (absolute, or relative to the working directory), a `file:` URL or a package name; exports `createPanelBackend(baseUrl)`. See "Panel backend" below                                                                                                                                                                              |
+| `REPSY_E2E_URL_SCHEME`        | `repo`                     | `repo` \| `owner-repo`: how a repository is addressed in a protocol URL, see "Repository URLs"                                                                                                                                                                                                                                                                                                                                           |
+| `REPSY_REPO_OWNER`            | _(unset)_                  | the `<owner>` of `/<owner>/<repo>/...` URLs; required, and read, only with `REPSY_E2E_URL_SCHEME=owner-repo`                                                                                                                                                                                                                                                                                                                             |
 | `REPSY_E2E_RUN_ID`            | random 6-char lowercase id | shared by every runner in one `run.sh test`                                                                                                                                                                                                                                                                                                                                                                                              |
 | `REPSY_E2E_STACK`             | _(unset — postgres)_       | `local up\|down` stack profile: unset/anything but `h2` is the postgres profile, `h2` is the embedded-H2 profile; equivalent to `--h2` on the command line. Unread by `run.sh test`, which is identical against either profile — see "Stack profiles" below                                                                                                                                                                              |
 | `REPSY_E2E_PROJECT`           | `repsy-e2e`                | compose project of the local stack (`local up\|down`, `test`, `sweep`, all of which follow it); also `--project NAME`. "Parallel stacks"                                                                                                                                                                                                                                                                                                 |
@@ -369,6 +372,42 @@ Things a backend module has to know:
 is an in-memory backend, and the spec points `REPSY_E2E_BACKEND_MODULE` at it and checks the registry, the
 `seeder` and `panelApi` fixtures and `UnsupportedPanelOperation`. It is also the smallest worked example of a
 backend module.
+
+## Repository URLs (`src/repo-url.ts`, RPS-1492)
+
+Repsy OS serves a repository at `/<repo>/...` (Docker `/v2/<repo>/<image>`). An owner-scoped registry
+such as Repsy Cloud serves it at `/<owner>/<repo>/...` (Docker `/v2/<owner>/<repo>/<image>`). No client,
+raw probe or spec writes `${env.repoBaseUrl}/${repoName}` itself: every repository URL goes through
+`src/repo-url.ts`, so a target only has to say which of the two it is.
+
+- **`target.urlScheme`** (`src/target.ts`): `'repo'` (the default for every target) or `'owner-repo'`.
+  `REPSY_E2E_URL_SCHEME` sets it.
+- **`env.repoOwner`** (`src/env.ts`, `REPSY_REPO_OWNER`): the owner segment. Read only with
+  `owner-repo`, where an unset owner is an error at the first URL built; ignored with `repo`.
+- **`repoPath(name)`**: `name`, or `<owner>/<name>`. For where only the path is wanted: a token scope
+  (`repository:<path>/<image>:pull`), `//<host>/<path>/:_authToken=` in an `.npmrc`, a `GOPROXY`, a
+  recorded wire path (`/${repoPath(repo.name)}/${pkg}`).
+- **`repoUrl(name, rel?)`**: `<repoBaseUrl>/<repoPath(name)>` plus `/<rel>`. `rel` is relative to the
+  repository root and has no leading slash. Without `rel` there is no trailing slash
+  (`.../r`); with `''` there is one (`.../r/`), which the cargo, npm, PyPI and NuGet registry URLs need.
+- **`imageRef(repoName, image, tag)`**: `<host>/<repoPath>/<image>:<tag>` for `docker`, `crane`,
+  `skopeo`, `regctl`, `oras`; **`registryHost()`** is the `<host>[:port]` alone (Helm's
+  `oci://<host>/<repoPath>[/<chart>]` is built from it).
+- **`v2Url(suffix)`** (`/`, `/_catalog`, `/token`: registry-wide, no owner) and
+  **`v2RepoUrl(repoName, rel)`** (`/v2/<repoPath>/<image>/manifests/<ref>`).
+
+What stays `env.repoBaseUrl` on purpose: the host, hostname and protocol (`new URL(env.repoBaseUrl)
+.host`), URLs the server sends back (`Location`, resolved against it), and the base a client is
+pointed at through a recorder or another host name (`RegistryBinding.baseUrl`, the Go TLS shim), to
+which the path is appended with `repoPath`. A run-id or repo name never contains the owner: the
+`e2e-<runid>-<protocol>-<n>` limit of 25 characters (`src/seed/run-id.ts`) is about the repository
+name alone and is unchanged, because the owner lives in the URL, not in any name the harness builds
+(package, image, chart and scope names carry the repo name at most, never `<owner>/<repo>`).
+
+Adding a client or a probe: build the URL with `repoUrl`/`repoPath`/`imageRef`/`v2RepoUrl`, and if a
+mustache template needs the repository, pass it the rendered URL (or `repoPath(name)`), never the bare
+name. `tests/skeleton/repo-url.spec.ts` runs the helpers and a few real call sites (a `gem push`
+command, a raw probe, `.npmrc`, `GOPROXY`) under both schemes, with no stack.
 
 ## Stack profiles (postgres and H2)
 
@@ -712,7 +751,8 @@ machinery. `clients/maven-adapter.ts`, `clients/npm.ts`'s `npmAdapter`, `clients
 five worked examples.
 
 1. `src/clients/<protocol>.ts` (+ a `<protocol>-raw.ts` for its raw-HTTP building blocks, built on
-   the shared pieces in `clients/raw-http.ts`): `publish(world)`/`resolve(world)`/`seedPublish(world)`
+   the shared pieces in `clients/raw-http.ts`, and building every repository URL with `repoUrl`/
+   `repoPath` from `src/repo-url.ts`, README.md "Repository URLs"): `publish(world)`/`resolve(world)`/`seedPublish(world)`
    (or that protocol's equivalent verbs), each returning an `AdapterResult`
    (`{ outcome, httpStatus, clientExitCode, command, contentSha256?, resolvedFile? }`, `adapter.ts`),
    derived from a **raw HTTP request with the same credential**, not from the client's exit code
@@ -725,7 +765,8 @@ five worked examples.
    must leave untouched, and the assertion that it did), and optionally
    `afterSuccessfulRoundTrip`/`knownConsumeFailure` (a known, already-filed backend bug that only
    affects the consume side -- see `npmAdapter.knownConsumeFailure` and RPS-1205 below).
-3. `src/packages/<protocol>/`: mustache templates of a tiny publishable project.
+3. `src/packages/<protocol>/`: mustache templates of a tiny publishable project. A template that needs
+   the repository takes the rendered URL, never the bare name ("Repository URLs").
 4. `runners/<protocol>.Dockerfile`: the toolchain that protocol's client needs, pinned versions as
    build args. See `runners/maven.Dockerfile`'s header comment for why it repeats
    `runners/base.Dockerfile`'s early layers instead of `FROM`ing it as a separately built image.

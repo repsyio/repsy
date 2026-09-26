@@ -32,7 +32,7 @@ import { expect } from '@playwright/test';
 
 import { bindPrepared, type ManageOperation } from '../scenarios/manage-catalog.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import { adminCredential, authHeader, sha256Hex } from './raw-http.js';
 import * as go from './golang-raw.js';
 import * as maven from './maven-raw.js';
@@ -103,7 +103,7 @@ function pypiDeleteFile(): ManageOperation {
       const wheel = pypi.buildWheel({ name, version: '1.0.0' });
       const res = await pypi.rawUpload(repoName, adminCredential(), wheel);
       expect(res.status, `seed ${wheel.filename}: ${res.msgId ?? ''}`).toBe(200);
-      return `${env.repoBaseUrl}/${repoName}/${pypi.downloadPath(name, wheel.filename)}`;
+      return repoUrl(repoName, pypi.downloadPath(name, wheel.filename));
     },
   });
 }
@@ -121,7 +121,7 @@ function goDeleteZip(): ManageOperation {
       });
       const res = await go.rawUpload(repoName, adminCredential(), built);
       expect(res.status, `seed ${built.modulePath}@${built.version}: ${res.msgId ?? ''}`).toBe(200);
-      return `${env.repoBaseUrl}/${repoName}/${go.zipRelPath(built.modulePath, built.version)}`;
+      return repoUrl(repoName, go.zipRelPath(built.modulePath, built.version));
     },
   });
 }
@@ -145,7 +145,7 @@ function mavenDeleteJar(): ManageOperation {
         'application/java-archive',
       );
       expect(res.status, `seed ${relPath}: ${res.msgId ?? ''}`).toBe(200);
-      return `${env.repoBaseUrl}/${repoName}/${relPath}`;
+      return repoUrl(repoName, relPath);
     },
   });
 }

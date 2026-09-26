@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 import { NEWEST_OLDEST, NEWEST_OLDEST_NAME, need, type ProtocolDescriptor } from './types.js';
+import { repoPath } from '../../../repo-url.js';
 
 /**
  * Helm: charts -> versions -> detail. Read from the components, not yet run in a browser (RPS-1257).
@@ -86,7 +87,7 @@ export const helmDescriptor: ProtocolDescriptor = {
     contains: (repo, url) => [
       `helm repo add ${repo} ${url}`,
       '<YOUR_PASSWORD_OR_DEPLOY_TOKEN>',
-      `oci://${new URL(url).host}/${repo}`,
+      `oci://${new URL(url).host}/${repoPath(repo)}`,
     ],
   },
   toolbar: { browseFiles: false },

@@ -66,6 +66,7 @@ import {
   test,
   type ScannerStubClient,
 } from '../../../src/scenarios/scanner-fixtures.js';
+import { repoPath } from '../../../src/repo-url.js';
 
 const CVE = 'CVE-2099-7001';
 const DESCRIPTION = 'Prototype pollution in lib';
@@ -340,7 +341,9 @@ test.describe(
               .filter((entry) => entry.method === 'POST')
               .map((entry) => `${entry.path} ${entry.authScheme} ${entry.status}`),
             'the audit requests',
-          ).toEqual(Array(2).fill(`/${repo.name}/-/npm/v1/security/advisories/bulk Bearer 200`));
+          ).toEqual(
+            Array(2).fill(`/${repoPath(repo.name)}/-/npm/v1/security/advisories/bulk Bearer 200`),
+          );
 
           const fixed = await consumerOf(FIXED, 'audit-fixed');
           const clean = await client.audit?.(fixed);

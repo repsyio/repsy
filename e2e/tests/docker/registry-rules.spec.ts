@@ -47,9 +47,11 @@ import {
   rawToken,
   rawUploadBlob,
   sha256Hex,
+  v2Url,
   type RawResponse,
 } from '../../src/clients/docker-raw.js';
 import { env } from '../../src/env.js';
+import { repoPath } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
 
@@ -146,9 +148,7 @@ test.describe('docker registry rules (raw HTTP)', () => {
     expect(oci?.code, 'an OCI UNAUTHORIZED body').toBe('UNAUTHORIZED');
 
     const parsed = parseBearerChallenge(ping.wwwAuthenticate ?? '');
-    expect(parsed.realm, "realm names this instance's own /v2/token").toBe(
-      `${env.repoBaseUrl}/v2/token`,
-    );
+    expect(parsed.realm, "realm names this instance's own /v2/token").toBe(v2Url('/token'));
     expect(parsed.service).toBe('repsy');
     expect(parsed.scope, 'the ping addresses no image, so it names no scope (RPS-1588)').toBe(
       undefined,
@@ -161,7 +161,7 @@ test.describe('docker registry rules (raw HTTP)', () => {
     async ({ seeder }) => {
       const priv = await newRepo(seeder, 'challengescope');
       const pub = await newRepo(seeder, 'challengescopepub', { privateRepo: false });
-      const base = (layout: Layout): string => `/${layout.repoName}/${layout.image}`;
+      const base = (layout: Layout): string => `/${repoPath(layout.repoName)}/${layout.image}`;
       const cases: {
         label: string;
         layout: Layout;
@@ -202,14 +202,14 @@ test.describe('docker registry rules (raw HTTP)', () => {
           layout: priv,
           suffix: '/blobs/uploads/',
           method: 'POST',
-          scope: `repository:${priv.repoName}/${priv.image}:pull,push`,
+          scope: `repository:${repoPath(priv.repoName)}/${priv.image}:pull,push`,
         },
         {
           label: 'blob upload start on a public repo',
           layout: pub,
           suffix: '/blobs/uploads/',
           method: 'POST',
-          scope: `repository:${pub.repoName}/${pub.image}:pull,push`,
+          scope: `repository:${repoPath(pub.repoName)}/${pub.image}:pull,push`,
         },
         {
           label: 'manifest delete',
@@ -930,7 +930,7 @@ test.describe('docker registry rules (raw HTTP)', () => {
         expect(tooLittle.hop, `issuance is not scope-checked (${scope})`).toBe('request');
         expectOci(tooLittle, 401, 'UNAUTHORIZED');
         expect(tooLittle.wwwAuthenticate, 'the challenge names the scope to ask for').toContain(
-          `scope="repository:${layout.repoName}/${layout.image}:delete"`,
+          `scope="repository:${repoPath(layout.repoName)}/${layout.image}:delete"`,
         );
         expect(tooLittle.wwwAuthenticate).toContain('error="insufficient_scope"');
       }

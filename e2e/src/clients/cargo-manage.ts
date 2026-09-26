@@ -40,7 +40,7 @@
  */
 import { expect } from '@playwright/test';
 
-import { env } from '../env.js';
+import { repoUrl } from '../repo-url.js';
 import { bindPrepared, type ManageOperation } from '../scenarios/manage-catalog.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
@@ -176,14 +176,11 @@ async function rawOwnersModify(
   credential: MaterializedCredential,
 ): Promise<number> {
   const res = await withBackoff429Response(async () => {
-    const response = await fetch(
-      `${env.repoBaseUrl}/${subject.repoName}/${ownersUrl(subject.crateName)}`,
-      {
-        method,
-        headers: { ...cargoAuthHeader(credential), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ users: [OWNER_LOGIN] }),
-      },
-    );
+    const response = await fetch(repoUrl(subject.repoName, ownersUrl(subject.crateName)), {
+      method,
+      headers: { ...cargoAuthHeader(credential), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ users: [OWNER_LOGIN] }),
+    });
     const bytes = Buffer.from(await response.arrayBuffer());
     return { status: response.status, msgId: undefined, body: bytes };
   });

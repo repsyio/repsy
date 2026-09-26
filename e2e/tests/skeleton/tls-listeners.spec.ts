@@ -42,6 +42,7 @@ import { RepoType } from '../../src/api/panel-api.js';
 import { edgeRequest } from '../../src/clients/edge-raw.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { env } from '../../src/env.js';
+import { repoPath } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import { seedPackage } from '../../src/seed/packages.js';
 import { optedIn } from '../../src/stack-overlays.js';
@@ -205,11 +206,11 @@ test.describe('the scheme of the public URLs', { tag: ['@tls', '@smoke'] }, () =
   test('Cargo config.json dl and api follow the listener', async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.CARGO, { privateRepo: false });
     for (const base of [tlsRepo, plainRepo]) {
-      const res = await edgeRequest(`${originOf(base)}/${repo.name}/config.json`);
+      const res = await edgeRequest(`${originOf(base)}/${repoPath(repo.name)}/config.json`);
       expect(res.status).toBe(200);
       expect(res.json).toMatchObject({
-        dl: `${originOf(base)}/${repo.name}/api/v1/crates/{crate}/{version}/download`,
-        api: `${originOf(base)}/${repo.name}`,
+        dl: `${originOf(base)}/${repoPath(repo.name)}/api/v1/crates/{crate}/{version}/download`,
+        api: `${originOf(base)}/${repoPath(repo.name)}`,
       });
     }
   });
@@ -227,12 +228,12 @@ test.describe('the scheme of the public URLs', { tag: ['@tls', '@smoke'] }, () =
     // Unscoped: this case is about the scheme of the tarball URL, not about how a scope is spelled.
     const pkg = await seedPackage(repo, seeder, { scoped: false });
     for (const base of [tlsRepo, plainRepo]) {
-      const res = await edgeRequest(`${originOf(base)}/${repo.name}/${pkg.name}`);
+      const res = await edgeRequest(`${originOf(base)}/${repoPath(repo.name)}/${pkg.name}`);
       expect(res.status).toBe(200);
       const versions = (res.json as { versions: Record<string, { dist: { tarball: string } }> })
         .versions;
       expect(versions[pkg.version]?.dist.tarball).toBe(
-        `${originOf(tlsRepo)}/${repo.name}/${pkg.name}/-/${pkg.name}-${pkg.version}.tgz`,
+        `${originOf(tlsRepo)}/${repoPath(repo.name)}/${pkg.name}/-/${pkg.name}-${pkg.version}.tgz`,
       );
     }
   });
@@ -242,12 +243,14 @@ test.describe('the scheme of the public URLs', { tag: ['@tls', '@smoke'] }, () =
   }) => {
     const repo = await seeder.createRepo(RepoType.NUGET, { privateRepo: false });
     for (const base of [tlsRepo, plainRepo]) {
-      const res = await edgeRequest(`${originOf(base)}/${repo.name}/v3/index.json`);
+      const res = await edgeRequest(`${originOf(base)}/${repoPath(repo.name)}/v3/index.json`);
       expect(res.status).toBe(200);
       const resources = (res.json as { resources: Array<{ '@id': string }> }).resources;
       expect(resources.length).toBeGreaterThan(0);
       for (const resource of resources) {
-        expect(resource['@id']).toMatch(new RegExp(`^${originOf(tlsRepo)}/${repo.name}/`));
+        expect(resource['@id']).toMatch(
+          new RegExp(`^${originOf(tlsRepo)}/${repoPath(repo.name)}/`),
+        );
       }
     }
   });
