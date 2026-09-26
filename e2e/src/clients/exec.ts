@@ -38,7 +38,8 @@ export interface RunOptions {
    * `docker`, which needs what the runner has), and NOT merged when there is one, so a client
    * whose environment is built with `clientEnv` (`client-env.ts`, RPS-1446) or `sealedEnv` (the
    * npm-family, `runSealed`, RPS-1364) never sees the runner's variables, the admin password among
-   * them. Pass `true` to merge an explicit `env` anyway.
+   * them. Pass `true` to merge an explicit `env` anyway (a harness tool such as `docker compose`
+   * that is given a few more variables; the `REPSY_*` refusal does not apply to it then).
    */
   extendEnv?: boolean;
   timeoutMs?: number;
@@ -124,7 +125,11 @@ export async function run(
 ): Promise<RunResult> {
   const secrets = opts.redact ?? [];
   const commandLine = redactedCommandLine(command, args, secrets);
-  assertNoRunnerVariables(command, opts.env);
+  // extendEnv: true is a harness tool that gets the runner's environment anyway (see RunOptions.extendEnv),
+  // so a REPSY_* key in its `env` (docker compose interpolating REPSY_IMAGE) leaks nothing.
+  if (opts.extendEnv !== true) {
+    assertNoRunnerVariables(command, opts.env);
+  }
 
   const result = await execa(command, args, {
     cwd: opts.cwd,

@@ -93,7 +93,7 @@ e2e/
   runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
   runners/ruby.Dockerfile      # + a pinned Ruby toolchain (ruby/gem/bundle/bundler + stdlib) copied out of the official ruby image
-  runners/stack.Dockerfile     # + the static `docker` CLI copied out of docker-cli; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
+  runners/stack.Dockerfile     # + the static `docker` CLI and its compose plugin copied out of docker-cli, a JDK + Maven, crane and npm; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
   runners/ui.Dockerfile        # + Playwright's own headless Chromium (build-time install, /ms-playwright); the "ui" runner, see "UI suite"
   runners/scanner-stub.Dockerfile  # the stub scanner of the scanner stack (src/stubs/scanner/ on node:24, no dependencies, no build)
   runners/ui-seccomp.json      # Playwright's seccomp profile, so Chromium's sandbox works as a non-root uid in Docker
@@ -124,7 +124,7 @@ e2e/
       sbt-extras.ts             # registerSbtExtras(): the sbt-only checks (file set, cross-build, .credentials, defaults, panel), RPS-134
     ui/                        # the panel UI suite's plumbing (fixtures, session seeding, page objects) -- see "UI suite"
     clients/
-      stack.ts                  # findRepsyContainer()/dockerExec()/logLinesContaining(): docker exec + docker logs against the local stack's Repsy container ("Stack runner")
+      stack.ts                  # findRepsyContainer()/dockerExec()/logLinesContaining(), restartRepsy()/crashRepsy()/recreateRepsy()/restoreStack(): docker exec, logs, restart and compose recreate of the local stack's Repsy container ("Stack runner")
       exec.ts                   # execa wrapper: isolated work dir/HOME, redacted logs, attach-on-fail, an explicit env is the child's whole env
       client-env.ts             # clientEnv(): the allow-list environment every client runs in (RPS-1446); env-probe.ts reads it back for the sealed-env specs
       raw-http.ts                # shared raw-HTTP building blocks: RawResponse, adminCredential(), authHeader(), sha256Hex, 429 backoff
@@ -3527,6 +3527,60 @@ The reset user is always one the test created through the panel API (the seeder 
 the test's own users are read, so no other password is ever printed. Flip check: `docker exec -u root
 <repsy> chown root:root /app/data/password-reset` (the Dockerfile bug the case guards against) makes
 all four tests fail on the owner assertion or on `touch: Permission denied`.
+
+### Restart, crash and recreate: persistence (RPS-1476)
+
+`tests/stack/persistence.spec.ts` (`@local-only`, serial) proves what outlives the Repsy container, on
+the PostgreSQL stack and on the H2 stack alike (`./run.sh local up [--h2]`, then
+`./run.sh test --protocol stack --grep persistence`; both legs are the same spec, only the H2-file
+assertion is profile specific). RPS-1401 put the default storage on the `/app/data` volume without a test
+that a package outlives its container, and the H2 file database (same volume) is the riskier half.
+
+It publishes a Maven artifact (`mvn deploy`), an npm package (`npm publish`) and a Docker image
+(`crane push`) into one repo each, with the scenario adapters' `seedPublish` (the real client, no raw
+probe), takes a deploy token per repo and a panel user, and after each event checks that every package is
+consumed again by the real client with the admin password AND with the deploy token, byte for byte, that
+the panel lists it (Maven versions, the npm latest version, the Docker image digest) and that the user and
+the admin still log in:
+
+1. control: `/app/data` is a volume (not the container layer), `STORAGE_BASE_PATH` is under it, the
+   storage holds files, and on H2 `/app/data/repsy.mv.db` exists;
+2. `docker restart` (SIGTERM): same container, everything there;
+3. recreate (`docker compose up --force-recreate`): a new container, the SAME `/app/data` volume, everything
+   there;
+4. crash (`docker kill --signal KILL`, `docker start`): nothing committed is lost;
+5. sessions: with `OS_APP_JWT_SECRET` unset (every stack file) a restart and a recreate each end a session:
+   the access token and the refresh token from before are answered 401 `accessNotAllowed`; recreated with
+   `docker-compose.stack-jwt.yml` and a secret (`REPSY_E2E_JWT_SECRET`, random per run), both stay valid
+   across a restart and a recreate, and go back to 401 when the stack is restored to no secret.
+
+The helpers are reusable (RPS-1487, the upgrade path, recreates on another image with them),
+`src/clients/stack.ts`:
+
+- `restartRepsy(stopTimeoutSeconds?)`, `crashRepsy()`: same container; wait for the healthcheck;
+- `recreateRepsy({ env, extraFiles, files })`: `docker compose -p <project> -f <files> up -d --no-deps
+--no-build --force-recreate --wait repsy`, from the compose files the container was created from (its
+  `com.docker.compose.project.config_files` label) plus overlays, with `env` added to what the stack files
+  interpolate (`REPSY_IMAGE` for another image, `REPSY_E2E_JWT_SECRET`), and returns the new container id.
+  Take `currentComposeFiles()` BEFORE an overlay recreate and pass it to `restoreStack()` (or as `files`)
+  to go back; after an overlay the labels name the overlay too. Anonymous volumes are carried over, which
+  is what makes it a recreate "on the same volume"; `dataMount()` names the volume to prove it;
+- how compose runs inside the runner: it mounts the e2e directory read-only at its HOST path
+  (`REPSY_E2E_HOST_DIR`, exported by `run.sh`), so the labels' absolute paths resolve, and forwards the
+  ports, `REPSY_E2E_IMAGE_TAG` and `REPSY_IMAGE` the stack files interpolate. `run()` with
+  `extendEnv: true` accepts `REPSY_*` variables (a harness tool, not a client).
+
+Every panel session the harness holds dies with a restart of a stack without a fixed secret, so
+`relogin()` (a fresh `PanelApi.login`) comes before any further panel call and before the seeder's cleanup;
+a Basic-auth client authenticates per request and never notices. The runner runs with
+`REPSY_E2E_WORKERS=1` (`playwright.config.ts`), never against a shared stack. The stack runner image is
+about 1.5 GB (JDK, Maven, crane, compose plugin; versions pinned in `docker-compose.runners.yml` next to
+the maven and docker runners' and to be kept equal to them).
+
+Flip checks (each made the named test fail, then reverted): `--renew-anon-volumes` on the recreate (the
+volume is another one), the secret set in the "unset" case (the token after the restart is accepted),
+`STORAGE_BASE_PATH=/home/appuser/.repsy` in the stack file (control test: the path is not under `/app/data`;
+without it the recreate test: Maven 404).
 
 ## API suite (RPS-1480)
 
