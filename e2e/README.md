@@ -4107,6 +4107,11 @@ by the backend's own ITs.
 | Findings              | whatever the DB says today                  | fixed by the package name               |
 | Failed / refused scan | cannot be produced                          | by the package name                     |
 
+The stack does not use the published scanner image (`repo.repsy.io/repsy/os/repsy-scanner-trivy`, released
+with every Repsy version since RPS-1400) for the same reasons, and the stub is a deliberate, permanent choice
+rather than a placeholder: the leg has to be offline, fast and able to produce failures. The published image
+is therefore not exercised by any e2e leg; its build is the only thing the release workflow checks.
+
 ```bash
 ./run.sh local up --scanner          # (or REPSY_E2E_SCANNER=1) postgres + Repsy + the stub scanner; add --h2 for H2
 REPSY_UI_OPT_IN=scanner ./run.sh test --protocol ui --grep @scanner       # with REPSY_E2E_SCANNER=1 the opt-in is implied
