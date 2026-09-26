@@ -484,3 +484,145 @@ export async function rawUploadBlob(
     digestHeader: res.headers.get('docker-content-digest') ?? undefined,
   };
 }
+
+// ---------------------------------------------------------------------------------------------
+// RPS-1478 part A: the listing endpoints and the `mount=` fallback (`tests/docker/registry-api.spec.ts`)
+// ---------------------------------------------------------------------------------------------
+
+/** The scope `skopeo`/`crane catalog`/`regctl repo ls` ask a `GET /v2/_catalog` token for. The
+ *  server never reads it (the route does not exist), it is only what a real client would send. */
+export const CATALOG_SCOPE = 'registry:catalog:*';
+
+/** A bare GET/HEAD of `/v2<pathSuffix>` with NO `Authorization` header at all (what a client that
+ *  skipped the ping-and-token dance would send). Keeps the challenge header so a test can say whether
+ *  the server answered with a `Bearer` challenge (a known route) or not (an unknown one). */
+export async function rawGetAnonymous(
+  pathSuffix: string,
+  method: 'GET' | 'HEAD' = 'GET',
+): Promise<RawResponse & { hop: 'request'; wwwAuthenticate?: string }> {
+  const res = await rawFetch(v2Url(pathSuffix), { method });
+  return {
+    status: res.status,
+    body: res.body,
+    hop: 'request',
+    wwwAuthenticate: res.headers.get('www-authenticate') ?? undefined,
+  };
+}
+
+/** `GET /v2/<repo>/<image>/tags/list[?query]` through the two-hop `dockerRequest` for `pullScope`
+ *  (what `crane ls`, `skopeo list-tags` and `regctl tag ls` send). `query` is appended as given
+ *  (`n=1&last=x` is the pagination a real client may add). */
+export async function rawTagsList(
+  repoName: string,
+  credential: MaterializedCredential,
+  image: string,
+  query?: string,
+): Promise<RawResponse & { hop: 'token' | 'request'; contentType?: string }> {
+  const suffix = `/${repoName}/${image}/tags/list${query ? `?${query}` : ''}`;
+  const res = await dockerRequest(credential, pullScope(repoName, image), (headers) =>
+    rawFetch(v2Url(suffix), { headers }),
+  );
+  return {
+    status: res.status,
+    body: res.body,
+    hop: res.hop,
+    contentType: res.headers.get('content-type') ?? undefined,
+  };
+}
+
+/** `GET /v2/_catalog[?query]` through the two-hop `dockerRequest` for `CATALOG_SCOPE`. */
+export async function rawCatalog(
+  credential: MaterializedCredential,
+  query?: string,
+): Promise<RawResponse & { hop: 'token' | 'request' }> {
+  const res = await dockerRequest(credential, CATALOG_SCOPE, (headers) =>
+    rawFetch(v2Url(`/_catalog${query ? `?${query}` : ''}`), { headers }),
+  );
+  return { status: res.status, body: res.body, hop: res.hop };
+}
+
+/** `GET /v2/<repo>/<image>/referrers/<digest>[?artifactType=...]` (OCI distribution 1.1's referrers
+ *  API, what `oras discover`, `regctl artifact tree` and `cosign tree` ask first) through the
+ *  two-hop `dockerRequest` for `pullScope`. */
+export async function rawReferrers(
+  repoName: string,
+  credential: MaterializedCredential,
+  image: string,
+  digest: string,
+  artifactType?: string,
+): Promise<RawResponse & { hop: 'token' | 'request' }> {
+  const suffix = `/${repoName}/${image}/referrers/${digest}${
+    artifactType ? `?artifactType=${encodeURIComponent(artifactType)}` : ''
+  }`;
+  const res = await dockerRequest(credential, pullScope(repoName, image), (headers) =>
+    rawFetch(v2Url(suffix), { headers }),
+  );
+  return { status: res.status, body: res.body, hop: res.hop };
+}
+
+export interface MountUploadResult {
+  /** The answer to `POST .../blobs/uploads/?mount=<digest>[&from=<repo>]`. */
+  status: number;
+  hop: 'token' | 'request';
+  body: Buffer;
+  /** The `Location` of the upload session (absent when the POST did not answer 202). */
+  location?: string;
+  /** `Docker-Upload-UUID` of the upload session. */
+  uploadUuid?: string;
+  /** Present when `bytes` was given and the POST answered 202: the `PUT <location>?digest=` after it. */
+  finalizeStatus?: number;
+  finalizeDigest?: string;
+}
+
+/**
+ * `POST /v2/<repo>/<image>/blobs/uploads/?mount=<digest>[&from=<fromRepo>]` (the cross-repository
+ * blob mount `docker push`, `skopeo copy` and `regctl image copy` attempt when the source and the
+ * destination live in one registry), and, when `bytes` is given and the POST answered `202` (the
+ * distribution spec's "mount not honoured, here is an upload session" fallback), the monolithic `PUT
+ * <location>?digest=` a client then sends -- all in ONE token hop. The token asks for the push scope
+ * of the destination only (a real client adds a pull scope for the source repository too; the
+ * token endpoint takes one `scope` here and the server never reads `from`, see the spec's header).
+ */
+export async function rawMountUpload(
+  repoName: string,
+  credential: MaterializedCredential,
+  image: string,
+  mount: { digest: string; fromRepo?: string; fromImage?: string },
+  bytes?: Buffer,
+): Promise<MountUploadResult> {
+  const from =
+    mount.fromRepo !== undefined && mount.fromImage !== undefined
+      ? `${mount.fromRepo}/${mount.fromImage}`
+      : mount.fromRepo;
+  const query = `mount=${encodeURIComponent(mount.digest)}${
+    from !== undefined ? `&from=${encodeURIComponent(from)}` : ''
+  }`;
+  let finalize: (RawResponse & { headers: Headers }) | undefined;
+  let start: (RawResponse & { headers: Headers }) | undefined;
+  const res = await dockerRequest(credential, pushScope(repoName, image), async (headers) => {
+    start = await rawFetch(v2Url(`/${repoName}/${image}/blobs/uploads/?${query}`), {
+      method: 'POST',
+      headers,
+    });
+    const location = start.headers.get('location');
+    if (bytes !== undefined && start.status === 202 && location) {
+      const url = new URL(location, env.repoBaseUrl);
+      url.searchParams.set('digest', mount.digest);
+      finalize = await rawFetch(url.toString(), {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/octet-stream' },
+        body: new Uint8Array(bytes),
+      });
+    }
+    return start;
+  });
+  return {
+    status: res.status,
+    hop: res.hop,
+    body: res.body,
+    location: start?.headers.get('location') ?? undefined,
+    uploadUuid: start?.headers.get('docker-upload-uuid') ?? undefined,
+    finalizeStatus: finalize?.status,
+    finalizeDigest: finalize?.headers.get('docker-content-digest') ?? undefined,
+  };
+}
