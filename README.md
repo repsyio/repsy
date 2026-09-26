@@ -422,6 +422,23 @@ and after the upgrade. A manifest whose file is missing or does not match its di
 `WARN` and left exactly as it was. Progress and results are logged at `INFO`
 (`Docker manifest layout repair: ...`).
 
+### NuGet versions with build metadata (RPS-996 / RPS-1059 / RPS-1123)
+
+NuGet ignores build metadata when it compares versions: `1.0.0+a` and `1.0.0` are the same version. The first release that contains RPS-996 (a version is stored, and found, by its version without build metadata), RPS-1059 (the migration below) and RPS-1123 (no lookup by the old spelling any more) stores a pushed `1.0.0+a` as `1.0.0`. The latest release, `v26.08.4`, contains none of these changes, so this applies starting with the next release.
+
+**What happens:** versions that an earlier release stored with build metadata (`1.0.0+a`, in a directory of its own) are moved to their version without it (`1.0.0`) by a runner that starts with the application: it copies the files, renames the database row and the scans, and removes the old directory. It is idempotent, and a version that fails is retried on the next start. A database without such versions costs one query and logs nothing. Progress is logged at `INFO` (`NuGet versions stored with build metadata: ...`).
+
+**Conflicts:** when `1.0.0` already exists next to `1.0.0+a` the runner cannot decide which upload is the right one. It leaves both, logs each conflict (repository, package, version) at `WARN` on every start, and never drops one. Until you act, a request for `1.0.0+a` is answered with the files of `1.0.0`, and both still show in the version list.
+
+**To resolve a conflict:** compare both uploads and then
+
+- to keep `1.0.0` and drop the other one, delete the `1.0.0+a` entry in the web UI. This removes only that entry and its directory;
+- to keep the other upload, delete `1.0.0` in the web UI and restart Repsy: the runner then promotes `1.0.0+a` to `1.0.0`.
+
+Deleting `1.0.0+a` when there is no such entry (the usual case) still deletes `1.0.0`, since they are one version. Releases before this change deleted `1.0.0` in both cases, so a conflict could not be cleaned up by deleting its entry.
+
+**Removal of the runner:** it is kept in this release and in every release within about six months of it. It is removed in the first release after that (about `27.03.x`), together with this section and with the sentence "Installations older than N must upgrade to N..27.02 first." (N is the release that first contains the runner, and 27.02 the last release that still has it). An installation that skips from an older release to one without the runner keeps its versions stored with build metadata: they are not served, and the panel shows them under their old spelling.
+
 ## Configuration
 
 ### Environment Variables

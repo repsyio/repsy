@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -26,8 +27,12 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
+@ExtendWith(OutputCaptureExtension.class)
 @DisplayName("NuGetBuildMetadataVersionMigrationRunner (RPS-1059)")
 class NuGetBuildMetadataVersionMigrationRunnerTest {
 
@@ -63,6 +68,47 @@ class NuGetBuildMetadataVersionMigrationRunnerTest {
     assertThatCode(() -> this.runner.run(this.arguments)).doesNotThrowAnyException();
 
     verify(this.service).migrate();
+  }
+
+  @Test
+  @DisplayName("lists every conflict (repo, package, version) in a WARN that points to the README")
+  void listsConflicts(final CapturedOutput output) {
+    final var first =
+        new NuGetBuildMetadataVersion(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "nuget-a",
+            "some.package",
+            "1.0.0+build");
+    final var second =
+        new NuGetBuildMetadataVersion(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "nuget-b",
+            "other.package",
+            "2.0.0+x");
+    when(this.service.migrate()).thenReturn(new MigrationReport(0, 0, List.of(first, second)));
+
+    this.runner.run(this.arguments);
+
+    assertThat(output.getAll())
+        .contains("WARN")
+        .contains("(nuget-a, some.package, 1.0.0+build)")
+        .contains("(nuget-b, other.package, 2.0.0+x)")
+        .contains("NuGet versions with build metadata")
+        .contains("Upgrading");
+  }
+
+  @Test
+  @DisplayName("does not warn when nothing is left for an operator")
+  void noConflictsNoWarning(final CapturedOutput output) {
+    when(this.service.migrate()).thenReturn(new MigrationReport(3, 0, List.of()));
+
+    this.runner.run(this.arguments);
+
+    assertThat(output.getAll()).doesNotContain("left for an operator, their canonical");
   }
 
   @Test

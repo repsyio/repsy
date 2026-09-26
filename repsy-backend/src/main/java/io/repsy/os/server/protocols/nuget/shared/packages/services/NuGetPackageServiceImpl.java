@@ -349,18 +349,35 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   public boolean deleteVersion(
       final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
 
-    return this.deleteVersionAndGetDeletedItem(repoInfo, packageId, version)
+    return this.deleteVersionAndGetDeletion(repoInfo, packageId, version).deletedItem()
         == NuGetDeletedItem.PACKAGE;
   }
 
+  /**
+   * What {@link #deleteVersionAndGetDeletion} removed.
+   *
+   * @param deletedItem the version, or the whole package when it was the last version
+   * @param storedVersion the version of the deleted row, as stored: the canonical version, or (a
+   *     row the RPS-1059 migration left because its canonical version exists) one with build
+   *     metadata, whose files are in a directory of their own
+   */
+  public record VersionDeletion(NuGetDeletedItem deletedItem, String storedVersion) {}
+
+  /**
+   * Deletes a version, by the string a client sent. A version with build metadata is normally the
+   * canonical version, but a row that the RPS-1059 migration left as a conflict (a {@code 1.0.0+a}
+   * row beside {@code 1.0.0}) is deleted by its own spelling, and only it: the canonical row is
+   * kept (RPS-1311).
+   */
   @Transactional
-  public NuGetDeletedItem deleteVersionAndGetDeletedItem(
+  public VersionDeletion deleteVersionAndGetDeletion(
       final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
 
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
     final var pkgVersion =
-        this.findVersion(pkg, version)
+        this.findLeftoverBuildMetadataVersion(pkg, version)
+            .or(() -> this.findVersion(pkg, version))
             .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
 
     this.packageVersionRepository.delete(pkgVersion);
@@ -370,10 +387,25 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
     if (!packageHasVersions) {
       this.packageRepository.delete(pkg);
-      return NuGetDeletedItem.PACKAGE;
+      return new VersionDeletion(NuGetDeletedItem.PACKAGE, pkgVersion.getVersion());
     }
 
-    return NuGetDeletedItem.VERSION;
+    return new VersionDeletion(NuGetDeletedItem.VERSION, pkgVersion.getVersion());
+  }
+
+  /**
+   * Finds a row that is stored with exactly the build metadata the client sent. Only the RPS-1059
+   * migration can leave one, so this is empty in every other case and the canonical lookup applies.
+   */
+  private Optional<NuGetPackageVersion> findLeftoverBuildMetadataVersion(
+      final NuGetPackage pkg, final String version) {
+
+    if (!version.contains("+")) {
+      return Optional.empty();
+    }
+
+    return this.packageVersionRepository.findByNugetPackageIdAndVersionIgnoreCase(
+        pkg.getId(), version);
   }
 
   /**

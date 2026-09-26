@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
@@ -26,6 +27,16 @@ import org.springframework.stereotype.Component;
  * Migrates, on startup, the NuGet versions that were stored with build metadata to their canonical
  * version. A clean database costs one query and logs nothing. A failure is logged and does not stop
  * the application from starting, since the next start tries again.
+ *
+ * <p><b>Removal (RPS-1311).</b> The runner stays in the first release that contains the
+ * normalisation of build metadata (RPS-996, RPS-1059, RPS-1123), in every release within about six
+ * months of it, and is removed in the first release after that, together with the README
+ * "Upgrading" sentence that installations older than that release must upgrade to it (or to the
+ * last release that still has the runner) first. It is not removed sooner because an installation
+ * that skipped the release would keep its versions stored with build metadata.
+ *
+ * <p>A conflict (a {@code 1.0.0+a} row whose {@code 1.0.0} exists) is never dropped: it is listed
+ * in the log and an operator decides, as the README "Upgrading" section describes.
  */
 @Slf4j
 @NullMarked
@@ -50,6 +61,16 @@ public class NuGetBuildMetadataVersionMigrationRunner implements ApplicationRunn
           report.migrated(),
           report.failed(),
           report.conflicts().size());
+
+      if (!report.conflicts().isEmpty()) {
+        log.warn(
+            "NuGet versions left for an operator, their canonical version already exists (repo,"
+                + " package, version): {}. The runner never drops a conflict. See the README"
+                + " section \"NuGet versions with build metadata\" under \"Upgrading\".",
+            report.conflicts().stream()
+                .map(c -> "(%s, %s, %s)".formatted(c.repoName(), c.packageId(), c.version()))
+                .collect(Collectors.joining(", ")));
+      }
     } catch (final RuntimeException e) {
       log.error("Could not migrate the NuGet versions stored with build metadata", e);
     }
