@@ -43,7 +43,8 @@ import type {
   UserCreateModal,
 } from '../../../src/ui/pages/users.js';
 
-test.describe('USR-01 create a user', () => {
+// @cloud-skip: the admin Users page exists on Repsy OS only (`target.ui.hasUsersPage`).
+test.describe('USR-01 create a user', { tag: ['@cloud-skip'] }, () => {
   test('a created USER appears in the list and can log in from a fresh context', async ({
     usersPage,
     seeder,
@@ -193,7 +194,8 @@ const CASES: ValidationCase[] = [
   { name: 'confirmation that differs', value: 'Other-Pass1', ...confirmation('mismatch') },
 ];
 
-test.describe('USR-02 create validation', () => {
+// @cloud-skip: the admin Users page exists on Repsy OS only (`target.ui.hasUsersPage`).
+test.describe('USR-02 create validation', { tag: ['@cloud-skip'] }, () => {
   for (const testCase of CASES) {
     test(`${testCase.name} shows the ${testCase.validator} message and blocks the submit`, async ({
       usersPage,

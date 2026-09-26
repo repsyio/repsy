@@ -24,10 +24,19 @@ scanner:
   job-retention-check-interval-ms: ${SCANNER_JOB_RETENTION_CHECK_INTERVAL_MS:600000}
   security:
     api-key: ${SCANNER_API_KEY}
+  advisories:
+    # The limits are part of the POST /advisories contract (README), not settings.
+    max-packages: 20000
+    max-body-bytes: 10485760
+    timeout-seconds: ${TRIVY_ADVISORY_TIMEOUT_SECONDS:30}
+    concurrency: ${SCANNER_ADVISORY_CONCURRENCY:2}
+    max-wait-seconds: ${SCANNER_ADVISORY_MAX_WAIT_SECONDS:5}
   trivy:
     binary-path: ${TRIVY_BINARY_PATH:trivy}
     timeout-seconds: ${TRIVY_TIMEOUT_SECONDS:300}
     db-repository: ${TRIVY_DB_REPOSITORY:ghcr.io/aquasecurity/trivy-db:2,mirror.gcr.io/aquasec/trivy-db:2}
+    cache-dir: ${TRIVY_CACHE_DIR:${user.home}/.cache/trivy}
+    db-refresh-interval: ${TRIVY_DB_REFRESH_INTERVAL:PT12H}
     java-db-repository: ${TRIVY_JAVA_DB_REPOSITORY:ghcr.io/aquasecurity/trivy-java-db:1,mirror.gcr.io/aquasec/trivy-java-db:1}
 
 logging:

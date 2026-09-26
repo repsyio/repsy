@@ -77,12 +77,10 @@
  *    deliberate) and the protocol port (the `go` command's own `GET <GOPROXY>/sumdb/supported` lands
  *    on the download handler, which 404s by a plain storage miss -- confirmed live/G9, the same
  *    observed signal on both ports by accident, not by any shared code path).
- *  - `HEAD` on ANY path (an existing `.info` included) is `404` -- confirmed live/H17: no
- *    `ProtocolMethodHandler` in either Go package lists `HttpMethod.HEAD` among its supported methods
- *    (only the download handler's `GET` and the upload handler's `PUT`), so the router itself has
- *    nothing to dispatch a `HEAD` to. This is the OPPOSITE of pypi's own `HEAD`-always-`200` quirk
- *    (`pypi-raw.ts`'s file header, P6): Go's router refuses a method it has no handler for, PyPI's
- *    root-level early-return does not check existence at all.
+ *  - `HEAD` answers the status and the headers of the matching `GET` (`AbstractGoHeadProtocolMethodHandler`,
+ *    RPS-1465), with the `Content-Length` of the file, and the same plain-text `404` for a file that
+ *    does not exist. It was a `404` for EVERY path, an existing `.info` included (H17, R15), because
+ *    no `ProtocolMethodHandler` listed `HttpMethod.HEAD`, so the router had nothing to dispatch to.
  *  - Auth (`GolangAuthPreProcessor`, priority 100): skipped only for a public-repo READ. Otherwise a
  *    missing/unparseable `Authorization` is a `401` + `WWW-Authenticate: Basic realm="Repsy"` with
  *    a `text/plain` message (RPS-1435: the `go` command prints a body only when it is `text/plain`,
@@ -461,8 +459,8 @@ export async function rawGet(
   return toGoResponse(res);
 }
 
-/** Raw `HEAD` of any path (H17: always `404`, confirmed live -- neither protocol method handler lists
- *  `HEAD` among its supported methods). */
+/** Raw `HEAD` of any path: the status and headers of the matching `GET` (RPS-1465; H17 found it a
+ *  `404` for every path, an existing `.info` included, because no handler supported `HEAD`). */
 export async function rawHead(
   repoName: string,
   credential: MaterializedCredential,

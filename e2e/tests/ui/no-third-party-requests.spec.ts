@@ -108,25 +108,26 @@ test.describe('No third-party requests', { tag: '@net' }, () => {
     expect(iconFont).toContain('loaded');
   });
 
-  test('NET-01 the signed-in pages ask for nothing outside the stack', async ({
-    adminPage,
-    baseURL,
-    seeder,
-  }) => {
-    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: false });
-    const external = recordExternalRequests(adminPage.context(), baseURL);
-    const problems = recordPageProblems(adminPage.context());
+  // @cloud-skip: walks the OS panel's pages (Users, profile); Repsy Cloud's own page list is RPS-1639's.
+  test(
+    'NET-01 the signed-in pages ask for nothing outside the stack',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage, baseURL, seeder }) => {
+      const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: false });
+      const external = recordExternalRequests(adminPage.context(), baseURL);
+      const problems = recordPageProblems(adminPage.context());
 
-    await new DashboardPage(adminPage).goto();
-    await new RepositoriesPage(adminPage).goto();
-    await new RepoSettingsPage(adminPage, repo.name).goto();
-    await new UsersPage(adminPage).goto();
+      await new DashboardPage(adminPage).goto();
+      await new RepositoriesPage(adminPage).goto();
+      await new RepoSettingsPage(adminPage, repo.name).goto();
+      await new UsersPage(adminPage).goto();
 
-    // The header shows the avatar on every one of these pages; it used to ask Gravatar for an image.
-    await new ProfilePage(adminPage).goto();
-    await expect(new Shell(adminPage).header.avatar).toBeVisible();
+      // The header shows the avatar on every one of these pages; it used to ask Gravatar for an image.
+      await new ProfilePage(adminPage).goto();
+      await expect(new Shell(adminPage).header.avatar).toBeVisible();
 
-    expect(external).toEqual([]);
-    expect(problems).toEqual({ misserved: [] });
-  });
+      expect(external).toEqual([]);
+      expect(problems).toEqual({ misserved: [] });
+    },
+  );
 });

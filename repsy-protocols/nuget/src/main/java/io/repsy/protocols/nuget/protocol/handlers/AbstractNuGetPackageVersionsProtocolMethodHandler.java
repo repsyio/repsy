@@ -40,7 +40,7 @@ import org.springframework.http.ResponseEntity;
 public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
     implements ProtocolMethodHandler {
 
-  private static final Pattern VERSIONS_PATTERN =
+  static final Pattern VERSIONS_PATTERN =
       Pattern.compile("^.*/v3/package/[^/]+/index\\.json$", Pattern.CASE_INSENSITIVE);
 
   private final PathParser basePathParser;

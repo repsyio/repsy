@@ -40,6 +40,7 @@
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import { golangAdapter } from '../../src/clients/golang.js';
+import { expectHeadMirrorsGet } from '../../src/clients/head-parity.js';
 import {
   adminCredential,
   authHeader,
@@ -581,7 +582,8 @@ test.describe('golang registry rules (raw HTTP)', () => {
   );
 
   test(
-    'HEAD on any path (existing or not) is 404 -- no handler supports it (R15/H17)',
+    'a HEAD answers the status and headers of its GET for every module file, and the 404 of a ' +
+      'file that does not exist (R15, RPS-1465)',
     {
       tag: ['@negative'],
     },
@@ -591,20 +593,37 @@ test.describe('golang registry rules (raw HTTP)', () => {
 
       const built = await buildModuleZip({ modulePath: layout.modulePath, version: 'v0.0.1' });
       expectMsgId(await rawUpload(layout.repoName, admin, built), 200, undefined);
+      const headers = authHeader(admin);
 
-      const existingRes = await rawHead(
-        layout.repoName,
-        admin,
+      for (const relPath of [
         infoRelPath(layout.modulePath, 'v0.0.1'),
-      );
-      expect(existingRes.status, 'HEAD of a path that DOES exist').toBe(404);
+        modRelPath(layout.modulePath, 'v0.0.1'),
+        zipRelPath(layout.modulePath, 'v0.0.1'),
+        listRelPath(layout.modulePath),
+        latestRelPath(layout.modulePath),
+      ]) {
+        await expectHeadMirrorsGet(relPath, repoUrl(layout.repoName, relPath), headers, {
+          contentLength: true,
+        });
+      }
 
+      // Before RPS-1465 every HEAD was the router's generic 404, an existing file included.
       const missingRes = await rawHead(
         layout.repoName,
         admin,
         infoRelPath(layout.modulePath, 'v9.9.9'),
       );
       expect(missingRes.status, 'HEAD of a path that does not exist').toBe(404);
+      expect(missingRes.contentType, 'the plain-text 404 of the GET').toMatch(/^text\/plain/);
+
+      // The same credential rules as the GET: no credentials on a private repo is a 401.
+      const anonymous = await fetch(
+        repoUrl(layout.repoName, zipRelPath(layout.modulePath, 'v0.0.1')),
+        {
+          method: 'HEAD',
+        },
+      );
+      expect(anonymous.status, 'HEAD of a private module without credentials').toBe(401);
     },
   );
 

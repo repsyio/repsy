@@ -30,6 +30,7 @@ import {
   SEEDERS,
 } from '../../../src/seed/packages.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
+import { repoRoute } from '../../../src/ui/routes.js';
 import {
   DESCRIPTORS,
   type ProtocolListPage,
@@ -266,12 +267,12 @@ test.describe('package seeding proof', () => {
     await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}/e2e-[a-z0-9]+$`));
 
     const tilde = pages.sublist(unscoped);
-    expect(tilde.path()).toBe(`/${repo.name}/~`);
+    expect(tilde.path()).toBe(repoRoute(repo.name, '~'));
     await tilde.goto();
     await tilde.expectRow(unscoped);
 
     const versions = pages.versions(unscoped);
-    expect(versions.path()).toBe(`/${repo.name}/~/${unscoped.name}`);
+    expect(versions.path()).toBe(repoRoute(repo.name, '~', unscoped.name));
     await versions.goto();
     await versions.expectRow(unscoped);
   });

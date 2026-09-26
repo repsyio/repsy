@@ -138,24 +138,26 @@ test.describe('Not-found page', () => {
     await expect(shell.header.burger).toHaveAttribute('aria-expanded', 'false');
   });
 
-  test('ERR-04: a USER at phone width gets the same burger, without Users and Security', async ({
-    openUiPage,
-    seededUser,
-  }) => {
-    const session = await loginSession(seededUser.username, seededUser.password);
-    const page = await openUiPage({ session, viewport: PHONE });
-    const shell = new Shell(page);
+  // @cloud-skip: runs as a seeded USER; Repsy Cloud has no USER role.
+  test(
+    'ERR-04: a USER at phone width gets the same burger, without Users and Security',
+    { tag: ['@cloud-skip'] },
+    async ({ openUiPage, seededUser }) => {
+      const session = await loginSession(seededUser.username, seededUser.password);
+      const page = await openUiPage({ session, viewport: PHONE });
+      const shell = new Shell(page);
 
-    await page.goto('/not-found');
+      await page.goto('/not-found');
 
-    await expect(page.getByTestId('not-found')).toBeVisible();
-    await shell.header.burger.click();
-    await expect(shell.mobileSidebar.link('repositories')).toBeVisible();
-    await expect(shell.mobileSidebar.link('users')).toHaveCount(0);
-    await expect(shell.mobileSidebar.link('security')).toHaveCount(0);
-    await shell.mobileSidebar.close.click();
-    await expect(shell.mobileSidebar.root).toHaveCount(0);
-  });
+      await expect(page.getByTestId('not-found')).toBeVisible();
+      await shell.header.burger.click();
+      await expect(shell.mobileSidebar.link('repositories')).toBeVisible();
+      await expect(shell.mobileSidebar.link('users')).toHaveCount(0);
+      await expect(shell.mobileSidebar.link('security')).toHaveCount(0);
+      await shell.mobileSidebar.close.click();
+      await expect(shell.mobileSidebar.root).toHaveCount(0);
+    },
+  );
 
   test('ERR-04: a signed-in visitor at desktop width has the sidebar and no burger on the 404 page', async ({
     adminPage,

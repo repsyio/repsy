@@ -220,49 +220,57 @@ test.describe('Error handling', () => {
     });
   });
 
-  test('ERR-02: an aborted request on another page (users) gives the same toast', async ({
-    adminPage,
-  }) => {
-    const users = new UsersPage(adminPage);
-    await withRoute(adminPage, USERS_URL, abort, async () => {
-      const raised = expectToastLater(users.shell.toasts, 'Connection error');
-      await adminPage.goto('/users');
-      await raised;
-      await expect(users.title).toBeVisible();
-    });
-  });
-
-  test('ERR-03: a 403 without a body on an admin endpoint shows "Access denied"', async ({
-    adminPage,
-  }) => {
-    const users = new UsersPage(adminPage);
-    await withRoute(adminPage, USERS_URL, respondWith(403), async () => {
-      const raised = expectToastLater(users.shell.toasts, 'Access denied');
-      await adminPage.goto('/users');
-      await raised;
-      await expect(users.title).toBeVisible();
-      await expect(users.rows()).toHaveCount(0);
-    });
-  });
-
-  test('ERR-03: a 403 that carries a server text shows that text instead', async ({
-    adminPage,
-  }) => {
-    const users = new UsersPage(adminPage);
-    await withRoute(
-      adminPage,
-      USERS_URL,
-      respondWith(403, { text: 'Only administrators may list users' }),
-      async () => {
-        const raised = expectToastLater(users.shell.toasts, 'Only administrators may list users');
+  // @cloud-skip: the Users page exists on Repsy OS only.
+  test(
+    'ERR-02: an aborted request on another page (users) gives the same toast',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage }) => {
+      const users = new UsersPage(adminPage);
+      await withRoute(adminPage, USERS_URL, abort, async () => {
+        const raised = expectToastLater(users.shell.toasts, 'Connection error');
         await adminPage.goto('/users');
         await raised;
-        await expect(users.shell.toasts.toast().filter({ hasText: 'Access denied' })).toHaveCount(
-          0,
-        );
-      },
-    );
-  });
+        await expect(users.title).toBeVisible();
+      });
+    },
+  );
+
+  // @cloud-skip: the Users page exists on Repsy OS only.
+  test(
+    'ERR-03: a 403 without a body on an admin endpoint shows "Access denied"',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage }) => {
+      const users = new UsersPage(adminPage);
+      await withRoute(adminPage, USERS_URL, respondWith(403), async () => {
+        const raised = expectToastLater(users.shell.toasts, 'Access denied');
+        await adminPage.goto('/users');
+        await raised;
+        await expect(users.title).toBeVisible();
+        await expect(users.rows()).toHaveCount(0);
+      });
+    },
+  );
+
+  test(
+    'ERR-03: a 403 that carries a server text shows that text instead',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage }) => {
+      const users = new UsersPage(adminPage);
+      await withRoute(
+        adminPage,
+        USERS_URL,
+        respondWith(403, { text: 'Only administrators may list users' }),
+        async () => {
+          const raised = expectToastLater(users.shell.toasts, 'Only administrators may list users');
+          await adminPage.goto('/users');
+          await raised;
+          await expect(users.shell.toasts.toast().filter({ hasText: 'Access denied' })).toHaveCount(
+            0,
+          );
+        },
+      );
+    },
+  );
 
   test('ERR-03: a 403 on /security toasts and sends the user back to the dashboard', async ({
     adminPage,

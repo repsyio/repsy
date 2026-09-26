@@ -18,6 +18,9 @@ import 'dotenv/config';
 
 import { defineConfig } from '@playwright/test';
 
+// A dependency-free module, so the config still loads without REPSY_ADMIN_PASSWORD (see below).
+import { uiBaseUrlFrom } from './src/ui/base-url.js';
+
 const isCI = Boolean(process.env.CI);
 
 // Retries are per project, not config-wide (RPS-1595). A retry hides a flake behind a warning nobody is
@@ -55,9 +58,10 @@ const uiWorkers = process.env.REPSY_UI_WORKERS ? Number(process.env.REPSY_UI_WOR
 const e2eWorkers = process.env.REPSY_E2E_WORKERS
   ? Number(process.env.REPSY_E2E_WORKERS)
   : undefined;
-// The SPA is served on the API port (8080), not the protocol port (9090).
-const uiBaseUrl =
-  process.env.REPSY_UI_BASE_URL || process.env.REPSY_API_BASE_URL || 'http://localhost:8080';
+// The SPA is served on the API port (8080), not the protocol port (9090). `uiBaseUrlFrom` is the one
+// place the chain lives (RPS-1638): REPSY_UI_BASE_URL, then on a Repsy Cloud target
+// REPSY_FRONTEND_BASE_URL, then REPSY_API_BASE_URL, then http://localhost:8080.
+const uiBaseUrl = uiBaseUrlFrom(process.env);
 
 // One project per protocol is added from step 2 onward; `skeleton` proves the harness itself
 // (seeding, cleanup, the raw-HTTP auth probe) and needs no protocol client or browser. `ui` is the

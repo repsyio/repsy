@@ -41,6 +41,7 @@ import type { BrowserContext, Page } from '@playwright/test';
 import { env } from '../env.js';
 import { type SeededUser } from '../seed/seeder.js';
 import { expect, test as base } from '../scenarios/fixtures.js';
+import { target } from '../target.js';
 import { applyUiDefaults } from './defaults.js';
 import { type PageErrorAllowList, PageErrors, watchPageErrors } from './page-errors.js';
 import {
@@ -49,6 +50,10 @@ import {
   seedSession,
   type UiSession,
 } from './session.js';
+
+// `@cloud-skip` (RPS-1638) marks a UI test or describe that only makes sense on Repsy OS (the Users page, a
+// seeded USER, the OS profile page...): the Cloud e2e package runs this suite with
+// `grepInvert: /@cloud-skip/`. Write it as a literal in the spec with a one-line reason; README "The UI seam".
 
 /** Tag for a test that changes a password/username or deletes an account: it must not use `adminPage`. */
 export const CREDENTIALS_TAG = '@credentials';
@@ -171,6 +176,12 @@ export const test = base.extend<UiFixtures & UiAutoFixtures, UiWorkerFixtures>({
   },
 
   seededUser: async ({ seeder }, use) => {
+    // The safety net behind the `@cloud-skip` tag (RPS-1638): a test that needs a USER and was not tagged
+    // skips with this reason on a target without the role, instead of failing in the seeder.
+    test.skip(
+      !target.supportsUserRole,
+      'this target has no USER role (supportsUserRole): seededUser/userPage cannot be seeded; tag the test @cloud-skip',
+    );
     await use(await seeder.createUser());
   },
 

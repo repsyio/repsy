@@ -18,7 +18,7 @@ package io.repsy.scanner.trivy.errors;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-public final class TrivyScanException extends RuntimeException {
+public class TrivyScanException extends RuntimeException {
 
   public TrivyScanException(final @NonNull String message) {
     super(message);

@@ -34,7 +34,7 @@ import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
-import { loginSession } from '../../../src/ui/session.js';
+import { loginSession, setStoredSessionValue } from '../../../src/ui/session.js';
 import { JWT_SHAPE, NO_SESSION, storedSession } from './stored-session.js';
 import { allowLists, errorToasts } from '../../../src/ui/page-errors.js';
 
@@ -79,7 +79,7 @@ test.describe('AUTH-08 expired access token (stubbed 401)', () => {
     // value on purpose, so the storage assertion below proves the SPA stored the NEW access token
     // (two tokens minted in the same second are otherwise identical).
     const stale = `${before.token}-stale`;
-    await adminPage.evaluate((token) => window.localStorage.setItem('token', token), stale);
+    await setStoredSessionValue(adminPage, 'token', stale);
     await expireAccessToken(adminPage, stale);
 
     // A new boot with the same storage: the dashboard's first API calls now hit the "expiry".
@@ -134,7 +134,7 @@ test.describe('AUTH-08 tampered access token', () => {
     await dashboard.goto();
     const before = await storedSession(adminPage);
     const tampered = `${before.token}x`;
-    await adminPage.evaluate((token) => window.localStorage.setItem('token', token), tampered);
+    await setStoredSessionValue(adminPage, 'token', tampered);
     let refreshCalls = 0;
     adminPage.on('request', (request) => {
       if (new URL(request.url()).pathname === REFRESH_PATH) {
@@ -157,7 +157,8 @@ async function expectLoggedOut(page: Page): Promise<void> {
   expect(await storedSession(page)).toEqual(NO_SESSION);
 }
 
-test.describe('AUTH-09 refused refresh token', () => {
+// @cloud-skip: these run as a seeded USER (`userPage`); Repsy Cloud has no USER role.
+test.describe('AUTH-09 refused refresh token', { tag: ['@cloud-skip'] }, () => {
   test.use({
     allowedPageErrors: errorToasts(
       'by design: the refresh is refused and the session ends',
@@ -174,7 +175,7 @@ test.describe('AUTH-09 refused refresh token', () => {
 
   test('a refresh token that is not a token logs the user out', async ({ userPage }) => {
     const session = await bootLoggedIn(userPage);
-    await userPage.evaluate(() => window.localStorage.setItem('refresh-token', 'not-a-token'));
+    await setStoredSessionValue(userPage, 'refreshToken', 'not-a-token');
     await expireAccessToken(userPage, session.token!);
 
     const refreshed = userPage.waitForResponse(isRefreshResponse);
@@ -240,7 +241,8 @@ test.describe('AUTH-09 refused refresh token', () => {
  * `accessDenied`; it used to be 401 `unAuthorized`, the same status as a lost session, so the SPA
  * could not tell them apart. Nothing is stubbed: both answers are the real ones.
  */
-test.describe('AUTH-12 permission failure is not a lost session', () => {
+// @cloud-skip: a USER answered 403 by a MANAGE route: the OS role model (Cloud has collaborators instead).
+test.describe('AUTH-12 permission failure is not a lost session', { tag: ['@cloud-skip'] }, () => {
   test.use({
     allowedPageErrors: allowLists(
       errorToasts(
@@ -316,7 +318,7 @@ test.describe('AUTH-12 permission failure is not a lost session', () => {
     // A msgId of its own, so nothing can mistake it for the permission failure above.
     expect(((await response.json()) as { msgId: string }).msgId).toBe('accessNotAllowed');
 
-    await userPage.evaluate((token) => window.localStorage.setItem('token', token), tampered);
+    await setStoredSessionValue(userPage, 'token', tampered);
     await userPage.reload();
 
     await expectLoggedOut(userPage);

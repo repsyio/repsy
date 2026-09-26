@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 import { NEWEST_OLDEST, NEWEST_OLDEST_NAME, need, type ProtocolDescriptor } from './types.js';
+import { repoRoute } from '../../routes.js';
 
 /**
  * Ruby: gems -> versions -> detail. Run in a browser by the package scenarios (RPS-1257).
@@ -28,7 +29,7 @@ export const rubyDescriptor: ProtocolDescriptor = {
   label: 'Ruby',
   levels: {
     list: {
-      path: (repo) => `/${repo}`,
+      path: (repo) => repoRoute(repo),
       rowKey: (t) => need(t, 'ruby').name,
       search: { placeholder: 'gem', term: (t) => t.name },
       sort: NEWEST_OLDEST_NAME,
@@ -40,7 +41,7 @@ export const rubyDescriptor: ProtocolDescriptor = {
       installBar: false,
     },
     versions: {
-      path: (repo, t) => `/${repo}/${need(t, 'ruby').name}`,
+      path: (repo, t) => repoRoute(repo, need(t, 'ruby').name),
       rowKey: (t) => need(t, 'ruby').version,
       search: { placeholder: 'version', term: (t) => t.version },
       sort: NEWEST_OLDEST,
@@ -54,7 +55,7 @@ export const rubyDescriptor: ProtocolDescriptor = {
     detail: {
       path: (repo, t) => {
         const { name, version } = need(t, 'ruby');
-        return `/${repo}/${name}/${version}`;
+        return repoRoute(repo, name, version);
       },
       installContains: (_repo, t) => [
         `gem install ${need(t, 'ruby').name} -v ${need(t, 'ruby').version}`,

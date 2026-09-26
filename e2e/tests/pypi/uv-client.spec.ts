@@ -46,8 +46,11 @@
  *  - U8 a deleted release (PyPI has no wire delete, the panel is the only way, RPS-1226 for HEAD): the
  *    file and page 404 (HEAD too), `uv lock` finds no solution, an old lock's `uv sync --frozen`
  *    fails on the 404, and a re-publish makes the same lock work again. A ranged GET of a wheel
- *    answers 206 with the right slice.
+ *    answers 206 with the right slice, and its HEAD answers the GET's headers (RPS-1562).
  *  - U9 (pip, for parity) `pip download --require-hashes`: right hash passes, wrong hash fails.
+ *  - U10 the HEAD of a wheel carries the Content-Length, Content-Type and `Accept-Ranges: bytes` of
+ *    its GET (RPS-1562), so `uv pip install -v` does not log "Range requests not supported" and
+ *    stream the whole wheel.
  */
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -751,10 +754,17 @@ test.describe('pypi uv client', () => {
       expect(Buffer.from(await ranged.arrayBuffer()).equals(built.bytes.subarray(0, 10))).toBe(
         true,
       );
-      expect(
-        (await rawHead(layout.repoName, credential, filePath)).status,
-        'HEAD of the stored file',
-      ).toBe(200);
+      const head = await fetch(url, { method: 'HEAD', headers: authHeader(credential) });
+      expect(head.status, 'HEAD of the stored file').toBe(200);
+      // RPS-1562: the HEAD carries what the GET does, which is what tells uv it may read by range.
+      expect(head.headers.get('content-length'), 'HEAD Content-Length').toBe(
+        String(built.bytes.length),
+      );
+      expect(head.headers.get('accept-ranges'), 'HEAD Accept-Ranges').toBe('bytes');
+      expect(head.headers.get('content-type'), 'HEAD Content-Type').toBe(
+        'application/octet-stream',
+      );
+      expect(Buffer.from(await head.arrayBuffer()), 'a HEAD has no body').toHaveLength(0);
 
       const consumer = await prepareConsumer(
         'uv-deleted',
@@ -861,6 +871,39 @@ test.describe('pypi uv client', () => {
       );
       const bad = await pip('bad.txt', path.join(work, 'bad'));
       expect(bad.exitCode, 'a wrong hash').not.toBe(0);
+    },
+  );
+
+  test(
+    'U10 uv reads a wheel by range: the HEAD says the index serves ranges, so uv does not stream it ' +
+      '(RPS-1562)',
+    { tag: UV_TAG },
+    async ({ seeder }) => {
+      const layout = await newLayout(seeder, 'rangehead');
+      await seedWheel(layout);
+      const credential = layout.world.credential;
+      const { home, work } = await isolatedWorkDir('uv-rangehead');
+      const uv = (label: string, args: string[]) =>
+        runUv(`uv-rangehead-${label}`, args, { home, cwd: work, credential, mode: 'none' });
+
+      expect((await uv('venv', ['venv', 'venv'])).exitCode).toBe(0);
+      const install = await uv('install', [
+        'pip',
+        'install',
+        '-v',
+        '--no-cache',
+        '--python',
+        'venv/bin/python',
+        '--index-url',
+        indexUrlFor(layout.repoName, credential),
+        `${layout.packageName}==${layout.version}`,
+      ]);
+
+      expect(install.exitCode, install.command).toBe(0);
+      expect(
+        install.stderr,
+        'uv found the ranges it needs, before RPS-1562 it logged this and downloaded the whole wheel',
+      ).not.toContain('Range requests not supported');
     },
   );
 });

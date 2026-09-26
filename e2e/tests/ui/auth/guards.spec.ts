@@ -26,14 +26,23 @@ import type { Page } from '@playwright/test';
 import { RepoType } from '../../../src/api/panel-api.js';
 import { documentIsMarked, markDocument } from '../../../src/ui/document-marker.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
+import { profileRoute, repoRoute } from '../../../src/ui/routes.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
+import { target } from '../../../src/target.js';
 import { NO_SESSION, storedSession } from './stored-session.js';
 
 test.describe('AUTH-05 anonymous visitor', () => {
-  const guardedRoutes = ['/repositories', '/users', '/security', '/profile'];
+  // Repsy OS has a Users page and a `/profile`; Repsy Cloud has no Users page and keeps the account at
+  // `/account` (`target.ui`, RPS-1638).
+  const guardedRoutes = [
+    '/repositories',
+    ...(target.ui.hasUsersPage ? ['/users'] : []),
+    '/security',
+    profileRoute(),
+  ];
 
   for (const route of guardedRoutes) {
     test(`${route} shows the login form`, async ({ page }) => {
@@ -48,67 +57,70 @@ test.describe('AUTH-05 anonymous visitor', () => {
     // A repository that exists, so it is the guard that stops the visitor, not a 404.
     const repo = await seeder.createRepo(RepoType.MAVEN);
 
-    await page.goto(`/${repo.name}`);
+    await page.goto(repoRoute(repo.name));
 
-    await expectLoginInPlace(page, `/${repo.name}`);
-    await expect(page).toHaveURL(returnsTo(`/${repo.name}`));
+    await expectLoginInPlace(page, repoRoute(repo.name));
+    await expect(page).toHaveURL(returnsTo(repoRoute(repo.name)));
   });
 
-  test('logging in from the redirected form returns to the requested page', async ({
-    page,
-    seededUser,
-  }) => {
-    await page.goto('/repositories');
-    const login = new LoginPage(page);
-    await expect(login.submit).toBeVisible();
-    // A marker that a document load (a reload, a full navigation) would wipe: RPS-1278 needed one.
-    await markDocument(page);
+  // @cloud-skip on the tests that log in as a seeded USER: Repsy Cloud has no USER role (`supportsUserRole`).
+  test(
+    'logging in from the redirected form returns to the requested page',
+    { tag: ['@cloud-skip'] },
+    async ({ page, seededUser }) => {
+      await page.goto('/repositories');
+      const login = new LoginPage(page);
+      await expect(login.submit).toBeVisible();
+      // A marker that a document load (a reload, a full navigation) would wipe: RPS-1278 needed one.
+      await markDocument(page);
 
-    await login.login(seededUser.username, seededUser.password);
+      await login.login(seededUser.username, seededUser.password);
 
-    await expect(page).toHaveURL('/repositories');
-    await expect(new RepositoriesPage(page).title).toBeVisible();
-    await expect(login.form).toHaveCount(0);
-    expect((await storedSession(page)).username).toBe(seededUser.username);
-    expect(await documentIsMarked(page)).toBe(true);
-  });
+      await expect(page).toHaveURL('/repositories');
+      await expect(new RepositoriesPage(page).title).toBeVisible();
+      await expect(login.form).toHaveCount(0);
+      expect((await storedSession(page)).username).toBe(seededUser.username);
+      expect(await documentIsMarked(page)).toBe(true);
+    },
+  );
 
-  test('logging in from the redirected form of a repository returns to that repository', async ({
-    page,
-    seededUser,
-    seeder,
-  }) => {
-    const repo = await seeder.createRepo(RepoType.MAVEN);
-    await page.goto(`/${repo.name}`);
-    const login = new LoginPage(page);
-    await expect(login.submit).toBeVisible();
+  test(
+    'logging in from the redirected form of a repository returns to that repository',
+    { tag: ['@cloud-skip'] },
+    async ({ page, seededUser, seeder }) => {
+      const repo = await seeder.createRepo(RepoType.MAVEN);
+      await page.goto(repoRoute(repo.name));
+      const login = new LoginPage(page);
+      await expect(login.submit).toBeVisible();
 
-    await login.login(seededUser.username, seededUser.password);
+      await login.login(seededUser.username, seededUser.password);
 
-    await expect(page).toHaveURL(`/${repo.name}`);
-    await expect(login.form).toHaveCount(0);
-    await expect(new Shell(page).sidebar.root).toBeVisible();
-  });
+      await expect(page).toHaveURL(repoRoute(repo.name));
+      await expect(login.form).toHaveCount(0);
+      await expect(new Shell(page).sidebar.root).toBeVisible();
+    },
+  );
 
-  test('logging in from the bare form at "/" opens the dashboard without a reload', async ({
-    page,
-    seededUser,
-  }) => {
-    await page.goto('/');
-    const login = new LoginPage(page);
-    await expect(login.submit).toBeVisible();
-    await markDocument(page);
+  test(
+    'logging in from the bare form at "/" opens the dashboard without a reload',
+    { tag: ['@cloud-skip'] },
+    async ({ page, seededUser }) => {
+      await page.goto('/');
+      const login = new LoginPage(page);
+      await expect(login.submit).toBeVisible();
+      await markDocument(page);
 
-    await login.login(seededUser.username, seededUser.password);
+      await login.login(seededUser.username, seededUser.password);
 
-    // The router is already at "/", so nothing navigates: the form has to follow the session itself.
-    const dashboard = new DashboardPage(page);
-    await dashboard.expectLoaded();
-    await expect(dashboard.welcomeUsername).toContainText(seededUser.username);
-    await expect(login.form).toHaveCount(0);
-    await expect(page).toHaveURL('/');
-    expect(await documentIsMarked(page)).toBe(true);
-  });
+      // The router is already at "/", so nothing navigates: the form has to follow the session itself.
+      const dashboard = new DashboardPage(page);
+      await dashboard.expectLoaded();
+      await expect(dashboard.welcomeUsername).toContainText(seededUser.username);
+      await expect(login.form).toHaveCount(0);
+      await expect(page).toHaveURL('/');
+      expect(await documentIsMarked(page)).toBe(true);
+    },
+  );
 
   // The value is read from the address bar, so it is attacker-controlled: only an in-app path may
   // be followed, anything else is ignored and the visitor lands on the dashboard.
@@ -119,42 +131,43 @@ test.describe('AUTH-05 anonymous visitor', () => {
     'javascript:alert(1)',
   ];
   for (const returnUrl of unsafeReturnUrls) {
-    test(`a returnUrl of ${returnUrl} is ignored (no open redirect)`, async ({
-      page,
-      seededUser,
-      baseURL,
-    }) => {
-      await page.goto(`/?returnUrl=${encodeURIComponent(returnUrl)}`);
+    test(
+      `a returnUrl of ${returnUrl} is ignored (no open redirect)`,
+      { tag: ['@cloud-skip'] },
+      async ({ page, seededUser, baseURL }) => {
+        await page.goto(`/?returnUrl=${encodeURIComponent(returnUrl)}`);
+        const login = new LoginPage(page);
+        await expect(login.submit).toBeVisible();
+
+        await login.login(seededUser.username, seededUser.password);
+
+        const dashboard = new DashboardPage(page);
+        await dashboard.expectLoaded();
+        // Still this app, on its root.
+        await expect(page).toHaveURL(
+          (url) => url.origin === new URL(baseURL!).origin && url.pathname === '/',
+        );
+        await expect(login.form).toHaveCount(0);
+      },
+    );
+  }
+
+  test(
+    'a returnUrl to an admin-only page is still guarded for a USER',
+    { tag: ['@cloud-skip'] },
+    async ({ page, seededUser }) => {
+      await page.goto('/users');
       const login = new LoginPage(page);
       await expect(login.submit).toBeVisible();
 
       await login.login(seededUser.username, seededUser.password);
 
-      const dashboard = new DashboardPage(page);
-      await dashboard.expectLoaded();
-      // Still this app, on its root.
-      await expect(page).toHaveURL(
-        (url) => url.origin === new URL(baseURL!).origin && url.pathname === '/',
-      );
+      // adminGuard bounces the USER from /users to "/".
+      await expect(page).toHaveURL('/');
+      await new DashboardPage(page).expectLoaded();
       await expect(login.form).toHaveCount(0);
-    });
-  }
-
-  test('a returnUrl to an admin-only page is still guarded for a USER', async ({
-    page,
-    seededUser,
-  }) => {
-    await page.goto('/users');
-    const login = new LoginPage(page);
-    await expect(login.submit).toBeVisible();
-
-    await login.login(seededUser.username, seededUser.password);
-
-    // adminGuard bounces the USER from /users to "/".
-    await expect(page).toHaveURL('/');
-    await new DashboardPage(page).expectLoaded();
-    await expect(login.form).toHaveCount(0);
-  });
+    },
+  );
 });
 
 /** The address of the in-place login form: "/", with the requested `route` remembered by `AuthGuard`. */
@@ -180,7 +193,8 @@ test.describe('AUTH-06 logged-in visitor', () => {
   });
 });
 
-test.describe('AUTH-07 admin-only routes for a USER', () => {
+// The whole block is about the USER role and the Users page, which only Repsy OS has.
+test.describe('AUTH-07 admin-only routes for a USER', { tag: ['@cloud-skip'] }, () => {
   for (const route of ['/users', '/security']) {
     test(
       `${route} redirects a USER to the dashboard`,

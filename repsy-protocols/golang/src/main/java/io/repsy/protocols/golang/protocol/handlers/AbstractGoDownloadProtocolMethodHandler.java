@@ -22,18 +22,12 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
@@ -80,64 +74,13 @@ public abstract class AbstractGoDownloadProtocolMethodHandler<ID> implements Pro
         return notFound(context);
       }
 
-      final var responseBuilder = ResponseEntity.ok().contentType(this.resolveContentType(context));
-      final var contentDisposition = resolveContentDisposition(context);
-
-      if (contentDisposition != null) {
-        responseBuilder.header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition);
-      }
-
-      return responseBuilder.body(resource);
+      return GoDownloadResponses.ok(context).body(resource);
     } catch (final ItemNotFoundException _) {
       return notFound(context);
     }
   }
 
-  /**
-   * The GOPROXY protocol wants a 404 (or 410) for what a proxy does not have, and a text/plain
-   * body, which the go command prints as the reason when no other GOPROXY entry has it either
-   * (RPS-1428). The header keeps Spring from naming the reason "f.txt" when the URL ends in {@code
-   * .zip}, {@code .info} or {@code .mod} (RPS-1442).
-   */
   private static ResponseEntity<Object> notFound(final ProtocolContext context) {
-    return ResponseEntity.status(HttpStatus.NOT_FOUND)
-        .contentType(MediaType.TEXT_PLAIN)
-        .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().build().toString())
-        .body("not found: " + ProtocolContextUtils.getRelativePath(context).getPath());
-  }
-
-  /**
-   * The module zip is an attachment, {@code .info} and {@code .mod} are shown under their own name.
-   * Without a header of its own Spring names all three "f.txt" (RPS-1389). {@code @v/list} and
-   * {@code @latest} have no extension, so Spring adds nothing to them.
-   */
-  @Nullable
-  private static String resolveContentDisposition(final ProtocolContext context) {
-    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var filename = path.substring(path.lastIndexOf('/') + 1);
-
-    if (filename.endsWith(".zip")) {
-      return ContentDisposition.attachment().filename(filename).build().toString();
-    }
-
-    if (filename.endsWith(".info") || filename.endsWith(".mod")) {
-      return ContentDisposition.inline().filename(filename).build().toString();
-    }
-
-    return null;
-  }
-
-  private MediaType resolveContentType(final ProtocolContext context) {
-    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
-
-    if (path.endsWith("/@v/list") || path.endsWith(".mod")) {
-      return MediaType.TEXT_PLAIN;
-    }
-
-    if (path.endsWith(".info") || path.endsWith("/@latest")) {
-      return MediaType.APPLICATION_JSON;
-    }
-
-    return MediaType.APPLICATION_OCTET_STREAM;
+    return GoDownloadResponses.notFound().body(GoDownloadResponses.notFoundText(context));
   }
 }

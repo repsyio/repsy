@@ -46,9 +46,8 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
 
   // Each segment is [^/]+ so the three of them cannot trade characters, which keeps the match
   // linear on a long path a client controls.
-  private static final Pattern NUPKG_PATTERN =
-      Pattern.compile(".*/v3/package/[^/]+/[^/]+/[^/]+\\.nupkg$");
-  private static final Pattern NUSPEC_PATTERN =
+  static final Pattern NUPKG_PATTERN = Pattern.compile(".*/v3/package/[^/]+/[^/]+/[^/]+\\.nupkg$");
+  static final Pattern NUSPEC_PATTERN =
       Pattern.compile(".*/v3/package/[^/]+/[^/]+/[^/]+\\.nuspec$");
 
   private final PathParser basePathParser;
@@ -101,7 +100,7 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
    * <id>.nuspec}). Without a header of its own Spring names the download "f.txt" (RPS-1389). The
    * package is an attachment, the nuspec a document a browser may show under its own name.
    */
-  private static String contentDisposition(final ProtocolContext context, final boolean attach) {
+  static String contentDisposition(final ProtocolContext context, final boolean attach) {
     final var path = ProtocolContextUtils.getRelativePath(context).getPath();
     final var filename = path.substring(path.lastIndexOf('/') + 1);
     final var builder = attach ? ContentDisposition.attachment() : ContentDisposition.inline();

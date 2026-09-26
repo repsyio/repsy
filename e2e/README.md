@@ -200,6 +200,7 @@ e2e/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe; both tests tagged @smoke
     skeleton/backend-module.spec.ts  # RPS-1495 the panel backend registry: `REPSY_E2E_BACKEND_MODULE` picks an external backend (`fake-panel-backend.ts`, in memory, no server), also for the `panelApi`/`seeder` fixtures; `UnsupportedPanelOperation`
     skeleton/cloud-target.spec.ts    # RPS-1498 the Repsy Cloud target seam: capabilities, expectation overlay, credentials a target cannot seed, known gaps, and the real scenario loop on a fake cloud backend (`fake-cloud-panel-backend.ts`); three of its tests are skipped ON PURPOSE (they are the skip paths)
+    skeleton/ui-target.spec.ts       # RPS-1638 the UI seam (`target.ui`): route builders per target, session keys, base-URL chain, the descriptors' routes on both, and `--list` under `cloud-remote` excluding `@cloud-skip`
     skeleton/repo-settings.spec.ts  # RPS-1200 settings-PUT field-by-field matrix across RepoTypes; untagged (not smoke-sized)
     skeleton/repo-type-casing.spec.ts  # RPS-1269 repo type: /format answers upper case; type accepted in any case (query and body)
     skeleton/login-password.spec.ts  # RPS-1308 POST /api/auth/login: a wrong password of any strength is 401 invalidCredentials; malformed shapes stay 400
@@ -237,11 +238,11 @@ e2e/
       matrix/*.spec.ts          # lockfile, dist-tags, deprecate, view, registry-endpoints (whoami/ping/search/audit), scoped-routing, tarball-host, abbreviated-metadata, wire
     cargo/
       publish-consume.spec.ts   # registerPublishConsumeLoop(cargoAdapter) + a hyphenated-crate-name real-client test
-      registry-rules.spec.ts    # raw-HTTP pins of the duplicate-version/version-validation/config.json/name-normalisation rules
+      registry-rules.spec.ts    # raw-HTTP pins of the duplicate-version/version-validation/config.json/name-normalisation rules, HEAD mirroring GET (RPS-1465)
       install-add.spec.ts       # the commands the panel advertises: `cargo install` of a binary crate (built and run), `cargo add`, `cargo login`/`logout`, `cargo search --limit` (RPS-1486)
     nuget/
       publish-consume.spec.ts   # registerPublishConsumeLoop(nugetAdapter) + api-key-only-push and mixed-case-id real-client tests
-      registry-rules.spec.ts    # raw-HTTP pins of the 409/422 override & version-kind rules, service index, X-NuGet-ApiKey (H7)
+      registry-rules.spec.ts    # raw-HTTP pins of the 409/422 override & version-kind rules, service index, X-NuGet-ApiKey (H7), HEAD mirroring GET (RPS-1465)
       transitive-resolution.spec.ts # a real `dotnet restore` of a project that references only A resolves A's nuspec dependencies (ranges, target-framework groups, unlisted, SemVer 2.0.0) from Repsy (RPS-1479)
       client-commands.spec.ts   # `dotnet add package` (the panel snippets), `dotnet nuget delete` (unlist), a real `dotnet pack --include-symbols` round trip and the `.snupkg` push (RPS-1486)
     docker/
@@ -271,7 +272,7 @@ e2e/
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload) + G1/G2/G10 candidates
     ruby/
       publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install (RPS-1233, fixed)/gem-fetch (RPS-1234, fixed), anonymous-push, yank (RPS-1235, fixed), USER-role-push, bundle-install-e2e real-client tests
-      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow incl. RPS-1238 fixed, specs.4.8.gz gzip framing (RPS-1234, fixed), gemspec.rz (RPS-1233, fixed), HEAD mirrors GET (RPS-1237, fixed), platform gem, RPS-1236 fixed) -- no remaining test.fail() pins
+      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow incl. RPS-1238 fixed, specs.4.8.gz gzip framing (RPS-1234, fixed), gemspec.rz (RPS-1233, fixed), HEAD mirrors GET (RPS-1237, fixed; its Content-Type too, RPS-1465), platform gem, RPS-1236 fixed) -- no remaining test.fail() pins
       transitive-resolution.spec.ts # RPS-1479 gem A -> B -> C: real bundle install/--frozen/update and gem install resolve the graph from Repsy's /info; requirement shapes, yank, platform gem
     api/
       port-separation.spec.ts   # RPS-1480 /api/** is not served on the protocol port (404 unknownPath); /v2/ and a Maven path on the api port are the SPA, not the protocol
@@ -306,6 +307,7 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_E2E_PORT_OFFSET`       | `0`                                 | added to the stack's host ports 8080 (panel API), 9090 (repo protocols) and 8090 (stub scanner); also `--port-offset N`. "Parallel stacks"                                                                                                                                                                                                                                                                                               |
 | `REPSY_E2E_FORCE`             | _(unset)_                           | `1` lets `local up\|down` take over a project or host port held by a stack started from another checkout (same as `--force`)                                                                                                                                                                                                                                                                                                             |
 | `REPSY_UI_BASE_URL`           | _(REPSY_API_BASE_URL)_              | ui runner only: where the panel SPA is (it is served on the API port 8080, not the protocol port 9090)                                                                                                                                                                                                                                                                                                                                   |
+| `REPSY_FRONTEND_BASE_URL`     | _(unset)_                           | ui project on a `cloud-*` target only: where Repsy Cloud's panel is served (a host other than its API). `REPSY_UI_BASE_URL` wins over it; ignored on an OS target ("The UI seam")                                                                                                                                                                                                                                                        |
 | `REPSY_UI_WORKERS`            | `4` (compose)                       | ui runner only: Playwright workers (each is a Chromium, ~250-400 MB)                                                                                                                                                                                                                                                                                                                                                                     |
 | `REPSY_UI_NO_SANDBOX`         | _(unset — sandbox on)_              | ui runner only: `1` launches Chromium with `chromiumSandbox: false`, see "UI suite"                                                                                                                                                                                                                                                                                                                                                      |
 | `REPSY_E2E_OPT_IN`            | _(unset)_                           | every runner: comma list of opt-in suites (`throttle`, `scanner`, ...) read by `optedIn()` in `src/stack-overlays.ts`; `run.sh test` adds the name of every stack overlay whose switch is set, see "Stack overlays"                                                                                                                                                                                                                      |
@@ -346,21 +348,31 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 `target` (`src/target.ts`) is the capabilities of the run's `REPSY_TARGET`. What differs by product is a
 capability, so a spec or the engine asks the capability and never the target's name:
 
-| Capability                               | Repsy OS                 | Repsy Cloud (provisional, see below)                           |
-| ---------------------------------------- | ------------------------ | -------------------------------------------------------------- |
-| `kind`                                   | `os`                     | `cloud` (for an adapter hook to branch on)                     |
-| `urlScheme`                              | `repo` (`/<repo>/...`)   | `owner-repo` (`/<owner>/<repo>/...`, `src/repo-url.ts`)        |
-| `supportsUserRole`                       | yes (`USER`/`ADMIN`)     | no                                                             |
-| `supportsRepoUsers`                      | no                       | yes (collaborators of a repo)                                  |
-| `supportsExpiredTokenSeed`               | yes (past date accepted) | no (an expiration date has to be in the future)                |
-| `expiredTokenStrategy`                   | `past-date`              | `short-ttl-wait` (short lifetime, then wait); or `unsupported` |
-| `maxDeployTokensPerRepo`                 | unlimited                | 1 (FREE plan)                                                  |
-| `supportsDirectoryListing`               | yes                      | no (nothing may rely on listings)                              |
-| `supportsVersionAllowanceSettings(type)` | Maven, NuGet             | the same                                                       |
+| Capability                               | Repsy OS                              | Repsy Cloud (provisional, see below)                                  |
+| ---------------------------------------- | ------------------------------------- | --------------------------------------------------------------------- |
+| `kind`                                   | `os`                                  | `cloud` (for an adapter hook to branch on)                            |
+| `urlScheme`                              | `repo` (`/<repo>/...`)                | `owner-repo` (`/<owner>/<repo>/...`, `src/repo-url.ts`)               |
+| `supportsUserRole`                       | yes (`USER`/`ADMIN`)                  | no                                                                    |
+| `supportsRepoUsers`                      | no                                    | yes (collaborators of a repo)                                         |
+| `supportsExpiredTokenSeed`               | yes (past date accepted)              | no (an expiration date has to be in the future)                       |
+| `expiredTokenStrategy`                   | `past-date`                           | `short-ttl-wait` (short lifetime, then wait); or `unsupported`        |
+| `maxDeployTokensPerRepo`                 | unlimited                             | 1 (FREE plan)                                                         |
+| `supportsDirectoryListing`               | yes                                   | no (nothing may rely on listings)                                     |
+| `supportsVersionAllowanceSettings(type)` | Maven, NuGet                          | the same                                                              |
+| `ui.repoRoute(repo, ...segments)`        | `/<repo>/...`                         | `/<owner>/<repo>/...` (`REPSY_REPO_OWNER`, read when called)          |
+| `ui.profilePath`                         | `/profile`                            | `/account`                                                            |
+| `ui.hasUsersPage`                        | yes (`/users`)                        | no                                                                    |
+| `ui.loginField`                          | `username`                            | `usernameOrEmail`                                                     |
+| `ui.sessionStorageKeys`                  | `username`, `token`, `refresh-token`  | the same plus `email`                                                 |
+| `ui.frontendBaseUrl()`                   | `REPSY_UI_BASE_URL`, else the API URL | `REPSY_UI_BASE_URL`, else `REPSY_FRONTEND_BASE_URL`, else the API URL |
 
 The Cloud column is **provisional**: only the FREE plan limits and the future-only expiration date are
 known; the rest is a guess until RPS-1491 (a probe of Repsy Cloud DEV that pins the cloud expectation
 table) is done, and that story may change any value here.
+
+The `ui.*` rows are the panel's side of the seam (RPS-1638, "The UI seam" below): what the `ui` project's
+page objects and specs ask instead of writing a route, a storage key or a login field themselves. The Cloud
+values of those rows are read from the Repsy Cloud frontend, not yet run against it (RPS-1639, RPS-1541).
 
 The engine uses the capabilities and three hooks, so **no cloud-specific outcome ever goes into
 `catalog.ts`**:
@@ -403,6 +415,52 @@ hooks): it runs the REAL `registerPublishConsumeLoop` (with the options `{ scena
 the harness itself may pass) and `world` fixture against a fake protocol adapter. It is also the smallest
 worked example of a cloud backend module. Three of its tests are skipped on purpose, because they are the
 skip paths.
+
+### The UI seam (`target.ui`, RPS-1638)
+
+The `ui` project (`tests/ui/`, `src/ui/`, "UI suite" below) drives the panel in a browser, and Repsy Cloud has
+its own panel: another route for a repository, another one for the account page, no Users page, a login form
+that takes a `usernameOrEmail`, an `email` next to the session in `localStorage`, and a frontend host that is
+not the API host. `target.ui` (`UiCapabilities` in `src/target.ts`) is where that lives, so the same specs run
+against both while what only Repsy OS has is tagged `@cloud-skip`:
+
+- **Routes.** A page object or spec never writes `` `/${repo}` ``: it calls `repoRoute(repo, ...segments)`
+  (`src/ui/routes.ts`, the short form of `target.ui.repoRoute`), and `profileRoute()` for the account page.
+  All nine protocol descriptors (`src/ui/pages/protocols/*.ts`), the repo settings page and the shared
+  package scenarios do. A route that is the same on both (`/`, `/login`, `/repositories`, `/security`,
+  `/not-found`) stays a literal, and so does an assertion that only needs the END of a URL
+  (`toHaveURL(new RegExp(`/${repo.name}/x$`))` also matches `/<owner>/<repo>/x`). `repoRoute` reads
+  `env.repoOwner` when it is called, never at import ("Import time is not run time" above), and throws on a
+  Cloud target when `REPSY_REPO_OWNER` is unset. `urlEndsWith(path)` is the regex for `toHaveURL`.
+- **Session.** `seedSession()`, `readStoredSession()`, `setStoredSessionValue()` and `currentUsername()`
+  (`src/ui/session.ts`) use `target.ui.sessionStorageKeys`, and `loginSession()` carries the `email` of the
+  login answer when a backend returns one (`UiSession.email`). A spec that needs the stored session reads it
+  through these (`tests/ui/auth/stored-session.ts` does), not with a literal `localStorage.getItem('token')`.
+- **Login form.** `LoginPage` derives its test ids from `loginField` (`login-username` on OS,
+  `login-usernameOrEmail` on Cloud: provisional until RPS-1541 fixes the Cloud test ids).
+- **Base URL.** `uiBaseUrlFrom(process.env)` (`src/ui/base-url.ts`, no imports so `playwright.config.ts` can
+  call it without `REPSY_ADMIN_PASSWORD`) is the one place the chain lives: `REPSY_UI_BASE_URL`, then on a
+  Cloud target `REPSY_FRONTEND_BASE_URL` (the name the Cloud e2e package already uses; ignored on OS), then
+  `REPSY_API_BASE_URL`, then `http://localhost:8080`.
+- **Stub models.** `security-stubs.ts` gets every model type and enum of the panel API from `src/ui/stub-models.ts`
+  (a re-export of the OS generated client), so a consumer whose panel API differs replaces that one module
+  and not every stub (H9).
+- **`@cloud-skip` in `tests/ui/`.** Tagged, each with a one-line reason above it: everything of `users/*`
+  and `profile/*`; every test that logs in as a seeded USER (`userPage`, `seededUser`, and the two USER
+  scenarios of the shared package template); the OS login form's validation (`AUTH-03`), wrong-credentials
+  (`AUTH-02`) and throttle (`AUTH-11`) specs; the dashboard's cards and count rows; the tests that open the
+  Users page (`ERR-02`/`ERR-03` on `/users`, the a11y user dialogs, the mobile sidebar's Users link,
+  `NET-01` signed in); and the deploy-token specs that seed more than one token or a past-dated one, which
+  the Cloud FREE plan cannot (`maxDeployTokensPerRepo`, `supportsExpiredTokenSeed`). The rest, the portable
+  core, is untagged. `seededUser` also skips itself with a reason on a target without `supportsUserRole`, as
+  a net under a test somebody forgot to tag. What Repsy Cloud's panel turns out to differ in beyond this
+  is found by running the suite against it (RPS-1639), and that story adds the tags.
+- **Proof.** `tests/skeleton/ui-target.spec.ts`: the route builder per target, the session keys (a stub
+  `window` runs the real init script), the base-URL chain, every descriptor's routes under both
+  (`/<owner>` dropped equals the OS route), and a child `playwright test --project ui --list` under
+  `REPSY_TARGET=cloud-remote` with no OS variable whose `--grep-invert @cloud-skip` list is exactly the
+  untagged tests. On `cloud-remote`, `--list` shows 563 of the 709 `ui` tests without `@cloud-skip` (the OS
+  run lists 710, 564 of them untagged: `guards.spec.ts` has no `/users` route to check on Cloud).
 
 ### Panel backend (RPS-1495)
 
@@ -601,7 +659,9 @@ workspace laid out as above:
 - The `ui` runner (the only image with a browser) installs Chromium with the Playwright of the LOCKFILE that
   builds it (`ui.Dockerfile`: `playwright install chromium`), so a range edit that does not change the
   locked version changes nothing about the image; a locked version change needs `./run.sh test --protocol ui -b`.
-  The Cloud harness has no `ui` runner (the OS `ui` suite drives the OS panel).
+  The Cloud harness has no `ui` runner image of its own yet: its `ui` project (RPS-1639) lists this suite's
+  specs (`testDir` `repsy-os/e2e/tests/ui`, `grepInvert: /@cloud-skip/`, "The UI seam" above) and needs
+  a Chromium from the Playwright of the lockfile that builds it.
 - The runner images install from the harness directory's own `package.json` and `pnpm-lock.yaml`, so they
   carry 1.63.0. A Cloud layer added on top must reuse that copy, not install a second one (RPS-1507).
 
@@ -635,7 +695,8 @@ test, or behind a function (RPS-1500 moved the ones that did this).
 
 - **The consumer's config, for whole specs:** `grepInvert: /@cloud-skip/` (config-wide, as above, or on a
   project), or `--grep-invert @cloud-skip` on the command line. The tagged tests are not listed at all
-  (`skeleton` goes from 117 to 114 tests under `cloud-remote`).
+  (`skeleton` goes from 129 to 125 tests under `cloud-remote`, the `ui` project from 709 to 563: its tags are
+  in "The UI seam").
 - **The scenario loop, for catalog scenarios:** a `@cloud-skip` scenario is skipped with a reason on a
   `cloud-*` target (visible in the report), even without the config. Use the config too when a skipped row is
   noise.
@@ -3824,9 +3885,11 @@ run `uv publish --trusted-publishing never --publish-url <repo>/`, `resolve` run
   404, `uv lock` has no solution, an old lock fails on the 404, and a re-published wheel (fresh bytes)
   is refused by the old lock's hash until it is re-locked. A ranged GET of a wheel answers `206` with
   the right slice.
-- Observed, not pinned (no ticket): a `HEAD` of a wheel answers `200` with neither `Content-Length` nor
-  `Accept-Ranges` (the `GET` has both), so uv's range-request fast path logs "Range requests not
-  supported" and streams the whole wheel (`uv pip install -v`). Performance only.
+- **HEAD of a wheel** (U8, U10; RPS-1562, fixed): a `HEAD` answers the `GET`'s `Content-Length`,
+  `Content-Type`, `Content-Disposition` and `Accept-Ranges: bytes`, with no body. Before, it answered `200`
+  with neither `Content-Length` nor `Accept-Ranges`, so uv's range-request fast path logged "Range
+  requests not supported" and streamed the whole wheel; U10 runs `uv pip install -v` and checks the
+  message is gone.
 
 ## Go runner
 
@@ -3883,8 +3946,8 @@ immutability + no storage side effect under BOTH `allowOverride` settings (R4/H9
 errors leaving nothing stored (R5); `@v/list`'s real-semver sort and text/plain-404-for-unknown-module
 shape (R8, RPS-1428); `@latest`'s DB-backed highest-version selection (R9); a malformed module path's bodyless
 400 (R11); `sumdb/supported` 404ing on both ports (R12/G9); over-long module-path/version refusal
-(R13); a deleted version's clean re-upload, never a `410` (R14/RPS-1230); `HEAD` always 404ing,
-the opposite of pypi's always-200 quirk (R15/H17); and that `releases`/`snapshots` are never read
+(R13); a deleted version's clean re-upload, never a `410` (R14/RPS-1230); `HEAD` answering the status
+and headers of its `GET` for every module file (R15/H17, RPS-1465; it was a `404` for every path); and that `releases`/`snapshots` are never read
 (R16). Three backend bug candidates are pinned with `test.fail()` (G1/G2/G10, below).
 
 ### H1-H20, confirmed live
@@ -3939,8 +4002,10 @@ BEFORE any adapter code was written — H1-H4 and H12 gated the whole design.
 - **H16** (`v0.<secs>.<seq>` is accepted by both Repsy and Go; `@latest` returns it when it is the
   only version): confirmed live.
 - **H17** (what the router answers to `HEAD .../@v/<v>.info`): confirmed live — `404`, not pypi's
-  `200` (see R15 above; neither protocol method handler lists `HEAD` among its supported methods, so
-  the router has nothing to dispatch to).
+  `200` (see R15 above; neither protocol method handler listed `HEAD` among its supported methods, so
+  the router had nothing to dispatch to). **RPS-1465 (fixed)**: `AbstractGoHeadProtocolMethodHandler`
+  answers a `HEAD` like the `GET` (status, `Content-Type`, `Content-Disposition`, `Content-Length`,
+  the plain-text `404`), and R15 now pins that.
 - **H18** (a mixed-case module path real round trip): confirmed live —
   `publish-consume.spec.ts`'s dedicated test: a real `go mod download -json` of a module path with a
   mixed-case last segment succeeds and reports back the ORIGINAL (not lower-cased) path in its own
@@ -4265,7 +4330,9 @@ unknownPath`. Broke `gem install --source`/`gem fetch`; did NOT break `bundle in
   (the pypi/nuget analogue). Fixed: `AbstractRubyHeadHandler` now dispatches per path kind with
   existence-only checks (`gemExists`/`gemFileExists`/`gemspecExists` on the facade, the `.gem` case
   reusing RPS-1236's `findByGemFilename` resolver) and mirrors the matching `GET` route's `200`/`404`.
-  `registry-rules.spec.ts`'s dedicated test now asserts the mirrored status directly.
+  `registry-rules.spec.ts`'s dedicated test now asserts the mirrored status directly. **RPS-1465
+  (fixed)**: the `HEAD` answers the `Content-Type` of its `GET` too (`text/plain` for `/names`,
+  `/versions`, `/info/<gem>`, `application/octet-stream` for the rest), which the same test asserts.
 - **RB-7** (observation from source, not independently forced live) — `RubyGemDownloadHandler`'s
   `downloadGem` swallows every exception (`catch (Exception)`) into a bodyless `404`, so a genuine
   server error (a storage backend outage, say) would be indistinguishable from "this gem does not
@@ -5094,13 +5161,14 @@ passwords can log in; the backend still refuses to boot with an `ADMIN_INITIAL_P
 the complexity rule, and one over 72 bytes). The `ui` project runs a worker-scoped preflight
 (`assertAdminCredentialsUsableInUi`) that fails every test with a message saying exactly that. `e2e/.env.example` documents it next to the `REPSY_UI_*` variables.
 
-| Variable              | Default                                            | Effect                                                                                                         |
-| --------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `REPSY_UI_BASE_URL`   | `REPSY_API_BASE_URL`, else `http://localhost:8080` | Playwright `baseURL`                                                                                           |
-| `REPSY_UI_WORKERS`    | `4` (compose)                                      | Playwright `workers`; config-wide, so only the `ui` service sets it                                            |
-| `REPSY_UI_NO_SANDBOX` | unset                                              | `1` = `chromiumSandbox: false`, see "Chromium sandbox" below                                                   |
-| `REPSY_UI_OPT_IN`     | unset                                              | comma list of opt-in suites (also `REPSY_E2E_OPT_IN`); `optedIn('throttle')`, "Stack overlays"                 |
-| `CI`                  | unset                                              | forwarded to every runner: `forbidOnly`; the `ui` project also `retries: 1` and `trace: on-first-retry` ("CI") |
+| Variable                  | Default                                            | Effect                                                                                                                        |
+| ------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `REPSY_UI_BASE_URL`       | `REPSY_API_BASE_URL`, else `http://localhost:8080` | Playwright `baseURL`                                                                                                          |
+| `REPSY_FRONTEND_BASE_URL` | unset                                              | Repsy Cloud targets only: the panel's host, between `REPSY_UI_BASE_URL` and `REPSY_API_BASE_URL` in the chain ("The UI seam") |
+| `REPSY_UI_WORKERS`        | `4` (compose)                                      | Playwright `workers`; config-wide, so only the `ui` service sets it                                                           |
+| `REPSY_UI_NO_SANDBOX`     | unset                                              | `1` = `chromiumSandbox: false`, see "Chromium sandbox" below                                                                  |
+| `REPSY_UI_OPT_IN`         | unset                                              | comma list of opt-in suites (also `REPSY_E2E_OPT_IN`); `optedIn('throttle')`, "Stack overlays"                                |
+| `CI`                      | unset                                              | forwarded to every runner: `forbidOnly`; the `ui` project also `retries: 1` and `trace: on-first-retry` ("CI")                |
 
 Where things land (all under the existing bind mounts): `test-results/` holds, per failed test, the
 trace (`trace.zip`; open it with `pnpm exec playwright show-trace <path>` on the host), the failure
@@ -5979,7 +6047,7 @@ network hiccup or a rate limit), not a Repsy fault: run the leg again. `TRIVY_DB
 `E2E_TRIVY_DB_REPOSITORY` and `E2E_TRIVY_JAVA_DB_REPOSITORY`, "CI"). The contract spec retries once for exactly this
 reason (`test.describe.configure({ retries: 1 })`, the one place of the `api` project that does).
 
-`tests/api/trivy-contract.spec.ts` (`@trivy`, opt-in `trivy`, the `api` runner, 10 tests):
+`tests/api/trivy-contract.spec.ts` (`@trivy`, opt-in `trivy`, the `api` runner, 14 tests):
 
 - **The contract cases the stub is held to as well** (`src/stubs/scanner/contract.ts`, run by this spec against the real
   scanner and by `tests/skeleton/scanner-stub.spec.ts` against the stub): `GET /health` needs no key; a call without
@@ -5991,6 +6059,14 @@ reason (`test.describe.configure({ retries: 1 })`, the one place of the `api` pr
   The first run of this list found two drifts, now fixed in the stub: the 404 message and the 415 for a body that is not
   multipart (the stub said 400). A third, the text of the 400 of a missing field (the stub had a message, the real one
   has none of its own), is why 400 bodies are not compared.
+- **The status and the advisory lookup** (RPS-1610, RPS-1611; contract in `repsy-scanner-trivy/README.md`, 4 tests, no
+  stub counterpart yet, that is RPS-1613): `GET /status` is a 401 without the key and reports `trivyVersion` and the
+  database dates with it (`/health` still says only `{"status":"ok"}`); `POST /advisories` is a 401 without the key and a
+  400 for another ecosystem, no list, an empty name or a name with a second `/`; a pair that is stored nowhere is looked
+  up in Trivy's own database (`lodash@4.17.20` has `CVE-2021-23337`, `@babel/traverse@7.20.0` is found under its scoped
+  name, `left-pad@1.3.0` and `lodash@latest` have nothing), with the `dbUpdatedAt` of `/status` in the answer; an empty
+  list is answered without a lookup. A lookup that answers 503 (a scan holds the database at that moment, the scanner
+  cannot share it, see its README) is repeated for up to a minute.
 - **A real scan, directly**: a tarball that bundles `lodash@4.17.20` ends COMPLETED, every finding has the fields of
   `ScannerFinding` in the service's order, and `CVE-2021-23337` is HIGH, fixed in 4.17.21.
 - **A real scan through Repsy, npm**: the same tarball published to an npm repository; the panel's
@@ -6175,7 +6251,7 @@ says; without it the leg takes tonight's runner of the rotation and `protocol` f
 | `cors`       | PostgreSQL + the CORS overlay               | `REPSY_E2E_OPT_IN=cors`, `--grep @cors` on `api`, "CORS leg": the configured origins are reflected, any other refused                                                                                                                       | 30 min  |
 | `upgrade`    | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                                                | 30 min  |
 | `upgrade-h2` | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                                    | 30 min  |
-| `trivy`      | PostgreSQL + the real scanner overlay       | `REPSY_E2E_OPT_IN=trivy`, `--grep @trivy` on `api`, 10 tests, "Real scanner stack": the contract the stub mimics and one real scan of an npm package and of a Docker image                                                                  | 45 min  |
+| `trivy`      | PostgreSQL + the real scanner overlay       | `REPSY_E2E_OPT_IN=trivy`, `--grep @trivy` on `api`, 14 tests, "Real scanner stack": the contract the stub mimics, the status and advisory lookup, and one real scan of an npm package and of a Docker image                                 | 45 min  |
 | `tls`        | PostgreSQL + the TLS overlay                | `REPSY_E2E_OPT_IN=tls` and `REPSY_E2E_TLS=1`, `@smoke` of `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` and `api` over Repsy's https listeners ("TLS stack"); no `ui`, no `stack` | 60 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the

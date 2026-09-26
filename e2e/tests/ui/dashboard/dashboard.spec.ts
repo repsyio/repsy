@@ -24,6 +24,7 @@ import type { APIRequestContext } from '@playwright/test';
 
 import { type PanelBackend, RepoType } from '../../../src/api/panel-backend.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
+import { repoRoute } from '../../../src/ui/routes.js';
 import { DashboardPage, RECENT_ACTIVITY_SIZE } from '../../../src/ui/pages/dashboard.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
@@ -66,9 +67,10 @@ async function apiSecurityTotal(request: APIRequestContext, token: string): Prom
 }
 
 test.describe('Dashboard', () => {
+  // @cloud-skip: the OS dashboard's cards (disk usage, security overview, the nine per-type counts).
   test(
     'DASH-01: the cards render and the per-type counts equal the API',
-    { tag: ['@smoke'] },
+    { tag: ['@cloud-skip', '@smoke'] },
     async ({ adminPage, adminSession, seeder, panelApi }) => {
       const dashboard = new DashboardPage(adminPage);
       await seeder.createRepo(RepoType.MAVEN);
@@ -139,113 +141,118 @@ test.describe('Dashboard', () => {
 
     await row.click();
 
-    await expect(adminPage).toHaveURL(`/${repo.name}`);
+    await expect(adminPage).toHaveURL(repoRoute(repo.name));
     await expect(adminPage.getByTestId('breadcrumb-current')).toContainText(repo.name);
     await expect(adminPage).toHaveTitle('repsy | Maven Groups');
   });
 
-  test('DASH-03: a repository count row opens the list filtered to that type', async ({
-    adminPage,
-    seeder,
-  }) => {
-    const dashboard = new DashboardPage(adminPage);
-    const repos = new RepositoriesPage(adminPage);
-    const maven = uiRepoType(RepoType.MAVEN);
-    const mavenRepo = await seeder.createRepo(RepoType.MAVEN);
-    const npmRepo = await seeder.createRepo(RepoType.NPM);
-    await dashboard.open();
+  // @cloud-skip: the OS dashboard's per-type count rows.
+  test(
+    'DASH-03: a repository count row opens the list filtered to that type',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage, seeder }) => {
+      const dashboard = new DashboardPage(adminPage);
+      const repos = new RepositoriesPage(adminPage);
+      const maven = uiRepoType(RepoType.MAVEN);
+      const mavenRepo = await seeder.createRepo(RepoType.MAVEN);
+      const npmRepo = await seeder.createRepo(RepoType.NPM);
+      await dashboard.open();
 
-    const listRequests: string[] = [];
-    adminPage.on('request', (request) => {
-      if (request.method() === 'GET' && /\/api\/repos\?/.test(request.url())) {
-        listRequests.push(request.url());
+      const listRequests: string[] = [];
+      adminPage.on('request', (request) => {
+        if (request.method() === 'GET' && /\/api\/repos\?/.test(request.url())) {
+          listRequests.push(request.url());
+        }
+      });
+      await repos.afterListResponse(() => dashboard.countRow(maven).click(), { type: maven });
+
+      await expect(adminPage).toHaveURL('/repositories');
+      await expect(repos.typeFilterText()).toHaveText(maven.label);
+      // ONE list request, filtered by the server to Maven: the type came from the click.
+      expect(listRequests).toHaveLength(1);
+      expect(new URL(listRequests[0]).searchParams.get('type')).toBe('MAVEN');
+
+      // Narrow the list (on the server) to this test's repositories before looking at rows.
+      await repos.search(`e2e-${seeder.runId}-`);
+      await expect(repos.row(mavenRepo.name)).toBeVisible();
+      await expect(repos.row(npmRepo.name)).toHaveCount(0);
+    },
+  );
+
+  // @cloud-skip: DASH-04 runs as a seeded USER; Repsy Cloud has no USER role.
+  test(
+    'DASH-04: a USER has no Create button and sees the real counts, with no usage calls',
+    { tag: ['@cloud-skip'] },
+    async ({ userPage, seededUser, seeder, panelApi }) => {
+      const dashboard = new DashboardPage(userPage);
+      await seeder.createRepo(RepoType.MAVEN);
+      const requests = dashboard.trackRepoRequests();
+
+      // Parallel workers create and delete repositories: accept a window in which nothing moved.
+      await expect(async () => {
+        const before = await apiCounts(panelApi);
+        await dashboard.open();
+        const shown = await dashboard.displayedCounts();
+        const after = await apiCounts(panelApi);
+
+        expect(after, 'a repository was created or deleted while loading: retry').toEqual(before);
+        // RPS-1284: a USER used to see nine zeros here (the counts were an admin-only call).
+        expect(shown).toEqual(before);
+      }).toPass({ timeout: SETTLE_TIMEOUT });
+
+      await expect(dashboard.welcomeUsername).toContainText(seededUser.username);
+      await expect(dashboard.diskUsageCard).toBeVisible();
+      await expect(dashboard.securityCard).toBeVisible();
+      await expect(dashboard.repoCountCard).toBeVisible();
+      await expect(dashboard.recentActivity).toBeVisible();
+      await expect(dashboard.createButton).toHaveCount(0);
+      expect((await dashboard.displayedCounts()).maven).toBeGreaterThanOrEqual(2);
+      // The counts and the recent list are one request each; the per-repository usage call (which a
+      // USER may not make) is gone, since the list item carries the disk usage.
+      expect(requests.counts().length).toBeGreaterThanOrEqual(1);
+      expect(requests.lists().length).toBeGreaterThanOrEqual(1);
+      for (const list of requests.lists()) {
+        const params = new URL(list).searchParams;
+        expect(params.get('size')).toBe(String(RECENT_ACTIVITY_SIZE));
+        expect(params.get('sort')).toBe('createdAt,desc');
+        expect(params.get('type')).toBeNull();
       }
-    });
-    await repos.afterListResponse(() => dashboard.countRow(maven).click(), { type: maven });
+      expect(requests.usages()).toEqual([]);
+    },
+  );
 
-    await expect(adminPage).toHaveURL('/repositories');
-    await expect(repos.typeFilterText()).toHaveText(maven.label);
-    // ONE list request, filtered by the server to Maven: the type came from the click.
-    expect(listRequests).toHaveLength(1);
-    expect(new URL(listRequests[0]).searchParams.get('type')).toBe('MAVEN');
+  test(
+    'DASH-04: a USER sees the newest repositories in Recent Activity',
+    { tag: ['@cloud-skip'] },
+    async ({ userPage, seeder }) => {
+      const dashboard = new DashboardPage(userPage);
+      const repo = await seeder.createRepo(RepoType.MAVEN);
 
-    // Narrow the list (on the server) to this test's repositories before looking at rows.
-    await repos.search(`e2e-${seeder.runId}-`);
-    await expect(repos.row(mavenRepo.name)).toBeVisible();
-    await expect(repos.row(npmRepo.name)).toHaveCount(0);
-  });
-
-  test('DASH-04: a USER has no Create button and sees the real counts, with no usage calls', async ({
-    userPage,
-    seededUser,
-    seeder,
-    panelApi,
-  }) => {
-    const dashboard = new DashboardPage(userPage);
-    await seeder.createRepo(RepoType.MAVEN);
-    const requests = dashboard.trackRepoRequests();
-
-    // Parallel workers create and delete repositories: accept a window in which nothing moved.
-    await expect(async () => {
-      const before = await apiCounts(panelApi);
-      await dashboard.open();
-      const shown = await dashboard.displayedCounts();
-      const after = await apiCounts(panelApi);
-
-      expect(after, 'a repository was created or deleted while loading: retry').toEqual(before);
-      // RPS-1284: a USER used to see nine zeros here (the counts were an admin-only call).
-      expect(shown).toEqual(before);
-    }).toPass({ timeout: SETTLE_TIMEOUT });
-
-    await expect(dashboard.welcomeUsername).toContainText(seededUser.username);
-    await expect(dashboard.diskUsageCard).toBeVisible();
-    await expect(dashboard.securityCard).toBeVisible();
-    await expect(dashboard.repoCountCard).toBeVisible();
-    await expect(dashboard.recentActivity).toBeVisible();
-    await expect(dashboard.createButton).toHaveCount(0);
-    expect((await dashboard.displayedCounts()).maven).toBeGreaterThanOrEqual(2);
-    // The counts and the recent list are one request each; the per-repository usage call (which a
-    // USER may not make) is gone, since the list item carries the disk usage.
-    expect(requests.counts().length).toBeGreaterThanOrEqual(1);
-    expect(requests.lists().length).toBeGreaterThanOrEqual(1);
-    for (const list of requests.lists()) {
-      const params = new URL(list).searchParams;
-      expect(params.get('size')).toBe(String(RECENT_ACTIVITY_SIZE));
-      expect(params.get('sort')).toBe('createdAt,desc');
-      expect(params.get('type')).toBeNull();
-    }
-    expect(requests.usages()).toEqual([]);
-  });
-
-  test('DASH-04: a USER sees the newest repositories in Recent Activity', async ({
-    userPage,
-    seeder,
-  }) => {
-    const dashboard = new DashboardPage(userPage);
-    const repo = await seeder.createRepo(RepoType.MAVEN);
-
-    await expect(async () => {
-      await dashboard.open();
-      await expect(dashboard.recentRow(repo.name)).toBeVisible({ timeout: 5_000 });
-    }).toPass({ timeout: 20_000 });
-  });
+      await expect(async () => {
+        await dashboard.open();
+        await expect(dashboard.recentRow(repo.name)).toBeVisible({ timeout: 5_000 });
+      }).toPass({ timeout: 20_000 });
+    },
+  );
 
   // RPS-1284: a USER used to be answered 401 (later 403 `accessDenied`) for the usage of every repository
   // Recent Activity asked about, which needs MANAGE. Since RPS-1268 the list item carries the disk usage
   // and the dashboard makes no such call, so there is nothing to refuse: no request, no toast, and the
   // session is untouched. (The 403 itself is pinned by AUTH-12 in `auth/session.spec.ts`.)
-  test('DASH-04: a USER makes no repository usage call, sees no toast and stays signed in', async ({
-    userPage,
-  }) => {
-    const dashboard = new DashboardPage(userPage);
-    const requests = dashboard.trackRepoRequests();
+  test(
+    'DASH-04: a USER makes no repository usage call, sees no toast and stays signed in',
+    { tag: ['@cloud-skip'] },
+    async ({ userPage }) => {
+      const dashboard = new DashboardPage(userPage);
+      const requests = dashboard.trackRepoRequests();
 
-    await dashboard.open();
-    await dashboard.settle();
+      await dashboard.open();
+      await dashboard.settle();
 
-    expect(requests.usages()).toEqual([]);
-    await expect(new Shell(userPage).toasts.toast()).toHaveCount(0);
-    await expect(userPage).toHaveURL('/');
-    expect((await storedSession(userPage)).token).toMatch(JWT_SHAPE);
-  });
+      expect(requests.usages()).toEqual([]);
+      await expect(new Shell(userPage).toasts.toast()).toHaveCount(0);
+      await expect(userPage).toHaveURL('/');
+      expect((await storedSession(userPage)).token).toMatch(JWT_SHAPE);
+    },
+  );
 });
