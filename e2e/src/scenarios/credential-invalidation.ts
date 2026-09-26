@@ -243,7 +243,7 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
         await accepted(repo.name, token, 'the login token before the change');
         await accepted(repo.name, token, 'the login token, again');
 
-        const userApi = new PanelApi(env.apiBaseUrl);
+        const userApi = await createPanelBackend();
         await userApi.login(user.username, user.password);
         const newPassword = `${user.password}${NEW_PASSWORD_SUFFIX}`;
         await userApi.changeOwnPassword(newPassword);
@@ -261,7 +261,13 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
       const token = await protocol.login(repo.name, user.username, user.password);
       await accepted(repo.name, token, 'the login token before the reset');
 
-      const generated = await panelApi.resetUserPassword(user.id);
+      // The admin's own session (`panelApi`); the reset answers the generated password as the envelope's data.
+      const reset = await panelApi.rawRequest(
+        'POST',
+        `/api/users/${user.id}/actions/reset-password`,
+      );
+      expect(reset.status, `reset-password: ${JSON.stringify(reset.body)}`).toBe(200);
+      const generated = String(reset.body.data);
 
       await endedSession(repo.name, token, 'the login token after the admin reset');
       const fresh = await protocol.login(repo.name, user.username, generated);
@@ -274,7 +280,7 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
       const other = await seeder.createUser();
       const token = await protocol.login(repo.name, user.username, user.password);
 
-      const otherApi = new PanelApi(env.apiBaseUrl);
+      const otherApi = await createPanelBackend();
       await otherApi.login(other.username, other.password);
       await otherApi.changeOwnPassword(`${other.password}${NEW_PASSWORD_SUFFIX}`);
 
@@ -290,7 +296,7 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
       const jwt = await protocol.login(repo.name, deployToken.username, deployToken.token);
       await accepted(repo.name, jwt, 'the deploy-token JWT before the change');
 
-      const userApi = new PanelApi(env.apiBaseUrl);
+      const userApi = await createPanelBackend();
       await userApi.login(user.username, user.password);
       await userApi.changeOwnPassword(`${user.password}${NEW_PASSWORD_SUFFIX}`);
 
@@ -316,7 +322,7 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
 
         await deployed(asLoginToken(token), realClient.adapter.version('release'));
 
-        const userApi = new PanelApi(env.apiBaseUrl);
+        const userApi = await createPanelBackend();
         await userApi.login(user.username, user.password);
         const newPassword = `${user.password}${NEW_PASSWORD_SUFFIX}`;
         await userApi.changeOwnPassword(newPassword);
