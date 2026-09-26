@@ -28,6 +28,7 @@ import { test } from '@playwright/test';
 import { isolatedWorkDir } from '../../src/clients/exec.js';
 import { expectSealed, probeEnv } from '../../src/clients/env-probe.js';
 import { pipEnv, twineEnv } from '../../src/clients/pypi.js';
+import { uvEnv } from '../../src/clients/uv.js';
 
 test(
   'pypi > no runner variable reaches twine, its credential does',
@@ -63,5 +64,32 @@ test(
       'pypi-sealed-env-pip',
     );
     expectSealed(seen, home, ['PIP_INDEX_URL', 'PIP_CONFIG_FILE']);
+  },
+);
+
+test(
+  'pypi > no runner variable reaches uv, its publish token and index credential do',
+  { tag: ['@sealed-env'] },
+  async () => {
+    const { home, work } = await isolatedWorkDir('pypi-sealed-env-uv');
+    const credential = {
+      transport: 'basic' as const,
+      username: 'token',
+      password: 'sealed-env-secret',
+      kind: 'token' as const,
+    };
+    const publishing = await probeEnv(
+      uvEnv(home, credential, 'publish'),
+      work,
+      'pypi-sealed-env-uv',
+    );
+    expectSealed(publishing, home, ['UV_PUBLISH_TOKEN', 'UV_CACHE_DIR', 'UV_PYTHON']);
+    const consuming = await probeEnv(uvEnv(home, credential, 'index'), work, 'pypi-sealed-env-uv');
+    expectSealed(consuming, home, [
+      'UV_INDEX_REPSY_USERNAME',
+      'UV_INDEX_REPSY_PASSWORD',
+      'UV_CACHE_DIR',
+      'UV_PYTHON',
+    ]);
   },
 );

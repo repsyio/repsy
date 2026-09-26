@@ -91,7 +91,7 @@ e2e/
   runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
   runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image, `skopeo` (built statically from its pinned tag) and `regctl` (pinned release binary); no daemon, no socket
   runners/helm.Dockerfile      # + the static `helm` binary + the cm-push plugin installed at build time; no daemon, no socket
-  runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time
+  runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time; the static uv binary copied out of Astral's image
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
   runners/ruby.Dockerfile      # + a pinned Ruby toolchain (ruby/gem/bundle/bundler + stdlib) copied out of the official ruby image
   runners/stack.Dockerfile     # + the static `docker` CLI and its compose plugin copied out of docker-cli, a JDK + Maven, crane and npm; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
@@ -168,6 +168,7 @@ e2e/
       helm-classic.ts                  # the classic (ChartMuseum) client + helmClassicAdapter: helm cm-push / pull --repo
       pypi-raw.ts                     # pypi-specific raw POST/GET (upload/simple page/root index/download), buildWheel (fflate)
       pypi.ts                          # the pypi client + pypiAdapter: publish()/resolve()/seedPublish(), python3 -m twine/pip
+      uv.ts                            # the second pypi client: uvAdapter (uv publish / uv lock + uv sync), uvEnv, runUv, a uv.lock reader
       golang-raw.ts                     # golang-specific raw PUT/GET (@v/list, @latest, .info/.mod/.zip), buildModuleZip (fflate), dirhashHash1
       golang-tls-shim.ts                 # in-process HTTPS reverse proxy for a credentialed consume (a real `go` refuses plain-http creds; not used on a TLS stack)
       golang.ts                          # the golang client + golangAdapter: publish()/resolve()/seedPublish(), real curl -T / go mod download
@@ -249,6 +250,8 @@ e2e/
     pypi/
       publish-consume.spec.ts   # registerPublishConsumeLoop(pypiAdapter) + a real pip-install and a mixed-case/dotted-name real-client test
       registry-rules.spec.ts    # raw-HTTP pins of the override/version/digest rules, root-index shape, HEAD, 307 redirect, no releases/snapshots rule
+      uv-catalog.spec.ts        # RPS-1486 registerPublishConsumeLoop(uvAdapter): the shared catalog with `uv publish` + `uv lock`/`uv sync`
+      uv-client.spec.ts         # RPS-1486 U1-U9: uv's upload form, uv.lock hashes, netrc, uv pip --require-hashes, tampered lock, PEP 691 Accept, --check-url, deleted release
     golang/
       publish-consume.spec.ts   # registerPublishConsumeLoop(golangAdapter) + go-get-build-run, plain-http-creds-refused, dirhash cross-check, mixed-case and wire-trace real-client tests
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload) + G1/G2/G10 candidates
@@ -3150,6 +3153,55 @@ repo update` + `helm search repo` + `helm pull <alias>/<chart>`) turned out to b
 covered by `tests/helm/classic-publish-consume.spec.ts`'s existing "C1" test (added in the Helm
 runner step) — checked first, confirmed by reading that file, so nothing new was added for Helm in
 this step; see the "Helm runner" section above for C1's own coverage.
+
+### uv (RPS-1486)
+
+`uv` is the second PyPI client: the pinned static binary (`UV_VERSION`, copied out of
+`ghcr.io/astral-sh/uv` in `runners/pypi.Dockerfile`; `UV_PYTHON` is the CPython the image carries and
+`UV_PYTHON_DOWNLOADS=never`). `clients/uv.ts`'s `uvAdapter` (`label: 'uv'`, tag `@uv`, titles
+`pypi[uv] > <scenario>`) reuses everything of `pypiAdapter` but the client: `publish`/`seedPublish`
+run `uv publish --trusted-publishing never --publish-url <repo>/`, `resolve` runs `uv lock` then
+`uv sync --locked` in an isolated project whose `pyproject.toml` names the repo as its default index.
+`tests/pypi/uv-catalog.spec.ts` runs the whole shared catalog through it (13 scenarios), and
+`tests/pypi/uv-client.spec.ts` (U1-U9) pins what only uv shows:
+
+```bash
+./run.sh test --protocol pypi --grep @uv -b   # -b the first time: the runner image gained uv
+```
+
+- **Credentials are uv's own**, in a private `HOME` (`clientEnv`, RPS-1446), never argv or a file:
+  `UV_PUBLISH_USERNAME`/`UV_PUBLISH_PASSWORD` for a password credential, `UV_PUBLISH_TOKEN` for a
+  deploy token (uv sends the username `__token__`; Repsy tries the token by its secret alone), and
+  `UV_INDEX_REPSY_USERNAME`/`UV_INDEX_REPSY_PASSWORD` for the named index of the consumer project (so
+  neither `pyproject.toml` nor `uv.lock` holds one). `~/.netrc` works too (U3). A plain-http index on
+  `localhost` needs no `--allow-insecure-host`; a remote plain-http target gets `UV_INSECURE_HOST`
+  under `REPSY_E2E_INSECURE_REGISTRY`, like pip's `PIP_TRUSTED_HOST`. The keyring provider needs the
+  `keyring` executable, which the runner does not carry: not covered.
+- **`uv publish` sends `sha256_digest`** (and `blake2_256_digest`, ignored server-side), so the
+  `sha256DigestMissing` refusal of RPS-1224 does not affect it: it is accepted like twine (captured
+  off a local server in U1). A wheel and an sdist in one call are both stored (U2).
+- **An anonymous publish** would make uv try "trusted publishing" first (an OIDC request to
+  `https://<repo host>/_/oidc/audience`, three retries, then `Missing credentials`); the adapter passes
+  `--trusted-publishing never`, so it fails client-side at once, like twine's non-interactive preflight,
+  and the outcome comes from the raw companion probe (401).
+- **`resolve` is lock + sync**, not `uv pip install`: `uv.lock` records the registry (no credential),
+  the canonical download URL and the sha256 the index advertised, and `uv sync` refuses a wheel whose
+  bytes differ (U5), so the locked hash is the installed bytes and is what `contentSha256` reports.
+  `uv pip install --index-url`, `--require-hashes` (a wrong hash is a hash mismatch, an unpinned
+  requirement is refused) and `uv pip compile --generate-hashes` are U4; pip's `--require-hashes` is U9.
+- **PEP 691** (U6): uv asks for `application/vnd.pypi.simple.v1+json` first, with HTML fallbacks. Repsy
+  has no JSON simple API and answers `200 text/html` to that header and to a JSON-only one (PEP 691
+  would also allow a 406 for the latter); uv falls back to the page. Pinned as observed.
+- **`uv publish --check-url`** (U7): the same bytes are skipped (exit 0, even on a no-override repo), other
+  bytes under the same name are refused by uv before it uploads, and a check URL without credentials
+  cannot read a private index, so uv uploads and the repo answers `403 fileAlreadyExists`.
+- **A deleted release** (U8; PyPI has no wire delete, the panel is the only way): file, page and HEAD
+  404, `uv lock` has no solution, an old lock fails on the 404, and a re-published wheel (fresh bytes)
+  is refused by the old lock's hash until it is re-locked. A ranged GET of a wheel answers `206` with
+  the right slice.
+- Observed, not pinned (no ticket): a `HEAD` of a wheel answers `200` with neither `Content-Length` nor
+  `Accept-Ranges` (the `GET` has both), so uv's range-request fast path logs "Range requests not
+  supported" and streams the whole wheel (`uv pip install -v`). Performance only.
 
 ## Go runner
 
