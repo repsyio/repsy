@@ -49,6 +49,7 @@ public final class OciErrors {
           Map.entry("dockerImageNameInvalid", OciErrorCode.NAME_INVALID),
           Map.entry("dockerReferenceInvalid", OciErrorCode.TAG_INVALID),
           Map.entry("dockerDigestInvalid", OciErrorCode.DIGEST_INVALID),
+          Map.entry("dockerDigestAlgorithmUnsupported", OciErrorCode.DIGEST_INVALID),
           Map.entry("dockerMediaTypeTooLong", OciErrorCode.MANIFEST_INVALID),
           Map.entry("dockerPlatformTooLong", OciErrorCode.MANIFEST_INVALID),
           Map.entry("manifestInvalidJson", OciErrorCode.MANIFEST_INVALID),

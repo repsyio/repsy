@@ -53,7 +53,10 @@
  *    with `mediaType = DOCKER_LAYER` for EVERY blob including the config JSON (confirmed live: a
  *    HEAD's `Content-Type` is always `application/vnd.docker.image.rootfs.diff.tar.gzip`, whatever
  *    the blob actually is), and answers `201` + `Docker-Content-Digest`. Re-uploading a digest that
- *    already exists in this repo is accepted again (`201`, dedup at the storage layer).
+ *    already exists in this repo is accepted again (`201`, dedup at the storage layer). The start
+ *    honours the OCI end-4c hint `?digest-algorithm=<alg>` (RPS-1594): `sha256`/`sha512` (or none)
+ *    start the session as usual, anything else is refused `400 DIGEST_INVALID` before a session
+ *    exists. The blob's algorithm is the one of the finalizing `?digest=`, which is not tied to the hint.
  *  - Manifest push (`AbstractDockerManifestPushProtocolMethodHandler`/`AbstractDockerProtocolTxFacade
  *    .saveManifest`): the `Image` row is created BEFORE the override check runs. `!allowOverride` +
  *    an existing tag of this name -> `403` (`DENIED`/`packageOverrideDisabled`) -- confirmed live, and
@@ -416,9 +419,13 @@ export async function rawStartUpload(
   repoName: string,
   credential: MaterializedCredential,
   image: string,
+  opts?: { digestAlgorithm?: string },
 ): Promise<RawResponse & { hop: 'token' | 'request'; location?: string }> {
   const res = await dockerRequest(credential, pushScope(repoName, image), (headers) =>
-    rawFetch(v2RepoUrl(repoName, `${image}/blobs/uploads/`), { method: 'POST', headers }),
+    rawFetch(v2RepoUrl(repoName, uploadStartPath(image, opts?.digestAlgorithm)), {
+      method: 'POST',
+      headers,
+    }),
   );
   return {
     status: res.status,
@@ -426,6 +433,14 @@ export async function rawStartUpload(
     hop: res.hop,
     location: res.headers.get('location') ?? undefined,
   };
+}
+
+/** The upload-start path, with the OCI end-4c `digest-algorithm` hint when one is given (RPS-1594). */
+function uploadStartPath(image: string, digestAlgorithm?: string): string {
+  const base = `${image}/blobs/uploads/`;
+  return digestAlgorithm === undefined
+    ? base
+    : `${base}?digest-algorithm=${encodeURIComponent(digestAlgorithm)}`;
 }
 
 /** `POST /v2/<repo>/<image>/blobs/uploads/` with a token the caller already holds (no token hop):
@@ -453,13 +468,16 @@ export async function rawUploadBlob(
   image: string,
   bytes: Buffer,
   digest: string,
-  opts?: { mode?: 'monolithic' | 'patch' },
+  opts?: { mode?: 'monolithic' | 'patch'; digestAlgorithm?: string },
 ): Promise<RawResponse & { hop: 'token' | 'request'; digestHeader?: string }> {
   const res = await dockerRequest(credential, pushScope(repoName, image), async (headers) => {
-    const startRes = await rawFetch(v2RepoUrl(repoName, `${image}/blobs/uploads/`), {
-      method: 'POST',
-      headers,
-    });
+    const startRes = await rawFetch(
+      v2RepoUrl(repoName, uploadStartPath(image, opts?.digestAlgorithm)),
+      {
+        method: 'POST',
+        headers,
+      },
+    );
     if (startRes.status !== 202) {
       return startRes;
     }
