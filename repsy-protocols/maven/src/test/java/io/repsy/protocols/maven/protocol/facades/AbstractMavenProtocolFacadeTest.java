@@ -63,6 +63,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -757,8 +758,16 @@ class AbstractMavenProtocolFacadeTest {
     deployIsAllowed();
     final InputStream failing =
         new InputStream() {
+          private boolean first = true;
+
           @Override
           public int read() throws IOException {
+            if (this.first) {
+              this.first = false;
+
+              return '<';
+            }
+
             throw new IOException("connection reset");
           }
         };
@@ -767,6 +776,46 @@ class AbstractMavenProtocolFacadeTest {
         .isInstanceOf(IOException.class);
 
     verify(this.storageService, never()).writeInputStreamToPath(any(), any(), anyString());
+  }
+
+  @ParameterizedTest(name = "{0}, declared length {1}")
+  @CsvSource({
+    "com/example/lib/1.0/lib-1.0.jar, 0",
+    "com/example/lib/1.0/lib-1.0.jar, -1",
+    "com/example/lib/1.0/lib-1.0.pom, 0",
+    "com/example/lib/1.0/lib-1.0.pom, -1",
+    "com/example/lib/maven-metadata.xml, 0",
+    "com/example/lib/maven-metadata.xml, -1",
+    "com/example/lib/1.0/lib-1.0.jar.sha1, 0",
+  })
+  @DisplayName("refuses a body with no byte in it with a 400, storing nothing (RPS-1443)")
+  void rejectsAnEmptyBody(final String path, final long declaredLength) {
+    requestFor(path);
+
+    assertThatThrownBy(
+            () ->
+                this.facade.upload(
+                    this.context, new ByteArrayInputStream(new byte[0]), declaredLength))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("mavenUploadBodyEmpty");
+
+    verifyNoInteractions(this.storageService);
+    verify(this.artifactService, never()).checkDeploymentRules(any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
+  @DisplayName("stores a one-byte body whole, the byte that was looked at included (RPS-1443)")
+  void storesAOneByteBodyWhole() throws Exception {
+    requestFor("com/example/lib/1.0/lib-1.0.jar");
+    deployIsAllowed();
+    storageReportsUsage(1);
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(new byte[] {'x'}));
+
+    upload("x");
+
+    assertThat(this.stored).singleElement().isEqualTo(new byte[] {'x'});
   }
 
   private static String filler(final long bytes) {
