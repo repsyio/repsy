@@ -101,6 +101,12 @@ export default defineConfig({
       testMatch: 'ruby/**/*.spec.ts',
     },
     {
+      // Raw HTTP at the edge of Repsy, no package client: which port serves what, the public URLs
+      // behind X-Forwarded-*, the CORS and CSP headers (README.md "API suite", RPS-1480).
+      name: 'api',
+      testMatch: 'api/**/*.spec.ts',
+    },
+    {
       // Cases that `docker exec` into the Repsy container itself (the password reset marker file in
       // the image, README.md "Stack runner"). Runs in the "stack" runner, the only one with the
       // host's Docker socket; specs under tests/stack/ skip themselves on a remote target.
