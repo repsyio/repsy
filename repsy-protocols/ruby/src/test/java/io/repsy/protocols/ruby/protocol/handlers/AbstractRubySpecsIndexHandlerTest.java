@@ -17,6 +17,7 @@ package io.repsy.protocols.ruby.protocol.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -35,8 +36,11 @@ import java.util.zip.GZIPInputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -77,6 +81,22 @@ class AbstractRubySpecsIndexHandlerTest {
     try (final var in = new GZIPInputStream(new ByteArrayInputStream(gzipped))) {
       return in.readAllBytes();
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"/specs.4.8.gz", "/latest_specs.4.8.gz", "/prerelease_specs.4.8.gz"})
+  @DisplayName("names the download after the index file instead of f.txt (RPS-1442)")
+  void namesTheIndexFile(final String path) {
+    lenient().when(this.facade.getSpecs(any())).thenReturn(new byte[0]);
+    lenient().when(this.facade.getLatestSpecs(any())).thenReturn(new byte[0]);
+    lenient().when(this.facade.getPrereleaseSpecs(any())).thenReturn(new byte[0]);
+
+    final var response =
+        this.handler()
+            .handle(contextFor(path), new MockHttpServletRequest(), new MockHttpServletResponse());
+
+    assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+        .isEqualTo("attachment; filename=\"" + path.substring(1) + "\"");
   }
 
   @Test

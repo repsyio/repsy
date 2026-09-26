@@ -19,20 +19,35 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
 import io.repsy.protocols.golang.protocol.handlers.AbstractGoUploadProtocolMethodHandler;
+import java.util.Locale;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 
 @Component
 @NullMarked
 public class GolangUploadProtocolMethodHandler extends AbstractGoUploadProtocolMethodHandler<UUID> {
 
+  private final MessageSource messageSource;
+
   public GolangUploadProtocolMethodHandler(
       @Qualifier("osGolangPathParser") final PathParser pathParser,
       final GoProtocolFacade<UUID> goProtocolFacade,
-      final GolangProtocolProvider provider) {
+      final GolangProtocolProvider provider,
+      final MessageSource messageSource) {
 
     super(pathParser, goProtocolFacade, provider);
+    this.messageSource = messageSource;
+  }
+
+  /** The message the auth pre-processor answers for the same id (RPS-1450). */
+  @Override
+  protected String unauthorizedText(final @Nullable String msgId) {
+    final var id = msgId == null ? "unAuthorized" : msgId;
+
+    return this.messageSource.getMessage(id, null, id, Locale.getDefault());
   }
 }

@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.http.HttpHeaders.CONTENT_DISPOSITION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -364,6 +365,45 @@ class NuGetReadBackProtocolIT extends AbstractIntegrationTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.versions", hasSize(1)))
           .andExpect(jsonPath("$.versions[0]").value("2.0.0"));
+    }
+
+    @Test
+    @DisplayName(
+        "the registration leaf and the version list are data and carry no file name (RPS-1442)")
+    void jsonReadsCarryNoContentDisposition() throws Exception {
+      final var repo = NuGetReadBackProtocolIT.this.nugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), "3.0.0", "json");
+      final var token = NuGetReadBackProtocolIT.this.adminProtocolBearerToken();
+
+      assertStatus(NuGetReadBackProtocolIT.this.pushAs(repo, pkg.nupkg(), token), 201);
+
+      final var leaf =
+          NuGetReadBackProtocolIT.this
+              .readRegistrationLeaf(repo, pkg)
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse();
+      final var versions =
+          NuGetReadBackProtocolIT.this
+              .readVersionList(repo, pkg)
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse();
+      final var index =
+          NuGetReadBackProtocolIT.this
+              .protocol(
+                  get(
+                          "/{repo}/v3/registration/{id}/index.json",
+                          repo.getName(),
+                          pkg.id().toLowerCase(Locale.ROOT))
+                      .header(AUTHORIZATION, token))
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse();
+
+      assertThat(leaf.getHeader(CONTENT_DISPOSITION)).isNull();
+      assertThat(versions.getHeader(CONTENT_DISPOSITION)).isNull();
+      assertThat(index.getHeader(CONTENT_DISPOSITION)).isNull();
     }
 
     @Test

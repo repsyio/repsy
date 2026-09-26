@@ -38,6 +38,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -101,6 +102,47 @@ class AbstractRubyHeadHandlerTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isNull();
     verifyNoInteractions(this.facade);
+  }
+
+  @ParameterizedTest
+  @MethodSource("alwaysExistingPaths")
+  @DisplayName("an index path answers the header its GET sends (RPS-1442)")
+  void indexPathMirrorsGetHeader(final String path) throws Exception {
+    final var response =
+        this.handler()
+            .handle(contextFor(path), new MockHttpServletRequest(), new MockHttpServletResponse());
+
+    assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+        .isEqualTo(RubyContentDisposition.forPath(path));
+  }
+
+  @Test
+  @DisplayName("/info/<gem>, .gem and .gemspec.rz answer the header their GET sends (RPS-1442)")
+  void existingFilesMirrorGetHeader() throws Exception {
+    when(this.facade.gemExists(any(), eq("demo.rb"))).thenReturn(true);
+    when(this.facade.gemFileExists(any(), eq("demo-1.0.0.gem"))).thenReturn(true);
+    when(this.facade.gemspecExists(any(), eq("demo"), eq("1.0.0"))).thenReturn(true);
+
+    assertThat(this.headOf("/info/demo.rb")).isEqualTo("inline");
+    assertThat(this.headOf("/gems/demo-1.0.0.gem"))
+        .isEqualTo("attachment; filename=\"demo-1.0.0.gem\"");
+    assertThat(this.headOf("/quick/Marshal.4.8/demo-1.0.0.gemspec.rz"))
+        .isEqualTo("attachment; filename=\"demo-1.0.0.gemspec.rz\"");
+  }
+
+  @Test
+  @DisplayName("a missing gem sends no Content-Disposition")
+  void missingSendsNoHeader() throws Exception {
+    when(this.facade.gemFileExists(any(), eq("demo-1.0.0.gem"))).thenReturn(false);
+
+    assertThat(this.headOf("/gems/demo-1.0.0.gem")).isNull();
+  }
+
+  private String headOf(final String path) throws Exception {
+    return this.handler()
+        .handle(contextFor(path), new MockHttpServletRequest(), new MockHttpServletResponse())
+        .getHeaders()
+        .getFirst(HttpHeaders.CONTENT_DISPOSITION);
   }
 
   @Test

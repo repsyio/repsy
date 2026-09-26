@@ -26,9 +26,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -87,6 +89,13 @@ public abstract class AbstractRubyCompactIndexInfoHandler implements ProtocolMet
     }
     final var gemName = matcher.group(1);
     final var body = this.facade.getGemInfo(context, gemName);
-    return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(body);
+    // A gem name with a dot ("foo.rb") reads as an extension to Spring, which then names the
+    // response "f.txt" (RPS-1442).
+    return ResponseEntity.ok()
+        .contentType(MediaType.TEXT_PLAIN)
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
+        .body(body);
   }
 }
