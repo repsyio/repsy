@@ -228,16 +228,21 @@ export function groupMetadataPath(suffix = ''): string {
   return `${groupPath(PLUGIN_GROUP_ID)}/maven-metadata.xml${suffix}`;
 }
 
-/** Uploads the jar, then the POM that registers the version: what Gradle or sbt send, and no metadata. */
+/**
+ * Uploads the jar, then the POM that registers the version: what Gradle or sbt send, and no metadata. With
+ * `order: 'pom-first'` the POM goes first, which is the order of `mvn deploy` (RPS-1589).
+ */
 export async function uploadPluginFiles(
   repoName: string,
   credential: MaterializedCredential,
   plugin: BuiltPlugin,
+  order: 'jar-first' | 'pom-first' = 'jar-first',
 ): Promise<void> {
-  for (const [name, body, type] of [
+  const files = [
     [`${plugin.artifactId}-${PLUGIN_VERSION}.jar`, plugin.jar, 'application/java-archive'],
     [`${plugin.artifactId}-${PLUGIN_VERSION}.pom`, plugin.pom, 'application/octet-stream'],
-  ] as const) {
+  ] as const;
+  for (const [name, body, type] of order === 'jar-first' ? files : [...files].reverse()) {
     const res = await rawPut(
       repoName,
       credential,

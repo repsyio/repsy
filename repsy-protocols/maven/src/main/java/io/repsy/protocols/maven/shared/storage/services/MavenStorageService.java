@@ -18,6 +18,7 @@ package io.repsy.protocols.maven.shared.storage.services;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.protocols.maven.shared.artifact.dtos.PluginPrefixChange;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
@@ -129,6 +130,26 @@ public interface MavenStorageService<ID> {
       String groupId,
       Supplier<? extends Collection<RegisteredPlugin>> registeredPlugins)
       throws IOException;
+
+  /**
+   * Corrects, in the group-level {@code maven-metadata.xml} that is stored, the entry of a plugin
+   * whose registered prefix was replaced by the one its jar names (RPS-1589): the POM of {@code mvn
+   * deploy} is stored first and had that file list the plugin under the prefix derived from its
+   * artifactId. An entry of {@code artifactId} with the prefix {@code from} gets {@code to}, or is
+   * dropped when the file lists the plugin under {@code to} already (Maven merged its own entry in
+   * meanwhile). No other entry is changed, so a plugin that was listed by hand under a prefix of
+   * its own is left alone.
+   *
+   * <p>The file and its stored checksums are rewritten (none is created) and a stored signature of
+   * it, which no longer verifies, is deleted. Nothing is written when the group has no stored file,
+   * when the file lists versions and no plugins, or when it has no entry to correct.
+   *
+   * @return the change of the disk usage of the repository, negative when the files shrank
+   * @throws io.repsy.core.error_handling.exceptions.BadRequestException {@code
+   *     malformedMetadataFile}, before anything is written, when the stored file cannot be parsed
+   */
+  long replacePluginPrefixInGroupMetadata(
+      BaseRepoInfo<ID> repoInfo, String groupId, PluginPrefixChange change) throws IOException;
 
   Path getPath(String groupId, String artifactId);
 

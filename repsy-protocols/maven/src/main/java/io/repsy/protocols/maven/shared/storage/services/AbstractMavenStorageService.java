@@ -27,6 +27,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import io.repsy.libs.storage.core.exceptions.RedirectToSlashEndedLocationException;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.maven.shared.artifact.dtos.PluginPrefixChange;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.utils.ArtifactMetadataSynthesizer;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
@@ -537,6 +538,47 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
               }
 
               return changed;
+            })
+        .getDiskUsage();
+  }
+
+  @Override
+  public long replacePluginPrefixInGroupMetadata(
+      final BaseRepoInfo<ID> repoInfo, final String groupId, final PluginPrefixChange change)
+      throws IOException {
+
+    return this.rewriteStoredMetadata(
+            repoInfo,
+            this.getPath(groupId)[0],
+            metadata -> {
+              if (metadata.getVersioning() != null && metadata.getPlugins().isEmpty()) {
+                return false;
+              }
+
+              final var stale =
+                  metadata.getPlugins().stream()
+                      .filter(plugin -> change.artifactId().equals(plugin.getArtifactId()))
+                      .filter(plugin -> change.from().equals(plugin.getPrefix()))
+                      .toList();
+
+              if (stale.isEmpty()) {
+                return false;
+              }
+
+              final var listedUnderNewPrefix =
+                  metadata.getPlugins().stream()
+                      .anyMatch(
+                          plugin ->
+                              change.artifactId().equals(plugin.getArtifactId())
+                                  && change.to().equals(plugin.getPrefix()));
+
+              if (listedUnderNewPrefix) {
+                metadata.getPlugins().removeAll(stale);
+              } else {
+                stale.forEach(plugin -> plugin.setPrefix(change.to()));
+              }
+
+              return true;
             })
         .getDiskUsage();
   }

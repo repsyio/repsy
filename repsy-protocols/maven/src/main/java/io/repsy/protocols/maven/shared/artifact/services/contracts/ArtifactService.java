@@ -18,6 +18,7 @@ package io.repsy.protocols.maven.shared.artifact.services.contracts;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.PluginPrefixChange;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
@@ -123,5 +124,23 @@ public interface ArtifactService<ID> {
       final BaseRepoInfo<ID> repoInfo, final String groupId) {
 
     return List.of();
+  }
+
+  /**
+   * Called after the main jar of a version is stored ({@link
+   * io.repsy.protocols.maven.shared.utils.ArtifactUtils#isMainJar}). When the POM of that version
+   * was registered as a plugin's before its jar (what {@code mvn deploy} sends), it registered the
+   * prefix derived from the artifactId; the jar's {@code plugin.xml} names the real {@code
+   * goalPrefix}, and it replaces the registered one when they differ (RPS-1589). It never fails the
+   * upload because of what the jar holds.
+   *
+   * @return the change, or {@code null} when the version is not a registered plugin's, the jar
+   *     names no usable prefix or the registered prefix is the jar's already. An implementation
+   *     that does not override it registers nothing.
+   */
+  default @Nullable PluginPrefixChange refreshPluginPrefixFromJar(
+      final BaseRepoInfo<ID> repoInfo, final StoragePath jarPath, final Resource jar) {
+
+    return null;
   }
 }

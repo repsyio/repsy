@@ -55,6 +55,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.PluginPrefixChange;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
@@ -2193,6 +2194,112 @@ class ArtifactServiceImplTest {
                 pluginPom("foo-maven-plugin", "jar")))
         .containsExactly(null, null);
     verify(this.storageStrategy, never()).get(any(StoragePath.class), any());
+  }
+
+  private static final String PLUGIN_JAR_PATH =
+      "com/acme/foo-maven-plugin/1.0/foo-maven-plugin-1.0.jar";
+
+  /** A registered plugin: the artifact and its version 1.0 both hold the derived prefix. */
+  private ArtifactVersion registeredPlugin(final UUID id, final boolean plugin) {
+    final var artifact = new Artifact();
+    artifact.setId(UUID.randomUUID());
+    artifact.setArtifactName("foo-maven-plugin");
+    artifact.setPlugin(plugin);
+    artifact.setPrefix("foo");
+    when(this.artifactRepository.findByRepoIdAndGroupNameAndArtifactName(
+            id, "com.acme", "foo-maven-plugin"))
+        .thenReturn(Optional.of(artifact));
+    final var version = new ArtifactVersion();
+    version.setArtifact(artifact);
+    version.setPrefix("foo");
+    lenient()
+        .when(
+            this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+
+    return version;
+  }
+
+  @Test
+  @DisplayName("the jar that arrives after the POM corrects the derived prefix of both rows")
+  void aJarAfterTheirPomCorrectsTheDerivedPrefix() throws Exception {
+    final var id = UUID.randomUUID();
+    final var version = this.registeredPlugin(id, true);
+
+    final var change =
+        this.artifactService.refreshPluginPrefixFromJar(
+            repo(id, true, true, true),
+            StoragePath.of(id, PLUGIN_JAR_PATH),
+            new ByteArrayResource(pluginJar("foo-maven-plugin", "custom")));
+
+    assertThat(change).isEqualTo(new PluginPrefixChange("foo-maven-plugin", "foo", "custom"));
+    assertThat(version.getPrefix()).isEqualTo("custom");
+    assertThat(version.getArtifact().getPrefix()).isEqualTo("custom");
+    verify(this.artifactVersionRepository).save(version);
+    verify(this.artifactRepository).save(version.getArtifact());
+  }
+
+  @Test
+  @DisplayName("the artifact keeps a prefix that came from another version")
+  void theArtifactPrefixOfAnotherVersionIsKept() throws Exception {
+    final var id = UUID.randomUUID();
+    final var version = this.registeredPlugin(id, true);
+    version.getArtifact().setPrefix("newer");
+
+    this.artifactService.refreshPluginPrefixFromJar(
+        repo(id, true, true, true),
+        StoragePath.of(id, PLUGIN_JAR_PATH),
+        new ByteArrayResource(pluginJar("foo-maven-plugin", "custom")));
+
+    assertThat(version.getPrefix()).isEqualTo("custom");
+    assertThat(version.getArtifact().getPrefix()).isEqualTo("newer");
+    verify(this.artifactRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("nothing changes for the prefix the jar names already, an unusable jar or no POM")
+  void aJarThatChangesNothing() throws Exception {
+    final var id = UUID.randomUUID();
+    final var version = this.registeredPlugin(id, true);
+    final var repoInfo = repo(id, true, true, true);
+    final var path = StoragePath.of(id, PLUGIN_JAR_PATH);
+
+    assertThat(
+            this.artifactService.refreshPluginPrefixFromJar(
+                repoInfo, path, new ByteArrayResource(pluginJar("foo-maven-plugin", "foo"))))
+        .isNull();
+    assertThat(
+            this.artifactService.refreshPluginPrefixFromJar(
+                repoInfo, path, new ByteArrayResource("not a zip".getBytes(UTF_8))))
+        .isNull();
+    assertThat(
+            this.artifactService.refreshPluginPrefixFromJar(
+                repoInfo, path, new ByteArrayResource(pluginJar("other-maven-plugin", "other"))))
+        .isNull();
+    assertThat(
+            this.artifactService.refreshPluginPrefixFromJar(
+                repoInfo,
+                StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
+                new ByteArrayResource(pluginJar("lib", "custom"))))
+        .isNull();
+
+    assertThat(version.getPrefix()).isEqualTo("foo");
+    verify(this.artifactVersionRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("the jar of an artifact that is not a plugin is not read")
+  void theJarOfAnOrdinaryArtifactIsNotRead() throws Exception {
+    final var id = UUID.randomUUID();
+    this.registeredPlugin(id, false);
+    final var jar = org.mockito.Mockito.mock(Resource.class);
+
+    assertThat(
+            this.artifactService.refreshPluginPrefixFromJar(
+                repo(id, true, true, true), StoragePath.of(id, PLUGIN_JAR_PATH), jar))
+        .isNull();
+
+    verifyNoInteractions(jar);
   }
 
   @Test

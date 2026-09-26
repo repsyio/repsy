@@ -166,6 +166,34 @@ class ArtifactUtilsTest {
     assertThat(ArtifactUtils.isClassifierJar(path, classifier)).isFalse();
   }
 
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(
+      strings = {
+        "com/acme/lib/1.0/lib-1.0.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar"
+      })
+  @DisplayName("the jar of a version itself is its main jar (RPS-1589)")
+  void isMainJarTellsTheJarOfTheVersion(final String path) {
+    assertThat(ArtifactUtils.isMainJar(StoragePath.of(UUID.randomUUID(), path))).isTrue();
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(
+      strings = {
+        "com/acme/lib/1.0/lib-1.0-sources.jar",
+        "com/acme/lib/1.0/lib-1.0.jar.sha1",
+        "com/acme/lib/1.0/lib-1.0.jar.asc",
+        "com/acme/lib/1.0/lib-1.0.pom",
+        "com/acme/lib/1.0/lib-1.0.war",
+        "com/acme/lib/1.0/stray.jar",
+        "com/acme/lib/maven-metadata.xml"
+      })
+  @DisplayName("a classifier jar, a checksum, a signature or another file is not a main jar")
+  void isMainJarRefusesEverythingElse(final String path) {
+    assertThat(ArtifactUtils.isMainJar(StoragePath.of(UUID.randomUUID(), path))).isFalse();
+  }
+
   @Test
   @DisplayName("reads a well-formed POM")
   void readsAWellFormedPom() {

@@ -351,6 +351,22 @@ public class ArtifactUtils {
     return endsWithIgnoreCase(fileName, POM_SUFFIX);
   }
 
+  /**
+   * The jar of a version itself, {@code <artifactId>-<version>.jar}: no classifier, and neither a
+   * checksum nor a signature of it. Its POM has the same name, so it is the file whose {@code
+   * plugin.xml} tells the goal prefix of a plugin (RPS-1589).
+   */
+  public static boolean isMainJar(final StoragePath storagePath) {
+
+    final var gav = convertPathToGav(storagePath.getRelativePath().getPath());
+
+    return gav != null
+        && !gav.isHash()
+        && !gav.isSignature()
+        && gav.getClassifier() == null
+        && "jar".equals(gav.getExtension());
+  }
+
   public static boolean isPomToParse(final StoragePath storagePath) {
     return isPomFile(storagePath.getRelativePath().getFileName());
   }

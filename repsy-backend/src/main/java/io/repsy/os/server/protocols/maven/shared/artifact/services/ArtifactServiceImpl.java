@@ -42,6 +42,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.PluginPrefixChange;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
@@ -56,6 +57,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -1365,14 +1367,102 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   }
 
   /**
+   * The jar of a plugin version that arrived after the POM registered it (what {@code mvn deploy}
+   * sends) names the plugin's real {@code goalPrefix}: it replaces the derived one the POM had to
+   * register, on the version and, when that was the artifact's prefix, on the artifact, in the same
+   * transaction (RPS-1589). One indexed lookup for a main jar; only a registered plugin's jar is
+   * read, bounded by {@link PluginDescriptorReader}, and what it holds never fails the upload.
+   *
+   * <p>A jar that is stored while the POM is still being registered by a concurrent request may
+   * find no version yet and leave the derived prefix; storing the jar or the POM again corrects it.
+   *
+   * @return the change, {@code null} when there is nothing to correct
+   */
+  @Override
+  @Transactional
+  public @Nullable PluginPrefixChange refreshPluginPrefixFromJar(
+      final BaseRepoInfo<UUID> repoInfo, final StoragePath jarPath, final Resource jar) {
+
+    final var version = this.findPluginVersionWithPrefix(repoInfo.getStorageKey(), jarPath);
+
+    if (version == null) {
+      return null;
+    }
+
+    final var artifact = version.getArtifact();
+    final var goalPrefix = readGoalPrefix(jar, jarPath, artifact.getArtifactName());
+
+    if (goalPrefix == null || goalPrefix.equals(version.getPrefix())) {
+      return null;
+    }
+
+    return this.replacePluginPrefix(version, goalPrefix);
+  }
+
+  /** The registered version of a plugin that has a prefix, {@code null} for anything else. */
+  private @Nullable ArtifactVersion findPluginVersionWithPrefix(
+      final UUID repoId, final StoragePath jarPath) {
+
+    final var gav = ArtifactUtils.convertPathToGav(jarPath.getRelativePath().getPath());
+
+    if (gav == null) {
+      return null;
+    }
+
+    final var artifact = this.getArtifact(repoId, gav.getArtifactId(), gav.getGroupId());
+
+    if (artifact == null || !artifact.isPlugin()) {
+      return null;
+    }
+
+    final var version = this.getArtifactVersionByGav(artifact.getId(), gav);
+
+    return version != null && version.getPrefix() != null ? version : null;
+  }
+
+  private PluginPrefixChange replacePluginPrefix(
+      final ArtifactVersion version, final String goalPrefix) {
+
+    final var registered = Objects.requireNonNull(version.getPrefix());
+    final var artifact = version.getArtifact();
+
+    version.setPrefix(goalPrefix);
+    this.artifactVersionRepository.save(version);
+
+    // The prefix of the artifact is the one of the version that registered last: it follows this
+    // version only when it was this version's.
+    if (registered.equals(artifact.getPrefix())) {
+      artifact.setPrefix(goalPrefix);
+      this.artifactRepository.save(artifact);
+    }
+
+    return new PluginPrefixChange(artifact.getArtifactName(), registered, goalPrefix);
+  }
+
+  private static @Nullable String readGoalPrefix(
+      final Resource jar, final StoragePath jarPath, final String artifactId) {
+
+    try (final var in = jar.getInputStream()) {
+      return PluginDescriptorReader.goalPrefix(in, artifactId);
+    } catch (final IOException | RuntimeException e) {
+      log.warn(
+          "The goalPrefix of the plugin jar {} could not be read, the registered one is kept: {}",
+          jarPath.getRelativePath().getPath(),
+          e.toString());
+
+      return null;
+    }
+  }
+
+  /**
    * The prefix a plugin's POM registers with, {@code null} when the POM is not a plugin's or the
    * prefix does not fit its column. It is the {@code goalPrefix} of {@code
    * META-INF/maven/plugin.xml} in the plugin's jar when the jar of that exact version is stored
    * already (Gradle's {@code maven-publish}, sbt and Ivy send it before the POM, and a plugin that
    * sets its own {@code goalPrefix} is otherwise not found by it, RPS-1458), and the one derived
    * from the artifactId otherwise. Only a plugin's POM costs the read of one stored file. A jar
-   * that arrives after the POM is not looked at: the prefix stays the derived one until the POM is
-   * stored again, like {@code hasSources}. Reading never fails the upload, whatever the jar is.
+   * that arrives after the POM corrects the prefix when it is stored ({@link
+   * #refreshPluginPrefixFromJar}, RPS-1589). Reading never fails the upload, whatever the jar is.
    */
   private @Nullable String resolvePluginPrefix(
       final BaseRepoInfo<UUID> repoInfo,
@@ -1441,8 +1531,8 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    *
    * <p>Only the files directly in the version directory count. The flags are only recomputed when a
    * POM of the version is stored, so a sources or javadoc jar uploaded after the POM is not
-   * reflected until the POM is stored again. The same goes for the plugin prefix: it is the {@code
-   * goalPrefix} of a plugin jar only if the jar was stored before the POM (RPS-1458).
+   * reflected until the POM is stored again. The plugin prefix is not one of them: a plugin jar
+   * stored after the POM corrects it when it arrives (RPS-1589).
    *
    * @param versionPath the version directory inside the repo, {@code
    *     <group>/<artifactId>/<version>}

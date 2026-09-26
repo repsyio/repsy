@@ -212,7 +212,7 @@ e2e/
       sbt.spec.ts               # RPS-134: registerPublishConsumeLoop(sbtAdapter) + the sbt extras
       ivy.spec.ts               # RPS-135: registerPublishConsumeLoop(ivyAdapter), a real `ant` with ivy:publish and ivy:retrieve
       ivy-client.spec.ts        # RPS-135: IV1-IV9 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete, the generated maven-metadata.xml read by Maven and Gradle, RPS-1369, an Ivy publish after mvn deploy, RPS-1437)
-      plugin-prefix.spec.ts     # RPS-1438, RPS-1457, RPS-1458: PP1-PP5, real Maven plugins built by `mvn package`, uploaded without a group-level maven-metadata.xml and run by `mvn hello:hi` through the file Repsy generates (and a control, a stored file that wins, a second plugin added to a stored file, and a plugin with its own goalPrefix)
+      plugin-prefix.spec.ts     # RPS-1438, RPS-1457, RPS-1458, RPS-1589: PP1-PP6, real Maven plugins built by `mvn package`, uploaded without a group-level maven-metadata.xml and run by `mvn hello:hi` through the file Repsy generates (and a control, a stored file that wins, a second plugin added to a stored file, and a plugin with its own goalPrefix, POM first or jar first)
       maven-reactor-plugin.spec.ts # RPS-1488: RA1-RA5, real `mvn deploy` of a parent + jar + war reactor (consumed by a second project), a hand-built war and `maven-plugin` packaging (group-level metadata Maven uploads, `mvn hello:hi`)
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
@@ -1043,7 +1043,7 @@ realm, `publishivy="true"`, the dependency line with and without its `conf`) and
 its version into the file Maven stored, with its checksum rewritten, RPS-1437). No `test.fail` pin is
 left in this suite.
 
-### Maven plugin prefix (`plugin-prefix.spec.ts`, RPS-1438, RPS-1457, RPS-1458)
+### Maven plugin prefix (`plugin-prefix.spec.ts`, RPS-1438, RPS-1457, RPS-1458, RPS-1589)
 
 `mvn hello:hi` (with the plugin's group in `pluginGroups`) finds a plugin by its prefix in the
 group-level `<group path>/maven-metadata.xml`. `mvn deploy` uploads that file for a plugin, but Gradle's
@@ -1070,15 +1070,13 @@ Maven builds), uploads its jar and POM by hand, and runs the real `mvn` in a cle
   published by hand, jar first and then the POM (Gradle's order), with no group-level file: the file
   Repsy answers lists `<prefix>tl</prefix>`, the real `mvn tl:hi` runs the goal and `mvn tool:hi` (the
   prefix derived from the artifactId) fails with "No plugin found for prefix 'tool'".
+- **PP6** (RPS-1589): the same plugin published by hand POM first and then the jar (the order of `mvn deploy`):
+  the POM registers the prefix derived from the artifactId, the jar's `plugin.xml` corrects it, so the file lists
+  `<prefix>tl</prefix>` once and no `tool`, `mvn tl:hi` runs and `mvn tool:hi` fails as in PP5.
 
 The version-level `maven-metadata.xml` of a SNAPSHOT is not generated (RPS-1438, decided): no client
 publishes timestamped SNAPSHOT files without it (Maven and Gradle send it, sbt and Ivy send the literal
 `-SNAPSHOT` names, which resolve without it), so the `404` pinned in `ivy-client.spec.ts` stays.
-
-Not covered: a plugin with its own `goalPrefix` whose POM arrives before its jar (Repsy reads the
-prefix when the POM registers, so it keeps the derived one until the POM is uploaded again; the
-integration test `MavenPluginGoalPrefixIT` pins that), and one `mvn deploy` adds to a group whose file
-is stored already (it is listed under both the derived and its own prefix).
 
 Not covered: an Ivy-native (non-Maven) layout, which Repsy cannot serve (a descriptor named
 `<artifact>-<revision>.ivy` is a valid Maven file name and is stored, but nothing registers it), the
@@ -1113,9 +1111,9 @@ shared read-only tail. `-ntp` hides Maven's "Uploaded to" lines, so a deploy is 
   runs it, and stores nothing.
 - **RA4**: a second plugin deployed by `mvn deploy` (Maven downloads the stored group file, adds its entry and
   uploads it) leaves both listed once, the stored `.sha1` is that of the merged file, and both prefixes run.
-- **RA5** (RPS-1458): a plugin with its own `goalPrefix` deployed by `mvn deploy` is listed by it and run by
-  `mvn tl:hi`. Repsy's file also lists it under the prefix derived from its artifactId (the case "Maven plugin
-  prefix" lists as not covered), which is not asserted.
+- **RA5** (RPS-1458, RPS-1589): a plugin with its own `goalPrefix` deployed by `mvn deploy` (the POM before the
+  jar, onto a group whose file Maven stored) is listed by it ONCE, with no entry under the prefix derived from its
+  artifactId (the jar corrects the one the POM added), and run by `mvn tl:hi`.
 
 ```bash
 ./run.sh test --protocol maven --grep "maven reactor|maven war|maven plugin"
