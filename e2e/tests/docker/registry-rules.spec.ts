@@ -212,10 +212,9 @@ test.describe('docker registry rules (raw HTTP)', () => {
       };
       const expiredTok = await rawToken(expiredCred, pushScope(layout.repoName, layout.image));
       expect(expiredTok.status, 'an expired token is refused at the TOKEN hop').toBe(401);
-      expect(
-        expiredTok.wwwAuthenticate,
-        "the token endpoint's own Basic challenge",
-      ).toContain('Basic realm=');
+      expect(expiredTok.wwwAuthenticate, "the token endpoint's own Basic challenge").toContain(
+        'Basic realm=',
+      );
       // RPS-1435: the client prints "unauthorized: <message>", so the cause is in the body.
       expect(ociErrorOf(expiredTok.body)?.code, 'an OCI UNAUTHORIZED body').toBe('UNAUTHORIZED');
       expect(ociErrorOf(expiredTok.body)?.message, 'the expiry is named').toBe(

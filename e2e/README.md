@@ -331,8 +331,8 @@ Otherwise `run.sh` does the following for every subcommand:
 - runs the runner containers in the compose project `<project>-runners` for a non-default project.
   Their shared Maven/Gradle cache volumes and their images are keyed by that name, so they are private to
   the stack: slower the first time, but a branch that changes a runner Dockerfile cannot swap another
-  worktree's runner image. Remove them with `docker compose -p <project>-runners -f
-  docker-compose.runners.yml down -v --rmi local` when the stack is retired.
+  worktree's runner image. Remove them with
+  `docker compose -p <project>-runners -f docker-compose.runners.yml down -v --rmi local` when the stack is retired.
 - validates the values: the project is compose's own rule (`[a-z0-9][a-z0-9_-]*`), the offset a
   non-negative integer with `9090 + offset <= 65535`.
 
