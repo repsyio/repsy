@@ -147,3 +147,33 @@ jobs:
           git status
           git commit -m "New Release '${{ env.DOCKER_IMAGE_TAG }}'"
           git push origin main
+
+  # RPS-1399: a release tag of this repository publishes the Helm chart (repsyio/repsy-os-helm,
+  # RELEASING.md). The chart's release workflow installs the chart on kind with the application
+  # image and the scanner image of the same version, so the tag is pushed only once both images
+  # exist (build-and-push-scanner) and the overlay commit of helm-update is on main of the chart
+  # repository. A build of a branch or a manual run has no version to publish and skips this job.
+  helm-release:
+    if: github.ref_type == 'tag'
+    needs: [helm-update, build-and-push-scanner]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tag repsy-os-helm with the release tag
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HELM_DEPLOY_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no"
+          cd ${{ runner.temp }}
+          git clone git@github.com:repsyio/repsy-os-helm.git
+          cd repsy-os-helm
+          git config user.name "Repsy Pipeline Bot"
+          git config user.email "pipeline-bot@repsy.io"
+          # The chart takes the version of the application tag verbatim (vYY.MM.P). A re-run of
+          # this workflow finds the tag already there: leave it, re-pushing would not re-publish.
+          if git ls-remote --exit-code --tags origin "refs/tags/${GITHUB_REF_NAME}" > /dev/null; then
+            echo "repsy-os-helm already has the tag ${GITHUB_REF_NAME}"
+            exit 0
+          fi
+          git tag "${GITHUB_REF_NAME}"
+          git push origin "refs/tags/${GITHUB_REF_NAME}"
