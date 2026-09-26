@@ -102,7 +102,7 @@ export function mavenEnv(home: string, extra: NodeJS.ProcessEnv = {}): NodeJS.Pr
   return clientEnv(home, extra);
 }
 
-function credentialView(credential: MaterializedCredential): Record<string, unknown> {
+export function credentialView(credential: MaterializedCredential): Record<string, unknown> {
   return {
     hasCredential: credential.transport === 'basic',
     username: credential.username ?? '',
@@ -110,7 +110,7 @@ function credentialView(credential: MaterializedCredential): Record<string, unkn
   };
 }
 
-async function renderTemplate(
+export async function renderTemplate(
   templateName: string,
   destPath: string,
   view: Record<string, unknown>,
@@ -208,7 +208,7 @@ let warmPromise: Promise<void> | undefined;
  * for whichever of its own tests races ahead of the warm-up finishing. Best-effort: a warm-up
  * failure only means slower (not broken) runs, so it never fails a test.
  */
-async function ensureSharedCacheWarm(): Promise<void> {
+export async function ensureSharedCacheWarm(): Promise<void> {
   warmPromise ??= (async () => {
     await fs.mkdir(SHARED_M2_DIR, { recursive: true });
 

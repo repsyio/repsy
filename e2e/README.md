@@ -212,6 +212,7 @@ e2e/
       ivy.spec.ts               # RPS-135: registerPublishConsumeLoop(ivyAdapter), a real `ant` with ivy:publish and ivy:retrieve
       ivy-client.spec.ts        # RPS-135: IV1-IV9 real-client tests (files and checksums, mvn <-> Ivy, transitive, dynamic revisions, realm, publishivy, panel dependency line, version delete, the generated maven-metadata.xml read by Maven and Gradle, RPS-1369, an Ivy publish after mvn deploy, RPS-1437)
       plugin-prefix.spec.ts     # RPS-1438, RPS-1457, RPS-1458: PP1-PP5, real Maven plugins built by `mvn package`, uploaded without a group-level maven-metadata.xml and run by `mvn hello:hi` through the file Repsy generates (and a control, a stored file that wins, a second plugin added to a stored file, and a plugin with its own goalPrefix)
+      maven-reactor-plugin.spec.ts # RPS-1488: RA1-RA5, real `mvn deploy` of a parent + jar + war reactor (consumed by a second project), a hand-built war and `maven-plugin` packaging (group-level metadata Maven uploads, `mvn hello:hi`)
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
@@ -1085,6 +1086,37 @@ clients).
 
 ```bash
 ./run.sh test --protocol maven
+```
+
+### Maven reactor, war and plugin deploys (`maven-reactor-plugin.spec.ts`, RPS-1488)
+
+The other specs deploy a source-free jar or upload files by hand; this one runs the real `mvn deploy`
+of the other packagings (`clients/maven-reactor.ts`, templates `pom.{parent,module,war,consumer}.template.xml`
+and `web.template.xml`; recovered from the step-5 branch, ported from repsy-cloud's `multi_module` and `war`
+cases). Every credential is a fresh read-write deploy token; every `mvn` has a fresh local repository and the
+shared read-only tail. `-ntp` hides Maven's "Uploaded to" lines, so a deploy is proven by the repo's own tree.
+
+- **RA1** (`@smoke`): a reactor root (`packaging=pom`) with a jar module and a war module (which depends on the
+  jar) is deployed by ONE `mvn deploy`. The repo holds the parent POM, each module's POM, the jar and the war,
+  each with the `.md5` and `.sha1` Maven uploads (Maven sends no other digest), the stored bytes are the built
+  ones, and each artifact's `maven-metadata.xml` lists exactly the version. A second project that depends on the
+  jar and the war (`dependency:copy-dependencies`, clean local repository) gets both byte for byte, and the parent
+  POM they name, from the server.
+- **RA2** (`@smoke`): a hand-built `packaging=war` project (no archetype) is deployed and resolved back with
+  the bytes it built; a raw `GET` of the war is `200`, its `.sha1` is the digest of the war.
+- **RA3** (`@smoke`): `mvn deploy` of the hello `maven-plugin` (`clients/maven-plugin.ts`'s `deployPlugin`; the
+  plugin POM names the repository when given `repoUrl`) STORES the group-level `maven-metadata.xml` and its
+  checksums (listed in the directory, unlike the file Repsy generates for a plugin published by hand), which lists
+  the plugin by its prefix; `mvn hello:hi` from a clean local repository (the group in `pluginGroups`) finds and
+  runs it, and stores nothing.
+- **RA4**: a second plugin deployed by `mvn deploy` (Maven downloads the stored group file, adds its entry and
+  uploads it) leaves both listed once, the stored `.sha1` is that of the merged file, and both prefixes run.
+- **RA5** (RPS-1458): a plugin with its own `goalPrefix` deployed by `mvn deploy` is listed by it and run by
+  `mvn tl:hi`. Repsy's file also lists it under the prefix derived from its artifactId (the case "Maven plugin
+  prefix" lists as not covered), which is not asserted.
+
+```bash
+./run.sh test --protocol maven --grep "maven reactor|maven war|maven plugin"
 ```
 
 ## npm runner
