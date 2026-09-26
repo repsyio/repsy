@@ -1655,6 +1655,30 @@ How it is driven, and why (all probed live):
 No new backend candidate came out of berry: it hits RPS-1357 (full packument on every read), RPS-1359 and,
 through the shared cells, RPS-1356/RPS-1358 as pinned above.
 
+## Credential invalidation (RPS-1481)
+
+`tests/maven/credential-invalidation.spec.ts` (real `mvn deploy`) and `tests/npm/credential-invalidation.spec.ts`
+(real `npm publish`) register the same four tests from `src/scenarios/credential-invalidation.ts`. A successful
+deploy with the credential comes first, so that the Basic-auth cache (`VerifiedPasswordCache`, keyed by user,
+password and stored hash) is warm and what is proved is invalidation, not a cold miss. Then the credential stops
+being valid and a deploy with it must be refused at once:
+
+| Event                                                                  | Old credential | Replacement               |
+| ---------------------------------------------------------------------- | -------------- | ------------------------- |
+| `PUT /api/profile/password` as the user (`PanelApi.changeOwnPassword`) | refused        | the new password deploys  |
+| `DELETE /api/users/{id}` as admin                                      | refused        | none                      |
+| deploy token revoked                                                   | refused        | none                      |
+| deploy token rotated                                                   | refused        | the rotated token deploys |
+
+"Refused" means the real client exits non-zero, the raw probe of the same credential (`adapter.publish`) answers 401
+(not 403 or 404), and an admin sees nothing of the refused version stored. `--grep "credential invalidation"`
+selects them, one test per protocol carries `@smoke`.
+
+Docker is not in this suite on purpose. A Docker `/v2/token` JWT is not re-checked against the password: probed
+live, a token minted before `PUT /api/profile/password` still starts a blob upload (202) until it expires
+(`expires_in` 1800), while the old password is refused by `/v2/token` at once (401) and a deleted user's token
+is refused (401) because the user is read again. Whether that is acceptable is an open decision, so nothing pins it.
+
 ## Cargo runner
 
 `runners/cargo.Dockerfile` copies a pinned Rust toolchain (`rust:1.98.1-slim-bookworm`, latest

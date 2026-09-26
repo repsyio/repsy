@@ -144,6 +144,16 @@ export class PanelApi {
   }
 
   /**
+   * `PUT /api/profile/password` as the user this instance is logged in as (RPS-1481): the caller's OWN
+   * password becomes `password`. Log a separate `PanelApi` in as the user first, an admin one would
+   * change the admin's password. The answer is a fresh session, which this instance adopts.
+   */
+  async changeOwnPassword(password: string): Promise<void> {
+    const res = await this.client.profileController.updatePassword({ requestBody: { password } });
+    this.token = unwrap(unwrap(res.data, 'updatePassword').token, 'updatePassword.token');
+  }
+
+  /**
    * One page of `GET /api/users` (RPS-1269): `q` filters by username on the server, `size` is 1-100
    * (server default 10) and `sort` defaults to `createdAt,desc`. Use `listAllUsers` to read everything.
    */
