@@ -74,11 +74,12 @@ export const cargoDescriptor: ProtocolDescriptor = {
   configure: {
     title: 'Cargo Configuration',
     deployTokenTitle: 'Deploy Token Usage',
-    // Both variants render the same body (the deploy token is a `<YOUR_DEPLOY_TOKEN>` placeholder in each).
+    // Both variants render the same body (the token is pasted at cargo's prompt, RPS-1598: no placeholder).
     contains: (repo, url) => [
       repo,
       `sparse+${url}/`,
-      'cargo login --registry repsy <YOUR_DEPLOY_TOKEN>',
+      'cargo login --registry repsy',
+      'paste it and press Enter',
     ],
   },
   toolbar: { browseFiles: false },
