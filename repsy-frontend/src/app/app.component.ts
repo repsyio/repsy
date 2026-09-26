@@ -14,9 +14,12 @@
 /// limitations under the License.
 ///
 
-import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Router, RouterOutlet } from '@angular/router';
 
+import { AuthService } from './auth/pages/service/auth.service';
+import { loginUrlReturningTo } from './auth/util/return-url';
 import { DangerModalComponent } from './panel/shared/components/modals/danger-modal/danger-modal.component';
 import { ToastComponent } from './panel/shared/components/toast/toast.component';
 import { SplashComponent } from './shared/components/splash-screen/splash-screen.component';
@@ -27,4 +30,13 @@ import { SplashComponent } from './shared/components/splash-screen/splash-screen
   imports: [RouterOutlet, ToastComponent, DangerModalComponent, SplashComponent],
   templateUrl: './app.component.html',
 })
-export class AppComponent {}
+export class AppComponent {
+  private readonly router = inject(Router);
+
+  constructor() {
+    // Another tab logged out (or its refresh failed): the session is gone here too (RPS-1621).
+    inject(AuthService)
+      .sessionEndedElsewhere$.pipe(takeUntilDestroyed())
+      .subscribe(() => this.router.navigateByUrl(loginUrlReturningTo(this.router.url)));
+  }
+}

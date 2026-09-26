@@ -5321,7 +5321,7 @@ own stub below, so the unchanged heading lines keep git's hunks apart; the Layou
 
 ### Auth, guards and session (RPS-1251)
 
-`tests/ui/auth/{login,guards,session}.spec.ts` (AUTH-01..12). Run them with
+`tests/ui/auth/{login,guards,session,multi-tab,session-write,access-token-fragment}.spec.ts` (AUTH-01..15). Run them with
 `./run.sh test --protocol ui --grep AUTH-`. UI login is typed ONLY in these specs; every other UI suite
 logs in through the API fixtures. No test changes the admin or its password: the admin only types its
 own credentials (AUTH-01), and negative logins use a seeded user or a name that does not exist.
@@ -5341,17 +5341,19 @@ Things a later author must know:
   `sessionExpired`, the one answer that makes `RefreshTokenInterceptor` refresh once and retry once.
   Every other 401 logs out at once with a toast, no refresh (RPS-1279): a token with a bad signature is
   answered `accessNotAllowed`, so the tampered-token AUTH-08 test needs no stub. The rule per `msgId` is
-  documented on `RefreshTokenInterceptor`. `expireAccessToken()` (`session.spec.ts`) answers calls
-  carrying one given token with that 401 (never the `/api/auth/` calls); the refresh, the rotation and
-  the logout run on the real backend.
+  documented on `RefreshTokenInterceptor`. `expireAccessToken()` (`src/ui/session.ts`) answers calls
+  carrying one given token with that 401 (never the `/api/auth/` calls; optionally only some methods, only
+  the first n calls); the refresh, the rotation and the logout run on the real backend.
   A permission failure is NOT a 401 (RPS-1284): a signed-in USER on any route that needs MANAGE (usage,
   settings, description, rename, deploy tokens, key stores, deletes) is answered `403 accessDenied`, which
   `RefreshTokenInterceptor` never touches; AUTH-12 pins that the session stays and DASH-04 that the
   dashboard makes no per-repository usage call any more (RPS-1268: the list item carries the disk usage), so a USER's dashboard has nothing to refuse and raises no toast.
   The AUTH-09 cases: a refresh token that is garbage, one that was already used (single use), and a
   stubbed `refreshTokenExpired` answer.
-- **The SPA reads `localStorage` once, at boot** (`AuthService`), and `seedSession()` writes once per
-  tab: change the storage, then `reload()`; the change survives it. Two tokens minted in the same second
+- **The SPA reads `localStorage` at boot and adopts what another tab of the same browser stores**
+  (`AuthService`, the `storage` event, RPS-1621), and `seedSession()` writes once per tab: to change a
+  token under a page, change the storage and `reload()` (the change survives it), and expect every OTHER
+  page of the same context to adopt it too. Two tokens minted in the same second
   are byte-identical, so compare a refreshed access token with a value the test wrote, not with the old one.
 - **The password eye button is a bundled remixicon glyph** (RPS-1402), so it has a box and a real click
   works: `LoginValidation.togglePasswordVisibility()` clicks it (RPS-1617: it used to dispatch the event).
@@ -5373,6 +5375,41 @@ Things a later author must know:
   turns red (and tells you to remove the line) when the bug is fixed. None is pinned in the auth specs
   any more: RPS-1278 (a login from the in-place form at `/` left the user on the form until a reload)
   and RPS-1279 (a tampered access token was never refreshed or logged out) are fixed.
+
+#### Two tabs, a write with an expired token, and the `#access_token` fragment (RPS-1621)
+
+`tests/ui/auth/multi-tab.spec.ts` (AUTH-13), `session-write.spec.ts` (AUTH-14) and
+`access-token-fragment.spec.ts` (AUTH-15). `./run.sh test --protocol ui --grep "AUTH-1[345]"`.
+
+| Test                                  | What is pinned                                                                                                                                                                                                                                                          |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AUTH-13 adopts the pair               | tab A refreshes (real refresh, the token rotates), tab B still had the old pair and the backend now calls its access token expired: B uses the new pair with NO refresh call, nobody is logged out (it used to spend the spent refresh token: family revoked, both out) |
+| AUTH-13 expire together (x2)          | both tabs boot with the same expired token and refresh answers held back 500 ms: ONE refresh between them, the other tab adopts it; once with Web Locks and once without (`withoutWebLocks()`)                                                                          |
+| AUTH-13 logout / login in one tab     | a logout in tab A puts tab B on `/login?returnUrl=<its page>` with an empty session; a login in tab A signs in tab B's form at `/` live                                                                                                                                 |
+| AUTH-14 write retried once            | the create-repository `POST /api/repos` is refused `sessionExpired` once: 1 refresh, 2 POSTs, the repository exists ONCE, no toast                                                                                                                                      |
+| AUTH-14 refresh fails / retry refused | no further POST (1, respectively 2 in total), the repository does not exist, toast `Session expired...` / `Session invalid...`, `/login?returnUrl=/repositories`, empty session, no modal left open                                                                     |
+| AUTH-15 `#access_token` fragment (x2) | it leaves an existing session untouched and does not sign a visitor in or write anything (the SPA's old `access-token.initializer` stored the fragment's token over the session; removed, this backend never produces such a fragment)                                  |
+
+- **Two tabs = two pages of ONE context.** They share `localStorage`; a second context does not. Open BOTH
+  pages before anything rotates (`openTwoTabs()`): `seedSession()` seeds every new tab once with the
+  ORIGINAL tokens, which would overwrite a pair the first tab has refreshed. A test that sets a stale
+  access token in tab A (the AUTH-08 trick) is heard by tab B through the storage event; that is fine, as B
+  makes no call in between.
+- **Web Locks are there on `localhost`, not on a plain-HTTP host.** `navigator.locks` needs a secure
+  context, and the suite's stack is on `localhost`; a self-hosted install served over HTTP has none, and
+  `AuthService` then locks with a `localStorage` entry (`repsy-refresh-lock`). Both paths are run
+  (`withoutWebLocks(context)` removes `navigator.locks` before the SPA boots), and the second one is what
+  fails without the storage lock (2 refresh calls instead of 1). The rotated pair is polled for in
+  storage: the dashboard's welcome card renders before its data (and so before the refresh answer) is in.
+- **A write is a write on the wire, whatever the page.** The interceptor treats every method alike; the one
+  the suite drives is the create-repository POST, and the Karma spec of `RefreshTokenInterceptor` replays
+  POST, PUT, PATCH and DELETE with their body. Since RPS-1621 a session that ends under the user goes to
+  `/login?returnUrl=<the page it was on>` (nothing to remember on `/` or `/login`), so a new login returns
+  there.
+- **Repsy Cloud** has its own `auth.service`/interceptor and stateless refresh tokens, so the two-tab race does
+  not exist there (RPS-1535: the fix applies if a refresh-token registry arrives); the specs run against it
+  unchanged and must stay green. Its `#access_token` initializer is the same leftover (its OAuth uses
+  `postMessage`).
 
 ### Repositories and dashboard (RPS-1252)
 

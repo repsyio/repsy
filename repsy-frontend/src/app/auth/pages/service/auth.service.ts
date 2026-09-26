@@ -15,12 +15,74 @@
 ///
 
 import { isPlatformBrowser } from '@angular/common';
-import { Inject, Injectable, PLATFORM_ID } from '@angular/core';
-import { BehaviorSubject, distinctUntilChanged, map, Observable, throwError } from 'rxjs';
+import { DestroyRef, Inject, inject, Injectable, PLATFORM_ID } from '@angular/core';
+import {
+  BehaviorSubject,
+  defer,
+  distinctUntilChanged,
+  EMPTY,
+  firstValueFrom,
+  from,
+  map,
+  mergeMap,
+  Observable,
+  of,
+  Subject,
+  throwError,
+} from 'rxjs';
 
 import { LoginForm, LoginInfo } from '../../../../generated/api';
 import { AuthControllerService } from '../../../../generated/api/api/auth-controller.service';
 
+const USERNAME_KEY = 'username';
+const TOKEN_KEY = 'token';
+const REFRESH_TOKEN_KEY = 'refresh-token';
+const SESSION_KEYS = [USERNAME_KEY, TOKEN_KEY, REFRESH_TOKEN_KEY];
+
+/** Name of the Web Lock that lets one tab at a time spend the (single-use) refresh token. */
+const REFRESH_LOCK = 'repsy-refresh';
+
+/**
+ * The same mutual exclusion where `navigator.locks` does not exist (it needs a secure context, and a
+ * self-hosted Repsy is often served over plain HTTP): a `localStorage` entry `<tab id>:<expiry>`, taken
+ * by writing it and checking after a short settle time that no other tab wrote over it. Not as strict as
+ * a Web Lock, but two tabs that hit their expiry together cannot both get through it in practice, and
+ * whoever gets through re-reads the session first (see `_refreshOnce`), so a tab that loses the race
+ * adopts the winner's tokens. An entry left by a closed tab expires, and a wait is bounded: the refresh
+ * then goes ahead unlocked rather than never.
+ */
+const REFRESH_LOCK_KEY = 'repsy-refresh-lock';
+const LOCK_TTL_MS = 15_000;
+const LOCK_SETTLE_MS = 40;
+const LOCK_POLL_MS = 50;
+const LOCK_MAX_WAIT_MS = 20_000;
+
+function randomTabId(): string {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * The panel session, kept in `localStorage` and in memory.
+ *
+ * Every tab of a browser shares the one `localStorage` session, but each keeps its own in-memory copy,
+ * and a refresh token is single use: the backend revokes the whole token family when a spent one comes
+ * back (`RefreshTokenService.consume`). Two tabs that each refreshed with their own copy therefore
+ * logged each other out (RPS-1621). The tabs now behave as one session:
+ *
+ * - a change of the stored session made by another tab (a refresh, a login, a logout) is adopted at once
+ *   (the `storage` event), and a tab whose session was ended by another tab announces it through
+ *   {@link sessionEndedElsewhere$};
+ * - a refresh takes a cross-tab lock (the Web Lock {@link REFRESH_LOCK}, or a `localStorage` one where the
+ *   browser has no `navigator.locks`, see {@link REFRESH_LOCK_KEY}) and, holding it, first re-reads the
+ *   storage: when another tab has rotated the tokens since the caller's copy was made, that tab's pair
+ *   is adopted and no refresh call is made.
+ */
 @Injectable({
   providedIn: 'root',
 })
@@ -30,6 +92,8 @@ export class AuthService {
   private _username: string;
   private readonly isBrowser: boolean;
   private readonly _authenticated$ = new BehaviorSubject<boolean>(false);
+  private readonly _sessionEndedElsewhere$ = new Subject<void>();
+  private readonly tabId = randomTabId();
 
   /**
    * Whether a session exists, emitted again whenever that changes (login, logout). Views that
@@ -39,15 +103,25 @@ export class AuthService {
    */
   public readonly isAuthenticated$: Observable<boolean> = this._authenticated$.pipe(distinctUntilChanged());
 
+  /** Emits when another tab logged out (or otherwise removed the session) while this tab held one. */
+  public readonly sessionEndedElsewhere$: Observable<void> = this._sessionEndedElsewhere$.asObservable();
+
+  private readonly onStorage = (event: StorageEvent): void => {
+    // A null key is `localStorage.clear()`. Other keys and sessionStorage are none of our business.
+    if (event.storageArea === localStorage && (event.key === null || SESSION_KEYS.includes(event.key))) {
+      this._syncFromStorage();
+    }
+  };
+
   constructor(
     private readonly authControllerService: AuthControllerService,
     @Inject(PLATFORM_ID) platformId: object,
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
     if (this.isBrowser) {
-      this._username = localStorage.getItem('username');
-      this._accessToken = localStorage.getItem('token');
-      this._refreshToken = localStorage.getItem('refresh-token');
+      this._readStorage();
+      window.addEventListener('storage', this.onStorage);
+      inject(DestroyRef).onDestroy(() => window.removeEventListener('storage', this.onStorage));
     }
     this._authenticated$.next(this.isAuthenticated());
   }
@@ -72,16 +146,22 @@ export class AuthService {
     );
   }
 
+  /**
+   * Swaps the session's tokens through the refresh token, emitting the new access token. Completes
+   * without a value when the session ended meanwhile, in another tab (nothing left to refresh; the tab is
+   * on its way to the login form, see {@link sessionEndedElsewhere$}) or through a refused refresh call
+   * (`RefreshTokenInterceptor` has logged out by then).
+   */
   public refreshToken(): Observable<string> {
-    if (!this._refreshToken) {
-      return throwError(new Error('No refresh token presents.'));
-    }
-    return this.authControllerService.refreshToken({ refreshToken: this._refreshToken }).pipe(
-      map((r) => {
-        this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
-        return r.data!.token!;
-      }),
-    );
+    return defer(() => {
+      if (!this._refreshToken) {
+        return throwError(() => new Error('No refresh token presents.'));
+      }
+      const spentBefore = this._refreshToken;
+      return from(this._withRefreshLock(() => this._refreshOnce(spentBefore))).pipe(
+        mergeMap((accessToken) => (accessToken ? of(accessToken) : EMPTY)),
+      );
+    });
   }
 
   public updateLoginInfo(loginInfo: LoginInfo): void {
@@ -94,9 +174,7 @@ export class AuthService {
     this._refreshToken = null;
 
     if (this.isBrowser) {
-      localStorage.removeItem('username');
-      localStorage.removeItem('token');
-      localStorage.removeItem('refresh-token');
+      SESSION_KEYS.forEach((key) => localStorage.removeItem(key));
     }
     this._authenticated$.next(this.isAuthenticated());
   }
@@ -107,10 +185,90 @@ export class AuthService {
     this._refreshToken = refreshToken;
 
     if (this.isBrowser) {
-      localStorage.setItem('username', this._username);
-      localStorage.setItem('token', this._accessToken);
-      localStorage.setItem('refresh-token', this._refreshToken);
+      localStorage.setItem(USERNAME_KEY, this._username);
+      localStorage.setItem(TOKEN_KEY, this._accessToken);
+      localStorage.setItem(REFRESH_TOKEN_KEY, this._refreshToken);
     }
     this._authenticated$.next(this.isAuthenticated());
+  }
+
+  private _readStorage(): void {
+    this._username = localStorage.getItem(USERNAME_KEY);
+    this._accessToken = localStorage.getItem(TOKEN_KEY);
+    this._refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  }
+
+  /** Adopts whatever the shared storage holds now, i.e. what the other tabs did to the session. */
+  private _syncFromStorage(): void {
+    const wasAuthenticated = this.isAuthenticated();
+    this._readStorage();
+    this._authenticated$.next(this.isAuthenticated());
+    if (wasAuthenticated && !this.isAuthenticated()) {
+      this._sessionEndedElsewhere$.next();
+    }
+  }
+
+  /** Runs `task` while holding the cross-tab refresh lock: a Web Lock, else the `localStorage` one. */
+  private _withRefreshLock<T>(task: () => Promise<T>): Promise<T> {
+    if (!this.isBrowser) {
+      return task();
+    }
+    if (navigator.locks) {
+      // The DOM typing of `request` does not flatten a promise-returning callback, though it does at runtime.
+      return navigator.locks.request(REFRESH_LOCK, task) as unknown as Promise<T>;
+    }
+    return this._withStorageLock(task);
+  }
+
+  private async _withStorageLock<T>(task: () => Promise<T>): Promise<T> {
+    const mine = `${this.tabId}:`;
+    const giveUpAt = Date.now() + LOCK_MAX_WAIT_MS;
+    let held = false;
+    while (!held && Date.now() < giveUpAt) {
+      const expiresAt = Number(localStorage.getItem(REFRESH_LOCK_KEY)?.split(':')[1]);
+      if (!(expiresAt > Date.now())) {
+        localStorage.setItem(REFRESH_LOCK_KEY, `${mine}${Date.now() + LOCK_TTL_MS}`);
+        await sleep(LOCK_SETTLE_MS);
+        held = !!localStorage.getItem(REFRESH_LOCK_KEY)?.startsWith(mine);
+      }
+      if (!held) {
+        await sleep(LOCK_POLL_MS);
+      }
+    }
+    try {
+      return await task();
+    } finally {
+      if (held && localStorage.getItem(REFRESH_LOCK_KEY)?.startsWith(mine)) {
+        localStorage.removeItem(REFRESH_LOCK_KEY);
+      }
+    }
+  }
+
+  /**
+   * The refresh, under the lock. `spentBefore` is the refresh token this tab held when it found its
+   * access token expired: when the storage holds another one by now, another tab has already rotated the
+   * session, so its pair is adopted instead of spending a token that is not ours to spend any more.
+   */
+  private async _refreshOnce(spentBefore: string): Promise<string | null> {
+    if (this.isBrowser) {
+      this._syncFromStorage();
+    }
+    if (!this._refreshToken) {
+      return null;
+    }
+    if (this._refreshToken !== spentBefore) {
+      return this._accessToken;
+    }
+    // The refresh call completes without an answer when `RefreshTokenInterceptor` logged the session out
+    // for a refused refresh token: no token, like the session that ended in another tab.
+    return firstValueFrom(
+      this.authControllerService.refreshToken({ refreshToken: this._refreshToken }).pipe(
+        map((r) => {
+          this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
+          return r.data!.token!;
+        }),
+      ),
+      { defaultValue: null },
+    );
   }
 }

@@ -17,7 +17,7 @@
  * AUTH-08 .. AUTH-10 and AUTH-12: the session. Access tokens live 30 minutes and are not configurable, and the
  * backend only answers `sessionExpired` (the one answer that makes `RefreshTokenInterceptor` refresh)
  * for a really expired token, so a test cannot wait for, or forge, an expiry. The 401 is therefore the
- * one thing that is stubbed (`expireAccessToken`); the refresh call, the token rotation and the
+ * one thing that is stubbed (`expireAccessToken`, `src/ui/session.ts`); the refresh call, the token rotation and the
  * logout on a refused refresh token all run against the real backend. Every other 401 (a tampered
  * token: `accessNotAllowed`) logs out without a refresh, and needs no stub.
  *
@@ -34,39 +34,15 @@ import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
-import { loginSession, setStoredSessionValue } from '../../../src/ui/session.js';
+import {
+  REFRESH_PATH,
+  expireAccessToken,
+  isRefreshResponse,
+  loginSession,
+  setStoredSessionValue,
+} from '../../../src/ui/session.js';
 import { JWT_SHAPE, NO_SESSION, storedSession } from './stored-session.js';
 import { allowLists, errorToasts } from '../../../src/ui/page-errors.js';
-
-const REFRESH_PATH = '/api/auth/tokens/refresh';
-
-function isRefreshResponse(response: { url(): string }): boolean {
-  return new URL(response.url()).pathname === REFRESH_PATH;
-}
-
-/**
- * From now on the page's API calls carrying `Bearer <token>` are answered with the 401
- * `sessionExpired` the backend gives an expired access token. Calls with any other token (the one
- * a refresh hands out) and the `/api/auth/` calls themselves (the refresh) go to the real backend.
- */
-async function expireAccessToken(page: Page, token: string): Promise<void> {
-  await page.route(/\/api\/(?!auth\/)/, async (route) => {
-    if (route.request().headers()['authorization'] !== `Bearer ${token}`) {
-      await route.continue();
-      return;
-    }
-    await route.fulfill({
-      status: 401,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        msgId: 'sessionExpired',
-        type: 'ERROR',
-        data: 'sessionExpired',
-        text: 'Session expired.',
-      }),
-    });
-  });
-}
 
 test.describe('AUTH-08 expired access token (stubbed 401)', () => {
   test('is swapped through the refresh token without the user noticing', async ({ adminPage }) => {
@@ -194,9 +170,9 @@ test.describe('AUTH-09 refused refresh token', { tag: ['@cloud-skip'] }, () => {
     });
     const session = await bootLoggedIn(page);
     // Somebody else (another tab, a stolen copy) spends the refresh token first: single use.
-    // NOTE (RPS-1621): logging the user out here is the current behaviour, not a contract. For "another
-    // tab of the same browser spent the token" it is arguably wrong (the second tab should adopt the
-    // first tab's new pair); RPS-1621 covers the multi-tab story. Do not rely on this test for it.
+    // A token spent by somebody OUTSIDE this browser (a stolen copy, a script) is a genuine reuse: the
+    // family is revoked and the user logs out. It is NOT what a second tab of the same browser does:
+    // that one adopts the first tab's new pair (AUTH-13, `multi-tab.spec.ts`, RPS-1621).
     const spent = await page.request.post(`${env.apiBaseUrl}${REFRESH_PATH}`, {
       data: { refreshToken: session.refreshToken },
     });

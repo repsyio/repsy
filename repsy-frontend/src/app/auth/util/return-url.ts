@@ -40,3 +40,17 @@ export function safeReturnUrl(value: unknown): string | null {
     return null;
   }
 }
+
+/**
+ * The URL a session that ended under the user (an expired refresh token, a logout in another tab)
+ * sends them to: the login form, remembering the page they were on so a new login returns there
+ * (RPS-1621). Nothing to remember on "/", which shows the form itself, on the login page or on an
+ * unsafe URL, so those give the bare `/login`.
+ */
+export function loginUrlReturningTo(currentUrl: string | null | undefined): string {
+  const returnUrl = safeReturnUrl(currentUrl);
+  if (!returnUrl || /^\/(?:[?#]|$)/.test(returnUrl) || /^\/login(?:[?#/]|$)/.test(returnUrl)) {
+    return '/login';
+  }
+  return `/login?${RETURN_URL_PARAM}=${encodeURIComponent(returnUrl)}`;
+}
