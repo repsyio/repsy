@@ -223,6 +223,7 @@ e2e/
     nuget/
       publish-consume.spec.ts   # registerPublishConsumeLoop(nugetAdapter) + api-key-only-push and mixed-case-id real-client tests
       registry-rules.spec.ts    # raw-HTTP pins of the 409/422 override & version-kind rules, service index, X-NuGet-ApiKey (H7)
+      transitive-resolution.spec.ts # a real `dotnet restore` of a project that references only A resolves A's nuspec dependencies (ranges, target-framework groups, unlisted, SemVer 2.0.0) from Repsy (RPS-1479)
     docker/
       publish-consume.spec.ts   # registerPublishConsumeLoop(dockerAdapter) + D1-D4 real-client tests (OCI family, auth login, by-digest, retag)
       registry-rules.spec.ts    # raw-HTTP pins R1-R15: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type, sha512 digests, protocol DELETE
@@ -2180,6 +2181,25 @@ repsy --configfile <cfg>` against a package this suite had just published and pr
   restoring A (`renderConsumerProject`/`nuget.resolve` always pin an exact bracketed
   `Version="[<version>]"`) returns exactly A's bytes, never B's — confirmed live, no "latest wins"
   behaviour leaks into an explicit restore.
+
+### NuGet transitive resolution (RPS-1479)
+
+`tests/nuget/transitive-resolution.spec.ts` publishes package B (1.0.0, 1.1.0, 2.0.0) and packages A
+that declare B in their nuspec (`buildNupkg({ dependencies, emptyGroups })`, one `<group
+targetFramework>` per framework), all with the real `dotnet nuget push`, then runs a REAL `dotnet
+restore` of a project that references A only and reads `obj/project.assets.json`: the resolved graph
+is exactly A plus B at the LOWEST version the range admits (`[1.0.0, )` gives 1.0.0, `(1.0.0, )` and
+`1.1.0` give 1.1.0, `[2.0.0]` gives 2.0.0), and B's restored nupkg is byte-identical to the pushed one.
+`restore` reads the dependencies from the flat-container `.nuspec`, never from the registration.
+The consumer is multi-targeted (`net10.0;netstandard2.0`) with `DisableImplicitFrameworkReferences`, so
+no targeting pack is downloaded and one restore checks every target-framework group (an empty
+`<group targetFramework="net10.0"/>` means "no dependencies" there). Live probes: an UNLISTED B still
+satisfies the dependency (`unlist` only flips `listed` on the registration), a SemVer 2.0.0-only B
+(`1.0.0-rc.1`) resolves although search hides it from a client without `semVerLevel`, and an
+unsatisfiable range fails the restore and names the package. The registration's
+`catalogEntry.dependencyGroups` (`NuGetResponseMapper.buildDependencyGroups`) is asserted on the
+per-version leaf document (`v3/registration/<id>/<ver>.json`); the leaves inlined into the
+registration INDEX carry none, and an empty group is dropped from it, which the suite does not pin.
 
 ## Docker runner
 
