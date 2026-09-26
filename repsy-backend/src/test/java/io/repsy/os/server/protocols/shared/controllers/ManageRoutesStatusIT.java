@@ -20,23 +20,17 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.AbstractIntegrationTest;
-import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
+import io.repsy.os.server.protocols.shared.controllers.RepoOperationRoutes.Route;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.http.HttpMethod;
-import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /**
@@ -58,63 +52,13 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 @DisplayName("MANAGE routes: 403 for a user who is not allowed, 401 for a bad credential")
 class ManageRoutesStatusIT extends AbstractIntegrationTest {
 
-  private static final String PANEL_PREFIX = "/api/";
-  private static final Pattern VARIABLE = Pattern.compile("\\{([^}:/]+)(?::[^}]*)?}");
-
   /** A floor, so an enumeration that silently finds nothing cannot pass. */
   private static final int EXPECTED_AT_LEAST = 30;
 
   @Autowired private RequestMappingHandlerMapping handlerMapping;
 
-  private record Route(HttpMethod method, String template) {
-
-    String urlFor(final String repoName) {
-      return VARIABLE
-          .matcher(this.template)
-          .replaceAll(
-              match ->
-                  switch (match.group(1)) {
-                    case "repoName" -> repoName;
-                    default -> "placeholder";
-                  });
-    }
-
-    @Override
-    public String toString() {
-      return this.method + " " + this.template;
-    }
-  }
-
   private List<Route> manageRoutes() {
-    final var routes = new ArrayList<Route>();
-
-    for (final var entry : this.handlerMapping.getHandlerMethods().entrySet()) {
-      final var handler = entry.getValue();
-      final var operation = handler.getMethodAnnotation(RepoOperation.class);
-
-      if (operation == null
-          || operation.permission() != Permission.MANAGE
-          || !isOnTheApiPort(handler)) {
-        continue;
-      }
-
-      for (final var pattern : entry.getKey().getPatternValues()) {
-        if (!pattern.startsWith(PANEL_PREFIX)) {
-          continue;
-        }
-
-        for (final var method : entry.getKey().getMethodsCondition().getMethods()) {
-          routes.add(new Route(HttpMethod.valueOf(method.name()), pattern));
-        }
-      }
-    }
-
-    return routes;
-  }
-
-  private static boolean isOnTheApiPort(final HandlerMethod handler) {
-    return AnnotationUtils.findAnnotation(handler.getMethod(), RestApiPort.class) != null
-        || AnnotationUtils.findAnnotation(handler.getBeanType(), RestApiPort.class) != null;
+    return RepoOperationRoutes.needing(this.handlerMapping, Permission.MANAGE);
   }
 
   private void expectError(
