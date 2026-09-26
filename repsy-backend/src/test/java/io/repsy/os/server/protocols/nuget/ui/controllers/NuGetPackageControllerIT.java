@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.nuget.ui.controllers;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
@@ -283,6 +284,112 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
               get("/api/nuget/packages/{repo}/{id}/{version}", repo.getName(), "missing", "1.0.0")
                   .with(apiPort()))
           .andExpect(status().isNotFound());
+    }
+  }
+
+  @Nested
+  @DisplayName("a package with unlisted versions (RPS-1580)")
+  class UnlistedVersions {
+
+    private void unlist(final String repoName, final String id, final String version) {
+      final var updated =
+          NuGetPackageControllerIT.this.jdbcTemplate.update(
+              """
+              update "public"."nuget_package_version" set "is_listed" = false
+              where "version" = ? and "package_id" in (
+                select p."id" from "public"."nuget_package" p
+                where p."package_id" = ? and p."repo_id" = ?)
+              """,
+              version,
+              id,
+              NuGetPackageControllerIT.this.repoTxService.getRepoByName(repoName).getId());
+      assertThat(updated).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("the detail of a package whose only version is unlisted agrees with the list")
+    void unlistedOnlyPackageHasADetail() throws Exception {
+      final var user =
+          NuGetPackageControllerIT.this.createUser(uniqueUsername("nuget"), UserRole.USER);
+      final var repo = NuGetPackageControllerIT.this.createRepo(RepoType.NUGET, true);
+      final var token = NuGetPackageControllerIT.this.bearerTokenFor(user);
+      NuGetPackageControllerIT.this.publish(repo.getName(), "Only.Unlisted", "1.0.0");
+      this.unlist(repo.getName(), "only.unlisted", "1.0.0");
+
+      NuGetPackageControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/nuget/packages/{repo}", repo.getName())
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(1)))
+          .andExpect(jsonPath("$.data.content[0].packageId").value("only.unlisted"));
+
+      NuGetPackageControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/nuget/packages/{repo}/{id}", repo.getName(), "only.unlisted")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("nugetPackageFetched"))
+          .andExpect(jsonPath("$.data.packageId").value("only.unlisted"))
+          .andExpect(jsonPath("$.data.latestVersion").value("1.0.0"))
+          .andExpect(jsonPath("$.data.title").value("NuGet fixture"))
+          .andExpect(jsonPath("$.data.description").value("integration fixture"))
+          .andExpect(jsonPath("$.data.totalDownloads").value(0));
+    }
+
+    @Test
+    @DisplayName("the newest listed version describes the package, an unlisted newer one does not")
+    void newestListedVersionWins() throws Exception {
+      final var user =
+          NuGetPackageControllerIT.this.createUser(uniqueUsername("nuget"), UserRole.USER);
+      final var repo = NuGetPackageControllerIT.this.createRepo(RepoType.NUGET, true);
+      final var token = NuGetPackageControllerIT.this.bearerTokenFor(user);
+      final var now = Instant.now();
+      NuGetPackageControllerIT.this.publish(
+          repo.getName(), "Mixed.Package", "1.0.0", now.minusSeconds(300));
+      NuGetPackageControllerIT.this.publish(
+          repo.getName(), "Mixed.Package", "2.0.0", now.minusSeconds(200));
+      NuGetPackageControllerIT.this.publish(
+          repo.getName(), "Mixed.Package", "3.0.0", now.minusSeconds(100));
+      this.unlist(repo.getName(), "mixed.package", "3.0.0");
+
+      NuGetPackageControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/nuget/packages/{repo}/{id}", repo.getName(), "mixed.package")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.latestVersion").value("2.0.0"));
+    }
+
+    @Test
+    @DisplayName("with every version unlisted, the newest published one describes the package")
+    void newestUnlistedVersionWhenNoneIsListed() throws Exception {
+      final var user =
+          NuGetPackageControllerIT.this.createUser(uniqueUsername("nuget"), UserRole.USER);
+      final var repo = NuGetPackageControllerIT.this.createRepo(RepoType.NUGET, true);
+      final var token = NuGetPackageControllerIT.this.bearerTokenFor(user);
+      final var now = Instant.now();
+      NuGetPackageControllerIT.this.publish(
+          repo.getName(), "All.Unlisted", "1.0.0", now.minusSeconds(200));
+      NuGetPackageControllerIT.this.publish(
+          repo.getName(), "All.Unlisted", "2.0.0", now.minusSeconds(100));
+      this.unlist(repo.getName(), "all.unlisted", "1.0.0");
+      this.unlist(repo.getName(), "all.unlisted", "2.0.0");
+
+      NuGetPackageControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/nuget/packages/{repo}/{id}", repo.getName(), "all.unlisted")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.latestVersion").value("2.0.0"));
     }
   }
 
