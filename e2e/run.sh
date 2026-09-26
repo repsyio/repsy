@@ -22,8 +22,6 @@ cd "$SCRIPT_DIR"
 
 STACK_FILE="docker-compose.stack.yml"
 STACK_FILE_H2="docker-compose.stack-h2.yml"
-# Overlay for either stack file: adds the stub scanner and points Repsy at it (README.md "Scanner stack").
-STACK_FILE_SCANNER="docker-compose.stack-scanner.yml"
 RUNNERS_FILE="docker-compose.runners.yml"
 
 if [ -f .env ]; then
@@ -60,8 +58,8 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  run.sh local up|down [--h2] [--scanner] [--force]
-  run.sh local logs|ps [--h2] [--scanner]
+  run.sh local up|down [--h2] [--scanner] [--throttle] [--force]
+  run.sh local logs|ps [--h2] [--scanner] [--throttle]
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
@@ -86,13 +84,19 @@ every runner is unchanged.
 
 Pass --scanner, or set REPSY_E2E_SCANNER=1, to add the opt-in stub scanner (docker-compose.stack-scanner.yml,
 combinable with --h2): Repsy starts with SECURITY_SCANNER=enabled pointed at a deterministic stand-in for
-repsy-scanner-trivy, which the @scanner UI specs need (REPSY_UI_OPT_IN=scanner; with REPSY_E2E_SCANNER=1
+repsy-scanner-trivy, which the @scanner UI specs need (REPSY_E2E_OPT_IN=scanner; with REPSY_E2E_SCANNER=1
 "run.sh test" adds that opt-in itself). The default stack never starts a scanner. Give "down" the same
 flags as "up". See README.md "Scanner stack".
 
 "local logs" prints the container logs (with timestamps) and "local ps" lists the containers (stopped ones
 too) of the stack that "local up" started with the same flags. The nightly workflow collects its stack
 logs with them, so a stack file added here needs no change there.
+
+--throttle (or REPSY_E2E_THROTTLE=1) is the second overlay: Repsy starts with the auth throttle at 3 failed
+password checks per 10 s per client (docker-compose.stack-throttle.yml), for the @throttle specs of the
+stack and ui runners. Overlays are rows of the OVERLAYS table at the top of this script; "run.sh test" turns
+every overlay whose switch is set into an entry of REPSY_E2E_OPT_IN (a comma list the runners read, which
+also takes a name directly, e.g. REPSY_E2E_OPT_IN=a11y-report). See README.md "Stack overlays".
 
 Parallel stacks (README.md "Parallel stacks"): the stack is the compose project --project NAME
 (default repsy-e2e) with its host ports moved up by --port-offset N (default 0: panel API 8080, repo
@@ -103,6 +107,34 @@ host port) that a stack started from another checkout holds; --force (or REPSY_E
 EOF
 }
 
+# The opt-in overlays of the stack (README.md "Stack overlays"): compose files layered on either stack file
+# (postgres or H2) that change what Repsy runs with for one leg. One row per overlay, "name|flag|env
+# switch|compose file". "local up|down" take the flag (or the switch set in the environment); "test" reads
+# the switches only, and turns each active overlay's name into an entry of REPSY_E2E_OPT_IN, the comma
+# list of opt-in suites every runner reads (src/stack-overlays.ts optedIn()), so a spec that needs an
+# overlay skips itself without it. A new overlay is one row and one compose file.
+OVERLAYS=(
+  "scanner|--scanner|REPSY_E2E_SCANNER|docker-compose.stack-scanner.yml"
+  "throttle|--throttle|REPSY_E2E_THROTTLE|docker-compose.stack-throttle.yml"
+)
+
+# Field $2 (1 name, 2 flag, 3 env switch, 4 file) of the overlay row $1.
+overlay_field() {
+  local IFS='|'
+  local -a fields
+  read -ra fields <<< "$1"
+  printf '%s' "${fields[$(($2 - 1))]}"
+}
+
+# True when the overlay called $1 is switched on for this call (see parse_stack_flags).
+overlay_active() {
+  local name
+  for name in ${ACTIVE_OVERLAYS[@]+"${ACTIVE_OVERLAYS[@]}"}; do
+    [ "$name" = "$1" ] && return 0
+  done
+  return 1
+}
+
 # True when an env switch such as REPSY_E2E_SCANNER is set to something other than off.
 env_switch_on() {
   case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
@@ -111,22 +143,31 @@ env_switch_on() {
   esac
 }
 
-# Parses the flags of "local up|down" into USE_H2 and USE_SCANNER ("true"/"false"). Both can also be
-# switched on from the environment: REPSY_E2E_STACK=h2 and REPSY_E2E_SCANNER=1.
+# Parses the flags of "local up|down" into USE_H2 ("true"/"false"), FORCE and ACTIVE_OVERLAYS (the names
+# of the OVERLAYS rows that are on). All of them can also be switched on from the environment:
+# REPSY_E2E_STACK=h2 and each overlay's switch (REPSY_E2E_SCANNER=1, REPSY_E2E_THROTTLE=1, ...).
 USE_H2="false"
-USE_SCANNER="false"
 FORCE="false"
+ACTIVE_OVERLAYS=()
 parse_stack_flags() {
   local sub="$1"
   shift
   USE_H2="false"
-  USE_SCANNER="false"
   FORCE="false"
-  local arg
+  ACTIVE_OVERLAYS=()
+  local arg row name known
   for arg in "$@"; do
+    known="false"
+    for row in "${OVERLAYS[@]}"; do
+      if [ "$arg" = "$(overlay_field "$row" 2)" ]; then
+        name="$(overlay_field "$row" 1)"
+        overlay_active "$name" || ACTIVE_OVERLAYS+=("$name")
+        known="true"
+      fi
+    done
+    [ "$known" = "true" ] && continue
     case "$arg" in
       --h2) USE_H2="true" ;;
-      --scanner) USE_SCANNER="true" ;;
       --force) FORCE="true" ;;
       *)
         echo "Unknown option for 'local $sub': $arg" >&2
@@ -136,7 +177,14 @@ parse_stack_flags() {
     esac
   done
   [ "${REPSY_E2E_STACK:-}" = "h2" ] && USE_H2="true"
-  env_switch_on "${REPSY_E2E_SCANNER:-}" && USE_SCANNER="true"
+  local switch
+  for row in "${OVERLAYS[@]}"; do
+    switch="$(overlay_field "$row" 3)"
+    name="$(overlay_field "$row" 1)"
+    if env_switch_on "${!switch:-}"; then
+      overlay_active "$name" || ACTIVE_OVERLAYS+=("$name")
+    fi
+  done
   env_switch_on "${REPSY_E2E_FORCE:-}" && FORCE="true"
   return 0
 }
@@ -262,7 +310,7 @@ guard_stack_owner() {
   [ "$action" = "up" ] || return 0
 
   local -a ports=("$REPSY_E2E_API_PORT" "$REPSY_E2E_REPO_PORT")
-  [ "$USE_SCANNER" = "true" ] && ports+=("$REPSY_E2E_SCANNER_PORT")
+  overlay_active scanner && ports+=("$REPSY_E2E_SCANNER_PORT")
   local port line name project
   for port in "${ports[@]}"; do
     while IFS= read -r line; do
@@ -279,19 +327,22 @@ guard_stack_owner() {
 }
 
 # The "-f" arguments of the stack for the parsed flags: --h2 (or REPSY_E2E_STACK=h2) selects
-# docker-compose.stack-h2.yml, anything else keeps the postgres profile; --scanner adds the overlay.
-# Fills STACK_ARGS.
+# docker-compose.stack-h2.yml, anything else keeps the postgres profile; every active overlay adds its
+# file. Fills STACK_ARGS.
 STACK_ARGS=()
 stack_args() {
+  local row
   # -p overrides the "name:" of the files.
   if [ "$USE_H2" = "true" ]; then
     STACK_ARGS=(-p "$PROJECT" -f "$STACK_FILE_H2")
   else
     STACK_ARGS=(-p "$PROJECT" -f "$STACK_FILE")
   fi
-  if [ "$USE_SCANNER" = "true" ]; then
-    STACK_ARGS+=(-f "$STACK_FILE_SCANNER")
-  fi
+  for row in "${OVERLAYS[@]}"; do
+    if overlay_active "$(overlay_field "$row" 1)"; then
+      STACK_ARGS+=(-f "$(overlay_field "$row" 4)")
+    fi
+  done
 }
 
 require_admin_password() {
@@ -328,9 +379,11 @@ cmd_local_up() {
   require_admin_password
   stack_args
   guard_stack_owner up
-  local db_label="postgres" scanner_label=""
+  local db_label="postgres" overlay_label="" name
   [ "$USE_H2" = "true" ] && db_label="h2"
-  [ "$USE_SCANNER" = "true" ] && scanner_label=", stub scanner"
+  for name in ${ACTIVE_OVERLAYS[@]+"${ACTIVE_OVERLAYS[@]}"}; do
+    overlay_label="$overlay_label, $name overlay"
+  done
   # `up` alone builds the Repsy image only when repsy-os-e2e:$REPSY_E2E_IMAGE_TAG does not exist yet, so a stale one
   # from an earlier checkout was reused and the runners tested old code (RPS-1321). Build every time
   # instead: Docker's layer cache makes it a near no-op when nothing under the build context
@@ -342,14 +395,17 @@ cmd_local_up() {
   else
     docker compose "${STACK_ARGS[@]}" up -d --wait --build
   fi
-  echo "Repsy is up ($db_label$scanner_label, project $PROJECT): panel API on $REPSY_API_BASE_URL, repo protocols on $REPSY_REPO_BASE_URL"
-  if [ "$USE_SCANNER" = "true" ]; then
+  echo "Repsy is up ($db_label$overlay_label, project $PROJECT): panel API on $REPSY_API_BASE_URL, repo protocols on $REPSY_REPO_BASE_URL"
+  if overlay_active scanner; then
     echo "Stub scanner control API on http://localhost:$REPSY_E2E_SCANNER_PORT"
   fi
   if [ "$PROJECT" != "$DEFAULT_PROJECT" ] || [ "$PORT_OFFSET" -ne 0 ]; then
     echo "Give the same to test, sweep and down: REPSY_E2E_PROJECT=$PROJECT REPSY_E2E_PORT_OFFSET=$PORT_OFFSET ./run.sh ..."
   fi
-  if [ "$USE_SCANNER" = "true" ]; then
+  if overlay_active throttle; then
+    echo "Throttle overlay on: 3 failed password checks per 10 s per client; run REPSY_E2E_THROTTLE=1 ./run.sh test --protocol stack,ui --grep @throttle (the ui runner last: AUTH-11 locks the docker gateway's bucket)"
+  fi
+  if overlay_active scanner; then
     echo "Scanner enabled: run the @scanner specs with REPSY_UI_OPT_IN=scanner (or REPSY_E2E_SCANNER=1) ./run.sh test --protocol ui --grep @scanner"
   fi
 }
@@ -422,11 +478,17 @@ cmd_test() {
   esac
   export REPSY_TARGET="$target"
 
-  # A stack started with the scanner overlay (REPSY_E2E_SCANNER=1) also opts the UI suite into its
-  # @scanner specs, which skip themselves otherwise (src/ui/session.ts optedIn()).
-  if env_switch_on "${REPSY_E2E_SCANNER:-}"; then
-    export REPSY_UI_OPT_IN="${REPSY_UI_OPT_IN:+$REPSY_UI_OPT_IN,}scanner"
-  fi
+  # A stack started with an overlay (REPSY_E2E_SCANNER=1, REPSY_E2E_THROTTLE=1, ...) opts every runner into
+  # that overlay's specs, which skip themselves otherwise: each active overlay's name joins
+  # REPSY_E2E_OPT_IN (src/stack-overlays.ts optedIn(); docker-compose.runners.yml forwards it).
+  local row switch
+  for row in "${OVERLAYS[@]}"; do
+    switch="$(overlay_field "$row" 3)"
+    if env_switch_on "${!switch:-}"; then
+      REPSY_E2E_OPT_IN="${REPSY_E2E_OPT_IN:+$REPSY_E2E_OPT_IN,}$(overlay_field "$row" 1)"
+    fi
+  done
+  export REPSY_E2E_OPT_IN="${REPSY_E2E_OPT_IN:-}"
 
   if [ -z "${REPSY_E2E_RUN_ID:-}" ]; then
     REPSY_E2E_RUN_ID="$(random_run_id)"

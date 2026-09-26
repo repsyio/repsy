@@ -275,8 +275,10 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_UI_BASE_URL`           | _(REPSY_API_BASE_URL)_     | ui runner only: where the panel SPA is (it is served on the API port 8080, not the protocol port 9090)                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_UI_WORKERS`            | `4` (compose)              | ui runner only: Playwright workers (each is a Chromium, ~250-400 MB)                                                                                                                                                                                                                                                                                                                                                                     |
 | `REPSY_UI_NO_SANDBOX`         | _(unset — sandbox on)_     | ui runner only: `1` launches Chromium with `chromiumSandbox: false`, see "UI suite"                                                                                                                                                                                                                                                                                                                                                      |
-| `REPSY_UI_OPT_IN`             | _(unset)_                  | ui runner only: comma list of opt-in UI suites (`throttle`, `scanner`); read by `optedIn()`                                                                                                                                                                                                                                                                                                                                              |
-| `REPSY_E2E_SCANNER`           | _(unset)_                  | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_UI_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                     |
+| `REPSY_E2E_OPT_IN`            | _(unset)_                  | every runner: comma list of opt-in suites (`throttle`, `scanner`, ...) read by `optedIn()` in `src/stack-overlays.ts`; `run.sh test` adds the name of every stack overlay whose switch is set, see "Stack overlays"                                                                                                                                                                                                                      |
+| `REPSY_UI_OPT_IN`             | _(unset)_                  | ui runner only: the UI suite's older spelling of `REPSY_E2E_OPT_IN`; `optedIn()` reads both, so either works                                                                                                                                                                                                                                                                                                                             |
+| `REPSY_E2E_SCANNER`           | _(unset)_                  | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_E2E_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                    |
+| `REPSY_E2E_THROTTLE`          | _(unset)_                  | `1` makes `local up\|down` include the auth-throttle overlay (same as `--throttle`) and `test` add `throttle` to `REPSY_E2E_OPT_IN`, see "Auth-throttle leg"                                                                                                                                                                                                                                                                             |
 | `REPSY_E2E_SCANNER_PORT`      | `8090` + offset            | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_SCANNER_STUB_URL`      | `http://localhost:8090`    | ui runner only: where the `@scanner` specs reach that API (follows `REPSY_E2E_SCANNER_PORT`)                                                                                                                                                                                                                                                                                                                                             |
 | `REPSY_SCANNER_API_KEY`       | `e2e-scanner-key`          | the shared secret of the stub scanner and the backend's scanner client                                                                                                                                                                                                                                                                                                                                                                   |
@@ -3513,6 +3515,36 @@ dependencies or platform and 404s for a multi-segment platform such as `x86_64-l
 of a platform gem fails and `gem dependency --remote` prints no dependency lines; and `RubyMarshalWriter.dumpDependencies`
 (the legacy `/api/v1/dependencies`) has no route.
 
+## Stack overlays
+
+The default stack is tuned so that every suite can run against it (the auth throttle at 100000 failures,
+no scanner, the default limits). A few behaviours can only be proven on a stack that is configured
+differently, so each of them is an **opt-in overlay**: a compose file layered on either stack file (the
+PostgreSQL one or the H2 one) with one more `-f`, that changes what Repsy runs with for one nightly leg
+and is never part of the default stack.
+
+| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                              | Specs                                        |
+| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | -------------------------------------------- | -------------------------------------------- |
+| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`     | `@scanner` (ui), "Scanner stack"             |
+| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client | `@throttle` (stack, ui), "Auth-throttle leg" |
+
+How it fits together, so a later overlay is one row:
+
+- **`run.sh`** keeps the table (`OVERLAYS`, one `name|flag|env switch|compose file` row each). `local
+up|down` builds the `-f` list from the flags and switches (both work, and they combine with `--h2`), so
+  give `down` the same ones as `up`. `test` cannot see the stack, so it reads the **switches** only: every
+  overlay whose switch is set adds its name to `REPSY_E2E_OPT_IN`.
+- **`REPSY_E2E_OPT_IN`** is a comma list of opt-in suites, forwarded by `docker-compose.runners.yml` to every
+  runner. `optedIn('throttle')` (`src/stack-overlays.ts`) is true for a name on it (case-insensitive) and also
+  for one on `REPSY_UI_OPT_IN`, the name the UI suite used before the overlays were shared. A name that
+  is no overlay works too (`REPSY_E2E_OPT_IN=a11y-report ./run.sh test --protocol ui`).
+- **A spec that needs an overlay skips itself without it**: `test.skip(!optedIn('throttle'), 'needs the
+throttle overlay ...')`, never through a `grepInvert` in the config. The nightly leg for the overlay
+  selects the specs by their tag (`--grep @throttle`) and fails the leg when one of them skipped
+  (`require_no_skips`), because a skip there means the switch never reached the runner and nothing was proven.
+- The overlays do not combine with the suites that expect the default stack: run only the tagged specs on
+  them (their compose files say so).
+
 ## Stack runner
 
 Some behaviour is decided by the Docker **image** and is invisible to an HTTP client: which user the
@@ -3553,6 +3585,53 @@ The reset user is always one the test created through the panel API (the seeder 
 the test's own users are read, so no other password is ever printed. Flip check: `docker exec -u root
 <repsy> chown root:root /app/data/password-reset` (the Dockerfile bug the case guards against) makes
 all four tests fail on the owner assertion or on `touch: Permission denied`.
+
+### Auth-throttle leg (RPS-1477)
+
+The auth throttle (`AuthFailureThrottle`, RPS-1092) is a CPU defence: after `AUTH_THROTTLE_MAX_FAILURES`
+failed password checks in a window, a client is refused with a 429 until the window ends. The default stack
+sets the limit to 100000 (`docker-compose.stack.yml`), so no other suite trips it, and the backend's
+`AuthThrottleIT` uses MockMvc and one address, so this leg is what proves it through Tomcat and both
+multiport listeners with a real `X-Forwarded-For`. The overlay `docker-compose.stack-throttle.yml` sets
+`AUTH_THROTTLE_MAX_FAILURES=3` and `AUTH_THROTTLE_WINDOW_SECONDS=10`.
+
+```bash
+./run.sh local up --throttle                                        # (or REPSY_E2E_THROTTLE=1) add --h2 for H2
+REPSY_E2E_THROTTLE=1 ./run.sh test --protocol stack --grep @throttle
+sleep 12                                                            # AUTH-11 locks the gateway's bucket, see below
+REPSY_E2E_THROTTLE=1 ./run.sh test --protocol ui --grep @throttle   # AUTH-11 of the UI suite, last
+./run.sh local down --throttle
+```
+
+`tests/stack/auth-throttle.spec.ts` (`@throttle`, the `stack` runner because the log case needs
+`logLinesContaining`; every other case is plain HTTP). Every test is its OWN client: it sends its own
+`X-Forwarded-For` (`10.<run>.<worker>.<n>`), so its count is never shared with another test or with the
+seeder's admin. The docker gateway of the compose network, where every runner's request comes from,
+counts as a **trusted proxy** (probed: the header is honoured from it, the default of Tomcat's
+`RemoteIpValve` with `server.forward-headers-strategy: native`); nothing in the spec fails
+authentication without the header. What it pins:
+
+| Case                   | Asserted                                                                                                                                                                |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Basic, repo port       | 3 wrong passwords answer 401 `unAuthorized`; the 4th is 429 `tooManyRequests` (text, `Retry-After` 1-10); the right password of a user not seen before is 429 too       |
+| Bearer, repo port      | 3 requests with a Bearer value nobody issued (`npm whoami`) are 401, the 4th is 429 (RPS-1209)                                                                          |
+| Panel login, API port  | 3 wrong passwords are 401 `invalidCredentials`, then 429, also for the right password                                                                                   |
+| One bucket, two ports  | 2 failures on the API port plus 1 on the repo port lock both ports                                                                                                      |
+| Per client             | another address is not locked (a first failure is a plain 401); a request with no `X-Forwarded-For` and a right credential passes (only right ones are ever sent there) |
+| Remembered credentials | a credential that already passed once (`VerifiedPasswordCache`) still passes in a blocked bucket; a new one and a wrong one do not                                      |
+| Window                 | 11 s after the lock (window + 1 s) the same client authenticates again and a new count starts                                                                           |
+| WARN log               | exactly one `Client <ip> (network <ip>) made 3 failed password checks ...` line per client and window (refused attempts do not add one); the next window adds a second  |
+
+**AUTH-11** (`tests/ui/auth/login.spec.ts`, `@throttle`) skips itself unless `throttle` is opted in and
+runs in the same leg (it needs a limit below its 30 attempts). It has no `X-Forwarded-For`, so it locks the
+docker gateway's bucket, the seeder's admin included, for the window: run the `ui` runner **last** and wait
+`WINDOW + 2` seconds before anything logs in as admin, including the leak-check `sweep`
+(the nightly does).
+
+Flip checks: `AUTH_THROTTLE_ENABLED: 'false'` in the overlay fails all eight cases (no 429 anywhere); a wait
+shorter than the window in the reset case fails it with a 429 where the right password should pass.
+The throttle is per client and never per username, so a leg like this cannot be run by other suites in
+parallel: any client that fails authentication three times is locked out for ten seconds.
 
 ## API suite (RPS-1480)
 
@@ -3608,7 +3687,8 @@ rather than firing the request and finding out from a 429; a protocol adapter's 
 off once and retry on an actual 429 via `withBackoff429`. `@local-only`-tagged scenarios (none exist
 in the catalog yet — nothing in it needs a server restart or special env) are skipped on remote.
 `tests/maven/remote-throttle.spec.ts` is a small, server-free sanity check of this accounting logic,
-with an injected fake clock/sleep so it runs in milliseconds instead of really waiting.
+with an injected fake clock/sleep so it runs in milliseconds instead of really waiting. The throttle
+itself, with a real low limit, is proven by the "Auth-throttle leg" (RPS-1477), not by this section.
 
 Untested by this step (no remote instance to test against): a preflight check that verifies admin
 login and refuses to run if the run prefix already exists, and never touching anything global on a
@@ -3636,8 +3716,8 @@ Karma unit tests.
 ./run.sh test --protocol ui --grep @smoke                   # the ~1 minute subset
 ./run.sh local up --h2 && ./run.sh test --protocol ui --grep @smoke   # embedded-H2 stack
 ./run.sh test --protocol ui -b                              # after a Playwright bump or a ui.Dockerfile change
-REPSY_UI_OPT_IN=throttle ./run.sh test --protocol ui        # also run an opt-in suite
-./run.sh local up --scanner && REPSY_UI_OPT_IN=scanner ./run.sh test --protocol ui --grep @scanner   # the real-scanner specs
+REPSY_E2E_OPT_IN=throttle ./run.sh test --protocol ui       # also run an opt-in suite ("Stack overlays")
+./run.sh local up --scanner && REPSY_E2E_SCANNER=1 ./run.sh test --protocol ui --grep @scanner   # the real-scanner specs
 ```
 
 The host needs Docker only: Chromium lives in the `ui` runner image (`runners/ui.Dockerfile`), never
@@ -3654,13 +3734,13 @@ passwords can log in; the backend still refuses to boot with an `ADMIN_INITIAL_P
 the complexity rule, and one over 72 bytes). The `ui` project runs a worker-scoped preflight
 (`assertAdminCredentialsUsableInUi`) that fails every test with a message saying exactly that. `e2e/.env.example` documents it next to the `REPSY_UI_*` variables.
 
-| Variable              | Default                                            | Effect                                                                                  |
-| --------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `REPSY_UI_BASE_URL`   | `REPSY_API_BASE_URL`, else `http://localhost:8080` | Playwright `baseURL`                                                                    |
-| `REPSY_UI_WORKERS`    | `4` (compose)                                      | Playwright `workers`; config-wide, so only the `ui` service sets it                     |
-| `REPSY_UI_NO_SANDBOX` | unset                                              | `1` = `chromiumSandbox: false`, see "Chromium sandbox" below                            |
-| `REPSY_UI_OPT_IN`     | unset                                              | comma list of opt-in suites; `optedIn('throttle')` in `src/ui/session.ts`               |
-| `CI`                  | unset                                              | forwarded to the `ui` service only: `retries: 1`, `forbidOnly`, `trace: on-first-retry` |
+| Variable              | Default                                            | Effect                                                                                         |
+| --------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `REPSY_UI_BASE_URL`   | `REPSY_API_BASE_URL`, else `http://localhost:8080` | Playwright `baseURL`                                                                           |
+| `REPSY_UI_WORKERS`    | `4` (compose)                                      | Playwright `workers`; config-wide, so only the `ui` service sets it                            |
+| `REPSY_UI_NO_SANDBOX` | unset                                              | `1` = `chromiumSandbox: false`, see "Chromium sandbox" below                                   |
+| `REPSY_UI_OPT_IN`     | unset                                              | comma list of opt-in suites (also `REPSY_E2E_OPT_IN`); `optedIn('throttle')`, "Stack overlays" |
+| `CI`                  | unset                                              | forwarded to the `ui` service only: `retries: 1`, `forbidOnly`, `trace: on-first-retry`        |
 
 Where things land (all under the existing bind mounts): `test-results/` holds, per failed test, the
 trace (`trace.zip`; open it with `pnpm exec playwright show-trace <path>` on the host), the failure
@@ -3824,9 +3904,11 @@ Things a later author must know:
   rule), so that it can log in is proved by `AuthControllerIT`, not here.
 - **AUTH-11 (`@throttle`) is skipped by default.** It needs a stack whose `AUTH_THROTTLE_MAX_FAILURES` is
   below 30 (the harness stack raises it to 100000, see `docker-compose.stack.yml`) and, once it trips,
-  the client stays refused for the window (`AUTH_THROTTLE_WINDOW_SECONDS`), so run it alone, on a
-  throwaway stack: `AUTH_THROTTLE_MAX_FAILURES=20` in the `repsy` service environment, then
-  `REPSY_UI_OPT_IN=throttle ./run.sh test --protocol ui --grep AUTH-11`. Not run by CI or by default.
+  the client stays refused for the window (`AUTH_THROTTLE_WINDOW_SECONDS`). It runs in the nightly's
+  `throttle` leg on the throttle overlay (RPS-1477): `./run.sh local up --throttle`, then
+  `REPSY_E2E_THROTTLE=1 ./run.sh test --protocol ui --grep AUTH-11` ("Auth-throttle leg"; `REPSY_E2E_OPT_IN=throttle`
+  or the older `REPSY_UI_OPT_IN=throttle` opts in as well). It locks the docker gateway's bucket, admin
+  included, for the window, so wait it out before anything else logs in.
 - **Known product bugs are `test.fail(true, ...)`**, written for the intended behaviour so the test
   turns red (and tells you to remove the line) when the bug is fixed. None is pinned in the auth specs
   any more: RPS-1278 (a login from the in-place form at `/` left the user on the form until a reload)
