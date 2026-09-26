@@ -78,6 +78,7 @@ import {
   rawPublish,
   sha256Hex,
 } from './cargo-raw.js';
+import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -147,14 +148,18 @@ async function renderConsumerCrate(work: string, crate: string, version: string)
 /** Exported (step 5b) for the same reason as `renderCargoConfig` above. */
 export function cargoEnv(home: string, credential: World['credential']): NodeJS.ProcessEnv {
   const token = cargoToken(credential);
-  return {
-    ...process.env,
-    HOME: home,
-    CARGO_HOME: path.join(home, 'cargo'),
-    CARGO_TERM_COLOR: 'never',
-    CARGO_NET_RETRY: '0',
-    ...(token !== undefined ? { CARGO_REGISTRIES_REPSY_TOKEN: token } : {}),
-  };
+  return clientEnv(
+    home,
+    {
+      CARGO_HOME: path.join(home, 'cargo'),
+      CARGO_TERM_COLOR: 'never',
+      CARGO_NET_RETRY: '0',
+      ...(token !== undefined ? { CARGO_REGISTRIES_REPSY_TOKEN: token } : {}),
+    },
+    // The runner's `cargo` is a rustup proxy (/usr/local/cargo/bin): without RUSTUP_HOME it finds no
+    // toolchain (probed live, RPS-1446).
+    ['RUSTUP_HOME'],
+  );
 }
 
 /** `target/package/<name>-<version>.crate`, the file `cargo package`/`cargo publish` write. */

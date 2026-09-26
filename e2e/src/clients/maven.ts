@@ -64,6 +64,7 @@ import type { AdapterResult } from '../scenarios/adapter.js';
 import { withBackoff429 } from '../scenarios/remote-throttle.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
+import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 import {
   authHeader,
@@ -91,6 +92,15 @@ const WARM_MARKER = path.join(SHARED_M2_DIR, '.e2e-warm');
 /** Re-exported so nothing importing `AdapterResult` from this module (its original home) breaks;
  *  the type itself now lives in `scenarios/adapter.ts`, generalised for every protocol. */
 export type { AdapterResult };
+
+/** The environment of every `mvn` invocation (this file's, `maven-plugin.ts`'s, `maven-signing.ts`'s
+ *  and the specs'): `clientEnv` alone. The runner image sets `JAVA_HOME`, `MAVEN_HOME`, `GRADLE_HOME`,
+ *  `SBT_HOME` and `ANT_HOME`, but the launchers find their JVM and install through `PATH` (probed
+ *  live, RPS-1446: the whole maven project, Gradle, sbt, Ivy and gpg included, passes without any of
+ *  them), so none is inherited. */
+export function mavenEnv(home: string, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  return clientEnv(home, extra);
+}
 
 function credentialView(credential: MaterializedCredential): Record<string, unknown> {
   return {
@@ -221,7 +231,7 @@ async function ensureSharedCacheWarm(): Promise<void> {
 
       await run('mvn', ['-B', '-ntp', `-Dmaven.repo.local=${SHARED_M2_DIR}`, 'package'], {
         cwd: work,
-        env: { ...process.env, HOME: home },
+        env: mavenEnv(home),
         timeoutMs: WARM_TIMEOUT_MS,
         label: 'maven-warm-package',
       });
@@ -239,7 +249,7 @@ async function ensureSharedCacheWarm(): Promise<void> {
         ],
         {
           cwd: work,
-          env: { ...process.env, HOME: home },
+          env: mavenEnv(home),
           timeoutMs: WARM_TIMEOUT_MS,
           label: 'maven-warm-dependency-plugin',
         },
@@ -310,7 +320,7 @@ async function deploy(world: World): Promise<DeployRun> {
     ],
     {
       cwd: work,
-      env: { ...process.env, HOME: home },
+      env: mavenEnv(home),
       timeoutMs: PUBLISH_TIMEOUT_MS,
       redact: secrets,
       label: `maven-publish-${world.scenario.id}`,
@@ -398,7 +408,7 @@ async function dependencyGet(
     ],
     {
       cwd: work,
-      env: { ...process.env, HOME: home },
+      env: mavenEnv(home),
       timeoutMs: CONSUME_TIMEOUT_MS,
       redact: secrets,
       label: `maven-consume-${world.scenario.id}`,

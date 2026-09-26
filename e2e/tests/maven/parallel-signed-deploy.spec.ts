@@ -37,6 +37,7 @@ import path from 'node:path';
 
 import { RepoType } from '../../src/api/panel-api.js';
 import { run, isolatedWorkDir } from '../../src/clients/exec.js';
+import { mavenEnv } from '../../src/clients/maven.js';
 import {
   adminCredential,
   buildJar,
@@ -127,7 +128,7 @@ async function signedDeploy(
     ],
     {
       cwd: work,
-      env: { ...process.env, HOME: home },
+      env: mavenEnv(home),
       timeoutMs: DEPLOY_TIMEOUT_MS,
       redact: [env.adminPassword],
       label: `maven-signed-deploy-${threads ?? 'default'}`,

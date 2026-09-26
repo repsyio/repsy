@@ -67,6 +67,7 @@ import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { boundedSemverVersion } from '../scenarios/coordinates.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
+import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 import {
   adminCredential,
@@ -148,9 +149,7 @@ export async function renderConsumerProject(
  *  avoids coupling the image to a specific ICU version (this harness's packages carry no culture-
  *  sensitive data). */
 export function nugetEnv(home: string): NodeJS.ProcessEnv {
-  return {
-    ...process.env,
-    HOME: home,
+  return clientEnv(home, {
     DOTNET_CLI_HOME: home,
     NUGET_PACKAGES: path.join(home, 'nuget-packages'),
     NUGET_HTTP_CACHE_PATH: path.join(home, 'nuget-http-cache'),
@@ -165,7 +164,7 @@ export function nugetEnv(home: string): NodeJS.ProcessEnv {
     DOTNET_CLI_UI_LANGUAGE: 'en-us',
     MSBUILDDISABLENODEREUSE: '1',
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: '1',
-  };
+  });
 }
 
 interface PublishRun {

@@ -57,6 +57,7 @@ import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { boundedSemverVersion, slugify } from '../scenarios/coordinates.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
+import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 import {
   adminCredential,
@@ -70,6 +71,13 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.resolve(__dirname, '../packages/npm');
+
+/** The environment of every `npm` invocation of this file (the npm-family suite has its own sealed
+ *  one, `npm-family/config.ts`): `clientEnv` with the invocation's isolated `HOME`, which is where
+ *  npm reads the `.npmrc` this file renders. */
+export function npmEnv(home: string): NodeJS.ProcessEnv {
+  return clientEnv(home);
+}
 
 const PUBLISH_TIMEOUT_MS = 120_000;
 const CONSUME_TIMEOUT_MS = 120_000;
@@ -134,7 +142,7 @@ async function packTarball(
 
   const result = await run('npm', ['pack', '--ignore-scripts', '--pack-destination', destDir], {
     cwd: work,
-    env: { ...process.env, HOME: home },
+    env: npmEnv(home),
     timeoutMs: PACK_TIMEOUT_MS,
     label,
   });
@@ -209,7 +217,7 @@ async function publishWithClient(world: World, label: string): Promise<PublishRu
 
   const execResult = await run('npm', args, {
     cwd: work,
-    env: { ...process.env, HOME: home },
+    env: npmEnv(home),
     timeoutMs: PUBLISH_TIMEOUT_MS,
     redact: secrets,
     label,
@@ -299,7 +307,7 @@ export async function unpublish(
 
   const result = await run('npm', args, {
     cwd: work,
-    env: { ...process.env, HOME: home },
+    env: npmEnv(home),
     timeoutMs: PUBLISH_TIMEOUT_MS,
     redact: secrets,
     label: `npm-unpublish-${world.scenario.id}`,
@@ -369,7 +377,7 @@ export async function resolve(world: World): Promise<AdapterResult> {
     ],
     {
       cwd: work,
-      env: { ...process.env, HOME: home },
+      env: npmEnv(home),
       timeoutMs: CONSUME_TIMEOUT_MS,
       redact: secrets,
       label: `npm-consume-${world.scenario.id}`,

@@ -31,6 +31,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import { clientEnv } from './client-env.js';
 import { run } from './exec.js';
 
 export interface GpgKey {
@@ -49,7 +50,7 @@ export interface GpgKey {
 
 /** The environment of a `gpg`-driving process: only this key's home is visible to it. */
 export function gpgEnv(key: Pick<GpgKey, 'gnupgHome'>, home: string): NodeJS.ProcessEnv {
-  return { ...process.env, HOME: home, GNUPGHOME: key.gnupgHome };
+  return clientEnv(home, { GNUPGHOME: key.gnupgHome });
 }
 
 /** Generates a fresh 2048 bit RSA signing key with `gpg --batch --gen-key` in its own GNUPGHOME. */
@@ -58,7 +59,7 @@ export async function generateGpgKey(): Promise<GpgKey> {
   const gnupgHome = path.join(root, 'h');
   await fs.mkdir(gnupgHome, { mode: 0o700 });
   const passphrase = randomBytes(12).toString('hex');
-  const env = { ...process.env, HOME: root, GNUPGHOME: gnupgHome };
+  const env = clientEnv(root, { GNUPGHOME: gnupgHome });
 
   const dispose = async (): Promise<void> => {
     await run('gpgconf', ['--kill', 'gpg-agent'], { cwd: root, env }).catch(() => undefined);

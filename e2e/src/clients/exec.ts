@@ -33,10 +33,12 @@ export interface RunOptions {
   cwd: string;
   env?: NodeJS.ProcessEnv;
   /**
-   * Whether `env` is merged over the runner's own `process.env` (`execa`'s default, and this
-   * wrapper's) or is the child's whole environment. A client that must not see the runner's
-   * variables (the admin password among them) passes `false`: the npm-family suite does, through
-   * `runSealed` (RPS-1364).
+   * Whether `env` is merged over the runner's own `process.env` (`execa`'s default) or is the
+   * child's whole environment. Default: merged when there is no `env` (a harness tool such as
+   * `docker`, which needs what the runner has), and NOT merged when there is one, so a client
+   * whose environment is built with `clientEnv` (`client-env.ts`, RPS-1446) or `sealedEnv` (the
+   * npm-family, `runSealed`, RPS-1364) never sees the runner's variables, the admin password among
+   * them. Pass `true` to merge an explicit `env` anyway.
    */
   extendEnv?: boolean;
   timeoutMs?: number;
@@ -79,6 +81,21 @@ function redactedCommandLine(
 }
 
 /**
+ * The harness's own variables (`REPSY_ADMIN_PASSWORD`, `REPSY_API_BASE_URL`, ...) never belong in
+ * a client's environment (RPS-1446): a call site that spreads `process.env` into `env` fails here,
+ * loudly, instead of leaking them.
+ */
+function assertNoRunnerVariables(command: string, env: NodeJS.ProcessEnv | undefined): void {
+  const leaked = Object.keys(env ?? {}).filter((name) => name.startsWith('REPSY_'));
+  if (leaked.length > 0) {
+    throw new Error(
+      `run(${command}): the client environment carries harness variables (${leaked.join(', ')}); ` +
+        'build it with clientEnv() (src/clients/client-env.ts) instead of spreading process.env.',
+    );
+  }
+}
+
+/**
  * A fresh temp directory for one client invocation, with `home` and `work` subdirectories: `work`
  * is meant as the process's `cwd` (the rendered package project), `home` as its `HOME`, so the
  * client's own dotfiles/config/cache never land in the invoking user's home directory and two
@@ -107,11 +124,12 @@ export async function run(
 ): Promise<RunResult> {
   const secrets = opts.redact ?? [];
   const commandLine = redactedCommandLine(command, args, secrets);
+  assertNoRunnerVariables(command, opts.env);
 
   const result = await execa(command, args, {
     cwd: opts.cwd,
     env: opts.env,
-    extendEnv: opts.extendEnv ?? true,
+    extendEnv: opts.extendEnv ?? opts.env === undefined,
     timeout: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     reject: false,
     ...(opts.input !== undefined ? { input: opts.input } : {}),

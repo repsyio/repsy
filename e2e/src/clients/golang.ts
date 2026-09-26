@@ -77,6 +77,7 @@ import {
   uploadUrl,
   zipRelPath,
 } from './golang-raw.js';
+import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 
 const PUBLISH_TIMEOUT_MS = 60_000;
@@ -97,9 +98,7 @@ async function goEnv(
   repoName: string,
 ): Promise<NodeJS.ProcessEnv> {
   const { proxyUrl, certFile } = await goProxyUrlFor(repoName, credential);
-  const result: NodeJS.ProcessEnv = {
-    ...process.env,
-    HOME: home,
+  const result = clientEnv(home, {
     GOPATH: path.join(home, 'gopath'),
     GOMODCACHE: path.join(home, 'gomodcache'),
     GOCACHE: path.join(home, 'gocache'),
@@ -116,7 +115,7 @@ async function goEnv(
     NO_PROXY: '127.0.0.1,localhost',
     HTTP_PROXY: '',
     HTTPS_PROXY: '',
-  };
+  });
   if (certFile) {
     result.SSL_CERT_FILE = certFile;
   }
@@ -139,7 +138,7 @@ interface PublishRun {
  * pin that the backend README's own suffix-less spelling is ALSO accepted).
  */
 async function publishWithClient(world: World, label: string): Promise<PublishRun> {
-  const { work } = await isolatedWorkDir(label);
+  const { home, work } = await isolatedWorkDir(label);
   const { packageName: modulePath, version } = world.publishTarget;
 
   const built = await buildModuleZip({ modulePath, version });
@@ -174,6 +173,7 @@ async function publishWithClient(world: World, label: string): Promise<PublishRu
 
   const execResult = await run('curl', args, {
     cwd: work,
+    env: clientEnv(home),
     timeoutMs: PUBLISH_TIMEOUT_MS,
     redact: secrets,
     label,

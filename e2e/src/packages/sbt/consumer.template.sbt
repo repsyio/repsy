@@ -16,7 +16,7 @@ lazy val root = (project in file("."))
     managedScalaInstance := false,
     libraryDependencies += ("{{{groupId}}}" %% "{{{artifactBase}}}" % "{{{version}}}").intransitive(),
 {{#credentialsEnv}}
-    credentials += Credentials("{{{realm}}}", "{{{host}}}", sys.env("REPSY_E2E_USER"), sys.env("REPSY_E2E_PASS")),
+    credentials += Credentials("{{{realm}}}", "{{{host}}}", sys.env("E2E_SBT_USER"), sys.env("E2E_SBT_PASS")),
 {{/credentialsEnv}}
 {{#credentialsFile}}
     credentials += Credentials(Path.userHome / ".sbt" / ".credentials"),

@@ -69,6 +69,7 @@ import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { boundedSemverVersion } from '../scenarios/coordinates.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
+import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 import { buildChart, writeChartFile, type BuiltChart } from './helm-chart.js';
 import {
@@ -142,9 +143,7 @@ export async function renderHelmRegistryConfig(
  *  pointed at the shared, read-only, build-time-installed `cm-push` plugin dir (never installed
  *  per-invocation -- `runners/helm.Dockerfile`'s header). */
 export function helmEnv(home: string): NodeJS.ProcessEnv {
-  return {
-    ...process.env,
-    HOME: home,
+  return clientEnv(home, {
     HELM_CACHE_HOME: path.join(home, 'cache'),
     HELM_CONFIG_HOME: path.join(home, 'config'),
     HELM_DATA_HOME: path.join(home, 'data'),
@@ -154,7 +153,7 @@ export function helmEnv(home: string): NodeJS.ProcessEnv {
     HELM_PLUGINS: process.env.HELM_PLUGINS ?? '/opt/helm/plugins',
     HELM_COLOR: 'never',
     NO_COLOR: '1',
-  };
+  });
 }
 
 /** `[]` on `http:` (always, this harness's own stack) or `['--plain-http']` -- derived from

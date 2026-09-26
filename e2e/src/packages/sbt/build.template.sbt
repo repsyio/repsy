@@ -2,7 +2,7 @@
 // A tiny Scala library: sbt compiles the one source file, packs it with the marker resource
 // clients/sbt.ts writes, and `publish` uploads the jar and the POM to a Maven repository (the Ivy
 // publisher, publishMavenStyle) the way a real project does. The Repsy credential is a Credentials
-// entry from the REPSY_E2E_USER/REPSY_E2E_PASS environment variables, or from the run's own
+// entry from the E2E_SBT_USER/E2E_SBT_PASS environment variables, or from the run's own
 // ~/.sbt/.credentials file; the anonymous credential renders no credentials at all, so sbt sends
 // no Authorization header.
 ThisBuild / organization := "{{{groupId}}}"
@@ -21,7 +21,7 @@ lazy val root = (project in file("."))
     Compile / packageDoc / publishArtifact := {{{withDocs}}},
     Compile / packageSrc / publishArtifact := {{{withDocs}}},
 {{#credentialsEnv}}
-    credentials += Credentials("{{{realm}}}", "{{{host}}}", sys.env("REPSY_E2E_USER"), sys.env("REPSY_E2E_PASS")),
+    credentials += Credentials("{{{realm}}}", "{{{host}}}", sys.env("E2E_SBT_USER"), sys.env("E2E_SBT_PASS")),
 {{/credentialsEnv}}
 {{#credentialsFile}}
     credentials += Credentials(Path.userHome / ".sbt" / ".credentials"),

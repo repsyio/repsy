@@ -65,6 +65,7 @@ import { env } from '../env.js';
 import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
+import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 import {
   adminCredential,
@@ -95,24 +96,18 @@ const PUBLISH_TIMEOUT_MS = 60_000;
 const CONSUME_TIMEOUT_MS = 120_000;
 
 /** Every env var isolating one `gem` invocation: a private `HOME`/`GEM_HOME`/`GEM_PATH`/
- *  `GEM_SPEC_CACHE`, no inherited `RUBYOPT`/`RUBYGEMS_HOST`, and the credential delivered ONLY via
+ *  `GEM_SPEC_CACHE`, no inherited `RUBYOPT`/`RUBYGEMS_HOST` (an allow-list env, `clientEnv`), and the credential delivered ONLY via
  *  `GEM_HOST_API_KEY` (never a `~/.gem/credentials` file, never `--key`) -- this file's header.
  *  `anonymous` leaves `GEM_HOST_API_KEY` unset entirely. */
 export function gemEnv(home: string, credential: MaterializedCredential): NodeJS.ProcessEnv {
-  const result: NodeJS.ProcessEnv = {
-    ...process.env,
-    HOME: home,
+  const result = clientEnv(home, {
     GEM_HOME: path.join(home, 'gems'),
     GEM_PATH: path.join(home, 'gems'),
     GEM_SPEC_CACHE: path.join(home, 'specs'),
-  };
-  delete result.RUBYOPT;
-  delete result.RUBYGEMS_HOST;
+  });
   const apiKey = apiKeyFor(credential);
   if (apiKey !== undefined) {
     result.GEM_HOST_API_KEY = apiKey;
-  } else {
-    delete result.GEM_HOST_API_KEY;
   }
   return result;
 }
@@ -128,9 +123,7 @@ export function bundleEnv(
   repoName: string,
 ): NodeJS.ProcessEnv {
   void repoName; // the credential is keyed by HOST, not by repo (bundleHostKey(env.repoBaseUrl's host))
-  const result: NodeJS.ProcessEnv = {
-    ...process.env,
-    HOME: home,
+  const result = clientEnv(home, {
     GEM_HOME: path.join(home, 'gems'),
     GEM_PATH: path.join(home, 'gems'),
     GEM_SPEC_CACHE: path.join(home, 'specs'),
@@ -149,16 +142,13 @@ export function bundleEnv(
     BUNDLE_GLOBAL_GEM_CACHE: 'false',
     BUNDLE_DISABLE_VERSION_CHECK: 'true',
     BUNDLE_FORCE_RUBY_PLATFORM: 'true',
-  };
-  delete result.RUBYOPT;
+  });
 
   const hostKey = bundleHostKey(new URL(env.repoBaseUrl).hostname);
   const value = bundleCredentialsValue(credential);
   if (value !== undefined) {
     const [user, pass] = value.split(/:(.*)/s);
     result[hostKey] = `${encodeURIComponent(user)}:${encodeURIComponent(pass ?? '')}`;
-  } else {
-    delete result[hostKey];
   }
   return result;
 }

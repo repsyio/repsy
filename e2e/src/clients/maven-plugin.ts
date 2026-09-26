@@ -35,7 +35,7 @@ import mustache from 'mustache';
 import { env } from '../env.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import { isolatedWorkDir, run, type RunResult } from './exec.js';
-import { SHARED_M2_DIR } from './maven.js';
+import { mavenEnv, SHARED_M2_DIR } from './maven.js';
 import { groupPath, rawPut } from './maven-raw.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -143,7 +143,7 @@ export function buildPlugin(spec: PluginSpec): Promise<BuiltPlugin> {
       ],
       {
         cwd: work,
-        env: { ...process.env, HOME: home },
+        env: mavenEnv(home),
         timeoutMs: BUILD_TIMEOUT_MS,
         label: 'maven-plugin-build',
       },
@@ -239,7 +239,7 @@ export async function runPrefixGoal(
     ],
     {
       cwd: work,
-      env: { ...process.env, HOME: home },
+      env: mavenEnv(home),
       timeoutMs: RUN_TIMEOUT_MS,
       redact: credential.password ? [credential.password] : [],
       label: 'maven-prefix-goal',

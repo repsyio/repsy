@@ -64,6 +64,7 @@ import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { boundedSemverVersion } from '../scenarios/coordinates.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
+import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 import {
   adminCredential,
@@ -90,14 +91,12 @@ const CONSUME_TIMEOUT_MS = 120_000;
  *  `TWINE_USERNAME`/`TWINE_PASSWORD` -- `--repository-url` makes twine skip `.pypirc` entirely, so
  *  there is no config file to isolate. `anonymous` leaves both unset (this file's header). */
 export function twineEnv(home: string, credential: MaterializedCredential): NodeJS.ProcessEnv {
-  const result: NodeJS.ProcessEnv = {
-    ...process.env,
-    HOME: home,
+  const result = clientEnv(home, {
     TWINE_NON_INTERACTIVE: '1',
     PYTHON_KEYRING_BACKEND: 'keyring.backends.null.Keyring',
     PYTHONDONTWRITEBYTECODE: '1',
     PYTHONNOUSERSITE: '1',
-  };
+  });
   if (credential.transport === 'basic') {
     result.TWINE_USERNAME = credential.username ?? '';
     result.TWINE_PASSWORD = credential.password ?? '';
@@ -116,9 +115,7 @@ export function pipEnv(
   credential: MaterializedCredential,
   repoName: string,
 ): NodeJS.ProcessEnv {
-  const result: NodeJS.ProcessEnv = {
-    ...process.env,
-    HOME: home,
+  const result = clientEnv(home, {
     XDG_CONFIG_HOME: path.join(home, '.config'),
     XDG_CACHE_HOME: path.join(home, '.cache'),
     PIP_CONFIG_FILE: '/dev/null',
@@ -129,7 +126,7 @@ export function pipEnv(
     PIP_NO_COLOR: '1',
     PYTHONDONTWRITEBYTECODE: '1',
     PYTHONNOUSERSITE: '1',
-  };
+  });
   if (env.insecureRegistry) {
     result.PIP_TRUSTED_HOST = new URL(env.repoBaseUrl).host;
   }

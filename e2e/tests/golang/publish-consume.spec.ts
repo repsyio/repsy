@@ -48,6 +48,7 @@ import {
   rawUpload,
 } from '../../src/clients/golang-raw.js';
 import { shimTraceSoFar } from '../../src/clients/golang-tls-shim.js';
+import { clientEnv } from '../../src/clients/client-env.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { env } from '../../src/env.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
@@ -91,6 +92,7 @@ test(
 
     const runResult = await run(binaryPath, [], {
       cwd: work,
+      env: clientEnv(home),
       timeoutMs: 30_000,
       label: 'golang-gogetbuild-run',
     });
@@ -125,9 +127,7 @@ test(
     const { home, work } = await isolatedWorkDir(`golang-plainhttpcreds-${seeder.runId}`);
     const result = await run('go', ['mod', 'download', '-json', `${modulePath}@${version}`], {
       cwd: work,
-      env: {
-        ...process.env,
-        HOME: home,
+      env: clientEnv(home, {
         GOPATH: path.join(home, 'gopath'),
         GOMODCACHE: path.join(home, 'gomodcache'),
         GOCACHE: path.join(home, 'gocache'),
@@ -137,7 +137,7 @@ test(
         CGO_ENABLED: '0',
         GOPROXY: insecureProxy,
         GONOSUMDB: MODULE_DOMAIN,
-      },
+      }),
       timeoutMs: 60_000,
       redact: [token.token],
       label: 'golang-plainhttpcreds',
