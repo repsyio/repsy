@@ -36,8 +36,8 @@
  *
  * Tagged `@gpg` for a focused run: `./run.sh test --protocol maven --grep @gpg`.
  */
-import { RepoType } from '../../src/api/panel-api.js';
-import type { PanelApi } from '../../src/api/panel-api.js';
+import { RepoType } from '../../src/api/panel-backend.js';
+import type { PanelBackend } from '../../src/api/panel-api.js';
 import { generateGpgKey, type GpgKey } from '../../src/clients/gpg.js';
 import { adminCredential, rawGet, repoTree, versionDir } from '../../src/clients/maven-raw.js';
 import {
@@ -123,7 +123,7 @@ async function setUp(
   return { repoName: repo.name, groupId: `io.repsy.e2e.${seeder.runId}`, signer };
 }
 
-async function versionSigned(panelApi: PanelApi, setup: Setup): Promise<boolean> {
+async function versionSigned(panelApi: PanelBackend, setup: Setup): Promise<boolean> {
   const version = await panelApi.getMavenArtifactVersion(
     setup.repoName,
     setup.groupId,

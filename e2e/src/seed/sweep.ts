@@ -24,7 +24,7 @@
  * default repos, none of them prefixed). Run with `pnpm sweep -- [--hours N] [--all] [--dry-run]`
  * or `./run.sh sweep`.
  */
-import { PanelApi } from '../api/panel-api.js';
+import { createPanelBackend } from '../api/backend-registry.js';
 import { env } from '../env.js';
 import { isRunPrefixed, RUN_PREFIX } from './run-id.js';
 
@@ -73,7 +73,7 @@ function isOlderThan(createdAt: string, hours: number): boolean {
 }
 
 export async function sweep(opts: SweepOptions): Promise<SweepResult> {
-  const api = new PanelApi(env.apiBaseUrl);
+  const api = await createPanelBackend();
   await api.login(env.adminUsername, env.adminPassword);
 
   let deletedRepos = 0;
@@ -112,7 +112,7 @@ export async function sweep(opts: SweepOptions): Promise<SweepResult> {
       continue;
     }
 
-    await api.deleteUser(user.id);
+    await api.deleteRepoUser(user.id);
     deletedUsers += 1;
     console.log(`deleted user ${user.username}`);
   }

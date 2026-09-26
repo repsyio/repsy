@@ -25,7 +25,7 @@
  */
 import type { BrowserContext, Page } from '@playwright/test';
 
-import { PanelApi } from '../api/panel-api.js';
+import { loginPanel } from '../api/backend-registry.js';
 import { env } from '../env.js';
 
 export interface UiSession {
@@ -49,7 +49,7 @@ const SEEDED_FLAG = 'repsy-e2e-session-seeded';
  * whole family and logs the other holder out mid-test.
  */
 export async function loginSession(username: string, password: string): Promise<UiSession> {
-  const info = await new PanelApi(env.apiBaseUrl).login(username, password);
+  const info = await loginPanel(username, password);
   if (!info.username || !info.token || !info.refreshToken) {
     throw new Error(`Login as "${username}" did not return a username, token and refresh token`);
   }

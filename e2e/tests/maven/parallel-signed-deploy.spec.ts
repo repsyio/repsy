@@ -147,7 +147,7 @@ async function signedDeploy(
 /** What is wrong with a finished deploy: nothing, when it ended complete and signed. */
 async function problemsOf(
   deploy: Deploy,
-  panelApi: import('../../src/api/panel-api.js').PanelApi,
+  panelApi: import('../../src/api/panel-backend.js').PanelBackend,
 ): Promise<string[]> {
   if (deploy.exitCode !== 0) {
     return [`mvn exited ${deploy.exitCode}\n${deploy.stdout.slice(-2000)}`];

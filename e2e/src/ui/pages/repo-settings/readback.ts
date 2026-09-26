@@ -15,7 +15,7 @@
 ///
 
 /**
- * Reads of the panel API that `PanelApi` (`src/api/panel-api.ts`, not owned by the settings story)
+ * Reads of the panel API that `PanelBackend` (`src/api/panel-backend.ts`, not owned by the settings story)
  * does not wrap: a repo's permissions/description, its disk usage and its Maven key stores; plus the
  * raw repo-port probe TOK-04 needs. Every method is a plain `fetch`, authenticated with the bearer
  * token of the test's `adminSession`, so the settings specs assert what a click PERSISTED through

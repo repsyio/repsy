@@ -31,7 +31,8 @@
  */
 import { loadSpecOperations, requestFor, type SpecOperation } from '../../src/api/spec-ops.js';
 import { bodyFor, seedSweepWorld, snapshotWorld, valuesFor } from '../../src/api/sweep-world.js';
-import { PanelApi, RepoType } from '../../src/api/panel-api.js';
+import { createPanelBackend } from '../../src/api/backend-registry.js';
+import { RepoType } from '../../src/api/panel-api.js';
 import { adminBearer, apiUrl, edgeRequest, type EdgeResponse } from '../../src/clients/edge-raw.js';
 import { env } from '../../src/env.js';
 import { expect, test as base } from '../../src/scenarios/fixtures.js';
@@ -75,11 +76,11 @@ interface SweepUser {
 const test = base.extend<object, { sweepUser: SweepUser }>({
   sweepUser: [
     async ({}, use, workerInfo) => {
-      const admin = new PanelApi(env.apiBaseUrl);
+      const admin = await createPanelBackend();
       await admin.login(env.adminUsername, env.adminPassword);
       const seeder = new Seeder(admin, perTestRunId(env.runId, workerInfo.parallelIndex, 0));
       const user = await seeder.createUser();
-      const session = new PanelApi(env.apiBaseUrl);
+      const session = await createPanelBackend();
       const login = await session.login(user.username, user.password);
       await use({ token: login.token ?? '' });
       await seeder.cleanup();

@@ -30,7 +30,7 @@
 import { expect, test as securityTest } from './security-fixtures.js';
 import type { PackageProtocol, PackageRef, SeededPackage } from '../seed/packages.js';
 import { ScannerStubClient, type RecordedCall } from '../stubs/scanner/client.ts';
-import type { PanelApi, VulnerabilityScanInfo } from '../api/panel-api.js';
+import type { PanelBackend, VulnerabilityScanInfo } from '../api/panel-backend.js';
 import { optedIn } from './session.js';
 
 export { ScannerStubClient };
@@ -172,7 +172,7 @@ export function expectSubmitted(
  * it. `scanCount` waits for that many scans to exist first (a re-scan adds a second one).
  */
 export async function newestFinishedScan(
-  panelApi: PanelApi,
+  panelApi: PanelBackend,
   repoName: string,
   pkg: PackageRef,
   scanCount = 1,

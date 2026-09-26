@@ -15,7 +15,7 @@
 ///
 
 /**
- * The Playwright fixtures every spec uses: an admin-authenticated `PanelApi`, a per-test `Seeder`
+ * The Playwright fixtures every spec uses: an admin-authenticated `PanelBackend`, a per-test `Seeder`
  * that cleans up after itself, and `world` — the factory that turns a `Scenario` into a ready-to-test
  * `World` (plan section "Scenario model"). `world` is a function-valued fixture (`world(scenario,
  * adapter)`), not a single resolved value, because one spec calls it once per scenario in its own
@@ -28,7 +28,8 @@
  */
 import { test as base } from '@playwright/test';
 
-import { PanelApi, RepoType } from '../api/panel-api.js';
+import { createPanelBackend } from '../api/backend-registry.js';
+import { type PanelBackend, RepoType } from '../api/panel-backend.js';
 import { env } from '../env.js';
 import { perTestRunId } from '../seed/run-id.js';
 import { Seeder } from '../seed/seeder.js';
@@ -168,7 +169,7 @@ export async function materializeCredentialKind(
 }
 
 export interface Fixtures {
-  panelApi: PanelApi;
+  panelApi: PanelBackend;
   seeder: Seeder;
   world: (scenario: Scenario, adapter: ProtocolAdapter) => Promise<World>;
 }
@@ -178,7 +179,7 @@ let testSeqByWorker = 0;
 export const test = base.extend<Fixtures>({
   // eslint-disable-next-line no-empty-pattern
   panelApi: async ({}, use) => {
-    const api = new PanelApi(env.apiBaseUrl);
+    const api = await createPanelBackend();
     await api.login(env.adminUsername, env.adminPassword);
     await use(api);
   },

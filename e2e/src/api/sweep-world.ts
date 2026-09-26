@@ -23,7 +23,7 @@
 import { edgeRequest, apiUrl } from '../clients/edge-raw.js';
 import { generateKeyPair } from '../clients/pgp.js';
 import { RepoType } from './panel-api.js';
-import type { PanelApi } from './panel-api.js';
+import type { PanelBackend } from './panel-backend.js';
 import {
   PACKAGE_PROTOCOLS,
   type PackageProtocol,
@@ -105,7 +105,7 @@ async function adminJson(
 /** Seeds the world in the calling test's own `seeder`, which removes it all again. */
 export async function seedSweepWorld(
   seeder: Seeder,
-  admin: PanelApi,
+  admin: PanelBackend,
   adminToken: string,
 ): Promise<SweepWorld> {
   const repos = {} as Record<PackageProtocol, SeededRepo>;
