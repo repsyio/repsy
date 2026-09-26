@@ -19,6 +19,7 @@ import io.repsy.scanner.trivy.config.TrivyScannerProperties;
 import io.repsy.scanner.trivy.dtos.ScanJob;
 import io.repsy.scanner.trivy.dtos.ScanOutcome;
 import io.repsy.scanner.trivy.dtos.trivy.TrivyReport;
+import io.repsy.scanner.trivy.dtos.trivy.TrivyVersion;
 import io.repsy.scanner.trivy.errors.TrivyScanException;
 import io.repsy.scanner.trivy.jobs.JobStore;
 import java.io.IOException;
@@ -55,6 +56,8 @@ public class TrivyScanService {
   private static final int MAX_ERROR_MESSAGE_LENGTH = 1900;
   private static final String TRUNCATION_SUFFIX = "... [truncated]";
 
+  private static final String VERSION_COMMAND = "version";
+
   private static final String WARMUP_TARGET = ".";
   private static final String DOWNLOAD_DB_ONLY_FLAG = "--download-db-only";
   private static final String DOWNLOAD_JAVA_DB_ONLY_FLAG = "--download-java-db-only";
@@ -76,6 +79,9 @@ public class TrivyScanService {
 
   @Qualifier("scanWorkerExecutor")
   private final @NonNull Executor scanWorkerExecutor;
+
+  // The version of the Trivy binary, read once (a failed read is not cached, so it is retried).
+  private volatile @Nullable String trivyVersion;
 
   public void submitScan(
       final @NonNull String scanId,
@@ -210,9 +216,41 @@ public class TrivyScanService {
     final var stdout = this.runTrivy(command);
     final var report = this.parseReport(stdout);
     final var findings = TrivyFindingMapper.toFindings(report.results());
-    final var scannerVersion = report.trivy() != null ? report.trivy().version() : null;
 
-    return new ScanOutcome(findings, scannerVersion);
+    return new ScanOutcome(findings, this.resolveScannerVersion(report));
+  }
+
+  // Trivy 0.66's JSON report has no "Trivy" key, so the version comes from the binary itself; a
+  // report that does carry one (an older or newer Trivy) wins.
+  private @Nullable String resolveScannerVersion(final @NonNull TrivyReport report) {
+    if (report.trivy() != null && StringUtils.isNotBlank(report.trivy().version())) {
+      return report.trivy().version();
+    }
+
+    return this.trivyVersion();
+  }
+
+  public @Nullable String trivyVersion() {
+    final var known = this.trivyVersion;
+
+    if (known != null) {
+      return known;
+    }
+
+    try {
+      final var parsed =
+          this.objectMapper.readValue(
+              this.runTrivy(this.buildVersionCommand()), TrivyVersion.class);
+
+      if (StringUtils.isNotBlank(parsed.version())) {
+        this.trivyVersion = parsed.version();
+        log.info("Trivy version {}", parsed.version());
+      }
+    } catch (final JacksonException | TrivyScanException exception) {
+      log.warn("Could not read the Trivy version; scans report none", exception);
+    }
+
+    return this.trivyVersion;
   }
 
   private void updateStatus(
@@ -304,6 +342,10 @@ public class TrivyScanService {
     command.add(imageReference);
 
     return command;
+  }
+
+  private @NonNull List<String> buildVersionCommand() {
+    return List.of(this.properties.binaryPath(), VERSION_COMMAND, "--format", "json");
   }
 
   private @NonNull List<String> buildDownloadOnlyCommand(final @NonNull String downloadOnlyFlag) {

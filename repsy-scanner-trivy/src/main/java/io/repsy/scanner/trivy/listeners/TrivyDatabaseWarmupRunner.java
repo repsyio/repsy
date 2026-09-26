@@ -42,6 +42,8 @@ public class TrivyDatabaseWarmupRunner implements ApplicationRunner {
   public void run(final @NonNull ApplicationArguments args) {
     this.publishReadiness(ReadinessState.REFUSING_TRAFFIC);
 
+    this.trivyScanService.trivyVersion();
+
     try {
       log.info("Warming up Trivy vulnerability databases before accepting traffic");
       this.trivyScanService.warmUpDatabases();
