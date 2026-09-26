@@ -34,6 +34,7 @@
  *  - It is a per-test resource: `start()` in the test, `stop()` in a `finally`.
  */
 import http from 'node:http';
+import https from 'node:https';
 import type { AddressInfo } from 'node:net';
 import zlib from 'node:zlib';
 
@@ -111,10 +112,14 @@ export async function startWireRecorder(options: WireRecorderOptions = {}): Prom
     };
     entries.push(entry);
 
-    const upstreamReq = http.request(
+    // The upstream is Repsy's own https listener on a TLS stack (RPS-1474: the runner's Node trusts the
+    // stack's CA through NODE_EXTRA_CA_CERTS); the recorder's own side stays plain http, the address the
+    // client under test is configured with.
+    const secure = upstream.protocol === 'https:';
+    const upstreamReq = (secure ? https : http).request(
       {
         hostname: upstream.hostname,
-        port: upstream.port || 80,
+        port: upstream.port || (secure ? 443 : 80),
         path: req.url,
         method: req.method,
         headers: { ...req.headers, ...options.forwardHeaders, host: upstream.host },

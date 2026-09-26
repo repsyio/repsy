@@ -3912,14 +3912,14 @@ differently, so each of them is an **opt-in overlay**: a compose file layered on
 PostgreSQL one or the H2 one) with one more `-f`, that changes what Repsy runs with for one nightly leg
 and is never part of the default stack.
 
-| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                                            | Specs                                                              |
-| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | ---------------------------------------------------------- | ------------------------------------------------------------------ |
-| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack" |
-| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                       |
-| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang), "TLS stack"                             |
-| `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                            |
-| `upgrade`  | `--upgrade`             | `REPSY_E2E_UPGRADE=1`  | `docker-compose.stack-upgrade.yml`  | `upgrade`   | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                 |
-| `trivy`    | `--trivy`               | `REPSY_E2E_TRIVY=1`    | `docker-compose.stack-trivy.yml`    | `trivy`     | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                               |
+| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                                            | Specs                                                                   |
+| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack"      |
+| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                            |
+| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang), "TLS stack"; nightly `@smoke` of all clients |
+| `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                 |
+| `upgrade`  | `--upgrade`             | `REPSY_E2E_UPGRADE=1`  | `docker-compose.stack-upgrade.yml`  | `upgrade`   | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                      |
+| `trivy`    | `--trivy`               | `REPSY_E2E_TRIVY=1`    | `docker-compose.stack-trivy.yml`    | `trivy`     | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                                    |
 
 How it fits together, so a later overlay is one row:
 
@@ -4169,7 +4169,7 @@ shorter than the window in the reset case fails it with a 429 where the right pa
 The throttle is per client and never per username, so a leg like this cannot be run by other suites in
 parallel: any client that fails authentication three times is locked out for ten seconds.
 
-## TLS stack (RPS-1474, part a)
+## TLS stack (RPS-1474)
 
 Repsy has optional HTTPS listeners of its own (the main README's "HTTPS / SSL": `API_SSL_*` for 8443 next to
 the panel API, `REPO_SSL_*` for 9443 next to the package protocols; HTTP stays open). Every other suite
@@ -4192,12 +4192,12 @@ only, run as the invoking user) writes into `e2e/.tls/<project>` (git-ignored; `
 directory, since Docker would create it as root) once and reuses it after that, because a running Repsy
 holds the keystore; delete the directory for new ones:
 
-| File             | What                                                                                                                     |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `ca.pem`         | the throwaway CA (`CN=Repsy e2e CA`, 10 years) every client trusts                                                       |
-| `leaf.pem`       | what Repsy serves, signed by it: `CN=localhost`, SANs `localhost`, `repsy` (the compose service), `127.0.0.1`, `::1`     |
-| `keystore.p12`   | the leaf key and chain, mounted into Repsy at `/app/certs` (the README's documented path); password `changeit`           |
-| `truststore.p12` | the CA as a Java truststore for the JVM clients (`REPSY_E2E_TLS_TRUSTSTORE`, password `changeit`); no runner uses it yet |
+| File             | What                                                                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ca.pem`         | the throwaway CA (`CN=Repsy e2e CA`, 10 years) every client trusts                                                                                                       |
+| `leaf.pem`       | what Repsy serves, signed by it: `CN=localhost`, SANs `localhost`, `repsy` (the compose service), `127.0.0.1`, `::1`                                                     |
+| `keystore.p12`   | the leaf key and chain, mounted into Repsy at `/app/certs` (the README's documented path); password `changeit`                                                           |
+| `truststore.p12` | the JDK's own trusted roots plus the CA, as a Java truststore for the JVM clients (`REPSY_E2E_TLS_TRUSTSTORE`, password `changeit`); rebuilt from `ca.pem` on every `up` |
 
 **Ports and URLs.** The https ports are 8443/9443 plus the port offset (`REPSY_E2E_API_TLS_PORT`,
 `REPSY_E2E_REPO_TLS_PORT`); the offset cap is now computed on 9443. Offsets that differ by a multiple of 1000 collide (8443 + 1000 is 9443), so keep to
@@ -4212,8 +4212,7 @@ stack without TLS sets none of them (an empty `SSL_CERT_FILE` would replace the 
 `e2e/.tls/<project>` at `/tls` and sets, each read by the clients that use it: `SSL_CERT_FILE` (Go, OpenSSL,
 .NET on Linux), `NODE_EXTRA_CA_CERTS` (Node: the harness's own `fetch`, npm, pnpm, yarn, bun), `REQUESTS_CA_BUNDLE`
 (Python: pip, twine), `CARGO_HTTP_CAINFO` (Cargo), `CURL_CA_BUNDLE` (curl), plus `REPSY_E2E_TLS_CA_FILE`,
-`REPSY_E2E_TLS_TRUSTSTORE(_PASSWORD)` for the specs and the JVM clients (which take a truststore through their
-own flags: part b). A client's environment is an allow-list, so the names are in `TRUST_VARIABLES`
+`REPSY_E2E_TLS_TRUSTSTORE(_PASSWORD)` for the JVM clients ("Every client over TLS" below). A client's environment is an allow-list, so the names are in `TRUST_VARIABLES`
 (`src/clients/client-env.ts`) and the npm-family's `sealedEnv` copies them too. The `ui` runner is left out
 of the TLS leg (Chromium would need `ignoreHTTPSErrors` and a config change).
 
@@ -4257,7 +4256,82 @@ passed", which is the reminder to delete the line:
 - `unpublish.spec.ts`: unpublishing one version of a scoped package, and the only version of a scoped package (the
   unscoped one passes).
 
-Part b's `@smoke` leg meets the first of them.
+The `@smoke` cases of the other runners meet none of them (no other protocol puts a `%2F` in a path); "Every client over TLS" has the npm-clients cases that do.
+
+### Every client over TLS (part b)
+
+`REPSY_E2E_TLS=1 ./run.sh test --protocol <runner> --grep @smoke` for every runner but `ui` and `stack` is the
+nightly `tls` leg ("CI"). Each client reaches `https://localhost:9443` (plus the panel over 8443 where a runner
+uses it) and trusts the CA the way it always does, with no `--insecure` and no skip-verify flag anywhere:
+
+| Runner / client                                                                                         | Trusts the CA through                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `maven`: mvn, gradle (groovy, kotlin, plugin builds), sbt, ant/ivy                                      | `JAVA_TOOL_OPTIONS` (`javax.net.ssl.trustStore*` of `truststore.p12`), built by `jvmTrustEnv()` in `src/clients/client-env.ts` and added by `clientEnv()`, so every JVM a client starts (mvn and its forks, the gradle client and its daemon, sbt, ant) reads it |
+| `cargo`                                                                                                 | `CARGO_HTTP_CAINFO`                                                                                                                                                                                                                                              |
+| `nuget`: `dotnet` (push, restore)                                                                       | `SSL_CERT_FILE` (OpenSSL on Linux)                                                                                                                                                                                                                               |
+| `pypi`: pip, twine                                                                                      | `REQUESTS_CA_BUNDLE` (both are `requests` based)                                                                                                                                                                                                                 |
+| `helm`: classic (`helm repo`, `cm-push`) and OCI (`helm push`/`pull`, `--plain-http` left off on https) | `SSL_CERT_FILE` (Go)                                                                                                                                                                                                                                             |
+| `ruby`: gem, bundler                                                                                    | `SSL_CERT_FILE` (OpenSSL)                                                                                                                                                                                                                                        |
+| `npm-clients`: npm, pnpm, yarn 1, yarn 4, bun                                                           | `NODE_EXTRA_CA_CERTS`, copied into their sealed environment by `sealedEnv`                                                                                                                                                                                       |
+| `docker`: crane; `golang`: go; `npm`: npm                                                               | `SSL_CERT_FILE` (Go), `NODE_EXTRA_CA_CERTS` (part a); `crane` runs without `--insecure` on https                                                                                                                                                                 |
+
+The JVM truststore is **not** the CA alone: a truststore replaces the JDK's for the whole process, and Maven and Gradle
+also resolve plugins from Maven Central (a CA-only store fails them with `PKIX path building failed`, observed). So
+`tls-init` copies the JDK's `cacerts` and imports the CA into the copy (`keytool`, password `changeit`). Setting
+`JAVA_TOOL_OPTIONS` only when `REPSY_E2E_TLS_TRUSTSTORE` is set keeps the "Picked up JAVA_TOOL_OPTIONS" line off the
+stderr of every client on a default stack. On a TLS stack no spec pins a client's stderr, and all 20 `@smoke` cases
+of the maven runner pass with it.
+
+**The wire recorder** (`src/clients/npm-family/wire-recorder.ts`, the in-process proxy the npm-clients `@wire`,
+`@scopes` and `@always-auth` cases put between a client and Repsy) forwarded with plain `http.request` whatever the
+upstream was, so on a TLS stack it spoke http to the TLS port and got Tomcat's `400` for every request through it.
+It now uses `https.request` for an https upstream (the runner's Node trusts the CA); its own side stays plain
+http, as the client under test is configured with. The full npm-clients catalog on a TLS stack is green with
+that and the RPS-1559 marks below: 208 passed (the expected failures included), 6 skipped, 0 failed.
+
+**RPS-1559 in npm-clients.** Every npm-family client spells a scoped name `@scope%2Fname`, so the scoped cases of
+`tests/npm-clients` meet the same bodyless `400` as `tests/npm`. On a TLS stack these 13 carry the same
+`test.fail(optedIn('tls'), 'RPS-1559: ...')`: the scoped read/publish of the token-routing matrix (all five clients),
+bun's scoped publish and `.npmrc` scopes cases, yarn berry's scoped read (H-7) and lockfile (H-9) cases, and yarn
+classic's scoped `always-auth` and the three scoped-publish `.yarnrc`/`.npmrc` cases. `yarn berry settings > plain
+http needs unsafeHttpWhitelist (H-6)` has no http registry to refuse on a TLS stack and skips itself there. None of them is
+`@smoke`, so the nightly leg never depends on them; the RPS-1559 fix turns each mark into "expected to fail but
+passed".
+
+**URLs that follow a client** (`tests/skeleton/tls-client-urls.spec.ts`, `@tls`, `@smoke`, skipped without the overlay)
+extends the table above to the remaining protocols, each read on 9443 and on 9090:
+
+| Case     | Asserted                                                                                                                                                                                                   |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PyPI     | the PEP 503 project page carries ABSOLUTE file links built from the request: `https://localhost:9443/...` on the TLS port, `http://` on the plain one, so pip and twine stay on the scheme they asked with |
+| Helm     | the classic `index.yaml` lists chart `urls` as relative references (`charts/<name>-<version>.tgz`) and holds no `http(s)://` anywhere, so `helm` resolves them against the URL it was given                |
+| Maven    | the directory page links its entries relatively                                                                                                                                                            |
+| Ruby, Go | the compact index (`/versions`, `/info/<gem>`) and Go's `@v/list`/`@latest` carry no absolute URL                                                                                                          |
+
+**skopeo, regctl, oras, uv and deno** (the adapters merged beside this part) need nothing beyond the CA on the runner:
+`docker-tls.ts` is the one place that decides their TLS flags, and on an https repo URL without
+`REPSY_E2E_INSECURE_REGISTRY` it leaves verification ON (skopeo's `--tls-verify`, regctl's `tls: enabled`), so they use the
+runner's trust variables; uv and deno get them through `clientEnv`/`sealedEnv` like the rest.
+**oras is the exception**: it speaks plain http to `localhost` unless told otherwise (`oras login` did
+`GET http://localhost:9443/v2/` and got Tomcat's `400` from the TLS port), so `orasTlsFlags()` now returns an explicit
+`--plain-http=false` (or `--from-`/`--to-plain-http=false`) when TLS is verified. A default stack keeps `--plain-http`.
+Whichever adapter comes next needs its own TLS setting decided in that file (or in its own client env), and a run of its
+`@smoke` (and full catalog) on a TLS stack recorded under "Runs of this part".
+
+**Runs of this part** (own stack, offset 200, image of main, `REPSY_E2E_TLS=1`): `@smoke` skeleton 21, maven 23, npm 5
+(+1 expected failure), npm-clients 11, cargo 12, nuget 12, docker 8, helm 7, pypi 7, golang 10 + 1 skipped (the shim case),
+ruby 7, api 277: all green, none retried (run as the nightly leg runs them, then its opt-in check). The full catalogs on the same stack (not part of the nightly leg, run once for this part):
+maven 238 passed and 1 skipped, cargo 49, nuget 51, helm 63, ruby 51, golang 48 and 1 skipped, npm-clients 208 (the 13 RPS-1559
+expected failures among them) and 6 skipped, and, after merging the skopeo, regctl, oras, uv and deno adapters, docker 106 passed
+and 1 skipped (the 4 RPS-1490 expected failures among them) and pypi 66 passed and 3 skipped; no failure anywhere.
+Flip checks: with the client-side trust withheld and the harness's own kept (`NODE_EXTRA_CA_CERTS` only), maven's `@smoke`
+fails 18 of 20 with `PKIX path building failed`, cargo 11/11 with `SSL peer certificate ... was not OK`, nuget 12/12
+with `Unable to load the service index`, pypi 5 of 6 (`CERTIFICATE_VERIFY_FAILED` by hand), helm 7/7 and docker 6/6
+with `x509: certificate signed by unknown authority`, ruby 3 of 7 (bundler's "your system doesn't have the CA
+certificates"), golang 8 of 10; with `NODE_EXTRA_CA_CERTS` withheld from the npm-clients' sealed environment only,
+all 11 npm-clients cases (deno included) fail with `self-signed certificate in certificate chain`; with every client-side
+variable withheld the docker runner's crane, skopeo, regctl and oras cases fail (35 of 54) and pypi's pip, twine and uv cases fail 6 of 7. (The
+passing rest of each are cases that talk only to the harness.)
 
 ### Size-limit leg (RPS-1482)
 
@@ -5524,7 +5598,7 @@ host-matching uid even though the packages themselves only need to be read.
 
 `.github/workflows/e2e-nightly.yml` ("E2E Nightly") runs this harness on GitHub Actions: the panel UI
 suite, the wire-level protocol runners, the embedded-H2 smoke run plus one rotating full catalog on H2, and
-the scanner-stub UI specs, and the real-scanner contract spec. **It runs nightly (01:23 UTC)
+the scanner-stub UI specs, the real-scanner contract spec and the `@smoke` of every client over Repsy's own TLS. **It runs nightly (01:23 UTC)
 and on demand only, by the product owner's decision (RPS-1260): it has no `pull_request`, `push` or
 `merge_group` trigger.** PR checks are switched off in this repo on purpose (`pr-checks.yml` is
 `workflow_dispatch` only, `AGENTS.md` "Merging to main"), and this workflow is not a required check.
@@ -5533,7 +5607,7 @@ and on demand only, by the product owner's decision (RPS-1260): it has no `pull_
 
 ```bash
 gh workflow run e2e-nightly.yml                            # everything, like the nightly run
-gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | upgrade (both) | trivy | all
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | upgrade (both) | trivy | tls | all
 gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
 gh workflow run e2e-nightly.yml -f suite=upgrade -f upgrade_from=26.08.3   # the upgrade legs from another release
 gh workflow run e2e-nightly.yml -f suite=h2 -f h2_full=docker   # the full catalog of this runner on H2, not tonight's
@@ -5550,19 +5624,20 @@ cancelling): a second one waits.
 
 ### What runs
 
-| Job / leg    | Stack                                       | Runs                                                                                                                                                                                                                     | Timeout |
-| ------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
-| `image`      |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                                           | 40 min  |
-| `ui`         | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                | 60 min  |
-| `wire`       | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                                    | 150 min |
-| `h2`         | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                    | 90 min  |
-| `h2-full`    | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another              | 60 min  |
-| `scanner`    | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite | 60 min  |
-| `throttle`   | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                | 30 min  |
-| `limits`     | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                  | 60 min  |
-| `upgrade`    | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                             | 30 min  |
-| `upgrade-h2` | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                 | 30 min  |
-| `trivy`      | PostgreSQL + the real scanner overlay       | `REPSY_E2E_OPT_IN=trivy`, `--grep @trivy` on `api`, 10 tests, "Real scanner stack": the contract the stub mimics and one real scan of an npm package and of a Docker image                                               | 45 min  |
+| Job / leg    | Stack                                       | Runs                                                                                                                                                                                                                                        | Timeout |
+| ------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `image`      |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                                                              | 40 min  |
+| `ui`         | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                                   | 60 min  |
+| `wire`       | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                                                       | 150 min |
+| `h2`         | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                                       | 90 min  |
+| `h2-full`    | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another                                 | 60 min  |
+| `scanner`    | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite                    | 60 min  |
+| `throttle`   | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                                   | 30 min  |
+| `limits`     | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                                     | 60 min  |
+| `upgrade`    | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                                                | 30 min  |
+| `upgrade-h2` | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                                    | 30 min  |
+| `trivy`      | PostgreSQL + the real scanner overlay       | `REPSY_E2E_OPT_IN=trivy`, `--grep @trivy` on `api`, 10 tests, "Real scanner stack": the contract the stub mimics and one real scan of an npm package and of a Docker image                                                                  | 45 min  |
+| `tls`        | PostgreSQL + the TLS overlay                | `REPSY_E2E_OPT_IN=tls` and `REPSY_E2E_TLS=1`, `@smoke` of `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` and `api` over Repsy's https listeners ("TLS stack"); no `ui`, no `stack` | 60 min  |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
 others. Every leg does the same: load the image, `./run.sh local up [--h2]` (with `REPSY_IMAGE` set, so
@@ -5600,6 +5675,14 @@ AUTH-11 leaves the docker gateway's bucket, admin included, locked for the windo
 The `limits` leg is the same with `./run.sh local up --limits` and `--grep @limits` (the `grep` input is ignored)
 on seven runners, one `run.sh test` each; the step "Check the opt-in specs ran" fails it when any of them skipped.
 
+The `tls` leg is `./run.sh local up --tls`, then every runner but `ui` and `stack` with `--grep @smoke` (the `grep`
+input may replace it, as on `h2`). `test` cannot see the stack, so the leg also exports `REPSY_E2E_TLS=1` for the step
+that runs the tests (the plan job's `SWITCHES`, the matrix field `switches`): that is what points the runners at the
+https URLs and gives every client its CA (`tls_run_args` in `run.sh`). Its check "Check the opt-in specs ran" cannot
+demand zero skips (the golang TLS-shim case skips by design on https), so the plan job's `OPT_IN_PROBE` names
+`tls-listeners.spec.ts` instead: the leg fails when a case of that file skipped (the opt-in never arrived) or a runner
+ran no test, and lists the other skips as notices.
+
 Each runner gets its own `run.sh test` invocation because every invocation overwrites `test-results/`
 and `playwright-report/` (see "Running"); the workflow copies each runner's output aside first.
 
@@ -5636,8 +5719,8 @@ CI=true ./run.sh test --protocol ui --grep @smoke          # with the CI retry/t
 
 The `h2` leg is the same with `./run.sh local up --h2` and `--grep @smoke` on every runner (and `ui`, and no
 `--grep` for `stack`); `h2-full` is `./run.sh local up --h2` and one `./run.sh test --target ci --protocol <runner>`
-without `--grep`. The stack logs of a failed leg are `./run.sh local ps [--h2|--scanner|--throttle|--limits]` and
-`./run.sh local logs [--h2|--scanner|--throttle|--limits]` (the step "Collect the stack logs" calls them, so a new stack flag needs
+without `--grep`. The stack logs of a failed leg are `./run.sh local ps [--h2|--scanner|--throttle|--limits|--tls]` and
+`./run.sh local logs [--h2|--scanner|--throttle|--limits|--tls]` (the step "Collect the stack logs" calls them, so a new stack flag needs
 no change in the workflow). To run against an image you already built, set `REPSY_IMAGE` to its tag.
 
 ### Runner requirements and the Chromium sandbox

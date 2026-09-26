@@ -57,15 +57,17 @@ export function regctlTls(): 'disabled' | 'insecure' | undefined {
 
 /**
  * oras's flags for the registry of a command (RPS-1478 part C): `--plain-http` (plain HTTP, verification
- * off) or `--insecure` (TLS on, certificate not verified), none when TLS is verified. `copy` names its two
+ * off) or `--insecure` (TLS on, certificate not verified), and `--plain-http=false` when TLS is verified. `copy` names its two
  * sides (`--from-plain-http`/`--to-plain-http`, `--from-insecure`/`--to-insecure`), every other command
  * takes one.
  */
 export function orasTlsFlags(side: 'target' | 'from' | 'to' = 'target'): string[] {
   const mode = registryTls();
+  const prefix = side === 'target' ? '--' : `--${side}-`;
   if (mode === 'enabled') {
-    return [];
+    // oras speaks plain http to `localhost` unless told otherwise (it logs in with `GET http://localhost:9443/v2/`
+    // and gets Tomcat's 400 from the TLS port, RPS-1474 part b), so a verified TLS stack says so explicitly.
+    return [`${prefix}plain-http=false`];
   }
-  const flag = mode === 'disabled' ? 'plain-http' : 'insecure';
-  return [side === 'target' ? `--${flag}` : `--${side}-${flag}`];
+  return [`${prefix}${mode === 'disabled' ? 'plain-http' : 'insecure'}`];
 }

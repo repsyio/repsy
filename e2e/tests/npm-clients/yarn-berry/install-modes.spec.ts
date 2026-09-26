@@ -61,6 +61,7 @@ import { isolatedWorkDir } from '../../../src/clients/exec.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
+import { optedIn } from '../../../src/stack-overlays.js';
 import type { Seeder } from '../../../src/seed/seeder.js';
 import { target } from '../../../src/target.js';
 
@@ -204,6 +205,10 @@ test.describe('yarn berry settings', () => {
     'plain http needs unsafeHttpWhitelist, even for localhost (H-6)',
     { tag: [TAG, '@config'] },
     async ({ seeder }) => {
+      test.skip(
+        optedIn('tls'),
+        'the registry is https on a TLS stack: there is no plain http for berry to refuse',
+      );
       const graph = await graphRepo(seeder, 'http');
 
       const consumer = await yarnBerryClient.prepare('http', [graph.reader]);
@@ -265,6 +270,10 @@ test.describe('yarn berry settings', () => {
     'without npmAlwaysAuth a SCOPED read still sends the credential (H-7)',
     { tag: [TAG, '@config'] },
     async ({ seeder }) => {
+      test.fail(
+        optedIn('tls'),
+        'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
+      );
       const repo = await newRepo(seeder);
       const scope = `@e2e-${seeder.runId}`;
       const scoped = packageNameFor(seeder, 'best-effort', true);
@@ -364,6 +373,10 @@ test.describe('yarn berry tarball URLs in the lockfile (H-9)', () => {
     "the lockfile records no __archiveUrl at the registry's own address, scoped packages included",
     { tag: [TAG, '@lockfile', '@archive-url'] },
     async ({ seeder }) => {
+      test.fail(
+        optedIn('tls'),
+        'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
+      );
       const graph = await graphRepo(seeder, 'archive');
       const scope = `@e2e-${seeder.runId}`;
       const scoped = packageNameFor(seeder, 'archived', true);

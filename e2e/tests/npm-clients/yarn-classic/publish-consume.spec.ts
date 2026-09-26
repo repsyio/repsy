@@ -64,6 +64,7 @@ import {
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
+import { optedIn } from '../../../src/stack-overlays.js';
 import { registerPublishConsumeLoop } from '../../../src/scenarios/loop.js';
 
 registerPublishConsumeLoop(npmFamilyAdapter(client));
@@ -77,6 +78,10 @@ test(
   'yarn-classic sends no credentials for an unscoped read without always-auth, a scoped read does',
   { tag: [client.tag, '@always-auth'] },
   async ({ seeder }) => {
+    test.fail(
+      optedIn('tls'),
+      'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
+    );
     const repo = await newRepo(seeder);
     const writer = await tokenBinding(seeder, repo.name, { readOnly: false });
     const reader = await tokenBinding(seeder, repo.name, { readOnly: true });
@@ -299,6 +304,10 @@ for (const config of SCOPED_PUBLISH_CONFIGS) {
     `yarn-classic scoped publish with ${config.title}: the registry serves its own conventional tarball URL`,
     { tag: [client.tag, '@scoped-publish'] },
     async ({ seeder }) => {
+      test.fail(
+        optedIn('tls'),
+        'RPS-1559: the SSL connectors miss EncodedSolidusHandling.DECODE (encoded slash -> bodyless 400)',
+      );
       const repo = await newRepo(seeder);
       const scope = `@e2e-${seeder.runId}`;
       const name = packageNameFor(seeder, 'scoped-pub', true);
