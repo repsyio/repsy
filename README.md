@@ -446,6 +446,9 @@ and after the upgrade. A manifest whose file is missing or does not match its di
 | `TRIVY_REQUEST_TIMEOUT_SECONDS` | Timeout of one HTTP request from Repsy to the scanner (submitting a scan, reading its status) | `10` |
 | `TRIVY_POLL_INTERVAL_MS` | How often Repsy asks the scanner for the status of an unfinished scan | `3000` |
 | `TRIVY_MAX_SCAN_DURATION_SECONDS` | How long Repsy waits for a scan to finish before it marks the scan failed | `330` |
+| `TRIVY_SUBMIT_MAX_ATTEMPTS` | How many times Repsy submits a scan when it cannot reach the scanner (connection refused, DNS failure, connection reset, as while the scanner restarts), the first submit included. `1` turns the retry off. A scanner that answers with an error or does not answer in time is not retried; re-run that scan from the panel (1 to 5) | `3` |
+| `TRIVY_SUBMIT_RETRY_INITIAL_DELAY_SECONDS` | Wait before the first retry of an unreachable scanner (1 to 300) | `15` |
+| `TRIVY_SUBMIT_RETRY_MAX_DELAY_SECONDS` | Longest wait before any retry; the wait grows fourfold per retry (15 s, then 60 s). Keep the waits well below `TRIVY_MAX_SCAN_DURATION_SECONDS`, and note a pending retry is lost when Repsy restarts (the scan is then marked failed after that duration) (initial delay to 300) | `60` |
 | `BASIC_AUTH_CACHE_ENABLED` | Remember successful HTTP Basic password checks, so a client that sends its username and password on every request pays for one password verification instead of one per request. See [Authenticating from CI](#authenticating-from-ci). | `true` |
 | `BASIC_AUTH_CACHE_TTL_SECONDS` | How long a remembered password check stays valid | `300` |
 | `BASIC_AUTH_CACHE_MAX_ENTRIES` | How many remembered password checks are kept | `10000` |
