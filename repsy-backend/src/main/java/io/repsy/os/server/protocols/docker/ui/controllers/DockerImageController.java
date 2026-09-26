@@ -114,6 +114,10 @@ public class DockerImageController {
 
     SortValidator.requireSortableBy(pageable, TAG_SORT_PROPERTIES);
 
+    // An image that does not exist answers 404 imageNotFound like every other image route, not an
+    // empty page (RPS-1579).
+    this.imageService.findImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
+
     final var imageTags =
         this.manifestService.getImageTagsContainsName(
             repoInfo.getStorageKey(), imageName, name, pageable);
