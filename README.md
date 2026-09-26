@@ -813,9 +813,22 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
   clients publishing the same artifact at the same moment can still lose a version, when a client
   uploads a file it computed from a copy read before the other's version was added; the next POM
   registered for the artifact lists it again.
-  Nothing generated is stored: it is not in the directory listing, is never signed (`.asc` is a `404`)
-  and is not generated for the version-level file of a SNAPSHOT (Maven, Gradle and Ivy resolve a
-  non-unique SNAPSHOT by its own file name without it).
+  Maven's plugin prefix lookup (`mvn hello:hi`, with the plugin's group in `pluginGroups`) reads the
+  group-level `<group path>/maven-metadata.xml` instead, which `mvn deploy` uploads for a plugin but
+  Gradle's `maven-publish`, sbt, Ivy and a raw `PUT` do not. Repsy answers a `GET` or `HEAD` of that file
+  (and of its four checksums) too, from the plugins it has registered for the group, when none is stored:
+  a `<plugins>` list with each plugin's name, prefix and artifactId, ordered by artifactId. The prefix
+  is the one Maven derives from the artifactId (`hello-maven-plugin` gives `hello`), so a plugin that
+  sets its own `goalPrefix` has to be published by Maven, which stores the file itself, or its prefix is
+  not found. A stored group-level file is served as it is. The path of that file has the shape of an
+  artifact-level one (`com/acme/tools/maven-metadata.xml` is both the artifact `tools` of `com.acme` and
+  the group `com.acme.tools`), so the artifact-level answer comes first and the group-level one is
+  given only when no artifact of that name is registered.
+  Nothing generated is stored: it is not in the directory listing and is never signed (`.asc` is a
+  `404`). The version-level `<version>-SNAPSHOT/maven-metadata.xml` is not generated (RPS-1438): Maven
+  and Gradle publish it themselves for a unique SNAPSHOT, and Ivy and sbt publish a non-unique one under
+  its literal `-SNAPSHOT` file names, which Maven, Gradle and Ivy resolve without it, so no client
+  needs Repsy to write it.
 
 ### Authenticating from CI
 

@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.maven.shared.artifact.repositories;
 
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactListItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -61,4 +62,22 @@ public interface ArtifactRepository extends JpaRepository<Artifact, UUID> {
 
   boolean existsByRepoIdAndArtifactNameAndGroupNameAndArtifactVersionsVersionName(
       UUID repoId, String artifactName, String groupName, String version);
+
+  /**
+   * The plugins of a group with a goal prefix, ordered by artifactId. One range scan of {@code
+   * ux_maven_artifact__repo_id_group_artifact} ({@code repo_id}, {@code group_name}).
+   */
+  @Query(
+      """
+        select new io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin(
+          a.artifactName, a.name, a.prefix)
+        from Artifact a
+        where a.repo.id = :repoId
+        and a.groupName = :groupName
+        and a.plugin = true
+        and a.prefix is not null
+        and a.prefix <> ''
+        order by a.artifactName
+      """)
+  List<RegisteredPlugin> findRegisteredPlugins(UUID repoId, String groupName);
 }

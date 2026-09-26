@@ -32,6 +32,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.protocol.resources.SynthesizedFileResource;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
@@ -57,14 +58,19 @@ import org.springframework.core.io.Resource;
 /**
  * RPS-1369: a request for the artifact-level {@code maven-metadata.xml} (or one of its checksums)
  * that finds no stored file is answered from the registered versions, and nothing else is.
+ * RPS-1438: the group-level one, which has the same shape, is answered from the registered plugins
+ * when no artifact of that group and name is registered.
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractMavenProtocolFacade download (RPS-1369)")
+@DisplayName("AbstractMavenProtocolFacade download (RPS-1369, RPS-1438)")
 class AbstractMavenProtocolFacadeDownloadTest {
 
   private static final UUID REPO_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
   private static final String REPO_NAME = "maven";
   private static final String XML_PATH = "/com/acme/lib/maven-metadata.xml";
+  private static final String GROUP_XML_PATH = "/com/acme/maven-metadata.xml";
+  private static final List<RegisteredPlugin> PLUGINS =
+      List.of(new RegisteredPlugin("hello-maven-plugin", "Hello", "hello"));
   private static final List<RegisteredVersion> VERSIONS =
       List.of(
           new RegisteredVersion("1.10", Instant.parse("2026-09-21T10:10:10Z")),
@@ -242,6 +248,139 @@ class AbstractMavenProtocolFacadeDownloadTest {
         mock(ArtifactService.class, org.mockito.Mockito.CALLS_REAL_METHODS);
 
     assertThat(service.getRegisteredVersions(this.repoInfo, "com.acme", "lib")).isEmpty();
+  }
+
+  private void pluginsAreRegistered() {
+    when(this.artifactService.getRegisteredPlugins(this.repoInfo, "com.acme")).thenReturn(PLUGINS);
+  }
+
+  private static boolean isTheGroupXml(final StoragePath storagePath) {
+    return storagePath != null
+        && storagePath.getPath().equals(REPO_ID + "/com/acme/maven-metadata.xml");
+  }
+
+  @Test
+  @DisplayName("serves a stored group-level file as stored and asks for no plugin")
+  void storedGroupFileWins() {
+    final var stored = new ByteArrayResource("<metadata/>".getBytes(UTF_8));
+    when(this.storageService.getResource(eq(REPO_NAME), any(StoragePath.class))).thenReturn(stored);
+    requestFor(GROUP_XML_PATH);
+
+    assertThat(this.facade.download(this.context)).isSameAs(stored);
+
+    verify(this.artifactService, never()).getRegisteredPlugins(any(), anyString());
+  }
+
+  @Test
+  @DisplayName("generates the group-level file from the registered plugins when none is stored")
+  void generatesTheGroupFile() throws Exception {
+    nothingIsStored();
+    pluginsAreRegistered();
+    requestFor(GROUP_XML_PATH);
+
+    final var resource = this.facade.download(this.context);
+
+    assertThat(resource).isInstanceOf(SynthesizedFileResource.class);
+    assertThat(resource.getFilename()).isEqualTo("maven-metadata.xml");
+    assertThat(bytesOf(resource)).isEqualTo(ArtifactMetadataSynthesizer.groupMetadataXml(PLUGINS));
+
+    verify(this.storageService, never()).writeInputStreamToPath(any(), any(), anyString());
+    verify(this.storageService, never()).exists(any(), anyString());
+  }
+
+  @Test
+  @DisplayName("answers the artifact-level file first when an artifact has the name of the group")
+  void artifactLevelComesFirst() throws Exception {
+    nothingIsStored();
+    when(this.artifactService.getRegisteredVersions(this.repoInfo, "com", "acme"))
+        .thenReturn(VERSIONS);
+    requestFor(GROUP_XML_PATH);
+
+    final var metadata = ArtifactUtils.readMetadata(bytesOf(this.facade.download(this.context)));
+
+    assertThat(metadata.getGroupId()).isEqualTo("com");
+    assertThat(metadata.getArtifactId()).isEqualTo("acme");
+    assertThat(metadata.getPlugins()).isEmpty();
+
+    verify(this.artifactService, never()).getRegisteredPlugins(any(), anyString());
+  }
+
+  @Test
+  @DisplayName("keeps the missing-file answer when the group has no registered plugin")
+  void groupWithoutPlugins() {
+    nothingIsStored();
+    when(this.artifactService.getRegisteredPlugins(this.repoInfo, "com.acme"))
+        .thenReturn(List.of());
+    requestFor(GROUP_XML_PATH);
+
+    assertThatThrownBy(() -> this.facade.download(this.context))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("itemNotFound");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"md5", "sha1", "sha256", "sha512"})
+  @DisplayName("generates a checksum of the group-level file when the file is not stored either")
+  void generatesTheGroupChecksum(final String algorithm) throws Exception {
+    nothingIsStored();
+    pluginsAreRegistered();
+    when(this.storageService.exists(
+            argThat(AbstractMavenProtocolFacadeDownloadTest::isTheGroupXml), eq(REPO_NAME)))
+        .thenReturn(false);
+    requestFor(GROUP_XML_PATH + "." + algorithm);
+
+    final var resource = this.facade.download(this.context);
+
+    assertThat(resource.getFilename()).isEqualTo("maven-metadata.xml." + algorithm);
+    assertThat(new String(bytesOf(resource), UTF_8))
+        .isEqualTo(hex(ArtifactMetadataSynthesizer.groupMetadataXml(PLUGINS), algorithm));
+  }
+
+  @Test
+  @DisplayName("does not hash a stored group-level file: its checksum is missing when it is stored")
+  void noChecksumOfAStoredGroupFile() {
+    nothingIsStored();
+    // The artifact-level and the group-level reading of the path name the same file.
+    when(this.storageService.exists(
+            argThat(AbstractMavenProtocolFacadeDownloadTest::isTheGroupXml), eq(REPO_NAME)))
+        .thenReturn(true);
+    requestFor(GROUP_XML_PATH + ".sha1");
+
+    assertThatThrownBy(() -> this.facade.download(this.context))
+        .isInstanceOf(ItemNotFoundException.class);
+
+    verify(this.artifactService, never()).getRegisteredVersions(any(), anyString(), anyString());
+    verify(this.artifactService, never()).getRegisteredPlugins(any(), anyString());
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/com/acme/maven-metadata.xml.asc",
+        "/com/acme/maven-metadata.xml.asc.sha1",
+        "/com/acme/1.0-SNAPSHOT/maven-metadata.xml",
+        "/maven-metadata.xml",
+        "/com/acme/lib-1.0.pom",
+        "/com/acme/"
+      })
+  @DisplayName("asks for no plugin for any other path")
+  void noPluginForAnyOtherPath(final String path) {
+    nothingIsStored();
+    requestFor(path);
+
+    assertThatThrownBy(() -> this.facade.download(this.context))
+        .isInstanceOf(ItemNotFoundException.class);
+
+    verify(this.artifactService, never()).getRegisteredPlugins(any(), anyString());
+  }
+
+  @Test
+  @DisplayName("registers no plugin unless the implementation says so")
+  void defaultRegistersNoPlugin() {
+    final ArtifactService<UUID> service =
+        mock(ArtifactService.class, org.mockito.Mockito.CALLS_REAL_METHODS);
+
+    assertThat(service.getRegisteredPlugins(this.repoInfo, "com.acme")).isEmpty();
   }
 
   private static String hex(final byte[] content, final String algorithm) {

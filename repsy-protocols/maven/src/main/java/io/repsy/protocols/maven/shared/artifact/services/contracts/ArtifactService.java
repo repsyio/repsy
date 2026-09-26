@@ -18,6 +18,7 @@ package io.repsy.protocols.maven.shared.artifact.services.contracts;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -108,6 +109,18 @@ public interface ArtifactService<ID> {
    */
   default List<RegisteredVersion> getRegisteredVersions(
       final BaseRepoInfo<ID> repoInfo, final String groupId, final String artifactId) {
+
+    return List.of();
+  }
+
+  /**
+   * The plugins of {@code groupId} that the repo has registered with a goal prefix, ordered by
+   * artifactId, which the group-level {@code maven-metadata.xml} answers a request with when the
+   * repo stores none (RPS-1438). Empty when the group has none. An implementation that does not
+   * override it registers nothing, so such a request keeps being answered with a 404.
+   */
+  default List<RegisteredPlugin> getRegisteredPlugins(
+      final BaseRepoInfo<ID> repoInfo, final String groupId) {
 
     return List.of();
   }

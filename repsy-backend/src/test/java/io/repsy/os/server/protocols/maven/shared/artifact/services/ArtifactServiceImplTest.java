@@ -55,6 +55,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
@@ -2055,6 +2056,17 @@ class ArtifactServiceImplTest {
     assertThat(
             this.artifactService.getRegisteredVersions(
                 repo(id, true, true, true), "com.acme", "lib"))
+        .isEqualTo(rows);
+  }
+
+  @Test
+  @DisplayName("lists the registered plugins of the group of the repo, RPS-1438")
+  void registeredPluginsComeFromTheRepositoryOfTheStorageKey() {
+    final var id = UUID.randomUUID();
+    final var rows = List.of(new RegisteredPlugin("hello-maven-plugin", "Hello", "hello"));
+    when(this.artifactRepository.findRegisteredPlugins(id, "com.acme")).thenReturn(rows);
+
+    assertThat(this.artifactService.getRegisteredPlugins(repo(id, true, true, true), "com.acme"))
         .isEqualTo(rows);
   }
 

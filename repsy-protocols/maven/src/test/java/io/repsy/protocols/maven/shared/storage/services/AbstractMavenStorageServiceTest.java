@@ -450,6 +450,40 @@ class AbstractMavenStorageServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "adding versions leaves a stored plugin-group file alone: it lists plugins, no versions"
+          + " (RPS-1438)")
+  void addVersionsLeavesAPluginGroupFileAlone() throws Exception {
+    useInMemoryStorage();
+    // The group-level file of the group com.example.demo sits where the artifact-level file of the
+    // artifact demo of com.example would.
+    final var pluginGroupXml =
+        """
+        <metadata>
+          <plugins>
+            <plugin>
+              <name>Demo</name>
+              <prefix>demo</prefix>
+              <artifactId>demo-maven-plugin</artifactId>
+            </plugin>
+          </plugins>
+        </metadata>
+        """;
+    store(METADATA_FILENAME, pluginGroupXml);
+    store(METADATA_FILENAME + ".sha1", "sum");
+
+    final var delta =
+        this.storageService.addVersionsToMetadata(
+            repoInfo(), GROUP, ARTIFACT, registered("1.0", "2.0"));
+
+    assertThat(delta).isZero();
+    assertThat(this.writes).isEmpty();
+    assertThat(this.deletes).isEmpty();
+    assertThat(stored(METADATA_FILENAME)).isEqualTo(pluginGroupXml);
+    assertThat(stored(METADATA_FILENAME + ".sha1")).isEqualTo("sum");
+  }
+
+  @Test
   @DisplayName("adding versions never removes one the file lists but the repository does not know")
   void addVersionsKeepsAVersionThatIsNotRegistered() throws Exception {
     useInMemoryStorage();
