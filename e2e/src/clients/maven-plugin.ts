@@ -35,7 +35,7 @@ import mustache from 'mustache';
 import { env } from '../env.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import { isolatedWorkDir, run, type RunResult } from './exec.js';
-import { mavenEnv, SHARED_M2_DIR } from './maven.js';
+import { credentialView, ensureSharedCacheWarm, mavenEnv, SHARED_M2_DIR } from './maven.js';
 import { groupPath, rawPut } from './maven-raw.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -162,6 +162,60 @@ export function buildPlugin(spec: PluginSpec): Promise<BuiltPlugin> {
   built.set(spec.artifactId, build);
 
   return build;
+}
+
+/**
+ * The real `mvn deploy` of a plugin (RPS-1488), the client that uploads everything a plugin publishes:
+ * the jar, the POM, the artifact-level `maven-metadata.xml` and, for `maven-plugin` packaging, the
+ * group-level one that lists the plugin by its prefix (which the by-hand uploads of `uploadPluginFiles`
+ * never send). Built fresh in its own work directory (unlike `buildPlugin`, whose POM names no
+ * repository), with the same fresh local repository plus shared read-only tail as every other `mvn`.
+ */
+export async function deployPlugin(
+  repoName: string,
+  credential: MaterializedCredential,
+  spec: PluginSpec = HELLO_PLUGIN,
+): Promise<RunResult> {
+  await ensureSharedCacheWarm();
+  const { home, work } = await isolatedWorkDir('mvn-plugin-deploy');
+  await render('plugin-pom.template.xml', path.join(work, 'pom.xml'), {
+    groupId: PLUGIN_GROUP_ID,
+    artifactId: spec.artifactId,
+    version: PLUGIN_VERSION,
+    name: spec.name,
+    goalPrefix: spec.goalPrefix,
+    repoUrl: `${env.repoBaseUrl}/${repoName}`,
+  });
+  await render(
+    'HelloMojo.template.java',
+    path.join(work, 'src/main/java/io/repsy/e2e/plugin/HelloMojo.java'),
+    { marker: spec.marker },
+  );
+  await render(
+    'settings.template.xml',
+    path.join(work, 'settings.xml'),
+    credentialView(credential),
+  );
+
+  return run(
+    'mvn',
+    [
+      '-B',
+      '-ntp',
+      'deploy',
+      '-s',
+      'settings.xml',
+      `-Dmaven.repo.local=${path.join(home, 'repo-local')}`,
+      `-Dmaven.repo.local.tail=${SHARED_M2_DIR}`,
+    ],
+    {
+      cwd: work,
+      env: mavenEnv(home),
+      timeoutMs: BUILD_TIMEOUT_MS,
+      redact: credential.password ? [credential.password] : [],
+      label: `maven-plugin-deploy-${spec.artifactId}`,
+    },
+  );
 }
 
 /** The path of a file of the plugin's version directory. */
