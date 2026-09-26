@@ -93,6 +93,17 @@ class BlobDigestsTest {
   }
 
   @Test
+  @DisplayName("isSupportedAlgorithm() accepts exactly the OCI names of sha256 and sha512")
+  void isSupportedAlgorithmChecksTheName() {
+    assertThat(BlobDigests.isSupportedAlgorithm("sha256")).isTrue();
+    assertThat(BlobDigests.isSupportedAlgorithm("sha512")).isTrue();
+    assertThat(BlobDigests.isSupportedAlgorithm("sha384")).isFalse();
+    assertThat(BlobDigests.isSupportedAlgorithm("SHA256")).isFalse();
+    assertThat(BlobDigests.isSupportedAlgorithm("sha256:")).isFalse();
+    assertThat(BlobDigests.isSupportedAlgorithm("")).isFalse();
+  }
+
+  @Test
   @DisplayName("isSupported() accepts sha256 and sha512 digests of the right length")
   void isSupportedChecksAlgorithmAndLength() {
     assertThat(BlobDigests.isSupported(SHA256)).isTrue();

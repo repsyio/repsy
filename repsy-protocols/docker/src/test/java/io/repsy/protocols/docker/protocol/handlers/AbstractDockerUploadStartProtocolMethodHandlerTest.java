@@ -16,7 +16,9 @@
 package io.repsy.protocols.docker.protocol.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
@@ -25,6 +27,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -78,5 +82,37 @@ class AbstractDockerUploadStartProtocolMethodHandlerTest {
     assertThat(uploadUuid).isNotNull();
     assertThat(location).endsWith(START_URI + uploadUuid);
     assertThat(UUID.fromString(uploadUuid)).isNotNull();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"sha256", "sha512"})
+  @DisplayName("a digest-algorithm the registry can check starts the upload (RPS-1594)")
+  void supportedDigestAlgorithmStartsTheUpload(final String algorithm) {
+    final var request = new MockHttpServletRequest("POST", START_URI);
+    request.setParameter("digest-algorithm", algorithm);
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
+    final var response =
+        new TestHandler(this.basePathParser, this.provider)
+            .handle(new ProtocolContext(), request, new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+    assertThat(response.getHeaders().getFirst("Docker-Upload-UUID")).isNotNull();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"md5", "sha384", "SHA512", "sha512:", "", " "})
+  @DisplayName("a digest-algorithm the registry cannot check is refused (RPS-1594)")
+  void unsupportedDigestAlgorithmIsRefused(final String algorithm) {
+    final var request = new MockHttpServletRequest("POST", START_URI);
+    request.setParameter("digest-algorithm", algorithm);
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    final var handler = new TestHandler(this.basePathParser, this.provider);
+    final var context = new ProtocolContext();
+    final var servletResponse = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, servletResponse))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("dockerDigestAlgorithmUnsupported");
   }
 }

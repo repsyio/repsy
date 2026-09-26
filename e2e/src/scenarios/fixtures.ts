@@ -42,9 +42,6 @@ import type { Coordinates, MaterializedCredential, World } from './world.js';
 
 export type { Coordinates, World, MaterializedCredential } from './world.js';
 
-/** The credential of the account the harness runs as (`admin` on OS, the tenant owner on Cloud). */
-const OWNER_CREDENTIAL: MaterializedCredential = ownerCredential();
-
 /** Lower-case runner/service name -> the RepoType its repos are created as. */
 const REPO_TYPE_BY_PROTOCOL: Record<string, RepoType> = {
   maven: RepoType.MAVEN,
@@ -164,7 +161,7 @@ async function seedCredential(
 ): Promise<MaterializedCredential> {
   switch (kind) {
     case 'admin-password':
-      return OWNER_CREDENTIAL;
+      return ownerCredential();
 
     case 'user-password':
       return seeder.backend.seedUserCredential({ seeder, repoName, repoType });
@@ -320,7 +317,7 @@ export const test = base.extend<Fixtures & FixtureOptions>({
         // artifact has to land in storage before that restriction exists.
         const seeded = await adapter.seedPublish({
           ...world,
-          credential: OWNER_CREDENTIAL,
+          credential: ownerCredential(),
           publishTarget: seedTarget,
         });
         world = { ...world, seeded };

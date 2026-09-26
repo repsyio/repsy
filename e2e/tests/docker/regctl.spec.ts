@@ -33,6 +33,11 @@
  *  - RC4 sha512 (RPS-1244): an image whose manifest is addressed by its sha512 digest copies in by that
  *    digest, is served under it (`Docker-Content-Digest: sha512:...`) and `regctl manifest head`
  *    reports it.
+ *  - RC4b sha512 by TAG (RPS-1594): the same rewritten image copied to a tag target. Repsy answers
+ *    the canonical sha256 in `Docker-Content-Digest` of a tag push (RPS-1244); regctl, which hashed the
+ *    manifest with sha512, FAILS the copy (`unexpected digest returned, expected sha512:..., received
+ *    sha256:...`) although the tag is stored and serves the same bytes as the sha512. Pinned as
+ *    observed: it is the trigger RPS-1594 names to revisit the sha256 answer.
  *  - RC5 a multi-platform Docker manifest list copies as a whole (children included), `--platform`
  *    resolves the right child through the served index, and it copies back unchanged.
  *  - `regctl tag ls` / `repo ls` (Repsy has no `tags/list`/`_catalog`, RPS-1489) are in
@@ -282,6 +287,70 @@ test(
     const head = await session.run(['manifest', 'head', target], 'rc4-head');
     expect(head.exitCode, `regctl manifest head by sha512: ${head.stderr}`).toBe(0);
     expect(head.stdout.trim()).toBe(digest);
+  },
+);
+
+test(
+  'docker > regctl pushing a sha512 image BY TAG fails on the sha256 answer of a tag push, the image is stored (RC4b, RPS-1594)',
+  { tag: ['@regctl'] },
+  async ({ seeder }) => {
+    const repoName = await newDockerRepo(seeder);
+    const image = `e2e-${seeder.runId}-rcsha512tag`;
+    const admin = adminCredential();
+    const session = await regctlSession(admin, `docker-regctl-rc4b-${seeder.runId}`);
+    const built = await buildImage({ dir: path.join(session.work, 'src'), marker: 'rc4b' });
+
+    const mod = await session.run(
+      [
+        'image',
+        'mod',
+        `ocidir://${built.dir}@${built.manifestDigest}`,
+        '--digest-algo',
+        'sha512',
+        '--create',
+        'rc4b',
+      ],
+      'rc4b-mod',
+    );
+    expect(mod.exitCode, `regctl image mod --digest-algo sha512: ${mod.stderr}`).toBe(0);
+    const layout = JSON.parse(await fs.readFile(path.join(built.dir, 'index.json'), 'utf8')) as {
+      manifests: { digest: string }[];
+    };
+    const sha512 = layout.manifests.map((m) => m.digest).find((d) => d.startsWith('sha512:'));
+    expect(sha512, 'the layout has a sha512 manifest').toBeDefined();
+    const digest = sha512 as string;
+
+    // The target is a TAG. The push names no digest, so Repsy answers its canonical sha256 in
+    // `Docker-Content-Digest` (the OCI spec lets the answer differ when the algorithms differ, and
+    // RPS-1244 decided it, pinned by R14). regctl hashed the manifest with sha512 and treats an
+    // answer in another algorithm as a failed push: this is the evidence RPS-1594 asked for, and the
+    // trigger that ticket names to revisit the sha256 answer. Pinned as observed until that is decided.
+    const ref = imageRef(repoName, image, 'tagged');
+    const copied = await session.run(
+      ['image', 'copy', `ocidir://${built.dir}@${digest}`, ref],
+      'rc4b-copy',
+    );
+    expect(copied.exitCode, 'regctl image copy of a sha512 image to a tag').not.toBe(0);
+    expect(copied.stderr).toContain('unexpected digest returned');
+    expect(copied.stderr).toContain(`expected ${digest}`);
+    expect(copied.stderr).toMatch(/received sha256:[0-9a-f]{64}/);
+
+    // The push itself went through on the server: the tag serves the manifest and answers the sha256,
+    // and the same bytes are addressable by the sha512 regctl named. Only the client's check failed.
+    const byTag = await rawGetManifest(repoName, admin, image, 'tagged');
+    expect(byTag.status, 'the tag exists after regctl gave up').toBe(200);
+    const sha256 = `sha256:${sha256Hex(byTag.body)}`;
+    expect(byTag.digestHeader, 'a tag is answered in the registry canonical sha256').toBe(sha256);
+    expect(copied.stderr).toContain(`received ${sha256}`);
+    const bySha512 = await rawGetManifest(repoName, admin, image, digest);
+    expect(bySha512.status, 'served by the sha512 the client hashed it with').toBe(200);
+    expect(bySha512.digestHeader).toBe(digest);
+    expect(bySha512.body.equals(byTag.body), 'the same bytes under both digests').toBe(true);
+
+    // regctl reads the tag back fine: `manifest head` reports the sha256 the registry answers.
+    const head = await session.run(['manifest', 'head', ref], 'rc4b-head');
+    expect(head.exitCode, `regctl manifest head of the tag: ${head.stderr}`).toBe(0);
+    expect(head.stdout.trim()).toBe(sha256);
   },
 );
 

@@ -52,8 +52,6 @@ interface Published {
 
 type Manifest = Record<string, unknown>;
 
-const admin = adminCredential();
-
 async function newRepo(seeder: Seeder): Promise<string> {
   const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
   return repo.name;
@@ -83,7 +81,7 @@ async function publish(
   });
   Object.assign((document.versions as Record<string, Manifest>)[version] ?? {}, options.extra);
   Object.assign(document, options.topLevel);
-  const res = await rawPublish(repoName, admin, name, document);
+  const res = await rawPublish(repoName, adminCredential(), name, document);
   expect(res.status, `publish ${name}@${version}: ${res.msgId ?? ''}`).toBe(200);
   return { repoName, name, version };
 }
@@ -96,7 +94,7 @@ async function packument(
 ): Promise<Response> {
   return fetch(urlOf(repoName, encodePackageNameForUrl(name)), {
     method,
-    headers: { ...npmAuthHeader(admin), ...headers },
+    headers: { ...npmAuthHeader(adminCredential()), ...headers },
   });
 }
 
@@ -115,7 +113,7 @@ async function rawExchange(
       urlOf(repoName, encodePackageNameForUrl(name)),
       {
         headers: {
-          ...npmAuthHeader(admin),
+          ...npmAuthHeader(adminCredential()),
           Accept: 'application/json',
           'Accept-Encoding': encoding,
         },
@@ -191,7 +189,7 @@ test.describe('npm registry reads (raw HTTP)', () => {
       const name = `@e2e-${seeder.runId}/publish-body`;
       const res = await rawPublish(
         repoName,
-        admin,
+        adminCredential(),
         name,
         buildPublishDocument({
           repoName,
@@ -243,7 +241,7 @@ test.describe('npm registry reads (raw HTTP)', () => {
       const scoped = `@e2e-${seeder.runId}/head`;
       await publish(repoName, name, '1.0.0');
       await publish(repoName, scoped, '1.0.0');
-      const headers = npmAuthHeader(admin);
+      const headers = npmAuthHeader(adminCredential());
       const head = async (path: string) =>
         (await fetch(urlOf(repoName, path), { method: 'HEAD', headers })).status;
       const get = async (path: string) => (await fetch(urlOf(repoName, path), { headers })).status;
@@ -366,7 +364,7 @@ test.describe('npm registry reads (raw HTTP)', () => {
         const read = await packument(repoName, name, { Accept: 'application/json' });
         const document = (await read.json()) as Manifest & { versions: Record<string, Manifest> };
         (document.versions[version] as Manifest).deprecated = message;
-        const res = await rawPublish(repoName, admin, name, document);
+        const res = await rawPublish(repoName, adminCredential(), name, document);
         expect(res.status, `deprecate ${version}: ${res.msgId ?? ''}`).toBe(200);
       };
       const deprecations = async (accept: string) =>
@@ -411,7 +409,7 @@ test.describe('npm registry reads (raw HTTP)', () => {
         [scoped, `${bareName(scoped)}-1.0.0.tgz`],
       ] as const) {
         const res = await fetch(urlOf(repoName, `${packageName}/-/${file}`), {
-          headers: npmAuthHeader(admin),
+          headers: npmAuthHeader(adminCredential()),
         });
         expect(res.status).toBe(200);
         expect(res.headers.get('content-type')).toBe('application/octet-stream');

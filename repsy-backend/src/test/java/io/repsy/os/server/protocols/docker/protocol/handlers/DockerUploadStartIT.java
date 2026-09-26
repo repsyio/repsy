@@ -20,13 +20,18 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 
 /**
@@ -96,5 +101,90 @@ class DockerUploadStartIT extends AbstractIntegrationTest {
     assertThat(status.getStatus()).isEqualTo(204);
     assertThat(status.getHeader("Docker-Upload-UUID")).isEqualTo(uploadUuid);
     assertThat(status.getHeader("Range")).isEqualTo("0-" + (chunk.length - 1));
+  }
+
+  /**
+   * RPS-1594: {@code POST .../blobs/uploads/?digest-algorithm=sha512} (OCI end-4c) starts an upload
+   * that a {@code sha512:} finalize completes and answers with that digest (serving a stored blob
+   * by its sha512 is {@code DockerBlobPullIT}'s).
+   */
+  @Test
+  @DisplayName("a digest-algorithm=sha512 start hint is honoured by a sha512 finalize")
+  void sha512HintStartsAnUploadThatASha512DigestFinalizes() throws Exception {
+    final var repo = this.seedRepo(RepoType.DOCKER, uniqueRepoName("docker"));
+    final var token = this.adminProtocolBearerToken();
+    final var content = ("sha512-blob-" + UUID.randomUUID()).getBytes(StandardCharsets.UTF_8);
+    final var digest =
+        "sha512:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-512").digest(content));
+
+    final var start =
+        this.mockMvc
+            .perform(
+                post("/v2/{repo}/{image}/blobs/uploads/", repo.getName(), IMAGE)
+                    .param("digest-algorithm", "sha512")
+                    .header(AUTHORIZATION, token)
+                    .with(protocolPort()))
+            .andReturn()
+            .getResponse();
+
+    assertThat(start.getStatus()).isEqualTo(202);
+    final var uploadUuid = start.getHeader("Docker-Upload-UUID");
+    assertThat(uploadUuid).isNotNull();
+
+    final var finalize =
+        this.mockMvc
+            .perform(
+                put("/v2/{repo}/{image}/blobs/uploads/{id}", repo.getName(), IMAGE, uploadUuid)
+                    .param("digest", digest)
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .content(content)
+                    .header(AUTHORIZATION, token)
+                    .with(protocolPort()))
+            .andReturn()
+            .getResponse();
+
+    assertThat(finalize.getStatus()).isEqualTo(201);
+    assertThat(finalize.getHeader("Docker-Content-Digest")).isEqualTo(digest);
+  }
+
+  @Test
+  @DisplayName("a digest-algorithm=sha256 start hint is accepted like no hint")
+  void sha256HintIsAccepted() throws Exception {
+    final var repo = this.seedRepo(RepoType.DOCKER, uniqueRepoName("docker"));
+
+    final var start =
+        this.mockMvc
+            .perform(
+                post("/v2/{repo}/{image}/blobs/uploads/", repo.getName(), IMAGE)
+                    .param("digest-algorithm", "sha256")
+                    .header(AUTHORIZATION, this.adminProtocolBearerToken())
+                    .with(protocolPort()))
+            .andReturn()
+            .getResponse();
+
+    assertThat(start.getStatus()).isEqualTo(202);
+    assertThat(start.getHeader("Docker-Upload-UUID")).isNotNull();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"md5", "sha384", "SHA512", "bogus:sha512"})
+  @DisplayName("a digest-algorithm the registry cannot check is a 400 DIGEST_INVALID")
+  void unsupportedHintIsRefused(final String algorithm) throws Exception {
+    final var repo = this.seedRepo(RepoType.DOCKER, uniqueRepoName("docker"));
+
+    final var start =
+        this.mockMvc
+            .perform(
+                post("/v2/{repo}/{image}/blobs/uploads/", repo.getName(), IMAGE)
+                    .param("digest-algorithm", algorithm)
+                    .header(AUTHORIZATION, this.adminProtocolBearerToken())
+                    .with(protocolPort()))
+            .andReturn()
+            .getResponse();
+
+    assertThat(start.getStatus()).isEqualTo(400);
+    assertThat(start.getContentAsString()).contains("DIGEST_INVALID");
+    assertThat(start.getHeader("Docker-Upload-UUID")).isNull();
+    assertThat(start.getHeader("Location")).isNull();
   }
 }

@@ -18,11 +18,13 @@ package io.repsy.protocols.docker.protocol.handlers;
 import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.DOCKER_UPLOAD_UUID;
 import static org.springframework.http.HttpHeaders.LOCATION;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -39,6 +41,9 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @NullMarked
 public abstract class AbstractDockerUploadStartProtocolMethodHandler
     implements ProtocolMethodHandler {
+
+  /** The OCI distribution spec's hint (end-4c) of the algorithm the blob's digest will use. */
+  private static final String DIGEST_ALGORITHM_PARAMETER = "digest-algorithm";
 
   private static final Pattern UPLOAD_START_PATTERN = Pattern.compile("^/([^/]+)/blobs/uploads/?$");
 
@@ -91,6 +96,16 @@ public abstract class AbstractDockerUploadStartProtocolMethodHandler
       final ProtocolContext context,
       final HttpServletRequest request,
       final HttpServletResponse response) {
+
+    // The registry keeps no state for a session until its first byte arrives, and the algorithm of
+    // the blob is the one of the digest the finalizing PUT names, which is verified against the
+    // stored bytes. So the hint (RPS-1594) is honoured by accepting what the finalize accepts and
+    // refusing an algorithm the registry cannot check, up front instead of after the upload.
+    final var digestAlgorithm = request.getParameter(DIGEST_ALGORITHM_PARAMETER);
+
+    if (digestAlgorithm != null && !BlobDigests.isSupportedAlgorithm(digestAlgorithm)) {
+      throw new BadRequestException("dockerDigestAlgorithmUnsupported");
+    }
 
     // Minted once: the Location a client PATCHes/PUTs against and the Docker-Upload-UUID it may
     // read back must name the same session (RPS-1241), and getUuid() is a fresh id on every call.
