@@ -302,6 +302,10 @@ export async function buildGem(opts: {
   requiredRubyVersion?: string;
   /** Declared dependencies (`Gem::Dependency` entries of the gemspec YAML); none by default. */
   dependencies?: GemDependencySpec[];
+  /** The gemspec's `homepage`, default `https://example.com/<name>` (RPS-1623: a hostile one for the panel's link). */
+  homepage?: string;
+  /** The gemspec's `description`, default `e2e probe gem <name>@<version>`. */
+  description?: string;
   /** Bytes of random padding stored in `e2e-padding.bin` of the data archive, for the size-limit leg
    *  (RPS-1482, `padding.ts`); the checksums cover it, so `gem push` still verifies the gem. */
   padBytes?: number;
@@ -318,6 +322,11 @@ export async function buildGem(opts: {
     platform,
     marker,
     dependenciesYaml: renderDependenciesYaml(opts.dependencies ?? []),
+    // JSON strings are valid YAML double-quoted scalars, so any text (a hostile `<img onerror=...>`) stays one value.
+    homepageYaml: JSON.stringify(opts.homepage ?? `https://example.com/${opts.name}`),
+    descriptionYaml: JSON.stringify(
+      opts.description ?? `e2e probe gem ${opts.name}@${opts.version}`,
+    ),
     rubyOperator: rubyRequirement[0],
     rubyVersion: rubyRequirement.slice(1).join(' '),
   });

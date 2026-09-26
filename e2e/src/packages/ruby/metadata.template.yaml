@@ -9,7 +9,7 @@ bindir: bin
 cert_chain: []
 date: 2026-01-01 00:00:00.000000000 Z
 dependencies:{{{dependenciesYaml}}}
-description: e2e probe gem {{{name}}}@{{{version}}}
+description: {{{descriptionYaml}}}
 email: e2e@repsy.io
 executables: []
 extensions: []
@@ -17,7 +17,7 @@ extra_rdoc_files: []
 files:
 - e2e-marker.txt
 - lib/{{{name}}}.rb
-homepage: https://example.com/{{{name}}}
+homepage: {{{homepageYaml}}}
 licenses:
 - Apache-2.0
 metadata: {}

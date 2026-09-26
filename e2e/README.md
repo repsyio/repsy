@@ -5701,6 +5701,38 @@ RPS-1298 (a pager without a tie-breaker) is fixed: every paged list ends its sor
 `02-pagination` scenario seeds its twelve packages with `seedPackages` (four at a time). The
 mobile-Delete `canWrite` bug of RPS-1262 (1) never existed in these five protocols (only PyPI and npm; fixed).
 
+#### Untrusted package content and copy buttons on a plain-HTTP install (RPS-1623)
+
+What a package publisher writes reaches the panel as a README, a description and homepage/project/repository
+URLs, so the panel must treat it as hostile. `src/ui/hostile-packages.ts` holds the payloads as plain data
+(`HOSTILE_PAYLOADS`, `HOSTILE_README`, `HOSTILE_URLS`, `HOSTILE_TEXT`: `<script>`, `onerror`/`onload`/`onclick`
+handlers, `javascript:`, `data:text/html` and `vbscript:` links (also spelled with an entity, a tab and mixed case),
+an external tracking image, a `data:` "image", relative links and images, an `<iframe>`, a `style` attribute that
+loads a background, an HTML comment) and one seeder per protocol (`seedHostileNpm|Pypi|Cargo|Nuget|Maven|Ruby`,
+raw HTTP, built on `src/seed/packages`). Every script payload sets `window.__pwned` to its own id. The
+assertions are in `src/ui/hostile-checks.ts`. Repsy Cloud's suite (RPS-1624) reuses both files.
+
+- `tests/ui/packages/untrusted-content.spec.ts`: UNT-01 the README of npm, PyPI, Cargo and NuGet renders inert
+  (no dangerous element or attribute, no picture, no publisher comment; a script-scheme link keeps an inert
+  `unsafe:` href, a relative link is text, the harmless controls survive); UNT-02 the metadata of npm, NuGet, Maven,
+  Cargo and Ruby is shown as text (no link, no markup); UNT-03 the two protocols that turn a URL into a link (PyPI
+  home page, Ruby homepage): an http(s) one opens with `target="_blank"` and `rel="noopener noreferrer nofollow"`,
+  a `javascript:`/`data:`/`vbscript:` one has no `href` at all. Nothing ran (the canary is unset), and the
+  publisher's host was never requested (`watchRequestsTo`).
+- **Links are judged by what an `href` may be**, an allow-list (`ALLOWED_HREF`: http(s), `mailto:`, `tel:`, an app
+  path, `unsafe:`), and the `unsafe:` rewrite is asserted as a positive match. Never write a check that greps for a
+  bad scheme (`startsWith('javascript:')`): CodeQL flags it and a deny-list misses the next scheme.
+- **Copy buttons without `navigator.clipboard`** (`clipboard-insecure.spec.ts`, `users-reset-password-copy.spec.ts`):
+  the panel opened on `http://<lan-ip>:8080` has no `navigator.clipboard`, but the harness runs on `localhost` (a
+  secure context, the permission granted), so the missing fallback never showed. `simulatePlainHttp(context)`
+  (`src/ui/plain-http.ts`) removes the API before any document loads and records what
+  `document.execCommand('copy')` copied and answered in `window.__copies` (`recordedCopies(page)`), so a spec reads
+  back what a button put on the clipboard without the clipboard permission. CLP-01 the install snippet of all nine
+  protocols, CLP-02 a README code block, CLP-03 the deploy-token secret and username, CLP-04 the reset-password modal
+  (`@cloud-skip`: Users page), CLP-05 (`execResult: 'fail'`) no button shows its check mark and the reset modal asks
+  the admin to copy by hand. Only `simulatePlainHttp` may delete the API: the older specs that grant
+  `clipboard-read` keep testing the real clipboard.
+
 ### Errors, navigation, mobile and accessibility (RPS-1258)
 
 `tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..04, NAV-01..03, A11Y-01..10) plus `src/ui/a11y.ts` (the axe

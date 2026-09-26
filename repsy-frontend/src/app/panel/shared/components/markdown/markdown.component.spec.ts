@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, fakeAsync, flushMicrotasks, TestBed, tick } from '@angular/core/testing';
 
 import { MarkdownComponent } from './markdown.component';
 
@@ -108,6 +108,28 @@ describe('MarkdownComponent', () => {
 
     // Angular prefixes an unsafe scheme with "unsafe:", which browsers do not execute.
     expect(el.querySelector('a')?.getAttribute('href')).toMatch(/^unsafe:/);
+  });
+
+  // RPS-1623: Angular's sanitiser rewrites javascript: only; data: and vbscript: links get the same inert prefix here.
+  describe('link schemes (RPS-1623)', () => {
+    const hrefOf = (markdown: string): string | null =>
+      render(markdown).querySelector('a')?.getAttribute('href') ?? null;
+
+    it('prefixes data: and vbscript: links with unsafe:', () => {
+      expect(hrefOf('[x](data:text/html,<b>hi</b>)')).toMatch(/^unsafe:data:text\/html/);
+      expect(hrefOf('[x](vbscript:msgbox(1))')).toMatch(/^unsafe:vbscript:/);
+      expect(hrefOf('[x](javascript:alert(1))')).toMatch(/^unsafe:javascript:/);
+    });
+
+    it('sees through case and whitespace inside the scheme', () => {
+      expect(hrefOf('<a href="  DaTa:text/html,x">x</a>')).toMatch(/^unsafe:DaTa:/);
+      expect(hrefOf('<a href="vb&#x09;script:x">x</a>')).toMatch(/^unsafe:vbscript:/);
+    });
+
+    it('keeps mailto: and tel: links as they are', () => {
+      expect(hrefOf('[x](mailto:team@repsy.io)')).toBe('mailto:team@repsy.io');
+      expect(hrefOf('[x](TEL:+31201234567)')).toBe('TEL:+31201234567');
+    });
   });
 
   it('strips iframes and forms', () => {
@@ -348,5 +370,36 @@ describe('MarkdownComponent', () => {
     const el = render('');
 
     expect(el.querySelector('article')?.textContent?.trim()).toBe('');
+  });
+  // RPS-1623: the code-block copy button works without navigator.clipboard (plain-HTTP install) and only then
+  // shows the check mark.
+  describe('code copy button', () => {
+    const copyButton = (el: HTMLElement): HTMLButtonElement => el.querySelector('button.copy-button');
+    const checkMark = (el: HTMLElement) => copyButton(el).querySelector('path[stroke="#69FFB4"]');
+
+    it('copies through the execCommand fallback when navigator.clipboard is undefined', fakeAsync(() => {
+      spyOnProperty(navigator, 'clipboard', 'get').and.returnValue(undefined as unknown as Clipboard);
+      const exec = spyOn(document, 'execCommand').and.returnValue(true);
+      const el = render('```bash\nmvn install\n```\n');
+
+      copyButton(el).click();
+      flushMicrotasks();
+
+      expect(exec).toHaveBeenCalledOnceWith('copy');
+      expect(checkMark(el)).not.toBeNull();
+      tick(2000);
+      expect(checkMark(el)).toBeNull();
+    }));
+
+    it('does not show the check mark when the copy failed', fakeAsync(() => {
+      spyOnProperty(navigator, 'clipboard', 'get').and.returnValue(undefined as unknown as Clipboard);
+      spyOn(document, 'execCommand').and.returnValue(false);
+      const el = render('```bash\nmvn install\n```\n');
+
+      copyButton(el).click();
+      flushMicrotasks();
+
+      expect(checkMark(el)).toBeNull();
+    }));
   });
 });

@@ -28,8 +28,13 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import hljs from 'highlight.js';
 import { Marked } from 'marked';
 
+import { copyToClipboard } from '../../util/clipboard.util';
+
 /** Elements that fetch or embed remote content. They have no place in a panel-rendered README. */
 const REMOVED_ELEMENTS = 'source, video, audio, track, link, object, embed, iframe, area, noscript';
+
+/** Schemes a README link may keep besides http(s), which are handled as external links. */
+const SAFE_LINK_SCHEMES = ['mailto:', 'tel:'];
 
 /** Attributes that can trigger a request (or hide one in CSS) without going through src or href. */
 const REMOVED_ATTRIBUTES = ['style', 'background', 'poster', 'srcset'];
@@ -40,7 +45,7 @@ const EXTERNAL_LINK_REL = 'noopener noreferrer nofollow';
  * How a URL found in a README resolves in the browser:
  * - `external`: http(s) or protocol-relative, so it points at a publisher-chosen host.
  * - `data-image`: an inline image, which needs no request.
- * - `scheme`: any other scheme (mailto:, javascript:, ...); left to Angular's sanitiser.
+ * - `scheme`: any other scheme (mailto:, tel:, javascript:, data:, ...); all but mailto: and tel: get an `unsafe:` prefix.
  * - `relative`: resolves against the panel's own origin, so it is meaningless here.
  */
 type UrlKind = 'external' | 'data-image' | 'scheme' | 'relative';
@@ -138,7 +143,11 @@ export class MarkdownComponent implements OnInit, AfterViewInit {
     img.replaceWith(...replacement);
   }
 
-  /** Relative links become text, external links open in a new tab without leaking the panel. */
+  /**
+   * Relative links become text, external links open in a new tab without leaking the panel, and a link with a
+   * scheme other than mailto:/tel: gets an inert "unsafe:" prefix (the rewrite Angular's sanitiser applies to
+   * javascript:, but it lets data: and vbscript: links through; RPS-1623).
+   */
   private restrictLink(anchor: Element): void {
     const { kind, url } = this.classifyUrl(anchor.getAttribute('href'));
     if (kind === 'relative') {
@@ -147,6 +156,8 @@ export class MarkdownComponent implements OnInit, AfterViewInit {
       anchor.setAttribute('href', url);
       anchor.setAttribute('target', '_blank');
       anchor.setAttribute('rel', EXTERNAL_LINK_REL);
+    } else if (kind === 'scheme' && !SAFE_LINK_SCHEMES.some((scheme) => url.toLowerCase().startsWith(scheme))) {
+      anchor.setAttribute('href', `unsafe:${url}`);
     }
   }
 
@@ -201,21 +212,22 @@ export class MarkdownComponent implements OnInit, AfterViewInit {
 
       button.innerHTML = copyIconSVG;
 
-      button.addEventListener('click', () => {
+      button.addEventListener('click', async () => {
         const code = pre.querySelector('code');
-        if (code?.textContent) {
-          navigator.clipboard.writeText(code.textContent);
-
-          // Show success state
-          button.className = 'copy-button h-4 w-4';
-          button.innerHTML = successIconSVG;
-
-          // Reset to original state after 2 seconds
-          setTimeout(() => {
-            button.className = 'copy-button h-4 w-4 text-[#9FA0A0] hover:text-secondary-500';
-            button.innerHTML = copyIconSVG;
-          }, 2000);
+        // The check mark shows only when the copy worked (RPS-1623): see copyToClipboard.
+        if (!code?.textContent || !(await copyToClipboard(code.textContent))) {
+          return;
         }
+
+        // Show success state
+        button.className = 'copy-button h-4 w-4';
+        button.innerHTML = successIconSVG;
+
+        // Reset to original state after 2 seconds
+        setTimeout(() => {
+          button.className = 'copy-button h-4 w-4 text-[#9FA0A0] hover:text-secondary-500';
+          button.innerHTML = copyIconSVG;
+        }, 2000);
       });
 
       // Insert button before the pre element

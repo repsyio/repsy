@@ -34,6 +34,10 @@ export interface OneTimeSecretModalIds {
   done: string;
   /** The X in the header. */
   close: string;
+  /** The copy button next to the secret (RPS-1623). */
+  copyValue: string;
+  /** The copy button in the footer, next to "Close" (RPS-1623). */
+  copyFooter: string;
 }
 
 export const RESET_PASSWORD_MODAL_IDS: OneTimeSecretModalIds = {
@@ -43,6 +47,8 @@ export const RESET_PASSWORD_MODAL_IDS: OneTimeSecretModalIds = {
   toggle: 'user-reset-password-toggle',
   done: 'user-reset-password-done',
   close: 'user-reset-password-close',
+  copyValue: 'user-reset-password-copy-password',
+  copyFooter: 'user-reset-password-copy-footer',
 };
 
 export class OneTimeSecretModal {
@@ -52,6 +58,8 @@ export class OneTimeSecretModal {
   readonly toggle: Locator;
   readonly done: Locator;
   readonly close: Locator;
+  readonly copyValue: Locator;
+  readonly copyFooter: Locator;
   /** The "save it now, you will not see it again" notice (no test id: matched by its text). */
   readonly warning: Locator;
 
@@ -62,6 +70,8 @@ export class OneTimeSecretModal {
     this.toggle = page.getByTestId(ids.toggle);
     this.done = page.getByTestId(ids.done);
     this.close = page.getByTestId(ids.close);
+    this.copyValue = page.getByTestId(ids.copyValue);
+    this.copyFooter = page.getByTestId(ids.copyFooter);
     this.warning = this.root.getByText(/won't be able to see it again/i);
   }
 

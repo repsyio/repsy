@@ -28,6 +28,7 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { externalHttpUrl } from '../../../../../shared/util/external-url.util';
 import {
   deleteVersionAndCheckLast$,
   landAfterVersionDelete,
@@ -60,6 +61,11 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
   public gemfileSnippet = '';
   public activeRepo: RepoPermissionInfo;
   public gemVersion: GemVersionInfo;
+
+  /** The homepage as a link target: http(s) only (RPS-1623), `null` leaves the anchor inert. */
+  public get homepageUrl(): string | null {
+    return externalHttpUrl(this.gemVersion?.homepage);
+  }
   private readonly repositoryChanges$: Subscription;
 
   constructor(

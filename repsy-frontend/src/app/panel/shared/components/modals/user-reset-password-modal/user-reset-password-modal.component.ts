@@ -20,6 +20,7 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
 import { idFactory } from '../../../../../shared/util/unique-id';
 import { DialogDirective } from '../../../directives/dialog.directive';
+import { copyToClipboard } from '../../../util/clipboard.util';
 import { ToastService } from '../../toast/toast.service';
 
 @Component({
@@ -52,8 +53,13 @@ export class UserResetPasswordModalComponent {
   }
 
   public copyToClipboard(text: string): void {
-    navigator.clipboard.writeText(text).then(() => {
-      this.toastService.show('Copied to clipboard', 'success');
+    void copyToClipboard(text).then((copied) => {
+      if (copied) {
+        this.toastService.show('Copied to clipboard', 'success');
+      } else {
+        // The password is shown only once: tell the user to take it by hand instead of pretending.
+        this.toastService.show('Could not copy. Show the password and copy it manually.', 'error');
+      }
     });
   }
 }
