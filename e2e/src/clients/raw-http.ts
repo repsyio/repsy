@@ -24,6 +24,8 @@
  * protocol's own `<protocol>-raw.ts`.
  */
 import { createHash } from 'node:crypto';
+import http from 'node:http';
+import https from 'node:https';
 
 import { env } from '../env.js';
 import { withBackoff429 } from '../scenarios/remote-throttle.js';
@@ -111,4 +113,55 @@ export async function withBackoff429Response(
     return last.status;
   });
   return last as RawResponse;
+}
+
+/**
+ * A request whose body the server may refuse BEFORE it has read it (a size limit read off
+ * `Content-Length`, RPS-1608), with the client's half of that race handled: the response is read while
+ * the body is still being written, and a reset that follows a response already received is ignored.
+ *
+ * Why `fetch` cannot be used for this. The server answers `400` and closes the connection; Tomcat
+ * swallows at most 2 MiB (`maxSwallowSize`) of the unread body first, so with a 10 MiB body it closes
+ * with data still unread and the kernel answers the client's remaining writes with a reset (`write
+ * EPIPE`, seen in 996 of 1000 sends). undici then fails the whole call (`TypeError: fetch failed` /
+ * `terminated`) even though the response has arrived: 7 in 1000 on a loaded runner. Here the `response`
+ * event resolves the promise, and the `error` that comes after it is the end of the connection, not a
+ * failed request. A reset that comes before any response still rejects: that would be a lost answer
+ * (none in 3000 sends), and the test should say so instead of guessing.
+ */
+export function sendReadingResponse(
+  url: string,
+  init: { method: string; headers: Record<string, string>; body: Uint8Array | string },
+): Promise<RawResponse> {
+  const body = Buffer.from(init.body);
+  const { method, headers } = init;
+  const target = new URL(url);
+  const transport = target.protocol === 'https:' ? https : http;
+  return new Promise<RawResponse>((resolve, reject) => {
+    let answered = false;
+    const req = transport.request(
+      target,
+      { method, headers: { ...headers, 'Content-Length': String(body.length) } },
+      (res) => {
+        answered = true;
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        const done = (): void => {
+          const bytes = Buffer.concat(chunks);
+          resolve({ status: res.statusCode ?? 0, msgId: msgIdOf(bytes), body: bytes });
+        };
+        res.on('end', done);
+        // The reset that closes the connection after the response can cut the body short: what
+        // arrived is what the server sent before it hung up, and the caller asserts on it.
+        res.on('error', done);
+        res.on('close', done);
+      },
+    );
+    req.on('error', (e) => {
+      if (!answered) {
+        reject(e);
+      }
+    });
+    req.end(body);
+  });
 }

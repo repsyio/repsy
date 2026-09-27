@@ -47,6 +47,7 @@ import {
   authHeader,
   msgIdOf,
   type RawResponse,
+  sendReadingResponse,
   sha256Hex,
   withBackoff429Response,
 } from './raw-http.js';
@@ -116,6 +117,28 @@ export async function rawPut(
     const bytes = Buffer.from(await res.arrayBuffer());
     return { status: res.status, msgId: msgIdOf(bytes), body: bytes };
   });
+}
+
+/**
+ * A raw PUT that the server is expected to REFUSE from its declared size before it reads the body (the
+ * 10 MiB `maven-metadata.xml`, RPS-1608). Same request as `rawPut`, sent so that the early 400 is not
+ * lost to the connection reset that follows it (`sendReadingResponse` explains why `fetch` loses it).
+ * Only for over-limit uploads: the ones that are meant to be stored keep using `rawPut`.
+ */
+export async function rawPutRefused(
+  repoName: string,
+  credential: MaterializedCredential,
+  relPath: string,
+  body: Uint8Array | string,
+  contentType: string,
+): Promise<RawResponse> {
+  return withBackoff429Response(() =>
+    sendReadingResponse(url(repoName, relPath), {
+      method: 'PUT',
+      headers: { ...authHeader(credential), 'Content-Type': contentType },
+      body,
+    }),
+  );
 }
 
 export async function rawGet(
