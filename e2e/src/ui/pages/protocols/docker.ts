@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import type { PackageRef } from '../../../seed/packages.js';
 import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
 import { repoPath } from '../../../repo-url.js';
 import { repoRoute } from '../../routes.js';
@@ -26,8 +27,12 @@ import { repoRoute } from '../../routes.js';
  *    only when the image has a config digest).
  *  - The manifest list is read-only: its rows are not clickable and have no delete. Its row key is the
  *    manifest's `name`, which for a single-platform image pushed by tag IS THE TAG (probed: the row is
- *    `pkg-manifests-row-1.0.0`, not the digest); a multi-platform index may name its rows otherwise
- *    (not seeded: the seeder pushes single-platform images). Confirmed in a browser by RPS-1256.
+ *    `pkg-manifests-row-1.0.0`, not the digest). Confirmed in a browser by RPS-1256.
+ *  - A multi-platform tag (an OCI image index, RPS-1627) lists the index itself, named by the tag with the
+ *    platform `Multiplatform` and no config digest, and one row per manifest it references, NAMED BY ITS FULL
+ *    DIGEST with that manifest's platform, digest and config digest: `dockerPlatformRef` gives the target of
+ *    such a row (its `version` is the digest, so `rowKey` finds it). There is no page of a platform of its own:
+ *    the rows are not clickable and have no delete, and the tag detail of an index shows the index JSON only.
  *  - RPS-1261 (fixed): the manifest table's DESKTOP Digest / Config Digest cells used to show the
  *    platform / the digest; PKG-docker-07 asserts them now. A manifest row is still found by its
  *    `pkg-manifests-row-<key>` id.
@@ -120,3 +125,17 @@ export const dockerDescriptor: ProtocolDescriptor = {
   },
   extraPaths: {},
 };
+
+/**
+ * The target of the manifest-list row of one platform of a seeded multi-platform tag (`seedDocker` with
+ * `docker.platforms`): same image, `version` the platform manifest's digest, which is what names the row
+ * (`pkg-manifests-row-<digest>`). Use it with `manifests(index)` for `inRow`/`expectRow`/`searchFor`, never with a
+ * page that takes a TAG.
+ */
+export function dockerPlatformRef(index: PackageRef, platform: string): PackageRef {
+  const digest = index.extra?.[`digest.${platform}`];
+  if (!digest) {
+    throw new Error(`dockerPlatformRef: the seeded image has no platform "${platform}"`);
+  }
+  return { ...index, version: digest, extra: { ...index.extra, digest } };
+}

@@ -35,6 +35,7 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
 import { DockerConfigComponent } from '../../config/docker-config.component';
 import { getRepoDomain } from '../../docker-repo-util';
 import { DockerService } from '../../service/docker.service';
@@ -137,6 +138,7 @@ export class DockerImagesManifestListComponent implements OnDestroy {
 
   private fetchManifests(): void {
     this.loading = true;
+    this.error = null;
     this.dockerService
       .searchManifests(this.searchText, this.sortOption, this.imageName, this.tagName, this.pageNum, this.pageSize)
       .pipe(
@@ -149,7 +151,12 @@ export class DockerImagesManifestListComponent implements OnDestroy {
           this.pagedData.page = pagedData.page;
           this.manifests = pagedData.content;
         },
-        error: () => {},
+        // A tag that does not exist (a mistyped link, a digest in the place of a tag, a tag deleted meanwhile) is a 404:
+        // the page says so, it does not pass for an empty tag (RPS-1627).
+        error: (err: unknown) => {
+          this.manifests = undefined;
+          this.error = versionLoadError(err, this.tagName);
+        },
       });
   }
 

@@ -231,6 +231,9 @@ export async function buildImage(opts: {
   return { dir: opts.dir, ...content };
 }
 
+/** Everything `buildIndexImage` returns except where it wrote the layout. */
+export type IndexContent = Omit<BuiltIndex, 'dir'>;
+
 export interface BuiltIndex {
   /** The OCI layout directory: every child's blobs, the index manifest, an `index.json` naming the index. */
   dir: string;
@@ -242,17 +245,16 @@ export interface BuiltIndex {
 }
 
 /**
- * A multi-platform layout (an image index / manifest list over one hand-built image per platform),
- * for the real clients that copy whole indexes (`skopeo copy --all`, `regctl image copy`). Each
- * child gets its own layer marker (`<marker>-<arch>`), so no two children share a digest; the
- * layout's `index.json` names the INDEX, not a child, like a real multi-arch layout.
+ * The in-memory half of `buildIndexImage` (an image index / manifest list over one hand-built image
+ * per platform): the children's bytes and the index manifest, with no file system involved, so a
+ * raw-HTTP seed (`rawUploadBlob` + `rawPutManifest`, RPS-1627) can push them. Each child gets its own
+ * layer marker (`<marker>-<arch>`), so no two children share a digest.
  */
-export async function buildIndexImage(opts: {
-  dir: string;
+export function buildIndexContent(opts: {
   marker: string;
   platforms: { os: string; arch: string }[];
   family?: MediaTypeFamily;
-}): Promise<BuiltIndex> {
+}): IndexContent {
   const children = opts.platforms.map(({ os, arch }) => ({
     os,
     arch,
@@ -263,16 +265,6 @@ export async function buildIndexImage(opts: {
       arch,
     }),
   }));
-
-  const blobsDir = path.join(opts.dir, 'blobs', 'sha256');
-  await fs.mkdir(blobsDir, { recursive: true });
-  const write = (digest: string, bytes: Buffer) =>
-    fs.writeFile(path.join(blobsDir, digest.slice('sha256:'.length)), bytes);
-  for (const { content } of children) {
-    await write(content.configDigest, content.configBytes);
-    await write(content.layerDigest, content.layerBytes);
-    await write(content.manifestDigest, content.manifestBytes);
-  }
 
   const indexMediaType =
     opts.family === 'oci'
@@ -291,7 +283,32 @@ export async function buildIndexImage(opts: {
     }),
     'utf8',
   );
-  const indexDigest = sha256(indexBytes);
+
+  return { indexBytes, indexDigest: sha256(indexBytes), indexMediaType, children };
+}
+
+/**
+ * A multi-platform layout (an image index / manifest list over one hand-built image per platform),
+ * for the real clients that copy whole indexes (`skopeo copy --all`, `regctl image copy`). The
+ * layout's `index.json` names the INDEX, not a child, like a real multi-arch layout.
+ */
+export async function buildIndexImage(opts: {
+  dir: string;
+  marker: string;
+  platforms: { os: string; arch: string }[];
+  family?: MediaTypeFamily;
+}): Promise<BuiltIndex> {
+  const { children, indexBytes, indexDigest, indexMediaType } = buildIndexContent(opts);
+
+  const blobsDir = path.join(opts.dir, 'blobs', 'sha256');
+  await fs.mkdir(blobsDir, { recursive: true });
+  const write = (digest: string, bytes: Buffer) =>
+    fs.writeFile(path.join(blobsDir, digest.slice('sha256:'.length)), bytes);
+  for (const { content } of children) {
+    await write(content.configDigest, content.configBytes);
+    await write(content.layerDigest, content.layerBytes);
+    await write(content.manifestDigest, content.manifestBytes);
+  }
   await write(indexDigest, indexBytes);
 
   await fs.writeFile(

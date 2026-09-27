@@ -5829,6 +5829,44 @@ Facts the tests rely on (probed, RPS-1256):
   `pypi.spec.ts` (long description, home page) publish their own rich package with the raw builders.
 - "Version 'x' not found" exists on the Go detail page only; nothing asserts it here.
 
+#### Docker multi-platform images (RPS-1627)
+
+`tests/ui/packages/docker-multiplatform.spec.ts` (`@packages`). The `ui` runner has no `crane`/`buildx`, so
+`seedDocker` takes `docker: { platforms, untagged }` (`DockerSeedOptions`): each platform (`linux/amd64`,
+`linux/arm64`) is its own OCI image manifest with its own config and layer blobs, pushed BY DIGEST, then an
+OCI image index (`application/vnd.oci.image.index.v1+json`) over them is pushed under the tag (`buildIndexContent`
+in `clients/docker-image.ts`, the in-memory half of `buildIndexImage`); `untagged: n` pushes `n` more manifests
+by digest that nothing lists. `extra` carries `digest` (the INDEX's), `digest.<os/arch>`, `configDigest.<os/arch>`,
+`layerDigest.<os/arch>`, `size.<os/arch>` (config plus layer bytes, what the panel adds up), `untaggedDigests`,
+`untaggedLayerDigests` and `untaggedSize`; `dockerPlatformRef(index, platform)` is the page-object target of a
+platform's manifest-list row (its `version` is the digest, which names the row).
+
+- **What the panel has.** The image row (the INDEX digest, the size of the platforms' blobs, no "No tags"), the tag
+  row (platform `Multiplatform`), the tag's manifest list (the index row named by the tag with an empty config digest,
+  then one row per platform NAMED BY ITS FULL DIGEST with platform, digest and config digest; searchable by that
+  name), the tag detail (the index JSON, no config block) and the deletes of a tag, of the untagged manifests and of
+  the image. It has no page, pull command or delete of a single platform: the manifest rows are read-only and the
+  pull command is the tag's.
+- **PKG-docker-10** (views): the three lists with the summary API next to them (`tagCount 1`, `untaggedManifestCount 1`:
+  the platforms are reached through the tag, so only the manifest no index lists is untagged), Newest/Oldest and the
+  search on the manifest list, the mobile cards, and the tag detail (index media type, both platforms and their
+  digests, no Config block, no runtime error).
+- **PKG-docker-11** (deletes, each also read back over the wire): deleting the TAG (cancel first) leaves the index, both
+  platforms and the extra manifest as four untagged manifests, all pullable by digest, the list row says "No tags" /
+  "4 untagged manifests"; "Delete Untagged Manifests" on a TAGGED image deletes only the manifest no index lists and
+  its layers (polled) and spares the index, the platforms and their layers; after the tag is gone it deletes the index
+  and the platforms and the image with them; "Delete Image" on the list removes tag, index, platforms and the
+  extra manifest; a platform manifest deleted over the wire (`DELETE manifests/<digest>`, the panel has no such
+  button) leaves the manifest list and the image size while the index and the other platform stay pullable. The
+  index JSON still NAMES the deleted platform (the registry does not rewrite it).
+- **PKG-docker-12** (a digest in the place of a tag): `/<image>/sha256:<unknown>` and `/<image>/<a platform's
+digest>` (a digest is not a tag) show the not-found state on the manifest list and on the detail. The 404 toast is
+  allowed through the page-error fixture with a reason.
+- Fixed with this story: the manifest list of a tag that does not exist said "Your list is empty" (it now shows
+  `Version '<tag>' not found`), and the tag detail of an index asked the API for the config of `undefined` (a runtime
+  error) and drew an empty Config block, because the API leaves `configDigest` OUT for an index instead of sending
+  `null`.
+
 ### Permissions requested once (RPS-1305)
 
 `tests/ui/packages/permissions-once.spec.ts` (PKG-perm-01, one test per protocol over `DESCRIPTORS`): a cold

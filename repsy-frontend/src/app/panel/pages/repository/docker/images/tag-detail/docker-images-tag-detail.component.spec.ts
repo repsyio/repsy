@@ -145,6 +145,27 @@ describe('DockerImagesTagDetailComponent', () => {
       expect(component.configText).toBeUndefined();
     });
 
+    it('does not load a config for an image index, whose API answer leaves configDigest out (RPS-1627)', () => {
+      const index = { ...TAG } as Partial<TagDetail>;
+      delete index.configDigest;
+      dockerService.fetchTag.and.returnValue(of(index as TagDetail));
+
+      select();
+
+      expect(dockerService.fetchConfigText).not.toHaveBeenCalled();
+      expect(component.configText).toBeUndefined();
+      expect(component.hasConfig).toBeFalse();
+      expect(dockerService.fetchManifestText).toHaveBeenCalledOnceWith('nginx', 'sha256:manifest');
+    });
+
+    it('has a config only when the tag names a config digest', () => {
+      expect(component.hasConfig).toBeFalse();
+
+      select();
+
+      expect(component.hasConfig).toBeTrue();
+    });
+
     it('keeps the manifest and config empty when they cannot be loaded', () => {
       dockerService.fetchManifestText.and.returnValue(throwError(() => new Error('boom')));
       dockerService.fetchConfigText.and.returnValue(throwError(() => new Error('boom')));
