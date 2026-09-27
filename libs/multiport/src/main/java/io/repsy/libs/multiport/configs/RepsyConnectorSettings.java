@@ -41,6 +41,10 @@ public final class RepsyConnectorSettings {
    *   <li>Encoded slashes ({@code %2F}) are decoded instead of refused with a bodyless 400: npm
    *       addresses a scoped package as {@code @scope%2Fname}.
    *   <li>{@code connectionTimeout} is the idle timeout, in milliseconds.
+   *   <li>{@code maxPartCount} is the upper bound on the number of parts a multipart request may
+   *       carry ({@code server.tomcat.max-part-count}), a protection limit that must hold wherever
+   *       a client can reach the application, not only on the connector Spring Boot customizes
+   *       itself.
    *   <li>{@code compression}, when it is given, is applied like Spring Boot does for {@code
    *       server.compression.*} (nothing changes when it is not enabled). Pass {@code null} for a
    *       port that is not compressed.
@@ -49,10 +53,12 @@ public final class RepsyConnectorSettings {
   public static void apply(
       final @NonNull Connector connector,
       final int connectionTimeout,
+      final int maxPartCount,
       final @Nullable Compression compression) {
 
     connector.setProperty("connectionTimeout", String.valueOf(connectionTimeout));
     connector.setEncodedSolidusHandling(EncodedSolidusHandling.DECODE.getValue());
+    connector.setMaxPartCount(maxPartCount);
 
     if (compression != null) {
       new CompressionConnectorCustomizer(compression).customize(connector);
