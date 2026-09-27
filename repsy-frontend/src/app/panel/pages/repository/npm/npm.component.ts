@@ -68,6 +68,7 @@ export class NpmComponent implements OnInit, OnDestroy {
         // If repo is private and user is not authenticated, redirect to 404
         if (registry.private && !this.isAuthenticated) {
           this.router.navigate(['/not-found'], {
+            replaceUrl: true,
             queryParams: {
               message: `Repository '${repoName}' not found`,
             },
@@ -80,7 +81,7 @@ export class NpmComponent implements OnInit, OnDestroy {
         this.loading = false;
       },
       error: () => {
-        this.router.navigate(['/not-found']);
+        this.router.navigate(['/not-found'], { replaceUrl: true });
       },
     });
   }

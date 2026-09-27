@@ -121,6 +121,7 @@ export function describeProtocolShell<S>(spec: ProtocolShellSpec<S>): void {
 
       expect(router.navigate).toHaveBeenCalledTimes(1);
       expect(router.navigate.calls.mostRecent().args[0]).toEqual(['/not-found']);
+      expect(router.navigate.calls.mostRecent().args[1]).toEqual(jasmine.objectContaining({ replaceUrl: true }));
     });
 
     it('marks a public repository as a public view for an anonymous visitor', () => {
@@ -136,6 +137,9 @@ export function describeProtocolShell<S>(spec: ProtocolShellSpec<S>): void {
 
       expect(router.navigate).toHaveBeenCalledTimes(1);
       expect(router.navigate.calls.mostRecent().args[0]).toEqual(['/not-found']);
+      // The 404 page REPLACES the entry of the repository that is gone: pushed on top of it, Back returned to that
+      // entry, which redirected again, and the visitor could not leave the 404 page (RPS-1650).
+      expect(router.navigate.calls.mostRecent().args[1]).toEqual({ replaceUrl: true });
     });
   });
 }

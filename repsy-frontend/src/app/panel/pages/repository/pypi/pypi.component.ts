@@ -67,7 +67,7 @@ export class PypiComponent implements OnInit, OnDestroy {
       next: (permissions: RepoPermissionInfo) => {
         // If repo is private and user is not authenticated, redirect to 404
         if (permissions.private && !this.isAuthenticated) {
-          this.router.navigate(['/not-found']);
+          this.router.navigate(['/not-found'], { replaceUrl: true });
           return;
         }
 
@@ -76,7 +76,7 @@ export class PypiComponent implements OnInit, OnDestroy {
         this.loading = false;
       },
       error: () => {
-        this.router.navigate(['/not-found']);
+        this.router.navigate(['/not-found'], { replaceUrl: true });
       },
     });
   }

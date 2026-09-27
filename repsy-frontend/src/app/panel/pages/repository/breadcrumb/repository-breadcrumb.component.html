@@ -3,10 +3,10 @@
     <nav class="text-[14px]">
       <ol class="flex flex-wrap items-center p-0">
         @for (crumbLink of crumbLinks; track crumbLink; let i = $index; let last = $last) {
-          <li [attr.data-testid]="'breadcrumb-item-' + i" class="flex items-center">
+          <li [attr.data-testid]="'breadcrumb-item-' + i" class="flex min-w-0 items-center">
             <!-- Last breadcrumb item (No link) -->
             @if (last) {
-              <div data-testid="breadcrumb-current" class="text-[#FDFDFD]">
+              <div data-testid="breadcrumb-current" class="min-w-0 break-all text-[#FDFDFD]">
                 @if (repoIcon.includes('cargo')) {
                   <img
                     width="23"
@@ -29,7 +29,7 @@
             } @else {
               <a
                 data-testid="breadcrumb-link"
-                class="text-[#9FA0A0] hover:text-[#FDFDFD]"
+                class="min-w-0 break-all text-[#9FA0A0] hover:text-[#FDFDFD]"
                 [routerLink]="crumbLink"
                 [queryParams]="crumbQueryParams[i]"
               >
@@ -48,7 +48,7 @@
                 height="16"
                 width="16"
                 alt="Breadcrumb Split"
-                class="mx-2"
+                class="mx-2 shrink-0"
               />
             }
           </li>

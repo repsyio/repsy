@@ -6048,7 +6048,7 @@ to an existing SNAPSHOT.
   repository block is the plain one: a Maven `<repository>` resolves snapshots unless it says otherwise); delete from
   the versions list and from the detail removes EVERY build, the version-level metadata and the artifact-level entry
   and leaves the release (the panel has no delete of a single build); the browser lists all timestamped files and
-  `maven-metadata.xml`. The "Newest orders by version" test is pinned with `test.fail` (`RPS-TBD`): the order is the
+  `maven-metadata.xml`. The "Newest orders by version" test is pinned with `test.fail` (`RPS-1665`): the order is the
   version NAME as a string, so `1.9.0` is above `1.10.0` and `1.0.0-SNAPSHOT` above `1.0.0`.
 - **PKG-maven-12** (Signed; `@cloud-skip`: the key store and verify-all are OS panel API): `row-signed` is `Signed` or
   `Unsigned` with a closed or open lock, on the desktop rows, the mobile cards and (`Signed: Yes|No`) the detail; a
@@ -6186,6 +6186,46 @@ Docker (1) and NuGet (2) detail pages: the highlight.js theme's pink keys/keywor
 those two theme colours (`styles.css`), gives every highlighted `<code>` `tabindex="0"`, turns the row into a link,
 and lightens the "Never logged in" text, the `@` in the security modal titles and the built-in keyserver rows (plain
 text, not disabled controls: they carried `opacity-40`), so all 40 scans are clean.
+
+#### Cross-cutting flows: history, phone width, keyboard, stale pages (RPS-1650)
+
+Four specs and one helper (`src/ui/layout.ts`). Run them with
+`./run.sh test --protocol ui --grep "NAV-(0[4-9]|1[0-8])|A11Y-(15|16|17|18|19|20|21)"`. Tags: `@nav`, `@mobile`,
+`@a11y`; the ones that need the Users page or a seeded USER are `@cloud-skip`.
+
+| Spec                  | Scenarios   | What is pinned                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `nav/history`         | NAV-04..09  | Back and Forward across list -> versions -> detail on all nine protocols (each step reloads from the server, the box and rows agree, no page error); a deleted repository or version is never resurrected by Back; login through `returnUrl` and logout with Back; modal, confirmation, row menu and mobile menu with Back; reload in the middle of the history; an unknown URL never traps Back |
+| `nav/mobile-detail`   | NAV-10..13  | 390x844: list, versions and detail of every protocol (also with a 150-character name), settings of every repository type, the token, one-time-token, delete and create-repository modals, dashboard, profile, users; axe on each; Tab through a detail and the settings page never lands under the fixed header                                                                                  |
+| `a11y/keyboard-flows` | A11Y-15..21 | login tab order and the eye, landmarks and titles, the settings page tab order (down the page, every control a stop, the header never covers the focus), pagination, sort and type selectors, a package row deleted with the keyboard, a user created with the keyboard, the mobile menu                                                                                                         |
+| `nav/stale-pages`     | NAV-14..18  | what SET-14 (`settings/repo-deleted`) does for the settings, for the rest: a version deleted under its open detail page (all protocols), a package under its versions page, a repository under its package list, a token revoked under the token list, a user deleted under the Users page and under their own open session                                                                      |
+
+- **"Fits" is measured on the content column, not only on the page.** The layout's `panel-content` is
+  `overflow: hidden`, so a wide table or an unbreakable name is clipped there and `documentElement.scrollWidth` stays
+  equal to `clientWidth`. `expectNoHorizontalOverflow()` checks the page, that column's `scrollWidth`, and names the
+  elements past the viewport with no scroller of their own. `expectReachable()` scrolls a control to the middle of the
+  screen and checks that the topmost element at its centre is the control (a Playwright trial click refuses a disabled
+  control and races the header, which shrinks once the page is scrolled). `expectModalFits()` is inside the viewport's
+  width, inside its height or scrolling inside itself, with its buttons reachable. `obscuredFocus()` is the "focus not
+  obscured" check behind the Tab-through tests.
+- **Back and Forward keep no list state.** The search, sort, page and type of a list are component state, not URL:
+  Back to a list comes back reset and Forward reopens what was left. The three `[known failure: RPS-1668]`
+  tests (repository list, package list, Users list) pin that with `test.fail`; the passing ones assert the honest part
+  (fresh server data, box and rows in agreement).
+- **History traps.** A route that redirects (a repository that is gone, `/login` for a signed-in visitor) must
+  REPLACE its own entry: pushing the target on top made Back land on the same route again, which redirected again.
+  RPS-1650 made the repository resolver answer with a `RedirectCommand`, the protocol shells replace with
+  `{ replaceUrl: true }` and `AuthRedirectGuard` answer with a `UrlTree` (as `AuthGuard` already did). The
+  `Navigation API` (`window.navigation.entries()`) shows the real entry list when a history test misbehaves.
+- **Pinned, not fixed** (`test.fail`, each with the ticket to file): `RPS-1668` (above),
+  `RPS-1669` (every list re-renders behind a spinner on each load, so the focus falls to the document after a
+  page change and after a row is deleted), `RPS-1669` (the mobile drawer neither takes the focus nor
+  gives it back), `RPS-1670` (the detail pages of nine protocols clip a very long name or tag on a
+  phone), `RPS-1670` (a list that answered "not found" on refresh keeps showing the deleted rows).
+- **Stale page, honest answer.** Deleting, revoking or renaming under an open page is asserted as an error toast
+  (`... not found`, allowed with its reason through the page-error fixture), never a success one, the page alive and
+  nothing changed. `NAV-18` is the account whose session is dead: the next click ends on `/login?returnUrl=`, and a
+  reload and Back show no private page.
 
 ### Security scanning UI (RPS-1259)
 

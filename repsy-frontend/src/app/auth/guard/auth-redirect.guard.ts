@@ -36,18 +36,23 @@ export class AuthRedirectGuard implements CanActivate, CanActivateChild {
     private readonly authService: AuthService,
   ) {}
 
+  /*
+   * A signed-in visitor at /login is redirected with a UrlTree, which REPLACES the /login entry of the history
+   * (a navigateByUrl() from inside a guard pushed "/" on top of it, so Back returned to /login, which redirected
+   * again: the Back button could not leave the page, RPS-1650).
+   */
   /* eslint-disable @typescript-eslint/no-unused-vars */
   public canActivate(
     route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
-    return !this.authService.isAuthenticated() ? true : this.router.navigateByUrl('/');
+    return !this.authService.isAuthenticated() ? true : this.router.createUrlTree(['/']);
   }
 
   public canActivateChild(
     childRoute: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
-    return !this.authService.isAuthenticated() ? true : this.router.navigateByUrl('/');
+    return !this.authService.isAuthenticated() ? true : this.router.createUrlTree(['/']);
   }
 }
