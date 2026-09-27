@@ -52,6 +52,9 @@ class BasicAuthColonPasswordIT extends AbstractIntegrationTest {
 
   private static final String COLON_PASSWORD = "Pass:Word1:tail";
 
+  /** Made once per class: a BCrypt hash costs about 100 ms, so it is not made per test. */
+  private static final String COLON_PASSWORD_HASH = PasswordHasher.hash(COLON_PASSWORD);
+
   /**
    * A route that takes Basic credentials and needs an admin: {@code MANAGE} on a repo that does not
    * exist. The auth interceptor authenticates the caller and checks the role as for a private repo
@@ -71,10 +74,9 @@ class BasicAuthColonPasswordIT extends AbstractIntegrationTest {
     this.createdUserIds.clear();
   }
 
-  private String createAdminWithPassword(final String password) {
+  private String createAdminWithHash(final String hash) {
     final var username = uniqueUsername("colon");
-    final var userInfo =
-        this.userTxService.create(username, UserRole.ADMIN, PasswordHasher.hash(password));
+    final var userInfo = this.userTxService.create(username, UserRole.ADMIN, hash);
     this.createdUserIds.add(userInfo.getId());
 
     return username;
@@ -90,7 +92,7 @@ class BasicAuthColonPasswordIT extends AbstractIntegrationTest {
   @Test
   @DisplayName("authenticates with the whole password, colons included")
   void authenticatesWithAColonPassword() throws Exception {
-    final var username = this.createAdminWithPassword(COLON_PASSWORD);
+    final var username = this.createAdminWithHash(COLON_PASSWORD_HASH);
 
     this.basicRequest(username, COLON_PASSWORD, AUTHENTICATED);
   }
@@ -98,7 +100,7 @@ class BasicAuthColonPasswordIT extends AbstractIntegrationTest {
   @Test
   @DisplayName("rejects the part of the password before its second colon")
   void rejectsTheTruncatedPassword() throws Exception {
-    final var username = this.createAdminWithPassword(COLON_PASSWORD);
+    final var username = this.createAdminWithHash(COLON_PASSWORD_HASH);
 
     this.basicRequest(username, "Pass", 401);
     this.basicRequest(username, "Pass:Word1", 401);
@@ -107,7 +109,7 @@ class BasicAuthColonPasswordIT extends AbstractIntegrationTest {
   @Test
   @DisplayName("rejects a colon password that differs after the second colon")
   void rejectsAWrongTail() throws Exception {
-    final var username = this.createAdminWithPassword(COLON_PASSWORD);
+    final var username = this.createAdminWithHash(COLON_PASSWORD_HASH);
 
     this.basicRequest(username, "Pass:Word1:other", 401);
   }
@@ -115,7 +117,7 @@ class BasicAuthColonPasswordIT extends AbstractIntegrationTest {
   @Test
   @DisplayName("panel login accepts a password with a colon")
   void panelLoginAcceptsAColonPassword() throws Exception {
-    final var username = this.createAdminWithPassword(COLON_PASSWORD);
+    final var username = this.createAdminWithHash(COLON_PASSWORD_HASH);
 
     this.perform(
             post("/api/auth/login")
@@ -129,7 +131,7 @@ class BasicAuthColonPasswordIT extends AbstractIntegrationTest {
   @Test
   @DisplayName("a password with a colon set through the panel works over Basic")
   void passwordChangedInThePanelWorksOverBasic() throws Exception {
-    final var username = this.createAdminWithPassword(VALID_PASSWORD);
+    final var username = this.createAdminWithHash(VALID_PASSWORD_HASH);
     final var user = this.userRepository.findByUsername(username).orElseThrow();
 
     this.perform(
