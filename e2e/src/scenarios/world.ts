@@ -38,6 +38,13 @@ export interface MaterializedCredential {
   username?: string;
   password?: string;
   kind?: 'password' | 'token';
+  /**
+   * The panel id of the account behind a `user-password` credential, when the backend that seeded it
+   * knows it (RPS-1481: a test that deletes or resets the user needs it). Optional and additive: a
+   * backend that leaves it out is looked up by `username` (`seedInvalidationUser`,
+   * `scenarios/credential-invalidation.ts`).
+   */
+  userId?: string;
 }
 
 /** A protocol-appropriate package identity: for maven, `groupId:artifactId` plus a version. */

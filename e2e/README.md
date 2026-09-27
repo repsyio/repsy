@@ -205,6 +205,8 @@ e2e/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe; both tests tagged @smoke
     skeleton/backend-module.spec.ts  # RPS-1495 the panel backend registry: `REPSY_E2E_BACKEND_MODULE` picks an external backend (`fake-panel-backend.ts`, in memory, no server), also for the `panelApi`/`seeder` fixtures; `UnsupportedPanelOperation`
     skeleton/cloud-target.spec.ts    # RPS-1498 the Repsy Cloud target seam: capabilities, expectation overlay, credentials a target cannot seed, known gaps, and the real scenario loop on a fake cloud backend (`fake-cloud-panel-backend.ts`); three of its tests are skipped ON PURPOSE (they are the skip paths)
+    skeleton/spec-path.spec.ts       # RPS-1481 where the spec-driven tests find `openapi-spec.yaml` (`REPSY_E2E_OPENAPI_SPEC`): the lookup, a Cloud target skipping without one, an OS target failing (inner runs, `inner-run.ts`)
+    skeleton/credential-invalidation-seed.spec.ts  # RPS-1481 the user of a credential-invalidation test comes from `seedUserCredential`: helper against a Cloud-shaped fake, and the real tests against a registry that refuses an ungranted user
     skeleton/known-gaps.spec.ts      # RPS-1510 the known-gap mechanism for specs outside the catalog (`src/known-gaps.ts`): registry rules, test keys, `byTarget`, and an inner run (`known-gap-inner/`) of the fake cloud that proves a gap that still fails is an expected failure, one that stops failing FAILS the run, gaps are per target, `@cloud-skip` skips, and an OS target has none
     skeleton/ui-target.spec.ts       # RPS-1638 the UI seam (`target.ui`): route builders per target, session keys, base-URL chain, the descriptors' routes on both, and `--list` under `cloud-remote` excluding `@cloud-skip`
     skeleton/repo-settings.spec.ts  # RPS-1200 settings-PUT field-by-field matrix across RepoTypes; untagged (not smoke-sized)
@@ -823,10 +825,10 @@ resolves inside the submodule).
 `gen:api` and `runners/entrypoint.sh` take the spec and the output directory from the environment, so a
 runner of another repository generates ITS client (a Cloud backend module imports it from there):
 
-| Variable                 | Default                                                         | Meaning                                                                                                 |
-| ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `REPSY_E2E_OPENAPI_SPEC` | `../repsy-backend/src/main/resources/openapi/openapi-spec.yaml` | the spec the client is generated from, relative to the harness's working directory (`/app`) or absolute |
-| `REPSY_E2E_GEN_OUT`      | `src/api/generated`                                             | where it goes (replaced when out of date), relative to the same directory                               |
+| Variable                 | Default                                                         | Meaning                                                                                                                                                                                                                                                                                                                              |
+| ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `REPSY_E2E_OPENAPI_SPEC` | `../repsy-backend/src/main/resources/openapi/openapi-spec.yaml` | the spec the client is generated from, and the one the spec-driven tests read (`src/api/spec-ops.ts`, RPS-1481), relative to the harness's working directory (`/app`) or absolute. When set it is the only place looked in. Without a spec on a Cloud target those tests are skipped with the reason; on an OS target it is an error |
+| `REPSY_E2E_GEN_OUT`      | `src/api/generated`                                             | where it goes (replaced when out of date), relative to the same directory                                                                                                                                                                                                                                                            |
 
 **Concurrent runners (RPS-1468).** The output directory is in a bind mount that every runner of a checkout
 shares, and `run.sh test --protocol a,b`, two terminals or two agents start runners at the same time. The
@@ -2446,6 +2448,20 @@ being valid and a deploy with it must be refused at once:
 "Refused" means the real client exits non-zero, the raw probe of the same credential (`adapter.publish`) answers 401
 (not 403 or 404), and an admin sees nothing of the refused version stored. `--grep "credential invalidation"`
 selects them, one test per protocol carries `@smoke`.
+
+**The user is the target's own `user-password` credential of the test's repo.** The password and the deleted-user tests
+(and the login-token tests below) take their user from `seedInvalidationUser(seeder, repo.name, repoType)`, which asks
+`PanelBackend.seedUserCredential` like every catalog scenario does (RPS-1481): on Repsy OS a plain `USER` account (it may use
+any repo), on Repsy Cloud a collaborator tenant with a read/write grant on that repo. A tenant that was only registered
+(`seeder.createUser()`) has no grant there, so its first deploy and its `npm login` were a `401` for a reason that is not the
+one under test. The helper returns the account's `id`, `username` and `password`: the id is the credential's optional `userId`
+(`MaterializedCredential.userId`, set by `OsPanelBackend`) or, when a backend leaves it out, looked up by the exact username
+through `PanelBackend.listAllUsers({ q })` (Cloud's list answers the tenants that backend registered, its id is the username).
+A target that cannot seed the credential (`UnsupportedPanelOperation`, or neither roles nor repo users) skips the test with the
+reason. A user that neither deploys nor logs in (the "other user" of a password change, the successor of a reused username)
+stays a plain `seeder.createUser()`. `skeleton/credential-invalidation-seed.spec.ts` proves it against a Cloud-shaped fake:
+the real tests run in an inner run against a registry that answers `401` to a user without a grant, and fail when the scenario
+goes back to `seeder.createUser()`. The admin `reset-password` test is `@cloud-skip` (an OS admin route).
 
 ### Login tokens (RPS-1552)
 
@@ -5196,6 +5212,14 @@ operations of the protocol BY `operationId` (`src/api/contract-checks.ts`: the p
 ```bash
 ./run.sh test --protocol maven,npm,pypi --grep "panel API"
 ```
+
+**On Repsy Cloud (RPS-1481).** The spec is `REPSY_E2E_OPENAPI_SPEC` when it is set, else the checkout's (`src/api/spec-ops.ts`).
+The Maven and npm specs are tagged `@cloud-skip`: they call the OS routes (no owner segment) and validate the answers against
+the OS spec, so they are a contract test of the Repsy OS panel and a Cloud panel has its own. The other protocols' specs are not
+tagged yet; a Cloud target that has no spec (the runner image does not carry the OS one) skips them, and a spec file that reads
+the spec while it loads (`tests/api/role-sweep.spec.ts`), with the reason "openapi-spec.yaml not found ... set
+REPSY_E2E_OPENAPI_SPEC". Only a Cloud target skips: on an OS target a missing spec fails the run, never a silent skip.
+`skeleton/spec-path.spec.ts` proves both in inner runs.
 
 ## Panel API contract specs: Docker and Helm (RPS-1483 part B6)
 

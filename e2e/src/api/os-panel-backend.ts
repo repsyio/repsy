@@ -146,6 +146,7 @@ export class OsPanelBackend implements PanelBackend {
       username: user.username,
       password: user.password,
       kind: 'password',
+      userId: user.id,
     };
   }
 

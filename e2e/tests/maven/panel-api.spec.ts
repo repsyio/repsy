@@ -156,7 +156,12 @@ const artifactValues = (d: Deployed, artifactId: string) => ({
   artifactName: artifactId,
 });
 
-test.describe('the Maven panel API against what mvn deploy stored', () => {
+// @cloud-skip: every call is built from the OS `openapi-spec.yaml` (`callOperation`: its paths, without an owner
+// segment) and every answer is validated against its schemas, so this is a contract test of the Repsy OS panel.
+// A Repsy Cloud panel has its own routes and its own spec (RPS-1481).
+const CLOUD_SKIP = { tag: ['@cloud-skip'] };
+
+test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, () => {
   test.setTimeout(300_000);
 
   test('names every operation of the Maven panel API', () => {

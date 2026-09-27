@@ -17,13 +17,18 @@
  * The panel API's operations, read from `openapi-spec.yaml` (the single source of truth of the API), so
  * a spec that has to cover "every operation" (the role sweep, RPS-1483) cannot go stale: a new route is
  * in the list the moment it is in the spec. The file is found the way a runner sees it: the checkout
- * has it at `../repsy-backend/...`, a runner container mounts it read-only under `/repsy-backend/...`.
+ * has it at `../repsy-backend/...`, a runner container mounts it read-only under `/repsy-backend/...`, and
+ * `REPSY_E2E_OPENAPI_SPEC` (RPS-1481) names another one (the setting the client generation already reads).
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { test } from '@playwright/test';
 import { parse } from 'yaml';
+
+import { env } from '../env.js';
+import { capabilitiesFor } from '../target.js';
 
 const SPEC_RELATIVE = 'repsy-backend/src/main/resources/openapi/openapi-spec.yaml';
 const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'patch'] as const;
@@ -60,18 +65,61 @@ interface RawOperation {
   requestBody?: unknown;
 }
 
-export function specPath(): string {
+/** The setting that names the spec: the same one the runner's client generation reads (`runners/entrypoint.sh`). */
+export const SPEC_SETTING = 'REPSY_E2E_OPENAPI_SPEC';
+
+/** Where the spec was looked for, and where it was found (`undefined` when nowhere). */
+export interface SpecLookup {
+  found?: string;
+  looked: string[];
+}
+
+/**
+ * Finds the spec (RPS-1481). When `setting` (`REPSY_E2E_OPENAPI_SPEC`) is set it IS the spec, relative to the
+ * working directory or absolute, and nothing else is tried: a setting that points nowhere is a spec that is
+ * absent, not a hint to fall back to another one. Unset, it is the checkout's own file, or where a runner
+ * container mounts it.
+ */
+export function locateSpec(
+  setting: string | undefined,
+  exists: (path: string) => boolean = existsSync,
+): SpecLookup {
+  const named = setting?.trim();
   const here = dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    resolve(here, '../../..', SPEC_RELATIVE),
-    resolve('/', SPEC_RELATIVE),
-    resolve(process.cwd(), '..', SPEC_RELATIVE),
-  ];
-  const found = candidates.find((candidate) => existsSync(candidate));
-  if (!found) {
-    throw new Error(`openapi-spec.yaml not found, looked in: ${candidates.join(', ')}`);
+  const looked = named
+    ? [resolve(process.cwd(), named)]
+    : [
+        resolve(here, '../../..', SPEC_RELATIVE),
+        resolve('/', SPEC_RELATIVE),
+        resolve(process.cwd(), '..', SPEC_RELATIVE),
+      ];
+  return { found: looked.find((candidate) => exists(candidate)), looked };
+}
+
+/** Why the spec-driven tests cannot run: what was looked for, and how to point the harness at a spec. */
+export function specMissingMessage(looked: readonly string[]): string {
+  return `openapi-spec.yaml not found, looked in: ${looked.join(', ')} (set ${SPEC_SETTING} to the spec of the panel under test)`;
+}
+
+/**
+ * The path of the panel API's spec, from `REPSY_E2E_OPENAPI_SPEC` or the checkout. When there is none, a Repsy
+ * Cloud target skips the running test with that reason: the runner image of a Cloud target has no OS spec and
+ * a Cloud panel is not what the OS spec describes. Called while a spec file loads (outside any test) it skips
+ * the file's tests instead and answers `''`, which `loadSpecOperations` reads as "no operations". On every
+ * other target a missing spec is an error, never a skip.
+ */
+export function specPath(): string {
+  const { found, looked } = locateSpec(process.env[SPEC_SETTING]);
+  if (found) {
+    return found;
   }
-  return found;
+  const message = specMissingMessage(looked);
+  if (capabilitiesFor(env.target).kind !== 'cloud') {
+    throw new Error(message);
+  }
+  // Inside a test this throws Playwright's skip; at file load it marks every test of the file skipped.
+  test.skip(true, message);
+  return '';
 }
 
 function securityKind(security: unknown[] | undefined): SecurityKind {
@@ -82,7 +130,12 @@ function securityKind(security: unknown[] | undefined): SecurityKind {
 }
 
 export function loadSpecOperations(): SpecOperation[] {
-  const spec = parse(readFileSync(specPath(), 'utf8')) as {
+  const path = specPath();
+  if (path === '') {
+    // Skipped at file load (a Cloud target without the spec, `specPath`): no operations, and no test runs.
+    return [];
+  }
+  const spec = parse(readFileSync(path, 'utf8')) as {
     paths: Record<string, Record<string, unknown>>;
   };
   const operations: SpecOperation[] = [];
