@@ -53,7 +53,14 @@ public class RefreshTokenService {
     this.entityManager.persist(token);
   }
 
-  @Transactional
+  // A replay must not undo the family-wide revocation below: without noRollbackFor, Spring's
+  // default rollback-on-RuntimeException would roll back revokeFamily along with the throw that
+  // reports the replay, leaving the rest of the family usable (RPS-1682). This method is called
+  // from AuthUserService.refreshToken(), itself @Transactional; propagation REQUIRED makes that
+  // caller's transaction, not this one, the physical commit/rollback boundary, so the same
+  // noRollbackFor is needed there too, or this annotation alone only stops this method from
+  // marking the shared transaction rollback-only, not from the caller rolling it back anyway.
+  @Transactional(noRollbackFor = UnAuthorizedException.class)
   public void consume(final @NonNull RefreshTokenClaims claims) {
     final var now = Instant.now();
     if (this.repository.markUsed(claims.tokenId(), now) == 1) {
