@@ -30,6 +30,7 @@ import {
   securityBadgeIn,
   severityBadge,
 } from '../../../src/ui/pages/security.js';
+import { urlHasPath } from '../../../src/ui/routes.js';
 import { expect, test } from '../../../src/ui/security-fixtures.js';
 import {
   ScanScript,
@@ -186,7 +187,7 @@ test.describe('SEC-02a repository list badges', { tag: MOCKED }, () => {
     await modal.closeViaBackdrop();
     // A badge click is the badge's own: it must not have opened the repository.
     await expectStaysOnPage(adminPage, listPath);
-    await expect(adminPage).toHaveURL(/\/repositories$/);
+    await expect(adminPage).toHaveURL(urlHasPath('/repositories'));
 
     await securityBadgeIn(repos.row(repo.name)).click();
     await modal.expectOpen();
@@ -347,7 +348,7 @@ test.describe('SEC-02a closing a security modal', { tag: MOCKED }, () => {
     await modal.close();
 
     await expectStaysOnPage(adminPage, listPath);
-    await expect(adminPage).toHaveURL(/\/repositories$/);
+    await expect(adminPage).toHaveURL(urlHasPath('/repositories'));
   });
 
   test('the X of the package modal closes it and stays on the package list', async ({

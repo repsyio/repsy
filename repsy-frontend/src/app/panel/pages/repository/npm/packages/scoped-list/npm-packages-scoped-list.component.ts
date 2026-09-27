@@ -35,6 +35,11 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
+import {
+  readListPageParam,
+  readListQueryParam,
+  updateListQueryParams,
+} from '../../../../../shared/util/list-query-params.util';
 import { NpmConfigComponent } from '../../config/npm-config.component';
 import { NpmService } from '../../service/npm.service';
 
@@ -92,6 +97,14 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
       if (registry) {
         this.activeRegistry = registry;
         this.scopeName = this.route.snapshot.paramMap.get('scope');
+
+        // RPS-1668: the search, sort and page live in the URL, so a reload or a Back navigation
+        // restores exactly what was left instead of an unfiltered, first page.
+        this.searchText = readListQueryParam(this.route, 'q') ?? '';
+        const sortParam = readListQueryParam(this.route, 'sort');
+        this.sortOption = this.sortOptions.find((option) => option.name === sortParam) ?? this.sortOptions[0];
+        this.pageNum = readListPageParam(this.route, 'page', 0);
+
         this.fetchPackages();
       }
     });
@@ -129,7 +142,17 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
     return moment(date).fromNow();
   }
 
+  /** Keeps the URL's `q`, `sort` and `page` query params in step with what is about to be fetched (RPS-1668). */
+  private syncUrl(): void {
+    updateListQueryParams(this.router, this.route, {
+      q: this.searchText || null,
+      sort: this.sortOption.name === this.sortOptions[0].name ? null : this.sortOption.name,
+      page: this.pageNum || null,
+    });
+  }
+
   private fetchPackages(): void {
+    this.syncUrl();
     this.loading = true;
     const call =
       this.scopeName !== '~'

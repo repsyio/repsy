@@ -17,6 +17,7 @@
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import moment from 'moment';
 import { catchError, EMPTY, filter, finalize, map, Subject, Subscription, switchMap, timer } from 'rxjs';
 
@@ -32,6 +33,11 @@ import { PaginationComponent } from '../../../shared/components/pagination/pagin
 import { SearchboxComponent } from '../../../shared/components/searchbox/searchbox.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../shared/components/tooltip/tooltip.component';
+import {
+  readListPageParam,
+  readListQueryParam,
+  updateListQueryParams,
+} from '../../../shared/util/list-query-params.util';
 import { UserService } from '../service/user.service';
 
 /** How long the search box must be idle before the typed text is sent to the server. */
@@ -86,6 +92,8 @@ export class UserManagementComponent implements OnInit, OnDestroy {
   private adminCountSubscription?: Subscription;
 
   constructor(
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
     private readonly userService: UserService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
@@ -118,6 +126,14 @@ export class UserManagementComponent implements OnInit, OnDestroy {
         )
         .subscribe((text) => this.applySearch(text)),
     );
+
+    // RPS-1668: the search and the page live in the URL, so a reload or a Back navigation restores
+    // exactly what was left instead of an unfiltered, first page.
+    const initialQuery = readListQueryParam(this.route, 'q') ?? '';
+    const initialPage = readListPageParam(this.route, 'page', 0);
+    this.searchQuery = initialQuery;
+    this.appliedQuery = initialQuery;
+    this.pageNum = initialPage;
   }
 
   public ngOnInit(): void {
@@ -131,6 +147,7 @@ export class UserManagementComponent implements OnInit, OnDestroy {
 
   /** Loads the current page of the current search, and the admin count that goes with it. */
   public fetchUsers(): void {
+    this.syncUrl();
     this.requests.next({ q: this.appliedQuery, page: this.pageNum });
     this.adminCountSubscription?.unsubscribe();
     this.adminCountSubscription = this.userService.countAdmins().subscribe({
@@ -290,6 +307,14 @@ export class UserManagementComponent implements OnInit, OnDestroy {
     this.appliedQuery = text;
     this.pageNum = 0;
     this.fetchUsers();
+  }
+
+  /** Keeps the URL's `q` and `page` query params in step with what `fetchUsers` is about to load (RPS-1668). */
+  private syncUrl(): void {
+    updateListQueryParams(this.router, this.route, {
+      q: this.appliedQuery || null,
+      page: this.pageNum || null,
+    });
   }
 
   protected readonly moment = moment;

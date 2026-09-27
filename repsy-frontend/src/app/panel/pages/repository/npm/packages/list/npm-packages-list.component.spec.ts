@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 import { fakeAsync, flushMicrotasks } from '@angular/core/testing';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
@@ -42,16 +43,25 @@ describe('NpmPackagesListComponent', () => {
   let securityService: jasmine.SpyObj<SecurityService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
+  let router: jasmine.SpyObj<Router>;
   let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
 
-  function build(): ListFixture {
+  /** A fake `ActivatedRoute` carrying the query params a test wants the component to start from. */
+  function activatedRoute(queryParams: Record<string, string> = {}): ActivatedRoute {
+    return { snapshot: { queryParamMap: convertToParamMap(queryParams) } } as ActivatedRoute;
+  }
+
+  function build(queryParams: Record<string, string> = {}): ListFixture {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
     npmService = jasmine.createSpyObj<NpmService>('NpmService', ['searchPackages', 'deletePackage'], { repoChanges });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
     securityService.watchArtifactSecuritySummary.and.returnValue(of({}));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
+    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     component = new NpmPackagesListComponent(
+      activatedRoute(queryParams),
+      router,
       npmService,
       { username: 'alice' } as AuthService,
       toastService,
@@ -95,6 +105,53 @@ describe('NpmPackagesListComponent', () => {
 
       expect(npmService.searchPackages.calls.mostRecent().args[0]).toBeNull();
     });
+  });
+
+  describe('the URL (RPS-1668: a reload or Back restores the list, not an empty one)', () => {
+    it('starts with the search, sort and page given in the URL', fakeAsync(() => {
+      build({ q: 'acme', sort: 'Oldest', page: '2' }).respond([], 1);
+
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+
+      expect(component.searchText).toBe('acme');
+      expect(component.sortOption.name).toBe('Oldest');
+      expect(component.pageNum).toBe(2);
+      expect(npmService.searchPackages).toHaveBeenCalledOnceWith('acme', component.sortOption, 2, 10);
+    }));
+
+    it('does not navigate when the URL already matches what is loaded (no reload loop)', fakeAsync(() => {
+      build().respond([], 1);
+
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+
+      expect(router.navigate).not.toHaveBeenCalled();
+    }));
+
+    it('puts the sort and page into the URL, replacing the current entry', fakeAsync(() => {
+      build().respond([], 3);
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+      router.navigate.calls.reset();
+
+      component.sort(component.sortOptions[1]);
+      flushMicrotasks();
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ sort: component.sortOptions[1].name }) }),
+      );
+
+      router.navigate.calls.reset();
+      component.loadPage(2);
+      flushMicrotasks();
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ page: 2 }) }),
+      );
+    }));
   });
 
   describe('deletePackage', () => {

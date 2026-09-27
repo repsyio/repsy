@@ -39,3 +39,12 @@ export function profileRoute(): string {
 export function urlEndsWith(path: string): RegExp {
   return new RegExp(`${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
 }
+
+/**
+ * The URL's pathname is exactly `path`, whatever its query string carries: for `expect(page).toHaveURL(...)`
+ * on a list page (RPS-1668: the repositories, package and users lists keep their search, sort, page and
+ * type in the query string), where a test means "still on this page", not "with no query string at all".
+ */
+export function urlHasPath(path: string): (url: URL) => boolean {
+  return (url) => url.pathname === path;
+}

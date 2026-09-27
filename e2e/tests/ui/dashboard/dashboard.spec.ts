@@ -24,7 +24,7 @@ import type { APIRequestContext } from '@playwright/test';
 
 import { type PanelBackend, RepoType } from '../../../src/api/panel-backend.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
-import { repoRoute } from '../../../src/ui/routes.js';
+import { repoRoute, urlHasPath } from '../../../src/ui/routes.js';
 import { DashboardPage, RECENT_ACTIVITY_SIZE } from '../../../src/ui/pages/dashboard.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
@@ -166,7 +166,9 @@ test.describe('Dashboard', () => {
       });
       await repos.afterListResponse(() => dashboard.countRow(maven).click(), { type: maven });
 
-      await expect(adminPage).toHaveURL('/repositories');
+      // RPS-1668: the click now puts the type into the URL too (`?type=maven`), so a reload or a
+      // Back keeps the dashboard's filter; the path is still the repositories list.
+      await expect(adminPage).toHaveURL(urlHasPath('/repositories'));
       await expect(repos.typeFilterText()).toHaveText(maven.label);
       // ONE list request, filtered by the server to Maven: the type came from the click.
       expect(listRequests).toHaveLength(1);

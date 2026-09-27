@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 import { ComponentFixture, fakeAsync, flush, TestBed, tick } from '@angular/core/testing';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import moment from 'moment';
 import { NEVER, of, Subject, throwError } from 'rxjs';
 
@@ -32,11 +33,31 @@ function pageOf(content: UserResponse[] | undefined, totalPages = 1): PagedModel
   return { content, page: { number: 0, size: 10, totalElements: content?.length ?? 0, totalPages } };
 }
 
+/** A fake `ActivatedRoute` carrying the query params a test wants the component to start from. */
+function activatedRoute(queryParams: Record<string, string> = {}): ActivatedRoute {
+  return { snapshot: { queryParamMap: convertToParamMap(queryParams) } } as ActivatedRoute;
+}
+
 describe('UserManagementComponent', () => {
   let component: UserManagementComponent;
   let userService: jasmine.SpyObj<UserService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
+  let router: jasmine.SpyObj<Router>;
+
+  /** Builds the component with `queryParams` as the URL it starts from (RPS-1668: `q`, `page`). */
+  function build(queryParams: Record<string, string> = {}): UserManagementComponent {
+    return new UserManagementComponent(
+      activatedRoute(queryParams),
+      router,
+      userService,
+      toastService,
+      dangerModalService,
+      {
+        username: 'admin',
+      } as AuthService,
+    );
+  }
 
   beforeEach(() => {
     userService = jasmine.createSpyObj<UserService>('UserService', [
@@ -51,9 +72,8 @@ describe('UserManagementComponent', () => {
     userService.resetPassword.and.returnValue(of('N3w-Passw0rd'));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
-    component = new UserManagementComponent(userService, toastService, dangerModalService, {
-      username: 'admin',
-    } as AuthService);
+    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
+    component = build();
   });
 
   afterEach(() => component.ngOnDestroy());
@@ -139,6 +159,69 @@ describe('UserManagementComponent', () => {
       expect(component.pageNum).toBe(0);
       expect(userService.listUsers.calls.mostRecent().args).toEqual([undefined, 0, 10]);
     }));
+  });
+
+  describe('the URL (RPS-1668: a reload or Back restores the list, not an empty one)', () => {
+    it('starts with the search and page given in the URL', () => {
+      const restored = build({ q: 'ali', page: '2' });
+
+      expect(restored.searchQuery).toBe('ali');
+      expect(restored.appliedQuery).toBe('ali');
+      expect(restored.pageNum).toBe(2);
+
+      restored.ngOnInit();
+      expect(userService.listUsers).toHaveBeenCalledOnceWith('ali', 2, 10);
+    });
+
+    it('falls back to page 0 for a page that is not a non-negative integer', () => {
+      expect(build({ page: 'bogus' }).pageNum).toBe(0);
+    });
+
+    it('does not navigate when the URL already matches what init loads (no reload loop)', () => {
+      component.ngOnInit();
+
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it('puts the page into the URL on loadPage', () => {
+      component.ngOnInit();
+      router.navigate.calls.reset();
+
+      component.loadPage(3);
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ page: 3 }) }),
+      );
+    });
+
+    it('puts the applied search into the URL once the typing pauses, not on every keystroke', fakeAsync(() => {
+      component.ngOnInit();
+      router.navigate.calls.reset();
+
+      component.search('ali');
+      expect(router.navigate).not.toHaveBeenCalled();
+
+      tick(USER_SEARCH_DEBOUNCE_MS);
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ q: 'ali', page: null }) }),
+      );
+    }));
+
+    it('drops q and page from the URL on refreshPage', () => {
+      const restored = build({ q: 'ali', page: '2' });
+      restored.ngOnInit();
+      router.navigate.calls.reset();
+
+      restored.refreshPage();
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: { q: null, page: null } }),
+      );
+    });
   });
 
   describe('typing into the search box', () => {
@@ -556,6 +639,8 @@ describe('UserManagementComponent search box', () => {
     TestBed.configureTestingModule({
       imports: [UserManagementComponent],
       providers: [
+        { provide: ActivatedRoute, useValue: activatedRoute() },
+        { provide: Router, useValue: jasmine.createSpyObj<Router>('Router', ['navigate']) },
         { provide: UserService, useValue: userService },
         { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
       ],

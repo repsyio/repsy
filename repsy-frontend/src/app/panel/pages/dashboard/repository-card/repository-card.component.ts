@@ -36,57 +36,45 @@ export class RepositoryCardComponent {
   @Input() nugetRepoCount: number;
   @Input() rubyRepoCount: number;
 
+  // RPS-1668: a `type` query param, not router state, so the repository list opens pre-filtered to
+  // this type even across a reload (the list itself owns restoring the rest of its state from the URL).
   routeMaven() {
-    this.router.navigate(['/repositories'], {
-      state: { repoType: 'maven' },
-    });
+    this.route('maven');
   }
 
   routeNpm() {
-    this.router.navigate(['/repositories'], {
-      state: { repoType: 'npm' },
-    });
+    this.route('npm');
   }
 
   routePypi() {
-    this.router.navigate(['/repositories'], {
-      state: { repoType: 'pypi' },
-    });
+    this.route('pypi');
   }
 
   routeDocker() {
-    this.router.navigate(['/repositories'], {
-      state: { repoType: 'docker' },
-    });
+    this.route('docker');
   }
 
   routeCargo() {
-    this.router.navigate(['/repositories'], {
-      state: { repoType: 'cargo' },
-    });
+    this.route('cargo');
   }
 
   routeGolang() {
-    this.router.navigate(['/repositories'], {
-      state: { repoType: 'golang' },
-    });
+    this.route('golang');
   }
 
   routeHelm() {
-    this.router.navigate(['/repositories'], {
-      state: { repoType: 'helm' },
-    });
+    this.route('helm');
   }
 
   routeNuget() {
-    this.router.navigate(['/repositories'], {
-      state: { repoType: 'nuget' },
-    });
+    this.route('nuget');
   }
 
   routeRuby() {
-    this.router.navigate(['/repositories'], {
-      state: { repoType: 'ruby' },
-    });
+    this.route('ruby');
+  }
+
+  private route(type: string): void {
+    this.router.navigate(['/repositories'], { queryParams: { type } });
   }
 }

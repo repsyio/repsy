@@ -30,7 +30,7 @@ import type { Locator, Page } from '@playwright/test';
 import { RepoType } from '../../../src/api/panel-api.js';
 import type { PackageProtocol, PackageRef } from '../../../src/seed/packages.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
-import { repoRoute } from '../../../src/ui/routes.js';
+import { repoRoute, urlHasPath } from '../../../src/ui/routes.js';
 import { OpenedTabs } from '../../../src/ui/new-tabs.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import {
@@ -212,14 +212,14 @@ test.describe('List rows are links', { tag: '@a11y' }, () => {
         .poll(newTabs, { message: 'a new tab opened on the repository' })
         .toEqual([expect.stringMatching(opened)]);
       await expect.poll(handled).toEqual([false]);
-      await expect(adminPage).toHaveURL(/\/repositories$/);
+      await expect(adminPage).toHaveURL(urlHasPath('/repositories'));
       await tabs.closeAll();
       await expect.poll(newTabs).toEqual([]);
 
       // A middle click does the same.
       await row.click({ button: 'middle' });
       await expect.poll(newTabs).toEqual([expect.stringMatching(opened)]);
-      await expect(adminPage).toHaveURL(/\/repositories$/);
+      await expect(adminPage).toHaveURL(urlHasPath('/repositories'));
       await tabs.closeAll();
       await expect.poll(newTabs).toEqual([]);
 
@@ -256,7 +256,7 @@ test.describe('List rows are links', { tag: '@a11y' }, () => {
     });
     expect(hit).toBe(true);
     // Opening the menu did not open the row.
-    await expect(adminPage).toHaveURL(/\/repositories$/);
+    await expect(adminPage).toHaveURL(urlHasPath('/repositories'));
 
     await item.click({ timeout: 3_000 });
     await expect(adminPage).toHaveURL(new RegExp(`/${top}/settings$`));
@@ -286,7 +286,7 @@ test.describe('List rows are links', { tag: '@a11y' }, () => {
     const row = dashboard.countRow(MAVEN_TYPE);
     await expect(row).toHaveJSProperty('tagName', 'BUTTON');
     await row.click();
-    await expect(adminPage).toHaveURL(/\/repositories$/);
+    await expect(adminPage).toHaveURL(urlHasPath('/repositories'));
   });
 
   // The list levels that have clickable rows, per protocol (the descriptor's `rowOpens`).
