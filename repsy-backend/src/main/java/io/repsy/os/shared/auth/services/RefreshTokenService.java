@@ -69,6 +69,17 @@ public class RefreshTokenService {
     throw new UnAuthorizedException(REFRESH_TOKEN_EXPIRED);
   }
 
+  /**
+   * Revokes every refresh token of {@code familyId}, so none of them can be exchanged again. Used
+   * for an explicit logout: unlike {@link #consume}, it neither requires nor marks a token used, so
+   * it also revokes a family whose current token was never spent, and it is idempotent (revoking an
+   * already-revoked or unknown family updates nothing and never fails).
+   */
+  @Transactional
+  public void revoke(final @NonNull UUID familyId) {
+    this.repository.revokeFamily(familyId, Instant.now());
+  }
+
   @Scheduled(fixedDelayString = "${os.auth.refresh-token-purge-delay-ms:3600000}")
   @Transactional
   public void purgeExpired() {

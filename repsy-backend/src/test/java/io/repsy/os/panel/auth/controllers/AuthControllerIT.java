@@ -103,17 +103,18 @@ class AuthControllerIT extends AbstractIntegrationTest {
 
   /** The text messages.properties gives each success id these tests assert on. */
   private static final Map<String, String> SUCCESS_TEXTS =
-      Map.of(
-          "loginSucceeded", "Log In succeeded.",
-          "passwordChanged", "Password changed.",
-          "passwordReset", "Password reset.",
-          "usernameUpdated", "Username successfully updated.",
-          "profileDeleted", "Profile account deleted.",
-          "profileFetched", "Profile fetched.",
-          "tokenRefreshed", "Token refreshed.",
-          "userCreated", "User created.",
-          "userUpdated", "User updated.",
-          "userDeleted", "User deleted.");
+      Map.ofEntries(
+          Map.entry("loginSucceeded", "Log In succeeded."),
+          Map.entry("passwordChanged", "Password changed."),
+          Map.entry("passwordReset", "Password reset."),
+          Map.entry("usernameUpdated", "Username successfully updated."),
+          Map.entry("profileDeleted", "Profile account deleted."),
+          Map.entry("profileFetched", "Profile fetched."),
+          Map.entry("loggedOut", "Logged out."),
+          Map.entry("tokenRefreshed", "Token refreshed."),
+          Map.entry("userCreated", "User created."),
+          Map.entry("userUpdated", "User updated."),
+          Map.entry("userDeleted", "User deleted."));
 
   private static final String[] LOGIN_INFO_KEYS = {"username", "token", "refreshToken"};
 
@@ -145,6 +146,15 @@ class AuthControllerIT extends AbstractIntegrationTest {
 
   private ResultActions refreshWith(final String refreshToken) throws Exception {
     return this.refresh(refreshBody(refreshToken));
+  }
+
+  private ResultActions logout(final String body) throws Exception {
+    return this.perform(
+        post("/api/auth/logout").contentType(MediaType.APPLICATION_JSON).content(body));
+  }
+
+  private ResultActions logoutWith(final String refreshToken) throws Exception {
+    return this.logout(refreshBody(refreshToken));
   }
 
   /** A refresh token of a session the user logged into just now, at the user's current version. */
@@ -1248,6 +1258,188 @@ class AuthControllerIT extends AbstractIntegrationTest {
   }
 
   // ---------------------------------------------------------------------------------------------
+  // POST /api/auth/logout
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * RPS-1622 (G06): a copied or leaked refresh token kept working indefinitely, because nothing
+   * server-side answered "log out". The refresh token is the credential, exactly as for {@code
+   * /tokens/refresh}: no {@code Authorization} header is needed or checked.
+   */
+  @Nested
+  @DisplayName("POST /api/auth/logout")
+  class Logout {
+
+    @Test
+    @DisplayName("revokes the family: the same refresh token can no longer be exchanged")
+    void revokesTheFamily() throws Exception {
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("logout"), UserRole.USER);
+      final var loginBody =
+          expectSuccess(
+              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
+      final String refreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
+
+      expectSuccess(AuthControllerIT.this.logoutWith(refreshToken), "loggedOut");
+
+      expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(refreshToken));
+    }
+
+    @Test
+    @DisplayName("revokes the whole family, including a rotated child the copy never saw")
+    void revokesARotatedChild() throws Exception {
+      final var user =
+          AuthControllerIT.this.createUser(uniqueUsername("logoutchild"), UserRole.USER);
+      final var loginBody =
+          expectSuccess(
+              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
+      final String originalRefreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
+      final var refreshedBody =
+          expectSuccess(AuthControllerIT.this.refreshWith(originalRefreshToken), "tokenRefreshed");
+      final String childRefreshToken = JsonPath.read(refreshedBody, "$.data.refreshToken");
+
+      expectSuccess(AuthControllerIT.this.logoutWith(childRefreshToken), "loggedOut");
+
+      expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(childRefreshToken));
+    }
+
+    @Test
+    @DisplayName(
+        "revokes a family whose current token was never spent (a plain login, then logout)")
+    void revokesAFamilyThatWasNeverRefreshed() throws Exception {
+      final var user =
+          AuthControllerIT.this.createUser(uniqueUsername("logoutunspent"), UserRole.USER);
+      final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
+
+      expectSuccess(AuthControllerIT.this.logoutWith(refreshToken), "loggedOut");
+
+      expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(refreshToken));
+    }
+
+    @Test
+    @DisplayName("is idempotent: logging out twice with the same token still answers loggedOut")
+    void isIdempotent() throws Exception {
+      final var user =
+          AuthControllerIT.this.createUser(uniqueUsername("logouttwice"), UserRole.USER);
+      final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
+
+      expectSuccess(AuthControllerIT.this.logoutWith(refreshToken), "loggedOut");
+      expectSuccess(AuthControllerIT.this.logoutWith(refreshToken), "loggedOut");
+    }
+
+    @Test
+    @DisplayName("leaves another session (a different login) of the same user alone")
+    void leavesOtherSessionsOfTheSameUserAlone() throws Exception {
+      final var user =
+          AuthControllerIT.this.createUser(uniqueUsername("logoutother"), UserRole.USER);
+      final var firstLogin =
+          expectSuccess(
+              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
+      final String firstRefreshToken = JsonPath.read(firstLogin, "$.data.refreshToken");
+      final var secondLogin =
+          expectSuccess(
+              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
+      final String secondRefreshToken = JsonPath.read(secondLogin, "$.data.refreshToken");
+
+      expectSuccess(AuthControllerIT.this.logoutWith(firstRefreshToken), "loggedOut");
+
+      expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(firstRefreshToken));
+      expectSuccess(AuthControllerIT.this.refreshWith(secondRefreshToken), "tokenRefreshed");
+    }
+
+    @Test
+    @DisplayName("needs no Authorization header, and ignores an invalid one")
+    void ignoresAuthorizationHeader() throws Exception {
+      final var user =
+          AuthControllerIT.this.createUser(uniqueUsername("logoutnoauth"), UserRole.USER);
+      final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
+
+      expectSuccess(
+          AuthControllerIT.this.perform(
+              post("/api/auth/logout")
+                  .header(AUTHORIZATION, "Bearer not-a-jwt")
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(refreshBody(refreshToken))),
+          "loggedOut");
+    }
+
+    @Test
+    @DisplayName("returns 401 accessNotAllowed for an access token")
+    void rejectsAnAccessTokenAsRefreshToken() throws Exception {
+      final var user =
+          AuthControllerIT.this.createUser(uniqueUsername("logoutaccess"), UserRole.USER);
+      final var loginBody =
+          expectSuccess(
+              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
+      final String accessToken = JsonPath.read(loginBody, "$.data.token");
+
+      expectAccessNotAllowed(AuthControllerIT.this.logoutWith(accessToken));
+    }
+
+    @Test
+    @DisplayName("returns 401 accessNotAllowed for a claim-less legacy token without an audience")
+    void rejectsAClaimlessLegacyToken() throws Exception {
+      final var user =
+          AuthControllerIT.this.createUser(uniqueUsername("logoutlegacy"), UserRole.USER);
+      final var legacyToken =
+          AuthControllerIT.this.claimlessToken(
+              user.getId(), user.getUsername(), AuthUtils.TIMEOUT_REFRESH_TOKEN);
+
+      expectAccessNotAllowed(AuthControllerIT.this.logoutWith(legacyToken));
+    }
+
+    @Test
+    @DisplayName("returns 401 refreshTokenExpired for an already-expired token")
+    void expiredToken() throws Exception {
+      final var user =
+          AuthControllerIT.this.createUser(uniqueUsername("logoutexpired"), UserRole.USER);
+      final var expired =
+          AuthControllerIT.this.jwtUtils.createRefreshToken(
+              user.getId(),
+              user.getUsername(),
+              Duration.ofSeconds(-30),
+              Instant.now(),
+              user.getTokenVersion());
+
+      expectRefreshTokenExpired(AuthControllerIT.this.logoutWith(expired));
+    }
+
+    @Test
+    @DisplayName("returns 401 accessNotAllowed for a token that is not a JWT")
+    void malformedToken() throws Exception {
+      expectAccessNotAllowed(AuthControllerIT.this.logoutWith("not-a-jwt"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidBodies")
+    @DisplayName("returns 400 validationError for an unreadable RefreshTokenForm")
+    void invalidBody(final String name, final String body) throws Exception {
+      expectValidationError(AuthControllerIT.this.logout(body));
+    }
+
+    static Stream<Arguments> invalidBodies() {
+      return Stream.of(
+          Arguments.of("null body", "null"),
+          Arguments.of("empty body", ""),
+          Arguments.of("malformed JSON", "{not-json"),
+          Arguments.of("JSON array", "[]"),
+          Arguments.of("JSON string", "\"token\""),
+          Arguments.of("empty object", "{}"),
+          Arguments.of("null refreshToken", "{\"refreshToken\":null}"),
+          Arguments.of("empty refreshToken", "{\"refreshToken\":\"\"}"));
+    }
+
+    @Test
+    @DisplayName("returns 415 unsupportedMediaType for an unsupported content type")
+    void unsupportedContentType() throws Exception {
+      expectUnsupportedMediaType(
+          AuthControllerIT.this.perform(
+              post("/api/auth/logout")
+                  .contentType(MediaType.TEXT_PLAIN)
+                  .content(refreshBody("some-token"))));
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
   // refresh_tokens rows of a deleted user (RPS-1082)
   // ---------------------------------------------------------------------------------------------
 
@@ -1382,7 +1574,10 @@ class AuthControllerIT extends AbstractIntegrationTest {
           Arguments.of("DELETE /api/auth/login", delete("/api/auth/login")),
           Arguments.of("GET /api/auth/tokens/refresh", get("/api/auth/tokens/refresh")),
           Arguments.of("PATCH /api/auth/tokens/refresh", patch("/api/auth/tokens/refresh")),
-          Arguments.of("PUT /api/auth/tokens/refresh", put("/api/auth/tokens/refresh")));
+          Arguments.of("PUT /api/auth/tokens/refresh", put("/api/auth/tokens/refresh")),
+          Arguments.of("GET /api/auth/logout", get("/api/auth/logout")),
+          Arguments.of("PUT /api/auth/logout", put("/api/auth/logout")),
+          Arguments.of("DELETE /api/auth/logout", delete("/api/auth/logout")));
     }
   }
 }

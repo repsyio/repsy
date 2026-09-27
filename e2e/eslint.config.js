@@ -119,6 +119,7 @@ export default tseslint.config(
             'expectPagingSweep',
             'expectCovers',
             'expectVisual',
+            'expectSessionEndedOnNextRequest',
           ],
         },
       ],

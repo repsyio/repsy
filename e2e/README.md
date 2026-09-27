@@ -5740,7 +5740,7 @@ own stub below, so the unchanged heading lines keep git's hunks apart; the Layou
 
 ### Auth, guards and session (RPS-1251)
 
-`tests/ui/auth/{login,guards,session,multi-tab,session-write,access-token-fragment}.spec.ts` (AUTH-01..15). Run them with
+`tests/ui/auth/{login,guards,session,multi-tab,session-write,access-token-fragment,revocation}.spec.ts` (AUTH-01..17). Run them with
 `./run.sh test --protocol ui --grep AUTH-`. UI login is typed ONLY in these specs; every other UI suite
 logs in through the API fixtures. No test changes the admin or its password: the admin only types its
 own credentials (AUTH-01), and negative logins use a seeded user or a name that does not exist.
@@ -5825,10 +5825,40 @@ Things a later author must know:
   POST, PUT, PATCH and DELETE with their body. Since RPS-1621 a session that ends under the user goes to
   `/login?returnUrl=<the page it was on>` (nothing to remember on `/` or `/login`), so a new login returns
   there.
-- **Repsy Cloud** has its own `auth.service`/interceptor and stateless refresh tokens, so the two-tab race does
-  not exist there (RPS-1535: the fix applies if a refresh-token registry arrives); the specs run against it
-  unchanged and must stay green. Its `#access_token` initializer is the same leftover (its OAuth uses
-  `postMessage`).
+- **Repsy Cloud** had its own `auth.service`/interceptor and, until RPS-1535, stateless refresh tokens, so the
+  two-tab race did not exist there; the specs run against it unchanged and must stay green. RPS-1535 has
+  since landed a refresh-token registry on Cloud too (family-reuse revocation, a 24h session cap and
+  revoke-on-credential-change, repsy-mono#1571/#1572), so this note wants re-checking against Cloud's own
+  e2e suite rather than assumed still true. Its `#access_token` initializer is the same leftover (its OAuth
+  uses `postMessage`).
+
+#### A second open session, and logout (RPS-1622)
+
+`tests/ui/auth/revocation.spec.ts` (AUTH-16, AUTH-17). `./run.sh test --protocol ui --grep RPS-1622`.
+
+AUTH-16 (G04) is the second-tab side of what `session.spec.ts`'s AUTH-09 already pins from a stubbed
+answer: a SECOND, independent login of the same user (or, for the admin-driven triggers, a second seeded
+admin) stays open in page A while page B (its own context) makes the credential-ending change; page A is
+then reloaded, with no `expireAccessToken` stub, because the 401 is real from the moment the change
+commits, not only once the access token's 30-minute lifetime is up.
+
+| Trigger (page B)                        | What page A sees on its next request                                                                                                                                                      |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| own password change (`ProfilePage`)      | 401 `sessionExpired` -> a real, refused refresh (`refreshTokenExpired`) -> logout, toast "Session expired, please log in again.", `/login`                                                  |
+| admin password reset (`UsersPage`)       | same as above                                                                                                                                                                                |
+| admin deletes the user (`UsersPage`)     | 401 `unAuthorized` (the row is gone): the interceptor logs out AT ONCE, no refresh attempt, toast "Session invalid, please log in again." (`RefreshTokenInterceptor`'s "every other 401")   |
+| admin demotes the user, SAME username    | nothing: `UserTxService.updateUserDetails` only bumps `token_version` inside its username-changed branch, so a role-only change leaves the token valid (AUTH-12); page A stays signed in, and only loses access to admin-only pages (`adminGuard` re-reads the profile on every navigation) |
+
+The demotion row is deliberate, not a gap: this file pins it instead of the "session dies" premise a
+first reading of the ticket suggests, and says why next to the test.
+
+AUTH-17 (G06) is `POST /api/auth/logout` (`AuthController`, `RefreshTokenService.revoke`), added by this
+ticket because nothing server-side answered "log out" before it: a refresh token copied out of
+`localStorage` before a click on Logout kept exchanging for new pairs indefinitely. `AuthService.logOut()`
+now calls it (fire-and-forget: a client-side logout must not be able to fail or hang on the network) with
+the refresh token it is about to discard, and the spec proves both the wire call (`msgId: "loggedOut"`)
+and the outcome (the copied token answers `refreshTokenExpired` afterwards, the same as an already-used
+one).
 
 ### Repositories and dashboard (RPS-1252)
 
@@ -5882,7 +5912,7 @@ Things a test here relies on, which a change to the page can break:
 
 ### Users and profile (RPS-1253)
 
-Specs: `tests/ui/users/{users-create,users-edit-delete,users-reset-password,users-list}.spec.ts` and
+Specs: `tests/ui/users/{users-create,users-edit-delete,users-reset-password,users-list,users-self}.spec.ts` and
 `tests/ui/profile/profile.spec.ts`. Page objects: `src/ui/pages/{users,profile,one-time-secret-modal}.ts`
 (`UsersPage` with its `UserCreateModal`/`UserEditModal`, `ProfilePage`, `OneTimeSecretModal` for the
 "shown once" reset-password modal, parameterised by ids so a token modal can reuse it). Fixtures on top
@@ -5897,6 +5927,7 @@ user the UI is about to create so a failing test still cleans it up).
 | USR-04   | reset password: one-time modal, the new password logs in, the old one is refused, cancel resets nothing                              |
 | USR-05   | delete (cancel, then confirm), delete next to another admin, a lone admin in the view is still deletable                             |
 | USR-06   | 11 users: search (incl. case-insensitive, no match with its `No user matches` message), pagination both ways, refresh                |
+| USR-07   | RPS-1622 (G05): a SEEDED admin acting on their OWN row (a second seeded admin present, so "last admin" never fires): no special warning, reset own password ends their own session on the next request, demote self keeps them signed in but 403s the list refresh it triggers, delete self ends their own session |
 | PRO-01   | change password: mismatch, cancel, confirm, re-login with the new one, the old one refused; field validation                         |
 | PRO-02   | change username: reload as the new name, same account, repo protocol URL and repo page still work; validation; taken name            |
 | PRO-03   | delete account: cancel, confirm, logged out, login refused                                                                           |
@@ -5910,7 +5941,10 @@ Rules these specs follow (and a later spec on these pages should too):
   admin's own credentials are untouched); `UsersPage.clickDelete`/`clickResetPassword` refuse the admin's row.
   The suite never edits, demotes or deletes the harness admin. Names a test creates or renames to come from
   `seeder.reserveUsername()`, so the `e2e-` prefix survives and sweep finds them; a renamed user is
-  cleaned up by id.
+  cleaned up by id. USR-07 (`users-self.spec.ts`) is neither of those: it is a SEEDED admin acting on
+  their OWN row, in its OWN context (`openUiPage`, never `adminPage`/`usersPage`, which are the harness
+  admin) - `assertNotAdmin` only refuses `env.adminUsername`, so it does not stand in the way of a seeded
+  admin resetting, demoting or deleting themselves, which is exactly the gap the file closes.
 - **Last admin.** The panel decides "last admin" from the server's admin count (`GET /api/users/admin-count`,
   RPS-1246), not from the page it shows, and the server guards the real one, which the backend ITs cover.
   A shared stack always has the harness admin, so the real last-admin state is unreachable here (the
