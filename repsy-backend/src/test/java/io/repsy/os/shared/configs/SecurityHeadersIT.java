@@ -21,17 +21,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import io.repsy.os.spa.controllers.AbstractStaticFrontendIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
 /**
  * RPS-1131: {@link SecurityHeadersFilter} pins a {@code Content-Security-Policy} header on the
@@ -40,31 +33,12 @@ import org.springframework.test.context.DynamicPropertySource;
  *
  * <p>{@code spring.web.resources.static-locations} normally points at the built frontend, which
  * this backend-only build does not produce, so this class points it at a temporary directory with a
- * minimal {@code index.html} instead, giving {@code SpaController}'s {@code forward:/index.html}
- * something to actually resolve. That is a different context configuration than every other IT
- * class shares, so it boots a Spring context of its own.
+ * minimal {@code index.html} instead (see {@link AbstractStaticFrontendIntegrationTest}, which it
+ * shares with {@code SpaControllerIT}). That is a different context configuration than every other
+ * IT class shares, so it boots a Spring context of its own.
  */
 @DisplayName("Content-Security-Policy header (RPS-1131)")
-class SecurityHeadersIT extends AbstractIntegrationTest {
-
-  private static final Path STATIC_ROOT;
-
-  static {
-    try {
-      STATIC_ROOT = Files.createTempDirectory("repsy-it-static");
-      Files.writeString(
-          STATIC_ROOT.resolve("index.html"),
-          "<!doctype html><html><body>panel</body></html>",
-          StandardCharsets.UTF_8);
-    } catch (final IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  @DynamicPropertySource
-  static void registerStaticLocation(final DynamicPropertyRegistry registry) {
-    registry.add("spring.web.resources.static-locations", () -> "file:" + STATIC_ROOT + "/");
-  }
+class SecurityHeadersIT extends AbstractStaticFrontendIntegrationTest {
 
   @Test
   @DisplayName("is present on GET /")
