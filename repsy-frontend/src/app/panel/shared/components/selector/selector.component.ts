@@ -44,8 +44,12 @@ export class SelectorComponent implements OnInit {
     }
   }
 
-  toggleDropdown(event: Event) {
-    event.stopPropagation();
+  /**
+   * The click is not stopped here: it has to reach the document, where an open row menu (`app-dropdown`) and
+   * any other open selector close on a click outside of themselves (RPS-1565). This selector's own menu ignores
+   * clicks inside it (`OutSideClickDirective`), so the toggle still opens and closes it.
+   */
+  toggleDropdown() {
     this.isOpen = !this.isOpen;
   }
 

@@ -60,15 +60,30 @@ describe('SortSelectorComponent', () => {
   });
 
   describe('toggleDropdown', () => {
-    it('opens and closes the dropdown without letting the click reach the page behind it', () => {
-      const event = jasmine.createSpyObj<Event>('Event', ['stopPropagation']);
-
-      component.toggleDropdown(event);
+    it('opens and closes the dropdown', () => {
+      component.toggleDropdown();
       expect(component.isOpen).toBeTrue();
 
-      component.toggleDropdown(event);
+      component.toggleDropdown();
       expect(component.isOpen).toBeFalse();
-      expect(event.stopPropagation).toHaveBeenCalledTimes(2);
+    });
+
+    it('lets the click reach the document, so an open row menu closes (RPS-1565)', () => {
+      const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+      const stop = spyOn(click, 'stopPropagation').and.callThrough();
+      const reachedDocument = jasmine.createSpy('documentClick');
+      document.addEventListener('click', reachedDocument);
+
+      try {
+        toggle().dispatchEvent(click);
+      } finally {
+        document.removeEventListener('click', reachedDocument);
+      }
+      fixture.detectChanges();
+
+      expect(stop).not.toHaveBeenCalled();
+      expect(reachedDocument).toHaveBeenCalledTimes(1);
+      expect(menu()).not.toBeNull();
     });
 
     it('shows the menu while open', () => {

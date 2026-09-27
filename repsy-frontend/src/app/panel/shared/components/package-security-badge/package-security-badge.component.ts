@@ -51,8 +51,11 @@ export class PackageSecurityBadgeComponent implements OnInit {
     this.isSupported$ = this.securityScanSupportService.isSupported(this.repoType);
   }
 
-  public openModal(event: Event): void {
-    event.stopPropagation();
+  /**
+   * Opens the modal. The click is not stopped: the badge is a sibling of the row's link, not a child, so it
+   * cannot open the row, and it has to reach the document so that an open row menu or selector closes (RPS-1565).
+   */
+  public openModal(): void {
     this.showModal = true;
   }
 }

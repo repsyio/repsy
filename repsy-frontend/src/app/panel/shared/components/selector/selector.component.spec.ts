@@ -50,4 +50,32 @@ describe('SelectorComponent', () => {
     expect(button.disabled).toBeTrue();
     expect(el.querySelector('[data-testid="selector-menu"]')).toBeNull();
   });
+
+  it('lets the click on its toggle reach the document, so an open row menu closes, and still toggles (RPS-1565)', async () => {
+    const { el, fixture } = await renderComponent(SelectorComponent, [], {
+      options: OPTIONS,
+      selectedOption: 'all packages',
+    });
+    const toggle = el.querySelector<HTMLButtonElement>('[data-testid="selector-toggle"]');
+    const menu = () => el.querySelector('[data-testid="selector-menu"]');
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    const stop = spyOn(click, 'stopPropagation').and.callThrough();
+    const reachedDocument = jasmine.createSpy('documentClick');
+    document.addEventListener('click', reachedDocument);
+
+    try {
+      toggle.dispatchEvent(click);
+    } finally {
+      document.removeEventListener('click', reachedDocument);
+    }
+    fixture.detectChanges();
+
+    expect(stop).not.toHaveBeenCalled();
+    expect(reachedDocument).toHaveBeenCalledTimes(1);
+    expect(menu()).not.toBeNull();
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(menu()).toBeNull();
+  });
 });

@@ -166,6 +166,29 @@ describe('DropdownComponent', () => {
     expect(menu('first')).toBeNull();
   });
 
+  it('closes on a click outside that another control stops from bubbling (RPS-1565)', () => {
+    const outside = el('#outside');
+    outside.addEventListener('click', (event) => event.stopPropagation());
+    trigger('first').click();
+    fixture.detectChanges();
+    expect(menu('first')).not.toBeNull();
+
+    outside.click();
+    fixture.detectChanges();
+
+    expect(menu('first')).toBeNull();
+    expect(trigger('first').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('stops listening to the document once it is destroyed', () => {
+    const removed = spyOn(document, 'removeEventListener').and.callThrough();
+
+    fixture.destroy();
+
+    expect(removed).toHaveBeenCalledWith('click', jasmine.any(Function), true);
+    expect(() => document.body.click()).not.toThrow();
+  });
+
   it('closes when a click lands outside', () => {
     trigger('first').click();
     fixture.detectChanges();
