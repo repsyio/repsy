@@ -26,11 +26,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 @DisplayName("SpooledUpload")
 class SpooledUploadTest {
@@ -42,11 +42,15 @@ class SpooledUploadTest {
     return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
   }
 
-  private static Set<Path> spooledFiles() throws IOException {
-    try (final Stream<Path> files = Files.list(Path.of(System.getProperty("java.io.tmpdir")))) {
-      return files
-          .filter(path -> path.getFileName().toString().startsWith("repsy-upload-"))
-          .collect(Collectors.toSet());
+  /**
+   * The directory the spooling tests write to, so a test never counts files of another process in
+   * the shared temporary directory (RPS-1464).
+   */
+  @TempDir private Path spoolDir;
+
+  private List<Path> spooledFiles() throws IOException {
+    try (final Stream<Path> files = Files.list(this.spoolDir)) {
+      return files.toList();
     }
   }
 
@@ -66,7 +70,8 @@ class SpooledUploadTest {
   @Test
   @DisplayName("openStream() reads the upload from the start every time")
   void canBeReadAgain() throws Exception {
-    try (final var upload = SpooledUpload.spool(new ByteArrayInputStream(CONTENT))) {
+    try (final var upload =
+        SpooledUpload.spool(new ByteArrayInputStream(CONTENT), Long.MAX_VALUE, this.spoolDir)) {
       try (final var in = upload.openStream()) {
         assertThat(in.readNBytes(10)).hasSize(10);
       }
@@ -80,7 +85,8 @@ class SpooledUploadTest {
   @Test
   @DisplayName("spool() accepts an empty upload")
   void spoolsEmptyUpload() throws Exception {
-    try (final var upload = SpooledUpload.spool(new ByteArrayInputStream(new byte[0]))) {
+    try (final var upload =
+        SpooledUpload.spool(new ByteArrayInputStream(new byte[0]), Long.MAX_VALUE, this.spoolDir)) {
       assertThat(upload.size()).isZero();
       assertThat(upload.sha256Hex()).isEqualTo(sha256Of(new byte[0]));
     }
@@ -98,21 +104,20 @@ class SpooledUploadTest {
   @Test
   @DisplayName("spool() refuses an upload past the limit and leaves no file behind")
   void refusesUploadPastLimit() throws Exception {
-    final var before = spooledFiles();
-
     assertThatThrownBy(
-            () -> SpooledUpload.spool(new ByteArrayInputStream(CONTENT), CONTENT.length - 1L))
+            () ->
+                SpooledUpload.spool(
+                    new ByteArrayInputStream(CONTENT), CONTENT.length - 1L, this.spoolDir))
         .isInstanceOfSatisfying(
             EntryTooLargeException.class,
             e -> assertThat(e.getMaxBytes()).isEqualTo(CONTENT.length - 1L));
 
-    assertThat(spooledFiles()).isEqualTo(before);
+    assertThat(this.spooledFiles()).isEmpty();
   }
 
   @Test
   @DisplayName("spool() leaves no file behind when the source fails halfway")
   void leavesNoFileWhenSourceFails() throws Exception {
-    final var before = spooledFiles();
     final InputStream failing =
         new InputStream() {
           private int served;
@@ -132,11 +137,11 @@ class SpooledUploadTest {
           }
         };
 
-    assertThatThrownBy(() -> SpooledUpload.spool(failing))
+    assertThatThrownBy(() -> SpooledUpload.spool(failing, Long.MAX_VALUE, this.spoolDir))
         .isInstanceOf(IOException.class)
         .hasMessage("connection reset");
 
-    assertThat(spooledFiles()).isEqualTo(before);
+    assertThat(this.spooledFiles()).isEmpty();
   }
 
   @Test
@@ -152,7 +157,7 @@ class SpooledUploadTest {
           }
         };
 
-    try (final var upload = SpooledUpload.spool(source)) {
+    try (final var upload = SpooledUpload.spool(source, Long.MAX_VALUE, this.spoolDir)) {
       assertThat(upload.size()).isEqualTo(CONTENT.length);
     }
 
@@ -162,14 +167,14 @@ class SpooledUploadTest {
   @Test
   @DisplayName("close() deletes the temporary file, and can be called twice")
   void closeDeletesFile() throws Exception {
-    final var before = spooledFiles();
-    final var upload = SpooledUpload.spool(new ByteArrayInputStream(CONTENT));
+    final var upload =
+        SpooledUpload.spool(new ByteArrayInputStream(CONTENT), Long.MAX_VALUE, this.spoolDir);
 
-    assertThat(spooledFiles()).hasSize(before.size() + 1);
+    assertThat(this.spooledFiles()).hasSize(1);
 
     upload.close();
     upload.close();
 
-    assertThat(spooledFiles()).isEqualTo(before);
+    assertThat(this.spooledFiles()).isEmpty();
   }
 }
