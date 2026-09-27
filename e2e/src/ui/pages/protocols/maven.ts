@@ -42,6 +42,11 @@ function coordinates(target: PackageRef | undefined): {
  *    highlighted `<code>`. RPS-1261 (fixed): its Gradle Groovy snippet used to show the
  *    Grape snippet (a duplicate); PKG-maven-07 asserts the Gradle one. All values here were
  *    confirmed in a browser (RPS-1256).
+ *  - The versions list has a `row-signed` cell, `Signed` or `Unsigned` with a closed or open lock (a boolean
+ *    the server computes, RPS-1626); a SNAPSHOT is ONE row however many timestamped builds it has. The detail
+ *    page says `Signed: Yes|No` in `pkg-detail-meta-signed`. The file browser (`extraPaths.browser`) has three
+ *    states: `maven-browser-grid`, `empty-list` (nothing stored) and `maven-browser-not-found` (a directory
+ *    that cannot be listed).
  *  - The detail page has no version badge and no "published" line, so those ids do not exist here.
  */
 export const mavenDescriptor: ProtocolDescriptor = {
