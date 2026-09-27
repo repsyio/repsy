@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { ActivatedRouteSnapshot, Router, RouterStateSnapshot } from '@angular/router';
+import { ActivatedRouteSnapshot, Router, RouterStateSnapshot, UrlTree } from '@angular/router';
 
 import { AuthService } from '../pages/service/auth.service';
 import { AuthRedirectGuard } from './auth-redirect.guard';
@@ -22,6 +22,7 @@ import { AuthRedirectGuard } from './auth-redirect.guard';
 describe('AuthRedirectGuard', () => {
   const route = {} as ActivatedRouteSnapshot;
   const state = {} as RouterStateSnapshot;
+  const rootTree = new UrlTree();
 
   let authService: jasmine.SpyObj<AuthService>;
   let router: jasmine.SpyObj<Router>;
@@ -29,8 +30,8 @@ describe('AuthRedirectGuard', () => {
 
   beforeEach(() => {
     authService = jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated']);
-    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
-    router.navigateByUrl.and.resolveTo(true);
+    router = jasmine.createSpyObj<Router>('Router', ['createUrlTree', 'navigateByUrl']);
+    router.createUrlTree.and.returnValue(rootTree);
     guard = new AuthRedirectGuard(router, authService);
   });
 
@@ -45,15 +46,16 @@ describe('AuthRedirectGuard', () => {
         authService.isAuthenticated.and.returnValue(false);
 
         expect(activate()).toBeTrue();
-        expect(router.navigateByUrl).not.toHaveBeenCalled();
+        expect(router.createUrlTree).not.toHaveBeenCalled();
       });
 
-      it('sends an already authenticated user to the root and blocks the route', async () => {
+      it('redirects an already authenticated user to the root with a UrlTree, which replaces the history entry', () => {
         authService.isAuthenticated.and.returnValue(true);
-        router.navigateByUrl.and.resolveTo(false);
 
-        expect(await activate()).toBeFalse();
-        expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/');
+        expect(activate()).toBe(rootTree);
+        expect(router.createUrlTree).toHaveBeenCalledOnceWith(['/']);
+        // Never a second navigation pushed from inside the guard: Back would land on /login again (RPS-1650).
+        expect(router.navigateByUrl).not.toHaveBeenCalled();
       });
     });
   });

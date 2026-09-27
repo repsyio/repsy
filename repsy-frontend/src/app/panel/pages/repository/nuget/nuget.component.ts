@@ -65,6 +65,7 @@ export class NugetComponent implements OnInit, OnDestroy {
       next: (repo: RepoPermissionInfo) => {
         if (repo.private && !this.isAuthenticated) {
           this.router.navigate(['/not-found'], {
+            replaceUrl: true,
             queryParams: {
               message: `Repository '${repoName}' not found`,
             },
@@ -77,7 +78,7 @@ export class NugetComponent implements OnInit, OnDestroy {
         this.loading = false;
       },
       error: () => {
-        this.router.navigate(['/not-found']);
+        this.router.navigate(['/not-found'], { replaceUrl: true });
       },
     });
   }

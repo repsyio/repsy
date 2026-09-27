@@ -220,7 +220,7 @@ export async function expectVersionNotFound(detail: VersionDetailPage): Promise<
  * logs an error toast as a console error, which the page-error fixture (RPS-1617) would fail on. The
  * toast is the by-design companion of the not-found state these scenarios provoke.
  */
-function allowNotFoundToast(pageErrors: PageErrors): void {
+export function allowNotFoundToast(pageErrors: PageErrors): void {
   pageErrors.allow(
     /not found/i,
     'by design: the error toast of the 404 a link to a missing version provokes (RPS-1625)',

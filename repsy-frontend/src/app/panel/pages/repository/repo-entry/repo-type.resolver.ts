@@ -15,7 +15,7 @@
 ///
 
 import { inject } from '@angular/core';
-import { ResolveFn, Router } from '@angular/router';
+import { RedirectCommand, ResolveFn, Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 
 import { RepoContext, RepoLookupService, RepoType } from './repo-lookup.service';
@@ -23,6 +23,13 @@ import { RepoContext, RepoLookupService, RepoType } from './repo-lookup.service'
 export type { RepoContext, RepoType };
 export type RepoRouteData = RepoContext;
 
+/**
+ * Answers with a `RedirectCommand` to /not-found instead of calling `router.navigate()` from in here (RPS-1650). A
+ * navigation started from a resolver is a NEW one: the entry of the unknown route stayed in the history and the
+ * 404 page was pushed on top of it, and after a Back (which is a popstate the router then restores) the visitor
+ * kept landing on the 404 page, whatever they pressed. A redirect is part of the navigation being resolved, so the
+ * router replaces the entry of the route that was not found (like the guards' `UrlTree` redirects do).
+ */
 export const repoTypeResolver: ResolveFn<RepoRouteData | null> = (route) => {
   const repoLookupService = inject(RepoLookupService);
   const router = inject(Router);
@@ -30,10 +37,7 @@ export const repoTypeResolver: ResolveFn<RepoRouteData | null> = (route) => {
   const repoName = route.paramMap.get('repoName');
 
   if (!repoName) {
-    router.navigate(['/not-found'], {
-      state: { message: 'Invalid repository path' },
-    });
-    return of(null);
+    return of(new RedirectCommand(router.parseUrl('/not-found'), { state: { message: 'Invalid repository path' } }));
   }
 
   return repoLookupService.getRepoType(repoName).pipe(
@@ -41,9 +45,6 @@ export const repoTypeResolver: ResolveFn<RepoRouteData | null> = (route) => {
       repoName,
       repoType,
     })),
-    catchError(() => {
-      router.navigate(['/not-found']);
-      return of(null);
-    }),
+    catchError(() => of(new RedirectCommand(router.parseUrl('/not-found')))),
   );
 };
