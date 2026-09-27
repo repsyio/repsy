@@ -32,7 +32,7 @@
  *  - NAV-09: a reload in the middle of the history keeps the entries around it working.
  *
  * What is pinned as a known failure (`test.fail`, NAV-04 "keeps its search, sort and page"): the list
- * comes back reset instead of as it was left. `RPS-TBD-list-state` is the ticket proposed in the PR of
+ * comes back reset instead of as it was left. `RPS-1668` is the ticket proposed in the PR of
  * RPS-1650; replace it with the key once filed.
  */
 import type { Page } from '@playwright/test';
@@ -65,7 +65,7 @@ function endsWith(path: string): RegExp {
 import type { PackageProtocol, PackageRef } from '../../../src/seed/packages.js';
 
 const NAV = '@nav';
-const LIST_STATE = 'RPS-TBD-list-state';
+const LIST_STATE = 'RPS-1668';
 
 /** The repository's row: click the free point of the row (the row is one stretched link). */
 async function openRepoRow(repos: RepositoriesPage, name: string): Promise<void> {
@@ -167,7 +167,7 @@ test.describe('Browser history: lists and details', { tag: NAV }, () => {
   });
 
   // Pinned: the state of a list is not in the URL and is not restored by Back (or by a reload).
-  test('NAV-04: the repository list keeps its search after Back [known failure: RPS-TBD-list-state]', async ({
+  test('NAV-04: the repository list keeps its search after Back [known failure: RPS-1668]', async ({
     adminPage,
     seeder,
   }) => {
@@ -185,7 +185,7 @@ test.describe('Browser history: lists and details', { tag: NAV }, () => {
     await expect(repos.rows()).toHaveCount(1);
   });
 
-  test('NAV-04: a package list keeps its page and sort after Back [known failure: RPS-TBD-list-state]', async ({
+  test('NAV-04: a package list keeps its page and sort after Back [known failure: RPS-1668]', async ({
     adminPage,
     seeder,
     seedPackages,
@@ -212,7 +212,7 @@ test.describe('Browser history: lists and details', { tag: NAV }, () => {
 
   // @cloud-skip: the Users page exists on Repsy OS only.
   test(
-    'NAV-04: the users list keeps its search after Back [known failure: RPS-TBD-list-state]',
+    'NAV-04: the users list keeps its search after Back [known failure: RPS-1668]',
     { tag: ['@cloud-skip'] },
     async ({ adminPage, seededUser }) => {
       test.fail(true, `${LIST_STATE}: the list comes back without the search it was left with`);

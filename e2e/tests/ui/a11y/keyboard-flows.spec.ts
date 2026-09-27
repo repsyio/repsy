@@ -256,14 +256,14 @@ test.describe('Keyboard: lists and menus', { tag: A11Y }, () => {
 
   // Pinned: a page change reloads the list behind a spinner and re-creates the pager (`@if (loading) ... @else`),
   // so the button that was pressed is gone and the focus falls back to the document.
-  test('A11Y-18: after a page change the focus is still in the pager [known failure: RPS-TBD-focus-loss]', async ({
+  test('A11Y-18: after a page change the focus is still in the pager [known failure: RPS-1669]', async ({
     adminPage,
     seeder,
     seedPackages,
   }) => {
     test.fail(
       true,
-      'RPS-TBD-focus-loss: the list is re-rendered on every load, so the focus is lost (document.body) after a page change',
+      'RPS-1669: the list is re-rendered on every load, so the focus is lost (document.body) after a page change',
     );
     const repo = await seeder.createRepo(RepoType.NPM);
     await seedPackages(repo, 12);
@@ -358,14 +358,14 @@ test.describe('Keyboard: lists and menus', { tag: A11Y }, () => {
   });
 
   // Pinned: the row that had the menu is re-rendered away and the focus falls back to the document.
-  test('A11Y-19: after a row is deleted the focus is on something in the page [known failure: RPS-TBD-focus-loss]', async ({
+  test('A11Y-19: after a row is deleted the focus is on something in the page [known failure: RPS-1669]', async ({
     adminPage,
     seeder,
     seedPackage,
   }) => {
     test.fail(
       true,
-      'RPS-TBD-focus-loss: the focus is lost (document.body) once the deleted row is gone',
+      'RPS-1669: the focus is lost (document.body) once the deleted row is gone',
     );
     const repo = await seeder.createRepo(RepoType.NPM);
     const gone = await seedPackage(repo, { index: 1 });
@@ -420,13 +420,13 @@ test.describe('Keyboard: lists and menus', { tag: A11Y }, () => {
 
 test.describe('Keyboard: the mobile menu', { tag: A11Y }, () => {
   // Pinned: the menu is a drawer (`aside`) without focus handling: the focus stays on the burger behind it.
-  test('A11Y-21: the burger opens the menu with Enter, focus moves into it, Escape closes it and gives the focus back [known failure: RPS-TBD-mobile-menu-focus]', async ({
+  test('A11Y-21: the burger opens the menu with Enter, focus moves into it, Escape closes it and gives the focus back [known failure: RPS-1669]', async ({
     openUiPage,
     adminSession,
   }) => {
     test.fail(
       true,
-      'RPS-TBD-mobile-menu-focus: opening the mobile menu does not move the focus into it (nor trap or restore it)',
+      'RPS-1669: opening the mobile menu does not move the focus into it (nor trap or restore it)',
     );
     const page = await openUiPage({ session: adminSession, viewport: { width: 390, height: 844 } });
     const shell = new Shell(page);

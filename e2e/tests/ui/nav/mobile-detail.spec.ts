@@ -54,7 +54,7 @@ import { UI_REPO_TYPES } from '../../../src/ui/repo-types.js';
 const PHONE = { width: 390, height: 844 };
 const MOBILE = '@mobile';
 /** The ticket proposed in the PR of RPS-1650 for the detail pages of a very long identity: replace with its key. */
-const LONG_DETAIL = 'RPS-TBD-long-identity-detail';
+const LONG_DETAIL = 'RPS-1670';
 
 /** A name (or tag) that cannot wrap at a space: the classic way to push a phone layout wider than the screen. */
 const LONG: Record<PackageProtocol, SeedPackageOptions> = {

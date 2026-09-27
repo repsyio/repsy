@@ -6048,7 +6048,7 @@ to an existing SNAPSHOT.
   repository block is the plain one: a Maven `<repository>` resolves snapshots unless it says otherwise); delete from
   the versions list and from the detail removes EVERY build, the version-level metadata and the artifact-level entry
   and leaves the release (the panel has no delete of a single build); the browser lists all timestamped files and
-  `maven-metadata.xml`. The "Newest orders by version" test is pinned with `test.fail` (`RPS-TBD`): the order is the
+  `maven-metadata.xml`. The "Newest orders by version" test is pinned with `test.fail` (`RPS-1665`): the order is the
   version NAME as a string, so `1.9.0` is above `1.10.0` and `1.0.0-SNAPSHOT` above `1.0.0`.
 - **PKG-maven-12** (Signed; `@cloud-skip`: the key store and verify-all are OS panel API): `row-signed` is `Signed` or
   `Unsigned` with a closed or open lock, on the desktop rows, the mobile cards and (`Signed: Yes|No`) the detail; a
@@ -6209,19 +6209,19 @@ Four specs and one helper (`src/ui/layout.ts`). Run them with
   width, inside its height or scrolling inside itself, with its buttons reachable. `obscuredFocus()` is the "focus not
   obscured" check behind the Tab-through tests.
 - **Back and Forward keep no list state.** The search, sort, page and type of a list are component state, not URL:
-  Back to a list comes back reset and Forward reopens what was left. The three `[known failure: RPS-TBD-list-state]`
+  Back to a list comes back reset and Forward reopens what was left. The three `[known failure: RPS-1668]`
   tests (repository list, package list, Users list) pin that with `test.fail`; the passing ones assert the honest part
-  (fresh server data, box and rows in agreement). Replace `RPS-TBD-*` with the ticket keys once filed.
+  (fresh server data, box and rows in agreement).
 - **History traps.** A route that redirects (a repository that is gone, `/login` for a signed-in visitor) must
   REPLACE its own entry: pushing the target on top made Back land on the same route again, which redirected again.
   RPS-1650 made the repository resolver answer with a `RedirectCommand`, the protocol shells replace with
   `{ replaceUrl: true }` and `AuthRedirectGuard` answer with a `UrlTree` (as `AuthGuard` already did). The
   `Navigation API` (`window.navigation.entries()`) shows the real entry list when a history test misbehaves.
-- **Pinned, not fixed** (`test.fail`, each with the ticket to file): `RPS-TBD-list-state` (above),
-  `RPS-TBD-focus-loss` (every list re-renders behind a spinner on each load, so the focus falls to the document after a
-  page change and after a row is deleted), `RPS-TBD-mobile-menu-focus` (the mobile drawer neither takes the focus nor
-  gives it back), `RPS-TBD-long-identity-detail` (the detail pages of nine protocols clip a very long name or tag on a
-  phone), `RPS-TBD-stale-rows` (a list that answered "not found" on refresh keeps showing the deleted rows).
+- **Pinned, not fixed** (`test.fail`, each with the ticket to file): `RPS-1668` (above),
+  `RPS-1669` (every list re-renders behind a spinner on each load, so the focus falls to the document after a
+  page change and after a row is deleted), `RPS-1669` (the mobile drawer neither takes the focus nor
+  gives it back), `RPS-1670` (the detail pages of nine protocols clip a very long name or tag on a
+  phone), `RPS-1670` (a list that answered "not found" on refresh keeps showing the deleted rows).
 - **Stale page, honest answer.** Deleting, revoking or renaming under an open page is asserted as an error toast
   (`... not found`, allowed with its reason through the page-error fixture), never a success one, the page alive and
   nothing changed. `NAV-18` is the account whose session is dead: the next click ends on `/login?returnUrl=`, and a

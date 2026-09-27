@@ -125,7 +125,7 @@ test.describe('Stale pages: versions and packages', { tag: NAV }, () => {
   });
 
   // Pinned: the refresh that answered "not found" leaves the deleted package's rows on screen.
-  test('NAV-15: after that refresh the versions page no longer lists the deleted package [known failure: RPS-TBD-stale-rows]', async ({
+  test('NAV-15: after that refresh the versions page no longer lists the deleted package [known failure: RPS-1670]', async ({
     adminPage,
     seeder,
     seedPackage,
@@ -133,7 +133,7 @@ test.describe('Stale pages: versions and packages', { tag: NAV }, () => {
   }) => {
     test.fail(
       true,
-      'RPS-TBD-stale-rows: a list that could not be refreshed because its package is gone keeps showing the deleted versions',
+      'RPS-1670: a list that could not be refreshed because its package is gone keeps showing the deleted versions',
     );
     allowNotFoundToast(pageErrors);
     const repo = await seeder.createRepo(RepoType.NPM);
