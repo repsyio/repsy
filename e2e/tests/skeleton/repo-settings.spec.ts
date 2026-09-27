@@ -120,6 +120,12 @@ for (const repoType of [
  * RPS-1435: Cargo and Go never replace a published version, so their settings do not show
  * `allowOverride`, and a PUT that sends it (the panel form does, for every protocol) is answered
  * 200 with the column left alone instead of being rejected.
+ *
+ * Repsy Cloud still shows `allowOverride` for them (RPS-1577): its harness pins the two tests below as
+ * known gaps of the targets that have not caught up (`PanelBackend.knownTestGap`, README "Known gaps"),
+ * keyed `skeleton > repo-settings > allowOverride is omitted from the settings and ignored on write
+ * (RPS-1435, CARGO)` and `... GOLANG)`. A gap is not written in this spec, so it is removed on the
+ * Cloud side, in the change that bumps the fix.
  */
 for (const repoType of [RepoType.CARGO, RepoType.GOLANG]) {
   test(`allowOverride is omitted from the settings and ignored on write (RPS-1435, ${repoType})`, async ({

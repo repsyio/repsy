@@ -28,10 +28,11 @@
  */
 import { test as base } from '@playwright/test';
 
-import { createPanelBackend } from '../api/backend-registry.js';
+import { BACKEND_MODULE_ENV, createPanelBackend } from '../api/backend-registry.js';
 import { isUnsupportedPanelOperation, type PanelBackend, RepoType } from '../api/panel-backend.js';
 import { ownerCredential } from '../clients/raw-http.js';
 import { env } from '../env.js';
+import { isCloudSkipped, testGapKey } from '../known-gaps.js';
 import { perTestRunId } from '../seed/run-id.js';
 import { Seeder } from '../seed/seeder.js';
 import { target, type TargetCapabilities } from '../target.js';
@@ -212,6 +213,14 @@ async function seedCredential(
 }
 
 export interface Fixtures {
+  /**
+   * Marks the test expected to fail when the target's backend pins `key` as a known gap
+   * (`PanelBackend.knownTestGap`, `src/known-gaps.ts`, README "Known gaps"): the same lookup the auto
+   * fixture does for the test's own key, for a gap that belongs to a feature rather than one test title.
+   * Call it first in the test. It is an `auto` fixture, so every test of this `test` already gets the
+   * lookup by its own key and the `@cloud-skip` skip on a Repsy Cloud target, without asking.
+   */
+  knownGap: (key: string) => void;
   panelApi: PanelBackend;
   seeder: Seeder;
   world: (scenario: Scenario, adapter: ProtocolAdapter) => Promise<World>;
@@ -228,8 +237,45 @@ export interface FixtureOptions {
 
 let testSeqByWorker = 0;
 
+/** Skips the running test when it is tagged `@cloud-skip` and the target is Repsy Cloud. */
+function skipCloudSkip(tags: readonly string[]): void {
+  base.skip(isCloudSkipped(tags), '@cloud-skip: does not apply to Repsy Cloud (README "Tags")');
+}
+
+/**
+ * The backend to ask for known gaps, without logging in. A Repsy Cloud target with no backend module
+ * has none (its tests cannot run either, and a spec that needs no backend still loads): `undefined`.
+ */
+async function backendForKnownGaps(): Promise<PanelBackend | undefined> {
+  if (env.target.startsWith('cloud-') && !process.env[BACKEND_MODULE_ENV]) {
+    return undefined;
+  }
+  return createPanelBackend();
+}
+
 export const test = base.extend<Fixtures & FixtureOptions>({
   targetCapabilities: [target, { option: true }],
+
+  // Auto (RPS-1510): every test of a spec on this `test` is looked up in the backend's known gaps by its
+  // key, and a Repsy Cloud target skips what is tagged `@cloud-skip`, whether or not the consumer's config
+  // excludes the tag. No login: the backend is only asked (`OsPanelBackend` has no gaps, so an OS run
+  // marks nothing).
+  knownGap: [
+    // eslint-disable-next-line no-empty-pattern
+    async ({}, use, testInfo) => {
+      skipCloudSkip(testInfo.tags);
+      const backend = await backendForKnownGaps();
+      const lookup = (key: string): void => {
+        const reason = backend?.knownTestGap?.(key, env.target);
+        if (reason) {
+          base.fail(true, reason);
+        }
+      };
+      lookup(testGapKey(testInfo));
+      await use(lookup);
+    },
+    { auto: true },
+  ],
 
   // eslint-disable-next-line no-empty-pattern
   panelApi: async ({}, use) => {

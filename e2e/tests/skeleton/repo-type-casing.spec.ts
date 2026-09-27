@@ -19,6 +19,12 @@
  * (`MAVEN`) everywhere the API writes a type, and a request may spell it in any case: the `type`
  * query of `GET /api/repos` and the `type` of the `POST /api/repos` body. The lower-case slug
  * (`maven`) is only for the UI's routes.
+ *
+ * `@cloud-skip` (RPS-1510) on the three tests that call the OS routes `POST /api/repos` (the type in the
+ * body) and `GET /api/repos?type=` (the type in the query) through `rawRequest`: Repsy Cloud has neither
+ * (its routes are `POST /api/repos/{TYPE}` and `GET /api/repos/{TYPE}/info`), so there is nothing for
+ * them to pin. What Cloud does with a lower-case or unknown `{TYPE}` (a 500, RPS-1636) is a defect of its
+ * own routes: the Cloud harness pins it with a test of its own routes and a known gap, not with these.
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
@@ -39,7 +45,7 @@ test(
 
 test(
   'the type of a new repository is read in any case and comes back in upper case',
-  { tag: ['@smoke'] },
+  { tag: ['@smoke', '@cloud-skip'] },
   async ({ seeder, panelApi }) => {
     for (const spelling of ['maven', 'Maven', 'mAvEn', 'MAVEN']) {
       const name = seeder.reserveRepoName(RepoType.MAVEN);
@@ -54,40 +60,45 @@ test(
   },
 );
 
-test('a type that names no repository type is refused, in any case', async ({
-  seeder,
-  panelApi,
-}) => {
-  const name = seeder.reserveRepoName(RepoType.MAVEN);
+test(
+  'a type that names no repository type is refused, in any case',
+  { tag: ['@cloud-skip'] },
+  async ({ seeder, panelApi }) => {
+    const name = seeder.reserveRepoName(RepoType.MAVEN);
 
-  const created = await panelApi.rawRequest('POST', '/api/repos', { name, type: 'mvn' });
+    const created = await panelApi.rawRequest('POST', '/api/repos', { name, type: 'mvn' });
 
-  expect(created.status).toBe(400);
-  expect((await panelApi.listAllRepos({ q: name })).map((repo) => repo.name)).toEqual([]);
-});
+    expect(created.status).toBe(400);
+    expect((await panelApi.listAllRepos({ q: name })).map((repo) => repo.name)).toEqual([]);
+  },
+);
 
-test('the type filter of the repository list is read in any case', async ({ seeder, panelApi }) => {
-  const npm = await seeder.createRepo(RepoType.NPM, { privateRepo: false });
-  const maven = await seeder.createRepo(RepoType.MAVEN, { privateRepo: false });
+test(
+  'the type filter of the repository list is read in any case',
+  { tag: ['@cloud-skip'] },
+  async ({ seeder, panelApi }) => {
+    const npm = await seeder.createRepo(RepoType.NPM, { privateRepo: false });
+    const maven = await seeder.createRepo(RepoType.MAVEN, { privateRepo: false });
 
-  for (const spelling of ['npm', 'Npm', 'NPM']) {
-    const listed = await panelApi.rawRequest(
-      'GET',
-      `/api/repos?type=${spelling}&q=${encodeURIComponent(npm.name)}`,
-    );
+    for (const spelling of ['npm', 'Npm', 'NPM']) {
+      const listed = await panelApi.rawRequest(
+        'GET',
+        `/api/repos?type=${spelling}&q=${encodeURIComponent(npm.name)}`,
+      );
 
-    expect(listed.status, spelling).toBe(200);
-    const names = (listed.body.data as { content: { name: string; type: string }[] }).content;
-    expect(
-      names.map((repo) => repo.name),
-      spelling,
-    ).toEqual([npm.name]);
-    expect(
-      names.map((repo) => repo.type),
-      spelling,
-    ).toEqual(['NPM']);
-  }
+      expect(listed.status, spelling).toBe(200);
+      const names = (listed.body.data as { content: { name: string; type: string }[] }).content;
+      expect(
+        names.map((repo) => repo.name),
+        spelling,
+      ).toEqual([npm.name]);
+      expect(
+        names.map((repo) => repo.type),
+        spelling,
+      ).toEqual(['NPM']);
+    }
 
-  const bogus = await panelApi.rawRequest('GET', `/api/repos?type=mvn&q=${maven.name}`);
-  expect(bogus.status).toBe(400);
-});
+    const bogus = await panelApi.rawRequest('GET', `/api/repos?type=mvn&q=${maven.name}`);
+    expect(bogus.status).toBe(400);
+  },
+);

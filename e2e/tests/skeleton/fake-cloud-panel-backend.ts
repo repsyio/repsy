@@ -24,6 +24,7 @@
  *    `src/target.ts` by `REPSY_TARGET=cloud-...`; the fake overrides one to make a skip reachable);
  *  - `expectByTarget`: outcomes that differ from the catalog's;
  *  - `knownGap`: a scenario side expected to fail, with the ticket that tracks it;
+ *  - `knownTestGap`: a test outside the catalog expected to fail on a target (`FAKE_CLOUD_TEST_GAPS`, RPS-1510);
  *  - `seedUserCredential` / `seedExpiredTokenCredential`: the credentials that differ per product.
  */
 import {
@@ -34,6 +35,8 @@ import {
   type TokenInfo,
   UnsupportedPanelOperation,
 } from '../../src/api/panel-backend.js';
+import type { RepsyTarget } from '../../src/env.js';
+import { defineKnownGaps } from '../../src/known-gaps.js';
 import type { ExpectationOverlay } from '../../src/scenarios/types.js';
 import type { MaterializedCredential } from '../../src/scenarios/world.js';
 import { capabilitiesFor, type TargetCapabilities } from '../../src/target.js';
@@ -67,6 +70,45 @@ export const FAKE_CLOUD_GAPS: Readonly<Record<string, ScenarioSide>> = {
   'fake-gap-consume': 'consume',
 };
 
+/**
+ * The known gaps of the fake cloud for tests outside the catalog: the tests of
+ * `known-gap-inner/known-gap-cases.inner.ts` (project `inner`), which `known-gaps.spec.ts` runs. This is
+ * what a Repsy Cloud registry looks like: keys, a ticket, a reason, and the targets it is open on.
+ */
+export const FAKE_CLOUD_TEST_GAPS = defineKnownGaps([
+  {
+    key: 'inner > known-gap-cases.inner > gap that still fails',
+    jira: 'RPS-0003',
+    reason: 'the fake cloud gets this wrong',
+    targets: ['cloud-local', 'cloud-remote'],
+  },
+  {
+    // Fixed by the fake's bump: the test passes, so it is reported as "Expected to fail, but passed".
+    key: 'inner > known-gap-cases.inner > gap that was fixed',
+    jira: 'RPS-0004',
+    reason: 'the fake cloud used to get this wrong',
+    targets: ['cloud-local', 'cloud-remote'],
+  },
+  {
+    key: 'inner > known-gap-cases.inner > gap of cloud-remote only',
+    jira: 'RPS-0005',
+    reason: 'only the older fake cloud gets this wrong',
+    targets: ['cloud-remote'],
+  },
+  {
+    key: 'feature > partial-put',
+    jira: 'RPS-0006',
+    reason: 'the fake cloud gets a whole feature wrong',
+    targets: ['cloud-local', 'cloud-remote'],
+  },
+  {
+    key: 'inner > known-gap-cases.inner > a group > nested gap that still fails',
+    jira: 'RPS-0007',
+    reason: 'the fake cloud gets this wrong inside a describe',
+    targets: ['cloud-local', 'cloud-remote'],
+  },
+]);
+
 export class FakeCloudPanelBackend extends FakePanelBackend implements PanelBackend {
   readonly expectByTarget = FAKE_CLOUD_OVERLAY;
   /** Every deploy token created: the repo it belongs to and its list item. */
@@ -77,6 +119,10 @@ export class FakeCloudPanelBackend extends FakePanelBackend implements PanelBack
     return FAKE_CLOUD_GAPS[scenarioId] === side
       ? `${FAKE_CLOUD_GAP_TICKET}: the fake cloud gets ${protocol} ${scenarioId} wrong on the ${side} side`
       : undefined;
+  }
+
+  knownTestGap(key: string, target: RepsyTarget): string | undefined {
+    return FAKE_CLOUD_TEST_GAPS.lookup(key, target);
   }
 
   // A repo user of a cloud is a collaborator with a plan limit: the fake has none to offer.

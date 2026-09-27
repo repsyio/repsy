@@ -26,9 +26,9 @@
  * paths (a credential the capabilities rule out, one the backend refuses, and a `@cloud-skip`
  * scenario), and their skip reasons show in the report. A pinned gap that starts passing fails its
  * test with Playwright's "Expected to fail, but passed", which is what forces the flip in the same
- * change as a bump; that failure is checked by hand (README "Targets"), not here, since a test that
- * must fail cannot be part of a green suite. The two gap tests print `✘` in Playwright's list
- * reporter: they are EXPECTED failures and count as passed.
+ * change as a bump. That failure is not asserted here, since a test that must fail cannot be part of a
+ * green suite; `known-gaps.spec.ts` runs the mechanism as a run of its own and asserts it (RPS-1510: the
+ * gap that stopped failing FAILS that run). The two gap tests print `✘` in Playwright's list reporter: they are EXPECTED failures and count as passed.
  */
 import { resolve } from 'node:path';
 
@@ -92,22 +92,27 @@ test.describe('target capabilities', () => {
     }
   });
 
-  test('both Repsy Cloud targets are remote cloud targets on the FREE plan', () => {
+  test('both Repsy Cloud targets are cloud targets on the FREE plan, never owned or tuned', () => {
     for (const name of ['cloud-remote', 'cloud-local'] as const) {
       const cloud = capabilitiesFor(name);
 
       expect(cloud.kind, name).toBe('cloud');
       expect(cloud.urlScheme, name).toBe('owner-repo');
-      // Not owned and not tunable, so the loop runs @negative scenarios serially on a budget.
-      expect(cloud, name).toMatchObject({
-        ownsStack: false,
-        canTuneThrottle: false,
-        isRemote: true,
-      });
+      // The harness does not start, restart or reconfigure either, and cannot raise a throttle.
+      expect(cloud, name).toMatchObject({ ownsStack: false, canTuneThrottle: false });
       expect(cloud.maxDeployTokensPerRepo, name).toBe(1);
       expect(cloud.supportsRepoUsers, name).toBe(true);
       expect(cloud.supportsUserRole, name).toBe(false);
     }
+  });
+
+  test('cloud-remote is a shared instance, cloud-local one of its own (RPS-1510, D7)', () => {
+    // A deployed environment: failed authentications spend a budget, so @negative scenarios run serially.
+    expect(capabilitiesFor('cloud-remote').isRemote).toBe(true);
+    // A stack built next to the harness with its own database: nobody else shares it, so the scenario
+    // loop treats it like `local` (parallel @negative scenarios, @local-only scenarios run), while
+    // `ownsStack: false` keeps the OS-overlay specs (size limits, stack specs) off it.
+    expect(capabilitiesFor('cloud-local').isRemote).toBe(false);
   });
 
   test('the token capabilities agree with each other on every target', () => {
