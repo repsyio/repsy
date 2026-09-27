@@ -168,7 +168,17 @@ export class AuthService {
     this._update(loginInfo.username!, loginInfo.token!, loginInfo.refreshToken!);
   }
 
+  /**
+   * Ends the session. The refresh token this tab held is sent to `POST /api/auth/logout`, which
+   * revokes its whole family server-side (RPS-1622): a copy of it left in another tab's memory, or
+   * leaked another way, can no longer be exchanged for a new pair. That call is best-effort and
+   * fire-and-forget: local storage is cleared and every subscriber told at once, whether or not the
+   * network call succeeds (offline, or the token was already gone), because a client-side sign-out
+   * must not be able to fail or hang on a server round trip.
+   */
   public logOut(): void {
+    const refreshToken = this._refreshToken;
+
     this._username = null;
     this._accessToken = null;
     this._refreshToken = null;
@@ -177,6 +187,10 @@ export class AuthService {
       SESSION_KEYS.forEach((key) => localStorage.removeItem(key));
     }
     this._authenticated$.next(this.isAuthenticated());
+
+    if (refreshToken) {
+      this.authControllerService.logout({ refreshToken }).subscribe({ error: () => undefined });
+    }
   }
 
   private _update(username: string, accessToken: string, refreshToken: string): void {

@@ -771,6 +771,30 @@ paths:
         '429':
           "$ref": "#/components/responses/TooManyRequests"
       summary: Authenticate user and return JWT tokens
+  "/api/auth/logout":
+    post:
+      tags:
+        - auth-controller
+      operationId: logout
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RefreshTokenForm"
+        required: true
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+      summary: Revoke the refresh token family of the session the refresh token belongs to
   "/api/repos/{repoName}/name":
     patch:
       tags:

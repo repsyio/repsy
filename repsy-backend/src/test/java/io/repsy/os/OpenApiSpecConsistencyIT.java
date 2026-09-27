@@ -94,6 +94,9 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
    *
    * <ul>
    *   <li>{@code login}, {@code refreshToken}: they are how a client gets a token.
+   *   <li>{@code logout} (RPS-1622): the refresh token being discarded is its own credential, the
+   *       same as {@code refreshToken}; it revokes the token's family instead of minting a new
+   *       pair.
    *   <li>{@code getSupportedRepoTypes}: a constant list, {@code SecurityScanController} takes no
    *       credentials for it.
    *   <li>{@code checkSumdbSupported}: the Go toolchain probes it without credentials and always
@@ -101,7 +104,8 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
    * </ul>
    */
   private static final Set<String> PUBLIC_OPERATIONS =
-      Set.of("login", "refreshToken", "getSupportedRepoTypes", "checkGolangSumdbSupported");
+      Set.of(
+          "login", "refreshToken", "logout", "getSupportedRepoTypes", "checkGolangSumdbSupported");
 
   /**
    * RPS-1593: the operations that answer 403 to a USER because their handler calls {@code

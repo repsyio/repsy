@@ -33,12 +33,13 @@ function response(data: LoginInfo): RestResponseLoginInfo {
 describe('AuthService', () => {
   let login: jasmine.Spy;
   let refreshToken: jasmine.Spy;
+  let logout: jasmine.Spy;
 
   function createService(platform = 'browser'): AuthService {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
-        { provide: AuthControllerService, useValue: { login, refreshToken } },
+        { provide: AuthControllerService, useValue: { login, refreshToken, logout } },
         { provide: PLATFORM_ID, useValue: platform },
       ],
     });
@@ -65,6 +66,7 @@ describe('AuthService', () => {
     clearStorage();
     login = jasmine.createSpy('login');
     refreshToken = jasmine.createSpy('refreshToken');
+    logout = jasmine.createSpy('logout').and.returnValue(of({}));
   });
 
   afterEach(clearStorage);
@@ -245,6 +247,44 @@ describe('AuthService', () => {
 
       expect(localStorage.getItem('theme')).toBe('dark');
       localStorage.removeItem('theme');
+    });
+
+    // RPS-1622: a copied/leaked refresh token must not keep working after the user clicks Logout.
+    it('revokes the refresh token family server-side, with the token it is about to discard', () => {
+      seedStorage(SESSION);
+      const service = createService();
+
+      service.logOut();
+
+      expect(logout).toHaveBeenCalledOnceWith({ refreshToken: 'refresh-1' });
+    });
+
+    it('does not call the backend when there is no refresh token to revoke', () => {
+      const service = createService();
+
+      service.logOut();
+
+      expect(logout).not.toHaveBeenCalled();
+    });
+
+    it('clears the session synchronously, without waiting for the backend call to settle', () => {
+      logout.and.returnValue(EMPTY);
+      seedStorage(SESSION);
+      const service = createService();
+
+      service.logOut();
+
+      expect(service.isAuthenticated()).toBeFalse();
+      STORAGE_KEYS.forEach((key) => expect(localStorage.getItem(key)).withContext(key).toBeNull());
+    });
+
+    it('does not throw or leave an unhandled rejection when the backend call fails', () => {
+      logout.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+      seedStorage(SESSION);
+      const service = createService();
+
+      expect(() => service.logOut()).not.toThrow();
+      expect(service.isAuthenticated()).toBeFalse();
     });
   });
 

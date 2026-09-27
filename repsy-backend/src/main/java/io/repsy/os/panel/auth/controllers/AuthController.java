@@ -22,6 +22,7 @@ import io.repsy.os.generated.model.LoginForm;
 import io.repsy.os.generated.model.LoginInfo;
 import io.repsy.os.generated.model.RefreshTokenForm;
 import io.repsy.os.panel.auth.services.AuthUserService;
+import io.repsy.os.shared.auth.services.RefreshTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.utils.MultiPortNames;
@@ -41,6 +42,7 @@ class AuthController {
 
   private final @NonNull AuthUserService authUserService;
   private final @NonNull JwtUtils jwtUtils;
+  private final @NonNull RefreshTokenService refreshTokenService;
   private final @NonNull RestResponseFactory resp;
 
   @PostMapping("/login")
@@ -63,5 +65,26 @@ class AuthController {
     final var loginInfo = this.authUserService.refreshToken(claims);
 
     return this.resp.success("tokenRefreshed", loginInfo);
+  }
+
+  /**
+   * Ends the session the refresh token belongs to: every token of its family is revoked, so a copy
+   * of it (leaked, or left in another tab's memory) can no longer be exchanged for a new pair. Like
+   * {@code /tokens/refresh}, the refresh token itself is the credential, so this needs no {@code
+   * Authorization} header. A token that fails to verify (expired, tampered, already rejected) has
+   * nothing left to revoke that {@code consume} would not already have revoked on its own replay,
+   * so it answers the same 401 the verify itself throws; a well-formed token of an already-revoked
+   * or unknown family is accepted and revoked again for no further effect, so a client can always
+   * call this and get a clean 200 on logout.
+   */
+  @PostMapping("/logout")
+  public @NonNull RestResponse<Void> logout(
+      @RequestBody @Valid final @NonNull RefreshTokenForm form) {
+
+    final var claims = this.jwtUtils.verifyRefreshToken(form.getRefreshToken());
+
+    this.refreshTokenService.revoke(claims.familyId());
+
+    return this.resp.success("loggedOut");
   }
 }
