@@ -6,10 +6,10 @@
       <div class="mb-4 flex items-center gap-x-2">
         <div
           data-testid="pkg-detail-version"
-          class="inline-flex gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]"
+          class="inline-flex min-w-0 items-center gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]"
         >
-          <img ngSrc="/assets/icons/cursor/tick.svg" alt="tick" height="12" width="16" />
-          {{ tagInfo.name }}
+          <img class="shrink-0" ngSrc="/assets/icons/cursor/tick.svg" alt="tick" height="12" width="16" />
+          <span class="break-all">{{ tagInfo.name }}</span>
         </div>
       </div>
       <p data-testid="pkg-detail-published" class="font-courier mb-8 text-[12px] text-[#9C9C9D]">
@@ -27,7 +27,7 @@
       </div>
 
       <div class="mb-8 rounded-lg bg-[#101112] p-[22px] text-[24px]">
-        <h3 data-testid="pkg-detail-name" class="text-neutral-200">{{ imageName }}</h3>
+        <h3 data-testid="pkg-detail-name" class="break-all text-neutral-200">{{ imageName }}</h3>
       </div>
 
       <div

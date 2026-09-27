@@ -124,17 +124,15 @@ test.describe('Stale pages: versions and packages', { tag: NAV }, () => {
     await list.expectNoRow(pkg);
   });
 
-  // Pinned: the refresh that answered "not found" leaves the deleted package's rows on screen.
-  test('NAV-15: after that refresh the versions page no longer lists the deleted package [known failure: RPS-1670]', async ({
+  // RPS-1670 (fixed here): the refresh that answers "not found" clears the deleted package's rows
+  // instead of leaving them on screen (the version-list component now sets its own error state on a
+  // failed load, like the other protocols' list pages already did).
+  test('NAV-15: after that refresh the versions page no longer lists the deleted package', async ({
     adminPage,
     seeder,
     seedPackage,
     pageErrors,
   }) => {
-    test.fail(
-      true,
-      'RPS-1670: a list that could not be refreshed because its package is gone keeps showing the deleted versions',
-    );
     allowNotFoundToast(pageErrors);
     const repo = await seeder.createRepo(RepoType.NPM);
     const pkg = await seedPackage(repo);

@@ -17,7 +17,9 @@
       >
         <img class="h-[15.6px] w-[24px]" ngSrc="/assets/icons/npm/npm.svg" alt="Npm Logo" height="84" width="141" />
 
-        <span data-testid="pkg-detail-install-text" class="text-[13px] text-[#9C9C9D]">{{ installation }}</span>
+        <span data-testid="pkg-detail-install-text" class="text-[13px] break-all text-[#9C9C9D]">{{
+          installation
+        }}</span>
         <app-copy-clipboard [text]="installation" />
       </div>
 
@@ -57,8 +59,8 @@
         </div>
       </div>
 
-      <div class="mb-8 overflow-x-auto rounded-lg bg-[#101112] p-[22px] text-[24px]">
-        <h3 data-testid="pkg-detail-name" class="text-neutral-200">{{ versionInfo.packageName }}</h3>
+      <div class="mb-8 rounded-lg bg-[#101112] p-[22px] text-[24px]">
+        <h3 data-testid="pkg-detail-name" class="break-all text-neutral-200">{{ versionInfo.packageName }}</h3>
       </div>
 
       <app-security-scan-section

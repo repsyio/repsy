@@ -7,14 +7,14 @@
       <div data-testid="pkg-detail-metadata" class="space-y-4">
         <!-- First row - Group ID and Organization -->
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <div data-testid="pkg-detail-meta-group" class="mb-1 text-[13px] text-[#FDFDFD]">
+          <div class="min-w-0 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+            <div data-testid="pkg-detail-meta-group" class="mb-1 text-[13px] break-all text-[#FDFDFD]">
               Group ID: <span class="text-[#9FA0A0]">{{ version.artifactGroupName }}</span>
             </div>
           </div>
 
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <div class="mb-1 text-[13px] text-[#FDFDFD]">
+          <div class="min-w-0 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+            <div class="mb-1 text-[13px] break-all text-[#FDFDFD]">
               Organization: <span class="text-[#9FA0A0]">{{ version.organization }}</span>
             </div>
           </div>
@@ -22,8 +22,8 @@
 
         <!-- Second row - Artifact ID and Licenses -->
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <div data-testid="pkg-detail-meta-artifact" class="mb-1 text-[13px] text-[#FDFDFD]">
+          <div class="min-w-0 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+            <div data-testid="pkg-detail-meta-artifact" class="mb-1 text-[13px] break-all text-[#FDFDFD]">
               Artifact ID: <span class="text-[#9FA0A0]">{{ version.artifactName }} ({{ version.versionName }})</span>
             </div>
           </div>
@@ -68,7 +68,7 @@
       </div>
 
       <div class="mb-8 rounded-lg bg-[#101112] p-[22px] text-[24px]">
-        <h3 data-testid="pkg-detail-name" class="text-neutral-200">{{ artifactName }}</h3>
+        <h3 data-testid="pkg-detail-name" class="break-all text-neutral-200">{{ artifactName }}</h3>
       </div>
 
       <!-- POM File -->

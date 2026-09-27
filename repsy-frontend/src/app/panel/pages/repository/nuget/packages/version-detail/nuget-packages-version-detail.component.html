@@ -25,17 +25,17 @@
             </div>
             <div class="min-w-0 flex-1">
               <div class="mb-2 flex flex-wrap items-center gap-2">
-                <h2 data-testid="pkg-detail-name" class="text-[24px] leading-tight text-[#FDFDFD]">
+                <h2 data-testid="pkg-detail-name" class="text-[24px] leading-tight break-all text-[#FDFDFD]">
                   {{ versionInfo.packageId }}
                 </h2>
                 <span
                   data-testid="pkg-detail-version"
-                  class="inline-flex items-center rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[12px] py-[4px] text-[13px] text-[#FDFDFD]"
+                  class="inline-flex items-center rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[12px] py-[4px] text-[13px] break-all text-[#FDFDFD]"
                 >
                   {{ versionInfo.version }}
                 </span>
               </div>
-              <p class="mb-3 text-[14px] text-[#9C9C9D]">{{ versionInfo.description || '-' }}</p>
+              <p class="mb-3 text-[14px] break-all text-[#9C9C9D]">{{ versionInfo.description || '-' }}</p>
               <div data-testid="pkg-detail-tags" class="flex flex-wrap gap-2">
                 @for (tag of tags; track tag) {
                   <span

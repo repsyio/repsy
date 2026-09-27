@@ -26,11 +26,7 @@ test.describe('Repository routing', () => {
   test(
     'REPO-10: an unknown path is the 404 page, a repository name opens its page',
     { tag: ['@smoke'] },
-    async ({ adminPage, seeder, pageErrors }) => {
-      pageErrors.allowToast(
-        'Repository not found',
-        "known bug, follow-up ticket proposed in the RPS-1617 PR: an unknown repository route fires about ten parallel lookups, each raising a 'Repository not found' toast",
-      );
+    async ({ adminPage, seeder }) => {
       const repo = await seeder.createRepo(RepoType.MAVEN);
 
       await adminPage.goto(`/no-such-path-${seeder.runId}`);
@@ -58,12 +54,7 @@ test.describe('Repository routing', () => {
   test('REPO-10: an unknown path with several segments is the 404 page inside the panel layout', async ({
     adminPage,
     seeder,
-    pageErrors,
   }) => {
-    pageErrors.allowToast(
-      'Repository not found',
-      "known bug, follow-up ticket proposed in the RPS-1617 PR: an unknown repository route fires about ten parallel lookups, each raising a 'Repository not found' toast",
-    );
     await adminPage.goto(`/no/such/path/${seeder.runId}/at/all`);
 
     await expect(adminPage.getByTestId('not-found')).toBeVisible();

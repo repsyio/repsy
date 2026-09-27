@@ -53,8 +53,6 @@ import { UI_REPO_TYPES } from '../../../src/ui/repo-types.js';
 
 const PHONE = { width: 390, height: 844 };
 const MOBILE = '@mobile';
-/** The ticket proposed in the PR of RPS-1650 for the detail pages of a very long identity: replace with its key. */
-const LONG_DETAIL = 'RPS-1670';
 
 /** A name (or tag) that cannot wrap at a space: the classic way to push a phone layout wider than the screen. */
 const LONG: Record<PackageProtocol, SeedPackageOptions> = {
@@ -158,18 +156,15 @@ test.describe('Phone width: package pages', { tag: MOBILE }, () => {
       await scanPage(page, testInfo, `mobile-${protocol}-detail`);
     });
 
-    // Pinned: the detail page's name, version and install text do not wrap (or break) inside their flex boxes,
-    // so a very long identity is clipped by the layout's `overflow-hidden` column.
-    test(`NAV-10: ${protocol}: the detail page of a very long name or tag fits [known failure: ${LONG_DETAIL}]`, async ({
+    // RPS-1670 (fixed here): the detail page's name, version and install text wrap or break inside their
+    // flex boxes (min-w-0 on the flex container, break-all on the text), so a very long identity no
+    // longer clips against the layout's `overflow-hidden` column.
+    test(`NAV-10: ${protocol}: the detail page of a very long name or tag fits`, async ({
       openUiPage,
       adminSession,
       seeder,
       seedPackage,
     }, testInfo) => {
-      test.fail(
-        true,
-        `${LONG_DETAIL}: a detail page with a very long name or tag is wider than the phone and its content is clipped`,
-      );
       const { page, pkg, pages } = await setup(
         openUiPage,
         adminSession,
