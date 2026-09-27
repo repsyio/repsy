@@ -33,7 +33,7 @@ import { test } from '@playwright/test';
  * see it, no other engine shows it.
  */
 export const FIREFOX_STALE_LOCALSTORAGE_IN_REFRESH_LOCK =
-  'Firefox: localStorage is replicated between tabs asynchronously, so a tab that just got the Web Lock re-reads a stale session and refreshes with a spent token (no ticket yet: proposed in the PR of RPS-1651, put its key here)';
+  'RPS-1672: Firefox: localStorage is replicated between tabs asynchronously, so a tab that just got the Web Lock re-reads a stale session and refreshes with a spent token';
 
 /** Marks the current test as an expected failure in Firefox, for the two-tab refresh under a Web Lock. */
 export function pinFirefoxWebLockRefresh(browserName: string): void {
