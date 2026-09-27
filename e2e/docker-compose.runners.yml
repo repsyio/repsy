@@ -402,7 +402,7 @@ services:
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
 
-  ui:
+  ui: &ui-runner
     <<: *runner-common
     build:
       context: .
@@ -425,6 +425,9 @@ services:
       # Playwright's default worker count.
       REPSY_UI_WORKERS: ${REPSY_UI_WORKERS:-4}
       REPSY_UI_NO_SANDBOX: ${REPSY_UI_NO_SANDBOX:-}
+      # Read by playwright.config.ts: replaces the @smoke|A11Y-13 filter of the ui-firefox and ui-webkit projects
+      # for one run (README.md "UI suite: Firefox and WebKit"). Empty: the filter.
+      REPSY_UI_BROWSER_GREP: ${REPSY_UI_BROWSER_GREP:-}
       # The UI suite's own, older spelling of REPSY_E2E_OPT_IN (above); optedIn() reads both.
       REPSY_UI_OPT_IN: ${REPSY_UI_OPT_IN:-}
       # Where the @scanner specs reach the stub scanner's /control API (docker-compose.stack-scanner.yml
@@ -438,6 +441,14 @@ services:
       - ./tests:/app/tests:ro
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
+
+  # The same runner, and the same image, for the @smoke subset in Firefox and in WebKit (RPS-1651): the service
+  # name is the Playwright project the entrypoint runs (`ui-firefox`, `ui-webkit` in playwright.config.ts).
+  # Compose builds each service under its own name, so after a change to runners/ui.Dockerfile give
+  # `run.sh test -b` all three: `--protocol ui,ui-firefox,ui-webkit` (the layers come from the cache).
+  ui-firefox: *ui-runner
+
+  ui-webkit: *ui-runner
 
 volumes:
   # Named (not bind-mounted): holds only downloaded third-party Maven plugins/dependencies, so it

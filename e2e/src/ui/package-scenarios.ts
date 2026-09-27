@@ -54,6 +54,7 @@ import { RepoType } from '../api/panel-api.js';
 import { env } from '../env.js';
 import { repoUrl } from '../repo-url.js';
 import type { PackageRef, SeededPackage } from '../seed/packages.js';
+import { allowClipboard, copiedText } from './clipboard.js';
 import { expect, test } from './package-fixtures.js';
 import {
   type LevelName,
@@ -269,7 +270,7 @@ export function registerPackageScenarios(
       { tag: ['@smoke'] },
       async ({ adminPage, context, seeder, seedPackage }) => {
         pin('01');
-        await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+        await allowClipboard(context);
         const repo = await seeder.createRepo(type);
         const pkg = await seedPackage(repo);
         const pages = protocolPages(adminPage, descriptor, repo.name);
@@ -318,7 +319,7 @@ export function registerPackageScenarios(
             const copy = configSnippet.getByTestId('copy-button');
             await copy.click();
             await expect(copy).toHaveAttribute('data-copied', 'true');
-            const copied = await adminPage.evaluate(() => navigator.clipboard.readText());
+            const copied = await copiedText(adminPage);
             for (const part of config) {
               expect(copied).toContain(part);
             }
@@ -328,7 +329,7 @@ export function registerPackageScenarios(
         // The copy button says so and puts the snippet on the clipboard.
         await opened.copyButton.click();
         await expect(opened.copyButton).toHaveAttribute('data-copied', 'true');
-        const clipboard = await adminPage.evaluate(() => navigator.clipboard.readText());
+        const clipboard = await copiedText(adminPage);
         for (const part of parts) {
           expect(clipboard).toContain(part);
         }

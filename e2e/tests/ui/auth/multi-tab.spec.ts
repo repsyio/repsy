@@ -30,6 +30,7 @@
 import type { Page } from '@playwright/test';
 
 import { env } from '../../../src/env.js';
+import { pinFirefoxWebLockRefresh } from '../../../src/ui/browser-gaps.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
@@ -103,7 +104,12 @@ test.describe('AUTH-13 two tabs, one session', () => {
   ]) {
     test(`two tabs whose access tokens expire together make one refresh between them (${name})`, async ({
       adminPage,
+      browserName,
     }) => {
+      if (hasWebLocks) {
+        // RPS-1651: only the ui-firefox project can reach this (the test is not @smoke).
+        pinFirefoxWebLockRefresh(browserName);
+      }
       await withoutWebLocks(adminPage.context(), !hasWebLocks);
       const { tabA, tabB } = await openTwoTabs(adminPage);
       expect(await tabA.evaluate(() => 'locks' in navigator && !!navigator.locks)).toBe(

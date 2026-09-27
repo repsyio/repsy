@@ -1,0 +1,86 @@
+# Copyright 2026 the original author or authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# The reverse proxy of docker-compose.stack-proxy.yml (RPS-1651, README.md "Reverse proxy stack"): nginx
+# terminating TLS in front of Repsy's plain HTTP ports, configured the way the main README's "Reverse Proxy"
+# section says. The nginx image renders this template with envsubst (only the PROXY_* variables of the
+# compose file, NGINX_ENVSUBST_FILTER) into conf.d/default.conf. Each listener listens on the very port it
+# is published on, so that $server_port in X-Forwarded-Port is the public port.
+#
+# There is deliberately NO location prefix: Repsy does not support a subpath (README.md "Reverse proxy
+# stack"), so the proxy hands "/" to Repsy as it is.
+
+# The panel: the Angular app and /api/... (Repsy's port 8080).
+server {
+  listen ${PROXY_API_PORT} ssl;
+  ssl_certificate /certs/proxy.pem;
+  ssl_certificate_key /certs/proxy.key;
+  client_max_body_size 0;
+
+  location / {
+    proxy_pass http://repsy:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port $server_port;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+}
+
+# The package protocols (Repsy's port 9090), with the headers of the README's nginx example.
+server {
+  listen ${PROXY_REPO_PORT} ssl;
+  ssl_certificate /certs/proxy.pem;
+  ssl_certificate_key /certs/proxy.key;
+  client_max_body_size 0;
+  proxy_request_buffering off;
+
+  location / {
+    proxy_pass http://repsy:9090;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port $server_port;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+}
+
+# The same protocols the way many proxies and ingress controllers forward them: the Host as the client sent
+# it, with its port ($http_host), in X-Forwarded-Host, and no X-Forwarded-Port at all. Repsy's RemoteIpValve
+# reads the port only from X-Forwarded-Port, so the public URL loses it (RPS-1515, pinned in
+# tests/api/reverse-proxy.spec.ts).
+server {
+  listen ${PROXY_HOSTPORT_PORT} ssl;
+  ssl_certificate /certs/proxy.pem;
+  ssl_certificate_key /certs/proxy.key;
+
+  location / {
+    proxy_pass http://repsy:9090;
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $http_host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+}
+
+# The compose healthcheck of the proxy service, on a port that is never published.
+server {
+  listen 8081;
+  location = /healthz {
+    return 200 "ok\n";
+  }
+}

@@ -63,6 +63,61 @@ const e2eWorkers = process.env.REPSY_E2E_WORKERS
 // REPSY_FRONTEND_BASE_URL, then REPSY_API_BASE_URL, then http://localhost:8080.
 const uiBaseUrl = uiBaseUrlFrom(process.env);
 
+// `use` shared by every panel UI project: the browser is the only thing that differs between `ui`,
+// `ui-firefox` and `ui-webkit` (RPS-1651).
+type UiBrowser = 'chromium' | 'firefox' | 'webkit';
+
+// Tests that run in Firefox and WebKit: the @smoke set, the keyboard walkthrough (whose Tab handling is the part
+// most likely to differ between engines) and the panel-over-https spec, which skips itself off a TLS stack.
+// `REPSY_UI_BROWSER_GREP=<regex>` replaces it for one run, to see how a wider slice (`.` is the whole suite)
+// fares in those engines; the nightly never sets it.
+const OTHER_BROWSERS_GREP = process.env.REPSY_UI_BROWSER_GREP
+  ? new RegExp(process.env.REPSY_UI_BROWSER_GREP)
+  : /@smoke|@tls|A11Y-13/;
+// Written as a literal tag in a spec with a one-line reason: it needs something only Chromium has (a CDP
+// session, the `clipboard-read` permission, ...). Firefox and WebKit leave it out; `ui` still runs it.
+const CHROMIUM_ONLY = /@chromium-only/;
+
+// A TLS stack (`run.sh test` with REPSY_E2E_TLS=1) serves a certificate of a throwaway CA. The harness's
+// Node clients trust that CA through NODE_EXTRA_CA_CERTS, but a browser keeps its own trust store (NSS for
+// Chromium, its own for Firefox, the system one for WebKit) that no environment variable feeds, so the
+// browser contexts of the UI project ignore certificate errors then. README.md "UI suite: TLS and a reverse proxy".
+// Mirrored in src/ui/browser-trust.ts for the contexts a spec opens itself; keep both on the same variable.
+const ignoreHTTPSErrors = Boolean(process.env.REPSY_E2E_TLS_CA_FILE);
+
+function uiProject(browserName: UiBrowser) {
+  return {
+    testMatch: 'ui/**/*.spec.ts',
+    retries: retriesFor(true),
+    // A UI test waits on renders and network round trips, but never on a real package client.
+    timeout: 60_000,
+    use: {
+      browserName,
+      headless: true,
+      baseURL: uiBaseUrl,
+      ignoreHTTPSErrors,
+      viewport: { width: 1440, height: 900 },
+      testIdAttribute: 'data-testid',
+      actionTimeout: 10_000,
+      navigationTimeout: 20_000,
+      // `on-first-retry` never fires without a retry (outside CI, or REPSY_E2E_RETRIES=0), so a
+      // failure would leave no trace behind then; keep one on failure instead.
+      trace: retriesFor(true) > 0 ? ('on-first-retry' as const) : ('retain-on-failure' as const),
+      screenshot: 'only-on-failure' as const,
+      video: 'retain-on-failure' as const,
+      // The app itself ignores prefers-reduced-motion; src/ui/defaults.ts injects the CSS that does
+      // the work. This only makes the media query true for anything that does honour it.
+      contextOptions: { reducedMotion: 'reduce' as const },
+      // Chromium only (Firefox and WebKit have no such option): Playwright's own default is
+      // chromiumSandbox:false; this suite wants the sandbox ON unless opted out (kernels without
+      // unprivileged user namespaces). Never a bare --no-sandbox arg.
+      ...(browserName === 'chromium'
+        ? { launchOptions: { chromiumSandbox: process.env.REPSY_UI_NO_SANDBOX !== '1' } }
+        : {}),
+    },
+  };
+}
+
 // One project per protocol is added from step 2 onward; `skeleton` proves the harness itself
 // (seeding, cleanup, the raw-HTTP auth probe) and needs no protocol client or browser. `ui` is the
 // odd one out: it drives the panel in a browser rather than a package client.
@@ -171,32 +226,23 @@ export default defineConfig({
       // The panel UI, driven in headless Chromium (README.md "UI suite"). Runs in the "ui" runner,
       // which is the only one with a browser installed; specs live under tests/ui/.
       name: 'ui',
-      testMatch: 'ui/**/*.spec.ts',
-      retries: retriesFor(true),
-      // A UI test waits on renders and network round trips, but never on a real package client.
-      timeout: 60_000,
-      use: {
-        browserName: 'chromium',
-        headless: true,
-        baseURL: uiBaseUrl,
-        viewport: { width: 1440, height: 900 },
-        testIdAttribute: 'data-testid',
-        actionTimeout: 10_000,
-        navigationTimeout: 20_000,
-        // `on-first-retry` never fires without a retry (outside CI, or REPSY_E2E_RETRIES=0), so a
-        // failure would leave no trace behind then; keep one on failure instead.
-        trace: retriesFor(true) > 0 ? 'on-first-retry' : 'retain-on-failure',
-        screenshot: 'only-on-failure',
-        video: 'retain-on-failure',
-        // The app itself ignores prefers-reduced-motion; src/ui/defaults.ts injects the CSS that does
-        // the work. This only makes the media query true for anything that does honour it.
-        contextOptions: { reducedMotion: 'reduce' },
-        launchOptions: {
-          // Playwright's own default is chromiumSandbox:false; this suite wants the sandbox ON unless
-          // opted out (kernels without unprivileged user namespaces). Never a bare --no-sandbox arg.
-          chromiumSandbox: process.env.REPSY_UI_NO_SANDBOX !== '1',
-        },
-      },
+      ...uiProject('chromium'),
+    },
+    {
+      // The @smoke subset (plus A11Y-13, the keyboard walkthrough) in Firefox and in WebKit (RPS-1651): the
+      // same specs, page objects and fixtures as `ui`, a different browser engine. Runs in the ui-firefox /
+      // ui-webkit runner services (same image as `ui`, docker-compose.runners.yml). A spec that cannot run
+      // there says why with `@chromium-only` (never a silent skip); README.md "UI suite: Firefox and WebKit".
+      name: 'ui-firefox',
+      ...uiProject('firefox'),
+      grep: OTHER_BROWSERS_GREP,
+      grepInvert: CHROMIUM_ONLY,
+    },
+    {
+      name: 'ui-webkit',
+      ...uiProject('webkit'),
+      grep: OTHER_BROWSERS_GREP,
+      grepInvert: CHROMIUM_ONLY,
     },
   ],
 });

@@ -68,12 +68,21 @@ export const CSP_VIOLATION_PREFIX = '[csp-violation]';
  *    login, or the flake defaults' blocked third-party hosts all produce them by design. The failure
  *    itself is asserted by the spec (a toast, a state); the panel's own handling of it is what
  *    `ErrorHandlerService` logs, which is not a runtime error either (see `HANDLED_API_ERROR`).
+ *  - Firefox logs "downloadable font: download failed ... status=2152398850" (NS_BINDING_ABORTED) for a font
+ *    whose download a navigation cancelled (RPS-1651). Anything a page's own `console.error` says from
+ *    `beforeunload` on is dropped too, in `watchPageErrors` (WebKit's cancelled XHRs, see there).
  */
 export const GLOBALLY_IGNORED: readonly AllowedPageError[] = [
   {
     pattern: /^Failed to load resource\b/,
     reason:
       'Chromium logs every 4xx/5xx/aborted request; the specs assert those outcomes themselves',
+  },
+  {
+    // 2152398850 is NS_BINDING_ABORTED: the font's download was cancelled, here by a navigation (RPS-1651).
+    pattern: /downloadable font: download failed .*status=2152398850/,
+    reason:
+      'Firefox logs a font whose download a navigation aborted (the Chromium case above, for Firefox)',
   },
 ];
 
@@ -160,6 +169,20 @@ export async function watchPageErrors(context: BrowserContext, errors: PageError
     });
   });
   await context.addInitScript((prefix) => {
+    // WebKit fires the `error` event of every XHR a navigation cancels, in the document that is going away, and the
+    // panel answers a status 0 with its "Connection error" toast and a console.error; Chromium and Firefox say nothing
+    // (RPS-1651: PKG-*-01 goes to another page while the detail page's scan requests are in flight). Leaving the page is
+    // not a runtime error of it, so nothing is logged from `beforeunload` on.
+    let leaving = false;
+    for (const event of ['beforeunload', 'pagehide']) {
+      window.addEventListener(event, () => (leaving = true), true);
+    }
+    const consoleError = console.error.bind(console);
+    console.error = (...args: unknown[]) => {
+      if (!leaving) {
+        consoleError(...args);
+      }
+    };
     window.addEventListener(
       'securitypolicyviolation',
       (event) => {

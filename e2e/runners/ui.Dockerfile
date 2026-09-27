@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The ui runner: the harness itself (see base.Dockerfile) plus Playwright's own headless Chromium
-# build, for the panel UI suite (tests/ui). Its first layers intentionally repeat base.Dockerfile's
+# The ui runner: the harness itself (see base.Dockerfile) plus Playwright's own headless Chromium,
+# Firefox and WebKit builds, for the panel UI suite (tests/ui; Firefox and WebKit run the @smoke subset,
+# README.md "UI suite: Firefox and WebKit"). Its first layers intentionally repeat base.Dockerfile's
 # rather than `FROM` a separately built tag, for the same reason npm.Dockerfile's header gives.
 #
 # Why not the mcr.microsoft.com/playwright image: its Playwright/browser revision has to equal the
@@ -37,13 +38,13 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # --- ui-specific layers ---
 
-# Chromium (plus its headless shell and ffmpeg for videos) and its system libraries/fonts, installed
-# as root at build time into a fixed path the non-root runtime uid (docker-compose.runners.yml runs
-# as the host's uid:gid) can read. Never run `playwright install` at test time. This layer sits before
+# Chromium (plus its headless shell and ffmpeg for videos), Firefox and WebKit (RPS-1651: the `ui-firefox`
+# and `ui-webkit` projects) and their system libraries/fonts, installed as root at build time into a fixed
+# path the non-root runtime uid (docker-compose.runners.yml runs as the host's uid:gid) can read. Never run `playwright install` at test time. This layer sits before
 # `COPY src ./src` so editing harness code never re-downloads the browser on `-b`. Calls the binary
 # directly, not `pnpm exec`, for the uid reason entrypoint.sh gives.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN ./node_modules/.bin/playwright install --with-deps chromium \
+RUN ./node_modules/.bin/playwright install --with-deps chromium firefox webkit \
   && rm -rf /var/lib/apt/lists/* \
   && chmod -R a+rX /ms-playwright
 

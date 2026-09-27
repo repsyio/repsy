@@ -169,66 +169,69 @@ test.describe('List rows are links', { tag: '@a11y' }, () => {
     await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
   });
 
-  test('A11Y-08: a click anywhere on a repository row opens it, a modified click is left to the browser', async ({
-    adminPage,
-    seeder,
-  }) => {
-    const repo = await seeder.createRepo(RepoType.MAVEN);
-    const repos = new RepositoriesPage(adminPage);
-    await repos.goto();
-    await repos.search(repo.name);
-    // Wait for the filter to settle: a row that moves under the pointer swallows the click.
-    await expect(repos.list.rows()).toHaveCount(1);
-    const row = repos.list.row(repo.name);
+  // @chromium-only (RPS-1651): OpenedTabs reads the tabs from a CDP session (`Target.getTargets`), which only
+  // Chromium has; Firefox and WebKit projects leave it out (playwright.config.ts).
+  test(
+    'A11Y-08: a click anywhere on a repository row opens it, a modified click is left to the browser',
+    { tag: '@chromium-only' },
+    async ({ adminPage, seeder }) => {
+      const repo = await seeder.createRepo(RepoType.MAVEN);
+      const repos = new RepositoriesPage(adminPage);
+      await repos.goto();
+      await repos.search(repo.name);
+      // Wait for the filter to settle: a row that moves under the pointer swallows the click.
+      await expect(repos.list.rows()).toHaveCount(1);
+      const row = repos.list.row(repo.name);
 
-    const tabs = await OpenedTabs.of(adminPage);
-    const link = row.locator('a.row-link');
-    // What the page does with a click event once every handler has run: an SPA navigation prevents
-    // the default; a ctrl/meta/shift/middle click must NOT, so the browser opens a new tab itself.
-    await adminPage.evaluate(() => {
-      const seen: boolean[] = [];
-      (window as unknown as { __clicks: boolean[] }).__clicks = seen;
-      window.addEventListener('click', (event) => {
-        setTimeout(() => seen.push(event.defaultPrevented));
+      const tabs = await OpenedTabs.of(adminPage);
+      const link = row.locator('a.row-link');
+      // What the page does with a click event once every handler has run: an SPA navigation prevents
+      // the default; a ctrl/meta/shift/middle click must NOT, so the browser opens a new tab itself.
+      await adminPage.evaluate(() => {
+        const seen: boolean[] = [];
+        (window as unknown as { __clicks: boolean[] }).__clicks = seen;
+        window.addEventListener('click', (event) => {
+          setTimeout(() => seen.push(event.defaultPrevented));
+        });
       });
-    });
-    const handled = () =>
-      adminPage.evaluate(() => (window as unknown as { __clicks: boolean[] }).__clicks);
-    const newTabs = () => tabs.urls();
-    const opened = new RegExp(`/${repo.name}$`);
+      const handled = () =>
+        adminPage.evaluate(() => (window as unknown as { __clicks: boolean[] }).__clicks);
+      const newTabs = () => tabs.urls();
+      const opened = new RegExp(`/${repo.name}$`);
 
-    // The row link is a plain link (no target, no download): "open in a new tab" is the browser's.
-    await expect(link).toHaveAttribute('href', repoRoute(repo.name));
-    await expect(link).not.toHaveAttribute('target', /.+/);
-    expect(await newTabs(), 'no tab is open yet').toEqual([]);
+      // The row link is a plain link (no target, no download): "open in a new tab" is the browser's.
+      await expect(link).toHaveAttribute('href', repoRoute(repo.name));
+      await expect(link).not.toHaveAttribute('target', /.+/);
+      expect(await newTabs(), 'no tab is open yet').toEqual([]);
 
-    // A ctrl-click on the row's centre (plain text under the link) opens the repository in a NEW tab
-    // and stays on the list. The tab is read from the browser's own target list: Playwright's `page`
-    // event for a background tab is missing every now and then in headless Chromium (see new-tabs.ts).
-    await row.click({ modifiers: ['ControlOrMeta'] });
-    await expect
-      .poll(newTabs, { message: 'a new tab opened on the repository' })
-      .toEqual([expect.stringMatching(opened)]);
-    await expect.poll(handled).toEqual([false]);
-    await expect(adminPage).toHaveURL(/\/repositories$/);
-    await tabs.closeAll();
-    await expect.poll(newTabs).toEqual([]);
+      // A ctrl-click on the row's centre (plain text under the link) opens the repository in a NEW tab
+      // and stays on the list. The tab is read from the browser's own target list: Playwright's `page`
+      // event for a background tab is missing every now and then in headless Chromium (see new-tabs.ts).
+      await row.click({ modifiers: ['ControlOrMeta'] });
+      await expect
+        .poll(newTabs, { message: 'a new tab opened on the repository' })
+        .toEqual([expect.stringMatching(opened)]);
+      await expect.poll(handled).toEqual([false]);
+      await expect(adminPage).toHaveURL(/\/repositories$/);
+      await tabs.closeAll();
+      await expect.poll(newTabs).toEqual([]);
 
-    // A middle click does the same.
-    await row.click({ button: 'middle' });
-    await expect.poll(newTabs).toEqual([expect.stringMatching(opened)]);
-    await expect(adminPage).toHaveURL(/\/repositories$/);
-    await tabs.closeAll();
-    await expect.poll(newTabs).toEqual([]);
+      // A middle click does the same.
+      await row.click({ button: 'middle' });
+      await expect.poll(newTabs).toEqual([expect.stringMatching(opened)]);
+      await expect(adminPage).toHaveURL(/\/repositories$/);
+      await tabs.closeAll();
+      await expect.poll(newTabs).toEqual([]);
 
-    // A plain click on empty space in the row, near its left edge, opens the repository in this tab.
-    await row.click({ position: { x: 3, y: 3 } });
-    await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
-    await expect.poll(async () => (await handled()).at(-1)).toBe(true);
-    // ...and it opens no tab of its own.
-    expect(await newTabs()).toEqual([]);
-    await tabs.dispose();
-  });
+      // A plain click on empty space in the row, near its left edge, opens the repository in this tab.
+      await row.click({ position: { x: 3, y: 3 } });
+      await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
+      await expect.poll(async () => (await handled()).at(-1)).toBe(true);
+      // ...and it opens no tab of its own.
+      expect(await newTabs()).toEqual([]);
+      await tabs.dispose();
+    },
+  );
 
   test('A11Y-08: the row menu still works, and an open menu paints over the next row', async ({
     adminPage,
