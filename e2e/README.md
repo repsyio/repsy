@@ -200,6 +200,7 @@ e2e/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe; both tests tagged @smoke
     skeleton/backend-module.spec.ts  # RPS-1495 the panel backend registry: `REPSY_E2E_BACKEND_MODULE` picks an external backend (`fake-panel-backend.ts`, in memory, no server), also for the `panelApi`/`seeder` fixtures; `UnsupportedPanelOperation`
     skeleton/cloud-target.spec.ts    # RPS-1498 the Repsy Cloud target seam: capabilities, expectation overlay, credentials a target cannot seed, known gaps, and the real scenario loop on a fake cloud backend (`fake-cloud-panel-backend.ts`); three of its tests are skipped ON PURPOSE (they are the skip paths)
+    skeleton/known-gaps.spec.ts      # RPS-1510 the known-gap mechanism for specs outside the catalog (`src/known-gaps.ts`): registry rules, test keys, `byTarget`, and an inner run (`known-gap-inner/`) of the fake cloud that proves a gap that still fails is an expected failure, one that stops failing FAILS the run, gaps are per target, `@cloud-skip` skips, and an OS target has none
     skeleton/ui-target.spec.ts       # RPS-1638 the UI seam (`target.ui`): route builders per target, session keys, base-URL chain, the descriptors' routes on both, and `--list` under `cloud-remote` excluding `@cloud-skip`
     skeleton/repo-settings.spec.ts  # RPS-1200 settings-PUT field-by-field matrix across RepoTypes; untagged (not smoke-sized)
     skeleton/repo-type-casing.spec.ts  # RPS-1269 repo type: /format answers upper case; type accepted in any case (query and body)
@@ -331,10 +332,19 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
   `--target ci` (see "CI" below).
 - **remote** — an already-running instance the harness does not own or reset. Throttle cannot be
   tuned and nothing global is touched; later steps add a failure budget and a preflight check.
-- **cloud-remote**, **cloud-local** (RPS-1498) — Repsy Cloud instead of Repsy OS: a deployed environment,
-  or one that runs next to the harness. Neither is owned or tunable by the harness, and Repsy Cloud
-  rate-limits failed authentications, so both count as `isRemote` (the loop runs `@negative` scenarios
-  serially on a `RemoteAuthBudget`). A cloud run has no built-in panel backend in this repository: its
+- **cloud-remote**, **cloud-local** (RPS-1498) — Repsy Cloud instead of Repsy OS. Neither is owned or tuned
+  by the harness (`ownsStack: false`, `canTuneThrottle: false`: it never starts, restarts or reconfigures
+  them, so the specs that assume the OS environment overlays stay off). They differ in who else is on the
+  instance (RPS-1510):
+  - **cloud-remote** is a deployed environment (DEV): `isRemote: true`. Failed authentications count against
+    a shared instance's rate limit, so the loop runs `@negative` scenarios serially on a `RemoteAuthBudget`
+    and skips `@local-only` ones.
+  - **cloud-local** is a Repsy Cloud stack built next to the harness, with its own database: `isRemote:
+false`. Nobody else shares it, so it behaves like `local` for the loop (parallel `@negative` scenarios,
+    `@local-only` scenarios run). A spec that cannot run against Repsy Cloud at all is `@cloud-skip`, not
+    `@local-only`.
+
+  A cloud run has no built-in panel backend in this repository: its
   backend is a module (`REPSY_E2E_BACKEND_MODULE`, below) supplied by the repository that owns Repsy Cloud.
   `env.ts` needs the OS-only `REPSY_ADMIN_PASSWORD` at import on the OS targets only; on a `cloud-*`
   target it is optional at import (it is the tenant owner's password there, and reading it without a value
@@ -348,7 +358,7 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 `target` (`src/target.ts`) is the capabilities of the run's `REPSY_TARGET`. What differs by product is a
 capability, so a spec or the engine asks the capability and never the target's name:
 
-| Capability                               | Repsy OS                              | Repsy Cloud (provisional, see below)                                  |
+| Capability                               | Repsy OS                              | Repsy Cloud (probed on DEV, RPS-1491)                                 |
 | ---------------------------------------- | ------------------------------------- | --------------------------------------------------------------------- |
 | `kind`                                   | `os`                                  | `cloud` (for an adapter hook to branch on)                            |
 | `urlScheme`                              | `repo` (`/<repo>/...`)                | `owner-repo` (`/<owner>/<repo>/...`, `src/repo-url.ts`)               |
@@ -357,7 +367,7 @@ capability, so a spec or the engine asks the capability and never the target's n
 | `supportsExpiredTokenSeed`               | yes (past date accepted)              | no (an expiration date has to be in the future)                       |
 | `expiredTokenStrategy`                   | `past-date`                           | `short-ttl-wait` (short lifetime, then wait); or `unsupported`        |
 | `maxDeployTokensPerRepo`                 | unlimited                             | 1 (FREE plan)                                                         |
-| `supportsDirectoryListing`               | yes                                   | no (nothing may rely on listings)                                     |
+| `supportsDirectoryListing`               | yes                                   | no (Maven repos list, no other protocol does: one flag, kept off)     |
 | `supportsVersionAllowanceSettings(type)` | Maven, NuGet                          | the same                                                              |
 | `ui.repoRoute(repo, ...segments)`        | `/<repo>/...`                         | `/<owner>/<repo>/...` (`REPSY_REPO_OWNER`, read when called)          |
 | `ui.profilePath`                         | `/profile`                            | `/account`                                                            |
@@ -366,9 +376,15 @@ capability, so a spec or the engine asks the capability and never the target's n
 | `ui.sessionStorageKeys`                  | `username`, `token`, `refresh-token`  | the same plus `email`                                                 |
 | `ui.frontendBaseUrl()`                   | `REPSY_UI_BASE_URL`, else the API URL | `REPSY_UI_BASE_URL`, else `REPSY_FRONTEND_BASE_URL`, else the API URL |
 
-The Cloud column is **provisional**: only the FREE plan limits and the future-only expiration date are
-known; the rest is a guess until RPS-1491 (a probe of Repsy Cloud DEV that pins the cloud expectation
-table) is done, and that story may change any value here.
+The Cloud column is what RPS-1491 observed on Repsy Cloud DEV (`docs/cloud-expectations.md` of the repsy-mono
+repository): the FREE plan's limits, a future-only expiration date (a 3 s lifetime is accepted, so
+`token-expired` is a short lifetime and a wait), owner/repo URLs, collaborators instead of roles.
+`supportsDirectoryListing` stays `false`: Maven repos answer a directory `GET` with a listing and no other
+protocol does, and the flag is one value for every protocol (a per-protocol answer is the Maven runner story's
+decision, RPS-1511). `supportsVersionAllowanceSettings` is the OS set (Maven, NuGet): Repsy Cloud enforces it
+for those two, but its panel also ACCEPTS `releases`/`snapshots` for every other type (RPS-1635), which is a
+known gap of the target ("Known gaps outside the catalog"), not a capability. Two more values differ per
+target and are not in the table: `isRemote` and `ownsStack` ("Targets" above).
 
 The `ui.*` rows are the panel's side of the seam (RPS-1638, "The UI seam" below): what the `ui` project's
 page objects and specs ask instead of writing a route, a storage key or a login field themselves. The Cloud
@@ -393,17 +409,18 @@ The engine uses the capabilities and three hooks, so **no cloud-specific outcome
   scenario's `expectByProtocol[protocol]`, the overlay's `*`, the overlay's protocol entry. The loop and
   the `world` fixture (its "needs a pre-publish" check) read through it. No overlay (every OS run) is
   exactly the old behaviour.
-- **Known gaps** (`PanelBackend.knownGap(protocol, scenarioId, side)`, `side` is `publish` or
-  `consume`). Returns the reason (name the Jira key) when that side of the scenario is a known,
-  filed gap of the target. The loop asks BEFORE that side runs and before every `adapter.known*`
+- **Known gaps of a catalog scenario** (`PanelBackend.knownGap(protocol, scenarioId, side)`, `side` is
+  `publish` or `consume`). Returns the reason (name the Jira key) when that side of the scenario is a
+  known, filed gap of the target. The loop asks BEFORE that side runs and before every `adapter.known*`
   hook, and marks the test `test.fail`. That is a pin, not a skip: **a gap that starts passing fails
   the run** ("Expected to fail, but passed"), so the entry is removed in the same change as the bump
-  that fixed it. (Checked by hand in RPS-1498: flip the fake's answer in `cloud-target.spec.ts` and the
-  test fails with that message; a permanently failing test cannot sit in a green suite.) `knownGap` and
-  `expectByTarget` are optional on a backend; absent means none.
-- **`@cloud-skip`**: a tag for what does not apply to Repsy Cloud at all. `tests/stack/**` and
-  `login-password.spec.ts` carry it, and a catalog scenario carrying it is skipped by the loop on a
-  cloud target with a reason. A cloud runner also excludes it for whole specs: `--grep-invert @cloud-skip`.
+  that fixed it. A spec outside the catalog has its own hook, "Known gaps outside the catalog" below.
+  `knownGap`, `knownTestGap` and `expectByTarget` are optional on a backend; absent means none.
+- **`@cloud-skip`**: a tag for what does not apply to Repsy Cloud at all ("Tags" below). `tests/stack/**`,
+  `login-password.spec.ts` and the OS-only tests of `backend-module.spec.ts` and `repo-type-casing.spec.ts`
+  carry it. A catalog scenario carrying it is skipped by the loop, and any test of a spec on this harness's
+  `test` is skipped by an auto fixture, on a cloud target, with a reason; a cloud runner can also exclude it
+  for whole specs: `--grep-invert @cloud-skip`.
 - **Token limits.** `tests/skeleton/seed.spec.ts` seeds `min(3, maxDeployTokensPerRepo)` tokens (in the
   order read-write, read-only, expired) and skips its expired-token round trip on a target that cannot
   seed one or holds fewer than two tokens per repo. The manage matrix (`manage-matrix.ts`) still seeds a
@@ -415,6 +432,94 @@ hooks): it runs the REAL `registerPublishConsumeLoop` (with the options `{ scena
 the harness itself may pass) and `world` fixture against a fake protocol adapter. It is also the smallest
 worked example of a cloud backend module. Three of its tests are skipped on purpose, because they are the
 skip paths.
+
+### Known gaps outside the catalog (RPS-1510)
+
+The catalog's `knownGap` covers only a scenario side. The other specs (`repo-settings`, registry rules, a
+protocol's own suite, `image-lifecycle`...) get the same pin through `src/known-gaps.ts`. A known gap is a
+difference of ONE target from what a spec pins, already filed as a Jira ticket, that the harness records
+instead of hiding. The test is marked `test.fail`, so:
+
+- while the gap exists the test fails inside, and Playwright reports it as an **expected failure** (passed);
+- when the gap is closed the test passes, and Playwright **fails** it with "Expected to fail, but passed". That
+  is what forces the entry to be deleted in the change that brought the fix (after a bump: RPS-1533). It is a
+  pin, never a skip.
+
+Three ways in, all ending in `test.fail(true, "<RPS-nnnn>: <reason>")`, so the report names the ticket:
+
+| Way                                                   | Where the gap is written           | Use it for                                                                                                                   |
+| ----------------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `PanelBackend.knownTestGap(key, target)`              | the backend module's registry      | the normal case: Repsy Cloud keeps its gaps in its own repository, so adding or removing one is a Cloud change, not an OS PR |
+| `knownGap(key)` fixture                               | the registry, a key the spec picks | a gap of a feature (`skeleton > settings-partial-put`) that no single test title names                                       |
+| `knownGapOn(targets, jira, reason)` (`known-gaps.ts`) | the spec itself                    | a spec on the bare `@playwright/test` (no fixtures), or a pin that must live next to the assertion                           |
+
+```ts
+// The backend module (Repsy Cloud's harness): a target-scoped registry, validated at load.
+import { defineKnownGaps } from 'repsy-e2e/src/known-gaps.js';
+
+const GAPS = defineKnownGaps([
+  {
+    key: 'skeleton > repo-settings > allowOverride is omitted from the settings and ignored on write (RPS-1435, CARGO)',
+    jira: 'RPS-1577',
+    reason: 'the settings still show allowOverride',
+    targets: ['cloud-remote'], // an entry is per target: a cloud-local stack with the fix is not pinned
+  },
+]);
+
+class CloudPanelBackend implements PanelBackend {
+  knownTestGap(key: string, target: RepsyTarget) {
+    return GAPS.lookup(key, target);
+  }
+}
+```
+
+- **The key of a test** is `<project> > <file stem> > <describe titles > test title>` (`testGapKey`), for
+  example `skeleton > repo-settings > a settings PUT with a single field changed leaves every other field alone
+(maven)`. A parameterised test carries its parameter in the title, so each is a key of its own. The match is
+  exact. `defineKnownGaps` throws at load on a ticket that is not `RPS-nnn`, an empty reason, no target, or the
+  same key twice for one target.
+- **The lookup is automatic.** `knownGap` is an `auto` fixture of the `test` of `src/scenarios/fixtures.ts`
+  (a spec on the bare `@playwright/test` `test` does not get it and uses `knownGapOn`), so the test's own key
+  is looked up before it runs, with no login. The backend is only asked: `OsPanelBackend` has no gaps, so
+  **an OS run marks nothing** and its behaviour, titles and JUnit names are unchanged.
+- **Gaps are per target.** `targets` lists where the gap is open (`cloud-remote` runs an older build than a
+  `cloud-local` stack built from the branch, so one gap can be open on one and closed on the other). An entry
+  that names no target of the run does nothing, so it cannot flip a run it does not belong to.
+- **`test.fail` marks the whole test.** Assertions after the first failure never run, so a second, unrelated
+  defect in the same test hides behind the gap. A difference that is only a different answer (a status, a
+  message id) is not a gap: use `byTarget({ default, cloud, 'cloud-local': ... })` (`known-gaps.ts`, the value
+  of an assertion per target, the most specific entry wins) in a spec, or the `expectByTarget` overlay in the
+  catalog.
+- **The rule.** Every gap has a Jira ticket (under RPS-1451 for Repsy Cloud) BEFORE it is pinned. The registry
+  is the backlog of Cloud behaviour to re-check after each bump; delete an entry in the same change as the fix.
+- **Proved by `tests/skeleton/known-gaps.spec.ts`**, which runs `known-gap-inner/known-gap-cases.inner.ts` as a
+  Playwright run of its own under each target against the fake cloud backend, and asserts the report: a gap
+  that still fails is an expected failure carrying its ticket; a gap that stopped failing is `unexpected`
+  (expected `failed`, ran `passed`: the flip-and-fail); a gap of `cloud-remote` does nothing on `cloud-local`;
+  `@cloud-skip` skips on a cloud target; on an OS target nothing is pinned or skipped.
+
+The skeleton project run against Repsy Cloud (RPS-1506 measured 87 passed, 20 skipped, 7 failed) is handled so:
+
+- `@cloud-skip` (OS-only, nothing to pin on Cloud): `backend-module.spec.ts` "without it the built-in Repsy OS
+  backend is used" and "an empty value counts as unset" (a Cloud target has no built-in backend), and
+  `repo-type-casing.spec.ts` "the type of a new repository is read in any case...", "a type that names no
+  repository type is refused..." and "the type filter of the repository list is read in any case" (they call
+  the OS routes `POST /api/repos` and `GET /api/repos?type=`, which Repsy Cloud does not have; what its own
+  `{TYPE}` routes do with a lower-case type is RPS-1636, pinned by the Cloud harness on its own routes).
+- Known gaps for the Cloud registry (RPS-1577, Cloud still shows `allowOverride` of Cargo and Go), keys of
+  `repo-settings.spec.ts`: `skeleton > repo-settings > allowOverride is omitted from the settings and ignored
+on write (RPS-1435, CARGO)` and the same with `GOLANG`.
+- `scanner-stub.spec.ts` needs no guard: it starts the stub in its own process on a free port and talks to no
+  Repsy at all, so it passes on every target (checked with `REPSY_TARGET=cloud-local`, no stack).
+
+### Tags
+
+| Tag           | Meaning                                                                                                                                                                                                                                                                    |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@cloud-skip` | does not apply to Repsy Cloud at all (an OS route, a `USER` role, the OS container). Skipped with a reason on a cloud target by the loop (catalog) and by the `test` fixtures (any spec), and excludable whole: `--grep-invert @cloud-skip`. Say why in a comment above it |
+| `@smoke`      | the small, fast subset of a project (`--grep @smoke`): one round trip per protocol, the skeleton's seed and auth probe                                                                                                                                                     |
+| `@negative`   | a scenario that spends failed authentications; on an `isRemote` target it runs serially on the `RemoteAuthBudget`                                                                                                                                                          |
+| `@local-only` | needs something only a stack of its own has (two names for the registry); skipped when `isRemote`                                                                                                                                                                          |
 
 ### The UI seam (`target.ui`, RPS-1638)
 
@@ -627,8 +732,8 @@ Each project's `testDir` is the protocol's own directory, so a project lists wha
 OS config's `testMatch` globs (`npm/**/*.spec.ts`) match a little more or less than a directory does: the OS
 `npm` project also picks up `tests/npm-clients/npm/` (13 tests, which a `testDir` of `tests/npm` leaves to
 the `npm-clients` project), and six `@local-only` tests (`matrix/tarball-host.spec.ts`, one in
-`yarn-berry/install-modes.spec.ts`) are only registered on a local target, so `npm-clients` lists 233 tests
-under `cloud-remote` and 239 under `local`. Every other protocol project lists the same tests as on OS.
+`yarn-berry/install-modes.spec.ts`) are only registered on a target that is not `isRemote`, so `npm-clients` lists 233 tests
+under `cloud-remote` and 239 under `local` and `cloud-local` (RPS-1510). Every other protocol project lists the same tests as on OS.
 
 **`link:` instead of a workspace.** `pnpm add link:<os>/e2e` only symlinks the directory: it installs
 nothing for it, so `pnpm install` has to have been run in the harness's own directory, and the harness then
@@ -695,7 +800,7 @@ test, or behind a function (RPS-1500 moved the ones that did this).
 
 - **The consumer's config, for whole specs:** `grepInvert: /@cloud-skip/` (config-wide, as above, or on a
   project), or `--grep-invert @cloud-skip` on the command line. The tagged tests are not listed at all
-  (`skeleton` goes from 129 to 125 tests under `cloud-remote`, the `ui` project from 709 to 563: its tags are
+  (`skeleton` goes from 155 to 144 tests under `cloud-remote`, the `ui` project from 709 to 563: its tags are
   in "The UI seam").
 - **The scenario loop, for catalog scenarios:** a `@cloud-skip` scenario is skipped with a reason on a
   `cloud-*` target (visible in the report), even without the config. Use the config too when a skipped row is

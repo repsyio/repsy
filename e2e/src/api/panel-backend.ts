@@ -45,6 +45,7 @@ import type { TokenInfo } from './generated/models/TokenInfo.js';
 import type { UserResponse } from './generated/models/UserResponse.js';
 import type { VulnerabilityFindingInfo } from './generated/models/VulnerabilityFindingInfo.js';
 import type { VulnerabilityScanInfo } from './generated/models/VulnerabilityScanInfo.js';
+import type { RepsyTarget } from '../env.js';
 import type { ExpectationOverlay } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import type { Seeder } from '../seed/seeder.js';
@@ -219,6 +220,16 @@ export interface PanelBackend {
    * the same change as the bump that fixed it. Absent: no gaps, as on every OS run.
    */
   knownGap?(protocol: string, scenarioId: string, side: ScenarioSide): string | undefined;
+  /**
+   * A known, already-filed gap of this target for a test OUTSIDE the scenario catalog (RPS-1510, README
+   * "Known gaps"): the reason (name the Jira key) when the test with this `key` is expected to fail on
+   * `target`, `undefined` otherwise. `key` is the test's `testGapKey` (`<project> > <file stem> > <titles>`,
+   * `src/known-gaps.ts`) or the one a spec passes to the `knownGap` fixture. The `test` of
+   * `scenarios/fixtures.ts` asks for every test before it runs and marks it `test.fail`, so a gap that
+   * starts passing FAILS the run; delete the entry in the change that fixed it. `defineKnownGaps`
+   * builds the lookup from a target-scoped list. Absent: no gaps, as on every OS run.
+   */
+  knownTestGap?(key: string, target: RepsyTarget): string | undefined;
 
   // Users -----------------------------------------------------------------------------------------
 

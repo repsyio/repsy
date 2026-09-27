@@ -74,13 +74,16 @@ test.describe('panel backend registry', () => {
     },
   );
 
-  test('without it the built-in Repsy OS backend is used', async () => {
+  // `@cloud-skip` (RPS-1510) on the next two: they assert the BUILT-IN backend of a target, which is
+  // `OsPanelBackend` for an OS target. A Repsy Cloud target has none (`backend-registry.ts` says so and
+  // names the variable, checked in `cloud-target.spec.ts`), so on Cloud they are OS-only by construction.
+  test('without it the built-in Repsy OS backend is used', { tag: ['@cloud-skip'] }, async () => {
     const backend = await withBackendModule(undefined, () => createPanelBackend());
 
     expect(backend).toBeInstanceOf(OsPanelBackend);
   });
 
-  test('an empty value counts as unset', async () => {
+  test('an empty value counts as unset', { tag: ['@cloud-skip'] }, async () => {
     const backend = await withBackendModule('', () => createPanelBackend());
 
     expect(backend).toBeInstanceOf(OsPanelBackend);

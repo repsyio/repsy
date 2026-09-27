@@ -101,8 +101,11 @@ test.describe('UI capabilities per target (RPS-1638)', () => {
     }));
 
   test('the short forms (`repoRoute`, `profileRoute`) follow the target they are called under', async () => {
-    expect(repoRoute('r', 'settings')).toBe('/r/settings');
-    expect(profileRoute()).toBe('/profile');
+    // Under `local` explicitly, not the run's target: this spec must pass on every target (RPS-1510).
+    await withUiTarget('local', undefined, () => {
+      expect(repoRoute('r', 'settings')).toBe('/r/settings');
+      expect(profileRoute()).toBe('/profile');
+    });
 
     await withUiTarget('cloud-remote', 'acme', () => {
       expect(repoRoute('r', 'settings')).toBe('/acme/r/settings');
@@ -178,16 +181,18 @@ function descriptorRoutes(protocol: PackageProtocol, repo: string): string[] {
 test.describe('the package page objects route through the seam (RPS-1638)', () => {
   const protocols = Object.keys(DESCRIPTORS) as PackageProtocol[];
 
-  test('Repsy OS: every route of every descriptor is /<repo>...', () => {
-    for (const protocol of protocols) {
-      const routes = descriptorRoutes(protocol, 'the-repo');
+  // Under `local` explicitly, not the run's target: this spec must pass on every target (RPS-1510).
+  test('Repsy OS: every route of every descriptor is /<repo>...', () =>
+    withUiTarget('local', undefined, () => {
+      for (const protocol of protocols) {
+        const routes = descriptorRoutes(protocol, 'the-repo');
 
-      expect(routes.length, protocol).toBeGreaterThanOrEqual(3);
-      for (const route of routes) {
-        expect(route, protocol).toMatch(/^\/the-repo(\/|\?|$)/);
+        expect(routes.length, protocol).toBeGreaterThanOrEqual(3);
+        for (const route of routes) {
+          expect(route, protocol).toMatch(/^\/the-repo(\/|\?|$)/);
+        }
       }
-    }
-  });
+    }));
 
   test('Repsy Cloud: the same routes are /<owner>/<repo>..., with nothing else changed', async () => {
     const os = await withUiTarget('local', undefined, () =>
@@ -263,15 +268,17 @@ test.describe('the session is seeded under the keys of the target (RPS-1638)', (
     email: 'alice@example.test',
   };
 
-  test('Repsy OS: three keys, and the email of a login answer is not stored', async () => {
-    const seeded = await seedInto(session);
+  // Under `local` explicitly, not the run's target: this spec must pass on every target (RPS-1510).
+  test('Repsy OS: three keys, and the email of a login answer is not stored', () =>
+    withUiTarget('local', undefined, async () => {
+      const seeded = await seedInto(session);
 
-    expect([...seeded.local.entries()].sort()).toEqual([
-      ['refresh-token', 'refresh'],
-      ['token', 'access'],
-      ['username', 'alice'],
-    ]);
-  });
+      expect([...seeded.local.entries()].sort()).toEqual([
+        ['refresh-token', 'refresh'],
+        ['token', 'access'],
+        ['username', 'alice'],
+      ]);
+    }));
 
   test('Repsy Cloud: the same three keys plus the email', () =>
     withUiTarget('cloud-remote', 'acme', async () => {

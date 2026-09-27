@@ -175,11 +175,17 @@ const OS_CAPABILITIES: ProductCapabilities = {
 };
 
 /**
- * PROVISIONAL until RPS-1491 (the probe of Repsy Cloud DEV) pins them. Known so far: the harness runs
- * on the FREE plan (1 deploy token and 1 collaborator per repo, RPS-1498), and Repsy Cloud validates
- * an expiration date as a future instant, so `token-expired` needs a short lifetime and a wait.
- * Guessed: directory listings (off, so no fingerprint may rely on them) and which repo types accept
- * `releases`/`snapshots` (the OS set, as Repsy Cloud forks the OS backend).
+ * Repsy Cloud, as probed on DEV in RPS-1491 (`docs/cloud-expectations.md` of the repsy-mono
+ * repository, "Proposed cloud column"). Pinned: the harness runs on the FREE plan (1 deploy token and
+ * 1 collaborator per repo, RPS-1498), and Repsy Cloud
+ * validates an expiration date as a future instant, so `token-expired` needs a short lifetime and a
+ * wait (a 3 s lifetime is accepted). `supportsVersionAllowanceSettings` is the OS set: Repsy Cloud
+ * ENFORCES releases/snapshots for Maven and NuGet only, but its panel still ACCEPTS them for every
+ * type (RPS-1635), which is a known gap of the target, not a capability.
+ *
+ * `supportsDirectoryListing` is `false` although Maven repos do answer a directory `GET` with a listing
+ * (no other protocol does): it is one flag for every protocol, so it stays off and no fingerprint may
+ * rely on it. A per-protocol answer is the Repsy Cloud runner story's decision (RPS-1511).
  */
 const CLOUD_CAPABILITIES: ProductCapabilities = {
   kind: 'cloud',
@@ -198,8 +204,15 @@ const CAPABILITIES: Record<RepsyTarget, TargetCapabilities> = {
   local: { ownsStack: true, canTuneThrottle: true, isRemote: false, ...OS_CAPABILITIES },
   ci: { ownsStack: true, canTuneThrottle: true, isRemote: false, ...OS_CAPABILITIES },
   remote: { ownsStack: false, canTuneThrottle: false, isRemote: true, ...OS_CAPABILITIES },
-  // The harness never owns Repsy Cloud, even one that runs next to it (`cloud-local`), and Repsy
-  // Cloud rate-limits failed authentications either way: both are `isRemote`.
+  // The harness never owns Repsy Cloud and cannot tune it, on either target (RPS-1510, D7).
+  //  - cloud-remote (a deployed environment, DEV): `isRemote`. Failed authentications count against a
+  //    shared instance's rate limit, so the scenario loop runs `@negative` scenarios serially on a
+  //    `RemoteAuthBudget`.
+  //  - cloud-local (a Repsy Cloud stack built next to the harness, its own database): NOT `isRemote`.
+  //    Nobody else shares it, so `@negative` scenarios run in parallel as on `local`. It still is not
+  //    `ownsStack` (the harness does not start, restart or reconfigure it, so `size-limits`,
+  //    `connector-limits` and the stack specs, which assume the OS environment overlays, stay off) and
+  //    `canTuneThrottle` is `false` until Repsy Cloud ports the throttle (RPS-1542).
   'cloud-remote': {
     ownsStack: false,
     canTuneThrottle: false,
@@ -209,7 +222,7 @@ const CAPABILITIES: Record<RepsyTarget, TargetCapabilities> = {
   'cloud-local': {
     ownsStack: false,
     canTuneThrottle: false,
-    isRemote: true,
+    isRemote: false,
     ...CLOUD_CAPABILITIES,
   },
 };
