@@ -19,13 +19,14 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { expect, test } from '@playwright/test';
 
 import { pushRuby } from '../../src/clients/oversize.js';
 import { goProxyUrlFor } from '../../src/clients/golang-tls-shim.js';
 import { writeNpmrc } from '../../src/clients/npm-family/config.js';
-import { imageRef, pushScope } from '../../src/clients/docker-raw.js';
+import { imageRef, pushScope, rawStartUploadWithToken } from '../../src/clients/docker-raw.js';
 import { env } from '../../src/env.js';
 import {
   imageRef as sharedImageRef,
@@ -183,4 +184,47 @@ test('the recorded client command and the raw probe carry x/<repo> under owner-r
     await new Promise((resolve) => server.close(resolve));
     await fs.rm(bin, { recursive: true, force: true });
   }
+});
+
+test('the Docker login-token probe reaches /v2/x/<repo>/<image> under owner-repo (RPS-1520)', async () => {
+  // `rawStartUploadWithToken` is the probe of the login-token invalidation tests: with no owner
+  // segment it is a 404 on an owner-scoped registry, so a dead session could never read as one.
+  const seen: string[] = [];
+  const server = http.createServer((req, res) => {
+    seen.push(`${req.method} ${req.url} ${req.headers.authorization ?? ''}`);
+    req.resume();
+    res.writeHead(202).end();
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const stub = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+  try {
+    for (const [scheme, owner, segment] of [
+      ['repo', undefined, 'r1'],
+      ['owner-repo', 'x', 'x/r1'],
+    ] as const) {
+      seen.length = 0;
+      const res = await withScheme(
+        scheme,
+        owner,
+        () => rawStartUploadWithToken('r1', 'img', 'tok'),
+        stub,
+      );
+      expect(res.status).toBe(202);
+      expect(seen).toEqual([`POST /v2/${segment}/img/blobs/uploads/ Bearer tok`]);
+    }
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('no raw Docker helper builds a /v2 path from a repository name by hand (RPS-1520)', async () => {
+  // A `v2Url(`/${repoName}/...`)` is the `repo` scheme only; `v2RepoUrl(repoName, ...)` and
+  // `repoPath(repoName)` are the seam.
+  const source = await fs.readFile(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '../../src/clients/docker-raw.ts'),
+    'utf8',
+  );
+  const byHand = source.split('\n').filter((line) => /v2Url\(`[^`]*\$\{repo/i.test(line));
+  expect(byHand).toEqual([]);
 });

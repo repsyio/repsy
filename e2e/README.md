@@ -663,7 +663,14 @@ name alone and is unchanged, because the owner lives in the URL, not in any name
 Adding a client or a probe: build the URL with `repoUrl`/`repoPath`/`imageRef`/`v2RepoUrl`, and if a
 mustache template needs the repository, pass it the rendered URL (or `repoPath(name)`), never the bare
 name. `tests/skeleton/repo-url.spec.ts` runs the helpers and a few real call sites (a `gem push`
-command, a raw probe, `.npmrc`, `GOPROXY`) under both schemes, with no stack.
+command, a raw probe, `.npmrc`, `GOPROXY`, the Docker login-token probe) under both schemes, with no stack, and
+keeps `src/clients/docker-raw.ts` from building a `/v2` path out of a bare repository name (RPS-1520). The same
+goes for `rawMountUpload`'s `from=`: it names the source repository through `repoPath`.
+
+An expired deploy token of a spec outside the scenario catalog comes from `materializeCredentialKind(seeder,
+'token-expired', repoName, repoType)` (`PanelBackend.seedExpiredTokenCredential`), never from a past
+`expirationDate` given to `seeder.createToken`: Repsy Cloud refuses that date (`400 validationError`) and waits out
+a short lifetime instead (`expiredTokenStrategy`). The Docker R2 token matrix does it since RPS-1520.
 
 ## Consuming the harness from another repository (RPS-1500)
 
@@ -2478,7 +2485,10 @@ Docker token minted before `PUT /api/profile/password` still started a blob uplo
 `registerLoginTokenInvalidation` (same file) pins it per protocol with raw HTTP and the stored token, because a
 real docker client exchanges its Basic credentials again for every operation and never holds a stale one:
 
-- `tests/docker/credential-invalidation.spec.ts`: `POST blobs/uploads/` with the `/v2/token` JWT.
+- `tests/docker/credential-invalidation.spec.ts`: `POST blobs/uploads/` with the `/v2/token` JWT
+  (`rawStartUploadWithToken`, which builds its URL with `v2RepoUrl`, so it reaches
+  `/v2/<owner>/<repo>/<image>/...` on an owner-scoped registry: without the owner segment the probe was a `404`,
+  and a dead session could not read as one, RPS-1520).
 - `tests/npm/credential-invalidation.spec.ts`: a read with the login token, and the real `npm publish` with it as
   `_authToken` (refused, nothing stored, and the new login publishes).
 - `tests/cargo/credential-invalidation.spec.ts`: a sparse-index read with the `/me` token.
@@ -3359,6 +3369,10 @@ is in the PR that added this file.
 | `POST .../blobs/uploads/?mount=<digest>[&from=<repo>]`                | `202` + a new upload session (`Location`, `Docker-Upload-UUID`), never the `201` of a real mount, whether or not the blob exists, in this or another repo, and for a malformed digest too; a read-only token is `401` at the request hop (RA5)                                                                                                                                | copies between two repos of one Repsy upload the bytes instead of mounting them; slower, still correct  |
 | `HEAD blobs/<digest>` of a blob another image of the SAME repo pushed | `200`: blobs are stored per repo, not per image (RA6)                                                                                                                                                                                                                                                                                                                         | a same-repo copy never reaches the mount request, a client's own `HEAD` finds the blob                  |
 
+- The `name` of a `tags/list` answer is the repository path of the request URL plus the image, as the
+  distribution spec wants: `<repo>/<image>`, and `<owner>/<repo>/<image>` on an owner-scoped registry, where
+  the Cloud `UrlParserProperties` overrides `BaseUrlParserProperties.getRepoPath()` (RPS-1520). RA1 builds
+  the expected value with `repoPath()`, so it is the same assertion on both targets.
 - The unauthenticated `404` of `_catalog` and `referrers` is the router's catch-all (no handler is
   registered for the route), which is why there is not even the `401` Bearer challenge a known route
   such as `GET manifests/<tag>` or, since RPS-1489, `tags/list` gives an anonymous caller (RA1 asserts

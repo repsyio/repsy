@@ -451,7 +451,7 @@ export async function rawStartUploadWithToken(
   image: string,
   token: string,
 ): Promise<RawResponse> {
-  return rawFetch(v2Url(`/${repoName}/${image}/blobs/uploads/`), {
+  return rawFetch(v2RepoUrl(repoName, `${image}/blobs/uploads/`), {
     method: 'POST',
     headers: bearerHeader(token),
   });
@@ -643,10 +643,13 @@ export async function rawMountUpload(
   mount: { digest: string; fromRepo?: string; fromImage?: string },
   bytes?: Buffer,
 ): Promise<MountUploadResult> {
+  // `from` names a repository the way the client addresses it: through the URL seam, so an
+  // owner-scoped registry gets `<owner>/<repo>[/<image>]`.
+  const fromPath = mount.fromRepo === undefined ? undefined : repoPath(mount.fromRepo);
   const from =
-    mount.fromRepo !== undefined && mount.fromImage !== undefined
-      ? `${mount.fromRepo}/${mount.fromImage}`
-      : mount.fromRepo;
+    fromPath !== undefined && mount.fromImage !== undefined
+      ? `${fromPath}/${mount.fromImage}`
+      : fromPath;
   const query = `mount=${encodeURIComponent(mount.digest)}${
     from !== undefined ? `&from=${encodeURIComponent(from)}` : ''
   }`;
