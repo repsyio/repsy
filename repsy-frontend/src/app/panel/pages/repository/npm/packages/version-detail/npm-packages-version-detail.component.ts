@@ -35,6 +35,7 @@ import {
   VERSION_PROBE_SIZE,
   VERSION_PROBE_SORT,
 } from '../../../../../shared/util/version-delete-landing.util';
+import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { NpmService } from '../../service/npm.service';
 
@@ -106,6 +107,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
 
   public loadVersion(): void {
     this.loading = true;
+    this.error = null;
 
     this.scopeName = this.route.snapshot.paramMap.get('scope');
     this.packageName = this.route.snapshot.paramMap.get('package');
@@ -135,7 +137,10 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
           this.versionInfo = packageVersionInfo;
           this.versionInfo.versionName = this.versionName;
         },
-        error: () => {},
+        error: (err: unknown) => {
+          this.versionInfo = undefined;
+          this.error = versionLoadError(err, this.versionName);
+        },
       });
   }
 

@@ -33,6 +33,7 @@ import {
   deleteVersionAndCheckLast$,
   landAfterVersionDelete,
 } from '../../../../../shared/util/version-delete-landing.util';
+import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
 import { HelmService } from '../../service/helm.service';
 
 @Component({
@@ -129,6 +130,7 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
     const ociHost = baseUrl.replace(/^https?:\/\//, '');
     this.ociPullCommand = `helm pull oci://${ociHost}/${repoName}/${name} --version ${version}`;
     this.loading = true;
+    this.error = null;
 
     this.helmService
       .getChartDetail(name, version)
@@ -153,7 +155,10 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
             .filter(Boolean)
             .join('\n');
         },
-        error: () => {},
+        error: (err: unknown) => {
+          this.chart = undefined;
+          this.error = versionLoadError(err, this.versionName);
+        },
       });
   }
 }

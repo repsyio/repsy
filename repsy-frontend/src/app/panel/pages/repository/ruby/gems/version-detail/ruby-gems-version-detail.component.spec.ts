@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
@@ -74,6 +75,26 @@ describe('RubyGemsVersionDetailComponent', () => {
   });
 
   describe('when a repository is selected', () => {
+    it('keeps a not-found message and no data when the version does not exist', () => {
+      rubyService.fetchGemVersion.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+
+      select();
+
+      expect(component.error).toBe("Version '7.1.0' not found");
+      expect(component.gemVersion).toBeUndefined();
+      expect(component.loading).toBeFalse();
+    });
+
+    it('says the version could not be loaded for a server error', () => {
+      rubyService.fetchGemVersion.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+
+      select();
+
+      expect(component.error).toBe('The version could not be loaded');
+      expect(component.gemVersion).toBeUndefined();
+      expect(component.loading).toBeFalse();
+    });
+
     it('loads the gem version of the route', () => {
       select();
 

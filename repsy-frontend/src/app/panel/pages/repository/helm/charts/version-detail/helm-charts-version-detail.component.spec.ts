@@ -77,6 +77,28 @@ describe('HelmChartsVersionDetailComponent', () => {
   }
 
   describe('when a repository is selected', () => {
+    it('keeps a not-found message and no data when the version does not exist', () => {
+      helmService.getChartDetail.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+
+      select();
+
+      expect(component.error).toBe("Version '1.2.3' not found");
+      expect(component.chart).toBeUndefined();
+      expect(component.loading).toBeFalse();
+    });
+
+    it('says the version could not be loaded for a server error, and clears the message on the next load', () => {
+      helmService.getChartDetail.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+      select();
+      expect(component.error).toBe('The version could not be loaded');
+      expect(component.chart).toBeUndefined();
+
+      helmService.getChartDetail.and.callThrough();
+      helmService.getChartDetail.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+      select();
+      expect(component.error).toBe("Version '1.2.3' not found");
+    });
+
     it('loads the chart version of the route', () => {
       select();
 

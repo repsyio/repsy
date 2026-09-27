@@ -14,6 +14,7 @@
 /// limitations under the License.
 ///
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Directive, Input } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
@@ -107,6 +108,31 @@ describe('CargoCratesVersionDetailComponent README', () => {
       remove: { imports: [SecurityScanSectionComponent, Highlight, HighlightLineNumbers] },
       add: { imports: [SecurityScanSectionStubComponent, HighlightStubDirective, HighlightLineNumbersStubDirective] },
     });
+  });
+
+  function renderFailure(status: number): HTMLElement {
+    cargoService.fetchCrate.and.returnValue(throwError(() => new HttpErrorResponse({ status: status })));
+    const fixture = TestBed.createComponent(CargoCratesVersionDetailComponent);
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('shows the not-found state, not an empty detail, when the version does not exist', () => {
+    const el = renderFailure(404);
+
+    expect(el.querySelector('[data-testid="pkg-detail"]')).toBeNull();
+    expect(el.querySelector('[data-testid="pkg-error-message"]')?.textContent?.trim()).toBe(
+      "Version '1.2.3' not found",
+    );
+  });
+
+  it('says the version could not be loaded when the request fails otherwise', () => {
+    const el = renderFailure(500);
+
+    expect(el.querySelector('[data-testid="pkg-detail"]')).toBeNull();
+    expect(el.querySelector('[data-testid="pkg-error-message"]')?.textContent?.trim()).toBe(
+      'The version could not be loaded',
+    );
   });
 
   it('renders the README markdown', () => {

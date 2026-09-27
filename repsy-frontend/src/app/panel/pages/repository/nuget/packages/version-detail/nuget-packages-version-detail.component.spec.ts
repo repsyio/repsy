@@ -93,6 +93,33 @@ describe('NugetPackagesVersionDetailComponent README', () => {
     });
   });
 
+  async function renderFailure(status: number): Promise<HTMLElement> {
+    nugetService.fetchPackageVersion.and.rejectWith(new HttpErrorResponse({ status: status }));
+    const fixture = TestBed.createComponent(NugetPackagesVersionDetailComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('shows the not-found state, not an empty detail, when the version does not exist', async () => {
+    const el = await renderFailure(404);
+
+    expect(el.querySelector('[data-testid="pkg-detail"]')).toBeNull();
+    expect(el.querySelector('[data-testid="pkg-error-message"]')?.textContent?.trim()).toBe(
+      "Version '1.2.3' not found",
+    );
+  });
+
+  it('says the version could not be loaded when the request fails otherwise', async () => {
+    const el = await renderFailure(500);
+
+    expect(el.querySelector('[data-testid="pkg-detail"]')).toBeNull();
+    expect(el.querySelector('[data-testid="pkg-error-message"]')?.textContent?.trim()).toBe(
+      'The version could not be loaded',
+    );
+  });
+
   it('renders the README markdown', async () => {
     const el = await render('# Acme readme\n\nUse **Acme.Lib** like this.');
 
@@ -125,7 +152,7 @@ describe('NugetPackagesVersionDetailComponent README', () => {
     expect(el.querySelector('[data-testid="readme"]')).toBeNull();
   });
 
-  it('shows the server message on the page, without a second toast, when the version cannot be loaded', async () => {
+  it('shows a not-found message on the page, without a second toast, when the version cannot be loaded', async () => {
     nugetService.fetchPackageVersion.and.rejectWith(
       new HttpErrorResponse({ status: 404, error: { text: 'Version not found' } }),
     );
@@ -135,10 +162,10 @@ describe('NugetPackagesVersionDetailComponent README', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.error).toBe('Version not found');
+    expect(fixture.componentInstance.error).toBe("Version '1.2.3' not found");
     expect(fixture.componentInstance.loading).toBeFalse();
     expect(TestBed.inject(ToastService).show).not.toHaveBeenCalled();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Version not found');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain("Version '1.2.3' not found");
   });
 });
 

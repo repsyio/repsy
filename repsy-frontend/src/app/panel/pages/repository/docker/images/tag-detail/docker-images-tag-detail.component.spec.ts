@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
@@ -95,6 +96,26 @@ describe('DockerImagesTagDetailComponent', () => {
   });
 
   describe('when a repository is selected', () => {
+    it('keeps a not-found message and no data when the version does not exist', () => {
+      dockerService.fetchTag.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+
+      select();
+
+      expect(component.error).toBe("Version 'latest' not found");
+      expect(component.tagInfo).toBeUndefined();
+      expect(component.loading).toBeFalse();
+    });
+
+    it('says the version could not be loaded for a server error', () => {
+      dockerService.fetchTag.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+
+      select();
+
+      expect(component.error).toBe('The version could not be loaded');
+      expect(component.tagInfo).toBeUndefined();
+      expect(component.loading).toBeFalse();
+    });
+
     it('loads the tag of the route and builds the pull command', () => {
       select();
 

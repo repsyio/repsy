@@ -37,6 +37,7 @@ import { SecurityScanSectionComponent } from '../../../../../shared/components/s
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
 import { landAfterVersionDelete } from '../../../../../shared/util/version-delete-landing.util';
+import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { DeletedItem } from '../../dto/deleted-item';
 import { MavenService } from '../../service/maven.service';
@@ -153,6 +154,7 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
 
   public loadVersion(): void {
     this.loading = true;
+    this.error = null;
 
     this.groupName = this.route.snapshot.paramMap.get('group');
     this.artifactName = this.route.snapshot.paramMap.get('artifact');
@@ -198,7 +200,10 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
   sha1 = "calculating...",
 )`;
         },
-        error: () => {},
+        error: (err: unknown) => {
+          this.version = undefined;
+          this.error = versionLoadError(err, this.versionName);
+        },
       });
   }
 

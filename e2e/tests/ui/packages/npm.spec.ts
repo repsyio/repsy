@@ -23,7 +23,14 @@
 import { RepoType } from '../../../src/api/panel-api.js';
 import { repoUrl } from '../../../src/repo-url.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
-import { buildPublishDocument, buildTarball, rawPublish } from '../../../src/clients/npm-raw.js';
+import {
+  buildPublishDocument,
+  buildTarball,
+  encodePackageNameForUrl,
+  npmAuthHeader,
+  rawPublish,
+  rawRequestPath,
+} from '../../../src/clients/npm-raw.js';
 import type { SeededPackage } from '../../../src/seed/packages.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { repoRoute } from '../../../src/ui/routes.js';
@@ -257,5 +264,127 @@ test.describe('npm version detail', { tag: '@packages' }, () => {
     const keywords = detail.byId('pkg-detail-metadata').getByText('Keywords:').locator('..');
     await expect(keywords).toContainText('alpha');
     await expect(keywords).toContainText('beta');
+  });
+});
+
+/** Publishes `name`@`version` under the dist-tag `tag` (what `npm publish --tag <tag>` sends). */
+async function publishTagged(
+  repoName: string,
+  name: string,
+  version: string,
+  tag: string,
+): Promise<SeededPackage> {
+  const document = buildPublishDocument({
+    repoName,
+    packageName: name,
+    version,
+    tarballBytes: buildTarball({ packageName: name, version }),
+    tag,
+  });
+  const res = await rawPublish(repoName, adminCredential(), name, document);
+  expect(
+    res.status,
+    `npm publish of ${name}@${version} --tag ${tag}: ${res.body.toString('utf8').slice(0, 200)}`,
+  ).toBe(200);
+  return { protocol: 'npm', repoName, name, version, extra: {} };
+}
+
+/** `npm dist-tag add|rm`: `PUT|DELETE /-/package/<pkg>/dist-tags/<tag>`. */
+async function distTag(
+  repoName: string,
+  name: string,
+  tag: string,
+  version?: string,
+): Promise<void> {
+  const res = await rawRequestPath(
+    repoName,
+    version ? 'PUT' : 'DELETE',
+    `-/package/${encodePackageNameForUrl(name)}/dist-tags/${encodeURIComponent(tag)}`,
+    { ...npmAuthHeader(adminCredential()), 'Content-Type': 'application/json' },
+    version ? JSON.stringify(version) : undefined,
+  );
+  expect(
+    res.status,
+    `dist-tag ${version ? 'add' : 'rm'} ${tag}: ${res.body.toString('utf8').slice(0, 200)}`,
+  ).toBeLessThan(300);
+}
+
+test.describe('npm dist-tags and list columns (RPS-1625)', { tag: '@packages' }, () => {
+  test('PKG-npm-10 the versions page shows every dist-tag, not only latest, and follows a tag added or removed', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.NPM);
+    const first = await seedPackage(repo, { name: `@e2e-${seeder.runId}/tagged` });
+    await publishTagged(repo.name, first.name, '2.0.0-beta.1', 'next');
+    await distTag(repo.name, first.name, 'lts-1.x', first.version);
+
+    const versions = protocolPages(adminPage, npm, repo.name).versions(first);
+    await versions.goto();
+    const bar = adminPage.getByTestId('pkg-dist-tags');
+    await expect(bar).toBeVisible();
+    for (const tag of ['latest', 'next', 'lts-1.x']) {
+      await expect(adminPage.getByTestId(`pkg-dist-tag-${tag}`)).toBeVisible();
+    }
+    await expect(bar.locator('[data-testid^="pkg-dist-tag-"]')).toHaveCount(3);
+
+    // Both versions are listed, the pre-release next to the release.
+    await expect(versions.rows()).toHaveCount(2);
+
+    // A tag removed elsewhere is gone after a refresh, and a reload agrees.
+    await distTag(repo.name, first.name, 'lts-1.x');
+    await versions.refresh();
+    await expect(adminPage.getByTestId('pkg-dist-tag-lts-1.x')).toHaveCount(0);
+    await adminPage.reload();
+    await versions.expectLoaded();
+    await expect(bar.locator('[data-testid^="pkg-dist-tag-"]')).toHaveCount(2);
+    await expect(adminPage.getByTestId('pkg-dist-tag-next')).toBeVisible();
+  });
+
+  test('PKG-npm-10 the list row of a package whose newest version is tagged next still shows the latest one', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.NPM);
+    const stable = await seedPackage(repo, { name: `@e2e-${seeder.runId}/columns` });
+    await publishTagged(repo.name, stable.name, '2.0.0-beta.1', 'next');
+
+    const list = protocolPages(adminPage, npm, repo.name).list();
+    await list.goto();
+    await list.expectRow(stable);
+
+    // The columns of a scoped row: scope link, package link, latest link, last updated.
+    const scope = stable.name.slice(1, stable.name.indexOf('/'));
+    await expect(list.inRow(stable, 'row-scope-link')).toContainText(`@${scope}`);
+    await expect(list.inRow(stable, 'row-package-link')).toContainText('columns');
+    await expect(list.inRow(stable, 'row-updated')).toHaveText(/\S/);
+    await expect(list.inRow(stable, 'row-latest-link')).toContainText(stable.version);
+    await expect(list.inRow(stable, 'row-latest-link')).not.toContainText('2.0.0-beta.1');
+
+    // The latest link opens the detail of that version, and the package link the versions page.
+    const detail = await list.openLink(stable, 'detail');
+    await expect(adminPage).toHaveURL(
+      new RegExp(`/${repo.name}/${scope}/columns/${stable.version}$`),
+    );
+    await detail.expectLoaded();
+  });
+
+  test('PKG-npm-10 the versions page columns: version name and last updated per row', async ({
+    adminPage,
+    seeder,
+    seedVersions,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.NPM);
+    const [first, second] = await seedVersions(repo, ['1.0.0', '2.0.0'], {
+      name: `@e2e-${seeder.runId}/cols`,
+    });
+    const versions = protocolPages(adminPage, npm, repo.name).versions(first);
+    await versions.goto();
+    for (const version of [first, second]) {
+      await expect(versions.inRow(version, 'row-name')).toContainText(version.version);
+      await expect(versions.inRow(version, 'row-updated')).toHaveText(/\S/);
+    }
   });
 });

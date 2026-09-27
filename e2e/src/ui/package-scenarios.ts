@@ -38,6 +38,7 @@
  * | 04  | delete: a version from the detail page, the last version, list row, versions row, sublist row |  |
  * | 05  | USER: no Settings, no row dropdown, no Delete, on desktop rows and on every mobile card list |  |
  * | 06  | Configure modal (repo name, password placeholder) and its deploy-token variant        |        |
+| 09  | a link to a version (or package) that does not exist, or was deleted by another session, lands on the not-found state (RPS-1625) | |
  *
  * Product bugs are pinned, not skipped: `options.knownFailures` maps a step key (`PackageScenarioKey`)
  * to its reason and Jira key, and that step runs under `test.fail`, so it must still fail and turns red
@@ -66,6 +67,7 @@ import {
 } from './pages/protocol.js';
 import type { ConfigureModal, ListLevelName } from './pages/protocols/types.js';
 import { RepoSettingsPage } from './pages/repo-settings/page.js';
+import type { PageErrors } from './page-errors.js';
 import { loginSession } from './session.js';
 
 /** The steps a `knownFailures` entry may name. */
@@ -86,7 +88,11 @@ export type PackageScenarioKey =
   | '05-mobile-sublist'
   | '05-mobile-versions'
   | '06-configure'
-  | '06-deploy-token';
+  | '06-deploy-token'
+  | '09-unknown-version'
+  | '09-unknown-package'
+  | '09-unknown-package-versions'
+  | '09-deleted-version';
 
 export interface PackageScenarioOptions {
   /** Steps that fail on the product today, by key, with the Jira key and a reason: `'RPS-1304: ...'`. */
@@ -197,7 +203,36 @@ function sorted(keys: readonly string[]): string[] {
   return [...keys].sort();
 }
 
-/** Registers PKG-<proto>-01..06 for one protocol. See the file comment. */
+/**
+ * The not-found state of a version detail page (RPS-1625): the load finished (no spinner left), the
+ * detail block is NOT rendered, and the error block says what is missing. Never an empty detail.
+ */
+export async function expectVersionNotFound(detail: VersionDetailPage): Promise<void> {
+  await detail.expectLoaded();
+  await expect(detail.error).toBeVisible();
+  await expect(detail.errorMessage).toHaveText(/not found/i);
+  await expect(detail.root).toHaveCount(0);
+  await expect(detail.spinner.root).toBeHidden();
+}
+
+/**
+ * The panel toasts the server's "<thing> not found" answer for a detail load, and its toast service
+ * logs an error toast as a console error, which the page-error fixture (RPS-1617) would fail on. The
+ * toast is the by-design companion of the not-found state these scenarios provoke.
+ */
+function allowNotFoundToast(pageErrors: PageErrors): void {
+  pageErrors.allow(
+    /not found/i,
+    'by design: the error toast of the 404 a link to a missing version provokes (RPS-1625)',
+  );
+}
+
+/** A version no seeder publishes: Go's carry the leading `v`. */
+function unknownVersionOf(descriptor: ProtocolDescriptor): string {
+  return descriptor.protocol === 'golang' ? 'v9.9.9' : '9.9.9';
+}
+
+/** Registers PKG-<proto>-01..06 and 09 for one protocol. See the file comment. */
 export function registerPackageScenarios(
   descriptor: ProtocolDescriptor,
   options: PackageScenarioOptions = {},
@@ -839,5 +874,119 @@ export function registerPackageScenarios(
         }
       },
     );
+
+    // 09 -----------------------------------------------------------------------------------------
+    test(
+      title(
+        '09',
+        'the detail URL of a version that never existed shows the not-found state',
+        '09-unknown-version',
+      ),
+      async ({ adminPage, pageErrors, seeder, seedPackage }) => {
+        pin('09-unknown-version');
+        allowNotFoundToast(pageErrors);
+        const repo = await seeder.createRepo(type);
+        const pkg = await seedPackage(repo);
+        const missing: PackageRef = { ...pkg, version: unknownVersionOf(descriptor) };
+        const detailPage = protocolPages(adminPage, descriptor, repo.name).detail(missing);
+        await detailPage.goto();
+        await expectVersionNotFound(detailPage);
+
+        // The page still works: the existing version's detail loads with data.
+        const existing = protocolPages(adminPage, descriptor, repo.name).detail(pkg);
+        await existing.goto();
+        await expect(existing.root).toBeVisible();
+        await expect(existing.error).toHaveCount(0);
+      },
+    );
+
+    test(
+      title(
+        '09',
+        'the detail URL of a package that never existed shows the not-found state',
+        '09-unknown-package',
+      ),
+      async ({ adminPage, pageErrors, seeder, seedPackage }) => {
+        pin('09-unknown-package');
+        allowNotFoundToast(pageErrors);
+        const repo = await seeder.createRepo(type);
+        const pkg = await seedPackage(repo);
+        // The same identity with one letter more: no such package, whatever the protocol's name rules.
+        const missing: PackageRef = { ...pkg, name: `${pkg.name}x` };
+        const detailPage = protocolPages(adminPage, descriptor, repo.name).detail(missing);
+        await detailPage.goto();
+        await expectVersionNotFound(detailPage);
+      },
+    );
+
+    test(
+      title(
+        '09',
+        'the versions URL of a package that never existed ends in the error, the empty state or the list, not a spinner',
+        '09-unknown-package-versions',
+      ),
+      async ({ adminPage, pageErrors, seeder, seedPackage }) => {
+        pin('09-unknown-package-versions');
+        allowNotFoundToast(pageErrors);
+        const repo = await seeder.createRepo(type);
+        const pkg = await seedPackage(repo);
+        const missing: PackageRef = { ...pkg, name: `${pkg.name}x` };
+        const pages = protocolPages(adminPage, descriptor, repo.name);
+        const versions = pages.versions(missing);
+        // Not `versions.goto()`: Docker answers a missing image by going back to the image list (its
+        // tag list navigates there on a 404), which is a fine end state, so any of the three is one.
+        await adminPage.goto(versions.path());
+        await expect(versions.spinner.root).toBeHidden();
+        await expect(
+          versions.error.or(versions.emptyList.root).or(pages.list().desktop.container).first(),
+        ).toBeVisible();
+        await expect(versions.rows()).toHaveCount(0);
+      },
+    );
+
+    if (detail.delete) {
+      test(
+        title(
+          '09',
+          'a link to a version another session deleted shows the not-found state, and so does a reload',
+          '09-deleted-version',
+        ),
+        async ({ adminPage, pageErrors, seeder, seedVersions }) => {
+          pin('09-deleted-version');
+          allowNotFoundToast(pageErrors);
+          const repo = await seeder.createRepo(type);
+          const [first, second] = await seedVersions(repo, ['1.0.0', '2.0.0']);
+          const pages = protocolPages(adminPage, descriptor, repo.name);
+
+          // Tab A shows the versions page, with both versions on it.
+          const versions = pages.versions(second);
+          await versions.goto();
+          await versions.expectRow(first);
+          await versions.expectRow(second);
+
+          // Another session (tab B) deletes the first version from its detail page.
+          const other = await adminPage.context().newPage();
+          try {
+            const detailB = protocolPages(other, descriptor, repo.name).detail(first);
+            await detailB.goto();
+            await detailB.delete();
+          } finally {
+            await other.close();
+          }
+
+          // Tab A still lists it: the link leads to the not-found state, not to an empty detail.
+          const stale = asDetailPage(await versions.openRow(first));
+          await expect(adminPage).toHaveURL(endsWith(stale.path()));
+          await expectVersionNotFound(stale);
+
+          // A reload of that URL says the same, and the other version is untouched.
+          await adminPage.reload();
+          await expectVersionNotFound(stale);
+          const remaining = pages.detail(second);
+          await remaining.goto();
+          await expect(remaining.root).toBeVisible();
+        },
+      );
+    }
   });
 }

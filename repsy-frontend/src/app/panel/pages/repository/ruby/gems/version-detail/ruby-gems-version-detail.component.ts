@@ -35,6 +35,7 @@ import {
   VERSION_PROBE_SIZE,
   VERSION_PROBE_SORT,
 } from '../../../../../shared/util/version-delete-landing.util';
+import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
 import { RubyService } from '../../service/ruby.service';
 
 @Component({
@@ -101,6 +102,7 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
     this.installCommand = `gem install ${gemName} -v ${version} --source ${repoUrl}`;
 
     this.loading = true;
+    this.error = null;
     this.rubyService
       .fetchGemVersion(gemName, version)
       .pipe(
@@ -114,7 +116,10 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
           this.gemfileSnippet = this.buildGemfileSnippet(repoUrl, gemName, version);
           this.error = null;
         },
-        error: () => {},
+        error: (err: unknown) => {
+          this.gemVersion = undefined;
+          this.error = versionLoadError(err, this.versionName);
+        },
       });
   }
 

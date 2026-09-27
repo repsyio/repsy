@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
@@ -110,6 +111,26 @@ describe('MavenArtifactsVersionDetailComponent', () => {
   });
 
   describe('when a repository is selected', () => {
+    it('keeps a not-found message and no data when the version does not exist', () => {
+      mavenService.fetchArtifactVersion.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+
+      select();
+
+      expect(component.error).toBe("Version '1.2.3' not found");
+      expect(component.version).toBeUndefined();
+      expect(component.loading).toBeFalse();
+    });
+
+    it('says the version could not be loaded for a server error', () => {
+      mavenService.fetchArtifactVersion.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+
+      select();
+
+      expect(component.error).toBe('The version could not be loaded');
+      expect(component.version).toBeUndefined();
+      expect(component.loading).toBeFalse();
+    });
+
     it('loads the version of the route', () => {
       select();
 

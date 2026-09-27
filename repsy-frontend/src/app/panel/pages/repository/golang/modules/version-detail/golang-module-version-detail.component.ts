@@ -27,6 +27,7 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
 import { GolangService } from '../../service/golang.service';
 
 @Component({
@@ -129,6 +130,7 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
 
   private fetchVersion(): void {
     this.loading = true;
+    this.error = undefined;
     this.golangService
       .fetchModuleInfo(this.modulePath)
       .pipe(
@@ -148,7 +150,10 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
 
           this.canonicalModulePath = info.modulePath ?? this.modulePath;
         },
-        error: () => {},
+        error: (err: unknown) => {
+          this.versionInfo = undefined;
+          this.error = versionLoadError(err, this.versionName);
+        },
       });
   }
 

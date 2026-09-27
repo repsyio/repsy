@@ -15,7 +15,6 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Highlight } from 'ngx-highlightjs';
@@ -36,6 +35,7 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { landAfterVersionDelete } from '../../../../../shared/util/version-delete-landing.util';
+import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
 import { NugetService } from '../../service/nuget.service';
 
 @Component({
@@ -105,15 +105,17 @@ export class NugetPackagesVersionDetailComponent implements OnDestroy {
     this.packageManagerCommandUrl = `Install-Package ${packageId} -Version ${version} -Source "${sourceUrl}"`;
 
     this.loading = true;
+    this.error = null;
     this.nugetService
       .fetchPackageVersion(packageId, version)
       .then((versionInfo) => {
         this.versionInfo = versionInfo;
         this.error = null;
       })
-      // The error interceptor has already toasted the failure; keep the message for the page.
-      .catch((err: HttpErrorResponse) => {
-        this.error = err.error?.text ?? 'Error Occurred';
+      // The error interceptor has already toasted the failure; keep a message for the page.
+      .catch((err: unknown) => {
+        this.versionInfo = undefined;
+        this.error = versionLoadError(err, version);
       })
       .finally(() => {
         this.loading = false;
