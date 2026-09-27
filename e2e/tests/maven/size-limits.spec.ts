@@ -39,6 +39,7 @@ import {
   minimalPom,
   rawGet,
   rawPut,
+  rawPutRefused,
   type RawResponse,
   repoTree,
   splitPackageName,
@@ -162,7 +163,9 @@ test.describe('maven upload size limits', { tag: '@negative' }, () => {
     const groupId = `io.repsy.e2e.${seeder.runId}`;
     const before = await repoTree(repo.name);
 
-    const res = await rawPut(
+    // Refused from its Content-Length before the body is read: rawPutRefused keeps the 400 that a reset
+    // of the connection would take from fetch (RPS-1608).
+    const res = await rawPutRefused(
       repo.name,
       admin,
       `${artifactDir(groupId, 'lib')}/maven-metadata.xml`,

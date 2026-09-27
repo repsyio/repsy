@@ -5001,6 +5001,17 @@ code: 400`; the jar and its checksums, uploaded before the POM, stay, the POM an
 is not one transaction), a POM of exactly 10 MiB stored and one byte more refused, and the metadata and a POM
 signature (exactly 64 KiB meets the signature check, a 422 `artifactSignatureNotVerified`, one byte more is the 400) as raw PUTs, since no signer produces a 65 KiB signature.
 
+The metadata case is refused from its `Content-Length` **before the body is read**, so Tomcat (which swallows at most 2 MiB
+of an unread body, `maxSwallowSize`) closes the connection while the client is still writing its 10 MiB and the kernel
+answers the rest of the write with a reset (`write EPIPE`). `fetch` (undici) then throws `TypeError: fetch failed` /
+`terminated` although the 400 has arrived: on a loaded runner 7 of 1000 sends (RPS-1608, the nightly flake). That test
+therefore sends with `rawPutRefused` (`src/clients/maven-raw.ts`, on `sendReadingResponse` in `src/clients/raw-http.ts`,
+`node:http`), which resolves on the response and ignores the reset that follows it; 3000 sends lost no response and
+failed none. **Convention:** a spec that sends more than 2 MiB to an endpoint that refuses on the declared size uses that
+helper, never `fetch`/`rawPut`; every other over-limit spec of the leg sends about 100 KB, which Tomcat swallows whole
+(the POM and the `.asc` cases read the body to the limit first), so it cannot meet this. Whether the server should drain
+more of the body (`server.tomcat.max-swallow-size`, a denial-of-service trade-off) is not decided here.
+
 **npm has no limit and no spec** (not pinned on purpose, a follow-up is proposed): probed on this stack, a real
 `npm publish` of 30 MB and a raw publish of 42 MB are accepted (200), and a publish of an 84 MB tarball (112 MB of
 base64 JSON) is a **500 `errorOccurred`** (`StreamConstraintsException: String value length (100007936) exceeds the
