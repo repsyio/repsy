@@ -39,6 +39,7 @@ import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
+import io.repsy.protocols.helm.shared.utils.HelmVersionComparator;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -47,6 +48,7 @@ import java.io.InputStream;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,6 +75,11 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
   private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final String STORAGE_PATH = "storagePath";
 
+  /** Charts by name, the versions of a chart highest first (SemVer precedence, then the string). */
+  private static final Comparator<HelmChartInfo> INDEX_ORDER =
+      Comparator.comparing(HelmChartInfo::name)
+          .thenComparing(HelmChartInfo::version, HelmVersionComparator.INSTANCE.reversed());
+
   private static final ObjectMapper DEPENDENCIES_MAPPER = new ObjectMapper();
   private static final TypeReference<List<Map<String, Object>>> DEPENDENCIES_TYPE =
       new TypeReference<>() {};
@@ -86,7 +93,11 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
   @Override
   public HelmIndexDto generateIndex(final ProtocolContext context) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var charts = this.chartService.findAllByRepoId(repoInfo.getId());
+    // The rows come back in the order the database keeps them, which changes with every update of
+    // a row. The index is listed the way `helm repo index` writes it (RPS-1614): the charts by
+    // name, the versions of a chart highest first.
+    final var charts =
+        this.chartService.findAllByRepoId(repoInfo.getId()).stream().sorted(INDEX_ORDER).toList();
 
     final Map<String, List<HelmIndexEntryDto>> entries = new LinkedHashMap<>();
 

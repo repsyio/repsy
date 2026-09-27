@@ -221,7 +221,7 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
         .map(
             pkg ->
                 this.nugetPackageVersionRepository
-                    .findByNugetPackageIdOrderByPublishedAtDesc(pkg.getId())
+                    .findByNugetPackageIdOrderByPublishedAtDescVersionAsc(pkg.getId())
                     .size())
         .orElse(0);
   }
@@ -291,7 +291,7 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
     assertThat(this.storedVersionCount(repo, id)).isEqualTo(1);
     assertThat(
             this.nugetPackageVersionRepository
-                .findByNugetPackageIdOrderByPublishedAtDesc(
+                .findByNugetPackageIdOrderByPublishedAtDescVersionAsc(
                     this.nugetPackageRepository
                         .findByRepoIdAndPackageIdIgnoreCase(repo.getId(), id)
                         .orElseThrow()

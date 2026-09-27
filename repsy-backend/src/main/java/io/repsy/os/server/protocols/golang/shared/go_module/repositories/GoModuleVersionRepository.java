@@ -43,7 +43,7 @@ public interface GoModuleVersionRepository extends JpaRepository<GoModuleVersion
       select v.id as id, v.version as version, v.goVersion as goVersion, v.createdAt as createdAt
       from GoModuleVersion v
       where v.goModule.id = :moduleId
-      order by v.createdAt desc
+      order by v.createdAt desc, v.id desc
       """)
   List<GoModuleVersionListItem> findAllByModuleId(UUID moduleId);
 

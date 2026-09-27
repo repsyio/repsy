@@ -58,9 +58,9 @@ public interface NuGetPackageVersionRepository extends JpaRepository<NuGetPackag
   @Query("UPDATE NuGetPackageVersion v SET v.downloadCount = v.downloadCount + 1 WHERE v.id = :id")
   void incrementDownloadCount(@Param("id") UUID id);
 
-  List<NuGetPackageVersion> findByNugetPackageIdOrderByPublishedAtDesc(UUID packageId);
+  List<NuGetPackageVersion> findByNugetPackageIdOrderByPublishedAtDescVersionAsc(UUID packageId);
 
-  List<NuGetPackageVersion> findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(
+  List<NuGetPackageVersion> findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDescVersionAsc(
       UUID packageId);
 
   /**

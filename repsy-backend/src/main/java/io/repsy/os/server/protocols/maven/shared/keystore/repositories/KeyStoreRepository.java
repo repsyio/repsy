@@ -56,6 +56,7 @@ public interface KeyStoreRepository extends JpaRepository<KeyStore, UUID> {
       FROM KeyStore ks
       JOIN ks.allowedKeyserver ak
       WHERE ks.repo.id = :repoId
+      ORDER BY ks.createdAt, ks.id
       """)
   @NonNull List<KeyStoreItem> findAllByRepoId(@NonNull UUID repoId);
 }

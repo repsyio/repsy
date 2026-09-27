@@ -165,6 +165,30 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
           .containsExactlyInAnyOrder("keyserver.pgp.com", "pgp.circl.lu", "pgpkeys.eu");
     }
 
+    /**
+     * RPS-1614: the three servers are seeded with one {@code created_at}, and the query had no
+     * {@code ORDER BY}, so the dropdown came in the order of the heap. It lists them by display
+     * name.
+     */
+    @Test
+    void listsServersByDisplayName() throws Exception {
+      final var user = KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.USER);
+      final var response =
+          KeyStoreControllerIT.this
+              .mockMvc
+              .perform(
+                  get("/api/mvn/key-stores/allowed-servers")
+                      .with(apiPort())
+                      .header(AUTHORIZATION, KeyStoreControllerIT.this.bearerTokenFor(user)))
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+
+      assertThat((List<String>) JsonPath.read(response, "$.data[*].displayName"))
+          .containsExactly("CIRCL OpenPGP Keyserver", "PGP Global Directory", "PGP Keys EU");
+    }
+
     @Test
     void excludesDeactivatedServers() throws Exception {
       final var server = KeyStoreControllerIT.this.keyserver("pgp.circl.lu");

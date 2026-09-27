@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.golang.ui.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
@@ -30,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.HeapOrder;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.golang.ui.facades.GolangApiFacade;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -39,6 +41,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -187,6 +193,55 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
         .andExpect(jsonPath("$.data.createdAt", notNullValue()))
         .andExpect(jsonPath("$.data.versions", hasSize(2)))
         .andExpect(jsonPath("$.text").value("Module info fetched."));
+  }
+
+  @Test
+  @DisplayName(
+      "the module info lists versions stored in the same instant newest id first (RPS-1614)")
+  void moduleInfoOrdersVersionsOfOneInstantById() throws Exception {
+    final var user = this.createUser(uniqueUsername("gomod"), UserRole.USER);
+    final var token = this.bearerTokenFor(user);
+    final var repo = this.createRepo(unique("order"), true);
+    final var writer = this.protocolBearerTokenFor(user);
+    this.upload(repo, "v1.0.0", writer);
+    this.upload(repo, "v1.1.0", writer);
+    this.upload(repo, "v1.2.0", writer);
+
+    final var ids = new HashMap<String, UUID>();
+    for (final var version : List.of("v1.0.0", "v1.1.0", "v1.2.0")) {
+      ids.put(
+          version,
+          this.jdbcTemplate.queryForObject(
+              "select v.\"id\" from \"go_module_version\" v"
+                  + " join \"go_module\" m on m.\"id\" = v.\"module_id\""
+                  + " join \"repo\" r on r.\"id\" = m.\"repo_id\""
+                  + " where r.\"name\" = ? and v.\"version\" = ?",
+              UUID.class,
+              repo,
+              version));
+    }
+
+    // The same instant for all three, and a heap that holds them in none of the id orders.
+    this.jdbcTemplate.update(
+        "update \"go_module_version\" set \"created_at\" = ? where \"id\" in (?, ?, ?)",
+        Timestamp.from(Instant.now().minusSeconds(60)),
+        ids.get("v1.0.0"),
+        ids.get("v1.1.0"),
+        ids.get("v1.2.0"));
+    HeapOrder.rewriteInOrder(
+        this.jdbcTemplate,
+        "go_module_version",
+        List.of(ids.get("v1.1.0"), ids.get("v1.0.0"), ids.get("v1.2.0")));
+
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}/info", repo)
+                .param("modulePath", MODULE)
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.data.versions[*].version").value(contains("v1.2.0", "v1.1.0", "v1.0.0")));
   }
 
   @Test

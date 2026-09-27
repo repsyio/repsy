@@ -112,7 +112,9 @@ class NuGetBuildMetadataVersionMigrationServiceIT extends AbstractIntegrationTes
   private List<String> versionsOf(final NuGetPackage pkg) {
     this.entityManager.flush();
     this.entityManager.clear();
-    return this.versionRepository.findByNugetPackageIdOrderByPublishedAtDesc(pkg.getId()).stream()
+    return this.versionRepository
+        .findByNugetPackageIdOrderByPublishedAtDescVersionAsc(pkg.getId())
+        .stream()
         .map(NuGetPackageVersion::getVersion)
         .toList();
   }
