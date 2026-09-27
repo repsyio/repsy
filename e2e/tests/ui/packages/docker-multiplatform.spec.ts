@@ -26,6 +26,10 @@
  * deleted over the wire only, and the panel follows it (PKG-docker-11).
  *
  * PKG-docker-10 the views, PKG-docker-11 the delete flows, PKG-docker-12 a digest in the place of a tag.
+ *
+ * `@cloud-skip`: the first PKG-docker-10 test and all of PKG-docker-11, because they use what only Repsy OS's
+ * panel has (RPS-1288: the image summary API, "Delete Untagged Manifests" and the "No tags" page; Repsy Cloud's
+ * docker panel has none of them, see RPS-1543). The rest is portable.
  * The seeded facts (`extra`) are documented on `seedDocker`.
  */
 import { RepoType } from '../../../src/api/panel-api.js';
@@ -72,85 +76,84 @@ const NOT_FOUND_TOAST = {
 };
 
 test.describe('Docker multi-platform image index', { tag: '@packages' }, () => {
-  test('PKG-docker-10 the image list, the tag list and the manifest list show the index and each platform', async ({
-    adminPage,
-    panelApi,
-    seeder,
-    seedPackage,
-  }, testInfo) => {
-    const repo = await seeder.createRepo(RepoType.DOCKER);
-    const index = await seedPackage(repo, {
-      docker: { platforms: PLATFORMS, untagged: 1 },
-    });
-    const pages = protocolPages(adminPage, docker, repo.name);
-    const host = new URL(env.repoBaseUrl).host;
+  test(
+    'PKG-docker-10 the image list, the tag list and the manifest list show the index and each platform',
+    { tag: '@cloud-skip' },
+    async ({ adminPage, panelApi, seeder, seedPackage }, testInfo) => {
+      const repo = await seeder.createRepo(RepoType.DOCKER);
+      const index = await seedPackage(repo, {
+        docker: { platforms: PLATFORMS, untagged: 1 },
+      });
+      const pages = protocolPages(adminPage, docker, repo.name);
+      const host = new URL(env.repoBaseUrl).host;
 
-    // The summary the list is made of: the platforms' manifests are reached through the tag, so only the
-    // manifest no index lists is untagged, and the size is what the two platforms' blobs add up to.
-    const summary = await panelApi.getDockerImageSummary(repo.name, index.name);
-    expect(summary).toMatchObject({
-      tagCount: 1,
-      untaggedManifestCount: 1,
-      size: platformBytes(index),
-      untaggedSize: num(index, 'untaggedSize'),
-      digest: index.extra['digest'],
-    });
+      // The summary the list is made of: the platforms' manifests are reached through the tag, so only the
+      // manifest no index lists is untagged, and the size is what the two platforms' blobs add up to.
+      const summary = await panelApi.getDockerImageSummary(repo.name, index.name);
+      expect(summary).toMatchObject({
+        tagCount: 1,
+        untaggedManifestCount: 1,
+        size: platformBytes(index),
+        untaggedSize: num(index, 'untaggedSize'),
+        digest: index.extra['digest'],
+      });
 
-    const images = pages.list();
-    await images.goto();
-    await images.expectRow(index);
-    await expect(images.rows()).toHaveCount(1);
-    await expect(images.inRow(index, 'row-digest')).toContainText(
-      index.extra['digest'].slice(0, 15),
-    );
-    await expect(images.inRow(index, 'row-size')).toHaveText(bytes(platformBytes(index)));
-    await expect(images.inRow(index, 'row-no-tags')).toHaveCount(0);
-
-    // The image row opens the tag list: one tag, and it is a multi-platform one.
-    const tags = (await images.openRow(index)) as ReturnType<typeof pages.versions>;
-    await tags.expectLoaded();
-    await expect(tags.rows()).toHaveCount(1);
-    await tags.expectRow(index);
-    await expect(tags.inRow(index, 'row-platform')).toHaveText('Multiplatform');
-    await expect(tags.noTags).toBeHidden();
-    await expect(adminPage.getByTestId('pkg-delete-untagged')).toBeVisible();
-
-    // The tag's link opens its manifests: the index, then one row per platform, named by its digest.
-    const manifests = await tags.openLink(index, 'manifests');
-    await manifests.expectLoaded();
-    await expect(manifests.installBarText).toHaveText(
-      `docker pull ${host}/${repoPath(repo.name)}/${index.name}:${index.version}`,
-    );
-    await expect(manifests.rows()).toHaveCount(3);
-    await expect(manifests.inRow(index, 'row-name')).toHaveText(index.version);
-    await expect(manifests.inRow(index, 'row-platform')).toHaveText('Multiplatform');
-    await expect(manifests.inRow(index, 'row-digest')).toContainText(
-      index.extra['digest'].slice(0, 15),
-    );
-    // An index has no config of its own: the cell is empty, not the digest of a platform's config.
-    await expect(manifests.inRow(index, 'row-config-digest')).toHaveText('');
-    for (const platform of PLATFORMS) {
-      const row = dockerPlatformRef(index, platform);
-      await manifests.expectRow(row);
-      await expect(manifests.inRow(row, 'row-name')).toContainText(
-        index.extra[`digest.${platform}`].slice(0, 15),
+      const images = pages.list();
+      await images.goto();
+      await images.expectRow(index);
+      await expect(images.rows()).toHaveCount(1);
+      await expect(images.inRow(index, 'row-digest')).toContainText(
+        index.extra['digest'].slice(0, 15),
       );
-      await expect(manifests.inRow(row, 'row-platform')).toHaveText(platform);
-      await expect(manifests.inRow(row, 'row-digest')).toContainText(
-        index.extra[`digest.${platform}`].slice(0, 15),
+      await expect(images.inRow(index, 'row-size')).toHaveText(bytes(platformBytes(index)));
+      await expect(images.inRow(index, 'row-no-tags')).toHaveCount(0);
+
+      // The image row opens the tag list: one tag, and it is a multi-platform one.
+      const tags = (await images.openRow(index)) as ReturnType<typeof pages.versions>;
+      await tags.expectLoaded();
+      await expect(tags.rows()).toHaveCount(1);
+      await tags.expectRow(index);
+      await expect(tags.inRow(index, 'row-platform')).toHaveText('Multiplatform');
+      await expect(tags.noTags).toBeHidden();
+      await expect(adminPage.getByTestId('pkg-delete-untagged')).toBeVisible();
+
+      // The tag's link opens its manifests: the index, then one row per platform, named by its digest.
+      const manifests = await tags.openLink(index, 'manifests');
+      await manifests.expectLoaded();
+      await expect(manifests.installBarText).toHaveText(
+        `docker pull ${host}/${repoPath(repo.name)}/${index.name}:${index.version}`,
       );
-      await expect(manifests.inRow(row, 'row-config-digest')).toContainText(
-        index.extra[`configDigest.${platform}`].slice(0, 15),
+      await expect(manifests.rows()).toHaveCount(3);
+      await expect(manifests.inRow(index, 'row-name')).toHaveText(index.version);
+      await expect(manifests.inRow(index, 'row-platform')).toHaveText('Multiplatform');
+      await expect(manifests.inRow(index, 'row-digest')).toContainText(
+        index.extra['digest'].slice(0, 15),
       );
-      // The manifest list is read-only: nothing to open or delete for a platform.
-      await expect(manifests.inRow(row, 'row-menu')).toHaveCount(0);
-    }
-    // The untagged manifest belongs to no tag, so it is not on this list.
-    await expect(adminPage.getByTestId(`pkg-manifests-row-${untaggedDigest(index)}`)).toHaveCount(
-      0,
-    );
-    await scanPage(adminPage, testInfo, 'docker-index-manifests');
-  });
+      // An index has no config of its own: the cell is empty, not the digest of a platform's config.
+      await expect(manifests.inRow(index, 'row-config-digest')).toHaveText('');
+      for (const platform of PLATFORMS) {
+        const row = dockerPlatformRef(index, platform);
+        await manifests.expectRow(row);
+        await expect(manifests.inRow(row, 'row-name')).toContainText(
+          index.extra[`digest.${platform}`].slice(0, 15),
+        );
+        await expect(manifests.inRow(row, 'row-platform')).toHaveText(platform);
+        await expect(manifests.inRow(row, 'row-digest')).toContainText(
+          index.extra[`digest.${platform}`].slice(0, 15),
+        );
+        await expect(manifests.inRow(row, 'row-config-digest')).toContainText(
+          index.extra[`configDigest.${platform}`].slice(0, 15),
+        );
+        // The manifest list is read-only: nothing to open or delete for a platform.
+        await expect(manifests.inRow(row, 'row-menu')).toHaveCount(0);
+      }
+      // The untagged manifest belongs to no tag, so it is not on this list.
+      await expect(adminPage.getByTestId(`pkg-manifests-row-${untaggedDigest(index)}`)).toHaveCount(
+        0,
+      );
+      await scanPage(adminPage, testInfo, 'docker-index-manifests');
+    },
+  );
 
   test('PKG-docker-10 the manifest list of an index sorts and searches its rows', async ({
     adminPage,
@@ -253,7 +256,7 @@ test.describe('Docker multi-platform image index', { tag: '@packages' }, () => {
     await expect(detail.error).toHaveCount(0);
   });
 
-  test.describe('deleting from a multi-platform image', () => {
+  test.describe('deleting from a multi-platform image', { tag: '@cloud-skip' }, () => {
     const untaggedText = (count: number, size: number): string =>
       `${count} untagged manifests are still stored (${bytes(size)})`;
 
