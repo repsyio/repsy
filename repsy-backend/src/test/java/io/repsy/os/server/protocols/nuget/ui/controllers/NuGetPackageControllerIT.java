@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.HeapOrder;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
@@ -365,6 +366,42 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.latestVersion").value("2.0.0"));
+    }
+
+    @Test
+    @DisplayName(
+        "versions published in the same instant are ordered by version, as the version list is"
+            + " (RPS-1614)")
+    void versionsOfOneInstantAreOrderedByVersion() throws Exception {
+      final var it = NuGetPackageControllerIT.this;
+      final var user = it.createUser(uniqueUsername("nuget"), UserRole.USER);
+      final var repo = it.createRepo(RepoType.NUGET, true);
+      final var token = it.bearerTokenFor(user);
+      final var instant = Instant.now().minusSeconds(100);
+      it.publish(repo.getName(), "Tie.Package", "1.0.0", instant);
+      it.publish(repo.getName(), "Tie.Package", "2.0.0", instant);
+
+      final var ids =
+          it.jdbcTemplate.queryForList(
+              """
+              select v."id" from "public"."nuget_package_version" v
+              where v."package_id" in (
+                select p."id" from "public"."nuget_package" p
+                where p."package_id" = 'tie.package' and p."repo_id" = ?)
+              order by v."version" desc
+              """,
+              UUID.class,
+              it.repoTxService.getRepoByName(repo.getName()).getId());
+      // The heap holds 2.0.0 before 1.0.0: only an ORDER BY on the version puts 1.0.0 first.
+      HeapOrder.rewriteInOrder(it.jdbcTemplate, "nuget_package_version", ids);
+
+      it.mockMvc
+          .perform(
+              get("/api/nuget/packages/{repo}/{id}", repo.getName(), "tie.package")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.latestVersion").value("1.0.0"));
     }
 
     @Test

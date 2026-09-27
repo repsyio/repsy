@@ -135,7 +135,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     // The flat-container version list is documented in ascending version order; the repository
     // keeps returning rows newest-published-first, so the ordering is fixed up here (RPS-1130).
     return this.packageVersionRepository
-        .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(pkg.getId())
+        .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDescVersionAsc(pkg.getId())
         .stream()
         .map(v -> v.getVersion().toLowerCase(Locale.ROOT))
         .sorted(NuGetPackageUtils.VERSION_COMPARATOR)
@@ -149,7 +149,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
     return this.packageVersionRepository
-        .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(pkg.getId())
+        .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDescVersionAsc(pkg.getId())
         .stream()
         .map(v -> this.converter.toVersionInfo(v, packageId))
         .toList();
@@ -168,7 +168,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
     return this.packageVersionRepository
-        .findByNugetPackageIdOrderByPublishedAtDesc(pkg.getId())
+        .findByNugetPackageIdOrderByPublishedAtDescVersionAsc(pkg.getId())
         .stream()
         .map(v -> this.converter.toVersionInfo(v, packageId))
         .toList();
@@ -184,7 +184,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     // contiguous range; the repository keeps returning rows newest-published-first, so the
     // ordering is fixed up here (RPS-1130).
     return this.packageVersionRepository
-        .findByNugetPackageIdOrderByPublishedAtDesc(pkg.getId())
+        .findByNugetPackageIdOrderByPublishedAtDescVersionAsc(pkg.getId())
         .stream()
         .map(v -> this.converter.toRegistrationInfo(v, packageId))
         .sorted(
@@ -524,8 +524,8 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final NuGetPackage pkg, final boolean prerelease, final boolean semVer2) {
 
     final var allVersions =
-        this.packageVersionRepository.findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(
-            pkg.getId());
+        this.packageVersionRepository
+            .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDescVersionAsc(pkg.getId());
 
     return this.converter.toSearchResult(pkg, prerelease, semVer2, allVersions);
   }

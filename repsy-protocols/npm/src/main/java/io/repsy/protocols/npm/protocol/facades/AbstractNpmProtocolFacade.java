@@ -35,6 +35,7 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -209,11 +210,14 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
+    // In the order of the tags the service returns (by name), not a HashMap's (RPS-1614).
     return this.getDistributionTags(repoInfo, scopeName, packageName).stream()
         .collect(
             Collectors.toMap(
                 PackageDistributionTagMapListItem::getTag,
-                PackageDistributionTagMapListItem::getVersion));
+                PackageDistributionTagMapListItem::getVersion,
+                (first, second) -> second,
+                LinkedHashMap::new));
   }
 
   @Override

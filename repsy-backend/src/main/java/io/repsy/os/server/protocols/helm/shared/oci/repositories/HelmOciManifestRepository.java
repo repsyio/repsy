@@ -52,7 +52,7 @@ public interface HelmOciManifestRepository extends JpaRepository<HelmOciManifest
       select m.reference from HelmOciManifest m
       where m.repo.id = :repoId
         and m.name = :name
-      order by m.createdAt desc
+      order by m.createdAt desc, m.id desc
       """)
   List<String> findReferencesByRepoIdAndName(UUID repoId, String name);
 

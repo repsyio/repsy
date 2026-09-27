@@ -39,6 +39,12 @@ public interface PackageMaintainerRepository extends JpaRepository<PackageMainta
     """)
   void deleteAllMaintainersOfVersion(UUID versionId);
 
+  /** The maintainers in the order they were published in: the row time, then the id. */
+  @Query(
+      """
+      select m from PackageMaintainer m
+      where m.packageVersion.id = :packageVersionId
+      order by m.createdAt, m.id""")
   List<PackageMaintainerListItem> findAllByPackageVersionId(UUID packageVersionId);
 
   @Query(
@@ -46,6 +52,6 @@ public interface PackageMaintainerRepository extends JpaRepository<PackageMainta
       select m.packageVersion.id as packageVersionId, m.name as name, m.email as email
       from PackageMaintainer m
       where m.packageVersion.id in :versionIds
-      order by m.createdAt, m.name""")
+      order by m.createdAt, m.name, m.id""")
   List<VersionMaintainerListItem> findAllByPackageVersionIdIn(Collection<UUID> versionIds);
 }

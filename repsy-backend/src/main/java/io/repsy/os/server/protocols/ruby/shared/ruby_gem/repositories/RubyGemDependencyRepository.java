@@ -25,8 +25,11 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface RubyGemDependencyRepository extends JpaRepository<RubyGemDependency, UUID> {
 
+  @Query(
+      "select d from RubyGemDependency d where d.gemVersion.id = :versionId order by d.name, d.id")
   List<RubyGemDependency> findAllByGemVersionId(UUID versionId);
 
-  @Query("select d from RubyGemDependency d where d.gemVersion.id in :versionIds order by d.name")
+  @Query(
+      "select d from RubyGemDependency d where d.gemVersion.id in :versionIds order by d.name, d.id")
   List<RubyGemDependency> findAllByGemVersionIdIn(@NonNull Collection<UUID> versionIds);
 }

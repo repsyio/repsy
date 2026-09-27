@@ -26,7 +26,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface AllowedKeyserverRepository extends JpaRepository<AllowedKeyserver, UUID> {
 
-  @NonNull List<AllowedKeyserver> findAllByActiveTrue();
+  @NonNull List<AllowedKeyserver> findAllByActiveTrueOrderByDisplayNameAscIdAsc();
 
   @NonNull Optional<AllowedKeyserver> findByIdAndActiveTrue(@NonNull UUID id);
 }

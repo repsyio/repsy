@@ -33,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.HeapOrder;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
@@ -1368,6 +1369,35 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final var body = it.tags(repo, "payments", token);
 
       assertThat(stringList(body)).containsExactlyInAnyOrder("1.0.0", "latest", "1.1.0");
+    }
+
+    @Test
+    @DisplayName("tags stored in the same instant are listed by id, newest first (RPS-1614)")
+    void tagsOfOneInstantAreListedByIdDescending() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.pushOci(repo, "payments", "1.0.0", ChartSpec.of("payments", "1.0.0"), token);
+      it.pushOci(repo, "payments", "latest", ChartSpec.of("payments", "1.0.0"), token);
+      it.pushOci(repo, "payments", "1.1.0", ChartSpec.of("payments", "1.1.0"), token);
+
+      final var rows =
+          it.jdbcTemplate.query(
+              "select \"id\", \"reference\" from \"helm_oci_manifest\""
+                  + " where \"repo_id\" = ? and \"name\" = 'payments' order by \"id\"",
+              (rs, n) -> Map.entry(rs.getObject(1, UUID.class), rs.getString(2)),
+              repo.getId());
+      it.jdbcTemplate.update(
+          "update \"helm_oci_manifest\" set \"created_at\" = ?"
+              + " where \"repo_id\" = ? and \"name\" = 'payments'",
+          Timestamp.from(Instant.now().minusSeconds(60)),
+          repo.getId());
+      // The heap holds them by ascending id: the reverse of the answer.
+      HeapOrder.rewriteInOrder(
+          it.jdbcTemplate, "helm_oci_manifest", rows.stream().map(Map.Entry::getKey).toList());
+
+      assertThat(stringList(it.tags(repo, "payments", token)))
+          .containsExactlyElementsOf(rows.reversed().stream().map(Map.Entry::getValue).toList());
     }
 
     @Test

@@ -71,11 +71,17 @@ public interface PypiPackageRepository extends JpaRepository<PypiPackage, UUID> 
 
   boolean existsByRepoIdAndNormalizedName(UUID repoId, String normalizedName);
 
+  /**
+   * The packages of the repo in the order of the {@code /simple/} root index: by normalized name,
+   * which is unique per repo, as pypi.org lists them (PEP 503 fixes no order, but a client and a
+   * mirror compare the page between requests).
+   */
   @Query(
       """
           select p from PypiPackage p
           join p.repo r
           where r.id = :repoId
+          order by p.normalizedName
           """)
   List<PackageIndexListItem> findAllByRepoIdAsListItem(UUID repoId);
 

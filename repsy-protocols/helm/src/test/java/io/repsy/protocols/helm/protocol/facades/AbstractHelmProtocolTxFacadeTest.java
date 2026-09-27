@@ -999,6 +999,39 @@ class AbstractHelmProtocolTxFacadeTest {
       assertThat(entry.getApiVersion()).isEqualTo("v2");
       assertThat(entry.getDependencies()).isNull();
     }
+
+    private HelmChartInfo named(final String name, final String version) {
+      final var chart = mock(HelmChartInfo.class);
+      when(chart.name()).thenReturn(name);
+      when(chart.version()).thenReturn(version);
+      when(chart.digest()).thenReturn(DIGEST);
+      when(chart.createdAt()).thenReturn(java.time.Instant.parse("2026-01-01T00:00:00Z"));
+      return chart;
+    }
+
+    @Test
+    @DisplayName(
+        "lists the charts by name and the versions of a chart highest first, whatever order the"
+            + " rows came in (RPS-1614)")
+    void listsChartsByNameAndVersionsHighestFirst() {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      final var rows =
+          List.of(
+              this.named("zeta", "1.0.0"),
+              this.named("alpha", "1.9.0"),
+              this.named("alpha", "1.10.0"),
+              this.named("alpha", "1.10.0-rc.1"),
+              this.named("alpha", "2.0.0"),
+              this.named("beta", "0.1.0"));
+      when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(rows);
+
+      final var entries = it.facade.generateIndex(it.context).getEntries();
+
+      assertThat(entries.keySet()).containsExactly("alpha", "beta", "zeta");
+      assertThat(entries.get("alpha"))
+          .extracting(HelmIndexEntryDto::getVersion)
+          .containsExactly("2.0.0", "1.10.0", "1.10.0-rc.1", "1.9.0");
+    }
   }
 
   @Nested

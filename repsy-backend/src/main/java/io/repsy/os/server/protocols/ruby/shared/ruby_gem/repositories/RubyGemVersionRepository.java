@@ -59,7 +59,7 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
         gv.createdAt as createdAt
       from RubyGemVersion gv join gv.gem g
       where gv.gem.id = :gemId
-      order by gv.createdAt
+      order by gv.createdAt, gv.id
       """)
   List<GemVersionCompactItem> findAllCompactByGemId(UUID gemId);
 
@@ -71,7 +71,7 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
         gv.createdAt as createdAt
       from RubyGemVersion gv join gv.gem g join g.repo r
       where r.id = :repoId
-      order by g.name, gv.createdAt
+      order by g.name, gv.createdAt, gv.id
       """)
   List<GemVersionCompactItem> findAllCompactByRepoId(UUID repoId);
 
@@ -83,7 +83,7 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
         gv.createdAt as createdAt
       from RubyGemVersion gv join gv.gem g join g.repo r
       where r.id = :repoId and gv.yanked = false
-      order by g.name, gv.createdAt
+      order by g.name, gv.createdAt, gv.id
       """)
   List<GemVersionCompactItem> findAllNonYankedCompactByRepoId(UUID repoId);
 }

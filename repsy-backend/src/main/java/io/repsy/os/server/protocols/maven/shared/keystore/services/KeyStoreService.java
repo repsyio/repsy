@@ -202,7 +202,7 @@ public class KeyStoreService {
 
   public List<AllowedKeyserverItem> findAllActiveKeyservers() {
 
-    return this.allowedKeyserverRepository.findAllByActiveTrue().stream()
+    return this.allowedKeyserverRepository.findAllByActiveTrueOrderByDisplayNameAscIdAsc().stream()
         .map(
             aks ->
                 AllowedKeyserverItem.builder()

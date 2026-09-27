@@ -442,8 +442,8 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
         .findByRepoIdAndPackageIdIgnoreCase(repo.getId(), id)
         .map(
             pkg ->
-                this.nugetPackageVersionRepository.findByNugetPackageIdOrderByPublishedAtDesc(
-                    pkg.getId()))
+                this.nugetPackageVersionRepository
+                    .findByNugetPackageIdOrderByPublishedAtDescVersionAsc(pkg.getId()))
         .orElse(List.of());
   }
 

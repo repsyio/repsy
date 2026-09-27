@@ -39,12 +39,19 @@ public interface PackageKeywordRepository extends JpaRepository<PackageKeyword, 
     """)
   void deleteAllKeywordsOfVersion(UUID versionId);
 
+  /** The keywords in the order they were published in: the row time, then the id. */
+  @Query(
+      """
+      select k from PackageKeyword k
+      where k.packageVersion.id = :packageVersionId
+      order by k.createdAt, k.id""")
   List<PackageKeywordListItem> findAllByPackageVersionId(UUID packageVersionId);
 
   @Query(
       """
       select k.packageVersion.id as packageVersionId, k.keyword as keyword
       from PackageKeyword k
-      where k.packageVersion.id in :versionIds""")
+      where k.packageVersion.id in :versionIds
+      order by k.createdAt, k.id""")
   List<VersionKeywordListItem> findAllByPackageVersionIdIn(Collection<UUID> versionIds);
 }

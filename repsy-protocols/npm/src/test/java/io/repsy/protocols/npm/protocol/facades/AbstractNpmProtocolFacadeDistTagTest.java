@@ -28,7 +28,9 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.protocols.npm.shared.npm_package.dtos.BasePackageInfo;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
+import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
 import io.repsy.protocols.npm.shared.storage.services.NpmStorageService;
@@ -224,5 +226,33 @@ class AbstractNpmProtocolFacadeDistTagTest {
         .isInstanceOf(BadRequestException.class);
 
     verify(this.packageService, never()).removeDistributionTag(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("the mapped tags keep the order the service returns them in (RPS-1614)")
+  void mappedTagsKeepTheServiceOrder() {
+    final var packageInfo = BasePackageInfo.<UUID>builder().id(REPO_ID).build();
+    when(this.packageService.getPackage(REPO_ID, null, PACKAGE)).thenReturn(packageInfo);
+    // A HashMap keeps these three as zulu, beta, latest.
+    when(this.packageService.getDistributionTags(REPO_ID))
+        .thenReturn(List.of(tag("beta", "1.0.0"), tag("latest", "2.0.0"), tag("zulu", "1.0.0")));
+
+    assertThat(this.facade.getMappedDistributionTags(this.context, null, PACKAGE))
+        .containsExactly(
+            Map.entry("beta", "1.0.0"), Map.entry("latest", "2.0.0"), Map.entry("zulu", "1.0.0"));
+  }
+
+  private static PackageDistributionTagMapListItem tag(final String tag, final String version) {
+    return new PackageDistributionTagMapListItem() {
+      @Override
+      public String getTag() {
+        return tag;
+      }
+
+      @Override
+      public String getVersion() {
+        return version;
+      }
+    };
   }
 }

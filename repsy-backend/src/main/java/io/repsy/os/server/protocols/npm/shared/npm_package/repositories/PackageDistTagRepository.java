@@ -34,11 +34,17 @@ public interface PackageDistTagRepository extends JpaRepository<PackageDistTag, 
       """
           select pdt.tagName as tag, pv.version as version
           from PackageDistTag pdt join pdt.packageVersion pv
-          where pv.npmPackage in (select p from NpmPackage p where p.id = :packageId)""")
+          where pv.npmPackage in (select p from NpmPackage p where p.id = :packageId)
+          order by pdt.tagName, pdt.id""")
   List<PackageDistributionTagMapListItem> findAllTagsOfPackage(UUID packageId);
 
   Optional<PackageDistTag> findByPackageVersionNpmPackageIdAndTagName(
       UUID packageId, String tagName);
 
+  @Query(
+      """
+      select pdt from PackageDistTag pdt
+      where pdt.packageVersion.id = :packageVersionId
+      order by pdt.tagName, pdt.id""")
   List<PackageDistributionTagListItem> findAllByPackageVersionId(UUID packageVersionId);
 }
