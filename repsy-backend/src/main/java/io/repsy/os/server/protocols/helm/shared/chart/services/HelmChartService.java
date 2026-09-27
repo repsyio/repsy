@@ -78,6 +78,8 @@ public class HelmChartService implements ChartService<UUID> {
     version.setDescription(form.getDescription());
     version.setAppVersion(form.getAppVersion());
     version.setType(form.getType());
+    version.setApiVersion(form.getApiVersion());
+    version.setDependencies(form.getDependencies());
     version.setDigest(form.getDigest());
     version.setSize(form.getSize());
     return this.toDetail(this.helmChartVersionRepository.save(version));
@@ -273,6 +275,8 @@ public class HelmChartService implements ChartService<UUID> {
       version.setDescription(form.getDescription());
       version.setAppVersion(form.getAppVersion());
       version.setType(form.getType());
+      version.setApiVersion(form.getApiVersion());
+      version.setDependencies(form.getDependencies());
       version.setDigest(form.getDigest());
       version.setSize(form.getSize());
       return this.helmChartVersionRepository.save(version);
@@ -284,6 +288,8 @@ public class HelmChartService implements ChartService<UUID> {
     version.setDescription(form.getDescription());
     version.setAppVersion(form.getAppVersion());
     version.setType(form.getType());
+    version.setApiVersion(form.getApiVersion());
+    version.setDependencies(form.getDependencies());
     version.setDigest(form.getDigest());
     version.setSize(form.getSize());
     return this.helmChartVersionRepository.save(version);
@@ -297,6 +303,8 @@ public class HelmChartService implements ChartService<UUID> {
         .description(version.getDescription())
         .appVersion(version.getAppVersion())
         .type(version.getType())
+        .apiVersion(version.getApiVersion())
+        .dependencies(version.getDependencies())
         .digest(version.getDigest())
         .size(version.getSize())
         .createdAt(version.getCreatedAt())
@@ -316,6 +324,8 @@ public class HelmChartService implements ChartService<UUID> {
       @Nullable String description,
       @Nullable String appVersion,
       @Nullable String type,
+      @Nullable String apiVersion,
+      @Nullable String dependencies,
       String digest,
       long size,
       Instant createdAt,

@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.yaml.snakeyaml.DumperOptions;
@@ -131,19 +132,22 @@ public abstract class AbstractHelmIndexPullProtocolMethodHandler<ID>
     return yaml.dump(root);
   }
 
+  private static void putIfPresent(
+      final Map<String, Object> map, final String key, final @Nullable Object value) {
+    if (value != null) {
+      map.put(key, value);
+    }
+  }
+
   private static Map<String, Object> entryToMap(final HelmIndexEntryDto entry) {
     final Map<String, Object> map = new LinkedHashMap<>();
     map.put("name", entry.getName());
     map.put("version", entry.getVersion());
-    if (entry.getDescription() != null) {
-      map.put("description", entry.getDescription());
-    }
-    if (entry.getAppVersion() != null) {
-      map.put("appVersion", entry.getAppVersion());
-    }
-    if (entry.getType() != null) {
-      map.put("type", entry.getType());
-    }
+    putIfPresent(map, "description", entry.getDescription());
+    putIfPresent(map, "appVersion", entry.getAppVersion());
+    putIfPresent(map, "type", entry.getType());
+    putIfPresent(map, "apiVersion", entry.getApiVersion());
+    putIfPresent(map, "dependencies", entry.getDependencies());
     map.put("digest", entry.getDigest());
     map.put("urls", entry.getUrls());
     map.put("created", entry.getCreated());

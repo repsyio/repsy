@@ -56,6 +56,20 @@ public final class HelmConstants {
   /** {@code helm_chart_version.type}. */
   public static final int MAX_CHART_TYPE_LENGTH = 32;
 
+  /** {@code helm_chart_version.api_version}: Helm knows {@code v1} and {@code v2}. */
+  public static final int MAX_CHART_API_VERSION_LENGTH = 32;
+
+  /** The {@code apiVersion} of a chart whose Chart.yaml has none: Helm's loader reads it as v1. */
+  public static final String DEFAULT_CHART_API_VERSION = "v1";
+
+  /**
+   * The most bytes of the {@code dependencies} of a Chart.yaml that are kept (as JSON, in {@code
+   * helm_chart_version.dependencies}, a {@code text} column). Every version's dependencies are
+   * repeated in {@code index.yaml}, so a chart cannot make the index arbitrarily large. Real charts
+   * declare a few short entries.
+   */
+  public static final int MAX_CHART_DEPENDENCIES_BYTES = 256 * 1024;
+
   /**
    * {@code helm_chart_version.digest}, {@code helm_oci_blob.digest} and {@code
    * helm_oci_manifest.digest}: {@code sha256:} and 64 hex characters. The push handlers only let a

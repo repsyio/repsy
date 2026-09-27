@@ -114,6 +114,90 @@ class HelmChartParserTest {
     assertThat(metadata.getType()).isNull();
   }
 
+  @Test
+  void aChartWithoutApiVersionIsV1AndDeclaresNoDependencies() throws IOException {
+    final var metadata = HelmChartParser.parseChartYaml(chart(BASE));
+
+    assertThat(metadata.getApiVersion()).isEqualTo("v1");
+    assertThat(metadata.getDependencies()).isNull();
+  }
+
+  @Test
+  void readsTheApiVersion() throws IOException {
+    final var metadata = HelmChartParser.parseChartYaml(chart(BASE + "apiVersion: v2\n"));
+
+    assertThat(metadata.getApiVersion()).isEqualTo("v2");
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "apiVersion: 2",
+        "apiVersion: [v2]",
+        "apiVersion: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      })
+  void rejectsAnInvalidApiVersion(final String line) {
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(BASE + line + "\n")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("chartApiVersionInvalid");
+  }
+
+  @Test
+  void keepsTheDependenciesHelmDefinesAsJson() throws IOException {
+    final var metadata =
+        HelmChartParser.parseChartYaml(
+            chart(
+                BASE
+                    + """
+                    dependencies:
+                      - name: postgresql
+                        version: "12.x.x"
+                        repository: https://charts.example.com
+                        condition: postgresql.enabled
+                        tags: [database]
+                        alias: db
+                        enabled: true
+                        import-values: [data]
+                        unknown: dropped
+                      - name: redis
+                    """));
+
+    assertThat(metadata.getDependencies())
+        .isEqualTo(
+            "[{\"name\":\"postgresql\",\"version\":\"12.x.x\","
+                + "\"repository\":\"https://charts.example.com\","
+                + "\"condition\":\"postgresql.enabled\",\"tags\":[\"database\"],"
+                + "\"enabled\":true,\"import-values\":[\"data\"],\"alias\":\"db\"},"
+                + "{\"name\":\"redis\"}]");
+  }
+
+  @Test
+  void anEmptyDependenciesListDeclaresNone() throws IOException {
+    assertThat(HelmChartParser.parseChartYaml(chart(BASE + "dependencies: []\n")).getDependencies())
+        .isNull();
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      value = {"dependencies: redis", "dependencies: {name: redis}", "dependencies: [redis]"})
+  void rejectsDependenciesThatAreNotAListOfMappings(final String line) {
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(BASE + line + "\n")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("chartDependenciesInvalid");
+  }
+
+  @Test
+  void rejectsDependenciesTooLargeToRepeatInTheIndex() {
+    final var big =
+        BASE + "dependencies:\n  - name: x\n    condition: " + "a".repeat(300 * 1024) + "\n";
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(big)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("chartDependenciesInvalid");
+  }
+
   @ParameterizedTest
   @CsvSource(
       delimiter = '|',

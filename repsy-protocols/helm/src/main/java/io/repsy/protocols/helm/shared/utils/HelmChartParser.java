@@ -20,6 +20,10 @@ import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
@@ -31,11 +35,27 @@ import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.error.YAMLException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 /** Parses Chart.yaml from a .tgz stream without extracting to disk. */
 @UtilityClass
 @NullMarked
 public class HelmChartParser {
+
+  /** The fields of a Chart.yaml dependency that Helm defines (the {@code Dependency} struct). */
+  private static final List<String> DEPENDENCY_KEYS =
+      List.of(
+          "name",
+          "version",
+          "repository",
+          "condition",
+          "tags",
+          "enabled",
+          "import-values",
+          "alias");
+
+  private static final ObjectMapper DEPENDENCIES_MAPPER = new ObjectMapper();
 
   private static final Pattern CHART_NAME_PATTERN = Pattern.compile("^[a-z0-9][a-z0-9-]*$");
   private static final Pattern SEMVER_PATTERN =
@@ -84,6 +104,8 @@ public class HelmChartParser {
     final var description = stringField(parsed, "description", "chartDescriptionInvalid");
     final var appVersion = stringField(parsed, "appVersion", "chartAppVersionInvalid");
     final var type = stringField(parsed, "type", "chartTypeInvalid");
+    final var apiVersion = apiVersion(parsed);
+    final var dependencies = dependencies(parsed.get("dependencies"));
 
     rejectOverLongOptionals(appVersion, type);
 
@@ -93,7 +115,73 @@ public class HelmChartParser {
         .description(description)
         .appVersion(appVersion)
         .type(type)
+        .apiVersion(apiVersion)
+        .dependencies(dependencies)
         .build();
+  }
+
+  /**
+   * The {@code apiVersion} of Chart.yaml. A chart without one is a {@code v1} chart, as Helm's own
+   * loader reads it, so the index entry always names the format the chart is in.
+   */
+  private static String apiVersion(final Map<?, ?> parsed) {
+    final var apiVersion = stringField(parsed, "apiVersion", "chartApiVersionInvalid");
+    if (apiVersion == null || apiVersion.isBlank()) {
+      return HelmConstants.DEFAULT_CHART_API_VERSION;
+    }
+    if (apiVersion.length() > HelmConstants.MAX_CHART_API_VERSION_LENGTH) {
+      throw new BadRequestException("chartApiVersionInvalid");
+    }
+    return apiVersion;
+  }
+
+  /**
+   * The dependencies a chart declares, as the JSON array {@code index.yaml} repeats for every
+   * version, or null for a chart that declares none. Only the fields Helm defines for a dependency
+   * are kept ({@code name}, {@code version}, {@code repository}, {@code condition}, {@code tags},
+   * {@code enabled}, {@code import-values}, {@code alias}): the entry is public metadata, so it
+   * does not echo whatever else a Chart.yaml contains. A value that is not a list of mappings is
+   * refused, as {@code helm package} refuses it, and so is one too large to repeat in the index.
+   */
+  private static @Nullable String dependencies(final @Nullable Object declared) {
+    if (declared == null) {
+      return null;
+    }
+    if (!(declared instanceof List<?> list)) {
+      throw new BadRequestException("chartDependenciesInvalid");
+    }
+    final var kept = new ArrayList<Map<String, Object>>();
+    for (final var item : list) {
+      kept.add(dependencyOf(item));
+    }
+    return kept.isEmpty() ? null : toBoundedJson(kept);
+  }
+
+  private static Map<String, Object> dependencyOf(final @Nullable Object item) {
+    if (!(item instanceof Map<?, ?> dependency)) {
+      throw new BadRequestException("chartDependenciesInvalid");
+    }
+    final var entry = new LinkedHashMap<String, Object>();
+    for (final var key : DEPENDENCY_KEYS) {
+      final var value = dependency.get(key);
+      if (value != null) {
+        entry.put(key, value);
+      }
+    }
+    return entry;
+  }
+
+  private static String toBoundedJson(final List<Map<String, Object>> dependencies) {
+    final String json;
+    try {
+      json = DEPENDENCIES_MAPPER.writeValueAsString(dependencies);
+    } catch (final JacksonException e) {
+      throw new BadRequestException("chartDependenciesInvalid");
+    }
+    if (json.getBytes(StandardCharsets.UTF_8).length > HelmConstants.MAX_CHART_DEPENDENCIES_BYTES) {
+      throw new BadRequestException("chartDependenciesInvalid");
+    }
+    return json;
   }
 
   private static void rejectOverLongOptionals(

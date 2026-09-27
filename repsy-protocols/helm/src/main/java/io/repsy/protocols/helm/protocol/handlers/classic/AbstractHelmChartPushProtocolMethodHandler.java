@@ -114,15 +114,7 @@ public abstract class AbstractHelmChartPushProtocolMethodHandler<ID>
 
       try (final var in = chart.openStream()) {
         this.helmFacade.pushChart(
-            context,
-            metadata.getName(),
-            metadata.getVersion(),
-            metadata.getDescription() != null ? metadata.getDescription() : "",
-            metadata.getAppVersion() != null ? metadata.getAppVersion() : "",
-            metadata.getType(),
-            HelmConstants.SHA256_PREFIX + chart.sha256Hex(),
-            in,
-            chart.size());
+            context, metadata, HelmConstants.SHA256_PREFIX + chart.sha256Hex(), in, chart.size());
       }
     }
 
