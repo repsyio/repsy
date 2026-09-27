@@ -14,7 +14,8 @@
 /// limitations under the License.
 ///
 
-import { ChangeDetectorRef, Component, ElementRef, HostListener, Input } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { ChangeDetectorRef, Component, ElementRef, HostListener, inject, Input, OnDestroy } from '@angular/core';
 
 const FOCUSABLE_ITEMS = 'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
@@ -24,7 +25,7 @@ const FOCUSABLE_ITEMS = 'button:not([disabled]), a[href], [tabindex]:not([tabind
   standalone: true,
   imports: [],
 })
-export class DropdownComponent {
+export class DropdownComponent implements OnDestroy {
   private static activeDropdown: DropdownComponent | null = null;
   private static nextId = 0;
 
@@ -34,10 +35,30 @@ export class DropdownComponent {
   public isOpen = false;
   public readonly menuId = `app-dropdown-menu-${DropdownComponent.nextId++}`;
 
+  private readonly document = inject(DOCUMENT);
+
+  /**
+   * Closes the menu on a click outside of it. It listens in the CAPTURE phase of the document, so a control
+   * that stops its own click (a modal backdrop, a future toggle) cannot keep this menu open next to what it
+   * opens: only one menu is open at a time (RPS-1347, RPS-1565).
+   */
+  private readonly onDocumentClick = (event: Event) => {
+    if (!this.eRef.nativeElement.contains(event.target as Node)) {
+      this.close();
+    }
+  };
+
   constructor(
     private eRef: ElementRef<HTMLElement>,
     private cdr: ChangeDetectorRef,
-  ) {}
+  ) {
+    this.document.addEventListener('click', this.onDocumentClick, true);
+  }
+
+  ngOnDestroy() {
+    this.document.removeEventListener('click', this.onDocumentClick, true);
+    this.close();
+  }
 
   toggleDropdown() {
     if (this.isOpen) {
@@ -118,13 +139,6 @@ export class DropdownComponent {
   onFocusOut(event: FocusEvent) {
     const next = event.relatedTarget as Node | null;
     if (this.isOpen && next && !this.eRef.nativeElement.contains(next)) {
-      this.close();
-    }
-  }
-
-  @HostListener('document:click', ['$event'])
-  clickOutside(event: Event) {
-    if (!this.eRef.nativeElement.contains(event.target as Node)) {
       this.close();
     }
   }

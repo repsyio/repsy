@@ -98,4 +98,23 @@ describe('VersionSecurityBadgeComponent', () => {
 
     expect(element().querySelector('button')).toBeNull();
   });
+
+  it('opens the modal on click and lets the click reach the document, so an open row menu or selector closes (RPS-1565)', () => {
+    render({ scanned: true, severity: Severity.High, scanStatus: ScanStatus.Completed });
+    expect(component.showModal).toBeFalse();
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    const stop = spyOn(click, 'stopPropagation').and.callThrough();
+    const reachedDocument = jasmine.createSpy('documentClick');
+    document.addEventListener('click', reachedDocument);
+
+    try {
+      element().querySelector('button')?.dispatchEvent(click);
+    } finally {
+      document.removeEventListener('click', reachedDocument);
+    }
+
+    expect(stop).not.toHaveBeenCalled();
+    expect(reachedDocument).toHaveBeenCalledTimes(1);
+    expect(component.showModal).toBeTrue();
+  });
 });

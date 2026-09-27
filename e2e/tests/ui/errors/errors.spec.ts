@@ -15,11 +15,11 @@
 ///
 
 /**
- * ERR-01, ERR-02, ERR-03: what the panel does when the backend misbehaves. Every fault is a
+ * ERR-01, ERR-02, ERR-03, ERR-05: what the panel does when the backend misbehaves. Every fault is a
  * Playwright `page.route` stub on top of the REAL stack (no fault injection in the backend), and the
  * mapping under test is `errorHandlerInterceptor`: status 0 -> `Connection error`, 403 -> the server's
- * `text` or `Access denied`, >= 500 -> `Server error` (whatever the body says), other 4xx -> the
- * server's `text`. Each test removes its own route in a `finally` (`withRoute`), and a route lives on
+ * `text` or `Access denied`, 503 with a `text` -> that text (RPS-1355: "try again shortly"), any other
+ * >= 500 -> `Server error` (whatever the body says), other 4xx -> the server's `text`. Each test removes its own route in a `finally` (`withRoute`), and a route lives on
  * the test's own page anyway, so nothing leaks into another test or worker.
  *
  * Two facts the tests are built around. A toast is short-lived (an error toast 7 s, a success toast
@@ -83,6 +83,9 @@ test.describe('Error handling', () => {
       'Access denied',
       'Only administrators may list users',
       'You do not have permission to view this page',
+      'The server is busy, try again in a moment',
+      'That name is already taken',
+      'An error occurred',
     ),
   });
 
@@ -287,6 +290,100 @@ test.describe('Error handling', () => {
 
       await expect(adminPage).toHaveURL(/\/$/);
       await dashboard.expectLoaded();
+    });
+  });
+
+  // ERR-05 (RPS-1629): the 5xx and 4xx branches the cases above do not reach. The backend answers 503 with a
+  // Retry-After for "try again shortly" (`resourceBusy`, `scanExecutorSaturated`, RPS-1355) and a `text` that
+  // says so in plain words: that one text is shown. Every other 5xx stays generic, and a 4xx shows its text.
+  test('ERR-05: a 503 with a text and a Retry-After toasts that text, once, and the page survives', async ({
+    adminPage,
+  }) => {
+    const repos = new RepositoriesPage(adminPage);
+    const busy = 'The server is busy, try again in a moment';
+    await withRoute(
+      adminPage,
+      LIST_URL,
+      (route) =>
+        route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          headers: { 'Retry-After': '1' },
+          body: JSON.stringify({ msgId: 'resourceBusy', text: busy }),
+        }),
+      async () => {
+        const raised = expectToastLater(repos.toasts, busy);
+        await adminPage.goto('/repositories');
+        await raised;
+
+        await expect(repos.toasts.error().first().getByTestId('toast-message')).toHaveText(busy);
+        await expect(repos.toasts.toast().filter({ hasText: 'Server error' })).toHaveCount(0);
+        await expect(repos.toasts.error()).toHaveCount(1);
+        // The page is in its error state, with the refresh button as the retry, like after a 500.
+        await expect(repos.title).toBeVisible();
+        await expect(repos.error).toBeVisible();
+        await expect(repos.spinner.root).toBeHidden();
+      },
+    );
+
+    await repos.refresh();
+    await expect(repos.error).toHaveCount(0);
+    await expect(repos.rows().first()).toBeVisible();
+  });
+
+  for (const [label, status, body] of [
+    ['a 503 without a body', 503, undefined],
+    ['a 503 whose body has no text', 503, {}],
+    ['a 502 with a text', 502, { text: 'upstream detail that must not reach the user' }],
+    ['a 504 with a text', 504, { text: 'gateway detail that must not reach the user' }],
+  ] as const) {
+    test(`ERR-05: ${label} toasts the generic "Server error"`, async ({ adminPage }) => {
+      const repos = new RepositoriesPage(adminPage);
+      await withRoute(
+        adminPage,
+        LIST_URL,
+        (route) =>
+          route.fulfill({
+            status,
+            headers: status === 503 ? { 'Retry-After': '1' } : {},
+            ...(body === undefined
+              ? {}
+              : { contentType: 'application/json', body: JSON.stringify(body) }),
+          }),
+        async () => {
+          const raised = expectToastLater(repos.toasts, 'Server error');
+          await adminPage.goto('/repositories');
+          await raised;
+
+          await expect(repos.toasts.error()).toHaveCount(1);
+          await expect(
+            repos.toasts.toast().filter({ hasText: 'detail that must not' }),
+          ).toHaveCount(0);
+          await expect(repos.title).toBeVisible();
+          await expect(repos.error).toBeVisible();
+        },
+      );
+    });
+  }
+
+  test('ERR-05: a 4xx with a msgId toasts its text, and one without a text toasts "An error occurred"', async ({
+    adminPage,
+  }) => {
+    const repos = new RepositoriesPage(adminPage);
+    await withRoute(
+      adminPage,
+      LIST_URL,
+      respondWith(409, { msgId: 'nameTaken', text: 'That name is already taken' }),
+      async () => {
+        const raised = expectToastLater(repos.toasts, 'That name is already taken');
+        await adminPage.goto('/repositories');
+        await raised;
+        await expect(repos.toasts.error()).toHaveCount(1);
+      },
+    );
+    await withRoute(adminPage, LIST_URL, respondWith(400), async () => {
+      await repos.refreshButton.click();
+      await repos.toasts.expectError('An error occurred');
     });
   });
 });
