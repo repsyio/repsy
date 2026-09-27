@@ -158,7 +158,7 @@ test.describe('Maven SNAPSHOT versions', { tag: '@packages' }, () => {
   }) => {
     test.fail(
       true,
-      'RPS-TBD: the Maven versions list sorts versionName as a string (1.9.0 above 1.10.0, 1.0.0-SNAPSHOT above 1.0.0)',
+      'RPS-1665: the Maven versions list sorts versionName as a string (1.9.0 above 1.10.0, 1.0.0-SNAPSHOT above 1.0.0)',
     );
     const repo = await seeder.createRepo(RepoType.MAVEN);
     const created = await seedVersions(repo, ['1.9.0', '1.10.0', '1.10.0-SNAPSHOT', '1.11.0']);
