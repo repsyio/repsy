@@ -42,6 +42,7 @@ import { env } from '../env.js';
 import { type SeededUser } from '../seed/seeder.js';
 import { expect, test as base } from '../scenarios/fixtures.js';
 import { target } from '../target.js';
+import { browserTrustOptions } from './browser-trust.js';
 import { applyUiDefaults } from './defaults.js';
 import { type PageErrorAllowList, PageErrors, watchPageErrors } from './page-errors.js';
 import {
@@ -188,9 +189,10 @@ export const test = base.extend<UiFixtures & UiAutoFixtures, UiWorkerFixtures>({
   openUiPage: async ({ browser, baseURL, pageErrors }, use) => {
     const opened: BrowserContext[] = [];
     await use(async (options = {}) => {
-      const context = await browser.newContext(
-        options.viewport ? { viewport: options.viewport } : {},
-      );
+      const context = await browser.newContext({
+        ...browserTrustOptions(),
+        ...(options.viewport ? { viewport: options.viewport } : {}),
+      });
       opened.push(context);
       await applyUiDefaults(context, allowedOrigins(baseURL));
       await watchPageErrors(context, pageErrors);

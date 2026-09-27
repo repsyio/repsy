@@ -1,0 +1,101 @@
+# Copyright 2026 the original author or authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# OPT-IN overlay that puts a reverse proxy in front of Repsy (RPS-1651): nginx terminating TLS on its own
+# ports and forwarding to Repsy's plain HTTP ports with the X-Forwarded-* headers the main README's "Reverse
+# Proxy" section asks for. The runners are pointed at the proxy (run.sh makes REPSY_API_BASE_URL and
+# REPSY_REPO_BASE_URL its https URLs, and the latter is also Repsy's REPO_BASE_URL, the address the panel's
+# install snippets print), so the panel a browser opens has an origin that is not Repsy's own: another
+# scheme and another port. Repsy's own ports stay published (the stack's health check and the direct URLs
+# in REPSY_E2E_PLAIN_*).
+#
+# Nothing is committed: a one-shot `proxy-init` service generates a throwaway CA and a certificate for
+# localhost (openssl, from the JRE image the TLS overlay also uses) into REPSY_E2E_PROXY_DIR
+# (e2e/.proxy/<project>, git-ignored, which run.sh creates as the invoking user); every runner trusts
+# ca.pem the way the TLS overlay's runners do (run.sh mounts the directory at /tls), and the browsers of the
+# ui runners ignore certificate errors then (src/ui/browser-trust.ts). The nginx configuration is
+# proxy/default.conf.template. There is no subpath: Repsy does not support one (README.md "Reverse proxy stack").
+#
+# The three proxy listeners listen on the port they are published on (nginx template variables, so that
+# $server_port is the public port):
+#   PROXY_API_PORT       8480 + offset  the panel, to Repsy's 8080
+#   PROXY_REPO_PORT      9490 + offset  the package protocols, to 9090 (Host, X-Forwarded-Host without a port,
+#                                       X-Forwarded-Port: the README's example)
+#   PROXY_HOSTPORT_PORT  9491 + offset  the same protocols, forwarded with the port INSIDE X-Forwarded-Host and
+#                                       no X-Forwarded-Port (RPS-1515)
+#
+# Like every overlay it changes nothing unless it is passed as an extra -f, which
+# `./run.sh local up --proxy` (or REPSY_E2E_PROXY=1) does. It cannot be combined with the TLS overlay (two
+# sets of certificates and two sets of public URLs). See README.md "Reverse proxy stack".
+services:
+  proxy-init:
+    image: eclipse-temurin:25-jre
+    user: '${HOST_UID:-1000}:${HOST_GID:-1000}'
+    volumes:
+      - ${REPSY_E2E_PROXY_DIR:?run.sh sets REPSY_E2E_PROXY_DIR; start the stack with ./run.sh local up --proxy}:/certs
+    working_dir: /certs
+    entrypoint: ['/bin/sh', '-ec']
+    command:
+      - |
+        if [ -s ca.pem ] && [ -s proxy.pem ] && [ -s proxy.key ]; then
+          echo "proxy-init: reusing the certificates in /certs"
+        else
+          rm -f ca.key ca.pem ca.srl proxy.key proxy.csr proxy.pem ext.cnf
+          openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -keyout ca.key -out ca.pem \
+            -subj "/CN=Repsy e2e proxy CA/O=Repsy" \
+            -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign"
+          openssl req -newkey rsa:2048 -nodes -keyout proxy.key -out proxy.csr \
+            -subj "/CN=localhost/O=Repsy e2e proxy"
+          printf 'subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1\nbasicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth\n' > ext.cnf
+          openssl x509 -req -in proxy.csr -CA ca.pem -CAkey ca.key -CAcreateserial -days 3650 \
+            -extfile ext.cnf -out proxy.pem
+          rm -f ca.key ca.srl proxy.csr ext.cnf
+          chmod a+r ca.pem proxy.pem proxy.key
+          echo "proxy-init: generated ca.pem, proxy.pem and proxy.key in /certs"
+        fi
+
+  proxy:
+    # A tag, not `latest`: the proxy is part of what the leg proves. Bump it on purpose.
+    image: nginx:1.29.8-alpine
+    depends_on:
+      proxy-init:
+        condition: service_completed_successfully
+      repsy:
+        condition: service_healthy
+    ports:
+      - '${REPSY_E2E_PROXY_API_PORT:-8480}:${REPSY_E2E_PROXY_API_PORT:-8480}'
+      - '${REPSY_E2E_PROXY_REPO_PORT:-9490}:${REPSY_E2E_PROXY_REPO_PORT:-9490}'
+      - '${REPSY_E2E_PROXY_HOSTPORT_PORT:-9491}:${REPSY_E2E_PROXY_HOSTPORT_PORT:-9491}'
+    volumes:
+      - ${REPSY_E2E_PROXY_DIR:?run.sh sets REPSY_E2E_PROXY_DIR; start the stack with ./run.sh local up --proxy}:/certs:ro
+      - ./proxy/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    environment:
+      PROXY_API_PORT: ${REPSY_E2E_PROXY_API_PORT:-8480}
+      PROXY_REPO_PORT: ${REPSY_E2E_PROXY_REPO_PORT:-9490}
+      PROXY_HOSTPORT_PORT: ${REPSY_E2E_PROXY_HOSTPORT_PORT:-9491}
+      # Only these variables are substituted into the template; nginx's own $host, $scheme ... stay.
+      NGINX_ENVSUBST_FILTER: '^PROXY_'
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8081/healthz']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  repsy:
+    environment:
+      # Sent only on a request that arrives as https, here through X-Forwarded-Proto (README.md "Security
+      # headers"): tests/api/reverse-proxy.spec.ts pins that it is sent through the proxy and not direct.
+      APP_HSTS_MAX_AGE: '31536000'
+      # REPO_BASE_URL (the base file's) is the https URL of the proxy's repo listener, because run.sh exports
+      # REPSY_REPO_BASE_URL as such for a proxy stack: the address the panel's install snippets, npm and NuGet name.

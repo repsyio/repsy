@@ -63,8 +63,8 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--force]
-  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy]
+  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy] [--force]
+  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy]
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [--workers N] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
@@ -75,7 +75,8 @@ REPSY_E2E_PORT_OFFSET), anywhere on the line.
 yarn classic, yarn berry and bun as well as npm; see README.md "npm-family clients"), cargo, nuget,
 docker, helm, pypi, golang, ruby, stack (cases that docker-exec into the Repsy container, tests/stack;
 local stack only, see README.md "Stack runner") ui (the panel UI suite in headless Chromium,
-tests/ui; see README.md "UI suite") and api (raw HTTP at Repsy's edge, no package client: port separation,
+tests/ui; see README.md "UI suite"), ui-firefox and ui-webkit (the same runner image, the @smoke subset of the
+UI suite in Firefox and in WebKit; see README.md "UI suite: Firefox and WebKit") and api (raw HTTP at Repsy's edge, no package client: port separation,
 X-Forwarded-* public URLs, CORS/CSP; tests/api, see README.md "API suite").
 
 --workers N (or REPSY_E2E_WORKERS=N; the flag wins) sets the number of Playwright workers of every runner "test"
@@ -117,8 +118,16 @@ also takes a name directly, e.g. REPSY_E2E_OPT_IN=a11y-report). See README.md "S
 next to the repo protocols, moved by the port offset; HTTP stays open) with a throwaway CA and certificate
 generated into e2e/.tls/<project> (docker-compose.stack-tls.yml). With the switch set, "run.sh test" and
 "run.sh sweep" point the runners at the https URLs (the http ones stay in REPSY_E2E_PLAIN_*) and make every
-client trust that CA in its own way. Give "test" the same switch as "up" (REPSY_E2E_TLS=1). The ui runner
-is left out. See README.md "TLS stack".
+client trust that CA in its own way. Give "test" the same switch as "up" (REPSY_E2E_TLS=1). The ui runners
+run there too (their browsers ignore certificate errors then): @smoke and the @tls spec of the panel over https.
+See README.md "TLS stack".
+
+--proxy (or REPSY_E2E_PROXY=1) puts a reverse proxy in front of Repsy (docker-compose.stack-proxy.yml, RPS-1651):
+nginx terminating TLS on 8480 (the panel) and 9490 (the package protocols), moved by the port offset, and
+forwarding to Repsy's plain ports with X-Forwarded-*. "run.sh test" points the runners at the proxy's https
+URLs (the direct http ones stay in REPSY_E2E_PLAIN_*) and the ui runners' browsers ignore the proxy's throwaway
+certificate. It cannot be combined with --tls. For the @proxy specs of the ui and api runners. See README.md
+"Reverse proxy stack".
 
 --limits (or REPSY_E2E_LIMITS=1) is the fourth overlay: Repsy starts with tiny upload size limits, 64 KiB for a
 PyPI/Helm/NuGet upload, a gem, a crate and a Go module zip (docker-compose.stack-limits.yml), for the @limits
@@ -158,6 +167,7 @@ OVERLAYS=(
   "upgrade|--upgrade|REPSY_E2E_UPGRADE|docker-compose.stack-upgrade.yml"
   "trivy|--trivy|REPSY_E2E_TRIVY|docker-compose.stack-trivy.yml"
   "cors|--cors|REPSY_E2E_CORS|docker-compose.stack-cors.yml"
+  "proxy|--proxy|REPSY_E2E_PROXY|docker-compose.stack-proxy.yml"
 )
 
 # Field $2 (1 name, 2 flag, 3 env switch, 4 file) of the overlay row $1.
@@ -269,6 +279,8 @@ extract_global_options() {
 #                                              the stack compose files
 #   REPSY_E2E_SCANNER_PORT                     host port of the stub scanner (8090 + offset)
 #   REPSY_E2E_API_TLS_PORT / _REPO_TLS_PORT    host ports of the TLS overlay's https listeners (8443/9443 + offset)
+#   REPSY_E2E_PROXY_API_PORT / _REPO_PORT / _HOSTPORT_PORT
+#                                              host ports of the proxy overlay's listeners (8480/9490/9491 + offset)
 #   REPSY_API_BASE_URL / REPSY_REPO_BASE_URL   what the runners call; the stack also prints the latter
 #                                              in the panel's client snippets (REPO_BASE_URL)
 #   REPSY_E2E_STACK_PROJECT                    the project the stack runner docker-execs into
@@ -292,9 +304,9 @@ derive_stack_env() {
       ;;
   esac
   # 10# so that 0100 is a hundred, not an invalid octal number. Five digits cannot overflow. 9443 is the
-  # highest port of the stack (the TLS overlay's repo port), so the cap is computed on it.
-  if [ "${#PORT_OFFSET}" -gt 5 ] || [ $((10#$PORT_OFFSET)) -gt $((65535 - 9443)) ]; then
-    echo "Invalid port offset \"$PORT_OFFSET\": 9443 + offset must stay at or below 65535." >&2
+  # highest port of the stack (the proxy overlay's second repo listener), so the cap is computed on it.
+  if [ "${#PORT_OFFSET}" -gt 5 ] || [ $((10#$PORT_OFFSET)) -gt $((65535 - 9491)) ]; then
+    echo "Invalid port offset \"$PORT_OFFSET\": 9491 + offset must stay at or below 65535." >&2
     exit 1
   fi
   PORT_OFFSET=$((10#$PORT_OFFSET))
@@ -305,6 +317,9 @@ derive_stack_env() {
   REPSY_E2E_SCANNER_PORT="${REPSY_E2E_SCANNER_PORT:-$((8090 + PORT_OFFSET))}"
   REPSY_E2E_API_TLS_PORT=$((8443 + PORT_OFFSET))
   REPSY_E2E_REPO_TLS_PORT=$((9443 + PORT_OFFSET))
+  REPSY_E2E_PROXY_API_PORT=$((8480 + PORT_OFFSET))
+  REPSY_E2E_PROXY_REPO_PORT=$((9490 + PORT_OFFSET))
+  REPSY_E2E_PROXY_HOSTPORT_PORT=$((9491 + PORT_OFFSET))
   # Whether the user chose the base URLs, which apply_tls_env then leaves alone.
   API_URL_EXPLICIT="${REPSY_API_BASE_URL:+true}"
   REPO_URL_EXPLICIT="${REPSY_REPO_BASE_URL:+true}"
@@ -338,6 +353,7 @@ derive_stack_env() {
   export REPSY_E2E_PROJECT="$PROJECT" REPSY_E2E_PORT_OFFSET="$PORT_OFFSET"
   export REPSY_E2E_API_PORT REPSY_E2E_REPO_PORT REPSY_E2E_SCANNER_PORT
   export REPSY_E2E_API_TLS_PORT REPSY_E2E_REPO_TLS_PORT
+  export REPSY_E2E_PROXY_API_PORT REPSY_E2E_PROXY_REPO_PORT REPSY_E2E_PROXY_HOSTPORT_PORT
   export REPSY_API_BASE_URL REPSY_REPO_BASE_URL REPSY_E2E_STACK_PROJECT REPSY_E2E_IMAGE_TAG
 }
 
@@ -366,6 +382,36 @@ apply_tls_env() {
   export REPSY_API_BASE_URL REPSY_REPO_BASE_URL
 }
 
+# The proxy overlay (docker-compose.stack-proxy.yml, README.md "Reverse proxy stack"): where its certificates
+# live and what the runners are pointed at. Like apply_tls_env, called once the flags (up|down|logs|ps) or the
+# switch (test|sweep) say the overlay is on. The runners reach Repsy only through the proxy's https URLs, and
+# trust its CA the way tls_run_args gives every client of a TLS stack (TLS_DIR is that directory here).
+PROXY_DIR=""
+apply_proxy_env() {
+  if overlay_active tls || env_switch_on "${REPSY_E2E_TLS:-}"; then
+    echo "--proxy and --tls cannot be combined: each has its own certificates and its own public URLs." >&2
+    exit 1
+  fi
+  PROXY_DIR="$SCRIPT_DIR/.proxy/$PROJECT"
+  TLS_DIR="$PROXY_DIR"
+  REPSY_E2E_PROXY_DIR="$PROXY_DIR"
+  export REPSY_E2E_PROXY_DIR
+  # Repsy's own (direct, plain http) URLs, for the specs that compare them with what the proxy serves.
+  REPSY_E2E_PLAIN_API_BASE_URL="http://localhost:$REPSY_E2E_API_PORT"
+  REPSY_E2E_PLAIN_REPO_BASE_URL="http://localhost:$REPSY_E2E_REPO_PORT"
+  export REPSY_E2E_PLAIN_API_BASE_URL REPSY_E2E_PLAIN_REPO_BASE_URL
+  # The public URLs. The repo one is also the stack's REPO_BASE_URL, so "up" and "test" must agree on it.
+  if [ "${API_URL_EXPLICIT:-}" != "true" ]; then
+    REPSY_API_BASE_URL="https://localhost:$REPSY_E2E_PROXY_API_PORT"
+  fi
+  if [ "${REPO_URL_EXPLICIT:-}" != "true" ]; then
+    REPSY_REPO_BASE_URL="https://localhost:$REPSY_E2E_PROXY_REPO_PORT"
+  fi
+  # The third listener (X-Forwarded-Host with its port, no X-Forwarded-Port): tests/api/reverse-proxy.spec.ts.
+  REPSY_E2E_PROXY_HOSTPORT_URL="https://localhost:$REPSY_E2E_PROXY_HOSTPORT_PORT"
+  export REPSY_API_BASE_URL REPSY_REPO_BASE_URL REPSY_E2E_PROXY_HOSTPORT_URL
+}
+
 # Fills TLS_RUN_ARGS with what "docker compose run" adds to a runner container of a TLS stack: the
 # certificate directory and, for each client, the variable it reads its trusted CA from (README.md "TLS
 # stack"). Done here rather than in docker-compose.runners.yml so that a new runner needs nothing, and
@@ -376,7 +422,7 @@ tls_run_args() {
   TLS_RUN_ARGS=()
   [ -n "$TLS_DIR" ] || return 0
   if [ ! -s "$TLS_DIR/ca.pem" ]; then
-    echo "No certificate in $TLS_DIR: start the TLS stack first (./run.sh local up --tls, same project and offset)." >&2
+    echo "No certificate in $TLS_DIR: start the TLS or proxy stack first (./run.sh local up --tls or --proxy, same project and offset)." >&2
     exit 1
   fi
   TLS_RUN_ARGS=(
@@ -392,6 +438,10 @@ tls_run_args() {
     -e REPSY_E2E_PLAIN_API_BASE_URL
     -e REPSY_E2E_PLAIN_REPO_BASE_URL
   )
+  # The proxy overlay's third listener; only its specs read it.
+  if [ -n "${REPSY_E2E_PROXY_HOSTPORT_URL:-}" ]; then
+    TLS_RUN_ARGS+=(-e REPSY_E2E_PROXY_HOSTPORT_URL)
+  fi
 }
 
 # Refuses to start or stop a stack that another checkout owns: a container of PROJECT running from a
@@ -421,6 +471,7 @@ guard_stack_owner() {
   overlay_active scanner && ports+=("$REPSY_E2E_SCANNER_PORT")
   overlay_active trivy && ports+=("$REPSY_E2E_SCANNER_PORT")
   overlay_active tls && ports+=("$REPSY_E2E_API_TLS_PORT" "$REPSY_E2E_REPO_TLS_PORT")
+  overlay_active proxy && ports+=("$REPSY_E2E_PROXY_API_PORT" "$REPSY_E2E_PROXY_REPO_PORT" "$REPSY_E2E_PROXY_HOSTPORT_PORT")
   local port line name project
   for port in "${ports[@]}"; do
     while IFS= read -r line; do
@@ -531,6 +582,10 @@ cmd_local_up() {
     apply_tls_env
     mkdir -p "$TLS_DIR"
   fi
+  if overlay_active proxy; then
+    apply_proxy_env
+    mkdir -p "$PROXY_DIR"
+  fi
   stack_args
   guard_stack_owner up
   local db_label="postgres" overlay_label="" name
@@ -559,7 +614,10 @@ cmd_local_up() {
     echo "Give the same to test, sweep and down: REPSY_E2E_PROJECT=$PROJECT REPSY_E2E_PORT_OFFSET=$PORT_OFFSET ./run.sh ..."
   fi
   if overlay_active tls; then
-    echo "TLS overlay on: https on $REPSY_API_BASE_URL and $REPSY_REPO_BASE_URL (plain http stays open); CA in $TLS_DIR/ca.pem; run REPSY_E2E_TLS=1 ./run.sh test --protocol skeleton,api,golang,docker,npm --grep @smoke (the ui runner is left out)"
+    echo "TLS overlay on: https on $REPSY_API_BASE_URL and $REPSY_REPO_BASE_URL (plain http stays open); CA in $TLS_DIR/ca.pem; run REPSY_E2E_TLS=1 ./run.sh test --protocol skeleton,api,golang,docker,npm --grep @smoke (the ui, ui-firefox and ui-webkit runners take it too)"
+  fi
+  if overlay_active proxy; then
+    echo "Proxy overlay on: nginx in front of Repsy, the panel on $REPSY_API_BASE_URL and the repo protocols on $REPSY_REPO_BASE_URL (Repsy's own plain ports stay open); CA in $PROXY_DIR/ca.pem; run REPSY_E2E_PROXY=1 ./run.sh test --protocol ui --grep '@smoke|@proxy' and --protocol api --grep @proxy"
   fi
   if overlay_active throttle; then
     echo "Throttle overlay on: 3 failed password checks per 10 s per client; run REPSY_E2E_THROTTLE=1 ./run.sh test --protocol stack,ui --grep @throttle (the ui runner last: AUTH-11 locks the docker gateway's bucket)"
@@ -584,6 +642,7 @@ cmd_local_up() {
 cmd_local_down() {
   parse_stack_flags down "$@"
   overlay_active tls && apply_tls_env
+  overlay_active proxy && apply_proxy_env
   stack_args
   guard_stack_owner down
   # Compose interpolates the whole file for every command, "down" included, and the stack file
@@ -597,6 +656,7 @@ cmd_local_down() {
 cmd_local_logs() {
   parse_stack_flags logs "$@"
   overlay_active tls && apply_tls_env
+  overlay_active proxy && apply_proxy_env
   stack_args
   REPSY_ADMIN_PASSWORD="${REPSY_ADMIN_PASSWORD:-unused}" docker compose "${STACK_ARGS[@]}" logs --no-color --timestamps
 }
@@ -604,6 +664,7 @@ cmd_local_logs() {
 cmd_local_ps() {
   parse_stack_flags ps "$@"
   overlay_active tls && apply_tls_env
+  overlay_active proxy && apply_proxy_env
   stack_args
   REPSY_ADMIN_PASSWORD="${REPSY_ADMIN_PASSWORD:-unused}" docker compose "${STACK_ARGS[@]}" ps -a
 }
@@ -687,6 +748,7 @@ cmd_test() {
   done
   export REPSY_E2E_OPT_IN="${REPSY_E2E_OPT_IN:-}"
   env_switch_on "${REPSY_E2E_TLS:-}" && apply_tls_env
+  env_switch_on "${REPSY_E2E_PROXY:-}" && apply_proxy_env
   tls_run_args
 
   if [ -z "${REPSY_E2E_RUN_ID:-}" ]; then
@@ -751,6 +813,7 @@ cmd_sweep() {
   require_admin_password
   ensure_runner_dirs
   env_switch_on "${REPSY_E2E_TLS:-}" && apply_tls_env
+  env_switch_on "${REPSY_E2E_PROXY:-}" && apply_proxy_env
   tls_run_args
   # Reuses the "skeleton" image: sweeping needs the harness and no protocol-specific tooling. Calls
   # tsx directly (see entrypoint.sh's comment: "pnpm exec" fails under the container's non-root,

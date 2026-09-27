@@ -78,7 +78,7 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example   # package.json is also the package `repsy-e2e` a workspace consumer depends on, see "Consuming the harness from another repository"
-  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" (the panel in headless Chromium, see "UI suite") and "api" (raw HTTP at the edge, see "API suite")
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" (the panel in headless Chromium, see "UI suite"), "ui-firefox" and "ui-webkit" (its @smoke subset in the other two engines, see "UI suite: Firefox and WebKit") and "api" (raw HTTP at the edge, see "API suite")
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
   docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
@@ -86,7 +86,9 @@ e2e/
   docker-compose.stack-trivy.yml  # OPT-IN overlay on either stack: the REAL repsy-scanner-trivy (built from ../repsy-scanner-trivy) + Repsy with the scanner enabled, `run.sh local up|down --trivy`, see "Real scanner stack"
   docker-compose.stack-limits.yml  # OPT-IN overlay on either stack: every configurable upload limit at 64 KiB, `run.sh local up|down --limits`, see "Size-limit leg"
   docker-compose.stack-cors.yml    # OPT-IN overlay on either stack: APP_ALLOWED_ORIGINS set to two origins, `run.sh local up|down --cors`, see "CORS leg"
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" and "api"
+  docker-compose.stack-proxy.yml   # OPT-IN overlay on either stack: an nginx in front of Repsy terminating TLS (RPS-1651), `run.sh local up|down --proxy`, see "Reverse proxy stack"
+  proxy/default.conf.template  # the nginx configuration of that overlay (three listeners, the README's X-Forwarded-* example)
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui", "ui-firefox", "ui-webkit" and "api"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle/sbt/Ant + Ivy and gpg; see "Adding a protocol adapter" below
   runners/sbt-warmup/          # the throwaway sbt project maven.Dockerfile builds once to prime the sbt caches (RPS-134)
@@ -100,7 +102,7 @@ e2e/
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
   runners/ruby.Dockerfile      # + a pinned Ruby toolchain (ruby/gem/bundle/bundler + stdlib) copied out of the official ruby image
   runners/stack.Dockerfile     # + the static `docker` CLI and its compose plugin copied out of docker-cli, a JDK + Maven, crane and npm; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
-  runners/ui.Dockerfile        # + Playwright's own headless Chromium (build-time install, /ms-playwright); the "ui" runner, see "UI suite"
+  runners/ui.Dockerfile        # + Playwright's own headless Chromium, Firefox and WebKit (build-time install, /ms-playwright); the "ui", "ui-firefox" and "ui-webkit" runners, see "UI suite"
   runners/scanner-stub.Dockerfile  # the stub scanner of the scanner stack (src/stubs/scanner/ on node:24, no dependencies, no build)
   runners/bump-pins.sh         # re-resolves every content pin of docker-compose.runners.yml (image digests, checksums, skopeo's commit) and prints or writes what differs, see "Runner images and pins"
   runners/ui-seccomp.json      # Playwright's seccomp profile, so Chromium's sandbox works as a non-root uid in Docker
@@ -4543,15 +4545,16 @@ differently, so each of them is an **opt-in overlay**: a compose file layered on
 PostgreSQL one or the H2 one) with one more `-f`, that changes what Repsy runs with for one nightly leg
 and is never part of the default stack.
 
-| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                                            | Specs                                                                   |
-| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack"      |
-| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                            |
-| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang), "TLS stack"; nightly `@smoke` of all clients |
-| `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                 |
-| `cors`     | `--cors`                | `REPSY_E2E_CORS=1`     | `docker-compose.stack-cors.yml`     | `cors`      | `APP_ALLOWED_ORIGINS` set to two origins (default: unset)  | `@cors` (api), "CORS leg"                                               |
-| `upgrade`  | `--upgrade`             | `REPSY_E2E_UPGRADE=1`  | `docker-compose.stack-upgrade.yml`  | `upgrade`   | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                      |
-| `trivy`    | `--trivy`               | `REPSY_E2E_TRIVY=1`    | `docker-compose.stack-trivy.yml`    | `trivy`     | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                                    |
+| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                                            | Specs                                                                       |
+| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack"          |
+| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                                |
+| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang, ui), "TLS stack"; nightly `@smoke` of all clients |
+| `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                     |
+| `cors`     | `--cors`                | `REPSY_E2E_CORS=1`     | `docker-compose.stack-cors.yml`     | `cors`      | `APP_ALLOWED_ORIGINS` set to two origins (default: unset)  | `@cors` (api), "CORS leg"                                                   |
+| `proxy`    | `--proxy`               | `REPSY_E2E_PROXY=1`    | `docker-compose.stack-proxy.yml`    | `proxy`     | an nginx in front of Repsy, TLS terminated there           | `@proxy` (ui, api), "Reverse proxy stack"                                   |
+| `upgrade`  | `--upgrade`             | `REPSY_E2E_UPGRADE=1`  | `docker-compose.stack-upgrade.yml`  | `upgrade`   | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                          |
+| `trivy`    | `--trivy`               | `REPSY_E2E_TRIVY=1`    | `docker-compose.stack-trivy.yml`    | `trivy`     | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                                        |
 
 How it fits together, so a later overlay is one row:
 
@@ -4861,8 +4864,9 @@ stack without TLS sets none of them (an empty `SSL_CERT_FILE` would replace the 
 .NET on Linux), `NODE_EXTRA_CA_CERTS` (Node: the harness's own `fetch`, npm, pnpm, yarn, bun), `REQUESTS_CA_BUNDLE`
 (Python: pip, twine), `CARGO_HTTP_CAINFO` (Cargo), `CURL_CA_BUNDLE` (curl), plus `REPSY_E2E_TLS_CA_FILE`,
 `REPSY_E2E_TLS_TRUSTSTORE(_PASSWORD)` for the JVM clients ("Every client over TLS" below). A client's environment is an allow-list, so the names are in `TRUST_VARIABLES`
-(`src/clients/client-env.ts`) and the npm-family's `sealedEnv` copies them too. The `ui` runner is left out
-of the TLS leg (Chromium would need `ignoreHTTPSErrors` and a config change).
+(`src/clients/client-env.ts`) and the npm-family's `sealedEnv` copies them too. The `ui` runners take part since
+RPS-1651: a browser keeps its own trust store, which no variable feeds, so their contexts ignore certificate errors
+when `REPSY_E2E_TLS_CA_FILE` is set ("The panel over https" under "UI suite: Firefox and WebKit").
 
 **`tests/skeleton/tls-listeners.spec.ts`** (`@tls`, `@smoke`, skipped without the overlay) pins:
 
@@ -5295,6 +5299,7 @@ Karma unit tests.
 ./run.sh test --protocol ui --grep @smoke                   # the ~1 minute subset
 ./run.sh local up --h2 && ./run.sh test --protocol ui --grep @smoke   # embedded-H2 stack
 ./run.sh test --protocol ui -b                              # after a Playwright bump or a ui.Dockerfile change
+./run.sh test --protocol ui-firefox,ui-webkit               # the @smoke subset in Firefox and in WebKit
 REPSY_E2E_OPT_IN=throttle ./run.sh test --protocol ui       # also run an opt-in suite ("Stack overlays")
 ./run.sh local up --scanner && REPSY_E2E_SCANNER=1 ./run.sh test --protocol ui --grep @scanner   # the real-scanner specs
 ```
@@ -5313,14 +5318,15 @@ passwords can log in; the backend still refuses to boot with an `ADMIN_INITIAL_P
 the complexity rule, and one over 72 bytes). The `ui` project runs a worker-scoped preflight
 (`assertAdminCredentialsUsableInUi`) that fails every test with a message saying exactly that. `e2e/.env.example` documents it next to the `REPSY_UI_*` variables.
 
-| Variable                  | Default                                            | Effect                                                                                                                        |
-| ------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `REPSY_UI_BASE_URL`       | `REPSY_API_BASE_URL`, else `http://localhost:8080` | Playwright `baseURL`                                                                                                          |
-| `REPSY_FRONTEND_BASE_URL` | unset                                              | Repsy Cloud targets only: the panel's host, between `REPSY_UI_BASE_URL` and `REPSY_API_BASE_URL` in the chain ("The UI seam") |
-| `REPSY_UI_WORKERS`        | `4` (compose)                                      | Playwright `workers`; config-wide, so only the `ui` service sets it                                                           |
-| `REPSY_UI_NO_SANDBOX`     | unset                                              | `1` = `chromiumSandbox: false`, see "Chromium sandbox" below                                                                  |
-| `REPSY_UI_OPT_IN`         | unset                                              | comma list of opt-in suites (also `REPSY_E2E_OPT_IN`); `optedIn('throttle')`, "Stack overlays"                                |
-| `CI`                      | unset                                              | forwarded to every runner: `forbidOnly`; the `ui` project also `retries: 1` and `trace: on-first-retry` ("CI")                |
+| Variable                  | Default                                            | Effect                                                                                                                              |
+| ------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `REPSY_UI_BASE_URL`       | `REPSY_API_BASE_URL`, else `http://localhost:8080` | Playwright `baseURL`                                                                                                                |
+| `REPSY_FRONTEND_BASE_URL` | unset                                              | Repsy Cloud targets only: the panel's host, between `REPSY_UI_BASE_URL` and `REPSY_API_BASE_URL` in the chain ("The UI seam")       |
+| `REPSY_UI_WORKERS`        | `4` (compose)                                      | Playwright `workers`; config-wide, so only the `ui` service sets it                                                                 |
+| `REPSY_UI_NO_SANDBOX`     | unset                                              | `1` = `chromiumSandbox: false`, see "Chromium sandbox" below                                                                        |
+| `REPSY_UI_BROWSER_GREP`   | unset                                              | regex that replaces the `@smoke\|@tls\|A11Y-13` filter of `ui-firefox` and `ui-webkit` for one run ("UI suite: Firefox and WebKit") |
+| `REPSY_UI_OPT_IN`         | unset                                              | comma list of opt-in suites (also `REPSY_E2E_OPT_IN`); `optedIn('throttle')`, "Stack overlays"                                      |
+| `CI`                      | unset                                              | forwarded to every runner: `forbidOnly`; the `ui` project also `retries: 1` and `trace: on-first-retry` ("CI")                      |
 
 Where things land (all under the existing bind mounts): `test-results/` holds, per failed test, the
 trace (`trace.zip`; open it with `pnpm exec playwright show-trace <path>` on the host), the failure
@@ -5344,6 +5350,115 @@ the shell); that is the only way to turn the sandbox off. Verified locally on Li
 sandbox works; with Docker's default profile it fails; `REPSY_UI_NO_SANDBOX=1` then passes); **not**
 verified on a CI-hosted runner. `.github/workflows/e2e-nightly.yml` therefore probes the sandbox on
 its runner and falls back to `REPSY_UI_NO_SANDBOX=1` by itself (see "CI" below).
+
+### UI suite: Firefox and WebKit (RPS-1651)
+
+The `ui` project is Chromium. Two more projects run the same specs, page objects and fixtures in the other
+engines, **`ui-firefox`** and **`ui-webkit`**, on the same runner image (`runners/ui.Dockerfile` installs
+`chromium firefox webkit` with the locked Playwright's own CLI, so the three follow the lockfile together; the image
+grew from about 1.55 GB to 2.54 GB) and the same stack. Each is a compose service of its own (`docker-compose.runners.yml`, an alias of `ui`), which is
+what `run.sh test --protocol` names and what the entrypoint hands to `--project`:
+
+```bash
+./run.sh test --protocol ui-firefox,ui-webkit                   # @smoke, @tls and A11Y-13: about 26 tests each, half a minute
+REPSY_UI_BROWSER_GREP=. ./run.sh test --protocol ui-firefox      # the WHOLE suite in Firefox, to see how much of it holds there
+./run.sh test --protocol ui,ui-firefox,ui-webkit -b             # after a change to runners/ui.Dockerfile: compose builds each service under its own name
+```
+
+What they run: `grep: /@smoke|@tls|A11Y-13/` (`OTHER_BROWSERS_GREP`; A11Y-13 is the keyboard walkthrough, where the
+engines' Tab handling may differ) and `grepInvert: /@chromium-only/`. A spec that needs something only Chromium has
+carries `@chromium-only` as a literal tag **with a one-line reason next to it**, never a silent skip: today only the
+ctrl-click spec of `a11y/rows.spec.ts` (A11Y-08), which reads the tabs from a CDP session (`new-tabs.ts`). The
+`ui-*` projects have the `ui` project's `use` (`uiProject()` in `playwright.config.ts`) minus `chromiumSandbox`, so the
+flake defaults, the network hygiene (`applyUiDefaults`) and the page-error guard apply unchanged; none of them uses CDP.
+
+**What differed, and what was done about it** (live, on this stack: Firefox 26/26, WebKit 26/26 of the selected
+tests, PostgreSQL stack, plain HTTP and https):
+
+- **Clipboard.** Playwright has no `clipboard-read`/`clipboard-write` permission in Firefox and WebKit, and their
+  `readText()` needs a paste prompt. `src/ui/clipboard.ts` (`allowClipboard(context)`, `copiedText(page)`) grants
+  them in Chromium and reads the clipboard back; elsewhere it records what the page passed to
+  `navigator.clipboard.writeText()` and returns the last value. That proves the copy button copied the right text; only
+  the Chromium run proves it reached the clipboard. PKG-*-01 and TOK-01 use it.
+- **Two tabs and the Web Locks refresh: a product defect, pinned.** In Firefox `localStorage` is replicated between
+  tabs (content processes) asynchronously: probed, 17 of 20 first reads right after another tab's Web Lock was released
+  returned the OLD value (Chromium and WebKit: 0). `AuthService` re-reads the session inside the refresh lock to adopt the pair
+  another tab rotated, so in Firefox the second tab refreshes with a spent token (2 refresh calls, not 1), and the
+  backend answers a spent token by revoking the family: both tabs logged out (RPS-1621's failure, back in one engine). The plain-HTTP
+  `localStorage` lock is not affected (its settle delay covers it). It fails the Web Locks case of
+  `tests/ui/auth/multi-tab.spec.ts` and TLS-04 in Firefox and is pinned with `test.fail` through `pinFirefoxWebLockRefresh`
+  (`src/ui/browser-gaps.ts`), so it turns red the day it is fixed. No ticket key exists yet: see the PR of RPS-1651.
+- **Requests cancelled by a navigation.** PKG-*-01 goes to another page while the detail page's scan requests are still in
+  flight. WebKit fires the `error` event of every XHR a navigation cancels, in the document that is going away, and the panel
+  answers a status 0 with its "Connection error" toast and a `console.error`; Chromium says nothing. Firefox logs a font
+  whose download was aborted (`downloadable font: download failed ... status=2152398850`). Both failed the page-error guard
+  (RPS-1617) in those engines, only when a run is fast enough to lose the race (`CI=true` turns the trace off on the first
+  attempt: 3 flaky tests per WebKit run). `watchPageErrors` therefore drops what the page's own `console.error` says from
+  `beforeunload` on, and `GLOBALLY_IGNORED` has the aborted font: after that, two `CI=true` runs of each browser had no flaky test.
+- Everything else selected passed as it was: the keyboard walkthrough (Tab order, Enter, Escape), the mocked routes,
+  the row menus, the toasts and the modals behave the same in all three engines.
+
+Not covered: the rest of the suite in Firefox and WebKit (only `@smoke`, `@tls` and A11Y-13 are held there; run the
+whole suite with `REPSY_UI_BROWSER_GREP=.` to see what is left), and mobile emulation devices.
+
+#### The panel over https (RPS-1651)
+
+`tests/ui/tls/panel-over-https.spec.ts` (`@tls`; skipped without the TLS overlay) runs on the stack of `./run.sh local up
+--tls` (README "TLS stack") in all three projects, and the nightly `tls` leg runs `@smoke|@tls` of `ui`, `ui-firefox` and
+`ui-webkit` next to every client: the whole ui `@smoke` set (25 tests) also passes over https, in every engine.
+
+- **Trust.** The runner has the leg's CA (`REPSY_E2E_TLS_CA_FILE`, `SSL_CERT_FILE`, `NODE_EXTRA_CA_CERTS`, "TLS stack"),
+  which the harness's Node clients (the seeder, `loginSession`) use. A browser has its own trust store: Chromium's NSS
+  database, Firefox's own, and for WebKit (GnuTLS) `SSL_CERT_FILE`. No variable feeds the first two, so the contexts of the
+  `ui*` projects set `ignoreHTTPSErrors` exactly when `REPSY_E2E_TLS_CA_FILE` is set (`playwright.config.ts` for what Playwright
+  creates, `src/ui/browser-trust.ts` for a context a fixture opens itself) and never on a plain-HTTP or remote run. The
+  certificate itself is pinned once, with Node, in `tls-listeners.spec.ts` (chain to the CA, SANs), and TLS-02 is the control: a
+  browser launched without any trust variable and without `ignoreHTTPSErrors` is refused (a WebKit that keeps `SSL_CERT_FILE`
+  would trust the CA on its own, which is why the control starts its own browser).
+- **TLS-01** the panel is an https origin (the API's 8443 + offset, not the plain port next to it), the document carries `Strict-Transport-Security`
+  (the overlay's `APP_HSTS_MAX_AGE`), `isSecureContext`, `navigator.locks` and `navigator.clipboard` exist, the login works, and
+  every request the panel makes afterwards goes to that https origin.
+- **TLS-03** the install snippet copies through `navigator.clipboard` (a secure context has it) and the npmrc snippet names the
+  https repo URL. **TLS-04** the two-tab refresh under a Web Lock on a real https origin (`localhost` is a secure context only by
+  exception; this is the case a production https install is in): one refresh between two tabs, in Chromium and WebKit; Firefox is
+  the pinned defect above.
+- RPS-1559 (the https connectors and `%2F` in a path, npm scoped packages) is fixed on main, so the leg has nothing to pin
+  there: no `test.fail` for it remains on the TLS stack.
+
+#### Reverse proxy stack (RPS-1651)
+
+`./run.sh local up --proxy` (or `REPSY_E2E_PROXY=1`, the switch `test` also needs) is the `proxy` overlay
+(`docker-compose.stack-proxy.yml`, "Stack overlays"; not combinable with `--tls`): a pinned `nginx:1.29.8-alpine` in front
+of Repsy that terminates TLS and forwards to Repsy's plain 8080 and 9090 with the headers of the main README's "Reverse
+Proxy" example (`Host $host`, `X-Forwarded-Proto/-Host/-Port/-For`). Its configuration is `proxy/default.conf.template`;
+three listeners, each on the port it is published on (so `$server_port` is the public port): the panel on 8480, the repo
+protocols on 9490, and a variant of the repo listener on 9491 (all plus the port offset). `proxy-init` generates a throwaway CA and
+a `localhost` certificate with `openssl` (from the `eclipse-temurin:25-jre` image the TLS overlay also uses) into
+`e2e/.proxy/<project>` (git-ignored), and the runners trust `ca.pem` the way a TLS stack's do (`tls_run_args`, mounted at `/tls`).
+`run.sh test` points them at the proxy (`REPSY_API_BASE_URL=https://localhost:<8480+offset>`,
+`REPSY_REPO_BASE_URL=https://localhost:<9490+offset>`, which is also Repsy's `REPO_BASE_URL`, the address the panel's install
+snippets print), keeps Repsy's own plain URLs in `REPSY_E2E_PLAIN_*`, and gives the runners `REPSY_E2E_PROXY_HOSTPORT_URL`.
+Repsy's `APP_HSTS_MAX_AGE` is set, so HSTS proves `X-Forwarded-Proto: https` was honoured.
+
+```bash
+./run.sh local up --proxy
+REPSY_E2E_PROXY=1 ./run.sh test --protocol ui --grep '@smoke|@proxy'    # the ui smoke set through the proxy, plus PX-01/PX-02
+REPSY_E2E_PROXY=1 ./run.sh test --protocol api --grep @proxy            # what Repsy builds from X-Forwarded-*, through a real proxy
+./run.sh local down --proxy
+```
+
+- **`tests/ui/proxy/panel-behind-proxy.spec.ts`** (`@proxy`): PX-01 the panel is loaded through nginx on its https origin and every
+  request it makes goes there, none to Repsy's own port; PX-02 (nine formats) the install snippet of a package's detail page and the
+  text its copy button copies name the public repository URL (`REPO_BASE_URL`) and never Repsy's internal host and port.
+- **`tests/api/reverse-proxy.spec.ts`** (`@proxy`): the Docker token realm, the Cargo `config.json` (`dl`, `api`) and the PyPI simple page
+  links are the proxy's https URLs (each with the direct answer as the control), HSTS goes out through the proxy and not on the
+  direct http port, and **RPS-1515 is pinned**: the third listener forwards `X-Forwarded-Host: localhost:<port>` and no
+  `X-Forwarded-Port` (what `proxy_set_header X-Forwarded-Host $http_host` does), and Repsy's public URL loses the port
+  (`realm="https://localhost/v2/token"`); `test.fail('RPS-1515')` until it is fixed or documented.
+- **No subpath.** Repsy does not support serving the panel under a path such as `/repsy/`: `index.html` has `<base href="/">` and
+  absolute `/assets/...` and `/api/...` URLs, and there is no context path setting (the README only offers a different host or
+  port; `REPO_BASE_URL` is a full URL and may carry a path for the wire protocols, which is a different thing). So nothing is tested
+  under a prefix and the proxy configuration has none; a subpath test belongs in `panel-behind-proxy.spec.ts` the day Repsy gets one.
 
 ### Fixtures (`src/ui/fixtures.ts`)
 
@@ -6673,7 +6788,7 @@ and on demand only, by the product owner's decision (RPS-1260): it has no `pull_
 
 ```bash
 gh workflow run e2e-nightly.yml                            # everything, like the nightly run
-gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | cors | upgrade (both) | trivy | tls | all
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 (both H2 legs) | scanner | throttle | limits | cors | browsers | proxy | upgrade (both) | trivy | tls | all
 gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
 gh workflow run e2e-nightly.yml -f suite=upgrade -f upgrade_from=26.08.3   # the upgrade legs from another release
 gh workflow run e2e-nightly.yml -f suite=h2 -f h2_full=docker   # the full catalog of this runner on H2, not tonight's
@@ -6690,21 +6805,23 @@ says; without it the leg takes tonight's runner of the rotation and `protocol` f
 
 ### What runs
 
-| Job / leg    | Stack                                       | Runs                                                                                                                                                                                                                                        | Timeout |
-| ------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `image`      |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                                                              | 40 min  |
-| `ui`         | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                                   | 60 min  |
-| `wire`       | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                                                       | 150 min |
-| `h2`         | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                                       | 90 min  |
-| `h2-full`    | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another                                 | 90 min  |
-| `scanner`    | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite                    | 60 min  |
-| `throttle`   | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                                   | 30 min  |
-| `limits`     | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                                     | 60 min  |
-| `cors`       | PostgreSQL + the CORS overlay               | `REPSY_E2E_OPT_IN=cors`, `--grep @cors` on `api`, "CORS leg": the configured origins are reflected, any other refused                                                                                                                       | 30 min  |
-| `upgrade`    | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                                                | 30 min  |
-| `upgrade-h2` | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                                    | 30 min  |
-| `trivy`      | PostgreSQL + the real scanner overlay       | `REPSY_E2E_OPT_IN=trivy`, `--grep @trivy` on `api`, 20 tests, "Real scanner stack": the contract the stub mimics, the status and advisory lookup, one real `npm audit` and one real scan of an npm package and of a Docker image            | 45 min  |
-| `tls`        | PostgreSQL + the TLS overlay                | `REPSY_E2E_OPT_IN=tls` and `REPSY_E2E_TLS=1`, `@smoke` of `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` and `api` over Repsy's https listeners ("TLS stack"); no `ui`, no `stack` | 60 min  |
+| Job / leg    | Stack                                       | Runs                                                                                                                                                                                                                                | Timeout                                                                    |
+| ------------ | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `image`      |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                                                      | 40 min                                                                     |
+| `ui`         | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                           | 60 min                                                                     |
+| `wire`       | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                                               | 150 min                                                                    |
+| `browsers`   | PostgreSQL                                  | `ui-firefox`, then `ui-webkit`: `@smoke`, `@tls` (skips here) and A11Y-13 of the UI suite in each engine ("UI suite: Firefox and WebKit"), one runner per browser so a failure names it                                             | 30 min                                                                     |
+| `h2`         | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                               | 90 min                                                                     |
+| `h2-full`    | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another                         | 90 min                                                                     |
+| `scanner`    | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite            | 60 min                                                                     |
+| `throttle`   | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                           | 30 min                                                                     |
+| `limits`     | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                             | 60 min                                                                     |
+| `cors`       | PostgreSQL + the CORS overlay               | `REPSY_E2E_OPT_IN=cors`, `--grep @cors` on `api`, "CORS leg": the configured origins are reflected, any other refused                                                                                                               | 30 min                                                                     |
+| `upgrade`    | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                                        | 30 min                                                                     |
+| `upgrade-h2` | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                            | 30 min                                                                     |
+| `trivy`      | PostgreSQL + the real scanner overlay       | `REPSY_E2E_OPT_IN=trivy`, `--grep @trivy` on `api`, 20 tests, "Real scanner stack": the contract the stub mimics, the status and advisory lookup, one real `npm audit` and one real scan of an npm package and of a Docker image    | 45 min                                                                     |
+| `tls`        | PostgreSQL + the TLS overlay                | `REPSY_E2E_OPT_IN=tls` and `REPSY_E2E_TLS=1`, `@smoke` of `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` and `api` over Repsy's https listeners ("TLS stack"), and `@smoke | @tls`of`ui`, `ui-firefox`and`ui-webkit`("The panel over https"); no`stack` | 75 min |
+| `proxy`      | PostgreSQL + the reverse proxy overlay      | `REPSY_E2E_OPT_IN=proxy` and `REPSY_E2E_PROXY=1`: `@smoke\|@proxy` of `ui` and `@proxy` of `api` through an nginx that terminates TLS ("Reverse proxy stack"); every case must run                                                  | 45 min                                                                     |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
 others. Every leg does the same: load the image, `./run.sh local up [--h2]` (with `REPSY_IMAGE` set, so
@@ -6743,13 +6860,19 @@ AUTH-11 leaves the docker gateway's bucket, admin included, locked for the windo
 The `limits` leg is the same with `./run.sh local up --limits` and `--grep @limits` (the `grep` input is ignored)
 on seven runners, one `run.sh test` each; the step "Check the opt-in specs ran" fails it when any of them skipped.
 
-The `tls` leg is `./run.sh local up --tls`, then every runner but `ui` and `stack` with `--grep @smoke` (the `grep`
-input may replace it, as on `h2`). `test` cannot see the stack, so the leg also exports `REPSY_E2E_TLS=1` for the step
+The `tls` leg is `./run.sh local up --tls`, then every runner but `stack` with `--grep @smoke` (the `grep`
+input may replace it, as on `h2`; the three ui runners take `@smoke|@tls` through `RUNNER_GREP`, since the panel spec is tagged
+`@tls` only). `test` cannot see the stack, so the leg also exports `REPSY_E2E_TLS=1` for the step
 that runs the tests (the plan job's `SWITCHES`, the matrix field `switches`): that is what points the runners at the
 https URLs and gives every client its CA (`tls_run_args` in `run.sh`). Its check "Check the opt-in specs ran" cannot
 demand zero skips (the golang TLS-shim case skips by design on https), so the plan job's `OPT_IN_PROBE` names
 `tls-listeners.spec.ts` instead: the leg fails when a case of that file skipped (the opt-in never arrived) or a runner
 ran no test, and lists the other skips as notices.
+
+The `proxy` leg is `./run.sh local up --proxy` and `REPSY_E2E_PROXY=1` for the tests, on `ui` (`@smoke|@proxy`, the `grep` input may replace
+it) and `api` (`@proxy` through `RUNNER_GREP`, its `@smoke` cases assume the ports of a plain stack); it demands zero skips like the other
+opt-in legs. The `browsers` leg has no overlay: `ui-firefox` and `ui-webkit` on the default stack, each with the project's own filter
+(`playwright.config.ts`), so its default grep is empty and a `grep` input narrows it further.
 
 Each runner gets its own `run.sh test` invocation because every invocation overwrites `test-results/`
 and `playwright-report/` (see "Running"); the workflow copies each runner's output aside first.

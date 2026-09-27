@@ -31,6 +31,7 @@ import {
   bulleted,
 } from '../../../src/ui/credential-messages.js';
 import type { SeededToken } from '../../../src/seed/seeder.js';
+import { allowClipboard, copiedText } from '../../../src/ui/clipboard.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
 import { repoRootStatus } from '../../../src/ui/pages/repo-settings/readback.js';
@@ -69,7 +70,7 @@ test.describe('Deploy tokens: create', { tag: SETTINGS }, () => {
     'TOK-01 a Read/Write token: the info modal shows the username and token once, copy works, the row says R/W',
     { tag: ['@smoke'] },
     async ({ adminPage, context, seeder, panelApi }) => {
-      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+      await allowClipboard(context);
       const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
       const name = `tok-rw-${seeder.runId}`;
       const settings = new RepoSettingsPage(adminPage, repo.name);
@@ -101,10 +102,10 @@ test.describe('Deploy tokens: create', { tag: SETTINGS }, () => {
       // Copy puts the very values on the clipboard and says so on the button.
       await tokens.infoModal.copyToken.click();
       await expect(tokens.infoModal.copyToken).toHaveAttribute('data-copied', 'true');
-      expect(await adminPage.evaluate(() => navigator.clipboard.readText())).toBe(token);
+      expect(await copiedText(adminPage)).toBe(token);
       await tokens.infoModal.copyUsername.click();
       await expect(tokens.infoModal.copyUsername).toHaveAttribute('data-copied', 'true');
-      expect(await adminPage.evaluate(() => navigator.clipboard.readText())).toBe(username);
+      expect(await copiedText(adminPage)).toBe(username);
 
       await tokens.infoModal.close();
 

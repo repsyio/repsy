@@ -179,6 +179,30 @@ test.describe('UI harness fixtures', () => {
     expect(pageErrors.unexpected()).toEqual([]);
   });
 
+  // RPS-1651: WebKit fires the error event of an XHR a navigation cancels, and the panel logs it while the old
+  // document is going away. The guard drops what a page's own console.error says from `beforeunload` on. The event is
+  // dispatched by hand here (a real navigation may drop the message in some browsers, which would prove nothing), and the
+  // message before it is the control that the wrapper does not swallow everything.
+  test('a console.error after beforeunload is not recorded, one before it is', async ({
+    page,
+    pageErrors,
+  }) => {
+    pageErrors.allow(/harness-probe: before/, 'the harness proof logs it on purpose');
+    await page.goto('/login');
+    await page.evaluate(() => console.error('harness-probe: before'));
+    await expect
+      .poll(() => pageErrors.all().map((error) => error.text))
+      .toContain('harness-probe: before');
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('beforeunload'));
+      console.error('harness-probe: after');
+    });
+    await page.evaluate(() => 0);
+
+    expect(pageErrors.all().map((error) => error.text)).not.toContain('harness-probe: after');
+  });
+
   test('the flake defaults are applied and third-party hosts are blocked', async ({
     page,
     pageErrors,
