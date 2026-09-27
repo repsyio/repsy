@@ -64,7 +64,7 @@ export class MavenBrowserComponent implements OnDestroy {
   public repoUrl = '';
   public directoryStack: Directory[] = [];
   public forwardStack: Directory[] = [];
-  public searchText: string;
+  public searchText = '';
 
   public fsItems: FsItemInfo[];
   public filteredFsItems: FsItemInfo[];
@@ -109,6 +109,11 @@ export class MavenBrowserComponent implements OnDestroy {
 
   public search(fileName: string) {
     this.searchText = fileName;
+    // No listing (the directory could not be read): there is nothing to filter, and the not-found state stays.
+    if (!this.fsItems) {
+      return;
+    }
+
     this.filteredFsItems = this.fsItems.filter((item) =>
       item.name.toLocaleLowerCase().includes(fileName.toLocaleLowerCase()),
     );
@@ -206,6 +211,8 @@ export class MavenBrowserComponent implements OnDestroy {
   private fetchCurrentRepoContent(): void {
     this.loading = true;
     this.operationLock = true;
+    // The file name filter belongs to the directory it was typed in: the box is emptied with the listing.
+    this.searchText = '';
 
     this.mavenService
       .getPathContent(this.directoryStack[this.directoryStack.length - 1].path)
@@ -221,6 +228,11 @@ export class MavenBrowserComponent implements OnDestroy {
           this.operationLock = false;
         },
         error: () => {
+          // The directory asked for cannot be listed (it was deleted meanwhile, or the request failed; the
+          // HTTP error interceptor says why). Show that, under the path that was asked for, instead of the
+          // previous directory's files under a path they are not in. The breadcrumb and Back still work.
+          this.fsItems = undefined;
+          this.filteredFsItems = undefined;
           this.operationLock = false;
         },
       });

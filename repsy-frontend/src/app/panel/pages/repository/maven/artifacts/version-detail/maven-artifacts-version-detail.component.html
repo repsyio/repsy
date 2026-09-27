@@ -58,8 +58,10 @@
             Signed:
             @if (version.signed) {
               <i aria-hidden="true" class="ri-lock-line"></i>
+              <span data-testid="pkg-detail-meta-signed-value">Yes</span>
             } @else {
               <i aria-hidden="true" class="ri-lock-unlock-line"></i>
+              <span data-testid="pkg-detail-meta-signed-value">No</span>
             }
           </div>
         </div>

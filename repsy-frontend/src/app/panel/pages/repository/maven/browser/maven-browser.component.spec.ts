@@ -15,7 +15,7 @@
 
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { BehaviorSubject, NEVER, of, Subject, throwError } from 'rxjs';
+import { BehaviorSubject, NEVER, Observable, of, Subject, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
 import { RepoPermissionInfo } from '../../../../../../generated/api';
@@ -164,6 +164,33 @@ describe('MavenBrowserComponent', () => {
 
       expect(component.loading).toBeFalse();
       expect(component.operationLock).toBeFalse();
+    });
+
+    // RPS-1626: a directory that was deleted while the browser was open answers 404. The old listing used to stay,
+    // under the breadcrumb of the directory asked for, and its entries could be opened from there.
+    it('shows no listing, under the path that was asked for, when a directory cannot be loaded', () => {
+      open();
+      mavenService.getPathContent.and.returnValue(throwError(() => new Error('404')));
+
+      component.go(dir('org/'));
+
+      expect(paths()).toEqual(['/', '/org/']);
+      expect(component.fsItems).toBeUndefined();
+      expect(component.filteredFsItems).toBeUndefined();
+      expect(component.loading).toBeFalse();
+      expect(component.operationLock).toBeFalse();
+    });
+
+    it('goes back from a directory that cannot be loaded, and lists the parent again', () => {
+      open();
+      mavenService.getPathContent.and.returnValue(throwError(() => new Error('404')));
+      component.go(dir('org/'));
+      mavenService.getPathContent.and.callFake((path: string) => of(contents[path] ?? []));
+
+      component.prev();
+
+      expect(paths()).toEqual(['/']);
+      expect(component.filteredFsItems.map((i) => i.name)).toEqual(['org/', 'com/', 'readme.txt']);
     });
 
     it('releases the lock, and stops loading, when the listing cannot be loaded', () => {
@@ -335,6 +362,25 @@ describe('MavenBrowserComponent', () => {
 
       expect(component.filteredFsItems).toBe(component.fsItems);
     });
+
+    // RPS-1626: the box kept its text after a navigation, while the new listing was not filtered by it.
+    it('is emptied, box and text, with the listing of the next directory', () => {
+      component.search('org');
+
+      component.go(dir('org/'));
+
+      expect(component.searchText).toBe('');
+    });
+
+    it('does nothing, and does not throw, while there is no listing to filter (RPS-1626)', () => {
+      mavenService.getPathContent.and.returnValue(throwError(() => new Error('404')));
+      component.go(dir('org/'));
+
+      expect(() => component.search('acme')).not.toThrow();
+
+      expect(component.filteredFsItems).toBeUndefined();
+      expect(component.searchText).toBe('acme');
+    });
   });
 
   describe('helpers', () => {
@@ -363,12 +409,12 @@ describe('MavenBrowserComponent', () => {
 });
 
 describe('MavenBrowserComponent template', () => {
-  function render(flags: { canManage: boolean }): HTMLElement {
+  function render(flags: { canManage: boolean }, listing: Observable<FsItemInfo[]> = of([])): HTMLElement {
     const repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO, flags));
     const mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['getPathContent', 'createDownloadToken'], {
       repoChanges,
     });
-    mavenService.getPathContent.and.returnValue(of([]));
+    mavenService.getPathContent.and.returnValue(listing);
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -390,5 +436,34 @@ describe('MavenBrowserComponent template', () => {
 
   it('renders no Settings button at all for a user who cannot manage the repository (RPS-1262)', () => {
     expect(render({ canManage: false }).querySelector('[data-testid="pkg-settings"]')).toBeNull();
+  });
+
+  // RPS-1626 (G26): the three states of a listing are told apart.
+  it('shows the not-found state when the listing could not be loaded, and no empty list', () => {
+    const page = render(
+      { canManage: true },
+      throwError(() => new Error('404')),
+    );
+
+    expect(page.querySelector('[data-testid="maven-browser-not-found"]')).not.toBeNull();
+    expect(page.textContent).toContain('Repository files not found!');
+    expect(page.querySelector('[data-testid="maven-browser-grid"]')).toBeNull();
+    expect(page.querySelector('[data-testid="empty-list"]')).toBeNull();
+    expect(page.querySelector('app-spinner')).toBeNull();
+  });
+
+  it('shows the empty list, not the not-found state, for a repository that stores nothing', () => {
+    const page = render({ canManage: true });
+
+    expect(page.querySelector('[data-testid="empty-list"]')).not.toBeNull();
+    expect(page.querySelector('[data-testid="maven-browser-not-found"]')).toBeNull();
+  });
+
+  it('shows the grid, and neither state, for a listing with entries', () => {
+    const page = render({ canManage: true }, of([dir('org/')]));
+
+    expect(page.querySelector('[data-testid="maven-browser-grid"]')).not.toBeNull();
+    expect(page.querySelector('[data-testid="maven-browser-not-found"]')).toBeNull();
+    expect(page.querySelector('[data-testid="empty-list"]')).toBeNull();
   });
 });

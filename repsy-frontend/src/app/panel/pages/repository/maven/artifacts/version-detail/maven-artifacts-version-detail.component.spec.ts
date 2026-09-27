@@ -343,6 +343,27 @@ describe('MavenArtifactsVersionDetailComponent template', () => {
     // The dependency snippet itself is unchanged.
     expect(copied(fixture, 'pkg-detail-install')).toContain('<artifactId>lib</artifactId>');
   });
+
+  // RPS-1626: "Signed" showed only a lock icon, which is `aria-hidden`, so the state was spoken by nothing.
+  describe('signed (RPS-1626)', () => {
+    const signed = (fixture: Awaited<ReturnType<typeof render>>): HTMLElement =>
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="pkg-detail-meta-signed"]') as HTMLElement;
+
+    it('says Yes, next to the closed lock, for a signed version', async () => {
+      const fixture = await render({ ...VERSION, signed: true });
+
+      expect(signed(fixture).textContent?.replace(/\s+/g, ' ').trim()).toBe('Signed: Yes');
+      expect(signed(fixture).querySelector('i.ri-lock-line')).not.toBeNull();
+    });
+
+    it('says No, next to the open lock, for an unsigned version', async () => {
+      const fixture = await render({ ...VERSION, signed: false });
+
+      expect(signed(fixture).textContent?.replace(/\s+/g, ' ').trim()).toBe('Signed: No');
+      expect(signed(fixture).querySelector('i.ri-lock-unlock-line')).not.toBeNull();
+    });
+  });
+
   // RPS-1425: the licenses and developers are lists of objects; the page used to print them as "[object Object]".
   describe('licenses and developers (RPS-1425)', () => {
     const text = (fixture: Awaited<ReturnType<typeof render>>, testId: string): string =>

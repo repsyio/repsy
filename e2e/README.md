@@ -5843,6 +5843,40 @@ assertions are in `src/ui/hostile-checks.ts`. Repsy Cloud's suite (RPS-1624) reu
   list row of a package whose newest version is tagged `next` shows the `latest` one in its Latest column (and links to
   it); the versions page's name and last-updated columns.
 
+#### Maven SNAPSHOT versions, the Signed column and the file browser's states (RPS-1626)
+
+`tests/ui/packages/maven-snapshots.spec.ts` (`@packages`; the ui runner has no `mvn`, so everything is seeded over
+the protocol port). `seedMaven` takes `maven: { builds, firstBuild, sign }` (`MavenSeedOptions`): a version ending in
+`-SNAPSHOT` is deployed like `mvn deploy` does (timestamped builds `lib-1.0-20260101.100000-1.jar` one second apart,
+the version-level metadata of the newest build, the artifact-level metadata, which now MERGES into what is stored so
+it lists every version), and `sign: { key, files: 'pom' | 'all' }` sends a real detached `.asc` per POM (and jar) made
+by a key registered on the repo (`seeder.registerPgpPublicKey`, OpenPGP.js, no `gpg`). `firstBuild` adds NEWER builds
+to an existing SNAPSHOT.
+
+- **PKG-maven-11** (SNAPSHOT): three builds are ONE row beside the release (Newest puts the SNAPSHOT above it,
+  Oldest reverses, the search finds it by `SNAPSHOT`); the detail names it and every snippet asks for it (the
+  repository block is the plain one: a Maven `<repository>` resolves snapshots unless it says otherwise); delete from
+  the versions list and from the detail removes EVERY build, the version-level metadata and the artifact-level entry
+  and leaves the release (the panel has no delete of a single build); the browser lists all timestamped files and
+  `maven-metadata.xml`. The "Newest orders by version" test is pinned with `test.fail` (`RPS-TBD`): the order is the
+  version NAME as a string, so `1.9.0` is above `1.10.0` and `1.0.0-SNAPSHOT` above `1.0.0`.
+- **PKG-maven-12** (Signed; `@cloud-skip`: the key store and verify-all are OS panel API): `row-signed` is `Signed` or
+  `Unsigned` with a closed or open lock, on the desktop rows, the mobile cards and (`Signed: Yes|No`) the detail; a
+  signed release and SNAPSHOT, an unsigned one; on a verify-all repo a POM-only signature is Unsigned, every file
+  signed is Signed, and a newer unsigned build makes the SNAPSHOT Unsigned; turning verify-all on and off recomputes
+  the column in the background (RPS-1323/1316: the `.asc` files stored while it was off are verified, so a fully
+  signed version stays signed). The column is a boolean: an `.asc` that does not verify is refused at the wire (422),
+  so there is no "invalid" state to show.
+- **PKG-maven-13** (browser states, G26): an empty repository shows `empty-list` (not `maven-browser-not-found`);
+  a directory deleted while the browser is open shows `maven-browser-not-found` under the path that was asked for
+  (never the previous directory's files) and Back lists the parent again; a root listing stubbed to answer 404 or
+  500 ends in the not-found state, no spinner; the File name filter never raises an error without a listing and is
+  emptied with the directory it was typed in; a path that repeats a directory (`com/foo/foo/foo/`) walks down and up
+  by level; a slow cold load still opens on the first click (RPS-1297). The 404/500 toasts are allowed through the page-error fixture with a reason.
+- Before RPS-1626 the browser kept the LISTING of the previous directory when the next one failed (its entries could
+  be opened from under the new path), the File name filter threw on a missing listing, and the filter box kept its
+  text while the new directory's listing was unfiltered; the detail page's Signed line was an `aria-hidden` icon only.
+
 ### Errors, navigation, mobile and accessibility (RPS-1258)
 
 `tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..04, NAV-01..03, A11Y-01..10) plus `src/ui/a11y.ts` (the axe

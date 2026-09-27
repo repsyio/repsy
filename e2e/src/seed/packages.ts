@@ -32,7 +32,7 @@ import { seedCargo } from './packages/cargo.js';
 import { seedDocker } from './packages/docker.js';
 import { seedGolang } from './packages/golang.js';
 import { seedHelm } from './packages/helm.js';
-import { seedMaven } from './packages/maven.js';
+import { type MavenSeedOptions, seedMaven } from './packages/maven.js';
 import { seedNpm } from './packages/npm.js';
 import { seedNuget } from './packages/nuget.js';
 import { seedPypi } from './packages/pypi.js';
@@ -93,6 +93,8 @@ export interface SeedPackageOptions {
   scoped?: boolean;
   /** helm only: which backend module publishes it, `oci` (default) or `classic` (ChartMuseum). */
   variant?: string;
+  /** maven only: timestamped SNAPSHOT builds and PGP-signed deploys (RPS-1626), see `MavenSeedOptions`. */
+  maven?: MavenSeedOptions;
 }
 
 /** Publishes one package version into `repoName` over raw HTTP, or throws. */
