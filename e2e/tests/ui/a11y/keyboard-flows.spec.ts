@@ -254,17 +254,13 @@ test.describe('Keyboard: lists and menus', { tag: A11Y }, () => {
     await expect(list.pagination.page(1)).toHaveAttribute('aria-current', 'page');
   });
 
-  // Pinned: a page change reloads the list behind a spinner and re-creates the pager (`@if (loading) ... @else`),
-  // so the button that was pressed is gone and the focus falls back to the document.
-  test('A11Y-18: after a page change the focus is still in the pager [known failure: RPS-1669]', async ({
+  // RPS-1669 (fixed): the list and pager now stay mounted through a reload (a busy overlay stands in
+  // for the old full-block spinner), so the button that was pressed keeps the focus.
+  test('A11Y-18: after a page change the focus is still in the pager', async ({
     adminPage,
     seeder,
     seedPackages,
   }) => {
-    test.fail(
-      true,
-      'RPS-1669: the list is re-rendered on every load, so the focus is lost (document.body) after a page change',
-    );
     const repo = await seeder.createRepo(RepoType.NPM);
     await seedPackages(repo, 12);
     const list = protocolPages(adminPage, DESCRIPTORS.npm, repo.name).list();
@@ -357,16 +353,13 @@ test.describe('Keyboard: lists and menus', { tag: A11Y }, () => {
     await list.expectRow(kept);
   });
 
-  // Pinned: the row that had the menu is re-rendered away and the focus falls back to the document.
-  test('A11Y-19: after a row is deleted the focus is on something in the page [known failure: RPS-1669]', async ({
+  // RPS-1669 (fixed): the deleted row's menu button really is gone, but the list now reclaims the focus
+  // (the next row's menu, the pager, or a tabbable fallback) once the reload's new rows are in.
+  test('A11Y-19: after a row is deleted the focus is on something in the page', async ({
     adminPage,
     seeder,
     seedPackage,
   }) => {
-    test.fail(
-      true,
-      'RPS-1669: the focus is lost (document.body) once the deleted row is gone',
-    );
     const repo = await seeder.createRepo(RepoType.NPM);
     const gone = await seedPackage(repo, { index: 1 });
     await seedPackage(repo, { index: 2 });
@@ -419,15 +412,12 @@ test.describe('Keyboard: lists and menus', { tag: A11Y }, () => {
 });
 
 test.describe('Keyboard: the mobile menu', { tag: A11Y }, () => {
-  // Pinned: the menu is a drawer (`aside`) without focus handling: the focus stays on the burger behind it.
-  test('A11Y-21: the burger opens the menu with Enter, focus moves into it, Escape closes it and gives the focus back [known failure: RPS-1669]', async ({
+  // RPS-1669 (fixed): the drawer now uses the same `appDialog` focus-trap contract as the app's modals
+  // (A11Y-05/A11Y-13): focus moves in on open, Escape closes it, and the focus returns to the burger.
+  test('A11Y-21: the burger opens the menu with Enter, focus moves into it, Escape closes it and gives the focus back', async ({
     openUiPage,
     adminSession,
   }) => {
-    test.fail(
-      true,
-      'RPS-1669: opening the mobile menu does not move the focus into it (nor trap or restore it)',
-    );
     const page = await openUiPage({ session: adminSession, viewport: { width: 390, height: 844 } });
     const shell = new Shell(page);
     await page.goto('/repositories');

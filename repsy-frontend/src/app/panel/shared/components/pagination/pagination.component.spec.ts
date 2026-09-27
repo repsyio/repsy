@@ -126,6 +126,12 @@ describe('PaginationComponent', () => {
       expect(component.pageNum).toBe(7);
       expect(emitted).toEqual([7]);
     });
+
+    it('does nothing for the page that is already current (RPS-1669: no needless reload)', () => {
+      at(3, 10).goToPage(3);
+
+      expect(emitted).toEqual([]);
+    });
   });
 
   describe('isNumber', () => {
@@ -198,5 +204,24 @@ describe('PaginationComponent markup', () => {
     q('[data-testid="pagination-prev"]').click();
 
     expect(emitted).toEqual([2, 1]);
+  });
+
+  // RPS-1669: the pager stays mounted while a list reloads; a native `disabled` on the button that just
+  // became current would still drop the keyboard focus to `<body>` even though the node survives, so the
+  // current page and the boundary prev/next use `aria-disabled` (screen readers still hear "disabled") and
+  // stay real, focusable buttons.
+  it('marks the current page and an exhausted boundary as aria-disabled, never natively disabled', () => {
+    render(0, 5);
+
+    const current = q('[data-testid="pagination-page-1"]') as HTMLButtonElement;
+    const prev = q('[data-testid="pagination-prev"]') as HTMLButtonElement;
+    const next = q('[data-testid="pagination-next"]') as HTMLButtonElement;
+
+    expect(current.disabled).toBeFalse();
+    expect(current.getAttribute('aria-disabled')).toBe('true');
+    expect(prev.disabled).toBeFalse();
+    expect(prev.getAttribute('aria-disabled')).toBe('true');
+    expect(next.disabled).toBeFalse();
+    expect(next.getAttribute('aria-disabled')).toBeNull();
   });
 });

@@ -97,12 +97,21 @@
   </div>
 </div>
 
-@if (loading) {
+@if (loading && !(versions?.length > 0)) {
   <app-spinner />
 } @else {
   @if (!this.error) {
     @if (versions?.length > 0) {
-      <div class="text-body1">
+      <!-- RPS-1669: stays mounted through a reload; see the npm packages list template for why. -->
+      <div class="text-body1 relative" [attr.aria-busy]="loading ? 'true' : null">
+        @if (loading) {
+          <div
+            data-testid="pkg-version-list-busy"
+            class="bg-primary-500/70 pointer-events-none absolute inset-0 z-10 flex items-start justify-center rounded-[12px] pt-16"
+          >
+            <app-spinner />
+          </div>
+        }
         <!-- Table Headers (Desktop) -->
         <div
           class="hidden grid-cols-[minmax(0,3fr)_1.2fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"

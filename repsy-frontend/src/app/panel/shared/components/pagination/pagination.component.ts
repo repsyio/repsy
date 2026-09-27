@@ -42,6 +42,11 @@ export class PaginationComponent {
   }
 
   goToPage(page: number) {
+    if (page === this.pageNum) {
+      // Already the current page (its button stays enabled, not `disabled`, so it keeps the keyboard
+      // focus after the click that made it current -- RPS-1669); do not reload for nothing.
+      return;
+    }
     this.pageNum = page;
     this.pageNumChange.emit(this.pageNum);
   }
