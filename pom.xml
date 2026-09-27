@@ -34,12 +34,13 @@
     <jacoco.check.phase>none</jacoco.check.phase>
 
     <!--
-      RPS-1453: extra JVM arguments of every forked test JVM (Surefire and Failsafe, see below). C1
-      only, because a test JVM lives for a few minutes and mostly runs code once (context start-up,
-      MockMvc), so C2 compilation is CPU spent for nothing: about a third less CPU and a fifth less
-      wall time in the integration tests. Without tiered compilation the JVM reserves only 48 MB of
-      code cache, which a Spring context, JaCoCo's instrumentation and 40 cached contexts fill
-      ("Out of space in CodeCache" kills the fork), hence the explicit size.
+      RPS-1453: extra JVM arguments of every forked test JVM. core-parent (RPS-1471) appends this
+      property to the argLine of Surefire and Failsafe, after the JaCoCo agent and -Duser.timezone.
+      C1 only, because a test JVM lives for a few minutes and mostly runs code once (context
+      start-up, MockMvc), so C2 compilation is CPU spent for nothing: about a third less CPU and a
+      fifth less wall time in the integration tests. Without tiered compilation the JVM reserves
+      only 48 MB of code cache, which a Spring context, JaCoCo's instrumentation and 40 cached
+      contexts fill ("Out of space in CodeCache" kills the fork), hence the explicit size.
 
       Do not set the "argLine" property instead: Maven would then freeze "${argLine}" in the plugin
       configuration when it builds the model, before JaCoCo's prepare-agent has put its agent in
@@ -115,18 +116,6 @@
         </configuration>
       </plugin>
 
-      <!--
-        RPS-1453: core-parent's Surefire configuration (argLine "${argLine} -Duser.timezone=UTC")
-        plus the test.jvm.args above. Once core-parent has such a property itself, drop this.
-      -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <argLine>${argLine} -Duser.timezone=UTC ${test.jvm.args}</argLine>
-        </configuration>
-      </plugin>
-
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
@@ -140,16 +129,12 @@
 
       <!--
         Integration tests (*IT.java, e.g. Testcontainers-backed) run here, not in Surefire, so
-        "mvn test" stays fast and Docker-free; "mvn verify" runs both. Same argLine as Surefire in
-        core-parent, so the JaCoCo agent (and thus the coverage report) covers them too.
+        "mvn test" stays fast and Docker-free; "mvn verify" runs both. core-parent manages the
+        version and the same argLine as Surefire's, so the JaCoCo agent covers them too.
       -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
-        <version>3.6.0</version>
-        <configuration>
-          <argLine>${argLine} -Duser.timezone=UTC ${test.jvm.args}</argLine>
-        </configuration>
         <executions>
           <execution>
             <goals>

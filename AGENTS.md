@@ -248,8 +248,9 @@ for SonarCloud.
   `mvn test` runs it) fails an integration test or helper that calls `PasswordHasher.hash` per test
   or hashes `VALID_PASSWORD` again, and names the file, the line and the fix; a test that needs a
   fresh hash per call goes in its `ALLOWED` map with the reason (RPS-1471).
-  `mvn verify` runs the forked test JVMs with C1 only (`test.jvm.args` in the root `pom.xml`): see
-  the comment there before touching `argLine`.
+  `mvn verify` runs the forked test JVMs with C1 only (`test.jvm.args` in the root `pom.xml`, which
+  `core-parent` appends to the Surefire and Failsafe `argLine`): see the comment there, and never set
+  the `argLine` property itself.
 - Do not declare versions for `org.testcontainers:*` artifacts: they are managed by `core-parent`
   (`testcontainers-bom`). The same goes for any other dependency `repsy-core` already manages,
   so only add a `<version>` for something it does not.
