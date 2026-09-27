@@ -352,6 +352,9 @@ This is the first release after `v26.08.4`. Read this section before you upgrade
   username and password), so nobody has to reset a password and no client needs a new one. An account keeps its
   SHA-256 hash, and its `users.salt` value, until that first sign-in. A later release will retire this legacy check
   and announce how, so sign in once with every account you still need before you move to it. (RPS-1615)
+- **Embedded H2 in `v26.08.4` and earlier stops accepting writes after about 30 minutes; this release fixes it.**
+  See [Embedded H2 stops accepting writes (releases up to `v26.08.4`)](#embedded-h2-stops-accepting-writes-releases-up-to-v26084-rps-1676)
+  for who is affected and the workaround for an image you cannot replace yet. (RPS-1652, RPS-1676)
 - **`DB_HOST`, `DB_PORT` and `DB_DATABASE` are no longer read.** Only `DB_URL` selects the database, and the Docker
   image now defaults it to an embedded H2 file. An installation that set only those three variables starts on a new,
   empty H2 database (the PostgreSQL data is untouched; a `WARN` is logged). Set
@@ -482,6 +485,16 @@ This is the first release after `v26.08.4`. Read this section before you upgrade
 <!-- Maintainer, before publishing the release notes: (1) RPS-1615 is done: passwords are verified once with the legacy SHA-256 hash and upgraded to BCrypt on login; docs must say "no password reset when upgrading from v26.08.4", and the release that retires the legacy path needs its own announced reset. (2) Re-check commits merged after the audit (main 7ed2c6839, 2026-09-26). -->
 
 ## Upgrading
+
+### Embedded H2 stops accepting writes (releases up to `v26.08.4`) (RPS-1676)
+
+**Who is affected:** every published release, `v26.03.0` up to and including `v26.08.4`, that runs on the embedded H2 database. H2 was the default database of the Docker image until `26.08.0`; `v26.08.2` to `v26.08.4` use it when `DB_URL` points to H2. Installations on PostgreSQL are not affected.
+
+**What happens:** these releases ship H2 2.4.240, which has a bug (h2database/h2database#4308, #4320, #4342; fixed in H2 2.5.250): a `CHECK (column IN (...))` constraint keeps the session that prepared it. The connection pool retires every connection after `max-lifetime` (30 minutes by default), and after that every insert or update of a table with such a constraint fails with `Check constraint invalid ... The database has been closed`. On the Docker image this shows up about 30 minutes after start: repositories cannot be created and logins cannot be recorded until the container is restarted.
+
+**Fixed in:** the first release after `v26.08.4`, which ships H2 2.5.252 (`H2CheckConstraintAcrossConnectionsTest` pins it).
+
+**For an image you cannot replace yet:** set `SPRING_DATASOURCE_HIKARI_MAX_LIFETIME=2147483647` so that the pool does not retire connections. `2147483647` milliseconds is about 24.8 days, so restart the container at least that often. This was verified on the `v26.08.4` image for a 200 second run (repository creation kept answering `200`; with `SPRING_DATASOURCE_HIKARI_MAX_LIFETIME=30000` the same probe failed with `500` from 20 seconds on); it was not run for the full 30 minutes. The reliable options are to upgrade or to use PostgreSQL. The embedded H2 database is meant for evaluation, so use PostgreSQL (`DB_URL=jdbc:postgresql://<host>:<port>/<database>`) for production.
 
 ### Artifact storage moved to `/app/data/storage` in the Docker image (RPS-1401)
 
