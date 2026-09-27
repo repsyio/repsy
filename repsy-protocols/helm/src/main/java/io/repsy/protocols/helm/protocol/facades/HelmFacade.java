@@ -17,6 +17,7 @@ package io.repsy.protocols.helm.protocol.facades;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
+import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
 import io.repsy.protocols.helm.shared.index.dtos.HelmIndexDto;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
@@ -29,7 +30,6 @@ import java.io.InputStream;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 @NullMarked
@@ -41,11 +41,7 @@ public interface HelmFacade<ID> {
 
   HelmChartInfo pushChart(
       ProtocolContext context,
-      String name,
-      String version,
-      String description,
-      String appVersion,
-      @Nullable String type,
+      HelmChartMetadata metadata,
       String digest,
       InputStream chartStream,
       long size)

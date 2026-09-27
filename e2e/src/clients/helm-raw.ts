@@ -349,6 +349,10 @@ export interface IndexEntry {
   appVersion?: string;
   type?: string;
   created?: string;
+  /** The chart's own `apiVersion` (`v1`/`v2`), kept with the version since RPS-1557. */
+  apiVersion?: string;
+  /** The chart's `dependencies:` (name/version/repository/condition/tags/alias/...), RPS-1557. */
+  dependencies?: Record<string, unknown>[];
 }
 
 export interface ParsedIndex {
@@ -361,7 +365,7 @@ export interface ParsedIndex {
  *  than a hand-rolled reader: the shape `HelmIndexGenerator` produces is small but this is a real
  *  YAML document (quoted/unquoted scalars, ISO instants), and a real parser is the safer choice --
  *  mirrors every field `HelmIndexEntryDto` writes (`name`, `version`, `digest`, `urls`,
- *  `description?`, `appVersion?`, `type?`, `created`). */
+ *  `description?`, `appVersion?`, `type?`, `apiVersion`, `dependencies?`, `created`). */
 export function parseIndex(yamlText: string): ParsedIndex {
   const doc = parseYaml(yamlText) as {
     apiVersion?: unknown;
@@ -384,6 +388,10 @@ export function parseIndex(yamlText: string): ParsedIndex {
         appVersion: typeof e.appVersion === 'string' ? e.appVersion : undefined,
         type: typeof e.type === 'string' ? e.type : undefined,
         created: typeof e.created === 'string' ? e.created : undefined,
+        apiVersion: typeof e.apiVersion === 'string' ? e.apiVersion : undefined,
+        dependencies: Array.isArray(e.dependencies)
+          ? (e.dependencies as Record<string, unknown>[])
+          : undefined,
       };
     });
   }

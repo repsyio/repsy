@@ -131,7 +131,7 @@ class AbstractHelmOciTagsListProtocolMethodHandlerTest {
   void handleReturnsFacadeTagList() throws Exception {
     final var context = context("/payments/tags/list");
     final var dto =
-        HelmOciTagListDto.builder().name("payments").tags(List.of("0.9.0", "1.0.0")).build();
+        HelmOciTagListDto.builder().name("helm/payments").tags(List.of("0.9.0", "1.0.0")).build();
     when(this.facade.listTags(context, "payments")).thenReturn(dto);
 
     final var response =

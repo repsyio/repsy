@@ -44,6 +44,7 @@ import {
   sha256Hex,
   type RawResponse,
 } from '../../src/clients/helm-raw.js';
+import { repoPath } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
 
@@ -306,6 +307,10 @@ test.describe('helm registry rules (raw HTTP)', () => {
     const admin = adminCredential();
     const res = await rawGetTagsList(layout.repoName, admin, layout.chart);
     expect(res.status, 'tags/list should be served').toBe(200);
+    expect(
+      (JSON.parse(res.body.toString('utf8')) as { name?: string }).name,
+      'the repository-qualified name of the distribution spec (RPS-1557)',
+    ).toBe(`${repoPath(layout.repoName)}/${layout.chart}`);
   });
 
   test(
@@ -400,6 +405,11 @@ test.describe('helm registry rules (raw HTTP)', () => {
         'index` (bare hex) -- low impact, no real client verifies it',
     ).toBe(built.tgzDigest);
     expect(entry?.created, 'an ISO instant').toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(entry?.apiVersion, "the chart's own apiVersion (RPS-1557)").toBe('v2');
+    expect(
+      entry?.dependencies,
+      'a chart that declares none has no dependencies key',
+    ).toBeUndefined();
   });
 
   test(

@@ -173,6 +173,8 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
             .description(metadata.getDescription())
             .appVersion(metadata.getAppVersion())
             .type(metadata.getType())
+            .apiVersion(metadata.getApiVersion())
+            .dependencies(metadata.getDependencies())
             .digest(layerDigest)
             .size(layerSize)
             .build();

@@ -278,11 +278,30 @@ test.describe('helm classic > dependency resolution (RPS-1479)', () => {
       expect(indexEntry(index, b, '1.1.0')?.digest).toBe(
         `sha256:${sha256Hex(stored['1.1.0'].bytes)}`,
       );
+      // The entry of A carries what Chart.yaml declares (RPS-1557), like ChartMuseum's and `helm
+      // repo index`'s; B declares none, so its entries have no `dependencies` key.
+      expect(indexEntry(index, a, '1.0.0')?.apiVersion).toBe('v2');
+      expect(indexEntry(index, a, '1.0.0')?.dependencies).toEqual(depsOfA);
+      expect(indexEntry(index, b, '1.1.0')?.apiVersion).toBe('v2');
+      expect(indexEntry(index, b, '1.1.0')?.dependencies).toBeUndefined();
 
       // The consumer: a local chart with A's dependency declaration, a read-only token in its own
       // repositories.yaml. Nothing of B is on its disk.
       const ws = await isolatedWorkDir('helm-dep-consumer');
       expectOk(await repoAdd(ws, 'repsy', url, reader), 'helm repo add');
+      // The real client reads the enriched index entries (apiVersion, dependencies) without a hitch.
+      const search = await helm(
+        ws,
+        'helm-dep-search',
+        ['search', 'repo', `repsy/${a}`, '-o', 'json'],
+        { cred: reader },
+      );
+      expectOk(search, 'helm search repo');
+      expect(
+        (JSON.parse(search.stdout) as { name: string; version: string }[]).map(
+          (hit) => `${hit.name}@${hit.version}`,
+        ),
+      ).toContain(`repsy/${a}@1.0.0`);
       const chartDir = await consumerChart(ws, 'a', depsOfA);
       const update = await helm(ws, 'helm-dep-update', ['dependency', 'update', chartDir], {
         cred: reader,

@@ -30,6 +30,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmFacade;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
+import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -43,6 +44,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -108,13 +110,18 @@ class AbstractHelmChartPushProtocolMethodHandlerTest {
             description: Pays
             appVersion: "2"
             type: application
+            apiVersion: v2
+            dependencies:
+              - name: postgresql
+                version: 12.x.x
+                repository: https://charts.example.com
+                condition: postgresql.enabled
             """);
     final var stored = new AtomicReference<byte[]>();
-    when(this.helmFacade.pushChart(
-            any(), any(), any(), any(), any(), any(), any(), any(), anyLong()))
+    when(this.helmFacade.pushChart(any(), any(), any(), any(), anyLong()))
         .thenAnswer(
             invocation -> {
-              stored.set(invocation.<InputStream>getArgument(7).readAllBytes());
+              stored.set(invocation.<InputStream>getArgument(3).readAllBytes());
               return this.chartInfo;
             });
     final var context = new ProtocolContext();
@@ -123,30 +130,37 @@ class AbstractHelmChartPushProtocolMethodHandlerTest {
         this.handler().handle(context, upload(chart), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    final var metadata = ArgumentCaptor.forClass(HelmChartMetadata.class);
     verify(this.helmFacade)
         .pushChart(
-            eq(context),
-            eq("payments"),
-            eq("1.0.0"),
-            eq("Pays"),
-            eq("2"),
-            eq("application"),
-            eq(sha256Of(chart)),
-            any(),
-            eq((long) chart.length));
+            eq(context), metadata.capture(), eq(sha256Of(chart)), any(), eq((long) chart.length));
+    assertThat(metadata.getValue().getName()).isEqualTo("payments");
+    assertThat(metadata.getValue().getVersion()).isEqualTo("1.0.0");
+    assertThat(metadata.getValue().getDescription()).isEqualTo("Pays");
+    assertThat(metadata.getValue().getAppVersion()).isEqualTo("2");
+    assertThat(metadata.getValue().getType()).isEqualTo("application");
+    assertThat(metadata.getValue().getApiVersion()).isEqualTo("v2");
+    assertThat(metadata.getValue().getDependencies())
+        .isEqualTo(
+            "[{\"name\":\"postgresql\",\"version\":\"12.x.x\","
+                + "\"repository\":\"https://charts.example.com\","
+                + "\"condition\":\"postgresql.enabled\"}]");
     assertThat(stored.get()).isEqualTo(chart);
   }
 
   @Test
-  @DisplayName("passes empty description and appVersion when Chart.yaml has none")
-  void passesEmptyOptionalFields() throws Exception {
+  @DisplayName("passes no description or appVersion, and apiVersion v1, when Chart.yaml has none")
+  void passesNoOptionalFields() throws Exception {
     final var chart = chart("name: payments\nversion: 1.0.0\n");
 
     this.handler().handle(new ProtocolContext(), upload(chart), new MockHttpServletResponse());
 
-    verify(this.helmFacade)
-        .pushChart(
-            any(), eq("payments"), eq("1.0.0"), eq(""), eq(""), any(), any(), any(), anyLong());
+    final var metadata = ArgumentCaptor.forClass(HelmChartMetadata.class);
+    verify(this.helmFacade).pushChart(any(), metadata.capture(), any(), any(), anyLong());
+    assertThat(metadata.getValue().getDescription()).isNull();
+    assertThat(metadata.getValue().getAppVersion()).isNull();
+    assertThat(metadata.getValue().getApiVersion()).isEqualTo("v1");
+    assertThat(metadata.getValue().getDependencies()).isNull();
   }
 
   @Test
@@ -161,8 +175,7 @@ class AbstractHelmChartPushProtocolMethodHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(response.getBody()).isEqualTo("Missing 'chart' part");
-    verify(this.helmFacade, never())
-        .pushChart(any(), any(), any(), any(), any(), any(), any(), any(), anyLong());
+    verify(this.helmFacade, never()).pushChart(any(), any(), any(), any(), anyLong());
   }
 
   @Test
@@ -177,7 +190,6 @@ class AbstractHelmChartPushProtocolMethodHandlerTest {
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("chartYamlInvalid");
 
-    verify(this.helmFacade, never())
-        .pushChart(any(), any(), any(), any(), any(), any(), any(), any(), anyLong());
+    verify(this.helmFacade, never()).pushChart(any(), any(), any(), any(), anyLong());
   }
 }

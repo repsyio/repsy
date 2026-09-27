@@ -30,6 +30,13 @@ public class HelmChartForm {
   @Nullable String description;
   @Nullable String appVersion;
   @Nullable String type;
+
+  // The apiVersion of Chart.yaml (v1 when the file does not say).
+  @Nullable String apiVersion;
+
+  // The dependencies of Chart.yaml as a JSON array, or null when it declares none.
+  @Nullable String dependencies;
+
   String digest;
   long size;
 }

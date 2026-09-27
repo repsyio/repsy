@@ -16,6 +16,7 @@
 package io.repsy.protocols.helm.shared.index.dtos;
 
 import java.util.List;
+import java.util.Map;
 import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.NullMarked;
@@ -32,6 +33,8 @@ public class HelmIndexEntryDto {
   @Nullable String description;
   @Nullable String appVersion;
   @Nullable String type;
+  @Nullable String apiVersion;
+  @Nullable List<Map<String, Object>> dependencies;
   String digest;
   List<String> urls;
   String created;

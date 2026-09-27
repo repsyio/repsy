@@ -244,7 +244,7 @@ test.describe('docker registry API gaps (raw HTTP, pinned at current behaviour)'
     },
   );
 
-  test('RA1b: control: the Helm OCI handler answers tags/list on the same port with the bare chart name, the Docker one with the repository-qualified name', async ({
+  test('RA1b: control: the Helm OCI handler answers tags/list on the same port with the repository-qualified name, like the Docker one (RPS-1557)', async ({
     seeder,
   }) => {
     const helmRepo = await seeder.createRepo(RepoType.HELM, { privateRepo: true });
@@ -255,8 +255,8 @@ test.describe('docker registry API gaps (raw HTTP, pinned at current behaviour)'
     const helm = await rawTagsList(helmRepo.name, admin, 'somechart');
     expect(helm.status, 'Helm OCI tags/list is served (RPS-1219)').toBe(200);
     const body = JSON.parse(helm.body.toString('utf8')) as { name?: string; tags?: unknown };
-    expect(body.name, 'the chart name, bare (the spec wants the qualified one: RPS-1557)').toBe(
-      'somechart',
+    expect(body.name, 'the repository-qualified chart name, as the spec wants (RPS-1557)').toBe(
+      `${repoPath(helmRepo.name)}/somechart`,
     );
     expect(Array.isArray(body.tags), 'a tags array').toBe(true);
 

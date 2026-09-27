@@ -77,6 +77,12 @@ public class HelmChartVersion {
   @Column(name = "type", length = HelmConstants.MAX_CHART_TYPE_LENGTH)
   private @Nullable String type;
 
+  @Column(name = "api_version", length = HelmConstants.MAX_CHART_API_VERSION_LENGTH)
+  private @Nullable String apiVersion;
+
+  @Column(name = "dependencies", columnDefinition = "text")
+  private @Nullable String dependencies;
+
   @Column(name = "digest", nullable = false, length = HelmConstants.MAX_DIGEST_LENGTH)
   private String digest;
 

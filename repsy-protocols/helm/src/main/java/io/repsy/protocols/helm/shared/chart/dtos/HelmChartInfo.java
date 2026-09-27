@@ -35,6 +35,12 @@ public interface HelmChartInfo {
 
   @Nullable String type();
 
+  /** Null for a chart stored before the api version was kept (RPS-1557). */
+  @Nullable String apiVersion();
+
+  /** The dependencies as a JSON array; null when the chart declares none or predates RPS-1557. */
+  @Nullable String dependencies();
+
   String digest();
 
   long size();

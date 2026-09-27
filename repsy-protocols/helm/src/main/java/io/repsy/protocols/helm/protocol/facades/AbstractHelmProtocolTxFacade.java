@@ -22,6 +22,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
+import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService;
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService.DeletedChart;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
@@ -59,6 +60,9 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @NullMarked
@@ -68,6 +72,10 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final String STORAGE_PATH = "storagePath";
+
+  private static final ObjectMapper DEPENDENCIES_MAPPER = new ObjectMapper();
+  private static final TypeReference<List<Map<String, Object>>> DEPENDENCIES_TYPE =
+      new TypeReference<>() {};
 
   protected final HelmStorageService<ID> helmStorageService;
   protected final ChartService<ID> chartService;
@@ -97,6 +105,8 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
               .description(chart.description())
               .appVersion(chart.appVersion())
               .type(chart.type())
+              .apiVersion(chart.apiVersion())
+              .dependencies(decodeDependencies(chart))
               .digest(chart.digest())
               .urls(List.of(url))
               .created(chart.createdAt().toString())
@@ -109,6 +119,28 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
         .entries(entries)
         .generated(Instant.now().toString())
         .build();
+  }
+
+  /**
+   * The dependencies of a chart for its index entry. They were validated and serialised when the
+   * chart was pushed, so a value that no longer reads back (a row edited by hand) costs the entry
+   * its dependencies, not the whole index.
+   */
+  private static @Nullable List<Map<String, Object>> decodeDependencies(final HelmChartInfo chart) {
+    final var json = chart.dependencies();
+    if (json == null || json.isBlank()) {
+      return null;
+    }
+    try {
+      return DEPENDENCIES_MAPPER.readValue(json, DEPENDENCIES_TYPE);
+    } catch (final JacksonException e) {
+      log.warn(
+          "Dependencies of chart {}:{} are not readable and are left out of the index: {}",
+          chart.name(),
+          chart.version(),
+          e.getMessage());
+      return null;
+    }
   }
 
   @Override
@@ -152,24 +184,24 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
   @Override
   public HelmChartInfo pushChart(
       final ProtocolContext context,
-      final String name,
-      final String version,
-      final String description,
-      final String appVersion,
-      final @Nullable String type,
+      final HelmChartMetadata metadata,
       final String digest,
       final InputStream chartStream,
       final long size)
       throws IOException {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var name = metadata.getName();
+    final var version = metadata.getVersion();
     final var form =
         HelmChartForm.builder()
             .name(name)
             .version(version)
-            .description(description.isBlank() ? null : description)
-            .appVersion(appVersion.isBlank() ? null : appVersion)
-            .type(type)
+            .description(blankToNull(metadata.getDescription()))
+            .appVersion(blankToNull(metadata.getAppVersion()))
+            .type(metadata.getType())
+            .apiVersion(metadata.getApiVersion())
+            .dependencies(metadata.getDependencies())
             .digest(digest)
             .size(size)
             .build();
@@ -183,6 +215,10 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
         form,
         repoInfo.isAllowOverride(),
         replaced -> this.storeChart(context, repoInfo, storagePath, chartStream, form, replaced));
+  }
+
+  private static @Nullable String blankToNull(final @Nullable String value) {
+    return value == null || value.isBlank() ? null : value;
   }
 
   /**
@@ -570,6 +606,8 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
             .filter(reference -> !reference.startsWith(HelmConstants.SHA256_PREFIX))
             .sorted()
             .toList();
-    return HelmOciTagListDto.builder().name(name).tags(tags).build();
+    // The distribution spec's name is the whole repository name, <repo>/<chart> here, as the
+    // Docker registry answers it (RPS-1489); the bare chart name was ambiguous between repos.
+    return HelmOciTagListDto.builder().name(repoInfo.getName() + "/" + name).tags(tags).build();
   }
 }

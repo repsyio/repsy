@@ -37,9 +37,11 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
+import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService;
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService.DeletedChart;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
+import io.repsy.protocols.helm.shared.index.dtos.HelmIndexEntryDto;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
@@ -59,6 +61,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -383,11 +386,14 @@ class AbstractHelmProtocolTxFacadeTest {
     private HelmChartInfo push() throws Exception {
       return AbstractHelmProtocolTxFacadeTest.this.facade.pushChart(
           AbstractHelmProtocolTxFacadeTest.this.context,
-          "payments",
-          "1.0.0",
-          "",
-          "",
-          null,
+          HelmChartMetadata.builder()
+              .name("payments")
+              .version("1.0.0")
+              .description("")
+              .appVersion("")
+              .apiVersion("v2")
+              .dependencies("[{\"name\":\"redis\"}]")
+              .build(),
           DIGEST,
           body(),
           BLOB_SIZE);
@@ -427,6 +433,20 @@ class AbstractHelmProtocolTxFacadeTest {
 
       verify(AbstractHelmProtocolTxFacadeTest.this.helmStorageService, never())
           .saveChart(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("stores the apiVersion and the dependencies of Chart.yaml with the version")
+    void passesApiVersionAndDependenciesToTheForm() throws Exception {
+      this.publishRunsTheWriterWith(null);
+
+      this.push();
+
+      final var form = ArgumentCaptor.forClass(HelmChartForm.class);
+      verify(AbstractHelmProtocolTxFacadeTest.this.chartService)
+          .publish(eq(REPO_ID), form.capture(), anyBoolean(), any());
+      assertThat(form.getValue().getApiVersion()).isEqualTo("v2");
+      assertThat(form.getValue().getDependencies()).isEqualTo("[{\"name\":\"redis\"}]");
     }
 
     @Test
@@ -919,6 +939,69 @@ class AbstractHelmProtocolTxFacadeTest {
   }
 
   @Nested
+  @DisplayName("generateIndex() (RPS-1557)")
+  class GenerateIndex {
+
+    private HelmChartInfo chart(final String apiVersion, final String dependencies) {
+      final var chart = mock(HelmChartInfo.class);
+      when(chart.name()).thenReturn("payments");
+      when(chart.version()).thenReturn("1.0.0");
+      when(chart.digest()).thenReturn(DIGEST);
+      when(chart.apiVersion()).thenReturn(apiVersion);
+      when(chart.dependencies()).thenReturn(dependencies);
+      when(chart.createdAt()).thenReturn(java.time.Instant.parse("2026-01-01T00:00:00Z"));
+      return chart;
+    }
+
+    private HelmIndexEntryDto entryOf(final HelmChartInfo chart) {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(List.of(chart));
+
+      return it.facade.generateIndex(it.context).getEntries().get("payments").getFirst();
+    }
+
+    @Test
+    @DisplayName("carries the apiVersion and the decoded dependencies of the chart")
+    void carriesApiVersionAndDependencies() {
+      final var entry =
+          this.entryOf(
+              this.chart(
+                  "v2",
+                  "[{\"name\":\"redis\",\"version\":\"17.x.x\","
+                      + "\"repository\":\"https://r.example\",\"tags\":[\"cache\"],"
+                      + "\"enabled\":true}]"));
+
+      assertThat(entry.getApiVersion()).isEqualTo("v2");
+      assertThat(entry.getDependencies())
+          .containsExactly(
+              Map.of(
+                  "name", "redis",
+                  "version", "17.x.x",
+                  "repository", "https://r.example",
+                  "tags", List.of("cache"),
+                  "enabled", true));
+    }
+
+    @Test
+    @DisplayName("leaves both out for a chart stored before they were kept")
+    void nullForALegacyChart() {
+      final var entry = this.entryOf(this.chart(null, null));
+
+      assertThat(entry.getApiVersion()).isNull();
+      assertThat(entry.getDependencies()).isNull();
+    }
+
+    @Test
+    @DisplayName("drops only the dependencies of a chart whose stored value is unreadable")
+    void unreadableDependenciesDoNotBreakTheIndex() {
+      final var entry = this.entryOf(this.chart("v2", "{not json"));
+
+      assertThat(entry.getApiVersion()).isEqualTo("v2");
+      assertThat(entry.getDependencies()).isNull();
+    }
+  }
+
+  @Nested
   @DisplayName("listTags() (RPS-1219)")
   class ListTags {
 
@@ -932,7 +1015,7 @@ class AbstractHelmProtocolTxFacadeTest {
 
       final var result = it.facade.listTags(it.context, "payments");
 
-      assertThat(result.getName()).isEqualTo("payments");
+      assertThat(result.getName()).isEqualTo(REPO_NAME + "/payments");
       assertThat(result.getTags()).containsExactly("0.9.0", "1.0.0");
     }
 
@@ -944,7 +1027,7 @@ class AbstractHelmProtocolTxFacadeTest {
 
       final var result = it.facade.listTags(it.context, "payments");
 
-      assertThat(result.getName()).isEqualTo("payments");
+      assertThat(result.getName()).isEqualTo(REPO_NAME + "/payments");
       assertThat(result.getTags()).isEmpty();
     }
   }

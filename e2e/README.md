@@ -3202,10 +3202,10 @@ is in the PR that added this file.
   nothing), and why a made-up repo cannot be told from a real one. The token endpoint still issues a token for `scope=registry:catalog:*`
   (issuance never reads the scope).
 - Helm OCI has its own `tags/list` handler on the same port: `GET /v2/<helm repo>/<chart>/tags/list`
-  answers `200` `{"name": "<chart>", "tags": [...]}` (RPS-1219), with the BARE chart name (RPS-1557
-  is about the repository-qualified one the spec wants) and no pagination; the Docker handler
-  answers the qualified name and paginates. RA1b pins both, side by side (the Helm section's "no
-  `tags/list` handler" notes predate RPS-1219).
+  answers `200` `{"name": "<repo>/<chart>", "tags": [...]}` (RPS-1219; the repository-qualified name
+  since RPS-1557) and no pagination; the Docker handler answers the same qualified name and
+  paginates. RA1b pins both, side by side (the Helm section's "no `tags/list` handler" notes predate
+  RPS-1219).
 - `tags/list` is `GET` only: a `HEAD` is still the router's `404` (the spec defines no `HEAD` for
   it). The order is byte order (`v10` before `v2`), computed in Java over the image's tag names, so
   it does not depend on the database collation and `last` pages consistently on PostgreSQL and H2.
@@ -3521,10 +3521,10 @@ repo cannot be rebuilt, and a chart pushed through the OCI API resolves via a cl
 OCI: a real `helm registry login`, then `repository: oci://<host>/<repo>` with `--plain-http` resolves
 from `tags/list` (RPS-1219) and the layer is byte-identical to the pushed file; without a login helm
 stops at "basic credential not found". `helm dependency update` does not recurse into a dependency's own
-`dependencies:` (A's are stored in A's chart and printed by `helm show chart`). Observed and not pinned
-(look like backend gaps, see the story report): the `index.yaml` entry of a chart with `dependencies:`
-carries no `dependencies` (nor `apiVersion`), and `tags/list` names the chart alone (`"name":"<chart>"`),
-not `<repo>/<chart>`.
+`dependencies:` (A's are stored in A's chart and printed by `helm show chart`). Since RPS-1557 the
+`index.yaml` entry of a chart carries its `apiVersion` and, when it declares any, its `dependencies`
+(asserted next to the resolution, plus a real `helm search repo` over the enriched entries), and
+`tags/list` names the chart `<repo>/<chart>` like the Docker handler (R8, RA1b).
 
 ### Backend bug candidates found while reading and confirmed live (do not fix here)
 

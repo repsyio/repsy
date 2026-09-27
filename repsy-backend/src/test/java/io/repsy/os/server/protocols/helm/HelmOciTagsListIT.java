@@ -186,7 +186,9 @@ class HelmOciTagsListIT extends AbstractIntegrationTest {
   // ---------------------------------------------------------------------------------------------
 
   @Test
-  @DisplayName("lists both pushed versions of a chart, lexically sorted (regression pin)")
+  @DisplayName(
+      "lists both pushed versions of a chart, lexically sorted, under the repo-qualified name"
+          + " (RPS-1557)")
   void listsBothPushedVersionsSorted() throws Exception {
     final var repo = this.helmRepo();
     final var token = this.adminProtocolBearerToken();
@@ -197,7 +199,7 @@ class HelmOciTagsListIT extends AbstractIntegrationTest {
 
     assertThat(response.getStatus()).isEqualTo(200);
     final var body = response.getContentAsString(StandardCharsets.UTF_8);
-    assertThat(JsonPath.<String>read(body, "$.name")).isEqualTo(CHART);
+    assertThat(JsonPath.<String>read(body, "$.name")).isEqualTo(repo.getName() + "/" + CHART);
     assertThat(JsonPath.<List<String>>read(body, "$.tags")).containsExactly("0.9.0", "1.0.0");
   }
 
@@ -227,7 +229,7 @@ class HelmOciTagsListIT extends AbstractIntegrationTest {
 
     assertThat(response.getStatus()).isEqualTo(200);
     final var body = response.getContentAsString(StandardCharsets.UTF_8);
-    assertThat(JsonPath.<String>read(body, "$.name")).isEqualTo("does-not-exist");
+    assertThat(JsonPath.<String>read(body, "$.name")).isEqualTo(repo.getName() + "/does-not-exist");
     final List<String> tags = JsonPath.read(body, "$.tags");
     assertThat(tags).isEmpty();
   }

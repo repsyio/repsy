@@ -19,6 +19,7 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.helm.protocol.facades.AbstractHelmProtocolTxFacade;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
+import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
 import io.repsy.protocols.helm.shared.index.dtos.HelmIndexDto;
@@ -33,7 +34,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -73,17 +73,12 @@ public class HelmProtocolTxFacade extends AbstractHelmProtocolTxFacade<UUID> {
   @Transactional(rollbackFor = IOException.class)
   public HelmChartInfo pushChart(
       final ProtocolContext context,
-      final String name,
-      final String version,
-      final String description,
-      final String appVersion,
-      final @Nullable String type,
+      final HelmChartMetadata metadata,
       final String digest,
       final InputStream chartStream,
       final long size)
       throws IOException {
-    return super.pushChart(
-        context, name, version, description, appVersion, type, digest, chartStream, size);
+    return super.pushChart(context, metadata, digest, chartStream, size);
   }
 
   @Override
