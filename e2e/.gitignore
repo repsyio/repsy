@@ -4,3 +4,6 @@ playwright-report/
 src/api/generated/
 .env
 .tls/
+src/api/generated.lock
+src/api/generated.tmp.*/
+src/api/generated.old.*/

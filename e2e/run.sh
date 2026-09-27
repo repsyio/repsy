@@ -65,7 +65,7 @@ usage() {
 Usage:
   run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--force]
   run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy]
-  run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [-b]
+  run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [--workers N] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
 Every subcommand also takes --project NAME and --port-offset N (or REPSY_E2E_PROJECT and
@@ -77,6 +77,11 @@ docker, helm, pypi, golang, ruby, stack (cases that docker-exec into the Repsy c
 local stack only, see README.md "Stack runner") ui (the panel UI suite in headless Chromium,
 tests/ui; see README.md "UI suite") and api (raw HTTP at Repsy's edge, no package client: port separation,
 X-Forwarded-* public URLs, CORS/CSP; tests/api, see README.md "API suite").
+
+--workers N (or REPSY_E2E_WORKERS=N; the flag wins) sets the number of Playwright workers of every runner "test"
+starts, for a loaded host or a leg that needs fewer (a positive integer; without it Playwright's default, or the
+ui runner's REPSY_UI_WORKERS, applies). The stack runner always runs with 1 worker (its specs restart the one Repsy
+container): it ignores the flag, and "test" says so. "sweep" runs no Playwright.
 
 REPSY_ADMIN_PASSWORD must be set (copy .env.example to .env and fill it in) for every subcommand
 except "local down".
@@ -321,6 +326,11 @@ derive_stack_env() {
   else
     RUNNERS_PROJECT="$PROJECT-runners"
     REPSY_E2E_IMAGE_TAG="${REPSY_E2E_IMAGE_TAG:-$PROJECT}"
+  fi
+  # A COMPOSE_PROJECT_NAME (typically a line of .env, sourced above) names neither the stack nor the runner
+  # project here, so say it instead of silently running the default project next to whoever else uses it.
+  if [ "$PROJECT" = "$DEFAULT_PROJECT" ] && [ -n "${COMPOSE_PROJECT_NAME:-}" ] && [ "$COMPOSE_PROJECT_NAME" != "$DEFAULT_PROJECT" ]; then
+    echo "Warning: COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME is ignored (run.sh passes -p to every compose call), so this uses the project $DEFAULT_PROJECT and its runners project $RUNNERS_PROJECT. To use your own, set REPSY_E2E_PROJECT=$COMPOSE_PROJECT_NAME (or --project) and REPSY_E2E_PORT_OFFSET=<n>; the runners then run in $COMPOSE_PROJECT_NAME-runners." >&2
   fi
   # REPSY_E2E_PROJECT is deliberately not COMPOSE_PROJECT_NAME: .env is sourced into this environment,
   # and COMPOSE_PROJECT_NAME would also rename the runners project. Every compose call below passes
@@ -606,6 +616,7 @@ cmd_test() {
   local protocols=""
   local grep_pattern=""
   local rebuild="false"
+  local workers="${REPSY_E2E_WORKERS:-}"
 
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -621,6 +632,18 @@ cmd_test() {
         grep_pattern="$2"
         shift 2
         ;;
+      --workers)
+        if [ $# -lt 2 ]; then
+          echo "--workers needs a value" >&2
+          exit 1
+        fi
+        workers="$2"
+        shift 2
+        ;;
+      --workers=*)
+        workers="${1#--workers=}"
+        shift
+        ;;
       -b)
         rebuild="true"
         shift
@@ -632,6 +655,16 @@ cmd_test() {
         ;;
     esac
   done
+
+  # A positive integer with no leading zero (Playwright's own "50%" form is not offered: the count is what
+  # a loaded host needs to pin). Checked here so a typo fails before a runner image is built or started.
+  case "$workers" in
+    '') ;;
+    *[!0-9]* | 0*)
+      echo "Invalid worker count \"$workers\" (--workers / REPSY_E2E_WORKERS): a positive integer." >&2
+      exit 1
+      ;;
+  esac
 
   case "$target" in
     local | remote | ci) ;;
@@ -690,10 +723,21 @@ cmd_test() {
   local service
   for service in "${services[@]}"; do
     echo "==> Running $service"
-    # entrypoint.sh regenerates the API client, then runs Playwright for the given project with
-    # any extra args (e.g. --grep) appended.
+    # --workers N goes to Playwright as its own flag, which beats the config (REPSY_UI_WORKERS of the ui
+    # runner included). The stack runner is the exception: its specs restart the one Repsy container, so it
+    # stays at the single worker docker-compose.runners.yml gives it.
+    local -a service_args=(${play_args[@]+"${play_args[@]}"})
+    if [ -n "$workers" ]; then
+      if [ "$service" = "stack" ]; then
+        echo "Note: the stack runner always runs with 1 worker; --workers $workers is not passed to it."
+      else
+        service_args+=("--workers=$workers")
+      fi
+    fi
+    # entrypoint.sh regenerates the API client when it is out of date, then runs Playwright for the given
+    # project with any extra args (e.g. --grep, --workers) appended.
     if ! docker compose -p "$RUNNERS_PROJECT" -f "$RUNNERS_FILE" run --rm ${TLS_RUN_ARGS[@]+"${TLS_RUN_ARGS[@]}"} "$service" \
-      ./entrypoint.sh "$service" "${play_args[@]}"; then
+      ./entrypoint.sh "$service" ${service_args[@]+"${service_args[@]}"}; then
       failed="true"
     fi
   done

@@ -30,6 +30,22 @@ const IGNORES = [
   'src/packages/**',
 ];
 
+const PROCESS_ENV_MESSAGE =
+  'Do not copy process.env into a child environment (it carries REPSY_ADMIN_PASSWORD and the other runner ' +
+  'variables): build it with clientEnv() (src/clients/client-env.ts), or give run() { extendEnv: true } ' +
+  'for a harness tool that needs the runner environment.';
+
+const PROCESS_ENV = "MemberExpression[object.name='process'][property.name='env']";
+
+const PROCESS_ENV_COPIES = [
+  // { ...process.env, X } and [...process.env]
+  `SpreadElement > ${PROCESS_ENV}`,
+  // Object.assign(target, process.env)
+  `CallExpression[callee.object.name='Object'][callee.property.name='assign'] > ${PROCESS_ENV}`,
+  // execa(cmd, args, { env: process.env }) and the same for spawn
+  `Property[key.name='env'] > ${PROCESS_ENV}`,
+].map((selector) => ({ selector, message: PROCESS_ENV_MESSAGE }));
+
 export default tseslint.config(
   { ignores: IGNORES },
   pluginJs.configs.recommended,
@@ -40,6 +56,19 @@ export default tseslint.config(
         'error',
         { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
       ],
+    },
+  },
+  {
+    // RPS-1468 / RPS-1446: a child process gets an explicit environment, never the runner's. `process.env`
+    // carries REPSY_ADMIN_PASSWORD and every other runner variable, so copying it whole into a child's
+    // environment (`{ ...process.env }`, `Object.assign(env, process.env)`, `env: process.env`) hands them
+    // to a client, its plugins and the scripts it runs. Build a client's environment with clientEnv()
+    // (src/clients/client-env.ts); a harness tool that needs the runner's environment (docker compose)
+    // takes `run(..., { extendEnv: true })`. Reading single names (`process.env.PATH`), filtering
+    // `Object.entries(process.env)` and passing `process.env` to a function stay allowed.
+    files: ['src/**/*.ts', 'tests/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...PROCESS_ENV_COPIES],
     },
   },
   {
