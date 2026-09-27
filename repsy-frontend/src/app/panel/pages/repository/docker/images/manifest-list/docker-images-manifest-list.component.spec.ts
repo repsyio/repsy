@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { fakeAsync, flushMicrotasks } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import moment from 'moment';
@@ -54,7 +55,11 @@ describe('DockerImagesManifestListComponent', () => {
   }
 
   describe('shared list behavior', () =>
-    describeRepoListBehavior(build, { security: false, search: { typed: 'sha256', loaded: 'sha256' } }));
+    describeRepoListBehavior(build, {
+      security: false,
+      search: { typed: 'sha256', loaded: 'sha256' },
+      failureMessage: 'The version could not be loaded',
+    }));
 
   describe('the listing', () => {
     it('loads the manifests of the image tag in the route and builds the pull command', fakeAsync(() => {
@@ -74,6 +79,48 @@ describe('DockerImagesManifestListComponent', () => {
         10,
       );
       expect(component.installText).toBe(`docker pull ${getRepoDomain()}/${REPO_NAME}/nginx:latest`);
+    }));
+  });
+
+  describe('a tag that cannot be loaded (RPS-1627)', () => {
+    it('says the tag is not found for a 404 and keeps no rows', fakeAsync(() => {
+      build().respond([{ name: 'latest' }] as never, 1);
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+      expect(component.manifests?.length).toBe(1);
+
+      dockerService.searchManifests.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+      component.refreshPage();
+      flushMicrotasks();
+
+      expect(component.error).toBe("Version 'latest' not found");
+      expect(component.manifests).toBeUndefined();
+      expect(component.loading).toBeFalse();
+    }));
+
+    it('says the manifests could not be loaded for a server error', fakeAsync(() => {
+      build();
+      dockerService.searchManifests.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+
+      expect(component.error).toBe('The version could not be loaded');
+      expect(component.loading).toBeFalse();
+    }));
+
+    it('clears the error when the next load succeeds', fakeAsync(() => {
+      build();
+      dockerService.searchManifests.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+      expect(component.error).toBeTruthy();
+
+      dockerService.searchManifests.and.returnValue(of(pageOf([], 0) as never));
+      component.refreshPage();
+      flushMicrotasks();
+
+      expect(component.error).toBeNull();
     }));
   });
 
@@ -124,5 +171,27 @@ describe('DockerImagesManifestListComponent template', () => {
     expect(cell('row-platform')).toBe('linux/amd64');
     expect(cell('row-digest')).toBe(digest.slice(0, 15) + '...');
     expect(cell('row-config-digest')).toBe(configDigest.slice(0, 15) + '...');
+  });
+
+  it('shows the not-found state, not an empty list, for a tag that does not exist (RPS-1627)', async () => {
+    const dockerService = jasmine.createSpyObj<DockerService>('DockerService', ['searchManifests'], {
+      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME)),
+    });
+    dockerService.searchManifests.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+
+    const { el } = await renderComponent(DockerImagesManifestListComponent, [
+      {
+        provide: ActivatedRoute,
+        useValue: { snapshot: { paramMap: convertToParamMap({ image: 'nginx', tag: 'sha256:0000' }) } },
+      },
+      { provide: AuthService, useValue: { username: 'alice' } },
+      { provide: DockerService, useValue: dockerService },
+    ]);
+
+    expect(el.querySelector('[data-testid="pkg-error-message"]')?.textContent?.trim()).toBe(
+      "Version 'sha256:0000' not found",
+    );
+    expect(el.querySelector('app-empty-list')).toBeNull();
+    expect(el.querySelector('[data-testid="pkg-manifests-table"]')).toBeNull();
   });
 });

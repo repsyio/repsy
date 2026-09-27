@@ -29,7 +29,7 @@
  */
 import type { RepoType } from '../api/panel-api.js';
 import { seedCargo } from './packages/cargo.js';
-import { seedDocker } from './packages/docker.js';
+import { type DockerSeedOptions, seedDocker } from './packages/docker.js';
 import { seedGolang } from './packages/golang.js';
 import { seedHelm } from './packages/helm.js';
 import { type MavenSeedOptions, seedMaven } from './packages/maven.js';
@@ -72,7 +72,7 @@ export interface SeededPackage extends PackageRef {
   protocol: PackageProtocol;
   repoName: string;
   /**
-   * Facts only some protocols have (always present, possibly empty). docker: `digest` (the manifest digest) and `configDigest`. helm: `variant` (`oci` or `classic`).
+   * Facts only some protocols have (always present, possibly empty). docker: `digest` (the manifest digest) and `configDigest` (an index has no `configDigest`, see `seedDocker`). helm: `variant` (`oci` or `classic`).
    */
   extra: Readonly<Record<string, string>>;
 }
@@ -95,6 +95,8 @@ export interface SeedPackageOptions {
   variant?: string;
   /** maven only: timestamped SNAPSHOT builds and PGP-signed deploys (RPS-1626), see `MavenSeedOptions`. */
   maven?: MavenSeedOptions;
+  /** docker only: a multi-platform image index and untagged manifests (RPS-1627), see `DockerSeedOptions`. */
+  docker?: DockerSeedOptions;
 }
 
 /** Publishes one package version into `repoName` over raw HTTP, or throws. */

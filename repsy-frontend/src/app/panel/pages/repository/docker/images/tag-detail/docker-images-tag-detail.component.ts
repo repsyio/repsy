@@ -140,8 +140,16 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
     });
   }
 
-  public loadConfigText(configDigest: string): void {
-    if (configDigest === null) {
+  /**
+   * An image index (a multi-platform tag) has no config of its own: the API leaves `configDigest` out, it does not send
+   * `null`, so the absence is `undefined` as much as `null` (RPS-1627). Its platforms' configs are in their manifests.
+   */
+  public get hasConfig(): boolean {
+    return !!this.tagInfo?.configDigest;
+  }
+
+  public loadConfigText(configDigest: string | null | undefined): void {
+    if (!configDigest) {
       return;
     }
 
