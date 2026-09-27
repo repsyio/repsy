@@ -1,15 +1,18 @@
 @if (crumbs.length > 0) {
   <nav data-testid="breadcrumb" class="mb-4 text-[14px]">
-    <ol class="flex items-center p-0">
+    <ol class="flex flex-wrap items-center p-0">
       @for (crumbLink of crumbLinks; track crumbLink; let i = $index; let last = $last) {
-        <li [attr.data-testid]="'breadcrumb-item-' + i" class="flex items-center">
+        <li [attr.data-testid]="'breadcrumb-item-' + i" class="flex min-w-0 items-center">
           <!-- Last breadcrumb item (No link) -->
           @if (last) {
-            <span data-testid="breadcrumb-current" class="text-[#FDFDFD]">{{ crumbs[i] }}</span>
+            <span data-testid="breadcrumb-current" class="min-w-0 break-all text-[#FDFDFD]">{{ crumbs[i] }}</span>
           } @else {
-            <a data-testid="breadcrumb-link" class="text-[#9FA0A0] hover:text-[#FDFDFD]" [routerLink]="crumbLink">{{
-              crumbs[i]
-            }}</a>
+            <a
+              data-testid="breadcrumb-link"
+              class="min-w-0 break-all text-[#9FA0A0] hover:text-[#FDFDFD]"
+              [routerLink]="crumbLink"
+              >{{ crumbs[i] }}</a
+            >
           }
 
           <!-- Separator Image -->
@@ -19,7 +22,7 @@
               height="16"
               width="16"
               alt="Breadcrumb Split"
-              class="mx-2"
+              class="mx-2 shrink-0"
             />
           }
         </li>

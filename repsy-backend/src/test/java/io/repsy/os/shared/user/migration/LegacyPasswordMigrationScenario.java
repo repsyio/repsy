@@ -38,6 +38,9 @@ public final class LegacyPasswordMigrationScenario {
   public static final String PASSWORD = "Password1!";
   public static final String SALT = "0123456789abcdef";
 
+  /** Made once per class: a BCrypt hash costs about 100 ms. */
+  private static final String BCRYPT_HASH = PasswordHasher.hash(PASSWORD);
+
   private static final Instant T0 = Instant.parse("2026-01-01T00:00:00Z");
 
   private final JdbcTemplate jdbc;
@@ -46,7 +49,6 @@ public final class LegacyPasswordMigrationScenario {
   private final UUID otherLegacyId = UUID.randomUUID();
   private final UUID bcryptId = UUID.randomUUID();
   private final UUID resetId = UUID.randomUUID();
-  private final String bcryptHash = PasswordHasher.hash(PASSWORD);
 
   /**
    * @param jdbc the database
@@ -72,7 +74,7 @@ public final class LegacyPasswordMigrationScenario {
         legacyHash("Other1234!", "fedcba9876543210"),
         "fedcba9876543210",
         0);
-    this.user(this.bcryptId, "bcrypt", this.bcryptHash, "abcdefghijklmnop", 4);
+    this.user(this.bcryptId, "bcrypt", BCRYPT_HASH, "abcdefghijklmnop", 4);
     this.user(this.resetId, "reset", "", "abcdefghijklmnop", 1);
   }
 
@@ -140,7 +142,7 @@ public final class LegacyPasswordMigrationScenario {
                 "Wrong1!", this.hashOf(this.legacyId), this.saltOf(this.legacyId)))
         .isFalse();
 
-    assertThat(this.hashOf(this.bcryptId)).isEqualTo(this.bcryptHash);
+    assertThat(this.hashOf(this.bcryptId)).isEqualTo(BCRYPT_HASH);
     assertThat(this.tokenVersionOf(this.bcryptId)).isEqualTo(4);
     assertThat(this.hashOf(this.resetId)).isEmpty();
     assertThat(this.tokenVersionOf(this.resetId)).isEqualTo(1);
@@ -156,7 +158,7 @@ public final class LegacyPasswordMigrationScenario {
     assertThat(this.saltOf(this.legacyId)).isNull();
     assertThat(this.saltOf(this.bcryptId)).isNull();
     assertThat(this.hashOf(this.legacyId)).isEmpty();
-    assertThat(this.hashOf(this.bcryptId)).isEqualTo(this.bcryptHash);
+    assertThat(this.hashOf(this.bcryptId)).isEqualTo(BCRYPT_HASH);
 
     this.verifySaltIsNullable();
   }
@@ -170,7 +172,7 @@ public final class LegacyPasswordMigrationScenario {
             + " \"token_version\") values (?, ?, ?, 'USER', ?, 0)",
         id,
         "nosalt",
-        this.bcryptHash,
+        BCRYPT_HASH,
         Timestamp.from(T0));
 
     assertThat(this.saltOf(id)).isNull();

@@ -198,11 +198,16 @@ export class UserManagementComponent implements OnInit, OnDestroy {
             this.operationLock = false;
           }),
         )
-        .subscribe((password) => {
-          this.newPassword = password;
-          this.selectedUser = user;
-          this.showResetPasswordModal = true;
-          this.toastService.show('Password reset successfully', 'success');
+        .subscribe({
+          next: (password) => {
+            this.newPassword = password;
+            this.selectedUser = user;
+            this.showResetPasswordModal = true;
+            this.toastService.show('Password reset successfully', 'success');
+          },
+          // The HTTP error interceptor already shows the failure (a user deleted under the open page is a 404).
+          // Without a handler the error also reached the global handler as an unhandled error (RPS-1650).
+          error: () => {},
         });
     });
   }
@@ -238,14 +243,18 @@ export class UserManagementComponent implements OnInit, OnDestroy {
             this.operationLock = false;
           }),
         )
-        .subscribe(() => {
-          // Deleting the only row of a later page leaves that page empty: go back to the first one.
-          if (this.users.length === 1 && this.pageNum > 0) {
-            this.pageNum = 0;
-          }
-          this.resetSearch();
-          this.fetchUsers();
-          this.toastService.show(successMsg, 'success');
+        .subscribe({
+          next: () => {
+            // Deleting the only row of a later page leaves that page empty: go back to the first one.
+            if (this.users.length === 1 && this.pageNum > 0) {
+              this.pageNum = 0;
+            }
+            this.resetSearch();
+            this.fetchUsers();
+            this.toastService.show(successMsg, 'success');
+          },
+          // The HTTP error interceptor already shows the failure; see resetPassword (RPS-1650).
+          error: () => {},
         });
     });
   }

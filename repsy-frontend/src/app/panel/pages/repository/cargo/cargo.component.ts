@@ -65,7 +65,7 @@ export class CargoComponent implements OnInit, OnDestroy {
     this.cargoService.getRepository(repoName).subscribe({
       next: (permissions: RepoPermissionInfo) => {
         if (permissions.private && !this.isAuthenticated) {
-          this.router.navigate(['/not-found']);
+          this.router.navigate(['/not-found'], { replaceUrl: true });
           return;
         }
 
@@ -74,7 +74,7 @@ export class CargoComponent implements OnInit, OnDestroy {
         this.loading = false;
       },
       error: () => {
-        this.router.navigate(['/not-found']);
+        this.router.navigate(['/not-found'], { replaceUrl: true });
       },
     });
   }

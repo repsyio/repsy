@@ -17,7 +17,7 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { BehaviorSubject, of } from 'rxjs';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { RepoPermissionInfo } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
@@ -106,7 +106,15 @@ describe('MavenComponent', () => {
 
     expect(router.navigate).toHaveBeenCalledWith(
       ['/not-found'],
-      jasmine.objectContaining({ queryParams: jasmine.anything() }),
+      jasmine.objectContaining({ replaceUrl: true, queryParams: jasmine.anything() }),
     );
+  });
+
+  it('replaces the entry of a repository that cannot be loaded with the 404 page, so Back can leave it (RPS-1650)', () => {
+    mavenService.getRepository.and.returnValue(throwError(() => new Error('404')));
+
+    create();
+
+    expect(router.navigate).toHaveBeenCalledOnceWith(['/not-found'], { replaceUrl: true });
   });
 });
