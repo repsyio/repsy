@@ -15,7 +15,14 @@
 ///
 
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRouteSnapshot, convertToParamMap, Router, RouterStateSnapshot } from '@angular/router';
+import {
+  ActivatedRouteSnapshot,
+  convertToParamMap,
+  RedirectCommand,
+  Router,
+  RouterStateSnapshot,
+  UrlTree,
+} from '@angular/router';
 import { firstValueFrom, Observable, of, throwError } from 'rxjs';
 
 import { RepoLookupService } from './repo-lookup.service';
@@ -24,10 +31,12 @@ import { repoTypeResolver } from './repo-type.resolver';
 describe('repoTypeResolver', () => {
   let repoLookupService: jasmine.SpyObj<RepoLookupService>;
   let router: jasmine.SpyObj<Router>;
+  const notFoundTree = new UrlTree();
 
   beforeEach(() => {
     repoLookupService = jasmine.createSpyObj<RepoLookupService>('RepoLookupService', ['getRepoType']);
-    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
+    router = jasmine.createSpyObj<Router>('Router', ['navigate', 'parseUrl']);
+    router.parseUrl.and.returnValue(notFoundTree);
 
     TestBed.configureTestingModule({
       providers: [
@@ -51,18 +60,34 @@ describe('repoTypeResolver', () => {
     expect(router.navigate).not.toHaveBeenCalled();
   });
 
-  it('goes to not-found with a message when the route has no repo name', async () => {
-    expect(await resolve({})).toBeNull();
+  it('redirects to not-found with a message when the route has no repo name', async () => {
+    const result = await resolve({});
 
-    expect(router.navigate).toHaveBeenCalledOnceWith(['/not-found'], { state: { message: 'Invalid repository path' } });
+    expect(result).toBeInstanceOf(RedirectCommand);
+    expect((result as RedirectCommand).redirectTo).toBe(notFoundTree);
+    expect((result as RedirectCommand).navigationBehaviorOptions).toEqual({
+      state: { message: 'Invalid repository path' },
+    });
+    expect(router.parseUrl).toHaveBeenCalledOnceWith('/not-found');
     expect(repoLookupService.getRepoType).not.toHaveBeenCalled();
   });
 
-  it('goes to not-found when the repo cannot be looked up', async () => {
+  it('redirects to not-found when the repo cannot be looked up', async () => {
     repoLookupService.getRepoType.and.returnValue(throwError(() => new Error('404')));
 
-    expect(await resolve({ repoName: 'missing' })).toBeNull();
+    const result = await resolve({ repoName: 'missing' });
 
-    expect(router.navigate).toHaveBeenCalledOnceWith(['/not-found']);
+    expect(result).toBeInstanceOf(RedirectCommand);
+    expect((result as RedirectCommand).redirectTo).toBe(notFoundTree);
+    expect(router.parseUrl).toHaveBeenCalledOnceWith('/not-found');
+  });
+
+  it('never starts a navigation of its own: that pushed the 404 page on top of the unknown route (RPS-1650)', async () => {
+    repoLookupService.getRepoType.and.returnValue(throwError(() => new Error('404')));
+
+    await resolve({ repoName: 'missing' });
+    await resolve({});
+
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 });

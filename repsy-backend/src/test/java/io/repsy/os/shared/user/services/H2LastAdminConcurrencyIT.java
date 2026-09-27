@@ -61,6 +61,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 @DisplayName("last admin guards under concurrent requests on the embedded H2 database (RPS-1101)")
 class H2LastAdminConcurrencyIT extends H2IntegrationTest {
 
+  /**
+   * Made once per class: a BCrypt hash costs about 100 ms, and every test makes users. {@link
+   * H2IntegrationTest} has no shared hash to reuse, as {@code AbstractIntegrationTest} has.
+   */
+  private static final String PASSWORD_HASH = PasswordHasher.hash("Other1234!");
+
   private static final int ROUNDS = 8;
   private static final Duration STILL_BLOCKED = Duration.ofMillis(500);
   private static final String CANNOT_DEMOTE = "cannotDemoteLastAdminUser";
@@ -116,7 +122,7 @@ class H2LastAdminConcurrencyIT extends H2IntegrationTest {
         this.userTxService.create(
             "h2lastadmin" + UUID.randomUUID().toString().replace("-", "").substring(0, 10),
             UserRole.ADMIN,
-            PasswordHasher.hash("Password1!"));
+            PASSWORD_HASH);
     this.createdUserIds.add(user.getId());
     return user;
   }

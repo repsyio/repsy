@@ -64,6 +64,9 @@ class UserConcurrentUpdateIT extends AbstractIntegrationTest {
 
   private static final int TIMEOUT_SECONDS = 15;
 
+  /** Made once per class: a BCrypt hash costs about 100 ms, so it is not made per test. */
+  private static final String NEW_PASSWORD_HASH = PasswordHasher.hash("NewPassword2@");
+
   @Autowired private PlatformTransactionManager transactionManager;
 
   private final List<UUID> createdUserIds = new ArrayList<>();
@@ -138,7 +141,7 @@ class UserConcurrentUpdateIT extends AbstractIntegrationTest {
   @DisplayName("a login update in flight does not undo a password change")
   void loginUpdateKeepsANewPassword() {
     final var user = this.commitUser();
-    final var newHash = PasswordHasher.hash("NewPassword2@");
+    final var newHash = NEW_PASSWORD_HASH;
 
     final var pending =
         this.interleave(
@@ -199,7 +202,7 @@ class UserConcurrentUpdateIT extends AbstractIntegrationTest {
   @DisplayName("a password change in flight does not erase the login it raced with")
   void passwordChangeKeepsTheLoginTime() {
     final var user = this.commitUser();
-    final var newHash = PasswordHasher.hash("NewPassword2@");
+    final var newHash = NEW_PASSWORD_HASH;
 
     final var pending =
         this.interleave(

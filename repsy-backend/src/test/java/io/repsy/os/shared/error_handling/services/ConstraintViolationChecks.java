@@ -44,6 +44,9 @@ final class ConstraintViolationChecks {
 
   private static final String PASSWORD = "Password1!";
 
+  /** Made once per class: a BCrypt hash costs about 100 ms, so it is not made per test. */
+  private static final String PASSWORD_HASH = PasswordHasher.hash(PASSWORD);
+
   private ConstraintViolationChecks() {}
 
   /** A username no other row has, so the unique index is only hit when a test asks for it. */
@@ -54,7 +57,7 @@ final class ConstraintViolationChecks {
   static User user(final String username) {
     final var user = new User();
     user.setUsername(username);
-    user.setHash(PasswordHasher.hash(PASSWORD));
+    user.setHash(PASSWORD_HASH);
     user.setRole(UserRole.USER);
     return user;
   }

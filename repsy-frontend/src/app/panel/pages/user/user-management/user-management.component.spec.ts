@@ -358,6 +358,17 @@ describe('UserManagementComponent', () => {
       expect(component.operationLock).toBeFalse();
     });
 
+    it('a failed reset (the user is gone) opens no one-time modal, toasts no success and leaves the error to the interceptor', () => {
+      userService.resetPassword.and.returnValue(throwError(() => new Error('404')));
+      component.resetPassword(target);
+
+      expect(() => dangerModalService.call()).not.toThrow();
+
+      expect(component.showResetPasswordModal).toBeFalse();
+      expect(toastService.show).not.toHaveBeenCalled();
+      expect(component.operationLock).toBeFalse();
+    });
+
     it('holds the operation lock while the reset is running', () => {
       const answer = new Subject<string>();
       userService.resetPassword.and.returnValue(answer);
@@ -393,6 +404,17 @@ describe('UserManagementComponent', () => {
       expect(userService.deleteUser).toHaveBeenCalledOnceWith('1');
       expect(userService.listUsers).toHaveBeenCalledTimes(1);
       expect(toastService.show).toHaveBeenCalledOnceWith('User deleted successfully', 'success');
+      expect(component.operationLock).toBeFalse();
+    });
+
+    it('a failed delete (the user is gone) reloads nothing, toasts no success and leaves the error to the interceptor', () => {
+      userService.deleteUser.and.returnValue(throwError(() => new Error('404')));
+      component.deleteUser(user('1'));
+
+      expect(() => dangerModalService.call()).not.toThrow();
+
+      expect(userService.listUsers).not.toHaveBeenCalled();
+      expect(toastService.show).not.toHaveBeenCalled();
       expect(component.operationLock).toBeFalse();
     });
 
