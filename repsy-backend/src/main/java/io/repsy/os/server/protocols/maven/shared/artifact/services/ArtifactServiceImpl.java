@@ -27,6 +27,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.generated.model.ArtifactVersionInfo;
 import io.repsy.os.generated.model.MavenGroupSummary;
+import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactVersionListItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactConverter;
@@ -46,6 +47,7 @@ import io.repsy.protocols.maven.shared.artifact.dtos.PluginPrefixChange;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
+import io.repsy.protocols.maven.shared.artifact.services.VersionComparator;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
@@ -56,6 +58,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -72,7 +75,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -672,6 +677,16 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final String artifactName,
       final Pageable pageable) {
 
+    final var versionNameOrder = versionNameSort(pageable);
+
+    if (versionNameOrder != null) {
+      return this.sortByVersionAndPage(
+          this.artifactVersionRepository.findAllByRepoIdAndGroupNameAndArtifactName(
+              repoId, groupName, artifactName),
+          pageable,
+          versionNameOrder);
+    }
+
     return this.artifactVersionRepository
         .findAllByRepoIdAndGroupNameAndArtifactName(repoId, groupName, artifactName, pageable)
         .map(this.artifactConverter::toArtifactVersionListItemDto);
@@ -685,10 +700,65 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
           final String version,
           final Pageable pageable) {
 
+    final var versionNameOrder = versionNameSort(pageable);
+
+    if (versionNameOrder != null) {
+      return this.sortByVersionAndPage(
+          this.artifactVersionRepository
+              .findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName(
+                  repoId, groupName, artifactName, version),
+          pageable,
+          versionNameOrder);
+    }
+
     return this.artifactVersionRepository
         .findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName(
             repoId, groupName, artifactName, version, pageable)
         .map(this.artifactConverter::toArtifactVersionListItemDto);
+  }
+
+  /**
+   * The direction the caller asked to sort {@code versionName} by, or {@code null} when the request
+   * sorts by something else (id, lastUpdatedAt), which stays a plain database {@code ORDER BY}.
+   */
+  private static Sort.@Nullable Direction versionNameSort(final Pageable pageable) {
+
+    final var order = pageable.getSort().getOrderFor("versionName");
+
+    return order == null ? null : order.getDirection();
+  }
+
+  /**
+   * Orders a whole set of a Maven artifact's versions by Maven's own version comparison (RPS-1665)
+   * and slices out the requested page. A database {@code ORDER BY versionName} sorts the column as
+   * a string, so {@code 1.9.0} would sit above {@code 1.10.0} and a {@code SNAPSHOT} above the
+   * release it precedes; {@link VersionComparator} (backed by {@code ComparableVersion}, the same
+   * comparator {@link ArtifactVersionWriteService} uses to pick the latest and release version)
+   * gets that right. The set has to be sorted whole, not page by page, or paging itself would be
+   * wrong: this mirrors {@link ArtifactVersionWriteService}, which already loads every version of
+   * an artifact to work out its latest and release version (RPS-1331), so the same bound already
+   * applies to a single artifact's versions.
+   */
+  private Page<io.repsy.os.generated.model.ArtifactVersionListItem> sortByVersionAndPage(
+      final List<ArtifactVersionListItem> versions,
+      final Pageable pageable,
+      final Sort.Direction direction) {
+
+    final Comparator<ArtifactVersionListItem> byVersion =
+        Comparator.comparing(ArtifactVersionListItem::getVersionName, new VersionComparator());
+
+    final var ordered = direction.isDescending() ? byVersion.reversed() : byVersion;
+
+    final var sorted =
+        versions.stream()
+            .sorted(ordered)
+            .map(this.artifactConverter::toArtifactVersionListItemDto)
+            .toList();
+
+    final var start = (int) Math.min(pageable.getOffset(), sorted.size());
+    final var end = Math.min(start + pageable.getPageSize(), sorted.size());
+
+    return new PageImpl<>(sorted.subList(start, end), pageable, sorted.size());
   }
 
   public Page<io.repsy.os.generated.model.ArtifactListItem> getArtifactsContainsGroupName(

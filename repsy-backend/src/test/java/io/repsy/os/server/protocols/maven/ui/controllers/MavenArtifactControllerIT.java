@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.maven.ui.controllers;
 
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
@@ -638,6 +639,74 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
       this.list(VERSIONS, "sort", "versionName,desc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].versionName").value("1.1.0-SNAPSHOT"));
+    }
+
+    /**
+     * RPS-1665: {@code versionName} used to sort as a plain string, so {@code 1.9.0} sat above
+     * {@code 1.10.0} and a SNAPSHOT above the release it precedes. Same set the pinned e2e spec
+     * ({@code maven-snapshots.spec.ts}) probes, so both agree on the expected order.
+     */
+    @Test
+    @DisplayName(
+        "orders the versions by Maven version semantics, not by the characters of the name")
+    void ordersVersionsByMavenSemantics() throws Exception {
+      final var it = MavenArtifactControllerIT.this;
+      it.seedExtraArtifact(GROUP, "semver-order", "1.9.0", "1.10.0", "1.10.0-SNAPSHOT", "1.11.0");
+
+      it.mockMvc
+          .perform(
+              get(VERSIONS, it.repoName, GROUP, "semver-order")
+                  .param("sort", "versionName,desc")
+                  .with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(
+              jsonPath("$.data.content[*].versionName")
+                  .value(contains("1.11.0", "1.10.0", "1.10.0-SNAPSHOT", "1.9.0")));
+
+      it.mockMvc
+          .perform(
+              get(VERSIONS, it.repoName, GROUP, "semver-order")
+                  .param("sort", "versionName,asc")
+                  .with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(
+              jsonPath("$.data.content[*].versionName")
+                  .value(contains("1.9.0", "1.10.0-SNAPSHOT", "1.10.0", "1.11.0")));
+    }
+
+    /**
+     * The version-name sort cannot sort a single page in isolation (the database no longer orders
+     * by it): the whole set is sorted by Maven version semantics first, and the page is a slice of
+     * that, not of the database's own (string) order (RPS-1665).
+     */
+    @Test
+    @DisplayName("pages the versionName sort across the whole set, not one page at a time")
+    void versionNameSortPagesTheWholeSet() throws Exception {
+      final var it = MavenArtifactControllerIT.this;
+      it.seedExtraArtifact(GROUP, "semver-paging", "1.9.0", "1.10.0", "1.10.0-SNAPSHOT", "1.11.0");
+
+      it.mockMvc
+          .perform(
+              get(VERSIONS, it.repoName, GROUP, "semver-paging")
+                  .param("sort", "versionName,desc")
+                  .param("size", "2")
+                  .param("page", "0")
+                  .with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[*].versionName").value(contains("1.11.0", "1.10.0")))
+          .andExpect(jsonPath("$.data.page.totalElements").value(4));
+
+      it.mockMvc
+          .perform(
+              get(VERSIONS, it.repoName, GROUP, "semver-paging")
+                  .param("sort", "versionName,desc")
+                  .param("size", "2")
+                  .param("page", "1")
+                  .with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(
+              jsonPath("$.data.content[*].versionName")
+                  .value(contains("1.10.0-SNAPSHOT", "1.9.0")));
     }
 
     @ParameterizedTest(name = "{0} {1}")
