@@ -25,9 +25,9 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.helm.shared.auth.HelmAuthComponent;
 import io.repsy.os.server.shared.auth.AuthChallenges;
+import io.repsy.os.server.shared.utils.PreProcessorUtils;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.error_handling.utils.OciErrors;
-import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -73,7 +73,8 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
 
     final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
 
-    if (this.shouldSkipAuthentication(repoInfo, properties)) {
+    if (PreProcessorUtils.shouldSkipAuthentication(
+        SKIP_PRE_PROCESSOR_KEY, WRITE_OPERATION_KEY, repoInfo, properties)) {
       return ProcessorResult.next();
     }
 
@@ -104,19 +105,5 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
           this.authComponent.handleBearerAuth(h, repoId, permission);
       default -> throw new UnAuthorizedException("unAuthorized");
     }
-  }
-
-  private boolean shouldSkipAuthentication(
-      final RepoInfo repoInfo, final Map<String, Object> properties) {
-
-    final var skipPreProcessor = (boolean) properties.getOrDefault(SKIP_PRE_PROCESSOR_KEY, false);
-
-    if (skipPreProcessor) {
-      return true;
-    }
-
-    final var writeOperation = (boolean) properties.getOrDefault(WRITE_OPERATION_KEY, false);
-
-    return !repoInfo.isPrivateRepo() && !writeOperation;
   }
 }

@@ -24,8 +24,8 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.nuget.shared.auth.services.NuGetAuthComponent;
+import io.repsy.os.server.shared.utils.PreProcessorUtils;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
-import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -76,7 +76,7 @@ public class NuGetAuthPreProcessor extends ProtocolProcessor {
 
     final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
 
-    if (shouldSkipAuthentication(
+    if (PreProcessorUtils.shouldSkipAuthentication(
         SKIP_PRE_PROCESSOR_KEY, WRITE_OPERATION_KEY, repoInfo, properties)) {
       return ProcessorResult.next();
     }
@@ -136,22 +136,5 @@ public class NuGetAuthPreProcessor extends ProtocolProcessor {
           this.authComponent.handleBearerAuth(header, repoId, permission);
       default -> throw new UnAuthorizedException("unAuthorized");
     }
-  }
-
-  private static boolean shouldSkipAuthentication(
-      final String skipKey,
-      final String writeKey,
-      final RepoInfo repoInfo,
-      final Map<String, Object> properties) {
-
-    final var skipPreProcessor = (boolean) properties.getOrDefault(skipKey, false);
-
-    if (skipPreProcessor) {
-      return true;
-    }
-
-    final var writeOperation = (boolean) properties.getOrDefault(writeKey, false);
-
-    return !repoInfo.isPrivateRepo() && !writeOperation;
   }
 }

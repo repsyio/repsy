@@ -19,6 +19,7 @@ import static io.repsy.os.shared.auth.utils.AuthUtils.TIMEOUT_ACCESS_TOKEN;
 import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBearerToken;
+import static io.repsy.os.shared.auth.utils.AuthUtils.normalizeToBearer;
 import static io.repsy.os.shared.auth.utils.AuthUtils.removeBasicPrefix;
 import static io.repsy.os.shared.auth.utils.AuthUtils.removeBearerHeader;
 import static io.repsy.protocols.shared.repo.dtos.RepoType.CARGO;
@@ -52,7 +53,13 @@ public class CargoAuthComponent extends ProtocolAuthService {
     super(userTxService, jwtUtils, deployTokenService, verifiedPasswordCache, authFailureThrottle);
   }
 
-  public String authenticateAndCreateToken(final String authHeader) {
+  public String authenticateAndCreateToken(final String rawAuthHeader) {
+
+    // The Cargo CLI's cargo:token provider sends a renewed bearer token with no scheme prefix
+    // (CargoAuthPreProcessor.normalizeAuthHeader does the same for the index/publish/download
+    // endpoints); without this, such a token matched neither branch below and this method — the
+    // only one implementing the RPS-979/RPS-1552 bearer-renewal checks — was unreachable for it.
+    final var authHeader = normalizeToBearer(rawAuthHeader);
 
     if (isBasicToken(authHeader)) {
       return this.authenticateBasicAndCreateToken(authHeader);
