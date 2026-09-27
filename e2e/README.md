@@ -5510,6 +5510,19 @@ look at when a spec fails on H2 only: an order that PostgreSQL happens to give (
 explicit order since RPS-1614), a search that is case-sensitive in one database, a count taken while another
 transaction is open. A failure that is not the database is a flake: give it a ticket.
 
+**The H2 stack retires its database connections every 30 seconds** (`docker-compose.stack-h2.yml`,
+`SPRING_DATASOURCE_HIKARI_MAX_LIFETIME=30000`; HikariCP's default is 30 minutes). The reason is the one thing a run
+of the whole suite found on H2 (RPS-1652): H2 2.4.240 broke every insert and update of a table with a `CHECK (col IN
+(...))` constraint (`repo.type`, `users.role`) once the connection that had prepared the constraint was closed, and
+HikariCP closes every connection after `max-lifetime`, so the Docker image (embedded H2 by default) could not create
+a repository or record a login after about 30 minutes of uptime: the second full run, 30 minutes after `up`, failed
+hundreds of tests with a 500 and `Check constraint invalid ... The database has been closed`. The fix is H2 2.5.250 or
+newer (`repsy-backend/pom.xml`, pinned by `H2CheckConstraintAcrossConnectionsTest`); the short lifetime keeps every H2
+run, of any length, exposed to that whole class of bug.
+The `upgrade-h2` leg's overlay puts the default 30 minutes back (`docker-compose.stack-upgrade.yml`): the previous
+release still has the bug, and its "control" step must test the release, not trip over it. That leg also proved that H2
+2.5.252 opens the database file that 2.4.240 wrote (5 passed, `--upgrade --h2`).
+
 ### UI suite: visual regression (RPS-1652)
 
 `tests/ui/visual/visual.spec.ts` compares a screenshot of each of a small set of pages with a baseline PNG committed in

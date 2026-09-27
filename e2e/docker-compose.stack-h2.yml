@@ -54,6 +54,13 @@ services:
       # (see target.ts: canTuneThrottle is false for a "remote" target, which cannot do this).
       AUTH_THROTTLE_MAX_FAILURES: '100000'
       AUTH_THROTTLE_WINDOW_SECONDS: '60'
+      # HikariCP retires every connection after this many milliseconds (the default is 30 minutes, the minimum
+      # it accepts is 30 s). A retired connection is one H2 has to let go of, and H2 2.4.240 broke every write to
+      # a table with a CHECK (col IN (...)) constraint once the connection that prepared it was closed: the
+      # Docker image, which defaults to embedded H2, could not create a repository or record a login after half
+      # an hour of uptime, and no run shorter than that could see it (RPS-1652,
+      # H2CheckConstraintAcrossConnectionsTest). A stack that retires them every 30 s puts that in every run.
+      SPRING_DATASOURCE_HIKARI_MAX_LIFETIME: '30000'
     healthcheck:
       # No actuator in this image; the SPA's static root is served once the app is fully up.
       test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://localhost:8080/']
