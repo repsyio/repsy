@@ -63,6 +63,12 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
       final MultipartFile file)
       throws IOException {
 
+    // An archive has at least one byte: an empty file part would otherwise be stored as a zero-byte
+    // wheel whose sha256 the client computed of nothing (RPS-1466).
+    if (file.isEmpty()) {
+      throw new BadRequestException("pypiArchiveEmpty");
+    }
+
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
     final var uploadForm = parseUploadForm(parameterMap);

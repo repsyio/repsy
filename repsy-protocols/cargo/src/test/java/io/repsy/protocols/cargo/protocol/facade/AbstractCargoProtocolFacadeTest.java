@@ -543,6 +543,74 @@ class AbstractCargoProtocolFacadeTest {
     }
 
     @Test
+    @DisplayName("refuses a body with no byte in it, nothing stored (RPS-1466)")
+    void refusesAnEmptyBody() {
+      assertThatThrownBy(() -> facade.publish(context("/api/v1/crates/new"), stream(new byte[0])))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("the publish body is empty");
+
+      verifyNoInteractions(storageService, crateService);
+    }
+
+    @Test
+    @DisplayName("refuses a body that stops inside a length field, nothing stored (RPS-1466)")
+    void refusesABodyCutInsideALengthField() {
+      assertThatThrownBy(
+              () -> facade.publish(context("/api/v1/crates/new"), stream(new byte[] {1, 0})))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("ends before a length field");
+
+      verifyNoInteractions(storageService, crateService);
+    }
+
+    @Test
+    @DisplayName("refuses a body whose metadata JSON is empty, nothing stored (RPS-1466)")
+    void refusesEmptyMetadata() throws Exception {
+      final var body = new ByteArrayOutputStream();
+      writeU32LE(body, 0);
+
+      assertThatThrownBy(
+              () -> facade.publish(context("/api/v1/crates/new"), stream(body.toByteArray())))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("the crate's metadata JSON is empty");
+
+      verifyNoInteractions(storageService, crateService);
+    }
+
+    @Test
+    @DisplayName("refuses a body with no crate length after its metadata (RPS-1466)")
+    void refusesAMissingCrateLength() throws Exception {
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(minimalRequest("my_crate", "1.0.0"));
+      final var body = new ByteArrayOutputStream();
+      writeU32LE(body, 2);
+      body.write("{}".getBytes(StandardCharsets.UTF_8));
+
+      assertThatThrownBy(
+              () -> facade.publish(context("/api/v1/crates/new"), stream(body.toByteArray())))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("ends before a length field");
+
+      verifyNoInteractions(storageService, crateService);
+    }
+
+    @Test
+    @DisplayName("refuses a crate of zero bytes, nothing stored (RPS-1466)")
+    void refusesAZeroByteCrate() throws Exception {
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(minimalRequest("my_crate", "1.0.0"));
+
+      assertThatThrownBy(
+              () ->
+                  facade.publish(
+                      context("/api/v1/crates/new"), stream(publishPayload("{}", new byte[0]))))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("the crate is empty");
+
+      verifyNoInteractions(storageService, crateService);
+    }
+
+    @Test
     @DisplayName("passes the crate's manifest edition through to the crate service")
     void passesEditionThrough() throws Exception {
       when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))

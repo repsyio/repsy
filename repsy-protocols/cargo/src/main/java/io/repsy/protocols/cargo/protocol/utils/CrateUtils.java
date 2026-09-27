@@ -151,7 +151,13 @@ public class CrateUtils {
 
   private static long readU32LittleEndian(final InputStream inputStream) throws IOException {
 
-    final var bytes = inputStream.readNBytes(4);
+    final var bytes = inputStream.readNBytes(Integer.BYTES);
+
+    // A body that stops inside a length field is the client's mistake, not a server fault: the
+    // buffer underflow it would otherwise end in surfaced as a 500 (RPS-1466).
+    if (bytes.length < Integer.BYTES) {
+      throw new IllegalArgumentException("the publish body ends before a length field is complete");
+    }
 
     return Integer.toUnsignedLong(ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getInt());
   }
@@ -421,6 +427,10 @@ public class CrateUtils {
       final InputStream inputStream, final ObjectMapper objectMapper) throws IOException {
 
     final var jsonLength = CrateUtils.readU32LittleEndian(inputStream);
+
+    if (jsonLength == 0) {
+      throw new IllegalArgumentException("the crate's metadata JSON is empty");
+    }
 
     if (jsonLength > MAX_METADATA_JSON_BYTES) {
       throw new IllegalArgumentException(

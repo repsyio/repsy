@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,6 +32,8 @@ import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmFacade;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -175,6 +178,35 @@ class AbstractHelmChartPushProtocolMethodHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(response.getBody()).isEqualTo("Missing 'chart' part");
+    verify(this.helmFacade, never()).pushChart(any(), any(), any(), any(), anyLong());
+  }
+
+  @Test
+  @DisplayName("answers 400 when the request is not multipart at all (RPS-1466)")
+  void answersBadRequestForANonMultipartRequest() throws Exception {
+    final var request = mock(HttpServletRequest.class);
+    when(request.getPart("chart")).thenThrow(new ServletException("not multipart"));
+
+    final var response =
+        this.handler().handle(new ProtocolContext(), request, new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getBody()).isEqualTo("Missing 'chart' part");
+    verify(this.helmFacade, never()).pushChart(any(), any(), any(), any(), anyLong());
+  }
+
+  @Test
+  @DisplayName("refuses a chart part with no byte in it with helmChartEmpty (RPS-1466)")
+  void refusesAnEmptyChartPart() throws Exception {
+    final var request = upload(new byte[0]);
+
+    assertThatThrownBy(
+            () ->
+                this.handler()
+                    .handle(new ProtocolContext(), request, new MockHttpServletResponse()))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("helmChartEmpty");
+
     verify(this.helmFacade, never()).pushChart(any(), any(), any(), any(), anyLong());
   }
 

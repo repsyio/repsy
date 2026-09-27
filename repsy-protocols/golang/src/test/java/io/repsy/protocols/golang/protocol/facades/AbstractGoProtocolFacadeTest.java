@@ -24,6 +24,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -284,5 +285,20 @@ class AbstractGoProtocolFacadeTest {
     assertThatThrownBy(() -> this.facade.download(this.listContext("example.com/!mod")))
         .isInstanceOf(ItemNotFoundException.class);
     verify(this.storageService, times(2)).listDirectory(any());
+  }
+
+  @Test
+  @DisplayName(
+      "refuses a body with no byte in it with goModuleZipEmpty, storing nothing (RPS-1466)")
+  void refusesAnEmptyBody() throws IOException {
+    assertThatThrownBy(
+            () ->
+                this.facade.upload(
+                    this.context(MODULE, VERSION), new ByteArrayInputStream(new byte[0]), 0))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("goModuleZipEmpty");
+
+    verify(this.moduleService, never())
+        .publishModule(any(), any(), any(), any(), any(), any(), any());
   }
 }

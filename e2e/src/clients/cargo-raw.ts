@@ -275,12 +275,13 @@ export async function rawPublish(
   repoName: string,
   credential: MaterializedCredential,
   body: Buffer,
+  opts?: { contentType?: string },
 ): Promise<RawResponse> {
   return rawRequest(`${repoUrl(repoName)}api/v1/crates/new`, {
     method: 'PUT',
     headers: {
       ...cargoAuthHeader(credential),
-      'Content-Type': 'application/octet-stream',
+      'Content-Type': opts?.contentType ?? 'application/octet-stream',
       Accept: 'application/json',
     },
     body,

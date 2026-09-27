@@ -34,6 +34,7 @@ import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.utils.RequestBodies;
 import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -106,13 +107,18 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
    * {@code go.mod} is read out of it, it is hashed, and it is copied to storage, each from its own
    * pass over the spooled file. The module path and version are validated against the URL before
    * any of the body is read (RPS-1072), so a request that was always going to be refused is refused
-   * without spooling it.
+   * without spooling it. A body with no byte in it is refused with a 400 {@code goModuleZipEmpty}
+   * before anything else is looked at: no module zip is empty, and a body that a form filter
+   * consumed on the way looks the same (RPS-1466).
    */
   @Override
   @SneakyThrows
   public void upload(
-      final ProtocolContext context, final InputStream inputStream, final long contentLength) {
+      final ProtocolContext context, final InputStream requestBody, final long contentLength) {
 
+    final var inputStream =
+        RequestBodies.nonEmpty(requestBody)
+            .orElseThrow(() -> new BadRequestException("goModuleZipEmpty"));
     final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var path = ProtocolContextUtils.getRelativePath(context).getPath();
     final var modulePath = GoVersionUtils.extractModulePath(path);

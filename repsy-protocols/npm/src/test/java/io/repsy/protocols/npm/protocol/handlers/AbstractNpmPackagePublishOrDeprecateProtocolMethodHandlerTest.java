@@ -16,6 +16,7 @@
 package io.repsy.protocols.npm.protocol.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -23,6 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
@@ -174,6 +176,16 @@ class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandlerTest {
     final var response = this.put("", "{}");
 
     assertThat(response.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+    verifyNoInteractions(this.facade);
+  }
+
+  @Test
+  @DisplayName("handle() refuses a body with no byte in it with npmPublishBodyEmpty (RPS-1466)")
+  void handleRefusesAnEmptyBody() {
+    assertThatThrownBy(() -> this.put("/left-pad", ""))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("npmPublishBodyEmpty");
+
     verifyNoInteractions(this.facade);
   }
 }

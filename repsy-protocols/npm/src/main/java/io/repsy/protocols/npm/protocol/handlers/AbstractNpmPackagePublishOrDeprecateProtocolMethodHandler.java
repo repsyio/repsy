@@ -17,6 +17,7 @@ package io.repsy.protocols.npm.protocol.handlers;
 
 import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -27,6 +28,7 @@ import io.repsy.protocols.npm.shared.utils.ExtractPath;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.utils.RequestBodies;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -131,9 +133,13 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
     final var packagePath = matcher.group(1);
 
     try {
+      // The publish document is the whole body: none at all is the client's mistake, and used to
+      // end in the JSON reader's "no content" failure, a 500 (RPS-1466).
+      final var body =
+          RequestBodies.nonEmpty(request.getInputStream())
+              .orElseThrow(() -> new BadRequestException("npmPublishBodyEmpty"));
       final var payload =
-          this.objectMapper.readValue(
-              request.getInputStream(), new TypeReference<Map<String, Object>>() {});
+          this.objectMapper.readValue(body, new TypeReference<Map<String, Object>>() {});
 
       final var pathVars = ExtractPath.extractPathVars(packagePath);
       final @Nullable String scopeName = pathVars.scopeName();
