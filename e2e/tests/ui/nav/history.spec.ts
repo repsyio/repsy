@@ -277,6 +277,14 @@ test.describe('Browser history: deleted things stay deleted', { tag: NAV }, () =
       'Repository not found',
       'known bug (see repo-management.spec.ts SET-05): an unknown repository route raises the toast several times',
     );
+    // The same lookups, one of which is the repository's permissions: the deleted repository answers it 404 and
+    // the panel lets that reach its global error handler (a console error). Which of the lookups is still in
+    // flight when the route resolves to not-found depends on timing, so the test failed about one run in two
+    // on a busy runner (RPS-1652: the full UI suite on H2) and passed on its retry.
+    pageErrors.allow(
+      /Global error handler caught an error: Http failure response for \S+\/api\/repos\/[^/]+\/permissions: 404/,
+      'known bug (see repo-management.spec.ts SET-05): the lookups of an unknown repository route include its permissions, whose 404 is not handled',
+    );
     const repo = await seeder.createRepo(RepoType.MAVEN);
     const repos = new RepositoriesPage(adminPage);
     await repos.goto();

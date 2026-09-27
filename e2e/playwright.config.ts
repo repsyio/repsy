@@ -85,9 +85,15 @@ const CHROMIUM_ONLY = /@chromium-only/;
 // Mirrored in src/ui/browser-trust.ts for the contexts a spec opens itself; keep both on the same variable.
 const ignoreHTTPSErrors = Boolean(process.env.REPSY_E2E_TLS_CA_FILE);
 
+// The visual regression specs (RPS-1652, README.md "UI suite: visual regression") are a project of their own:
+// a screenshot needs the fixed viewport, the baselines and the writable snapshot directory only the
+// `ui-visual` runner has, so `ui`, `ui-firefox` and `ui-webkit` never run them (a run without baselines fails).
+const VISUAL_SPECS = 'ui/visual/**/*.spec.ts';
+
 function uiProject(browserName: UiBrowser) {
   return {
     testMatch: 'ui/**/*.spec.ts',
+    testIgnore: VISUAL_SPECS,
     retries: retriesFor(true),
     // A UI test waits on renders and network round trips, but never on a real package client.
     timeout: 60_000,
@@ -243,6 +249,46 @@ export default defineConfig({
       ...uiProject('webkit'),
       grep: OTHER_BROWSERS_GREP,
       grepInvert: CHROMIUM_ONLY,
+    },
+    {
+      // Screenshot comparison of a small set of pages (login, the repository list, a package list and detail,
+      // the repository settings, the security badges) against baselines committed under
+      // tests/ui/__screenshots__ (RPS-1652, README.md "UI suite: visual regression"). Chromium only, the one
+      // runner image (docker-compose.runners.yml `ui-visual`), so the fonts and the rasteriser are the same
+      // on every machine that produces or compares a baseline. Never retried: a comparison that needs a retry
+      // is a flake to fix, not to hide.
+      name: 'ui-visual',
+      ...uiProject('chromium'),
+      testMatch: VISUAL_SPECS,
+      testIgnore: undefined,
+      retries: 0,
+      // One folder, one file per screenshot name: {arg} is the name the spec gives, `login.png`. No
+      // {platform}/{projectName} suffix: the baselines exist for the one Linux runner image only, and
+      // `--update-snapshots` through run.sh is the way to produce them (README.md "Updating the baselines").
+      snapshotPathTemplate: '{testDir}/ui/__screenshots__/{arg}{ext}',
+      expect: {
+        timeout: 10_000,
+        toHaveScreenshot: {
+          animations: 'disabled',
+          caret: 'hide',
+          scale: 'css',
+          // The tolerance, tuned on twenty runs on two stacks (README.md "UI suite: visual regression"): the same
+          // font at the same size renders byte-identically in the pinned image, so those runs differed in no pixel
+          // at all, and 20 pixels only absorb a stray edge pixel of a mask. A real change (a lost icon, a moved
+          // button, another colour, a wrapped label) is hundreds of pixels or more. Never raise it to make one
+          // comparison pass: look at the diff.
+          maxDiffPixels: 20,
+          threshold: 0.2,
+        },
+      },
+      use: {
+        ...uiProject('chromium').use,
+        viewport: { width: 1280, height: 800 },
+        deviceScaleFactor: 1,
+        colorScheme: 'light' as const,
+        locale: 'en-US',
+        timezoneId: 'UTC',
+      },
     },
   ],
 });

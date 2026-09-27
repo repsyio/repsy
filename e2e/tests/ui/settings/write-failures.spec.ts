@@ -33,6 +33,7 @@ import {
   SETTING_TOGGLES,
   togglesFor,
 } from '../../../src/ui/pages/repo-settings/setting-toggles.js';
+import { errorBody, fulfillJson, type ErrorResponse } from '../../../src/ui/stub-responses.js';
 
 const SETTINGS = '@settings';
 
@@ -44,11 +45,7 @@ const FAILURES = [
     mode: 'a 500',
     toast: 'Server error',
     fail: (route: import('@playwright/test').Route) =>
-      route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ msgId: 'boom', text: 'boom' }),
-      }),
+      fulfillJson<ErrorResponse>(route, 500, errorBody({ msgId: 'boom', text: 'boom' })),
   },
   {
     mode: 'an aborted request',

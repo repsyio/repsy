@@ -272,9 +272,18 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- RPS-1652: 2.4.240 (the version of the Spring Boot BOM) has a bug (h2database/h2database#4308,
+             #4320, #4342, fixed in 2.5.250): a CHECK (col IN (...)) constraint keeps the session that
+             prepared it, so once that connection is closed (HikariCP retires every connection after
+             max-lifetime, 30 minutes by default) EVERY later insert or update of such a table fails with
+             "Check constraint invalid ... The database has been closed": on the embedded database of the
+             Docker image, repositories cannot be created and logins cannot be recorded after about half an
+             hour of uptime. H2CheckConstraintAcrossConnectionsTest pins it. Drop this version when
+             repsy-core's BOM manages H2 2.5.250 or newer. -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
+            <version>2.5.252</version>
             <scope>provided</scope>
         </dependency>
 

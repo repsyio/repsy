@@ -43,3 +43,7 @@ services:
       DB_DATABASE: repsy
       DOCKER_MANIFEST_LAYOUT_REPAIR_INITIAL_DELAY: PT5S
       DOCKER_MANIFEST_LAYOUT_REPAIR_ENABLED: ${REPSY_E2E_UPGRADE_REPAIR:-true}
+      # HikariCP's own default (30 minutes), over the 30 s of the H2 stack file (RPS-1652): the PREVIOUS release
+      # still ships H2 2.4.240, whose CHECK (IN ...) bug breaks every write once a connection is retired, so on the
+      # short lifetime the spec's "control" step would fail on the release before the upgrade, not test it.
+      SPRING_DATASOURCE_HIKARI_MAX_LIFETIME: '1800000'

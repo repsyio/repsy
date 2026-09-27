@@ -78,7 +78,7 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example   # package.json is also the package `repsy-e2e` a workspace consumer depends on, see "Consuming the harness from another repository"
-  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" (the panel in headless Chromium, see "UI suite"), "ui-firefox" and "ui-webkit" (its @smoke subset in the other two engines, see "UI suite: Firefox and WebKit") and "api" (raw HTTP at the edge, see "API suite")
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" (the panel in headless Chromium, see "UI suite"), "ui-firefox" and "ui-webkit" (its @smoke subset in the other two engines, see "UI suite: Firefox and WebKit"), "ui-visual" (screenshot comparison, see "UI suite: visual regression") and "api" (raw HTTP at the edge, see "API suite")
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
   docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
@@ -88,7 +88,7 @@ e2e/
   docker-compose.stack-cors.yml    # OPT-IN overlay on either stack: APP_ALLOWED_ORIGINS set to two origins, `run.sh local up|down --cors`, see "CORS leg"
   docker-compose.stack-proxy.yml   # OPT-IN overlay on either stack: an nginx in front of Repsy terminating TLS (RPS-1651), `run.sh local up|down --proxy`, see "Reverse proxy stack"
   proxy/default.conf.template  # the nginx configuration of that overlay (three listeners, the README's X-Forwarded-* example)
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui", "ui-firefox", "ui-webkit" and "api"
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui", "ui-firefox", "ui-webkit", "ui-visual" and "api"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle/sbt/Ant + Ivy and gpg; see "Adding a protocol adapter" below
   runners/sbt-warmup/          # the throwaway sbt project maven.Dockerfile builds once to prime the sbt caches (RPS-134)
@@ -102,7 +102,7 @@ e2e/
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
   runners/ruby.Dockerfile      # + a pinned Ruby toolchain (ruby/gem/bundle/bundler + stdlib) copied out of the official ruby image
   runners/stack.Dockerfile     # + the static `docker` CLI and its compose plugin copied out of docker-cli, a JDK + Maven, crane and npm; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
-  runners/ui.Dockerfile        # + Playwright's own headless Chromium, Firefox and WebKit (build-time install, /ms-playwright); the "ui", "ui-firefox" and "ui-webkit" runners, see "UI suite"
+  runners/ui.Dockerfile        # + Playwright's own headless Chromium, Firefox and WebKit (build-time install, /ms-playwright); the "ui", "ui-firefox", "ui-webkit" and "ui-visual" runners, see "UI suite"
   runners/scanner-stub.Dockerfile  # the stub scanner of the scanner stack (src/stubs/scanner/ on node:24, no dependencies, no build)
   runners/bump-pins.sh         # re-resolves every content pin of docker-compose.runners.yml (image digests, checksums, skopeo's commit) and prints or writes what differs, see "Runner images and pins"
   runners/ui-seccomp.json      # Playwright's seccomp profile, so Chromium's sandbox works as a non-root uid in Docker
@@ -555,9 +555,11 @@ against both while what only Repsy OS has is tagged `@cloud-skip`:
   call it without `REPSY_ADMIN_PASSWORD`) is the one place the chain lives: `REPSY_UI_BASE_URL`, then on a
   Cloud target `REPSY_FRONTEND_BASE_URL` (the name the Cloud e2e package already uses; ignored on OS), then
   `REPSY_API_BASE_URL`, then `http://localhost:8080`.
-- **Stub models.** `security-stubs.ts` gets every model type and enum of the panel API from `src/ui/stub-models.ts`
-  (a re-export of the OS generated client), so a consumer whose panel API differs replaces that one module
-  and not every stub (H9).
+- **Stub models.** `security-stubs.ts` and `stub-responses.ts` get every model type and enum of the panel API from
+  `src/ui/stub-models.ts` (a re-export of the OS generated client), so a consumer whose panel API differs replaces
+  that one module and not every stub (H9). `stub-responses.ts` (RPS-1652) is the one way a spec answers a request with a
+  body of its own, and it needs `ErrorResponse` and `ResponseType` from that module: "UI suite: route stubs typed
+  from the OpenAPI models" below.
 - **`@cloud-skip` in `tests/ui/`.** Tagged, each with a one-line reason above it: everything of `users/*`
   and `profile/*`; every test that logs in as a seeded USER (`userPage`, `seededUser`, and the two USER
   scenarios of the shared package template); the OS login form's validation (`AUTH-03`), wrong-credentials
@@ -1029,6 +1031,9 @@ it — which `@smoke` across every runner, plus one full catalog on H2, demonstr
 The nightly's `h2-full` leg runs that one catalog every night and rotates it over the protocol runners by
 date, so each protocol's whole catalog meets H2 every ten nights ("CI", "What runs"). `@smoke` alone was not
 enough: RPS-1385 (a native CTE that broke Docker on H2 while every IT passed) escaped for exactly that reason.
+The panel UI suite is the one runner that is cheap enough to run whole on H2 every night (`h2-ui`, RPS-1652,
+about 6 minutes on a workstation): H2 is the database of the Docker image's default, and what a self-hoster sees in the
+panel (an ordering, a case-insensitive search, a count) is decided by the database as much as by the wire protocols.
 
 ### H2-9, confirmed live: the skeleton `@smoke` tag gap
 
@@ -5324,6 +5329,7 @@ Karma unit tests.
 ./run.sh local up --h2 && ./run.sh test --protocol ui --grep @smoke   # embedded-H2 stack
 ./run.sh test --protocol ui -b                              # after a Playwright bump or a ui.Dockerfile change
 ./run.sh test --protocol ui-firefox,ui-webkit               # the @smoke subset in Firefox and in WebKit
+./run.sh test --protocol ui-visual                          # the screenshot comparison ("UI suite: visual regression")
 REPSY_E2E_OPT_IN=throttle ./run.sh test --protocol ui       # also run an opt-in suite ("Stack overlays")
 ./run.sh local up --scanner && REPSY_E2E_SCANNER=1 ./run.sh test --protocol ui --grep @scanner   # the real-scanner specs
 ```
@@ -5386,7 +5392,7 @@ what `run.sh test --protocol` names and what the entrypoint hands to `--project`
 ```bash
 ./run.sh test --protocol ui-firefox,ui-webkit                   # @smoke, @tls and A11Y-13: about 26 tests each, half a minute
 REPSY_UI_BROWSER_GREP=. ./run.sh test --protocol ui-firefox      # the WHOLE suite in Firefox, to see how much of it holds there
-./run.sh test --protocol ui,ui-firefox,ui-webkit -b             # after a change to runners/ui.Dockerfile: compose builds each service under its own name
+./run.sh test --protocol ui,ui-firefox,ui-webkit,ui-visual -b   # after a change to runners/ui.Dockerfile: compose builds each service under its own name
 ```
 
 What they run: `grep: /@smoke|@tls|A11Y-13/` (`OTHER_BROWSERS_GREP`; A11Y-13 is the keyboard walkthrough, where the
@@ -5483,6 +5489,114 @@ REPSY_E2E_PROXY=1 ./run.sh test --protocol api --grep @proxy            # what R
   absolute `/assets/...` and `/api/...` URLs, and there is no context path setting (the README only offers a different host or
   port; `REPO_BASE_URL` is a full URL and may carry a path for the wire protocols, which is a different thing). So nothing is tested
   under a prefix and the proxy configuration has none; a subpath test belongs in `panel-behind-proxy.spec.ts` the day Repsy gets one.
+
+### UI suite: the complete suite on H2 (RPS-1652)
+
+The `h2` leg runs `@smoke` of the wire runners; the panel UI suite has its own H2 leg, **`h2-ui`**, which runs the
+whole `ui` project on the embedded-H2 stack every night (`e2e-nightly.yml`, plan job `LEGS`), beside the `ui` leg on
+PostgreSQL. It is a leg of its own, not a runner of `h2`, so it runs in parallel with the wire legs instead of adding
+to their 90 minutes; the 45-minute budget is about seven times the 6 minutes the suite takes on a workstation.
+By hand:
+
+```bash
+./run.sh local up --h2 && ./run.sh test --protocol ui        # the whole panel UI suite on H2
+./run.sh local up --h2 && ./run.sh test --protocol ui --grep @smoke   # the subset
+```
+
+First full run (RPS-1652, `main` at `fc209f5f`): 1052 tests, 999 passed, 53 skipped (the opt-in `@scanner` real-scanner
+specs of `security-real/`, `@tls`, `@proxy` and the `@throttle` AUTH-11: each skips without its overlay, exactly as
+on PostgreSQL), 0 failed. The expected failures (`test.fail`, listed in "Known gaps") are the same on both. What to
+look at when a spec fails on H2 only: an order that PostgreSQL happens to give (the list and index queries have an
+explicit order since RPS-1614), a search that is case-sensitive in one database, a count taken while another
+transaction is open. A failure that is not the database is a flake: give it a ticket.
+
+**The H2 stack retires its database connections every 30 seconds** (`docker-compose.stack-h2.yml`,
+`SPRING_DATASOURCE_HIKARI_MAX_LIFETIME=30000`; HikariCP's default is 30 minutes). The reason is the one thing a run
+of the whole suite found on H2 (RPS-1652): H2 2.4.240 broke every insert and update of a table with a `CHECK (col IN
+(...))` constraint (`repo.type`, `users.role`) once the connection that had prepared the constraint was closed, and
+HikariCP closes every connection after `max-lifetime`, so the Docker image (embedded H2 by default) could not create
+a repository or record a login after about 30 minutes of uptime: the second full run, 30 minutes after `up`, failed
+hundreds of tests with a 500 and `Check constraint invalid ... The database has been closed`. The fix is H2 2.5.250 or
+newer (`repsy-backend/pom.xml`, pinned by `H2CheckConstraintAcrossConnectionsTest`); the short lifetime keeps every H2
+run, of any length, exposed to that whole class of bug.
+The `upgrade-h2` leg's overlay puts the default 30 minutes back (`docker-compose.stack-upgrade.yml`): the previous
+release still has the bug, and its "control" step must test the release, not trip over it. That leg also proved that H2
+2.5.252 opens the database file that 2.4.240 wrote (5 passed, `--upgrade --h2`).
+
+### UI suite: visual regression (RPS-1652)
+
+`tests/ui/visual/visual.spec.ts` compares a screenshot of each of a small set of pages with a baseline PNG committed in
+`tests/ui/__screenshots__/`. It catches what no locator sees: a moved control, a lost colour, a table that overflows.
+It is deliberately small, because every baseline is a file to review when the design changes on purpose:
+
+| Test   | Baseline                  | Page                                                                                                 |
+| ------ | ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| VIS-01 | `login.png`               | the login form                                                                                       |
+| VIS-02 | `repository-list.png`     | the repository list, three repositories of three types                                               |
+| VIS-03 | `package-list.png`        | the package list of an npm repository                                                                |
+| VIS-03 | `package-detail.png`      | the version detail page of that package                                                              |
+| VIS-04 | `repository-settings.png` | the repository settings (top of the page)                                                            |
+| VIS-05 | `security-badges.png`     | the repository list with the four kinds of security badge (stubbed, typed from the generated models) |
+
+```bash
+./run.sh test --protocol ui-visual                          # compare against the committed baselines
+./run.sh test --protocol ui-visual -b --update-snapshots    # rewrite them (-b after a Playwright or ui.Dockerfile change)
+```
+
+How it stays stable:
+
+- **Its own project and runner** (`ui-visual`, `docker-compose.runners.yml`): the `ui`, `ui-firefox` and `ui-webkit` projects
+  ignore `tests/ui/visual/` (`testIgnore`), so the default `ui` run is neither slower nor able to fail on a baseline.
+  Tag `@visual`. Chromium only, never retried.
+- **One rendering environment.** The baselines are made and compared in the `ui` runner image (Debian, the locked
+  Playwright's Chromium, the panel's own web font `Comfortaa`), at 1280x800, scale 1, light colour scheme, `en-US`, UTC,
+  animations frozen. There is no per-platform suffix (`snapshotPathTemplate`): a baseline made on the host, outside the
+  image, will not match. Always update through `run.sh`.
+- **Masks for what changes from run to run** (`src/ui/visual.ts`, `expectVisual`): the run id in a name, dates, sizes,
+  digests, the install snippet with the stack's port, the breadcrumb, the search box. A mask is painted
+  magenta over the element's box, and every text under it is first replaced by one constant text, so the box is
+  the same width in every run whatever the run id's letters are. The layout around a mask is still compared.
+- **Tolerance.** `maxDiffPixels: 20` and colour `threshold: 0.2` in `playwright.config.ts`. The same font at the same
+  size renders byte-identically in the pinned image: ten consecutive runs on the H2 stack and ten on a PostgreSQL stack
+  with a freshly built runner image (other ports, other run ids), against baselines made on the H2 one, all passed at
+  this tolerance, so 20 pixels only absorb a stray edge pixel of a mask. A ratio (a first try at 0.2 %, 2000 pixels) is too
+  loose: it let a change of every button's corner radius (86 pixels) through. A lost icon, a moved control or a wrapped label
+  is that size or more. Do not raise it to make a comparison pass: open the diff (`playwright-report/`,
+  `test-results/*/*-diff.png`).
+- **Data is seeded by the spec** and every page is reached through its page object, so nothing depends on what
+  other specs left in the stack. The dashboard is not in the set: its totals are the whole stack's.
+
+Updating the baselines (on purpose, after a visible change of the panel): `./run.sh test --protocol ui-visual -b
+--update-snapshots` writes the PNGs into `tests/ui/__screenshots__/` (the `ui-visual` service mounts that one folder
+writable, the rest of `tests/` stays read-only), then run the command again without the flag (it must pass), open every
+changed PNG and commit them with the change that caused it. The PNGs are about 0.6 MB together; a new baseline needs a
+reason to exist ("small, stable set" above). It is not a nightly leg: the comparison is a per-change check, and a leg
+that fails for a font-hinting change of a new Chromium would train people to update baselines without looking. Add it
+to `e2e-nightly.yml` (a `LEGS` row `("visual", "", ["ui-visual"], "", 15, "", False)`) when the set has proven itself.
+
+### UI suite: route stubs typed from the OpenAPI models (RPS-1652)
+
+A UI test that answers a request itself (`page.route` + `route.fulfill`) builds a body the panel parses. Untyped, a
+spec change (a renamed field, a new required one) leaves the stub as it was: the test fails at run time with a screen
+that shows nothing, or passes on an answer the backend no longer gives. So every stub body is a value of a model
+generated from `openapi-spec.yaml` (`src/api/generated`, through the per-target seam `src/ui/stub-models.ts`), and `tsc`
+breaks on the drift:
+
+- **`fulfillJson<Model>(route, status, body, headers?)`** (`src/ui/stub-responses.ts`): the model is a type argument the
+  caller must write (`fulfillJson<ErrorResponse>(route, 503, errorBody({ msgId: 'resourceBusy', text }))`): the default is
+  `never`, so a call without one does not compile. `errorBody()` builds the `ErrorResponse` envelope the backend sends for
+  every failure (`type: ERROR`). `fulfillText()` is for a body that is not JSON on purpose.
+- **`security-stubs.ts`** builds its `RestResponse*` bodies the same way (`success<Model>`) and answers through `fulfillJson`.
+- **Session stubs** (`answerSessionExpired`, `answerRefreshTokenExpired` in `src/ui/session.ts`) are the two 401 bodies
+  the backend sends, in one place instead of four copies.
+- **A lint rule** (`eslint.config.js`, `no-restricted-syntax`) fails `route.fulfill({ body })`, `({ json })` and `({ path })`
+  in `src/ui/` and `tests/ui/`: `fulfill({ response })` (a real answer, passed on) and a status-only `fulfill({ status })`
+  stay allowed. `pnpm lint` and `pnpm exec tsc --noEmit` are the checks, and the nightly's `typecheck` job runs both on every trigger
+  (Playwright transpiles a spec without checking its types, so without that job a spec drift would go unseen until a test failed).
+
+Proof that a spec change breaks the build, not the test: with `ErrorResponse.text` renamed in the generated model,
+`tsc` reports the stubs that set it (RPS-1652's PR body has the command and its output). Repsy Cloud's harness replaces
+`stub-models.ts` with the models of its own generated client and must export `ErrorResponse` and `ResponseType` there too.
 
 ### Fixtures (`src/ui/fixtures.ts`)
 
@@ -6832,10 +6946,12 @@ says; without it the leg takes tonight's runner of the rotation and `protocol` f
 | Job / leg    | Stack                                       | Runs                                                                                                                                                                                                                                | Timeout                                                                    |
 | ------------ | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | `image`      |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                                                      | 40 min                                                                     |
+| `typecheck`  |                                             | `tsc --noEmit` and `eslint .` of this harness against the client generated from `openapi-spec.yaml`, no stack ("UI suite: route stubs typed from the OpenAPI models")                                                               | 10 min                                                                     |
 | `ui`         | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                           | 60 min                                                                     |
 | `wire`       | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                                               | 150 min                                                                    |
 | `browsers`   | PostgreSQL                                  | `ui-firefox`, then `ui-webkit`: `@smoke`, `@tls` (skips here) and A11Y-13 of the UI suite in each engine ("UI suite: Firefox and WebKit"), one runner per browser so a failure names it                                             | 30 min                                                                     |
-| `h2`         | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui`; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                               | 90 min                                                                     |
+| `h2`         | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every wire runner above; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                                    | 90 min                                                                     |
+| `h2-ui`      | embedded H2                                 | `--protocol ui`, the WHOLE panel UI suite on H2 ("UI suite: the complete suite on H2")                                                                                                                                              | 45 min                                                                     |
 | `h2-full`    | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another                         | 90 min                                                                     |
 | `scanner`    | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite            | 60 min                                                                     |
 | `throttle`   | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                           | 30 min                                                                     |
@@ -7030,8 +7146,11 @@ of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays o
 - **Stacks shaped differently** are covered by the `tls`, `limits`, `cors`, `upgrade` and `upgrade-h2` legs of
   "What runs" and, for a restart, by `tests/stack/persistence.spec.ts` (RPS-1476, the `stack` runner). A
   new stack shape gets its own row there.
-- **H2 gets one full catalog a night**, not all ten: a protocol's whole catalog meets H2 every ten nights
-  (`h2-full`), its `@smoke` subset every night (`h2`).
+- **H2 gets one full wire catalog a night**, not all ten: a protocol's whole catalog meets H2 every ten nights
+  (`h2-full`), its `@smoke` subset every night (`h2`). The panel UI suite is the exception: all of it runs on H2 every
+  night (`h2-ui`).
+- **The visual baseline is not a nightly leg** (yet): `ui-visual` is run by hand and before a change to the panel's
+  look ("UI suite: visual regression").
 - **Only `ui`, `maven` and the trivy contract spec retry** ("Retries and flaky tests"), so a flaky test of any other runner fails its leg outright, on purpose.
 
 ## Panel API facts this step verified against a running instance

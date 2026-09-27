@@ -42,6 +42,7 @@ import { Shell } from '../../../src/ui/pages/shell.js';
 import { currentUsername, loginSession } from '../../../src/ui/session.js';
 import type { Page } from '@playwright/test';
 import { errorToasts } from '../../../src/ui/page-errors.js';
+import { errorBody, fulfillJson, type ErrorResponse } from '../../../src/ui/stub-responses.js';
 
 const CREDENTIALS = { tag: ['@credentials'] };
 
@@ -334,11 +335,7 @@ test.describe(
           await route.fallback();
           return;
         }
-        await route.fulfill({
-          status: 400,
-          contentType: 'application/json',
-          body: JSON.stringify({ text: REFUSAL }),
-        });
+        await fulfillJson<ErrorResponse>(route, 400, errorBody({ text: REFUSAL }));
       });
     }
 

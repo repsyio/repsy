@@ -50,6 +50,7 @@ import { errorToasts } from '../../../src/ui/page-errors.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { expectVersionNotFound } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages, type VersionsPage } from '../../../src/ui/pages/protocol.js';
+import { errorBody, fulfillJson, type ErrorResponse } from '../../../src/ui/stub-responses.js';
 
 const maven = DESCRIPTORS.maven;
 
@@ -636,15 +637,11 @@ test.describe('Maven file browser states', { tag: '@packages' }, () => {
       }) => {
         const repo = await seeder.createRepo(RepoType.MAVEN);
         await adminPage.route('**/api/repos/*/contents?*', (route) =>
-          route.fulfill({
+          fulfillJson<ErrorResponse>(
+            route,
             status,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              msgId: 'itemNotFound',
-              type: 'ERROR',
-              text: 'Resource not found.',
-            }),
-          }),
+            errorBody({ msgId: 'itemNotFound', text: 'Resource not found.' }),
+          ),
         );
         await openBrowser(adminPage, repo.name);
         await expect(adminPage.getByTestId('maven-browser-not-found')).toBeVisible();

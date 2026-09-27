@@ -40,6 +40,7 @@ import {
   isRefreshResponse,
   loginSession,
   setStoredSessionValue,
+  answerRefreshTokenExpired,
 } from '../../../src/ui/session.js';
 import { JWT_SHAPE, NO_SESSION, storedSession } from './stored-session.js';
 import { allowLists, errorToasts } from '../../../src/ui/page-errors.js';
@@ -190,18 +191,7 @@ test.describe('AUTH-09 refused refresh token', { tag: ['@cloud-skip'] }, () => {
     const session = await bootLoggedIn(userPage);
     await expireAccessToken(userPage, session.token!);
     // What the backend answers for a refresh token past its lifetime (also 30 days, so not waitable).
-    await userPage.route(`**${REFRESH_PATH}`, (route) =>
-      route.fulfill({
-        status: 401,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          msgId: 'refreshTokenExpired',
-          type: 'ERROR',
-          data: 'refreshTokenExpired',
-          text: 'Refresh token expired.',
-        }),
-      }),
-    );
+    await userPage.route(`**${REFRESH_PATH}`, answerRefreshTokenExpired);
 
     await userPage.reload();
 

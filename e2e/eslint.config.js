@@ -46,6 +46,18 @@ const PROCESS_ENV_COPIES = [
   `Property[key.name='env'] > ${PROCESS_ENV}`,
 ].map((selector) => ({ selector, message: PROCESS_ENV_MESSAGE }));
 
+// RPS-1652 (H9): a stub body is a value of a generated OpenAPI model, written through fulfillJson<Model>() in
+// src/ui/stub-responses.ts, so `tsc` breaks on an API change. A `route.fulfill({ body })` or `({ json })`
+// anywhere else in the UI suite is an untyped body (a string, or `unknown`); `fulfill({ response })` (a real
+// answer, passed on) and a status-only `fulfill({ status })` stay allowed.
+const UNTYPED_STUB_BODY = {
+  selector:
+    "CallExpression[callee.property.name='fulfill'] > ObjectExpression > Property[key.name=/^(body|json|path)$/]",
+  message:
+    'Answer a stub with fulfillJson<Model>(route, status, body) (src/ui/stub-responses.ts), a body typed from the ' +
+    'generated OpenAPI models, or fulfillText() for a body that is not JSON on purpose (RPS-1652).',
+};
+
 export default tseslint.config(
   { ignores: IGNORES },
   pluginJs.configs.recommended,
@@ -69,6 +81,13 @@ export default tseslint.config(
     files: ['src/**/*.ts', 'tests/**/*.ts'],
     rules: {
       'no-restricted-syntax': ['error', ...PROCESS_ENV_COPIES],
+    },
+  },
+  {
+    files: ['src/ui/**/*.ts', 'tests/ui/**/*.ts'],
+    ignores: ['src/ui/stub-responses.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...PROCESS_ENV_COPIES, UNTYPED_STUB_BODY],
     },
   },
   {
@@ -99,6 +118,7 @@ export default tseslint.config(
             'expectFailure',
             'expectPagingSweep',
             'expectCovers',
+            'expectVisual',
           ],
         },
       ],
