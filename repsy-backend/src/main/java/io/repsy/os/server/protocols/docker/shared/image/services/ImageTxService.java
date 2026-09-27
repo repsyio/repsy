@@ -30,7 +30,9 @@ import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -193,9 +195,11 @@ public class ImageTxService implements ImageService<UUID> {
             .findById(repoId)
             .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
 
-    return this.imageRepository
-        .findAllByRepoIdAndContainsName(repo.getId(), imageName, pageable)
-        .map(this::toDto);
+    final var page =
+        this.imageRepository.findAllByRepoIdAndContainsName(repo.getId(), imageName, pageable);
+    final var untagged = this.untaggedStatsOf(page.getContent());
+
+    return page.map(item -> this.toDto(item, untagged.get(item.getId())));
   }
 
   /**
@@ -208,8 +212,25 @@ public class ImageTxService implements ImageService<UUID> {
 
     return this.imageRepository
         .findListItemByRepoIdAndName(repoId, imageName)
-        .map(this::toDto)
+        .map(item -> this.toDto(item, this.untaggedStatsOf(List.of(item)).get(item.getId())))
         .orElseThrow(() -> new ItemNotFoundException("imageNotFound"));
+  }
+
+  /** The untagged stats of all the listed images in one query, whatever their number (RPS-1566). */
+  private Map<UUID, ImageRepository.UntaggedStats> untaggedStatsOf(
+      final List<io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem> items) {
+
+    if (items.isEmpty()) {
+      return Map.of();
+    }
+
+    return this.imageRepository
+        .findUntaggedStatsByImageIds(
+            items.stream()
+                .map(io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem::getId)
+                .toList())
+        .stream()
+        .collect(Collectors.toMap(stats -> UUID.fromString(stats.getImageId()), stats -> stats));
   }
 
   /**
@@ -217,13 +238,14 @@ public class ImageTxService implements ImageService<UUID> {
    * this count both take from the whole index graph of the image (RPS-1350).
    */
   private io.repsy.os.generated.model.ImageListItem toDto(
-      final io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem item) {
+      final io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem item,
+      final ImageRepository.@Nullable UntaggedStats untagged) {
 
-    final var dto = this.imageConverter.toDto(item);
-    final var untagged = this.imageRepository.findUntaggedStatsByImageId(item.getId());
-
-    return dto.untaggedManifestCount(Math.toIntExact(untagged.getManifestCount()))
-        .untaggedSize(untagged.getSize());
+    // No row only when the image was deleted between the two queries: it stores nothing then.
+    return this.imageConverter
+        .toDto(item)
+        .untaggedManifestCount(untagged == null ? 0 : Math.toIntExact(untagged.getManifestCount()))
+        .untaggedSize(untagged == null ? 0 : untagged.getSize());
   }
 
   @Override
