@@ -25,10 +25,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.PagingAssertions;
+import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.layer.services.LayerTxService;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
+import io.repsy.os.server.protocols.docker.shared.tag.services.UntaggedManifestFinder;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -40,11 +42,16 @@ import io.repsy.protocols.docker.shared.tag.dtos.ManifestListManifest;
 import io.repsy.protocols.docker.shared.tag.dtos.Platform;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import jakarta.persistence.EntityManagerFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -54,6 +61,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
@@ -76,6 +85,13 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
   private static final int LAYER_SIZE = 3;
   private static final String MANIFEST_LIST_MEDIA_TYPE =
       "application/vnd.docker.distribution.manifest.list.v2+json";
+
+  // Named differently from the base class' method, or it would hide that one.
+  @DynamicPropertySource
+  static void registerStatisticsProperty(final DynamicPropertyRegistry registry) {
+    // Lets the query-count test read the number of statements a request ran.
+    registry.add("spring.jpa.properties.hibernate.generate_statistics", () -> "true");
+  }
 
   @Autowired private ImageTxService imageService;
   @Autowired private LayerTxService layerService;
@@ -765,6 +781,193 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           "sessionExpired",
           "sessionExpired",
           "Session expired.");
+    }
+  }
+
+  @Nested
+  @DisplayName("untagged stats of a page of images (RPS-1566)")
+  class UntaggedStatsOfAPage {
+
+    /**
+     * The per-image query the list used before RPS-1566, kept as the oracle: one recursive walk for
+     * one image.
+     */
+    private static final String PER_IMAGE_UNTAGGED_SQL =
+        """
+        with recursive reach(manifest_id) as (
+          select t."manifest_id" from "public"."docker_tag" t where t."image_id" = :imageId
+          union
+          select c."child_id" from "public"."docker_manifest_child" c
+            join reach r on c."parent_id" = r.manifest_id
+        )
+        select
+          (
+            select count(*) from "public"."docker_manifest" m
+            where m."image_id" = :imageId
+              and m."id" not in (select manifest_id from reach)
+          ),
+          cast(coalesce((
+            select sum(l."size") from "public"."docker_layer" l
+            where l."id" in (
+                select ml."layer_id" from "public"."docker_manifest_layer" ml
+                  join "public"."docker_manifest" um on um."id" = ml."manifest_id"
+                where um."image_id" = :imageId
+                  and um."id" not in (select manifest_id from reach)
+              )
+              and l."id" not in (
+                select rl."layer_id" from "public"."docker_manifest_layer" rl
+                where rl."manifest_id" in (select manifest_id from reach)
+              )
+          ), 0) as bigint)
+        """;
+
+    @Autowired private UntaggedManifestFinder untaggedManifestFinder;
+    @Autowired private ImageRepository imageRepository;
+    @Autowired private EntityManagerFactory entityManagerFactory;
+
+    private void deleteTag(final Repo repo, final String imageName, final String tag)
+        throws Exception {
+      DockerImageControllerIT.this.expectSuccess(
+          DockerImageControllerIT.this.perform(
+              delete("/api/docker/images/%s/%s/tags/%s".formatted(repo.getName(), imageName, tag))
+                  .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
+          "tagDeleted",
+          "Tag deleted.");
+    }
+
+    /** The whole first page of the repo's images, by image name. */
+    private Map<String, Map<String, Object>> listedImages(final Repo repo) throws Exception {
+      final var body =
+          DockerImageControllerIT.this.expectSuccess(
+              DockerImageControllerIT.this.perform(
+                  get("/api/docker/images/%s".formatted(repo.getName()))
+                      .param("size", "100")
+                      .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
+              "imagesFetched",
+              "Packages are fetched.");
+      final List<Map<String, Object>> content = JsonPath.read(body, "$.data.content");
+
+      return content.stream()
+          .collect(Collectors.toMap(image -> (String) image.get("name"), image -> image));
+    }
+
+    /** Runs the list request and returns how many JDBC statements Hibernate prepared for it. */
+    private long statementsToList(final Repo repo) throws Exception {
+      final var statistics = this.statistics();
+      DockerImageControllerIT.this.entityManager.flush();
+      DockerImageControllerIT.this.entityManager.clear();
+      statistics.clear();
+      this.listedImages(repo);
+      return statistics.getPrepareStatementCount();
+    }
+
+    private Statistics statistics() {
+      return this.entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+    }
+
+    /** What the pre-RPS-1566 per-image query answers: {manifest count, size}. */
+    private long[] perImageUntagged(final UUID imageId) {
+      final var row =
+          (Object[])
+              DockerImageControllerIT.this
+                  .entityManager
+                  .createNativeQuery(PER_IMAGE_UNTAGGED_SQL)
+                  .setParameter("imageId", imageId)
+                  .getSingleResult();
+      return new long[] {((Number) row[0]).longValue(), ((Number) row[1]).longValue()};
+    }
+
+    @Test
+    @DisplayName("a page of many images is listed in as many queries as a page of few")
+    void constantQueryCount() throws Exception {
+      final var fewImages = DockerImageControllerIT.this.dockerRepo();
+      for (int i = 0; i < 3; i++) {
+        DockerImageControllerIT.this.seedImage(fewImages, "few-" + i, "latest");
+      }
+      final var fewStatements = this.statementsToList(fewImages);
+
+      final var manyImages = DockerImageControllerIT.this.dockerRepo();
+      for (int i = 0; i < 25; i++) {
+        DockerImageControllerIT.this.seedImage(manyImages, "many-" + i, "latest");
+      }
+      final var manyStatements = this.statementsToList(manyImages);
+
+      assertThat(this.listedImages(manyImages)).hasSize(25);
+      assertThat(manyStatements)
+          .as("statements for 25 images, against %d for 3", fewStatements)
+          .isEqualTo(fewStatements);
+    }
+
+    @Test
+    @DisplayName("counts and sizes of a mixed page are those of the per-image query")
+    void countsAndSizesMatchThePerImageQuery() throws Exception {
+      final var repo = DockerImageControllerIT.this.dockerRepo();
+      final var it = DockerImageControllerIT.this;
+      // Tagged only, with nothing untagged.
+      it.seedImage(repo, "tagged", "latest");
+      // Untagged only: the tag was deleted, the manifest stays.
+      it.seedImage(repo, "untagged-only", "latest", "sha256:" + "5".repeat(64));
+      this.deleteTag(repo, "untagged-only", "latest");
+      // Shares its layer with a tagged manifest: only the config blob of the dropped one counts.
+      it.seedImage(repo, "shared-layers", "kept");
+      it.seedImage(repo, "shared-layers", "dropped", "sha256:" + "6".repeat(64));
+      this.deleteTag(repo, "shared-layers", "dropped");
+      // An index whose children are not untagged while the index is tagged...
+      it.seedMultiPlatformImage(repo, "index-tagged", "v1");
+      // ...and are, all three manifests of them, once its tag is gone.
+      final var untaggedIndex = it.seedMultiPlatformImage(repo, "index-untagged", "v1");
+      this.deleteTag(repo, "index-untagged", untaggedIndex.tag());
+      // Pad the page well over 20 images.
+      for (int i = 0; i < 20; i++) {
+        it.seedImage(repo, "pad-" + i, "latest");
+      }
+
+      final var listed = this.listedImages(repo);
+
+      assertThat(listed).hasSize(25);
+      assertThat(listed.get("tagged")).containsEntry("untaggedManifestCount", 0);
+      assertThat(listed.get("untagged-only")).containsEntry("untaggedManifestCount", 1);
+      assertThat(listed.get("shared-layers")).containsEntry("untaggedManifestCount", 1);
+      assertThat(listed.get("index-tagged")).containsEntry("untaggedManifestCount", 0);
+      assertThat(listed.get("index-untagged")).containsEntry("untaggedManifestCount", 3);
+      for (final var image : this.imageRepository.findAllByRepoId(repo.getId())) {
+        final var expected = this.perImageUntagged(image.getId());
+        final var row = listed.get(image.getName());
+
+        assertThat(((Number) row.get("untaggedManifestCount")).longValue())
+            .as("untagged manifests of %s", image.getName())
+            .isEqualTo(expected[0])
+            .isEqualTo(this.untaggedManifestFinder.findUntagged(image.getId()).size());
+        assertThat(((Number) row.get("untaggedSize")).longValue())
+            .as("untagged size of %s", image.getName())
+            .isEqualTo(expected[1]);
+      }
+    }
+
+    @Test
+    @DisplayName("the summary of one image carries the same untagged stats as its list row")
+    void summaryMatchesTheListRow() throws Exception {
+      final var repo = DockerImageControllerIT.this.dockerRepo();
+      DockerImageControllerIT.this.seedImage(repo, "app", "latest");
+      DockerImageControllerIT.this.seedImage(repo, "other", "latest");
+      this.deleteTag(repo, "app", "latest");
+
+      final var body =
+          DockerImageControllerIT.this.expectSuccess(
+              DockerImageControllerIT.this.perform(
+                  get("/api/docker/images/%s/app/summary".formatted(repo.getName()))
+                      .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
+              "imageFetched",
+              "Image is fetched.");
+      final var summary = data(body);
+      final var listed = this.listedImages(repo).get("app");
+
+      assertThat(summary)
+          .containsEntry("untaggedManifestCount", 1)
+          .containsEntry("untaggedManifestCount", listed.get("untaggedManifestCount"));
+      assertThat(((Number) summary.get("untaggedSize")).longValue())
+          .isEqualTo(((Number) listed.get("untaggedSize")).longValue())
+          .isEqualTo(CONFIG_JSON.length() + LAYER_SIZE);
     }
   }
 

@@ -19,6 +19,7 @@ import io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -69,7 +70,7 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
    * row may have no tag: {@code tagCount} is 0 then, and {@code size} and {@code digest}, which
    * describe what the tags reach, are 0 and null. The untagged manifests and their size are not
    * columns here: they follow indexes of any depth, which a JPQL subquery cannot, so {@link
-   * #findUntaggedStatsByImageId} computes them per image.
+   * #findUntaggedStatsByImageIds} computes them for the page.
    */
   @Query(
       LIST_ITEM_SELECT
@@ -139,14 +140,16 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
       UUID repoId, UUID imageId, @Nullable String digest, long size, Instant now);
 
   /**
-   * What the image stores only for manifests that no tag reaches, computed the way "Delete untagged
-   * manifests" computes it ({@code UntaggedManifestFinder}): a manifest is reached when a tag
-   * points at it or at an index that lists it, directly or through other indexes, to any depth. The
-   * recursive CTE follows the index edges to the end.
+   * What each of the images stores only for manifests that no tag reaches, computed the way "Delete
+   * untagged manifests" computes it ({@code UntaggedManifestFinder}): a manifest is reached when a
+   * tag points at it or at an index that lists it, directly or through other indexes, to any depth.
+   * The recursive CTE follows the index edges to the end, once for all the images: it is seeded
+   * with the tags of every listed image and carries the image with each reached manifest, so a page
+   * of images costs one query, not one per image (RPS-1566).
    *
    * <p>{@code manifestCount} is the number of manifests no tag reaches; {@code size} is the size of
    * the distinct layers (config blobs included) those manifests link to and no reached manifest
-   * links to.
+   * links to. Every listed image has a row, an image without manifests with 0 and 0.
    *
    * <p>The identifiers are quoted and schema-qualified, as in {@code insertIfAbsent}: the H2
    * migrations create lower-case quoted names, which H2 matches case-sensitively (RPS-1385).
@@ -154,37 +157,49 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
   @Query(
       value =
           """
-          with recursive reach(manifest_id) as (
-            select t."manifest_id" from "public"."docker_tag" t where t."image_id" = :imageId
+          with recursive reach(image_id, manifest_id) as (
+            select t."image_id", t."manifest_id" from "public"."docker_tag" t
+              where t."image_id" in (:imageIds)
             union
-            select c."child_id" from "public"."docker_manifest_child" c
+            select r.image_id, c."child_id" from "public"."docker_manifest_child" c
               join reach r on c."parent_id" = r.manifest_id
           )
           select
+            cast(i."id" as varchar(36)) as "imageId",
             (
               select count(*) from "public"."docker_manifest" m
-              where m."image_id" = :imageId
-                and m."id" not in (select manifest_id from reach)
+              where m."image_id" = i."id"
+                and not exists (
+                  select 1 from reach r where r.image_id = i."id" and r.manifest_id = m."id"
+                )
             ) as "manifestCount",
             cast(coalesce((
               select sum(l."size") from "public"."docker_layer" l
               where l."id" in (
                   select ml."layer_id" from "public"."docker_manifest_layer" ml
                     join "public"."docker_manifest" um on um."id" = ml."manifest_id"
-                  where um."image_id" = :imageId
-                    and um."id" not in (select manifest_id from reach)
+                  where um."image_id" = i."id"
+                    and not exists (
+                      select 1 from reach r where r.image_id = i."id" and r.manifest_id = um."id"
+                    )
                 )
                 and l."id" not in (
                   select rl."layer_id" from "public"."docker_manifest_layer" rl
-                  where rl."manifest_id" in (select manifest_id from reach)
+                    join reach rr on rr.manifest_id = rl."manifest_id"
+                  where rr.image_id = i."id"
                 )
             ), 0) as bigint) as "size"
+          from "public"."docker_image" i
+          where i."id" in (:imageIds)
           """,
       nativeQuery = true)
-  UntaggedStats findUntaggedStatsByImageId(UUID imageId);
+  List<UntaggedStats> findUntaggedStatsByImageIds(Collection<UUID> imageIds);
 
   /** The untagged manifests of an image and the size only they store. */
   interface UntaggedStats {
+
+    /** The id as text: H2 hands a native {@code uuid} column to a projection as bytes. */
+    String getImageId();
 
     Long getManifestCount();
 

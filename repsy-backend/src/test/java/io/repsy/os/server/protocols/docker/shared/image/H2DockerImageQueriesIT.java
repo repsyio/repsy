@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.os.H2IntegrationTest;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
+import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository.UntaggedStats;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.layer.entities.Layer;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
@@ -32,7 +33,10 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,7 +94,7 @@ class H2DockerImageQueriesIT extends H2IntegrationTest {
     // The leaf is two indexes below the tag: reached, so not untagged, and part of the size.
     assertThat(this.layerRepository.sumDistinctSizeByImageId(repo.getId(), image.getId()))
         .isEqualTo(100);
-    var untagged = this.imageRepository.findUntaggedStatsByImageId(image.getId());
+    var untagged = this.untaggedStats(image.getId());
     assertThat(untagged.getManifestCount()).isEqualTo(1);
     assertThat(untagged.getSize()).isEqualTo(7);
 
@@ -100,11 +104,50 @@ class H2DockerImageQueriesIT extends H2IntegrationTest {
     tag.setDigest(plain.getDigest());
     this.tagRepository.saveAndFlush(tag);
 
-    untagged = this.imageRepository.findUntaggedStatsByImageId(image.getId());
+    untagged = this.untaggedStats(image.getId());
     assertThat(untagged.getManifestCount()).isEqualTo(3);
     assertThat(untagged.getSize()).isEqualTo(100);
     assertThat(this.layerRepository.sumDistinctSizeByImageId(repo.getId(), image.getId()))
         .isEqualTo(7);
+  }
+
+  @Test
+  @DisplayName("the untagged stats of several images come from one query, each with its own")
+  void untaggedStatsOfSeveralImages() {
+    final var repo = this.repo("h2dockermany");
+    final var tagged = this.image(repo, "tagged");
+    final var untagged = this.image(repo, "untagged");
+    final var empty = this.image(repo, "empty");
+    final var sharedLayer = this.layer(repo, "shared", 5);
+    final var ownLayer = this.layer(repo, "own", 11);
+    this.tag(tagged, this.manifest(tagged, "tagged", OCI_MANIFEST, sharedLayer), "latest");
+    this.manifest(untagged, "untagged1", OCI_MANIFEST, sharedLayer, ownLayer);
+    this.manifest(untagged, "untagged2", OCI_MANIFEST, ownLayer);
+
+    final var stats =
+        this.imageRepository
+            .findUntaggedStatsByImageIds(List.of(tagged.getId(), untagged.getId(), empty.getId()))
+            .stream()
+            .collect(Collectors.toMap(s -> UUID.fromString(s.getImageId()), s -> s));
+
+    assertThat(stats).hasSize(3);
+    assertThat(stats.get(tagged.getId()).getManifestCount()).isZero();
+    assertThat(stats.get(tagged.getId()).getSize()).isZero();
+    assertThat(stats.get(untagged.getId()).getManifestCount()).isEqualTo(2);
+    assertThat(stats.get(untagged.getId()).getSize()).isEqualTo(16);
+    assertThat(stats.get(empty.getId()).getManifestCount()).isZero();
+    assertThat(stats.get(empty.getId()).getSize()).isZero();
+  }
+
+  private UntaggedStats untaggedStats(final UUID imageId) {
+    return this.imageRepository.findUntaggedStatsByImageIds(List.of(imageId)).getFirst();
+  }
+
+  private io.repsy.os.server.protocols.docker.shared.image.entities.Image image(
+      final Repo repo, final String name) {
+    return this.imageRepository
+        .findById(this.imageTxService.findOrCreateImage(repo.getId(), name).getId())
+        .orElseThrow();
   }
 
   private Repo repo(final String name) {

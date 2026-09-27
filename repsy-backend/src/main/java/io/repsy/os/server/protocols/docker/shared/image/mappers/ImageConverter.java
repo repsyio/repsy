@@ -43,7 +43,7 @@ public interface ImageConverter {
   ImageInfo toImageInfo(Image image);
 
   // The untagged fields follow indexes of any depth, which the list query cannot: the service
-  // sets them from ImageRepository.findUntaggedStatsByImageId.
+  // sets them from ImageRepository.findUntaggedStatsByImageIds.
   @Mapping(target = "updatedAt", expression = "java(resolveUpdatedAt(source))")
   @Mapping(target = "untaggedManifestCount", ignore = true)
   @Mapping(target = "untaggedSize", ignore = true)
