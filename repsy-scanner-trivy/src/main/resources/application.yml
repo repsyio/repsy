@@ -23,7 +23,7 @@ scanner:
   job-retention-minutes: ${SCANNER_JOB_RETENTION_MINUTES:60}
   job-retention-check-interval-ms: ${SCANNER_JOB_RETENTION_CHECK_INTERVAL_MS:600000}
   security:
-    api-key: ${SCANNER_API_KEY}
+    api-key: ${SCANNER_API_KEY:}
   advisories:
     # The limits are part of the POST /advisories contract (README), not settings.
     max-packages: 20000

@@ -262,7 +262,7 @@ To enable vulnerability scanning, add the following service to your docker-compo
     hostname: repsy-scanner-trivy
     image: repo.repsy.io/repsy/os/repsy-scanner-trivy:latest
     environment:
-      - SCANNER_API_KEY=${TRIVY_SCANNER_API_KEY:-changeme-trivy-api-key}
+      - SCANNER_API_KEY=${TRIVY_SCANNER_API_KEY:?set TRIVY_SCANNER_API_KEY to a shared secret}
     ports:
       - "8090:8090"
     extra_hosts:
@@ -472,6 +472,10 @@ This is the first release after `v26.08.4`. Read this section before you upgrade
   off). (RPS-1107)
 - The vulnerability scanner is now published as `repo.repsy.io/repsy/os/repsy-scanner-trivy` with the same tags as
   the application; run both images of the same release. (RPS-1400)
+- `repsy-scanner-trivy` does not start without a `SCANNER_API_KEY` (missing, blank or an unresolved `${...}` placeholder),
+  and Repsy with `SECURITY_SCANNER=enabled` does not start without a `TRIVY_SCANNER_API_KEY`; before, both started,
+  the scanner accepting the literal text `${SCANNER_API_KEY}` as its key. Set the same secret on both, or leave the
+  scanner disabled. (RPS-1663)
 - The upgrade jobs (Docker manifest rename, NuGet version move) log their progress at `INFO`, which the default log
   level (`WARN`) hides; set `LOGGING_LEVEL_IO_REPSY=INFO` to follow them.
 
@@ -586,7 +590,7 @@ Deleting `1.0.0+a` when there is no such entry (the usual case) still deletes `1
 | `H2_TCP_SERVER_PORT` | H2 TCP server port | `9092` |
 | `SECURITY_SCANNER` | Enables vulnerability scanning of pushed artifacts (`enabled`/`disabled`) | `disabled` |
 | `TRIVY_SCANNER_BASE_URL` | Base URL of the `repsy-scanner-trivy` service | `http://localhost:8090` |
-| `TRIVY_SCANNER_API_KEY` | Shared API key sent to the scanner service (must match its `SCANNER_API_KEY`). The scanner's own settings (`SCANNER_API_KEY`, `TRIVY_TIMEOUT_SECONDS`, `TRIVY_DB_REPOSITORY`, ...) are listed in [`repsy-scanner-trivy/README.md`](./repsy-scanner-trivy/README.md) | *(empty)* |
+| `TRIVY_SCANNER_API_KEY` | Shared API key sent to the scanner service (must match its `SCANNER_API_KEY`). **Required when `SECURITY_SCANNER=enabled`**: Repsy does not start with it blank or unset, and the scanner does not start without its own `SCANNER_API_KEY`. The scanner's own settings (`SCANNER_API_KEY`, `TRIVY_TIMEOUT_SECONDS`, `TRIVY_DB_REPOSITORY`, ...) are listed in [`repsy-scanner-trivy/README.md`](./repsy-scanner-trivy/README.md) | *(none; unused while the scanner is disabled)* |
 | `DOCKER_INTERNAL_REGISTRY_BASE_URL` | Base URL the scanner uses to pull Docker images from this instance's own registry | `http://localhost:9090` |
 | `TRIVY_REQUEST_TIMEOUT_SECONDS` | How long Repsy waits on the scanner at one time: for its answer once a request has been sent in full, and for the scanner to accept more of an upload it has stopped reading. It does not limit how long an artifact takes to upload, so a large artifact (up to 500 MB) still scans on a slow link; a submit as a whole is cut off after `TRIVY_MAX_SCAN_DURATION_SECONDS`. A submit that fails on this timeout is not retried | `10` |
 | `TRIVY_ADVISORY_LOOKUP_MAX_CONCURRENCY` | How many npm audit lookups (see [Auditing npm packages](#auditing-npm-packages)) run on the scanner at once; an audit that finds no free place within `TRIVY_ADVISORY_LOOKUP_MAX_WAIT_MILLIS` is answered from the stored findings only. Each lookup is bounded by `TRIVY_REQUEST_TIMEOUT_SECONDS` and never delays a scan | `2` |
