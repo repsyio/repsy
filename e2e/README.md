@@ -66,7 +66,10 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
   whole environment (only a call with no `env`, such as `docker` in the stack runner, inherits) and
   throws on a `REPSY_*` key in it. Each suite has a `tests/<protocol>/sealed-env.spec.ts` that runs
   `env` through `run()` with the suite's own builder and checks what arrived; a new client suite adds
-  its builder to the same pattern.
+  its builder to the same pattern. ESLint enforces the rest (RPS-1468): `no-restricted-syntax` in
+  `eslint.config.js` fails `pnpm lint` on `{ ...process.env }`, `Object.assign(x, process.env)` and
+  `env: process.env` anywhere under `src/` and `tests/`, so a new suite cannot copy the runner's
+  environment into a child; a harness tool that needs it (`docker compose`) takes `extendEnv: true`.
 - **Nothing global is ever touched**: the `admin` user, and a fresh instance's 9 default repos, are
   never created, modified or deleted by anything in this harness.
 
@@ -101,7 +104,7 @@ e2e/
   runners/scanner-stub.Dockerfile  # the stub scanner of the scanner stack (src/stubs/scanner/ on node:24, no dependencies, no build)
   runners/bump-pins.sh         # re-resolves every content pin of docker-compose.runners.yml (image digests, checksums, skopeo's commit) and prints or writes what differs, see "Runner images and pins"
   runners/ui-seccomp.json      # Playwright's seccomp profile, so Chromium's sandbox works as a non-root uid in Docker
-  runners/entrypoint.sh         # regenerates the API client (spec and output dir from REPSY_E2E_OPENAPI_SPEC / REPSY_E2E_GEN_OUT), then runs Playwright for one project
+  runners/entrypoint.sh         # regenerates the API client when it is out of date (stamp + lock, safe for concurrent runners; spec and output dir from REPSY_E2E_OPENAPI_SPEC / REPSY_E2E_GEN_OUT), then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
     target.ts                  # capabilities derived from REPSY_TARGET: OS or Repsy Cloud (`kind`, the URL scheme `repo` | `owner-repo`, token and user model, plan limits), see "Targets"
@@ -287,7 +290,7 @@ e2e/
 cd e2e
 cp .env.example .env   # fill in REPSY_ADMIN_PASSWORD
 pnpm install
-pnpm gen:api            # generates src/api/generated from ../repsy-backend's openapi spec
+pnpm gen:api            # (re)generates src/api/generated from ../repsy-backend's openapi spec
 ```
 
 ## Environment
@@ -309,6 +312,7 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_E2E_FORCE`             | _(unset)_                           | `1` lets `local up\|down` take over a project or host port held by a stack started from another checkout (same as `--force`)                                                                                                                                                                                                                                                                                                             |
 | `REPSY_UI_BASE_URL`           | _(REPSY_API_BASE_URL)_              | ui runner only: where the panel SPA is (it is served on the API port 8080, not the protocol port 9090)                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_FRONTEND_BASE_URL`     | _(unset)_                           | ui project on a `cloud-*` target only: where Repsy Cloud's panel is served (a host other than its API). `REPSY_UI_BASE_URL` wins over it; ignored on an OS target ("The UI seam")                                                                                                                                                                                                                                                        |
+| `REPSY_E2E_WORKERS`           | _(unset)_                           | `run.sh test`: Playwright workers of every runner but `stack` (which stays at 1); the same as `--workers N`, which wins. A positive integer, see "Worker count"                                                                                                                                                                                                                                                                          |
 | `REPSY_UI_WORKERS`            | `4` (compose)                       | ui runner only: Playwright workers (each is a Chromium, ~250-400 MB)                                                                                                                                                                                                                                                                                                                                                                     |
 | `REPSY_UI_NO_SANDBOX`         | _(unset — sandbox on)_              | ui runner only: `1` launches Chromium with `chromiumSandbox: false`, see "UI suite"                                                                                                                                                                                                                                                                                                                                                      |
 | `REPSY_E2E_OPT_IN`            | _(unset)_                           | every runner: comma list of opt-in suites (`throttle`, `scanner`, ...) read by `optedIn()` in `src/stack-overlays.ts`; `run.sh test` adds the name of every stack overlay whose switch is set, see "Stack overlays"                                                                                                                                                                                                                      |
@@ -820,7 +824,25 @@ runner of another repository generates ITS client (a Cloud backend module import
 | Variable                 | Default                                                         | Meaning                                                                                                 |
 | ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `REPSY_E2E_OPENAPI_SPEC` | `../repsy-backend/src/main/resources/openapi/openapi-spec.yaml` | the spec the client is generated from, relative to the harness's working directory (`/app`) or absolute |
-| `REPSY_E2E_GEN_OUT`      | `src/api/generated`                                             | where it goes (deleted first), relative to the same directory                                           |
+| `REPSY_E2E_GEN_OUT`      | `src/api/generated`                                             | where it goes (replaced when out of date), relative to the same directory                               |
+
+**Concurrent runners (RPS-1468).** The output directory is in a bind mount that every runner of a checkout
+shares, and `run.sh test --protocol a,b`, two terminals or two agents start runners at the same time. The
+entrypoint used to `rm -rf` the directory and generate into it, so one runner deleted what another was
+writing (the second one failed at that step). Now `runners/entrypoint.sh`:
+
+- skips the generation when `<out>/.stamp` matches: the stamp is the sha256 of the spec, the version of
+  `openapi-typescript-codegen` and the generator's arguments, so a changed spec (or generator) regenerates
+  and an unchanged one costs a hash;
+- otherwise takes `flock` on `<out>.lock`, re-checks the stamp (the runner that held the lock has usually
+  just generated it), generates into `<out>.tmp.<pid>` and swaps that into place, so a runner never sees a
+  half-written client. Only one of N concurrent runners logs `Generating the API client`.
+
+`pnpm gen:api` is `runners/entrypoint.sh --gen-api --force` (always regenerates, still under the lock). A
+consumer that sets `REPSY_E2E_GEN_OUT` gets `<out>.lock` next to its directory: git-ignore it (Repsy OS's
+`e2e/.gitignore` has the entries for the default). `tests/skeleton/gen-api-race.spec.ts` starts eight
+generations at once (into a missing and into a stale directory) and checks that all succeed, one generates
+and nothing is left behind; the entrypoint is baked into the runner image, so a change to it needs `-b`.
 
 ### Runner images from another build context
 
@@ -910,8 +932,22 @@ Otherwise `run.sh` does the following for every subcommand:
   the stack: slower the first time, but a branch that changes a runner Dockerfile cannot swap another
   worktree's runner image. Remove them with
   `docker compose -p <project>-runners -f docker-compose.runners.yml down -v --rmi local` when the stack is retired.
+  The runner containers are `run --rm`, so nothing of them is left after a run; `local down` stops the stack
+  only and leaves those images and cache volumes (that command is how they go).
+- prints a warning when `COMPOSE_PROJECT_NAME` is set (a line of `.env` is sourced into `run.sh`'s
+  environment) and the project is still the default: it names neither the stack nor the runners, so the
+  default project would be used next to whoever else runs it. Set `REPSY_E2E_PROJECT` (the same name will
+  do) and `REPSY_E2E_PORT_OFFSET` instead (RPS-1567).
 - validates the values: the project is compose's own rule (`[a-z0-9][a-z0-9_-]*`), the offset a
   non-negative integer with `9090 + offset <= 65535`.
+
+**Worker count (RPS-1567).** `./run.sh test --workers N` (or `REPSY_E2E_WORKERS=N`; the flag wins) gives
+every runner `--workers=N`, which Playwright applies over the config, the `ui` runner's `REPSY_UI_WORKERS`
+(4) included: a loaded host runs `./run.sh test --protocol ui,maven --workers 2`, and `--workers 1` runs one
+test at a time. It has to be a positive integer. The `stack` runner ignores it (its specs restart the one
+Repsy container, so it stays at 1 worker, `REPSY_E2E_WORKERS: '1'` in `docker-compose.runners.yml`) and
+`run.sh` prints a note when it skips it. Without the flag nothing changes: Playwright's default count per
+runner, 4 for `ui`. `sweep` runs no Playwright.
 
 **The guard.** `local up` refuses when a container of the project is running from another checkout
 (the `com.docker.compose.project.working_dir` label differs from this `e2e/` directory), or when a
@@ -6516,7 +6552,8 @@ reports. If you already have root-owned ones from an older checkout, remove them
 (`sudo rm -r test-results playwright-report`).
 
 Editing a test, a file under `src/`, or the openapi spec needs no image rebuild: both are
-bind-mounted into the runner container, which regenerates the API client on every start. Only a
+bind-mounted into the runner container, which regenerates the API client on start when the spec changed
+(a stamp, see "The generated client"). Only a
 change to `runners/base.Dockerfile` or `pnpm-lock.yaml` needs `-b`.
 
 The runner container runs as the invoking host user, not root (`docker-compose.runners.yml`'s
