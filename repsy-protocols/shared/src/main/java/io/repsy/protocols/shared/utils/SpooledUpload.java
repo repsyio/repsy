@@ -26,6 +26,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * An upload that was copied to a temporary file while it was read, so a package archive of any size
@@ -63,9 +64,23 @@ public final class SpooledUpload implements Closeable {
    */
   public static SpooledUpload spool(final InputStream source, final long maxBytes)
       throws IOException {
+    return spool(source, maxBytes, null);
+  }
+
+  /**
+   * Same as {@link #spool(InputStream, long)}, with the temporary file created in {@code
+   * directory}, or in the default temporary-file directory when it is {@code null}. Package-private
+   * so a test can spool into a directory of its own instead of the one the whole machine shares.
+   */
+  static SpooledUpload spool(
+      final InputStream source, final long maxBytes, @Nullable final Path directory)
+      throws IOException {
 
     final var digest = newSha256();
-    final var file = Files.createTempFile("repsy-upload-", ".tmp");
+    final var file =
+        directory == null
+            ? Files.createTempFile("repsy-upload-", ".tmp")
+            : Files.createTempFile(directory, "repsy-upload-", ".tmp");
 
     try {
       final var buffer = new byte[BUFFER_SIZE];
