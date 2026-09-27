@@ -28,6 +28,7 @@
  *  - `seedUserCredential` / `seedExpiredTokenCredential`: the credentials that differ per product.
  */
 import {
+  type CredentialSeedContext,
   type DeployTokenForm,
   type DeployTokenInfoListItem,
   type PanelBackend,
@@ -126,7 +127,7 @@ export class FakeCloudPanelBackend extends FakePanelBackend implements PanelBack
   }
 
   // A repo user of a cloud is a collaborator with a plan limit: the fake has none to offer.
-  async seedUserCredential(): Promise<MaterializedCredential> {
+  async seedUserCredential(_ctx?: CredentialSeedContext): Promise<MaterializedCredential> {
     throw new UnsupportedPanelOperation(FAKE_CLOUD_UNSUPPORTED_TICKET, 'seedUserCredential');
   }
 

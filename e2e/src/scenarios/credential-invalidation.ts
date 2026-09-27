@@ -39,6 +39,13 @@
  *
  * Each spec file calls {@link registerCredentialInvalidation} once, with its protocol's adapter.
  *
+ * The user whose credential ends is the target's own `user-password` credential of the test's repo
+ * ({@link seedInvalidationUser}, which asks `PanelBackend.seedUserCredential` like every scenario does): an
+ * OS `USER` account, which may use any repo, or a Repsy Cloud collaborator with a read/write grant on it. A
+ * tenant that was merely registered has no grant on the repo, so its deploy would be refused for a reason
+ * that is not the one under test (RPS-1481). A user that is not the one deploying or logging in (the
+ * "other user" of a password change, the successor of a reused name) stays a plain `seeder.createUser()`.
+ *
  * RPS-1552 adds {@link registerLoginTokenInvalidation}: the same events seen through the token a client KEEPS
  * after logging in (a Docker `/v2/token` JWT, the token `npm login` stores, the Cargo `/me` token). Those
  * protocol JWTs carry the user's `token_version` (`tv` claim), so a password change ends them at once; before
@@ -48,8 +55,10 @@
  */
 import { createPanelBackend } from '../api/backend-registry.js';
 import { RepoType } from '../api/panel-api.js';
+import type { Seeder } from '../seed/seeder.js';
+import { target, type TargetCapabilities } from '../target.js';
 import type { ProtocolAdapter } from './adapter.js';
-import { expect, test } from './fixtures.js';
+import { expect, test, tryMaterializeCredentialKind } from './fixtures.js';
 import type { Scenario } from './types.js';
 import type { MaterializedCredential, World } from './world.js';
 
@@ -62,6 +71,75 @@ const SCENARIO: Scenario = {
 };
 
 const NEW_PASSWORD_SUFFIX = 'Changed9';
+
+/** The user a test ends the credential of: what it logs in as and what an admin needs to act on it. */
+export interface InvalidationUser {
+  /** The panel id (`DELETE /api/users/{id}`, `reset-password`). */
+  id: string;
+  username: string;
+  password: string;
+}
+
+/** A seeded user that may use the repo, or why the target has none to seed (a skip reason). */
+export type InvalidationUserResult =
+  { user: InvalidationUser; skipReason?: undefined } | { skipReason: string; user?: undefined };
+
+/**
+ * Seeds the user of an invalidation test through the target's `user-password` credential of `repoName`
+ * (`PanelBackend.seedUserCredential`, RPS-1481): the account that can deploy to the repo, tracked by the
+ * seeder so the test's cleanup removes it. The id is the credential's `userId` when the backend gave one,
+ * else it is looked up by the exact username through the panel's user list. A target with no such
+ * credential (`UnsupportedPanelOperation`, or neither roles nor repo users) answers a skip reason.
+ */
+export async function seedInvalidationUser(
+  seeder: Seeder,
+  repoName: string,
+  repoType: RepoType,
+  capabilities: TargetCapabilities = target,
+): Promise<InvalidationUserResult> {
+  const seeded = await tryMaterializeCredentialKind(
+    seeder,
+    'user-password',
+    repoName,
+    repoType,
+    capabilities,
+  );
+  if (seeded.credential === undefined) {
+    return { skipReason: seeded.skipReason };
+  }
+  const { username, password, userId } = seeded.credential;
+  if (username === undefined || password === undefined) {
+    throw new Error(
+      'seedInvalidationUser: the user-password credential has no username or password',
+    );
+  }
+  const id = userId ?? (await userIdOf(seeder, username));
+  return { user: { id, username, password } };
+}
+
+async function userIdOf(seeder: Seeder, username: string): Promise<string> {
+  const matches = await seeder.backend.listAllUsers({ q: username });
+  const match = matches.find((candidate) => candidate.username === username);
+  if (!match) {
+    throw new Error(`seedInvalidationUser: no user "${username}" in the panel's user list`);
+  }
+  return match.id;
+}
+
+/** {@link seedInvalidationUser}, skipping the running test when the target cannot seed the user. */
+async function invalidationUser(
+  seeder: Seeder,
+  repoName: string,
+  repoType: RepoType,
+): Promise<InvalidationUser> {
+  const result = await seedInvalidationUser(seeder, repoName, repoType);
+  if (result.user === undefined) {
+    test.skip(true, result.skipReason);
+    // `test.skip` throws to end the test; this is for the type checker only.
+    throw new Error(result.skipReason);
+  }
+  return result.user;
+}
 
 export interface CredentialInvalidationProtocol<F = unknown> {
   /** The protocol's real client adapter: `publish` runs the client AND a raw probe of the same credential. */
@@ -127,7 +205,7 @@ export function registerCredentialInvalidation<F>(
       { tag: ['@smoke'] },
       async ({ seeder }) => {
         const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
-        const user = await seeder.createUser();
+        const user = await invalidationUser(seeder, repo.name, protocol.repoType);
         const oldCredential = passwordCredential(user.username, user.password);
         const packageName = adapter.packageName(seeder.runId, SCENARIO);
         const { accepted, refused } = deploySetup(protocol, repo.name, packageName);
@@ -154,7 +232,7 @@ export function registerCredentialInvalidation<F>(
       panelApi,
     }) => {
       const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
-      const user = await seeder.createUser();
+      const user = await invalidationUser(seeder, repo.name, protocol.repoType);
       const credential = passwordCredential(user.username, user.password);
       const packageName = adapter.packageName(seeder.runId, SCENARIO);
       const { accepted, refused } = deploySetup(protocol, repo.name, packageName);
@@ -236,7 +314,7 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
       { tag: ['@smoke'] },
       async ({ seeder }) => {
         const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
-        const user = await seeder.createUser();
+        const user = await invalidationUser(seeder, repo.name, protocol.repoType);
         const token = await protocol.login(repo.name, user.username, user.password);
 
         // Used twice first: what ends is a token that worked, not one that never did.
@@ -264,7 +342,7 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
       seeder,
     }) => {
       const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
-      const former = await seeder.createUser();
+      const former = await invalidationUser(seeder, repo.name, protocol.repoType);
       const token = await protocol.login(repo.name, former.username, former.password);
       await accepted(repo.name, token, 'the login token before the rename');
 
@@ -287,28 +365,34 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
       await accepted(repo.name, fresh, 'the token of the new owner of the name');
     });
 
-    test('an admin password reset ends the login token at once', async ({ seeder, panelApi }) => {
-      const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
-      const user = await seeder.createUser();
-      const token = await protocol.login(repo.name, user.username, user.password);
-      await accepted(repo.name, token, 'the login token before the reset');
+    // @cloud-skip: `POST /api/users/{id}/actions/reset-password` is an admin route of Repsy OS; a Repsy Cloud
+    // tenant has no administrator who resets another's password.
+    test(
+      'an admin password reset ends the login token at once',
+      { tag: ['@cloud-skip'] },
+      async ({ seeder, panelApi }) => {
+        const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
+        const user = await invalidationUser(seeder, repo.name, protocol.repoType);
+        const token = await protocol.login(repo.name, user.username, user.password);
+        await accepted(repo.name, token, 'the login token before the reset');
 
-      // The admin's own session (`panelApi`); the reset answers the generated password as the envelope's data.
-      const reset = await panelApi.rawRequest(
-        'POST',
-        `/api/users/${user.id}/actions/reset-password`,
-      );
-      expect(reset.status, `reset-password: ${JSON.stringify(reset.body)}`).toBe(200);
-      const generated = String(reset.body.data);
+        // The admin's own session (`panelApi`); the reset answers the generated password as the envelope's data.
+        const reset = await panelApi.rawRequest(
+          'POST',
+          `/api/users/${user.id}/actions/reset-password`,
+        );
+        expect(reset.status, `reset-password: ${JSON.stringify(reset.body)}`).toBe(200);
+        const generated = String(reset.body.data);
 
-      await endedSession(repo.name, token, 'the login token after the admin reset');
-      const fresh = await protocol.login(repo.name, user.username, generated);
-      await accepted(repo.name, fresh, 'the token of a login with the generated password');
-    });
+        await endedSession(repo.name, token, 'the login token after the admin reset');
+        const fresh = await protocol.login(repo.name, user.username, generated);
+        await accepted(repo.name, fresh, 'the token of a login with the generated password');
+      },
+    );
 
     test('a password change of another user leaves the login token alone', async ({ seeder }) => {
       const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
-      const user = await seeder.createUser();
+      const user = await invalidationUser(seeder, repo.name, protocol.repoType);
       const other = await seeder.createUser();
       const token = await protocol.login(repo.name, user.username, user.password);
 
@@ -341,7 +425,7 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
         seeder,
       }) => {
         const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
-        const user = await seeder.createUser();
+        const user = await invalidationUser(seeder, repo.name, protocol.repoType);
         const packageName = realClient.adapter.packageName(seeder.runId, SCENARIO);
         const { accepted: deployed, refused } = deploySetup(realClient, repo.name, packageName);
         const token = await protocol.login(repo.name, user.username, user.password);

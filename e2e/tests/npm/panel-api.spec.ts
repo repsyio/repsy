@@ -162,7 +162,10 @@ async function listedVersions(names: Names, packageName: string): Promise<string
   return page.content.map((row) => row.version).sort();
 }
 
-test.describe('the npm panel API against what npm publish stored', () => {
+// @cloud-skip: every call is built from the OS `openapi-spec.yaml` (`callOperation`: its paths, without an owner
+// segment) and every answer is validated against its schemas, so this is a contract test of the Repsy OS panel.
+// A Repsy Cloud panel has its own routes and its own spec (RPS-1481).
+test.describe('the npm panel API against what npm publish stored', { tag: ['@cloud-skip'] }, () => {
   test.setTimeout(300_000);
 
   test('names every operation of the npm panel API', () => {

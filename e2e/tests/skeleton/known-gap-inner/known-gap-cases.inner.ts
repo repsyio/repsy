@@ -23,6 +23,7 @@
 import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import { byTarget, knownGapOn } from '../../../src/known-gaps.js';
+import { specPath } from '../../../src/api/spec-ops.js';
 
 test('gap that still fails', () => {
   throw new Error('the defect of the target');
@@ -73,4 +74,10 @@ test.describe('a group', () => {
   test('nested gap that still fails', () => {
     throw new Error('the defect of the target');
   });
+});
+
+// RPS-1481: the spec the spec-driven tests read. `known-gaps.spec.ts` runs this with REPSY_E2E_OPENAPI_SPEC
+// pointing at nothing (a Cloud runner image has no OS spec): a Cloud target skips it, an OS target fails it.
+test('spec path', () => {
+  expect(specPath()).toBeTruthy();
 });
