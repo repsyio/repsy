@@ -62,6 +62,9 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
 
   private static final String BCRYPT_PREFIX = "{bcrypt}$2";
 
+  /** Made once per class: a BCrypt hash costs about 100 ms, so it is not made per test. */
+  private static final String NEW_PASSWORD_HASH = PasswordHasher.hash("NewPassword2@");
+
   /**
    * A route that takes Basic credentials and needs an admin: {@code MANAGE} on a repo that does not
    * exist. The auth interceptor authenticates the caller and checks the role as for a private repo
@@ -379,7 +382,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
     final var user = this.createLegacyUser(VALID_PASSWORD);
     final var staleView = this.userTxService.getUserById(user.getId());
 
-    this.userTxService.updatePassword(user.getId(), PasswordHasher.hash("NewPassword2@"));
+    this.userTxService.updatePassword(user.getId(), NEW_PASSWORD_HASH);
     final var changed = this.reload(user.getId());
 
     this.userTxService.upgradePasswordHash(staleView, VALID_PASSWORD);
@@ -393,7 +396,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
   void updatePasswordClearsTheSalt() {
     final var user = this.createLegacyUser(VALID_PASSWORD);
 
-    this.userTxService.updatePassword(user.getId(), PasswordHasher.hash("NewPassword2@"));
+    this.userTxService.updatePassword(user.getId(), NEW_PASSWORD_HASH);
 
     assertThat(this.reload(user.getId()).getSalt()).isNull();
   }
@@ -426,7 +429,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
     final var staleView = this.userTxService.getUserById(user.getId());
 
     // The owner changes the password after the login read the row but before it wrote the upgrade.
-    this.userTxService.updatePassword(user.getId(), PasswordHasher.hash("NewPassword2@"));
+    this.userTxService.updatePassword(user.getId(), NEW_PASSWORD_HASH);
     final var changed = this.reload(user.getId());
 
     this.userTxService.upgradePasswordHash(staleView, VALID_PASSWORD);

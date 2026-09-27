@@ -54,6 +54,9 @@ class H2AuthUserServiceRaceIT extends H2IntegrationTest {
 
   private static final String PASSWORD = "Password1!";
 
+  /** Made once per class: a BCrypt hash costs about 100 ms, so it is not made per test. */
+  private static final String PASSWORD_HASH = PasswordHasher.hash(PASSWORD);
+
   @Autowired private AuthUserService authUserService;
   @Autowired private JdbcTemplate jdbcTemplate;
   @Autowired private AuthFailureThrottle authFailureThrottle;
@@ -81,7 +84,7 @@ class H2AuthUserServiceRaceIT extends H2IntegrationTest {
   @DisplayName("logs in normally: the lock query accepts a user row that is still there")
   void logsInNormally() {
     final var username = this.uniqueUsername("h2login");
-    this.userTxServiceSpy.create(username, UserRole.USER, PasswordHasher.hash(PASSWORD));
+    this.userTxServiceSpy.create(username, UserRole.USER, PASSWORD_HASH);
 
     final var loginInfo = this.authUserService.login(this.loginForm(username));
 
@@ -94,8 +97,7 @@ class H2AuthUserServiceRaceIT extends H2IntegrationTest {
   @DisplayName("answers invalidCredentials, not a lock-mode error, once the user is gone")
   void loginRaceWithADeletion() {
     final var username = this.uniqueUsername("h2race");
-    final var user =
-        this.userTxServiceSpy.create(username, UserRole.USER, PasswordHasher.hash(PASSWORD));
+    final var user = this.userTxServiceSpy.create(username, UserRole.USER, PASSWORD_HASH);
 
     Mockito.doAnswer(
             invocation -> {

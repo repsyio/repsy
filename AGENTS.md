@@ -243,7 +243,11 @@ for SonarCloud.
   integration run (RPS-1453). `createUser` and the `*BearerToken()` helpers reuse
   `VALID_PASSWORD_HASH`, the hash of `VALID_PASSWORD` made once per JVM; use it (not
   `PasswordHasher.hash(VALID_PASSWORD)`) whenever a test only needs a user that can log in with the
-  known password, and hash on your own only for a different password or a specific work factor.
+  known password, and hash on your own only for a different password or a specific work factor, once
+  per class in a `private static final` field. `IntegrationTestHashingGuardTest` (a unit test, so
+  `mvn test` runs it) fails an integration test or helper that calls `PasswordHasher.hash` per test
+  or hashes `VALID_PASSWORD` again, and names the file, the line and the fix; a test that needs a
+  fresh hash per call goes in its `ALLOWED` map with the reason (RPS-1471).
   `mvn verify` runs the forked test JVMs with C1 only (`test.jvm.args` in the root `pom.xml`): see
   the comment there before touching `argLine`.
 - Do not declare versions for `org.testcontainers:*` artifacts: they are managed by `core-parent`
