@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.Comparator;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -137,6 +138,33 @@ class ScannerHttpTest {
 
     assertThat(response.statusCode()).isEqualTo(200);
     assertThat(response.body()).isEqualTo("{\"status\":\"ok\"}");
+  }
+
+  @Test
+  void everyEndpointButHealthRefusesARequestWithoutTheKeyOrWithTheWrongOne() throws Exception {
+    final var scan = "/scan";
+    final var poll = "/scan/" + UUID.randomUUID();
+
+    assertThat(this.send(this.post(scan, null, "{}")).statusCode()).isEqualTo(401);
+    assertThat(this.send(this.post(scan, "wrong", "{}")).statusCode()).isEqualTo(401);
+    assertThat(this.send(this.get(poll, null)).statusCode()).isEqualTo(401);
+    assertThat(this.send(this.get(poll, "wrong")).statusCode()).isEqualTo(401);
+    assertThat(this.send(this.get("/actuator/info", null)).statusCode()).isEqualTo(401);
+  }
+
+  @Test
+  void aBlankOrPlaceholderKeyIsNotTheKey() throws Exception {
+    for (final var key : new String[] {"", " ", "${SCANNER_API_KEY}", "${SCANNER_API_KEY:}"}) {
+      assertThat(this.send(this.get("/status", key)).statusCode()).isEqualTo(401);
+      assertThat(this.send(this.post("/advisories", key, VALID_BODY)).statusCode()).isEqualTo(401);
+    }
+  }
+
+  @Test
+  void theKeyOpensTheScanEndpoints() throws Exception {
+    // An unknown scan id: past the filter (404), not refused (401).
+    assertThat(this.send(this.get("/scan/" + UUID.randomUUID(), "test-key")).statusCode())
+        .isEqualTo(404);
   }
 
   @Test

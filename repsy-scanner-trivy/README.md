@@ -64,7 +64,7 @@ The container listens on port `8090` by default (`SERVER_PORT` env var to overri
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `SCANNER_API_KEY` | yes | — | Shared secret checked against the `X-Scanner-Api-Key` header |
+| `SCANNER_API_KEY` | yes | — | Shared secret checked against the `X-Scanner-Api-Key` header. The service does not start without it: a missing, blank or unresolved (`${...}`) value stops the start with an error that names the variable (see [below](#the-api-key)). Set the same value as `TRIVY_SCANNER_API_KEY` on the application |
 | `SERVER_PORT` | no | `8090` | HTTP port the service listens on |
 | `TRIVY_BINARY_PATH` | no | `trivy` | Path to the `trivy` binary (already baked into the image) |
 | `TRIVY_TIMEOUT_SECONDS` | no | `300` | Max time to wait for a single `trivy` subprocess run |
@@ -79,6 +79,15 @@ The container listens on port `8090` by default (`SERVER_PORT` env var to overri
 | `SCANNER_ADVISORY_MAX_WAIT_SECONDS` | no | `5` | How long a lookup waits for a running scan or a database switch to end before it gets a `503` |
 | `TRIVY_JAVA_DB_REPOSITORY` | no | `ghcr.io/aquasecurity/trivy-java-db:1,mirror.gcr.io/aquasec/trivy-java-db:1` | Same, for the Java (Maven) database |
 | `SHUTDOWN_TIMEOUT_SECONDS` | no | `300` | How long a graceful shutdown waits for running scans |
+
+### The API key
+
+`SCANNER_API_KEY` is required. When it is missing, blank or still an unresolved placeholder such as `${SCANNER_API_KEY}`,
+the service refuses to start (the log says `scanner.security.api-key (SCANNER_API_KEY) must be set to a non-blank
+secret ...` and the process exits non-zero), so a scanner that is misconfigured this way is never reachable, instead
+of answering every request. The value is compared in constant time and is never logged. Every endpoint except
+`GET /health` answers `401` without the matching `X-Scanner-Api-Key` header. The application, in turn, does not start
+with `SECURITY_SCANNER=enabled` and a blank `TRIVY_SCANNER_API_KEY`.
 
 ### Advisory lookup: `POST /advisories`
 
