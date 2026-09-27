@@ -21,9 +21,9 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
-import io.repsy.os.server.protocols.cargo.protocol.pre_processors.CargoAuthPreProcessor;
 import io.repsy.os.server.protocols.ruby.shared.auth.services.RubyAuthComponent;
 import io.repsy.os.server.shared.auth.AuthChallenges;
+import io.repsy.os.server.shared.utils.PreProcessorUtils;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
@@ -72,7 +72,7 @@ public class RubyAuthPreProcessor extends ProtocolProcessor {
 
     final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
 
-    if (CargoAuthPreProcessor.shouldSkipAuthentication(
+    if (PreProcessorUtils.shouldSkipAuthentication(
         SKIP_PRE_PROCESSOR_KEY, WRITE_OPERATION_KEY, repoInfo, properties)) {
       return ProcessorResult.next();
     }

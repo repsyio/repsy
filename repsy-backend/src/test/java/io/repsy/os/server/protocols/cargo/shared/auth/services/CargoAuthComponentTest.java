@@ -202,6 +202,31 @@ class CargoAuthComponentTest {
         .isEqualTo("renewed");
   }
 
+  /**
+   * RPS-1576: the {@code cargo:token} credential provider sends a renewed token bare, with no
+   * {@code Bearer } prefix (registry-authentication.html); {@code CargoAuthPreProcessor} already
+   * normalizes this for the index/publish/download endpoints, and this is the same fix for {@code
+   * /me}, the only place implementing the RPS-979/RPS-1552 bearer-renewal checks.
+   */
+  @Test
+  @DisplayName("authenticateAndCreateToken renews a scheme-less (raw) bearer token")
+  void authenticateAndCreateTokenAcceptsARawBearerToken() {
+    final var jwtUtils = Mockito.mock(JwtUtils.class);
+    final var userId = UUID.randomUUID();
+    when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+        .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+    when(jwtUtils.extractProtocolUserClaims(anyString()))
+        .thenReturn(new ProtocolUserClaims(userId, USERNAME, 2));
+    when(this.userTxService.getAuthenticatedUserByUsername(USERNAME))
+        .thenReturn(UserInfo.builder().id(userId).username(USERNAME).tokenVersion(2).build());
+    when(jwtUtils.createProtocolToken(eq(userId), eq(USERNAME), any(TemporalAmount.class), eq(2)))
+        .thenReturn("renewed");
+    final var component = this.componentWith(jwtUtils);
+
+    // No "Bearer " prefix, exactly as the real cargo:token credential provider sends it.
+    assertThat(component.authenticateAndCreateToken("raw.jwt.token")).isEqualTo("renewed");
+  }
+
   private CargoAuthComponent componentWith(final JwtUtils jwtUtils) {
     return new CargoAuthComponent(
         this.userTxService,

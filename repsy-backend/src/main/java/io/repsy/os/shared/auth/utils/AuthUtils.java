@@ -104,6 +104,19 @@ public class AuthUtils {
     return authHeader.startsWith(AUTH_BASIC);
   }
 
+  /**
+   * RPS-1576: the {@code cargo:token} credential provider sends a token as the bare {@code
+   * Authorization} value, no {@code Bearer }/{@code Basic } scheme prefix — the server is expected
+   * to add it (Cargo's {@code registry-authentication.html}). A header that already carries a
+   * scheme is returned unchanged.
+   */
+  public static @NonNull String normalizeToBearer(final @NonNull String authHeader) {
+
+    return (isBasicToken(authHeader) || isBearerToken(authHeader))
+        ? authHeader
+        : AUTH_BEARER + authHeader;
+  }
+
   public static @Nullable Credentials extractCredentialsFromAuthHeader(
       final @NonNull String authHeader) {
 

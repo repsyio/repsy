@@ -143,4 +143,28 @@ class AuthUtilsTest {
       assertThat(AuthUtils.extractCredentialsFromAuthHeader("Basic !!!")).isNull();
     }
   }
+
+  @Nested
+  @DisplayName("normalizeToBearer")
+  class NormalizeToBearer {
+
+    @Test
+    @DisplayName("prefixes a scheme-less token with Bearer")
+    void prefixesABareToken() {
+      assertThat(AuthUtils.normalizeToBearer("raw.jwt.token")).isEqualTo("Bearer raw.jwt.token");
+    }
+
+    @Test
+    @DisplayName("leaves an existing Bearer header untouched")
+    void leavesBearerUntouched() {
+      assertThat(AuthUtils.normalizeToBearer("Bearer raw.jwt.token"))
+          .isEqualTo("Bearer raw.jwt.token");
+    }
+
+    @Test
+    @DisplayName("leaves an existing Basic header untouched")
+    void leavesBasicUntouched() {
+      assertThat(AuthUtils.normalizeToBearer("Basic dXNlcjpwYXNz")).isEqualTo("Basic dXNlcjpwYXNz");
+    }
+  }
 }
