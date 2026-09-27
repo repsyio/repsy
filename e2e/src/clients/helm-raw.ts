@@ -443,6 +443,24 @@ export async function rawUploadChart(
   return rawFetch(url, { method: 'POST', headers: authHeader(credential), body: form });
 }
 
+/**
+ * Raw `POST` of arbitrary bytes to the classic chart route with a content type of the caller's
+ * choosing: what `curl --data-binary @chart.tgz` sends (a form content type, no multipart at all),
+ * RPS-1466.
+ */
+export async function rawPostChartBody(
+  repoName: string,
+  credential: MaterializedCredential,
+  body: Buffer,
+  contentType: string,
+): Promise<RawResponse> {
+  return rawFetch(`${env.repoBaseUrl}/api/${repoPath(repoName)}/charts`, {
+    method: 'POST',
+    headers: { ...authHeader(credential), 'Content-Type': contentType },
+    body: new Uint8Array(body),
+  });
+}
+
 /** Raw multipart POST with NO `chart` part at all -- pins the classic push handler's plain-text
  *  `Missing 'chart' part` `400` (confirmed live). */
 export async function rawUploadChartMissingPart(

@@ -146,6 +146,21 @@ class AbstractPypiProtocolFacadeTest {
     }
 
     @Test
+    @DisplayName(
+        "rejects an empty archive, even with the digest of nothing, writing nothing (RPS-1466)")
+    void rejectsAnEmptyArchive() throws Exception {
+      final var bytes = new byte[0];
+      final var file = file("pkg-1.0.0.tar.gz", bytes);
+      final var params = form("pkg", "1.0.0", sha256Hex(bytes));
+
+      assertThatThrownBy(() -> facade.uploadPackage(context(), params, file))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("pypiArchiveEmpty");
+
+      verifyNoInteractions(storageService, packageService);
+    }
+
+    @Test
     @DisplayName("rejects an upload whose digest does not match the actual bytes, writing nothing")
     void rejectsMismatchedDigest() {
       final var bytes = "content".getBytes();

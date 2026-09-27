@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.helm.protocol.handlers.classic;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
@@ -26,13 +27,17 @@ import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.SpooledUpload;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -96,7 +101,7 @@ public abstract class AbstractHelmChartPushProtocolMethodHandler<ID>
       final HttpServletResponse response)
       throws Exception {
 
-    final var chartPart = request.getPart(HelmConstants.CHART_PART_NAME);
+    final var chartPart = chartPartOf(request);
 
     if (chartPart == null) {
       return ResponseEntity.badRequest().body("Missing 'chart' part");
@@ -106,6 +111,12 @@ public abstract class AbstractHelmChartPushProtocolMethodHandler<ID>
     // memory: the metadata is read from the file and then the file is streamed into storage.
     try (final var chartStream = chartPart.getInputStream();
         final var chart = SpooledUpload.spool(chartStream)) {
+
+      // No chart is empty: an empty file part would otherwise fail in the gzip reader with a 500
+      // (RPS-1466).
+      if (chart.size() == 0) {
+        throw new BadRequestException("helmChartEmpty");
+      }
 
       final HelmChartMetadata metadata;
       try (final var in = chart.openStream()) {
@@ -119,5 +130,20 @@ public abstract class AbstractHelmChartPushProtocolMethodHandler<ID>
     }
 
     return ResponseEntity.status(HttpStatus.CREATED).build();
+  }
+
+  /**
+   * The {@code chart} part of the request, or {@code null} when there is none. A request that is
+   * not {@code multipart/form-data} at all, such as {@code curl --data-binary @chart.tgz} sends,
+   * has none either: the servlet container refuses to look for parts in it, which used to end in a
+   * 500 (RPS-1466).
+   */
+  private static @Nullable Part chartPartOf(final HttpServletRequest request) throws IOException {
+
+    try {
+      return request.getPart(HelmConstants.CHART_PART_NAME);
+    } catch (final ServletException _) {
+      return null;
+    }
   }
 }

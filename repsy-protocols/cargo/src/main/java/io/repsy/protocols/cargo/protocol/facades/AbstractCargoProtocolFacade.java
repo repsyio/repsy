@@ -26,6 +26,7 @@ import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.utils.RequestBodies;
 import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.IOException;
 import java.io.InputStream;
@@ -106,12 +107,17 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
    * tarball is inspected and the checksum is taken from the spool's own hash, and the file is
    * streamed into storage. The publish-metadata JSON is bounded the same way in {@link
    * CrateUtils#getPublishRequest}, which runs first, so a request that fails validation is refused
-   * before the (potentially large) crate that follows it is even looked at.
+   * before the (potentially large) crate that follows it is even looked at. A body with no byte in
+   * it, one that stops inside a length field, and a crate of zero bytes are refused with a {@code
+   * 400} in Cargo's error shape, and nothing is stored (RPS-1466).
    */
   @Override
-  public void publish(final ProtocolContext context, final InputStream inputStream)
+  public void publish(final ProtocolContext context, final InputStream requestBody)
       throws IOException {
 
+    final var inputStream =
+        RequestBodies.nonEmpty(requestBody)
+            .orElseThrow(() -> new IllegalArgumentException("the publish body is empty"));
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var published = CrateUtils.getPublishRequest(inputStream, this.objectMapper);
 
@@ -120,6 +126,10 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
     final var request = CrateUtils.dropOverLongMetadata(published);
 
     final var crateLength = CrateUtils.readCrateLength(inputStream);
+
+    if (crateLength == 0) {
+      throw new IllegalArgumentException("the crate is empty");
+    }
 
     if (crateLength > this.maxCrateBytes) {
       throw new MaxUploadSizeExceededException(this.maxCrateBytes);

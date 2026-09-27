@@ -201,7 +201,7 @@ export function buildPublishDocument(opts: {
 
 async function rawRequest(
   url: string,
-  init: { method?: string; headers?: Record<string, string>; body?: string },
+  init: { method?: string; headers?: Record<string, string>; body?: BodyInit },
 ): Promise<RawResponse> {
   return withBackoff429Response(async () => {
     const res = await fetch(url, init);
@@ -221,6 +221,25 @@ export async function rawPublish(
     method: 'PUT',
     headers: { ...npmAuthHeader(credential), 'Content-Type': 'application/json' },
     body: JSON.stringify(document),
+  });
+}
+
+/** Raw `PUT` of arbitrary bytes at a package's publish URL: what a client that is not `npm` sends
+ *  (`curl -T file`, or `curl --data-binary`, which declares a form content type), RPS-1466. */
+export async function rawPublishBody(
+  repoName: string,
+  credential: MaterializedCredential,
+  packageName: string,
+  body: Buffer,
+  contentType?: string,
+): Promise<RawResponse> {
+  return rawRequest(packagePutGetUrl(repoName, packageName), {
+    method: 'PUT',
+    headers: {
+      ...npmAuthHeader(credential),
+      ...(contentType === undefined ? {} : { 'Content-Type': contentType }),
+    },
+    body: new Uint8Array(body),
   });
 }
 

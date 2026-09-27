@@ -35,11 +35,11 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.utils.RequestBodies;
 import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PushbackInputStream;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -226,7 +226,9 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       final ProtocolContext context, final InputStream requestBody, final long contentLength)
       throws IOException, XmlPullParserException {
 
-    final var inputStream = nonEmpty(requestBody);
+    final var inputStream =
+        RequestBodies.nonEmpty(requestBody)
+            .orElseThrow(() -> new BadRequestException("mavenUploadBodyEmpty"));
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var relativePath = ProtocolContextUtils.getRelativePath(context);
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
@@ -270,25 +272,6 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       context.addProperty(ARTIFACT_NAME, gav.getGroupId() + ":" + gav.getArtifactId());
       context.addProperty(ARTIFACT_VERSION, resolveLogicalVersion(gav));
     }
-  }
-
-  /**
-   * Answers the body with its first byte put back, refusing one that has none (RPS-1443). The
-   * artifact is what the body is, so an empty one can only be a mistake of the client or a body
-   * that was read by something else on the way.
-   */
-  private static InputStream nonEmpty(final InputStream inputStream) throws IOException {
-
-    final var body = new PushbackInputStream(inputStream, 1);
-    final var first = body.read();
-
-    if (first < 0) {
-      throw new BadRequestException("mavenUploadBodyEmpty");
-    }
-
-    body.unread(first);
-
-    return body;
   }
 
   /**
