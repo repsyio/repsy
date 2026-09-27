@@ -37,6 +37,7 @@ import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { Toasts } from '../../../src/ui/pages/components.js';
 import { UsersPage } from '../../../src/ui/pages/users.js';
 import { errorToasts } from '../../../src/ui/page-errors.js';
+import { errorBody, fulfillJson, type ErrorResponse } from '../../../src/ui/stub-responses.js';
 
 const LIST_URL = /\/api\/repos(\?|$)/;
 const USERS_URL = /\/api\/users(\?|$)/;
@@ -60,10 +61,11 @@ async function withRoute(
   }
 }
 
+/** Answers with `status` and the failure envelope `fields` fill in (`ErrorResponse`, typed from the OpenAPI spec). */
 const respondWith =
-  (status: number, json: unknown = {}): Handler =>
+  (status: number, fields: Omit<ErrorResponse, 'type'> = {}): Handler =>
   (route) =>
-    route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(json) });
+    fulfillJson<ErrorResponse>(route, status, errorBody(fields));
 
 const abort: Handler = (route) => route.abort('failed');
 
@@ -305,11 +307,8 @@ test.describe('Error handling', () => {
       adminPage,
       LIST_URL,
       (route) =>
-        route.fulfill({
-          status: 503,
-          contentType: 'application/json',
-          headers: { 'Retry-After': '1' },
-          body: JSON.stringify({ msgId: 'resourceBusy', text: busy }),
+        fulfillJson<ErrorResponse>(route, 503, errorBody({ msgId: 'resourceBusy', text: busy }), {
+          'Retry-After': '1',
         }),
       async () => {
         const raised = expectToastLater(repos.toasts, busy);
@@ -331,25 +330,27 @@ test.describe('Error handling', () => {
     await expect(repos.rows().first()).toBeVisible();
   });
 
-  for (const [label, status, body] of [
+  const cases: [string, number, Omit<ErrorResponse, 'type'> | undefined][] = [
     ['a 503 without a body', 503, undefined],
     ['a 503 whose body has no text', 503, {}],
     ['a 502 with a text', 502, { text: 'upstream detail that must not reach the user' }],
     ['a 504 with a text', 504, { text: 'gateway detail that must not reach the user' }],
-  ] as const) {
+  ];
+  for (const [label, status, body] of cases) {
     test(`ERR-05: ${label} toasts the generic "Server error"`, async ({ adminPage }) => {
       const repos = new RepositoriesPage(adminPage);
       await withRoute(
         adminPage,
         LIST_URL,
         (route) =>
-          route.fulfill({
-            status,
-            headers: status === 503 ? { 'Retry-After': '1' } : {},
-            ...(body === undefined
-              ? {}
-              : { contentType: 'application/json', body: JSON.stringify(body) }),
-          }),
+          body === undefined
+            ? route.fulfill({ status, headers: status === 503 ? { 'Retry-After': '1' } : {} })
+            : fulfillJson<ErrorResponse>(
+                route,
+                status,
+                errorBody(body),
+                status === 503 ? { 'Retry-After': '1' } : {},
+              ),
         async () => {
           const raised = expectToastLater(repos.toasts, 'Server error');
           await adminPage.goto('/repositories');

@@ -25,11 +25,12 @@
  * with family revocation on reuse (`RefreshTokenService.consume` in the backend), which shapes
  * everything here: never share one token pair between tests or contexts.
  */
-import type { BrowserContext, Page, Request } from '@playwright/test';
+import type { BrowserContext, Page, Request, Route } from '@playwright/test';
 
 import { loginPanel } from '../api/backend-registry.js';
 import { env } from '../env.js';
 import { target, type UiSessionStorageKeys } from '../target.js';
+import { errorBody, fulfillJson, type ErrorResponse } from './stub-responses.js';
 
 export interface UiSession {
   username: string;
@@ -182,17 +183,30 @@ export async function expireAccessToken(
     }
     left -= 1;
     options.refused?.push(request);
-    await route.fulfill({
-      status: 401,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        msgId: 'sessionExpired',
-        type: 'ERROR',
-        data: 'sessionExpired',
-        text: 'Session expired.',
-      }),
-    });
+    await answerSessionExpired(route);
   });
+}
+
+/** What the backend answers (401) for an access token past its lifetime: the panel then tries a refresh. */
+export function answerSessionExpired(route: Route): Promise<void> {
+  return fulfillJson<ErrorResponse>(
+    route,
+    401,
+    errorBody({ msgId: 'sessionExpired', data: 'sessionExpired', text: 'Session expired.' }),
+  );
+}
+
+/** What the backend answers (401) for a refresh token past its lifetime (30 days, so not waitable). */
+export function answerRefreshTokenExpired(route: Route): Promise<void> {
+  return fulfillJson<ErrorResponse>(
+    route,
+    401,
+    errorBody({
+      msgId: 'refreshTokenExpired',
+      data: 'refreshTokenExpired',
+      text: 'Refresh token expired.',
+    }),
+  );
 }
 
 /** Counts the refresh calls `page` sends from now on (the request, whatever the answer). */

@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack, plus the full catalog of one rotating runner), scanner (the @scanner specs of the ui runner and of the npm-clients, docker, maven and pypi runners against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack), limits (the @limits specs of the pypi, helm, nuget, ruby, cargo, golang and api runners against the tiny-upload-limit stack), cors (the @cors specs of the api runner against the stack that sets APP_ALLOWED_ORIGINS), browsers (@smoke of the panel UI in Firefox and in WebKit), proxy (@smoke of the panel UI and the @proxy specs of the ui and api runners behind an nginx reverse proxy that terminates TLS), upgrade (the previous release on a populated volume, upgraded to this image: PostgreSQL and H2), trivy (the @trivy contract spec of the api runner against the real repsy-scanner-trivy), tls (@smoke of every runner but stack over Repsy's own https listeners, every client trusting the generated CA, the ui runners in browsers that ignore the certificate error) or all"
+        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (the embedded-H2 stack: @smoke of every wire runner, the full catalog of one rotating runner and the complete panel UI suite), scanner (the @scanner specs of the ui runner and of the npm-clients, docker, maven and pypi runners against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack), limits (the @limits specs of the pypi, helm, nuget, ruby, cargo, golang and api runners against the tiny-upload-limit stack), cors (the @cors specs of the api runner against the stack that sets APP_ALLOWED_ORIGINS), browsers (@smoke of the panel UI in Firefox and in WebKit), proxy (@smoke of the panel UI and the @proxy specs of the ui and api runners behind an nginx reverse proxy that terminates TLS), upgrade (the previous release on a populated volume, upgraded to this image: PostgreSQL and H2), trivy (the @trivy contract spec of the api runner against the real repsy-scanner-trivy), tls (@smoke of every runner but stack over Repsy's own https listeners, every client trusting the generated CA, the ui runners in browsers that ignore the certificate error) or all"
         type: choice
         options: [all, ui, wire, h2, scanner, throttle, limits, cors, browsers, proxy, upgrade, trivy, tls]
         default: all
@@ -27,7 +27,7 @@ on:
         type: string
         default: ""
       grep:
-        description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 and tls legs then keep their default, @smoke). The scanner, throttle, limits, cors and trivy legs ignore it and always run @scanner, @throttle, @limits, @cors and @trivy. The browsers leg keeps its own filter on top of it (@smoke, @tls and the keyboard walkthrough)"
+        description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 and tls legs then keep their default, @smoke; the h2-ui leg runs the whole panel UI suite). The scanner, throttle, limits, cors and trivy legs ignore it and always run @scanner, @throttle, @limits, @cors and @trivy. The browsers leg keeps its own filter on top of it (@smoke, @tls and the keyboard walkthrough)"
         type: string
         default: ""
       h2_full:
@@ -102,8 +102,15 @@ jobs:
               # in WebKit, on the default stack, each its own runner so a failure names its browser. The project's own
               # filter applies, so the default grep is empty; nothing is opt-in here, so skips are not an error.
               "browsers": ("browsers", "", ["ui-firefox", "ui-webkit"], "", 30, "", True),
-              # Embedded H2: @smoke of every runner (README.md "Scope decision"), not the catalogs.
-              "h2": ("h2", "--h2", WIRE + ["ui"], "@smoke", 90, "", True),
+              # Embedded H2: @smoke of every wire runner (README.md "Scope decision"), not the catalogs.
+              "h2": ("h2", "--h2", WIRE, "@smoke", 90, "", True),
+              # The COMPLETE panel UI suite on the embedded-H2 stack (RPS-1652, README.md "UI suite on H2"): H2 is
+              # the database of the Docker image's default, so what a self-hoster sees in the panel (orderings,
+              # case-insensitive searches, counts) is proven on it every night, not only its @smoke tests. One
+              # runner, its own leg, so it runs in parallel with the wire legs instead of adding to h2's 90
+              # minutes. The whole catalog (the project's own grep: none), the same as the `ui` leg on PostgreSQL:
+              # 6 minutes on a workstation, three to four times that on a runner.
+              "h2-ui": ("h2", "--h2", ["ui"], "", 45, "", True),
               # One full catalog on H2 per night, rotating (README.md "CI"): @smoke alone let RPS-1385 (a
               # native CTE that broke Docker on H2 while every IT passed) through.
               # 90 minutes, not 60 (RPS-1600): the maven catalog alone took 43.7 minutes on PostgreSQL in the
@@ -212,6 +219,40 @@ jobs:
               out.write("matrix=" + json.dumps({"include": include}) + "\n")
           print(json.dumps(include, indent=2))
           PY
+
+  # The harness's own types and lint (RPS-1652, H9). Playwright transpiles the specs without checking types,
+  # so a change of openapi-spec.yaml that a UI stub or a page object no longer matches would only show as a
+  # run-time failure of a test, if at all. The route stubs of the UI suite are typed from the models generated out
+  # of the spec (README.md "UI suite: route stubs typed from the OpenAPI models"), so this job turns that drift into
+  # a red `tsc`, in a minute and with no stack. It runs on every trigger, whatever the suite input says.
+  typecheck:
+    name: E2E typecheck and lint
+    runs-on: ${{ vars.E2E_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: false
+
+      # Node, the pinned pnpm and e2e/'s dependencies. No Java: the panel client is generated by
+      # openapi-typescript-codegen (a node tool, `pnpm gen:api` below), not by the Java generator of the frontend.
+      - name: Set up Node and the harness dependencies
+        uses: ./.github/actions/setup-frontend
+        with:
+          working-directory: e2e
+          generate-api: "false"
+
+      - name: Generate the panel API client
+        working-directory: e2e
+        run: pnpm run gen:api
+
+      - name: Type-check
+        working-directory: e2e
+        run: ./node_modules/.bin/tsc --noEmit
+
+      - name: Lint
+        working-directory: e2e
+        run: ./node_modules/.bin/eslint .
 
   # The Repsy image, built once from this checkout with the layer cache, and handed to the legs as
   # an artifact: three legs each rebuilding it would triple the slowest step of the run.

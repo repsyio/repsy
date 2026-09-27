@@ -450,6 +450,20 @@ services:
 
   ui-webkit: *ui-runner
 
+  # The visual regression project (RPS-1652, README.md "UI suite: visual regression"): the same image as `ui`,
+  # plus a WRITABLE mount of the baseline folder, so `run.sh test --protocol ui-visual --update-snapshots` writes
+  # the new PNGs into the checkout (tests/ is otherwise mounted read-only). The folder is committed, so the bind
+  # never creates it as root.
+  ui-visual:
+    <<: *ui-runner
+    volumes:
+      - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
+      - ./src:/app/src
+      - ./tests:/app/tests:ro
+      - ./tests/ui/__screenshots__:/app/tests/ui/__screenshots__
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+
 volumes:
   # Named (not bind-mounted): holds only downloaded third-party Maven plugins/dependencies, so it
   # persists across `run.sh test` invocations without leaving anything in the working tree.

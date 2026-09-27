@@ -74,6 +74,7 @@ import {
   type VulnerabilityScanDetail,
   type VulnerabilityScanInfo,
 } from './stub-models.js';
+import { fulfillJson } from './stub-responses.js';
 
 export { FixStatus, RepoType, ScanStatus, Severity };
 export type {
@@ -121,8 +122,9 @@ function success<R extends { type?: ResponseType; data?: unknown }>(
   return { type: ResponseType.SUCCESS, data } as R;
 }
 
-async function json(route: Route, body: unknown): Promise<void> {
-  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+/** Answers 200 with `body`, an instance of a generated model (`success<R>` builds one): never `unknown`. */
+async function json<R extends object>(route: Route, body: R): Promise<void> {
+  await fulfillJson<R>(route, 200, body);
 }
 
 /**

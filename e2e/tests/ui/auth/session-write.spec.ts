@@ -28,7 +28,7 @@
  * As in `session.spec.ts` the 401 is stubbed (an access token cannot be expired on demand) and the rest
  * is the real backend. The tests use `adminPage` and only create a repository of their own.
  */
-import type { Page, Request, Route } from '@playwright/test';
+import type { Page, Request } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
@@ -36,7 +36,13 @@ import { allowLists, errorToasts } from '../../../src/ui/page-errors.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { uiRepoType } from '../../../src/ui/repo-types.js';
-import { REFRESH_PATH, countRefreshCalls, expireAccessToken } from '../../../src/ui/session.js';
+import {
+  REFRESH_PATH,
+  answerRefreshTokenExpired,
+  answerSessionExpired,
+  countRefreshCalls,
+  expireAccessToken,
+} from '../../../src/ui/session.js';
 import { JWT_SHAPE, NO_SESSION, storedSession } from './stored-session.js';
 
 const CREATE_URL = /\/api\/repos(\?|$)/;
@@ -53,18 +59,6 @@ function countCreateCalls(page: Page): { readonly count: number } {
   });
   return counter;
 }
-
-const sessionExpired = (route: Route) =>
-  route.fulfill({
-    status: 401,
-    contentType: 'application/json',
-    body: JSON.stringify({
-      msgId: 'sessionExpired',
-      type: 'ERROR',
-      data: 'sessionExpired',
-      text: 'Session expired.',
-    }),
-  });
 
 test.describe('AUTH-14 a write refused with an expired access token', () => {
   test.use({
@@ -134,18 +128,7 @@ test.describe('AUTH-14 a write refused with an expired access token', () => {
     const before = await storedSession(adminPage);
     await expireAccessToken(adminPage, before.token!, { methods: ['POST'] });
     // What the backend answers for a refresh token past its lifetime (30 days, so not waitable).
-    await adminPage.route(`**${REFRESH_PATH}`, (route) =>
-      route.fulfill({
-        status: 401,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          msgId: 'refreshTokenExpired',
-          type: 'ERROR',
-          data: 'refreshTokenExpired',
-          text: 'Refresh token expired.',
-        }),
-      }),
-    );
+    await adminPage.route(`**${REFRESH_PATH}`, answerRefreshTokenExpired);
     const creates = countCreateCalls(adminPage);
     const refreshes = countRefreshCalls(adminPage);
 
@@ -171,7 +154,7 @@ test.describe('AUTH-14 a write refused with an expired access token', () => {
     const { repos, modal } = await fillCreateModal(adminPage, name);
     // Every create is refused as expired, whatever token it carries: the retry with the fresh token too.
     await adminPage.route(CREATE_URL, (route) =>
-      route.request().method() === 'POST' ? sessionExpired(route) : route.fallback(),
+      route.request().method() === 'POST' ? answerSessionExpired(route) : route.fallback(),
     );
     const creates = countCreateCalls(adminPage);
     const refreshes = countRefreshCalls(adminPage);

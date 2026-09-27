@@ -27,6 +27,7 @@ export {
   ResponseType,
   ScanStatus,
   Severity,
+  type ErrorResponse,
   type PagedModelVulnerabilityFindingInfo,
   type PagedModelVulnerabilityScanInfo,
   type RecentScannedVersion,

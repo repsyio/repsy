@@ -65,7 +65,7 @@ usage() {
 Usage:
   run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy] [--force]
   run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy]
-  run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [--workers N] [-b]
+  run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [--workers N] [--update-snapshots] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
 Every subcommand also takes --project NAME and --port-offset N (or REPSY_E2E_PROJECT and
@@ -78,6 +78,10 @@ local stack only, see README.md "Stack runner") ui (the panel UI suite in headle
 tests/ui; see README.md "UI suite"), ui-firefox and ui-webkit (the same runner image, the @smoke subset of the
 UI suite in Firefox and in WebKit; see README.md "UI suite: Firefox and WebKit") and api (raw HTTP at Repsy's edge, no package client: port separation,
 X-Forwarded-* public URLs, CORS/CSP; tests/api, see README.md "API suite").
+
+ui-visual (the same runner image, the screenshot comparison of a few pages against the baselines committed under
+tests/ui/__screenshots__; see README.md "UI suite: visual regression"). --update-snapshots (ui-visual only) rewrites
+those baselines instead of comparing against them.
 
 --workers N (or REPSY_E2E_WORKERS=N; the flag wins) sets the number of Playwright workers of every runner "test"
 starts, for a loaded host or a leg that needs fewer (a positive integer; without it Playwright's default, or the
@@ -677,6 +681,7 @@ cmd_test() {
   local protocols=""
   local grep_pattern=""
   local rebuild="false"
+  local update_snapshots="false"
   local workers="${REPSY_E2E_WORKERS:-}"
 
   while [ $# -gt 0 ]; do
@@ -703,6 +708,10 @@ cmd_test() {
         ;;
       --workers=*)
         workers="${1#--workers=}"
+        shift
+        ;;
+      --update-snapshots)
+        update_snapshots="true"
         shift
         ;;
       -b)
@@ -772,6 +781,13 @@ cmd_test() {
     services=(skeleton)
   fi
 
+  # Only the visual project has baselines to rewrite (and the only runner whose baseline folder is writable):
+  # for any other runner the flag would be silently ignored or fail on a read-only mount, so refuse it up front.
+  if [ "$update_snapshots" = "true" ] && { [ "${#services[@]}" -ne 1 ] || [ "${services[0]}" != "ui-visual" ]; }; then
+    echo "--update-snapshots takes exactly --protocol ui-visual (the only runner with baselines): $protocols" >&2
+    exit 1
+  fi
+
   if [ "$rebuild" = "true" ]; then
     docker compose -p "$RUNNERS_PROJECT" -f "$RUNNERS_FILE" build "${services[@]}"
   fi
@@ -779,6 +795,9 @@ cmd_test() {
   local -a play_args=()
   if [ -n "$grep_pattern" ]; then
     play_args+=(--grep "$grep_pattern")
+  fi
+  if [ "$update_snapshots" = "true" ]; then
+    play_args+=(--update-snapshots)
   fi
 
   local failed="false"

@@ -33,6 +33,7 @@ import { expect, test } from '../../../src/ui/fixtures.js';
 import { REPO_PAGE_SIZE, RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
 import { errorToasts } from '../../../src/ui/page-errors.js';
+import { errorBody, fulfillJson, type ErrorResponse } from '../../../src/ui/stub-responses.js';
 
 /** axe (WCAG 2.0/2.1 A and AA) on ONE component: the whole page still carries other debt (RPS-1266). */
 async function expectNoAxeViolations(page: Page, selector: string): Promise<void> {
@@ -173,7 +174,7 @@ test.describe('Shared components: ARIA contract', { tag: '@a11y' }, () => {
     async function raiseErrorToast(page: Page) {
       await page.clock.install();
       await page.route(REPO_LIST_URL, (route) =>
-        route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }),
+        fulfillJson<ErrorResponse>(route, 500, errorBody()),
       );
       const repos = new RepositoriesPage(page);
       await page.goto('/repositories');
