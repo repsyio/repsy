@@ -173,6 +173,41 @@ class AbstractDockerTagsListProtocolMethodHandlerTest {
   }
 
   @Test
+  @DisplayName("answers the name the client addressed, owner included, when the registry has one")
+  void answersTheOwnerScopedName() {
+    final var context = new ProtocolContext();
+    context.addProperty(
+        "urlProperties",
+        new OwnerScopedProperties(
+            BaseUrlParserProperties.<UUID, BaseRepoInfo<UUID>>builder()
+                .repoName("images")
+                .relativePath(new RelativePath("/app/tags/list"))
+                .repoInfo(new BaseRepoInfo<UUID>())));
+    when(this.dockerFacade.listTags(context, "app", null, null))
+        .thenReturn(new TagPage(List.of("v1"), false));
+
+    final var response =
+        this.handler().handle(context, requestWith(), new MockHttpServletResponse());
+
+    assertThat(response.getBody()).isEqualTo(new TagListResponse("acme/images/app", List.of("v1")));
+  }
+
+  /** The shape of Repsy Cloud's own properties: the repo path starts with the owner. */
+  private static class OwnerScopedProperties
+      extends BaseUrlParserProperties<UUID, BaseRepoInfo<UUID>> {
+    OwnerScopedProperties(
+        final BaseUrlParserProperties.BaseUrlParserPropertiesBuilder<UUID, BaseRepoInfo<UUID>, ?, ?>
+            builder) {
+      super(builder);
+    }
+
+    @Override
+    public String getRepoPath() {
+      return "acme/" + getRepoName();
+    }
+  }
+
+  @Test
   @DisplayName("hands n and last to the facade, and links to the next page after the last tag")
   void linksToTheNextPage() {
     final var context = contextFor("/app/tags/list");

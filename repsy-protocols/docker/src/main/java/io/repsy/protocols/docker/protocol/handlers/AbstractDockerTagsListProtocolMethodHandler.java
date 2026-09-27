@@ -123,8 +123,8 @@ public abstract class AbstractDockerTagsListProtocolMethodHandler<ID>
 
     final var page = this.dockerFacade.listTags(context, imageName, limit, last);
 
-    final var repoName = ProtocolContextUtils.getUrlProperties(context).getRepoName();
-    final var body = new TagListResponse(repoName + "/" + imageName, page.tags());
+    final var repoPath = ProtocolContextUtils.getUrlProperties(context).getRepoPath();
+    final var body = new TagListResponse(repoPath + "/" + imageName, page.tags());
 
     final var answer =
         ResponseEntity.ok().header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);

@@ -52,7 +52,7 @@ import {
 } from '../../src/clients/docker-raw.js';
 import { env } from '../../src/env.js';
 import { repoPath } from '../../src/repo-url.js';
-import { expect, test } from '../../src/scenarios/fixtures.js';
+import { expect, materializeCredentialKind, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
 
 interface Layout {
@@ -277,16 +277,14 @@ test.describe('docker registry rules (raw HTTP)', () => {
         200,
       );
 
-      const expired = await seeder.createToken(layout.repoName, {
-        readOnly: false,
-        expirationDate: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      });
-      const expiredCred = {
-        transport: 'basic' as const,
-        username: expired.username,
-        password: expired.token,
-        kind: 'token' as const,
-      };
+      // The target's own way to an expired token (`PanelBackend.seedExpiredTokenCredential`): OS
+      // creates it with a past date, Repsy Cloud refuses that and waits out a short lifetime.
+      const expiredCred = await materializeCredentialKind(
+        seeder,
+        'token-expired',
+        layout.repoName,
+        RepoType.DOCKER,
+      );
       const expiredTok = await rawToken(expiredCred, pushScope(layout.repoName, layout.image));
       expect(expiredTok.status, 'an expired token is refused at the TOKEN hop').toBe(401);
       expect(expiredTok.wwwAuthenticate, "the token endpoint's own Basic challenge").toContain(

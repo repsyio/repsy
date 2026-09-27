@@ -27,4 +27,14 @@ public class BaseUrlParserProperties<ID, T extends BaseRepoInfo<ID>> {
   private final @NonNull String repoName;
   private final @NonNull RelativePath relativePath;
   private final @NonNull T repoInfo;
+
+  /**
+   * The repository as the request URL names it, without the image: {@code <repo>} here, and {@code
+   * <owner>/<repo>} in a registry whose repositories live under an owner (Repsy Cloud overrides
+   * it). The distribution spec wants the {@code name} of a {@code tags/list} answer to be what the
+   * client addressed, so it is built from this and not from {@link #getRepoName()}.
+   */
+  public @NonNull String getRepoPath() {
+    return this.repoName;
+  }
 }
