@@ -403,6 +403,13 @@ docker exec repsy env | grep ADMIN
 **Docker scans failing:**
 - Remember that `DOCKER_INTERNAL_REGISTRY_BASE_URL` is resolved from the **scanner container's** point of view, not the backend's — it must never be `localhost`. Use `host.docker.internal` (hybrid topology, backend on host) or the backend's service name (e.g. `http://repsy:9090`, full-compose topology) instead.
 
+**Embedded H2 stops accepting writes after about 30 minutes (RPS-1676):** this release pins H2 to
+2.5.252 to fix it (an upstream H2 bug, h2database/h2database#4308, #4320, #4342: a `CHECK (col IN
+(...))` constraint keeps the session that prepared it, so once HikariCP retires that connection —
+every 30 minutes by default — every later insert or update of such a table fails with `"Check
+constraint invalid ... The database has been closed"`). If you are still on an older image and
+cannot upgrade yet, set `SPRING_DATASOURCE_HIKARI_MAX_LIFETIME=2147483647` as a workaround.
+
 ### Logs
 
 ```bash
