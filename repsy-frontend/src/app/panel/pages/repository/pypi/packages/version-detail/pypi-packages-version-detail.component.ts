@@ -36,6 +36,7 @@ import {
   VERSION_PROBE_SIZE,
   VERSION_PROBE_SORT,
 } from '../../../../../shared/util/version-delete-landing.util';
+import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { PypiService } from '../../service/pypi.service';
 
@@ -112,6 +113,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
 
   public loadVersion(): void {
     this.loading = true;
+    this.error = null;
 
     this.packageName = this.route.snapshot.paramMap.get('package');
     this.versionName = this.route.snapshot.paramMap.get('version');
@@ -138,7 +140,10 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
             ? releaseInfo.descriptionContentType.split(';')[0].trim()
             : '';
         },
-        error: () => {},
+        error: (err: unknown) => {
+          this.versionInfo = undefined;
+          this.error = versionLoadError(err, this.versionName);
+        },
       });
   }
 

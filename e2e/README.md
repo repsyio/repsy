@@ -5809,6 +5809,40 @@ assertions are in `src/ui/hostile-checks.ts`. Repsy Cloud's suite (RPS-1624) reu
   the admin to copy by hand. Only `simulatePlainHttp` may delete the API: the older specs that grant
   `clipboard-read` keep testing the real clipboard.
 
+#### Real-world names and versions, links to a missing version, npm dist-tags (RPS-1625)
+
+- **PKG-<proto>-09** (the template, all nine protocols, `registerPackageScenarios`): a version detail URL that
+  never existed, a package that never existed, and a version another session deleted (tab B deletes it from its
+  detail page, tab A still lists it: its row leads to the not-found state, and so does a reload) each end in the
+  not-found state: no spinner left, no `pkg-detail`, `pkg-error-message` says "not found" (`expectVersionNotFound`).
+  A fourth step opens the VERSIONS URL of an unknown package: the error, the empty state, or (Docker, whose tag
+  list navigates back to the image list on a 404) the list, never a spinner. The server's own "<thing> not found"
+  answer is toasted by the error interceptor, and the toast service logs an error toast as a console error, so the
+  scenarios allow `/not found/i` through the page-error fixture with a reason (`allowNotFoundToast`); any other
+  runtime error still fails them. Before RPS-1625 every version-detail component but Go's swallowed the failed
+  load (`error: () => {}`) and rendered `pkg-detail` from `undefined` (TypeError, blank page); they now keep
+  `versionLoadError(err, version)` ("Version 'x' not found" for a 404, "The version could not be loaded" otherwise)
+  in `error`, and the shared error block renders it.
+- **PKG-ID-<case>** (`tests/ui/packages/real-world-identities.spec.ts`): data-driven identities published through
+  the wire protocols and walked list -> versions (with a second version, so the version search has something to
+  filter out) -> detail: npm `@scope.one/pkg_x.js` with `1.2.3-beta.4+build.567` and a 150-character name; Cargo
+  `1.2.3+build.9`; NuGet PascalCase ids, a four-part version and `1.0.0+meta.1`; PyPI `My_Package.Name` (post and dev
+  releases too); Maven capital letters, `-RC1`, `.Final` and `sources`/`javadoc`/`tests` classifier jars next to the
+  main one (they are files, not versions); Go capital letters, `+incompatible`, a pseudo-version and non-ASCII path
+  elements; Helm `1.2.3+build.5` and a pre-release; Ruby capitals and `.pre.1`/`.beta1`; Docker tags with
+  capitals, dots, underscores and 127 characters. Each asserts the row, the versions row and its search by the
+  version (a `+` must not turn into a space), that the URL the app builds decodes to the identity, the header and
+  install snippet, a reload, and a direct visit to the route. `SHOWN` differences are data: the panel shows a NuGet
+  id lower-cased (`E2e.PascalCase.Pkg` is `e2e.pascalcase.pkg`, as the registry keys it) and drops NuGet build metadata
+  (`1.0.0+meta.1` is `1.0.0`); PyPI keeps the name as published and also serves the normalised spelling
+  (`alias: 'my-package-name'`). Not covered: PyPI local versions (`1.0.0+local.1`): the upload grammar
+  (`PackageStorageUtils`) refuses them with `archiveFileNameInvalid`, which is a wire-protocol decision for the
+  PyPI suite, not the panel.
+- **PKG-npm-10** (`npm.spec.ts`): the versions page shows every dist-tag (`latest`, one published with `--tag next`,
+  one added with `npm dist-tag add`, `lts-1.x`) and follows a tag removed elsewhere after a refresh and a reload; the
+  list row of a package whose newest version is tagged `next` shows the `latest` one in its Latest column (and links to
+  it); the versions page's name and last-updated columns.
+
 ### Errors, navigation, mobile and accessibility (RPS-1258)
 
 `tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..04, NAV-01..03, A11Y-01..10) plus `src/ui/a11y.ts` (the axe

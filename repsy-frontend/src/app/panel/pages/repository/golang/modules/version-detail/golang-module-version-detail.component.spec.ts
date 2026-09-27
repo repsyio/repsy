@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
@@ -71,6 +72,26 @@ describe('GolangModuleVersionDetailComponent', () => {
   }
 
   describe('when a repository is selected', () => {
+    it('keeps a not-found message and no data when the version does not exist', () => {
+      golangService.fetchModuleInfo.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+
+      select();
+
+      expect(component.error).toBe("Version 'v1.2.3' not found");
+      expect(component.versionInfo).toBeUndefined();
+      expect(component.loading).toBeFalse();
+    });
+
+    it('says the version could not be loaded for a server error', () => {
+      golangService.fetchModuleInfo.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+
+      select();
+
+      expect(component.error).toBe('The version could not be loaded');
+      expect(component.versionInfo).toBeUndefined();
+      expect(component.loading).toBeFalse();
+    });
+
     it('finds the version of the query in the module info', () => {
       select();
 

@@ -29,6 +29,7 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
+import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { getRepoDomain } from '../../docker-repo-util';
 import { DockerService } from '../../service/docker.service';
@@ -105,6 +106,7 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
 
   public loadTag(): void {
     this.loading = true;
+    this.error = null;
 
     this.dockerService
       .fetchTag(this.imageName, this.tagName)
@@ -120,7 +122,10 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
           this.loadManifestText(tagInfo.digest);
           this.loadConfigText(tagInfo.configDigest);
         },
-        error: () => {},
+        error: (err: unknown) => {
+          this.tagInfo = undefined;
+          this.error = versionLoadError(err, this.tagName);
+        },
       });
   }
 

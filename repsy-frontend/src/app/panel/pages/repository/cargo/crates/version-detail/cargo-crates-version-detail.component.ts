@@ -41,6 +41,7 @@ import {
   VERSION_PROBE_SIZE,
   VERSION_PROBE_SORT,
 } from '../../../../../shared/util/version-delete-landing.util';
+import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
 import { CargoService } from '../../service/cargo.service';
 
 @Component({
@@ -109,6 +110,7 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
 repsy = { index = "sparse+${environment.repoBaseUrl}/${this.activeRepo.repoName}/" }`;
 
     this.loading = true;
+    this.error = null;
     this.cargoService
       .fetchCrate(crateName)
       .pipe(
@@ -126,7 +128,10 @@ repsy = { index = "sparse+${environment.repoBaseUrl}/${this.activeRepo.repoName}
           this.cargoToml = this.buildCargoToml(this.crate, crateVersion);
           this.error = null;
         },
-        error: () => {},
+        error: (err: unknown) => {
+          this.crateVersion = undefined;
+          this.error = versionLoadError(err, this.versionName);
+        },
       });
   }
 
