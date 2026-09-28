@@ -108,9 +108,9 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
     );
   });
 
-  test('artifactId at 200 chars (near max) succeeds', { tag: ['@negative'] }, async ({ seeder }) => {
-    // MavenPublishLimits.MAX_ARTIFACT_ID_LENGTH = 255. Test near limit with practical length.
-    const maxArtifactId = 'a'.repeat(200);
+  test('artifactId at 255 chars (max) succeeds', { tag: ['@negative'] }, async ({ seeder }) => {
+    // MavenPublishLimits.MAX_ARTIFACT_ID_LENGTH = 255. Test at exact documented boundary.
+    const maxArtifactId = 'a'.repeat(255);
     const layout = await newRepo(seeder, 'io', maxArtifactId);
     const version = '1';
 
@@ -120,7 +120,7 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
 
     const result = await layout.put(path, body, OCTET);
 
-    expect(result.status, `artifactId at 200 chars (near max) should succeed`).toBe(200);
+    expect(result.status, `artifactId at 255 chars (max) should succeed`).toBe(200);
   });
 
   test('artifactId at 256 chars (over max) is refused', { tag: ['@negative'] }, async ({
@@ -146,10 +146,10 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
     );
   });
 
-  test('version at 200 chars (near max) succeeds', { tag: ['@negative'] }, async ({ seeder }) => {
-    // MavenPublishLimits.MAX_VERSION_LENGTH = 255. Test near limit with practical length.
-    const maxVersion = 'v' + 'a'.repeat(199);
-    // Use short groupId and artifactId to keep path length reasonable (filesystem limits)
+  test('version at 255 chars (max) succeeds', { tag: ['@negative'] }, async ({ seeder }) => {
+    // MavenPublishLimits.MAX_VERSION_LENGTH = 255. Test at exact documented boundary.
+    const maxVersion = 'a'.repeat(255);
+    // Use short groupId and artifactId to keep test simple
     const layout = await newRepo(seeder, 'io', 'a');
 
     const dir = versionDir(layout.groupId, layout.artifactId, maxVersion);
@@ -158,7 +158,7 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
 
     const result = await layout.put(path, body, OCTET);
 
-    expect(result.status, `version at 200 chars (near max) should succeed`).toBe(200);
+    expect(result.status, `version at 255 chars (max) should succeed`).toBe(200);
   });
 
   test('version at 256 chars (over max) is refused', { tag: ['@negative'] }, async ({
