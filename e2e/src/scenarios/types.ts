@@ -32,7 +32,15 @@ export type CredentialKind =
   | 'token-rotated-old'
   | 'token-other-repo'
   | 'wrong-password'
-  | 'anonymous';
+  | 'anonymous'
+  /**
+   * A read-write deploy token materialised WITHOUT its own username: `fixtures.ts`'s `seedCredential`
+   * pairs the token's secret with an arbitrary username instead (RPS-1716), so a publish/consume that
+   * authenticates with it proves the server validates a deploy token by its secret alone, never by
+   * the username presented alongside it. Only meaningful over Basic auth (`MaterializedCredential.
+   * preferBasic`), since a Bearer-only rendering never sends a username to the server at all.
+   */
+  | 'token-rw-any-username';
 
 /**
  * A normalised result a protocol adapter returns for one publish or consume attempt, derived from
@@ -100,6 +108,13 @@ export interface Scenario {
   /** The shared, maven-pinned expectation. A protocol whose real behaviour differs overrides it
    *  via `expectByProtocol`, never by editing this field. */
   expect: ScenarioExpectation;
+  /**
+   * npm-only (RPS-1717): renders the publish document AND the real client's `package.json` with no
+   * `keywords` field at all, instead of the empty array every other scenario sends (see
+   * `npm-raw.ts`'s `buildPublishDocument` file header for the backend bug this reproduces). Ignored by
+   * every other protocol's adapter, the same way `versionType` is maven-only.
+   */
+  omitKeywords?: boolean;
   /**
    * A per-protocol override of `expect`, keyed by `adapter.protocol` (e.g. `'npm'`). Lets a later
    * protocol (Cargo, NuGet, ...) pin its own real, probed status for a scenario whose outcome

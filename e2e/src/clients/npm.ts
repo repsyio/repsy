@@ -97,11 +97,34 @@ async function renderTemplate(
 }
 
 /**
+ * `package.template.json` always renders `"keywords": []` (correction: it is JSON, not a place a
+ * mustache section can conditionally drop a field). `omitKeywords` (RPS-1717) strips the key back
+ * out post-render instead of a second template, so `renderPackage` stays the one place a real npm
+ * client's manifest is built.
+ */
+async function renderPackageJson(
+  destPath: string,
+  view: Record<string, unknown>,
+  omitKeywords: boolean,
+): Promise<void> {
+  if (!omitKeywords) {
+    return renderTemplate('package.template.json', destPath, view);
+  }
+  const template = await fs.readFile(path.join(TEMPLATES_DIR, 'package.template.json'), 'utf8');
+  const manifest = JSON.parse(mustache.render(template, view)) as Record<string, unknown>;
+  delete manifest.keywords;
+  await fs.writeFile(destPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+}
+
+/**
  * The `.npmrc` view (correction #4): `registry=<repoBaseUrl>/<repo>/` and a matching
  * `//<host:port>/<repo>/:_authToken=`/`:_auth=` line, trailing slash on both so npm's per-path
  * scoping actually matches a request under that registry. No credential (`anonymous`) renders
  * neither auth line, so `npm` sends no `Authorization` header (or, with none configured at all,
- * refuses client-side with `ENEEDAUTH` before ever sending the request).
+ * refuses client-side with `ENEEDAUTH` before ever sending the request). `credential.preferBasic`
+ * (RPS-1716, `token-rw-any-username`) renders even a `kind: 'token'` credential as `_auth` instead
+ * of `_authToken`: Bearer never puts a username on the wire, so an "any username" scenario needs
+ * Basic to reach the server at all.
  */
 function npmrcView(repoName: string, credential: MaterializedCredential): Record<string, unknown> {
   const hostAndPort = new URL(env.repoBaseUrl).host;
@@ -109,8 +132,9 @@ function npmrcView(repoName: string, credential: MaterializedCredential): Record
     registryUrl: repoUrl(repoName, ''),
     hostAndPort,
     repoName: repoPath(repoName),
-    hasToken: credential.kind === 'token',
-    hasBasic: credential.kind === 'password',
+    hasToken: credential.kind === 'token' && !credential.preferBasic,
+    hasBasic:
+      credential.kind === 'password' || (credential.kind === 'token' && credential.preferBasic),
     token: credential.password ?? '',
     basicAuth:
       credential.transport === 'basic'
@@ -174,17 +198,17 @@ export async function packTarball(
 
 /** Renders the tiny publishable package (package.json, index.js, a fresh random marker file).
  *  `padBytes`, when given, adds a random-content padding file (RPS-1482, the size-limit leg's
- *  `clients/oversize.ts` `pushNpm`; random so the tarball's gzip cannot shrink it below a limit). */
+ *  `clients/oversize.ts` `pushNpm`; random so the tarball's gzip cannot shrink it below a limit).
+ *  `omitKeywords` (RPS-1717) drops `package.json`'s `keywords` field entirely instead of the usual
+ *  empty array. */
 export async function renderPackage(
   work: string,
   packageName: string,
   version: string,
   padBytes?: number,
+  omitKeywords = false,
 ): Promise<{ marker: string }> {
-  await renderTemplate('package.template.json', path.join(work, 'package.json'), {
-    packageName,
-    version,
-  });
+  await renderPackageJson(path.join(work, 'package.json'), { packageName, version }, omitKeywords);
   await renderTemplate('index.template.js', path.join(work, 'index.js'), {});
   const marker = randomUUID();
   await fs.writeFile(path.join(work, MARKER_FILENAME), marker, 'utf8');
@@ -213,7 +237,13 @@ async function publishWithClient(world: World, label: string): Promise<PublishRu
   const { home, work } = await isolatedWorkDir(label);
   const { packageName, version } = world.publishTarget;
 
-  const { marker } = await renderPackage(work, packageName, version);
+  const { marker } = await renderPackage(
+    work,
+    packageName,
+    version,
+    undefined,
+    world.scenario.omitKeywords,
+  );
   const npmrcPath = await renderNpmrc(home, world.repoName, world.credential);
   const cacheDir = await isolatedCache(home);
   const { file: tarballFile, bytes: tarballBytes } = await packTarball(work, home, `${label}-pack`);
@@ -256,6 +286,7 @@ export async function publish(world: World): Promise<AdapterResult> {
     packageName: world.publishTarget.packageName,
     version: world.publishTarget.version,
     tarballBytes: published.tarballBytes,
+    omitKeywords: world.scenario.omitKeywords,
   });
   const rawRes = await rawPublish(
     world.repoName,

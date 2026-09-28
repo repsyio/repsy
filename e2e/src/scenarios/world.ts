@@ -45,6 +45,16 @@ export interface MaterializedCredential {
    * `scenarios/credential-invalidation.ts`).
    */
   userId?: string;
+  /**
+   * Set by the fixture that materialised this credential (`fixtures.ts`'s `seedCredential`, for
+   * `token-rw-any-username`, RPS-1716) when a `kind: 'token'` credential should still be rendered
+   * over Basic auth (npm's `_auth`, an npm-family `hasBasic` binding) instead of the usual Bearer
+   * (`_authToken`) a deploy token gets by default -- Bearer never sends a username at all, so an
+   * "any username" scenario needs Basic to reach the server. A renderer reads this field, never a
+   * scenario id, to decide (README "Adding a scenario"'s layering: a credential concern lives on the
+   * credential, not branched on in the client).
+   */
+  preferBasic?: boolean;
 }
 
 /** A protocol-appropriate package identity: for maven, `groupId:artifactId` plus a version. */

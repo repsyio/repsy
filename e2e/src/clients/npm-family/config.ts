@@ -129,12 +129,20 @@ function basicOf(credential: MaterializedCredential): string {
   );
 }
 
+/**
+ * `credential.preferBasic` (RPS-1716, `token-rw-any-username`) overrides a `kind: 'token'`
+ * credential to Basic too: Bearer never puts a username on the wire, so an "any username" scenario
+ * needs Basic to reach the server at all -- see `world.ts`'s `MaterializedCredential.preferBasic`.
+ */
 function hasToken(credential: MaterializedCredential): boolean {
-  return credential.transport === 'basic' && credential.kind === 'token';
+  return credential.transport === 'basic' && credential.kind === 'token' && !credential.preferBasic;
 }
 
 function hasBasic(credential: MaterializedCredential): boolean {
-  return credential.transport === 'basic' && credential.kind !== 'token';
+  return (
+    credential.transport === 'basic' &&
+    (credential.kind !== 'token' || Boolean(credential.preferBasic))
+  );
 }
 
 function scopeName(binding: RegistryBinding): string | undefined {

@@ -188,7 +188,15 @@ async function tokenHome(ctx: ClientCtx): Promise<{ env: NodeJS.ProcessEnv; secr
   const bindings: RegistryBinding[] = [];
   for (const binding of ctx.bindings) {
     if (binding.credential.kind === 'token') {
-      bindings.push(binding);
+      // Forced to Bearer here regardless of `preferBasic` (RPS-1716, `token-rw-any-username`):
+      // this HOME's `.npmrc` exists solely so `bun publish` sees a token (this function's own
+      // header), and `bun publish` refuses client-side with "missing authentication" when it is
+      // given only `_auth` -- rendering it as Basic here would just fail bun's own preflight before
+      // any request reaches the server. The credential's OWN `preferBasic` still governs its bunfig
+      // registry (`add`/`install`/`whoami`) and every raw-HTTP probe, so the scenario's actual
+      // "arbitrary username" assertion still runs against the server; `bun publish` itself simply
+      // cannot exercise it, the same pre-existing limitation this file's header already documents.
+      bindings.push({ ...binding, credential: { ...binding.credential, preferBasic: false } });
       continue;
     }
     const token = await loginToken(binding);
