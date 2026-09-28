@@ -24,6 +24,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -282,12 +283,20 @@ class VersionSignatureServiceTest {
     this.version.setVersionName("1.0");
     when(this.artifactVersionRepository.findById(this.version.getId()))
         .thenReturn(Optional.of(this.version));
+    // The final, locked step re-reads the setting fresh (RPS-1469): kept in sync with the entity
+    // above by every test that uses this helper, so both still say what the version is signed by.
+    lenient()
+        .when(
+            this.artifactVersionRepository.findVerifyAllSignaturesEnabledByVersionId(
+                this.version.getId()))
+        .thenReturn(Optional.of(verifyAll));
 
     return this.version;
   }
 
   @Test
-  @DisplayName("recompute locks the version first and applies the verify-all rule of its repo")
+  @DisplayName(
+      "recompute verifies before the lock and applies the verify-all rule of its repo under it")
   void recomputeAppliesVerifyAllOfTheRepo() {
     this.storedVersion(true);
     this.directoryHolds("lib-1.0.pom", "lib-1.0.jar");
@@ -296,7 +305,6 @@ class VersionSignatureServiceTest {
     assertThat(this.service.recompute(this.version.getId())).isTrue();
 
     final var order = inOrder(this.artifactVersionRepository, this.storageStrategy);
-    order.verify(this.artifactVersionRepository).lockForSignedUpdate(this.version.getId());
     order.verify(this.artifactVersionRepository).findById(this.version.getId());
     order
         .verify(this.storageStrategy)
@@ -305,7 +313,37 @@ class VersionSignatureServiceTest {
                 (StoragePath path) ->
                     path.getStorageKey().equals(this.storageKey)
                         && path.getRelativePath().getPath().equals(VERSION_PATH)));
+    // The lock is taken only for the final, local read-modify-write (RPS-1469): after the
+    // verification above, and before the write it guards.
+    order.verify(this.artifactVersionRepository).lockForSignedUpdate(this.version.getId());
     order.verify(this.artifactVersionRepository).updateSigned(this.version.getId(), false);
+    // The directory is listed again under the lock, for the final decision.
+    verify(this.storageStrategy, times(2))
+        .listStorageItems(
+            argThat(
+                (StoragePath path) ->
+                    path.getStorageKey().equals(this.storageKey)
+                        && path.getRelativePath().getPath().equals(VERSION_PATH)));
+  }
+
+  @Test
+  @DisplayName(
+      "recompute of a version whose repo verifies-all setting cannot be found any more"
+          + " (deleted while the network-bound verification was running) changes nothing")
+  void recomputeOfAVersionThatVanishesAfterVerification() {
+    this.storedVersion(true);
+    this.directoryHolds("lib-1.0.pom", "lib-1.0.jar");
+    this.verifiedFiles("lib-1.0.pom");
+    // The join behind findVerifyAllSignaturesEnabledByVersionId finds nothing: the version (or its
+    // artifact, or its repo) is gone by the time the lock is taken.
+    when(this.artifactVersionRepository.findVerifyAllSignaturesEnabledByVersionId(
+            this.version.getId()))
+        .thenReturn(Optional.empty());
+
+    assertThat(this.service.recompute(this.version.getId())).isFalse();
+
+    verify(this.artifactVersionRepository).lockForSignedUpdate(this.version.getId());
+    verify(this.artifactVersionRepository, never()).updateSigned(any(), anyBoolean());
   }
 
   @Test
@@ -385,9 +423,11 @@ class VersionSignatureServiceTest {
     final var saved = ArgumentCaptor.forClass(VersionSignature.class);
     verify(this.versionSignatureRepository).save(saved.capture());
     assertThat(saved.getValue().getFileName()).isEqualTo("lib-1.0.jar");
+    // The verification (and its recording) happens before the lock is taken (RPS-1469): only the
+    // final write is under it.
     final var order = inOrder(this.artifactVersionRepository, this.versionSignatureRepository);
-    order.verify(this.artifactVersionRepository).lockForSignedUpdate(this.version.getId());
     order.verify(this.versionSignatureRepository).save(any(VersionSignature.class));
+    order.verify(this.artifactVersionRepository).lockForSignedUpdate(this.version.getId());
     order.verify(this.artifactVersionRepository).updateSigned(this.version.getId(), true);
   }
 
