@@ -9,8 +9,9 @@
     type="button"
     aria-label="Previous page"
     (click)="previousPage()"
-    class="text-secondary-500 flex h-8 w-7 items-center justify-center rounded-[8px] bg-neutral-400 p-[6px] text-sm font-medium hover:bg-neutral-300 disabled:opacity-50"
-    [disabled]="pageNum === 0"
+    class="text-secondary-500 flex h-8 w-7 items-center justify-center rounded-[8px] bg-neutral-400 p-[6px] text-sm font-medium hover:bg-neutral-300"
+    [ngClass]="{ 'opacity-50': pageNum === 0 }"
+    [attr.aria-disabled]="pageNum === 0 ? 'true' : null"
   >
     <img ngSrc="/assets/icons/cursor/arrow-left.svg" class="h-[12px] w-[12px]" height="8" width="4" alt="" />
   </button>
@@ -22,12 +23,13 @@
           type="button"
           [attr.aria-label]="'Page ' + (page + 1)"
           [attr.aria-current]="page === pageNum ? 'page' : null"
+          [attr.aria-disabled]="page === pageNum ? 'true' : null"
           (click)="goToPage(page)"
-          [disabled]="page === pageNum"
           [ngClass]="{
             'hover:bg-neutral-300': page !== pageNum,
+            'opacity-50': page === pageNum,
           }"
-          class="text-secondary-500 flex h-8 min-w-8 items-center justify-center rounded-[8px] bg-neutral-400 p-[6px] text-sm font-medium disabled:opacity-50"
+          class="text-secondary-500 flex h-8 min-w-8 items-center justify-center rounded-[8px] bg-neutral-400 p-[6px] text-sm font-medium"
         >
           {{ page + 1 }}
         </button>
@@ -46,8 +48,9 @@
     type="button"
     aria-label="Next page"
     (click)="nextPage()"
-    class="text-secondary-500 flex h-8 w-7 items-center justify-center rounded-[8px] bg-neutral-400 p-[6px] text-sm font-medium hover:bg-neutral-300 disabled:opacity-50"
-    [disabled]="pageNum + 1 >= totalPages"
+    class="text-secondary-500 flex h-8 w-7 items-center justify-center rounded-[8px] bg-neutral-400 p-[6px] text-sm font-medium hover:bg-neutral-300"
+    [ngClass]="{ 'opacity-50': pageNum + 1 >= totalPages }"
+    [attr.aria-disabled]="pageNum + 1 >= totalPages ? 'true' : null"
   >
     <img ngSrc="/assets/icons/cursor/arrow-right.svg" class="h-[12px] w-[12px]" height="8" width="5" alt="" />
   </button>

@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { ElementRef } from '@angular/core';
 import { fakeAsync, flushMicrotasks } from '@angular/core/testing';
 import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
@@ -57,6 +58,7 @@ describe('NpmPackagesListComponent', () => {
       toastService,
       dangerModalService,
       securityService,
+      new ElementRef(document.createElement('div')),
     );
     return {
       component,

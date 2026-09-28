@@ -82,6 +82,11 @@ const provideSession = (
       document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
       fixture.detectChanges();
     };
+    /** `Tab`, cancelable so the directive's `preventDefault` (it moved the focus itself) is observable. */
+    const pressTab = (shiftKey = false): void => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true }));
+      fixture.detectChanges();
+    };
 
     beforeEach(() => {
       viewport = new FakeMediaQueryList();
@@ -144,6 +149,44 @@ const provideSession = (
       press('Escape');
       expect(query('mobile-sidebar')).toBeNull();
       expect(burger().getAttribute('aria-expanded')).toBe('false');
+    });
+
+    // RPS-1669: the drawer has none of the standard modal-focus behaviours (A11Y-05/A11Y-13) before this fix.
+    it('moves the focus into the drawer (its close button) when it opens', async () => {
+      burger().focus();
+      click('header-burger');
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(document.activeElement).toBe(query('mobile-sidebar-close'));
+    });
+
+    it('traps Tab and Shift+Tab inside the open drawer', async () => {
+      click('header-burger');
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const content = query('mobile-sidebar-content')!;
+      query<HTMLElement>('mobile-sidebar-close')!.focus();
+      pressTab(true);
+      expect(content.contains(document.activeElement)).toBeTrue();
+
+      const last = content.querySelector<HTMLElement>('[data-testid="mobile-sidebar-logout"]')!;
+      last.focus();
+      pressTab(false);
+      expect(content.contains(document.activeElement)).toBeTrue();
+    });
+
+    it('returns the focus to the burger when Escape closes the drawer', async () => {
+      burger().focus();
+      click('header-burger');
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      press('Escape');
+
+      expect(query('mobile-sidebar')).toBeNull();
+      expect(document.activeElement).toBe(burger());
     });
 
     it('closes on a sidebar link click and navigates', async () => {
