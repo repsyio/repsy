@@ -417,7 +417,13 @@ test(
       );
     }
 
-    // Build the index from both children
+    // Build the attestation manifest with subject referencing the index-to-be
+    // Use a placeholder digest since we'll compute the actual index bytes below
+    const { manifestBytes: attestationBytes, manifestDigest: attestationDigest } =
+      buildAttestationManifest({ indexDigest: 'sha256:placeholder' });
+
+    // Build the index from both children PLUS the attestation manifest in manifests[]
+    // The attestation is included as an entry with unknown/unknown media type and annotations
     const indexObj = {
       schemaVersion: 2,
       mediaType: 'application/vnd.oci.image.index.v1+json',
@@ -434,12 +440,28 @@ test(
           size: arm64.manifestBytes.length,
           platform: { architecture: 'arm64', os: 'linux' },
         },
+        {
+          mediaType: 'application/unknown+unknown',
+          digest: attestationDigest,
+          size: attestationBytes.length,
+          annotations: { 'vnd.docker.reference.type': 'attestation-manifest' },
+        },
       ],
     };
     const indexBytes = Buffer.from(JSON.stringify(indexObj), 'utf8');
     const indexDigest = sha256Hex(indexBytes);
 
-    // Push the index
+    // Push the attestation manifest by digest only (no tag, only reachable through index)
+    await rawPutManifest(
+      layout.repoName,
+      credential,
+      layout.image,
+      attestationDigest,
+      attestationBytes,
+      'application/unknown+unknown',
+    );
+
+    // Push the index by tag (it references the attestation in manifests[])
     const indexTag = 'attestation-index';
     await rawPutManifest(
       layout.repoName,
@@ -450,36 +472,8 @@ test(
       'application/vnd.oci.image.index.v1+json',
     );
 
-    // Build and push the attestation manifest
-    const { manifestBytes: attestationBytes, manifestDigest: attestationDigest } =
-      buildAttestationManifest({ indexDigest: `sha256:${indexDigest}` });
-    const attestationTag = 'attestation-manifest';
-    await rawPutManifest(
-      layout.repoName,
-      credential,
-      layout.image,
-      attestationTag,
-      attestationBytes,
-      'application/unknown+unknown',
-    );
-
-    // Verify the attestation is servable by tag and has the correct digest header
+    // Verify the attestation is servable by digest
     const admin = adminCredential();
-    const attestationRes = await rawGetManifest(
-      layout.repoName,
-      admin,
-      layout.image,
-      attestationTag,
-    );
-    expect(attestationRes.status, 'attestation manifest is servable by tag').toBe(200);
-    expect(attestationRes.contentType?.split(';')[0], 'attestation has unknown media type').toBe(
-      'application/unknown+unknown',
-    );
-    expect(attestationRes.digestHeader, 'attestation digest header is correct').toBe(
-      `sha256:${sha256Hex(attestationBytes)}`,
-    );
-
-    // Verify the attestation is also servable by digest
     const attestationByDigestRes = await rawGetManifest(
       layout.repoName,
       admin,
@@ -487,6 +481,10 @@ test(
       attestationDigest,
     );
     expect(attestationByDigestRes.status, 'attestation is pullable by digest').toBe(200);
+    expect(
+      attestationByDigestRes.contentType?.split(';')[0],
+      'attestation has unknown media type',
+    ).toBe('application/unknown+unknown');
     expect(sha256Hex(attestationByDigestRes.body)).toBe(attestationDigest.slice('sha256:'.length));
 
     // Verify both children are still pullable
@@ -505,7 +503,7 @@ test(
     );
     expect(arm64ByDigestRes.status, 'arm64 child is pullable by digest').toBe(200);
 
-    // Verify the index is also servable
+    // Verify the index is servable and contains all three manifests
     const indexByTagRes = await rawGetManifest(layout.repoName, admin, layout.image, indexTag);
     expect(indexByTagRes.status, 'index is servable by tag').toBe(200);
     const indexByDigestRes = await rawGetManifest(
@@ -515,5 +513,18 @@ test(
       `sha256:${indexDigest}`,
     );
     expect(indexByDigestRes.status, 'index is servable by digest').toBe(200);
+
+    // Verify the index round-trips with all three entries
+    const parsedIndex = JSON.parse(indexByTagRes.body.toString('utf8')) as {
+      manifests: { digest: string; annotations?: Record<string, string> }[];
+    };
+    expect(parsedIndex.manifests, 'index contains exactly 3 manifests').toHaveLength(3);
+    const attestationEntry = parsedIndex.manifests.find(
+      (m) => m.annotations?.['vnd.docker.reference.type'] === 'attestation-manifest',
+    );
+    expect(attestationEntry, 'index contains attestation manifest entry').toBeDefined();
+    expect(attestationEntry?.digest, 'attestation entry has correct digest').toBe(
+      attestationDigest,
+    );
   },
 );
