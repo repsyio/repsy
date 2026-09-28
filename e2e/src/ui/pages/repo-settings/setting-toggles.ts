@@ -32,7 +32,8 @@ import { stubSupportedRepoTypes } from '../../security-stubs.js';
 import { VulnerabilityScanningSection } from '../security.js';
 import type { RepoSettingsPage } from './page.js';
 
-export type SettingToggleName = 'visibility' | 'override' | 'scanning' | 'allowance';
+export type SettingToggleName =
+  'visibility' | 'override' | 'scanning' | 'allowance' | 'pgpVerifyAll' | 'pgpKeyServerLookup';
 
 /** The settings a repo stores that the panel can change, as `GET /api/repos/{repo}/settings` answers them. */
 export type StoredSettings = RepoSettingsInfo;
@@ -134,6 +135,40 @@ export const SETTING_TOGGLES: readonly SettingToggle[] = [
     successToast: (_stored, type) => `Version allowance has changed to ${allowanceOption(type)}`,
     expectShows: (settings, stored, type) =>
       expect(settings.allowance.toggle).toHaveText(allowanceText(stored, type)),
+  },
+  {
+    // RPS-1628 (G16): PGP settings apply to Maven only (`rejectPgpSettingsForUnsupportedType`,
+    // `RepoTxService`), which is also the one type every other row here already covers, so the N x N
+    // matrices of `write-failures.spec.ts` (SET-11) and `concurrent-admins.spec.ts` (SET-13) exercise
+    // it against every other setting for free.
+    name: 'pgpVerifyAll',
+    title: 'PGP Verify All Signatures',
+    appliesTo: (type) => type === RepoType.MAVEN,
+    prepare: async () => {},
+    flipTwice: (settings) => settings.pgp.verifyAllLabel.dblclick(),
+    flip: (settings) => settings.pgp.flipVerifyAll(),
+    flipped: (stored) => ({
+      pgpVerifyAllSignaturesEnabled: !stored.pgpVerifyAllSignaturesEnabled,
+    }),
+    successToast: (stored) =>
+      `Every signature is ${stored.pgpVerifyAllSignaturesEnabled ? 'no longer' : 'now'} verified`,
+    expectShows: (settings, stored) =>
+      settings.pgp.expectVerifyAllChecked(!!stored.pgpVerifyAllSignaturesEnabled),
+  },
+  {
+    name: 'pgpKeyServerLookup',
+    title: 'PGP Key Server Lookup',
+    appliesTo: (type) => type === RepoType.MAVEN,
+    prepare: async () => {},
+    flipTwice: (settings) => settings.pgp.keyServerLookupLabel.dblclick(),
+    flip: (settings) => settings.pgp.flipKeyServerLookup(),
+    flipped: (stored) => ({
+      pgpKeyServerLookupEnabled: !stored.pgpKeyServerLookupEnabled,
+    }),
+    successToast: (stored) =>
+      `Key server lookup is now ${stored.pgpKeyServerLookupEnabled ? 'disabled' : 'enabled'}`,
+    expectShows: (settings, stored) =>
+      settings.pgp.expectKeyServerLookupChecked(!!stored.pgpKeyServerLookupEnabled),
   },
 ];
 

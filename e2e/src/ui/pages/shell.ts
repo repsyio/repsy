@@ -58,9 +58,13 @@ export class Shell {
     root: Locator;
     burger: Locator;
     login: Locator;
+    /** The documentation icon next to the avatar, shown whether or not there is a session. */
+    docs: Locator;
     avatar: Locator;
     menu: Locator;
     profile: Locator;
+    /** The "Docs" entry of the avatar menu (only while it is open, see `openAvatarMenu`). */
+    menuDocs: Locator;
     logout: Locator;
   };
 
@@ -86,9 +90,11 @@ export class Shell {
       root: page.getByTestId('header'),
       burger: page.getByTestId('header-burger'),
       login: page.getByTestId('header-login'),
+      docs: page.getByTestId('header-docs'),
       avatar: page.getByTestId('header-avatar'),
       menu: page.getByTestId('header-menu'),
       profile: page.getByTestId('header-menu-profile'),
+      menuDocs: page.getByTestId('header-menu-docs'),
       logout: page.getByTestId('header-menu-logout'),
     };
   }

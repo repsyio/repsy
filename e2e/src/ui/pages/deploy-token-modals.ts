@@ -82,6 +82,11 @@ export class TokenCreateModal {
     return this.root.getByTestId('token-create-description-error-maxlength');
   }
 
+  /** The expiration date's one validation message: out of the tomorrow..+1-year range, or malformed. */
+  expirationError(kind: 'range' | 'invalid'): Locator {
+    return this.root.getByTestId(`token-create-expiration-error-${kind}`);
+  }
+
   /** The "n/500" character counter under the description. */
   descriptionCounter(): Locator {
     return this.root.getByTestId('token-create-description-counter');
