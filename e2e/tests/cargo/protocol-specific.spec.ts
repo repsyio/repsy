@@ -998,3 +998,161 @@ test(
     expect(entry?.features2, 'features2 is served verbatim').toEqual({ extra: ['dep:bogus'] });
   },
 );
+
+test(
+  'cargo > sparse index publish order is stable after yanking a middle version (RPS-1605)',
+  { tag: ['@smoke'] },
+  async ({ seeder }) => {
+    const layout = await newRepoWithToken(seeder, 'yank-order');
+    const admin = adminCredential();
+
+    // Publish three versions in order: 1.0.0, 1.1.0, 1.2.0
+    const versions = ['1.0.0', '1.1.0', '1.2.0'];
+    for (const version of versions) {
+      const target: Coordinates = { packageName: layout.packageName, version };
+      const world = buildWorld(layout, target, `yank-order-${version}`);
+      const published = await cargo.publish(world);
+      expect(published.outcome, `publish ${version}: ${published.command}`).toBe('ok');
+    }
+
+    // Get the index after all publishes
+    const indexBeforeYank = await rawGetIndex(layout.repoName, admin, layout.packageName);
+    expect(indexBeforeYank.status, 'sparse index serves the crate').toBe(200);
+    const entriesBeforeYank = parseIndex(indexBeforeYank.body);
+    const orderBefore = entriesBeforeYank.map((e) => e.vers);
+    expect(orderBefore, 'all three versions are published in order').toEqual([
+      '1.0.0',
+      '1.1.0',
+      '1.2.0',
+    ]);
+
+    // Yank the middle version (1.1.0)
+    const { home, work } = await isolatedWorkDir(`cargo-yank-middle-${seeder.runId}`);
+    await renderCargoConfig(work, layout.repoName);
+    const env = cargoEnv(home, layout.credential);
+
+    const yankResult = await run(
+      'cargo',
+      ['yank', '--registry', 'repsy', '--version', '1.1.0', layout.packageName],
+      {
+        cwd: work,
+        env,
+        timeoutMs: 60_000,
+        redact: [layout.credential.password ?? ''],
+        label: 'cargo-yank-middle',
+      },
+    );
+    expect(yankResult.exitCode, `cargo yank 1.1.0: ${yankResult.command}`).toBe(0);
+
+    // Verify the index order is STILL 1.0.0, 1.1.0 (yanked), 1.2.0
+    const indexAfterYank = await rawGetIndex(layout.repoName, admin, layout.packageName);
+    expect(indexAfterYank.status, 'sparse index still serves the crate after yank').toBe(200);
+    const entriesAfterYank = parseIndex(indexAfterYank.body);
+
+    // The order should be unchanged
+    const orderAfter = entriesAfterYank.map((e) => e.vers);
+    expect(orderAfter, 'index order is unchanged after yanking a middle version').toEqual([
+      '1.0.0',
+      '1.1.0',
+      '1.2.0',
+    ]);
+
+    // Verify that only the middle version is yanked
+    const yankedEntry = entriesAfterYank.find((e) => e.vers === '1.1.0');
+    expect(yankedEntry?.yanked, 'the middle version is marked as yanked').toBe(true);
+
+    const unyankedEntries = entriesAfterYank.filter((e) => e.vers !== '1.1.0');
+    expect(
+      unyankedEntries.every((e) => !e.yanked),
+      'other versions are not yanked',
+    ).toBe(true);
+  },
+);
+
+test(
+  'cargo > sparse index name normalization: both hyphenated and underscore spellings fetch the same crate (RPS-1212)',
+  { tag: ['@smoke'] },
+  async ({ seeder }) => {
+    // N1 probe: verify the documented behavior from RPS-1212 (already fixed in the backend).
+    // Cargo applies crate-name normalization (lower-case, `-` -> `_`) both when storing and when
+    // looking up by name. This test probes live: publishes a crate with a hyphenated name, queries
+    // the sparse index with both the original and normalized spelling, and confirms both work and
+    // return the same entry (with the `name` field always showing the original published spelling).
+    // This is not a spec requirement guess — it is the documented behavior after RPS-1212 was fixed.
+
+    // Create a repo and publish with hyphenated name
+    const repo = await seeder.createRepo(RepoType.CARGO, { privateRepo: true });
+    const token = await seeder.createToken(repo.name, { readOnly: false });
+    const credential: MaterializedCredential = {
+      transport: 'basic',
+      username: token.username,
+      password: token.token,
+      kind: 'token',
+    };
+    const hyphenName = `e2e-${seeder.runId}-hyphen-name`;
+    const underscoreName = hyphenName.replace(/-/g, '_');
+    const version = '1.0.0';
+
+    const target: Coordinates = { packageName: hyphenName, version };
+    const world: World = {
+      scenario: {
+        id: `spelling-probe-${seeder.runId}`,
+        tags: ['@smoke'],
+        repo: { privateRepo: true },
+        credential: 'token-rw',
+        expect: { publish: 'ok', consume: 'ok' },
+      },
+      protocol: 'cargo',
+      repoName: repo.name,
+      credential,
+      publishTarget: target,
+      consumeTarget: target,
+    };
+
+    // Publish the crate with hyphenated name
+    const published = await cargo.publish(world);
+    expect(published.outcome, `publish hyphenated name: ${published.command}`).toBe('ok');
+    expect(published.clientExitCode, `cargo publish: ${published.command}`).toBe(0);
+
+    const admin = adminCredential();
+
+    // Query the sparse index with BOTH spellings
+    const byHyphen = await rawGetIndex(repo.name, admin, hyphenName);
+    const byUnderscore = await rawGetIndex(repo.name, admin, underscoreName);
+
+    // Both spellings should return 200
+    expect(byHyphen.status, `query by hyphenated spelling "${hyphenName}"`).toBe(200);
+    expect(
+      byUnderscore.status,
+      `query by normalized spelling "${underscoreName}"`,
+    ).toBe(200);
+
+    // Both queries should return the same entry
+    const entryByHyphen = parseIndex(byHyphen.body)[0];
+    const entryByUnderscore = parseIndex(byUnderscore.body)[0];
+
+    expect(entryByHyphen, `index entry for hyphenated query`).toBeDefined();
+    expect(entryByUnderscore, `index entry for underscore query`).toBeDefined();
+
+    // The served entry's NAME field should always be the published spelling (hyphenated)
+    expect(entryByHyphen?.name, 'entry from hyphenated query').toBe(hyphenName);
+    expect(
+      entryByUnderscore?.name,
+      'entry from underscore query also shows published spelling',
+    ).toBe(hyphenName);
+
+    // Verify both entries are identical
+    expect(entryByUnderscore, 'entries are identical regardless of query spelling').toEqual(
+      entryByHyphen,
+    );
+
+    // Verify downloads work with both spellings
+    const dlHyphen = await rawDownload(repo.name, admin, hyphenName, version);
+    const dlUnderscore = await rawDownload(repo.name, admin, underscoreName, version);
+    expect(dlHyphen.status, `download by hyphenated spelling`).toBe(200);
+    expect(dlUnderscore.status, `download by normalized spelling`).toBe(200);
+
+    // Both downloads should have identical content
+    expect(dlUnderscore.body).toEqual(dlHyphen.body);
+  },
+);
