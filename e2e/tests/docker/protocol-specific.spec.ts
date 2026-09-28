@@ -452,13 +452,16 @@ test(
     const indexDigest = sha256Hex(indexBytes);
 
     // Push the attestation manifest by digest only (no tag, only reachable through index)
+    // Push with OCI manifest media type (the server requires a known type), but the config
+    // is empty (application/vnd.oci.empty.v1+json), which makes the server recognize it as
+    // an attestation and store it with unknown platform
     await rawPutManifest(
       layout.repoName,
       credential,
       layout.image,
       attestationDigest,
       attestationBytes,
-      'application/unknown+unknown',
+      'application/vnd.oci.image.manifest.v1+json',
     );
 
     // Push the index by tag (it references the attestation in manifests[])
