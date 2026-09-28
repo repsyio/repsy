@@ -13,20 +13,21 @@
 # limitations under the License.
 
 # OPT-IN overlay that gives the e2e stack tiny upload size limits (RPS-1482): 64 KiB for a PyPI, Helm
-# or NuGet upload (the multipart limit), a gem, a crate and a Go module zip, instead of the defaults of
-# 100-500 MB (docker-compose.stack.yml leaves them alone). With it, the 413 a real client gets for an
-# over-limit push is proven end to end through Tomcat and the multiport listeners, with a real twine,
-# `dotnet nuget push`, `helm cm-push`, `gem push`, `cargo publish` and curl, which the backend's own
-# ITs (MockMvc, no real request stream) cannot do (tests/<protocol>/size-limits.spec.ts, @limits).
+# or NuGet upload (the multipart limit), a gem, a crate, a Go module zip and an npm publish body
+# (RPS-1561), instead of the defaults of 100-500 MB (docker-compose.stack.yml leaves them alone). With
+# it, the 413 a real client gets for an over-limit push is proven end to end through Tomcat and the
+# multiport listeners, with a real twine, `dotnet nuget push`, `helm cm-push`, `gem push`,
+# `cargo publish`, `npm publish`/pnpm/yarn/bun and curl, which the backend's own ITs (MockMvc, no real
+# request stream) cannot do (tests/<protocol>/size-limits.spec.ts, @limits).
 #
 # It is never part of the default stack: it changes nothing unless it is passed as an extra -f, which
 # `./run.sh local up --limits` (or REPSY_E2E_LIMITS=1) does, on top of the postgres or the H2 stack:
 #
 #   docker compose -f docker-compose.stack.yml -f docker-compose.stack-limits.yml up -d --wait
 #
-# No other suite may run against it: any package bigger than 64 KiB is refused there (the maven
-# limits are hardcoded and npm has none, so those two are not part of this overlay). Give "down" the
-# same flags as "up". See README.md "Size-limit leg".
+# No other suite may run against it: any package bigger than 64 KiB is refused there (Maven's limits
+# are hardcoded in its handlers, not configurable, so it is not part of this overlay -- see README.md
+# "Size-limit leg"). Give "down" the same flags as "up".
 services:
   repsy:
     environment:
@@ -40,3 +41,7 @@ services:
       RUBY_MAX_GEM_SIZE: 64KB
       CARGO_MAX_CRATE_SIZE: 64KB
       GO_MAX_MODULE_ZIP_SIZE: 64KB
+      # An npm publish body: the JSON packument plus its base64 tarball, read whole into memory
+      # (RPS-1561). Not multipart, so it is its own variable, checked from `Content-Length` and while
+      # the body is read.
+      NPM_MAX_PUBLISH_SIZE: 64KB

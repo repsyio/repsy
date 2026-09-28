@@ -236,6 +236,7 @@ e2e/
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
       packument-read.spec.ts    # raw-HTTP reads: abbreviated packument, no publish-only fields, HEAD, ETag/304/gzip, undeprecate, tarball header (RPS-1356..1360, 1363)
       unpublish.spec.ts         # real `npm unpublish` (RPS-1289): one version (unscoped/scoped), the only version, a whole package; refused for a read-write deploy token (RPS-1424)
+      size-limits.spec.ts       # RPS-1482/RPS-1561 registerSizeLimitSpecs(npmAdapter): a real `npm publish` over NPM_MAX_PUBLISH_SIZE, @limits
     npm-clients/
       npm/publish-consume.spec.ts   # registerPublishConsumeLoop(npmFamilyAdapter(npmClient)): the catalog through the npm-family harness
       pnpm/*.spec.ts            # pnpm: the catalog, `pnpm -r publish` (workspace: rewrite), native-command wire proof, resolution / minimumReleaseAge
@@ -244,6 +245,7 @@ e2e/
       versions.spec.ts          # --version of every installed client == its pin; config renderers read back by pnpm/yarn
       sealed-network.spec.ts    # the network seal: a misconfigured registry fails fast for all five clients
       matrix/*.spec.ts          # lockfile, dist-tags, deprecate, view, registry-endpoints (whoami/ping/search/audit), scoped-routing, tarball-host, abbreviated-metadata, wire
+      size-limits.spec.ts       # RPS-1482/RPS-1561 registerSizeLimitSpecs per npm-family publisher (pnpm, yarn classic, yarn berry, bun), @limits
     cargo/
       publish-consume.spec.ts   # registerPublishConsumeLoop(cargoAdapter) + a hyphenated-crate-name real-client test
       registry-rules.spec.ts    # raw-HTTP pins of the duplicate-version/version-validation/config.json/name-normalisation rules, HEAD mirroring GET (RPS-1465)
@@ -5027,12 +5029,13 @@ passing rest of each are cases that talk only to the harness.)
 Every package format has an upload size limit, and a limit nobody exercises is a limit nobody knows still works.
 The default stack leaves them at their defaults (100-500 MB), so the overlay `docker-compose.stack-limits.yml`
 sets the configurable ones to **64 KiB** (`MULTIPART_MAX_FILE_SIZE`, `MULTIPART_MAX_REQUEST_SIZE` 256 KiB,
-`RUBY_MAX_GEM_SIZE`, `CARGO_MAX_CRATE_SIZE`, `GO_MAX_MODULE_ZIP_SIZE`; the request limit stays above the file
-limit so the file limit is what trips). No other suite may run there: any package over 64 KiB is refused.
+`RUBY_MAX_GEM_SIZE`, `CARGO_MAX_CRATE_SIZE`, `GO_MAX_MODULE_ZIP_SIZE`, `NPM_MAX_PUBLISH_SIZE`; the request limit
+stays above the file limit so the file limit is what trips). No other suite may run there: any package over 64
+KiB is refused.
 
 ```bash
 ./run.sh local up --limits                                        # (or REPSY_E2E_LIMITS=1) add --h2 for H2
-REPSY_E2E_LIMITS=1 ./run.sh test --protocol pypi --grep @limits   # and helm, nuget, ruby, cargo, golang, api
+REPSY_E2E_LIMITS=1 ./run.sh test --protocol pypi --grep @limits   # and helm, nuget, ruby, cargo, golang, npm, npm-clients, api
 ./run.sh local down --limits
 ```
 
@@ -5046,18 +5049,21 @@ RANDOM bytes (`src/clients/padding.ts`: gems, crates and charts are gzipped, so 
 - **under the limit** (about 20 KB, same client, a fresh repo): the push succeeds and the package is in the repository,
   so the limit is what refused the first push, not a client or a repo that cannot publish.
 
-| Format         | Limit                     | Client                                                         | What the client prints (asserted)                                                                                                                            | Raw replay                                                                                              |
-| -------------- | ------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| PyPI           | `MULTIPART_MAX_FILE_SIZE` | `twine upload`                                                 | `HTTPError: 413 Content Too Large`                                                                                                                           | 413, `payloadTooLarge`                                                                                  |
-| NuGet          | `MULTIPART_MAX_FILE_SIZE` | `dotnet nuget push`                                            | `error: Response status code does not indicate success: 413`                                                                                                 | 413, `payloadTooLarge`                                                                                  |
-| Helm (classic) | `MULTIPART_MAX_FILE_SIZE` | `helm cm-push`                                                 | `Error: 413: could not properly parse response JSON: {...payloadTooLarge...}` (cm-push expects ChartMuseum's `{"error"}`, so it prints Repsy's envelope raw) | 413, `payloadTooLarge`                                                                                  |
-| Ruby           | `RUBY_MAX_GEM_SIZE`       | `gem push`                                                     | the envelope itself (`{"msgId":"payloadTooLarge",...}`, no status)                                                                                           | 413, `payloadTooLarge`                                                                                  |
-| Cargo          | `CARGO_MAX_CRATE_SIZE`    | `cargo publish`                                                | `the remote server responded with an error (status 413 Payload Too Large): the crate exceeds the maximum upload size`                                        | 413, cargo's own shape `{"errors":[{"detail":"the crate exceeds the maximum upload size"}]}` (no msgId) |
-| Go             | `GO_MAX_MODULE_ZIP_SIZE`  | `curl -T` (there is no Go publisher, the panel documents curl) | `curl: (22) The requested URL returned error: 413` and the envelope                                                                                          | 413, `payloadTooLarge`                                                                                  |
+| Format           | Limit                     | Client                                                         | What the client prints (asserted)                                                                                                                                                                                                                       | Raw replay                                                                                              |
+| ---------------- | ------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| PyPI             | `MULTIPART_MAX_FILE_SIZE` | `twine upload`                                                 | `HTTPError: 413 Content Too Large`                                                                                                                                                                                                                      | 413, `payloadTooLarge`                                                                                  |
+| NuGet            | `MULTIPART_MAX_FILE_SIZE` | `dotnet nuget push`                                            | `error: Response status code does not indicate success: 413`                                                                                                                                                                                            | 413, `payloadTooLarge`                                                                                  |
+| Helm (classic)   | `MULTIPART_MAX_FILE_SIZE` | `helm cm-push`                                                 | `Error: 413: could not properly parse response JSON: {...payloadTooLarge...}` (cm-push expects ChartMuseum's `{"error"}`, so it prints Repsy's envelope raw)                                                                                            | 413, `payloadTooLarge`                                                                                  |
+| Ruby             | `RUBY_MAX_GEM_SIZE`       | `gem push`                                                     | the envelope itself (`{"msgId":"payloadTooLarge",...}`, no status)                                                                                                                                                                                      | 413, `payloadTooLarge`                                                                                  |
+| Cargo            | `CARGO_MAX_CRATE_SIZE`    | `cargo publish`                                                | `the remote server responded with an error (status 413 Payload Too Large): the crate exceeds the maximum upload size`                                                                                                                                   | 413, cargo's own shape `{"errors":[{"detail":"the crate exceeds the maximum upload size"}]}` (no msgId) |
+| Go               | `GO_MAX_MODULE_ZIP_SIZE`  | `curl -T` (there is no Go publisher, the panel documents curl) | `curl: (22) The requested URL returned error: 413` and the envelope                                                                                                                                                                                     | 413, `payloadTooLarge`                                                                                  |
+| npm              | `NPM_MAX_PUBLISH_SIZE`    | `npm publish`                                                  | `npm error code E413` / `npm error 413 Payload Too Large - PUT ...`                                                                                                                                                                                     | 413, `payloadTooLarge`                                                                                  |
+| npm (npm-family) | `NPM_MAX_PUBLISH_SIZE`    | pnpm / yarn classic / yarn berry / bun (`tests/npm-clients`)   | own wording each: pnpm `Error: ERR_PNPM_FAILED_TO_PUBLISH` (+ `413 Payload Too Large` in its error body); yarn classic `... returned a 413`; yarn berry `YN0035: ... Response Code: 413 (Payload Too Large)`; bun `413: http://<host>/<repo>/<package>` | 413, `payloadTooLarge`                                                                                  |
 
 The envelope is `{"msgId":"payloadTooLarge","type":"ERROR","text":"The uploaded content is too large."}`, always
 with `Connection: close`. The Helm OCI push and Docker send blobs, which none of these variables limit, so they
-are left out. twine is not counted for retries (there is no wire recorder): a 413 is not a status it retries.
+are left out. twine is not counted for retries (there is no wire recorder): a 413 is not a status it retries; npm
+and every npm-family client were probed the same way -- one attempt, no retry.
 
 `tests/api/connector-limits.spec.ts` covers the two limits of the connector itself, on the `api` runner:
 
@@ -5087,15 +5093,20 @@ helper, never `fetch`/`rawPut`; every other over-limit spec of the leg sends abo
 (the POM and the `.asc` cases read the body to the limit first), so it cannot meet this. Whether the server should drain
 more of the body (`server.tomcat.max-swallow-size`, a denial-of-service trade-off) is not decided here.
 
-**npm has no limit and no spec** (not pinned on purpose, a follow-up is proposed): probed on this stack, a real
-`npm publish` of 30 MB and a raw publish of 42 MB are accepted (200), and a publish of an 84 MB tarball (112 MB of
-base64 JSON) is a **500 `errorOccurred`** (`StreamConstraintsException: String value length (100007936) exceeds the
-maximum allowed (100000000)` on `_attachments`, Jackson's default; `npm` retries it three times). So there is no
-configurable limit, everything below Jackson's ceiling is read into memory, and above it the answer is a 500, not a 413. Do not pin that as the contract.
+**npm now has a limit too** (`NPM_MAX_PUBLISH_SIZE`, `repsy.npm.max-publish-size`, default 500MB, RPS-1561), part of
+this overlay and this leg like every other format (`tests/npm/size-limits.spec.ts` for the real `npm` client,
+`tests/npm-clients/size-limits.spec.ts` for pnpm/yarn classic/yarn berry/bun -- see the table above). It used to
+have neither: below Jackson's own 100,000,000-character string-length ceiling on the packument's base64
+`_attachments` value, a publish of any size was accepted regardless of the (nonexistent) limit; above it, the
+parse failed with an unrelated **500 `errorOccurred`** instead of a 413. The fix bounds that same string-length
+ceiling by `maxPublishBytes`, so a body the configured limit allows never reaches Jackson's ceiling either; a body
+over the limit is now a 413 `payloadTooLarge`, checked from `Content-Length` and again while the body is read (the
+packument JSON plus its base64 tarball, so roughly 4/3 of the tarball's own size).
 
-Flip checks: raising all five values to 1 MB in the overlay fails every over-limit test (six clients, two chunked
-cases) and keeps every under-limit one green; running the specs on the default stack with `REPSY_E2E_OPT_IN=limits`
-does the same (every push succeeds); without the opt-in every `@limits` test skips, and the nightly leg fails on a skip.
+Flip checks: raising all six values to 1 MB in the overlay fails every over-limit test (six clients, two chunked
+cases, plus npm and every npm-family publisher -- pnpm, yarn classic, yarn berry, bun) and keeps every under-limit
+one green; running the specs on the default stack with `REPSY_E2E_OPT_IN=limits` does the same (every push
+succeeds); without the opt-in every `@limits` test skips, and the nightly leg fails on a skip.
 
 ### CORS leg (RPS-1590)
 

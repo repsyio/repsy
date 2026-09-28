@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (the embedded-H2 stack: @smoke of every wire runner, the full catalog of one rotating runner and the complete panel UI suite), scanner (the @scanner specs of the ui runner and of the npm-clients, docker, maven and pypi runners against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack), limits (the @limits specs of the pypi, helm, nuget, ruby, cargo, golang and api runners against the tiny-upload-limit stack), cors (the @cors specs of the api runner against the stack that sets APP_ALLOWED_ORIGINS), browsers (@smoke of the panel UI in Firefox and in WebKit), proxy (@smoke of the panel UI and the @proxy specs of the ui and api runners behind an nginx reverse proxy that terminates TLS), upgrade (the previous release on a populated volume, upgraded to this image: PostgreSQL and H2), trivy (the @trivy contract spec of the api runner against the real repsy-scanner-trivy), tls (@smoke of every runner but stack over Repsy's own https listeners, every client trusting the generated CA, the ui runners in browsers that ignore the certificate error) or all"
+        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (the embedded-H2 stack: @smoke of every wire runner, the full catalog of one rotating runner and the complete panel UI suite), scanner (the @scanner specs of the ui runner and of the npm-clients, docker, maven and pypi runners against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack), limits (the @limits specs of the pypi, helm, nuget, ruby, cargo, golang, npm, npm-clients and api runners against the tiny-upload-limit stack), cors (the @cors specs of the api runner against the stack that sets APP_ALLOWED_ORIGINS), browsers (@smoke of the panel UI in Firefox and in WebKit), proxy (@smoke of the panel UI and the @proxy specs of the ui and api runners behind an nginx reverse proxy that terminates TLS), upgrade (the previous release on a populated volume, upgraded to this image: PostgreSQL and H2), trivy (the @trivy contract spec of the api runner against the real repsy-scanner-trivy), tls (@smoke of every runner but stack over Repsy's own https listeners, every client trusting the generated CA, the ui runners in browsers that ignore the certificate error) or all"
         type: choice
         options: [all, ui, wire, h2, scanner, throttle, limits, cors, browsers, proxy, upgrade, trivy, tls]
         default: all
@@ -129,9 +129,10 @@ jobs:
               "throttle": ("throttle", "--throttle", ["stack", "ui"], "@throttle", 30, "throttle", False),
               # The tiny-upload-limit overlay (README.md "Size-limit leg"): 64 KiB on every configurable upload
               # limit, so only the opted-in @limits specs run there (any other suite would be refused for
-              # every package over 64 KiB). One over-limit push per real client: pypi, helm, nuget, ruby, cargo
-              # and golang, plus the raw connector cases (chunked uploads) of the api runner.
-              "limits": ("limits", "--limits", ["pypi", "helm", "nuget", "ruby", "cargo", "golang", "api"], "@limits", 60, "limits", False),
+              # every package over 64 KiB). One over-limit push per real client: pypi, helm, nuget, ruby, cargo,
+              # golang and npm (plus npm-clients: pnpm, yarn classic, yarn berry, bun), plus the raw connector
+              # cases (chunked uploads) of the api runner.
+              "limits": ("limits", "--limits", ["pypi", "helm", "nuget", "ruby", "cargo", "golang", "npm", "npm-clients", "api"], "@limits", 60, "limits", False),
               # The APP_ALLOWED_ORIGINS overlay (README.md "CORS leg", RPS-1590): the default stack leaves the variable
               # unset (same-origin only, @smoke in the api runner), this one sets two origins, so only the opted-in
               # @cors specs of the api runner run there.

@@ -60,6 +60,7 @@ import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
 import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
+import { randomPadding } from './padding.js';
 import {
   adminCredential,
   buildPublishDocument,
@@ -120,20 +121,29 @@ function npmrcView(repoName: string, credential: MaterializedCredential): Record
   };
 }
 
-async function renderNpmrc(home: string, repoName: string, credential: MaterializedCredential) {
+/** Renders the `.npmrc` a client run reads its registry and credential from; exported for
+ *  `clients/oversize.ts`'s `pushNpm` (the size-limit leg, RPS-1482), which needs the exact same
+ *  rendering `publishWithClient` uses but with a padded package. */
+export async function renderNpmrc(
+  home: string,
+  repoName: string,
+  credential: MaterializedCredential,
+) {
   const npmrcPath = path.join(home, 'npmrc');
   await renderTemplate('npmrc.template', npmrcPath, npmrcView(repoName, credential));
   return npmrcPath;
 }
 
-async function isolatedCache(home: string): Promise<string> {
+/** Exported for `clients/oversize.ts`'s `pushNpm`, see `renderNpmrc`. */
+export async function isolatedCache(home: string): Promise<string> {
   const cacheDir = path.join(home, 'npm-cache');
   await fs.mkdir(cacheDir, { recursive: true });
   return cacheDir;
 }
 
-/** `npm pack`s the rendered package in `work` into an isolated destination, returning its bytes. */
-async function packTarball(
+/** `npm pack`s the rendered package in `work` into an isolated destination, returning its bytes.
+ *  Exported for `clients/oversize.ts`'s `pushNpm`, see `renderNpmrc`. */
+export async function packTarball(
   work: string,
   home: string,
   label: string,
@@ -162,11 +172,14 @@ async function packTarball(
   return { file: path.join(destDir, file), bytes };
 }
 
-/** Renders the tiny publishable package (package.json, index.js, a fresh random marker file). */
-async function renderPackage(
+/** Renders the tiny publishable package (package.json, index.js, a fresh random marker file).
+ *  `padBytes`, when given, adds a random-content padding file (RPS-1482, the size-limit leg's
+ *  `clients/oversize.ts` `pushNpm`; random so the tarball's gzip cannot shrink it below a limit). */
+export async function renderPackage(
   work: string,
   packageName: string,
   version: string,
+  padBytes?: number,
 ): Promise<{ marker: string }> {
   await renderTemplate('package.template.json', path.join(work, 'package.json'), {
     packageName,
@@ -175,6 +188,9 @@ async function renderPackage(
   await renderTemplate('index.template.js', path.join(work, 'index.js'), {});
   const marker = randomUUID();
   await fs.writeFile(path.join(work, MARKER_FILENAME), marker, 'utf8');
+  if (padBytes !== undefined) {
+    await fs.writeFile(path.join(work, 'e2e-padding.bin'), randomPadding(padBytes));
+  }
   return { marker };
 }
 

@@ -53,6 +53,17 @@ import { buildNupkg, nugetApiKey, rawPublish as rawNugetPublish } from './nuget-
 import { buildWheel, rawUpload as rawPypiUpload, uploadUrl as pypiUploadUrl } from './pypi-raw.js';
 import { twineEnv } from './pypi.js';
 import { clientEnv } from './client-env.js';
+import {
+  isolatedCache as npmIsolatedCache,
+  npmEnv,
+  packTarball as packNpmTarball,
+  renderNpmrc,
+  renderPackage as renderNpmPackage,
+} from './npm.js';
+import { buildPublishDocument, rawPublish as rawNpmPublish } from './npm-raw.js';
+import type { NpmFamilyClient } from './npm-family/client.js';
+import { renderPackage as renderNpmFamilyPackage } from './npm-family/fixtures.js';
+import { randomPadding } from './padding.js';
 import type { RawResponse } from './raw-http.js';
 
 const TIMEOUT_MS = 120_000;
@@ -371,5 +382,98 @@ export async function pushGolang(
     replay,
     packageBytes: built.bytes.length,
     httpStatus: Number.parseInt(result.stdout.trim(), 10) || 0,
+  };
+}
+
+/** `npm publish <tarball>` of a package padded with `padBytes` (`npm.ts` `publishWithClient`),
+ *  plus a raw replay of the SAME tarball bytes as the publish document `npm.ts`'s own adapter
+ *  builds (`buildPublishDocument`/`rawPublish`, `npm-raw.ts`): what `NPM_MAX_PUBLISH_SIZE`
+ *  (`repsy.npm.max-publish-size`, RPS-1561) really answers, since `npm publish` itself only ever
+ *  reports a generic network error for a body the server refused. */
+export async function pushNpm(
+  world: World,
+  padBytes: number,
+  label: string,
+): Promise<OversizePush> {
+  const { home, work } = await isolatedWorkDir(label);
+  const { packageName, version } = world.publishTarget;
+
+  await renderNpmPackage(work, packageName, version, padBytes);
+  const npmrcPath = await renderNpmrc(home, world.repoName, world.credential);
+  const cacheDir = await npmIsolatedCache(home);
+  const { file: tarballFile, bytes: tarballBytes } = await packNpmTarball(
+    work,
+    home,
+    `${label}-pack`,
+  );
+
+  const secrets = world.credential.password ? [world.credential.password] : [];
+  const result = await run(
+    'npm',
+    ['publish', tarballFile, '--userconfig', npmrcPath, '--cache', cacheDir, '--ignore-scripts'],
+    {
+      cwd: work,
+      env: npmEnv(home),
+      timeoutMs: TIMEOUT_MS,
+      redact: secrets,
+      label,
+    },
+  );
+
+  const document = buildPublishDocument({
+    repoName: world.repoName,
+    packageName,
+    version,
+    tarballBytes,
+  });
+  const replay = await rawNpmPublish(world.repoName, world.credential, packageName, document);
+
+  return {
+    exitCode: result.exitCode,
+    output: `${result.stdout}\n${result.stderr}`,
+    command: result.command,
+    replay,
+    packageBytes: tarballBytes.length,
+  };
+}
+
+/** The `pushXyz` of one npm-family publisher (pnpm, yarn classic, yarn berry, bun; `npm-family/
+ *  client.ts`'s `NpmFamilyClient`), for `tests/npm-clients/size-limits.spec.ts` (the plain `npm`
+ *  client is `pushNpm` above, run against `tests/npm/size-limits.spec.ts` instead, so it is not
+ *  re-pushed here): `client.pack`/`client.publish` of a package padded with `padBytes`
+ *  (`npm-family/fixtures.ts`'s `renderPackage`, the same rendering the catalog's `publishPackage`
+ *  uses), plus the same raw replay `pushNpm` does. Returns a `push` function, so a caller does
+ *  `pushNpmFamily(pnpmClient)` once per client and hands the result straight to
+ *  `registerSizeLimitSpecs`. */
+export function pushNpmFamily(
+  client: NpmFamilyClient,
+): (world: World, padBytes: number, label: string) => Promise<OversizePush> {
+  return async (world, padBytes, label) => {
+    const ctx = await client.prepare(label, [
+      { repoName: world.repoName, credential: world.credential },
+    ]);
+    const { packageName, version } = world.publishTarget;
+    const dir = path.join(ctx.work, 'pkg');
+
+    await renderNpmFamilyPackage(dir, { packageName, version });
+    await fs.writeFile(path.join(dir, 'e2e-padding.bin'), randomPadding(padBytes));
+    const tarball = await client.pack(ctx, dir);
+    const result = await client.publish(ctx, { dir, tarball });
+
+    const document = buildPublishDocument({
+      repoName: world.repoName,
+      packageName,
+      version,
+      tarballBytes: tarball.bytes,
+    });
+    const replay = await rawNpmPublish(world.repoName, world.credential, packageName, document);
+
+    return {
+      exitCode: result.exitCode,
+      output: `${result.stdout}\n${result.stderr}`,
+      command: result.command,
+      replay,
+      packageBytes: tarball.bytes.length,
+    };
   };
 }
