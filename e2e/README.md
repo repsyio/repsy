@@ -2792,6 +2792,15 @@ generate-lockfile` then resolves the renamed dependency correctly, locking it un
 - `cargo-raw.ts`'s `ParsedIndexEntry`/new `ParsedIndexDep` gained typed `deps`, `features`, `v`,
   `features2` and `rust_version` fields (previously reachable only through the loose `[key: string]:
 unknown` index signature); `parseIndex`'s own body is unchanged.
+- **Sparse-index publish-order stable after yank (RPS-1605)**: publishes multiple versions of a
+  crate, yanks a middle version (not the last one), and confirms the sparse index's line order
+  remains in original publish order — yanking marks it yanked in place, it does NOT reorder or
+  remove it from the index. Confirmed live.
+- **Crate-name normalization round-trip (RPS-1212)**: publishes a crate with a hyphenated name,
+  queries the sparse index with both the original hyphenated and the normalized underscore spelling,
+  confirms both return HTTP 200 with the same entry, and that the served entry's `name` field always
+  names the original published spelling (not the lookup key). Downloads work with either spelling
+  too. Confirmed live.
 
 ### Cargo install, add and login (RPS-1486)
 
