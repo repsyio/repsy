@@ -98,6 +98,18 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   }
 
   @Override
+  public List<GemCompactEntry> getCompactEntriesByGemNames(
+      final BaseRepoInfo<UUID> repoInfo, final List<String> gemNames) {
+    if (gemNames.isEmpty()) {
+      return List.of();
+    }
+    final var rows =
+        this.versionRepository.findAllNonYankedCompactByRepoIdAndGemNameIn(
+            repoInfo.getId(), gemNames);
+    return this.toCompactEntries(rows);
+  }
+
+  @Override
   public Optional<GemCompactEntry> findByGemFilename(
       final BaseRepoInfo<UUID> repoInfo, final String filename) {
     for (final var candidate : GemFilenameCandidates.split(filename)) {
@@ -120,7 +132,32 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
                     AbstractRubyStorageService.buildFilename(
                         row.getGemName(), row.getVersion(), row.getPlatform())))
         .findFirst()
-        .map(this::toSpecsEntry);
+        .map(this::toSpecsEntryWithDependencies);
+  }
+
+  /**
+   * Like {@link #toSpecsEntry}, plus the row's own runtime dependencies (RPS-1554): {@link
+   * #findByGemFilename} resolves at most one row, so one extra query here is not the N+1 that
+   * batching in {@link #toCompactEntries} avoids for a whole gem's or repo's worth of rows. {@code
+   * getGemspec} (the one caller that needs the dependencies) reaches this through {@link
+   * #findByGemFilename}; the other callers (a download, an existence check) pay for and discard
+   * them, which is cheaper than a second, dependency-aware resolution path.
+   */
+  private GemCompactEntry toSpecsEntryWithDependencies(final GemVersionCompactItem row) {
+    final var runtimeDeps =
+        this.dependencyRepository.findAllByGemVersionId(row.getGemVersionId()).stream()
+            .filter(d -> RUNTIME_TYPE.equals(d.getType()))
+            .map(this::toDependencyDto)
+            .toList();
+    return GemCompactEntry.builder()
+        .gemName(row.getGemName())
+        .version(row.getVersion())
+        .platform(row.getPlatform())
+        .checksum(row.getChecksum())
+        .yanked(row.isYanked())
+        .createdAt(row.getCreatedAt())
+        .runtimeDependencies(runtimeDeps)
+        .build();
   }
 
   @Override

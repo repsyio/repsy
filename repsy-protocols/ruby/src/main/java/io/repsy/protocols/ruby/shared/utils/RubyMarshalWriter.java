@@ -104,7 +104,13 @@ public class RubyMarshalWriter {
     }
   }
 
-  private static void writeSymbol(
+  /**
+   * Writes {@code name} as a Marshal symbol: a fresh declaration the first time it appears in
+   * {@code symbols}, a link back to it every time after. Package-visible so {@link
+   * RubyGemspecMarshalWriter} can share it and the same {@code symbols} table for the gemspec's
+   * {@code dependencies} field (RPS-1554).
+   */
+  static void writeSymbol(
       final ByteArrayOutputStream out, final List<String> symbols, final String name)
       throws IOException {
     final var idx = symbols.indexOf(name);
@@ -120,7 +126,10 @@ public class RubyMarshalWriter {
     }
   }
 
-  private static void writeEncodedString(
+  /**
+   * Writes {@code value} as a UTF-8 encoded Marshal string (an IVAR string with an {@code :E} tag).
+   */
+  static void writeEncodedString(
       final ByteArrayOutputStream out, final List<String> symbols, final String value)
       throws IOException {
     final var bytes = value.getBytes(StandardCharsets.UTF_8);

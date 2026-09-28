@@ -18,6 +18,7 @@ package io.repsy.protocols.ruby.protocol.facades.contract;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.IOException;
+import java.util.List;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
@@ -66,4 +67,12 @@ public interface RubyProtocolFacade {
   byte[] getLatestSpecs(ProtocolContext context);
 
   byte[] getPrereleaseSpecs(ProtocolContext context);
+
+  /**
+   * The Marshal bytes of the legacy {@code GET /api/v1/dependencies?gems=name1,name2} (RPS-1554):
+   * one hash per non-yanked version of each requested gem that exists in the repo, with its name,
+   * number, platform and runtime dependencies. A requested name with no match in the repo is
+   * omitted, not an error, matching the real RubyGems API.
+   */
+  byte[] getDependencies(ProtocolContext context, List<String> gemNames);
 }

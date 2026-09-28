@@ -15,10 +15,14 @@
  */
 package io.repsy.protocols.ruby.shared.utils;
 
+import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
 
@@ -103,8 +107,9 @@ public class RubyGemspecMarshalWriter {
   // After name and version, up to original_platform (array slots 4..7):
   //   date (Time.utc(2000,1,1)), summary=nil,
   //   required_ruby_version([">= 0"]), required_rubygems_version([">= 0"] via object ref 11).
-  // Then come original_platform, TAIL_MIDDLE, new_platform and TAIL_END, which no object or
-  // symbol reference points into, so the platform strings can vary in length freely.
+  // Then come original_platform, dependencies (RPS-1554), TAIL_MIDDLE_AFTER_DEPENDENCIES,
+  // new_platform and TAIL_END, which no object or symbol reference points into, so the platform
+  // strings and the dependencies can vary in length and count freely.
   //
   // Symbol indices used here (in order of first appearance in the full inner stream):
   //   [0]="E"  [1]="Gem::Version"  [2]="Time"  [3]="zone"  [4]="Gem::Requirement"
@@ -214,11 +219,28 @@ public class RubyGemspecMarshalWriter {
   // `<name>-<version>-<platform>.gem` from (RPS-1553); slot 16 is not read back by _load.
   private static final byte[] ORIGINAL_PLATFORM_NIL = {0x30};
 
-  // dependencies = [] up to has_rdoc = true (array slots 9..15)
-  private static final byte[] TAIL_MIDDLE = {
-    // dependencies = []
-    0x5b,
-    0x00,
+  // Marshal tags used by the dynamic `dependencies` field (RPS-1554); the fixed byte arrays above
+  // have their array tags (0x5b) inlined instead, since they never vary.
+  private static final int ARRAY_TAG = 0x5b;
+  private static final int OBJECT_TAG = 0x6f;
+  private static final int USER_MARSHAL_TAG = 0x55;
+  private static final int FALSE_TAG = 0x46;
+  private static final int DEPENDENCY_IVAR_COUNT = 5;
+  private static final String DEFAULT_REQUIREMENT = ">= 0";
+
+  /**
+   * Symbols the fixed prefix (up to and including {@code required_rubygems_version}) has already
+   * registered, in order, so the {@code dependencies} field can reuse them by link (matching real
+   * Ruby's own dump) instead of re-declaring them, and so a link it writes resolves to the same
+   * index a real Ruby reader would already have assigned that symbol.
+   */
+  private static List<String> fixedPrefixSymbols() {
+    return new ArrayList<>(List.of("E", "Gem::Version", "Time", "zone", "Gem::Requirement"));
+  }
+
+  // rubyforge_project = "" up to has_rdoc = true (array slots 10..15); slot 9 (dependencies) is
+  // written dynamically by writeDependencies between original_platform and this.
+  private static final byte[] TAIL_MIDDLE_AFTER_DEPENDENCIES = {
     // rubyforge_project = ""
     0x49,
     0x22,
@@ -257,22 +279,36 @@ public class RubyGemspecMarshalWriter {
 
   private static final String DEFAULT_PLATFORM = "ruby";
 
-  /** The gemspec of a pure-Ruby gem: platform {@code ruby}. */
+  /** The gemspec of a pure-Ruby gem: platform {@code ruby}, no dependencies. */
   public static byte[] dumpGemspec(final String name, final String version) {
     return dumpGemspec(name, version, DEFAULT_PLATFORM);
   }
 
   /**
-   * The gemspec of {@code name} at {@code version} for {@code platform}. RubyGems derives the
-   * {@code .gem} file it downloads from the spec's full name ({@code <name>-<version>-<platform>}),
-   * so a platform gem's gemspec has to carry its platform (RPS-1553). {@code ruby} (a pure gem)
-   * leaves the bytes as they always were.
+   * The gemspec of {@code name} at {@code version} for {@code platform}, with no dependencies.
+   * RubyGems derives the {@code .gem} file it downloads from the spec's full name ({@code
+   * <name>-<version>-<platform>}), so a platform gem's gemspec has to carry its platform
+   * (RPS-1553). {@code ruby} (a pure gem) leaves the bytes as they always were.
    */
   public static byte[] dumpGemspec(final String name, final String version, final String platform) {
+    return dumpGemspec(name, version, platform, List.of());
+  }
+
+  /**
+   * The gemspec of {@code name} at {@code version} for {@code platform}, with its runtime {@code
+   * dependencies} written as real {@code Gem::Dependency} objects (RPS-1554): before this, {@code
+   * gemspec.rz} always said {@code dependencies = []}, so a client resolving from the quick gemspec
+   * (as opposed to the compact index or the {@code .gem} itself) saw no dependency at all.
+   */
+  public static byte[] dumpGemspec(
+      final String name,
+      final String version,
+      final String platform,
+      final List<GemDependency> dependencies) {
     try {
       final var nameBytes = name.getBytes(StandardCharsets.UTF_8);
       final var versionBytes = version.getBytes(StandardCharsets.UTF_8);
-      final var inner = buildInner(nameBytes, versionBytes, platform);
+      final var inner = buildInner(nameBytes, versionBytes, platform, dependencies);
       final var out = new ByteArrayOutputStream(OUTER_PREFIX.length + 3 + inner.length);
       out.write(OUTER_PREFIX);
       RubyMarshalWriter.writePackedInt(out, inner.length);
@@ -284,7 +320,11 @@ public class RubyGemspecMarshalWriter {
   }
 
   private static byte[] buildInner(
-      final byte[] nameBytes, final byte[] versionBytes, final String platform) throws IOException {
+      final byte[] nameBytes,
+      final byte[] versionBytes,
+      final String platform,
+      final List<GemDependency> dependencies)
+      throws IOException {
     final var pure = DEFAULT_PLATFORM.equals(platform);
     final var platformBytes = platform.getBytes(StandardCharsets.UTF_8);
     final var out =
@@ -294,9 +334,10 @@ public class RubyGemspecMarshalWriter {
                 + VERSION_PREFIX.length
                 + versionBytes.length
                 + TAIL_HEAD.length
-                + TAIL_MIDDLE.length
+                + TAIL_MIDDLE_AFTER_DEPENDENCIES.length
                 + TAIL_END.length
                 + 2 * platformBytes.length
+                + 64 * dependencies.size()
                 + 32);
     out.write(INNER_PREFIX);
     // name: IVAR String {len} {bytes} 1ivar ;E true
@@ -307,19 +348,119 @@ public class RubyGemspecMarshalWriter {
     out.write(versionBytes);
     out.write(IVAR_SUFFIX_E_TRUE);
     out.write(TAIL_HEAD);
+    final var symbols = fixedPrefixSymbols();
     if (pure) {
       out.write(ORIGINAL_PLATFORM_NIL);
-      out.write(TAIL_MIDDLE);
+      writeDependencies(out, symbols, dependencies);
+      out.write(TAIL_MIDDLE_AFTER_DEPENDENCIES);
       out.write(NEW_PLATFORM_RUBY);
     } else {
       // Both slots carry the platform string: slot 8 is what _load reads, slot 16 is what a
       // reader that does not go through _load would see (the real dump has a Gem::Platform).
       writeString(out, platformBytes);
-      out.write(TAIL_MIDDLE);
+      writeDependencies(out, symbols, dependencies);
+      out.write(TAIL_MIDDLE_AFTER_DEPENDENCIES);
       writeString(out, platformBytes);
     }
     out.write(TAIL_END);
     return out.toByteArray();
+  }
+
+  /**
+   * Writes the {@code dependencies} field (array slot 9) as an {@code Array} of real {@code
+   * Gem::Dependency} objects, matching what {@code Marshal.dump(Gem::Specification)} produces (each
+   * one {@code o:Gem::Dependency} with {@code @name}, {@code @requirement}, {@code @type},
+   * {@code @prerelease} and {@code @version_requirements}). {@code symbols} is seeded with the
+   * class/ivar-encoding symbols the fixed prefix already registered ({@link
+   * #fixedPrefixSymbols()}), so a repeated one (such as {@code Gem::Requirement} or the {@code :E}
+   * UTF-8 marker every encoded string carries) links back to it instead of being redeclared, the
+   * same way real Ruby's own dump does. Nothing after this field links back into it (see the class
+   * doc), so it does not itself need to reuse or predict any object (as opposed to symbol) index.
+   */
+  private static void writeDependencies(
+      final ByteArrayOutputStream out, final List<String> symbols, final List<GemDependency> deps)
+      throws IOException {
+    out.write(ARRAY_TAG);
+    RubyMarshalWriter.writePackedInt(out, deps.size());
+    for (final var dep : deps) {
+      writeDependency(out, symbols, dep);
+    }
+  }
+
+  private static void writeDependency(
+      final ByteArrayOutputStream out, final List<String> symbols, final GemDependency dep)
+      throws IOException {
+    out.write(OBJECT_TAG);
+    RubyMarshalWriter.writeSymbol(out, symbols, "Gem::Dependency");
+    RubyMarshalWriter.writePackedInt(out, DEPENDENCY_IVAR_COUNT);
+    RubyMarshalWriter.writeSymbol(out, symbols, "@name");
+    RubyMarshalWriter.writeEncodedString(out, symbols, dep.getName());
+    RubyMarshalWriter.writeSymbol(out, symbols, "@requirement");
+    writeRequirement(out, symbols, dep.getRequirements());
+    RubyMarshalWriter.writeSymbol(out, symbols, "@type");
+    RubyMarshalWriter.writeSymbol(out, symbols, dep.getType());
+    RubyMarshalWriter.writeSymbol(out, symbols, "@prerelease");
+    out.write(FALSE_TAG);
+    // Real Gem::Dependency carries @version_requirements as the same Gem::Requirement instance as
+    // @requirement (an old alias for it); a second, independent dump of the same value decodes to
+    // an equal, if not object-identical, Gem::Requirement, which no client of this field compares
+    // by identity.
+    RubyMarshalWriter.writeSymbol(out, symbols, "@version_requirements");
+    writeRequirement(out, symbols, dep.getRequirements());
+  }
+
+  /**
+   * Writes {@code requirements} (formatted by {@code GemspecParser} as one or more {@code "<op>
+   * <version>"} clauses joined by {@code ", "}, for example {@code ">= 1.0, < 2.0"}) as a {@code
+   * Gem::Requirement}: {@code U :Gem::Requirement} wrapping its {@code marshal_dump}, {@code
+   * [@requirements]}, where {@code @requirements} is the array of {@code [operator, Gem::Version]}
+   * pairs.
+   */
+  private static void writeRequirement(
+      final ByteArrayOutputStream out, final List<String> symbols, final String requirements)
+      throws IOException {
+    out.write(USER_MARSHAL_TAG);
+    RubyMarshalWriter.writeSymbol(out, symbols, "Gem::Requirement");
+    out.write(ARRAY_TAG);
+    RubyMarshalWriter.writePackedInt(out, 1);
+    final var pairs = parseRequirementPairs(requirements);
+    out.write(ARRAY_TAG);
+    RubyMarshalWriter.writePackedInt(out, pairs.size());
+    for (final var pair : pairs) {
+      out.write(ARRAY_TAG);
+      RubyMarshalWriter.writePackedInt(out, 2);
+      RubyMarshalWriter.writeEncodedString(out, symbols, pair[0]);
+      out.write(USER_MARSHAL_TAG);
+      RubyMarshalWriter.writeSymbol(out, symbols, "Gem::Version");
+      out.write(ARRAY_TAG);
+      RubyMarshalWriter.writePackedInt(out, 1);
+      RubyMarshalWriter.writeEncodedString(out, symbols, pair[1]);
+    }
+  }
+
+  /**
+   * Splits a {@code GemspecParser}-formatted requirement string on its {@code ", "} clause
+   * separator, then each clause on its first space into {@code [operator, version]}. A clause with
+   * no space, or an input with no clause at all (a blank string), falls back to {@code
+   * DEFAULT_REQUIREMENT} ({@code ">= 0"}), the same default {@code GemspecParser} itself uses for a
+   * dependency with no requirement.
+   */
+  private static List<String[]> parseRequirementPairs(final String requirements) {
+    if (requirements.isBlank()) {
+      return List.<String[]>of(splitClause(DEFAULT_REQUIREMENT));
+    }
+    return Arrays.stream(requirements.split(", "))
+        .map(RubyGemspecMarshalWriter::splitClause)
+        .toList();
+  }
+
+  private static String[] splitClause(final String clause) {
+    final var trimmed = clause.trim();
+    final var spaceIdx = trimmed.indexOf(' ');
+    if (spaceIdx < 0) {
+      return new String[] {">=", trimmed};
+    }
+    return new String[] {trimmed.substring(0, spaceIdx), trimmed.substring(spaceIdx + 1).trim()};
   }
 
   private static void writeString(final ByteArrayOutputStream out, final byte[] bytes)

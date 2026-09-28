@@ -26,11 +26,13 @@ import io.repsy.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
 import io.repsy.protocols.ruby.shared.utils.GemspecParser;
 import io.repsy.protocols.ruby.shared.utils.RubyGemspecMarshalWriter;
+import io.repsy.protocols.ruby.shared.utils.RubyMarshalWriter;
 import io.repsy.protocols.ruby.shared.utils.RubySpecsIndexWriter;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -72,7 +74,10 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
         this.findLiveGemspecEntry(repoInfo, gemspecName)
             .orElseThrow(() -> new ItemNotFoundException("gemVersionNotFound"));
     return RubyGemspecMarshalWriter.dumpGemspec(
-        entry.getGemName(), entry.getVersion(), entry.getPlatform());
+        entry.getGemName(),
+        entry.getVersion(),
+        entry.getPlatform(),
+        entry.getRuntimeDependencies());
   }
 
   @Override
@@ -238,6 +243,13 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     return RubySpecsIndexWriter.dumpPrereleaseSpecs(
         this.gemService.getAllNonYankedEntries(repoInfo));
+  }
+
+  @Override
+  public byte[] getDependencies(final ProtocolContext context, final List<String> gemNames) {
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var entries = this.gemService.getCompactEntriesByGemNames(repoInfo, gemNames);
+    return RubyMarshalWriter.dumpDependencies(entries);
   }
 
   private void refreshVersionsChecksum(final BaseRepoInfo<ID> repoInfo, final String gemName) {

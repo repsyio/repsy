@@ -17,9 +17,12 @@ package io.repsy.protocols.ruby.shared.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -109,5 +112,106 @@ class RubyGemspecMarshalWriterTest {
       }
     }
     return -1;
+  }
+
+  /**
+   * RPS-1554: {@code dependencies} used to be hardcoded to {@code []}, so a client reading the
+   * quick gemspec directly (as opposed to the compact index or the {@code .gem} itself, both of
+   * which already carried dependencies) saw none. Every fixture here was round-tripped through real
+   * Ruby's {@code Marshal.load} (a {@code ruby:3.3-slim} container, not part of this build) to
+   * confirm it decodes to a {@code Gem::Specification} with the expected name, type and requirement
+   * of each dependency, then pinned byte for byte.
+   */
+  @Nested
+  @DisplayName("dependencies (RPS-1554)")
+  class Dependencies {
+
+    /**
+     * {@code dumpGemspec("demo", "1.2.3", "ruby", [rake >= 1.0 < 2.0 (runtime), rspec ~> 3.0
+     * (development)])}, confirmed by {@code Marshal.load} to decode to those two dependencies with
+     * their name, type and requirement intact.
+     */
+    private static final String DEMO_WITH_TWO_DEPS =
+        "0408753a1747656d3a3a53706563696669636174696f6e02fc0104085b1849220b332e342e3230063a06"
+            + "4554690949220964656d6f063b0054553a1147656d3a3a56657273696f6e5b0649220a312e322e33"
+            + "063b005449753a0954696d650d200019c000000000063a097a6f6e65492208555443063b00463055"
+            + "3a1547656d3a3a526571756972656d656e745b065b065b074922073e3d063b0054553b065b064922"
+            + "0630063b0046553b095b065b064010305b076f3a1447656d3a3a446570656e64656e63790a3a0a40"
+            + "6e616d6549220972616b65063b00543a1140726571756972656d656e74553b095b065b075b074922"
+            + "073e3d063b0054553b065b06492208312e30063b00545b074922063c063b0054553b065b06492208"
+            + "322e30063b00543a0a40747970653a0c72756e74696d653a104070726572656c65617365463a1a40"
+            + "76657273696f6e5f726571756972656d656e7473553b095b065b075b074922073e3d063b0054553b"
+            + "065b06492208312e30063b00545b074922063c063b0054553b065b06492208322e30063b00546f3b"
+            + "0a0a3b0b49220a7273706563063b00543b0c553b095b065b065b074922077e3e063b0054553b065b"
+            + "06492208332e30063b00543b0d3a10646576656c6f706d656e743b0f463b10553b095b065b065b07"
+            + "4922077e3e063b0054553b065b06492208332e30063b00544922"
+            + "00063b0054305b0030305449220972756279063b00545b007b00";
+
+    @Test
+    @DisplayName(
+        "writes two dependencies (runtime and development) as real Gem::Dependency objects")
+    void writesRuntimeAndDevelopmentDependencies() {
+      final var deps =
+          List.of(
+              GemDependency.builder()
+                  .name("rake")
+                  .requirements(">= 1.0, < 2.0")
+                  .type("runtime")
+                  .build(),
+              GemDependency.builder()
+                  .name("rspec")
+                  .requirements("~> 3.0")
+                  .type("development")
+                  .build());
+
+      final var dump = RubyGemspecMarshalWriter.dumpGemspec("demo", "1.2.3", "ruby", deps);
+
+      assertThat(dump).isEqualTo(HexFormat.of().parseHex(DEMO_WITH_TWO_DEPS));
+    }
+
+    @Test
+    @DisplayName("an empty dependency list is byte for byte the pre-RPS-1554 stub")
+    void emptyDependenciesUnchanged() {
+      final var withEmptyList =
+          RubyGemspecMarshalWriter.dumpGemspec("demo", "1.2.3", "ruby", List.of());
+      final var withoutList = RubyGemspecMarshalWriter.dumpGemspec("demo", "1.2.3", "ruby");
+      final var withoutPlatform = RubyGemspecMarshalWriter.dumpGemspec("demo", "1.2.3");
+
+      assertThat(withEmptyList).isEqualTo(withoutList).isEqualTo(withoutPlatform);
+    }
+
+    @Test
+    @DisplayName("a blank requirement falls back to \">= 0\", matching GemspecParser's own default")
+    void blankRequirementDefaultsToAnyVersion() {
+      final var deps =
+          List.of(GemDependency.builder().name("bare").requirements("").type("runtime").build());
+
+      final var dump = RubyGemspecMarshalWriter.dumpGemspec("demo", "1.0.0", "ruby", deps);
+
+      final var marshal = new String(dump, StandardCharsets.ISO_8859_1);
+      assertThat(marshal).contains("bare").contains(">=");
+    }
+
+    @Test
+    @DisplayName("a platform gem's gemspec still carries its dependencies")
+    void platformGemCarriesDependencies() {
+      final var deps =
+          List.of(
+              GemDependency.builder()
+                  .name("nokogiri")
+                  .requirements(">= 1.10")
+                  .type("runtime")
+                  .build());
+
+      final var dump =
+          RubyGemspecMarshalWriter.dumpGemspec("native-demo", "2.0.0", "x86_64-linux", deps);
+
+      final var marshal = new String(dump, StandardCharsets.ISO_8859_1);
+      assertThat(marshal)
+          .contains("native-demo")
+          .contains("x86_64-linux")
+          .contains("nokogiri")
+          .contains("Gem::Dependency");
+    }
   }
 }

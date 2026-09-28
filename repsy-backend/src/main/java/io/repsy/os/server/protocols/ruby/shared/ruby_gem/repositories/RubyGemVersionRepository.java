@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemVersionCompactItem;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemVersionListItem;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGemVersion;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -86,4 +87,17 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
       order by g.name, gv.createdAt, gv.id
       """)
   List<GemVersionCompactItem> findAllNonYankedCompactByRepoId(UUID repoId);
+
+  @Query(
+      """
+      select gv.id as gemVersionId, g.name as gemName,
+        gv.version as version, gv.platform as platform,
+        gv.checksum as checksum, gv.yanked as yanked,
+        gv.createdAt as createdAt
+      from RubyGemVersion gv join gv.gem g join g.repo r
+      where r.id = :repoId and gv.yanked = false and g.name in :gemNames
+      order by g.name, gv.createdAt, gv.id
+      """)
+  List<GemVersionCompactItem> findAllNonYankedCompactByRepoIdAndGemNameIn(
+      UUID repoId, Collection<String> gemNames);
 }
