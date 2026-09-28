@@ -451,6 +451,17 @@ test(
     const indexBytes = Buffer.from(JSON.stringify(indexObj), 'utf8');
     const indexDigest = sha256Hex(indexBytes);
 
+    // The attestation has an empty config blob that must be uploaded first
+    const emptyConfigBytes = Buffer.from(JSON.stringify({}), 'utf8');
+    const emptyConfigDigest = sha256Hex(emptyConfigBytes);
+    await rawUploadBlob(
+      layout.repoName,
+      credential,
+      layout.image,
+      emptyConfigBytes,
+      `sha256:${emptyConfigDigest}`,
+    );
+
     // Push the attestation manifest by digest only (no tag, only reachable through index)
     // Push with OCI manifest media type (the server requires a known type), but the config
     // is empty (application/vnd.oci.empty.v1+json), which makes the server recognize it as
