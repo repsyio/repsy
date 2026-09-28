@@ -49,8 +49,8 @@
  *    RegistrationsBaseUrl and the search/autocomplete services, no symbol resource). `dotnet nuget push x.nupkg` of a `dotnet pack
  *    --include-symbols` output sends the `.nupkg` alone, the `.snupkg` next to it stays unpushed, with
  *    or without `--symbol-source`. So the real client never reaches the server's publish endpoint with
- *    a symbol package; a raw `PUT` of one is another matter (proposed as a backend story in the PR
- *    report, not asserted here).
+ *    a symbol package; a raw `PUT` of one is tested in `tests/nuget/registry-rules.spec.ts` under
+ *    RPS-1569 (the `.snupkg` side effect test).
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -623,5 +623,272 @@ test.describe('nuget > symbol packages (.snupkg)', () => {
     expect(second.exitCode, describeRun('dotnet nuget push .snupkg', second)).toBe(0);
     const after = await rawDownloadNupkg(layout.repoName, adminCredential(), idLower, version);
     expect(sha256Hex(after.body), 'the stored nupkg is unchanged').toBe(sha256Hex(stored.body));
+  });
+});
+
+test.describe('nuget > dotnet nuget push --skip-duplicate', () => {
+  test('a second push with --skip-duplicate exits 0 and does not change the served bytes', async ({
+    seeder,
+  }) => {
+    const layout = await newRepo(seeder, true);
+    await seeder.setSettings(layout.repoName, { allowOverride: false });
+    const packageId = `e2e-${seeder.runId}-skip-dup`;
+    const version = '1.0.0';
+
+    // First push with allowOverride OFF (explicitly set above).
+    const { home, work } = await isolatedWorkDir('nuget-skip-dup');
+    const nupkgBytes = buildNupkg({ packageId, version });
+    const nupkgFile = path.join(work, 'package.nupkg');
+    await fs.writeFile(nupkgFile, nupkgBytes);
+
+    const cfg = await renderNugetConfig(home, layout.repoName, layout.credential);
+    const apiKey = nugetApiKey(layout.credential) ?? '';
+
+    const first = await run(
+      'dotnet',
+      [
+        'nuget',
+        'push',
+        nupkgFile,
+        '--source',
+        'repsy',
+        '--configfile',
+        cfg,
+        '--allow-insecure-connections',
+        '--no-symbols',
+        '--timeout',
+        '60',
+        '--api-key',
+        apiKey,
+      ],
+      {
+        cwd: work,
+        env: nugetEnv(home),
+        timeoutMs: CLIENT_TIMEOUT_MS,
+        redact: [apiKey, layout.credential.password ?? ''],
+        label: 'nuget-push-first',
+      },
+    );
+    expect(first.exitCode, describeRun('first push', first)).toBe(0);
+    expect(first.stdout).toContain('Your package was pushed.');
+
+    // Verify the bytes are stored.
+    const idLower = packageId.toLowerCase();
+    const verNormalized = normalizeVersion(version);
+    const storedAfterFirst = await rawDownloadNupkg(
+      layout.repoName,
+      adminCredential(),
+      idLower,
+      verNormalized,
+    );
+    expect(storedAfterFirst.status).toBe(200);
+    expect(sha256Hex(storedAfterFirst.body)).toBe(sha256Hex(nupkgBytes));
+
+    // Second push without --skip-duplicate should fail with 409.
+    const second = await run(
+      'dotnet',
+      [
+        'nuget',
+        'push',
+        nupkgFile,
+        '--source',
+        'repsy',
+        '--configfile',
+        cfg,
+        '--allow-insecure-connections',
+        '--no-symbols',
+        '--timeout',
+        '60',
+        '--api-key',
+        apiKey,
+      ],
+      {
+        cwd: work,
+        env: nugetEnv(home),
+        timeoutMs: CLIENT_TIMEOUT_MS,
+        redact: [apiKey, layout.credential.password ?? ''],
+        label: 'nuget-push-second-no-skip',
+      },
+    );
+    expect(second.exitCode, describeRun('second push without --skip-duplicate', second)).not.toBe(
+      0,
+    );
+    expect(second.stdout + second.stderr, 'the client reports conflict').toMatch(
+      /409|already exists/i,
+    );
+
+    // Third push with --skip-duplicate should succeed.
+    const third = await run(
+      'dotnet',
+      [
+        'nuget',
+        'push',
+        nupkgFile,
+        '--source',
+        'repsy',
+        '--configfile',
+        cfg,
+        '--allow-insecure-connections',
+        '--no-symbols',
+        '--skip-duplicate',
+        '--timeout',
+        '60',
+        '--api-key',
+        apiKey,
+      ],
+      {
+        cwd: work,
+        env: nugetEnv(home),
+        timeoutMs: CLIENT_TIMEOUT_MS,
+        redact: [apiKey, layout.credential.password ?? ''],
+        label: 'nuget-push-third-with-skip',
+      },
+    );
+    expect(third.exitCode, describeRun('third push with --skip-duplicate', third)).toBe(0);
+
+    // Verify the bytes are unchanged.
+    const storedAfterThird = await rawDownloadNupkg(
+      layout.repoName,
+      adminCredential(),
+      idLower,
+      verNormalized,
+    );
+    expect(storedAfterThird.status).toBe(200);
+    expect(sha256Hex(storedAfterThird.body), 'the served bytes are unchanged').toBe(
+      sha256Hex(nupkgBytes),
+    );
+  });
+});
+
+test.describe('nuget > dotnet tool install', () => {
+  test('a real tool package can be built, pushed, and installed', async ({ seeder }) => {
+    const layout = await newRepo(seeder, true);
+    const packageId = `e2e-${seeder.runId}-tool`;
+    const version = '1.0.0';
+
+    // Build a real console tool: a classlib with PackAsTool and ToolCommandName.
+    const { home, work } = await isolatedWorkDir('nuget-tool-build');
+    await fs.writeFile(
+      path.join(work, 'Tool.csproj'),
+      '<Project Sdk="Microsoft.NET.Sdk">\n' +
+        '  <PropertyGroup>\n' +
+        '    <OutputType>Exe</OutputType>\n' +
+        '    <TargetFramework>net10.0</TargetFramework>\n' +
+        `    <PackageId>${packageId}</PackageId>\n` +
+        `    <Version>${version}</Version>\n` +
+        '    <Authors>repsy-e2e</Authors>\n' +
+        '    <Description>e2e tool package</Description>\n' +
+        '    <PackAsTool>true</PackAsTool>\n' +
+        `    <ToolCommandName>e2e-${seeder.runId}-tool-cmd</ToolCommandName>\n` +
+        '    <NuGetAudit>false</NuGetAudit>\n' +
+        '  </PropertyGroup>\n' +
+        '</Project>\n',
+    );
+    await fs.writeFile(
+      path.join(work, 'Program.cs'),
+      'namespace E2e.Tool { class Program { static void Main() { System.Console.WriteLine("Hello from e2e tool!"); } } }\n',
+    );
+
+    const cfg = await renderNugetConfig(home, layout.repoName, layout.credential);
+    const packOut = path.join(work, 'out');
+    const packed = await run(
+      'dotnet',
+      ['pack', '--configfile', cfg, '--disable-build-servers', '-o', packOut],
+      {
+        cwd: work,
+        env: nugetEnv(home),
+        timeoutMs: CLIENT_TIMEOUT_MS,
+        label: 'tool-pack',
+      },
+    );
+    expect(packed.exitCode, describeRun('dotnet pack', packed)).toBe(0);
+
+    const nupkgFile = path.join(packOut, `${packageId}.${version}.nupkg`);
+
+    // Push the tool package with a real dotnet nuget push.
+    const apiKey = nugetApiKey(layout.credential) ?? '';
+    const pushed = await run(
+      'dotnet',
+      [
+        'nuget',
+        'push',
+        nupkgFile,
+        '--source',
+        'repsy',
+        '--configfile',
+        cfg,
+        '--allow-insecure-connections',
+        '--timeout',
+        '60',
+        '--api-key',
+        apiKey,
+      ],
+      {
+        cwd: work,
+        env: nugetEnv(home),
+        timeoutMs: CLIENT_TIMEOUT_MS,
+        redact: [apiKey, layout.credential.password ?? ''],
+        label: 'tool-push',
+      },
+    );
+    expect(pushed.exitCode, describeRun('dotnet nuget push', pushed)).toBe(0);
+
+    // Install the tool via dotnet tool install with the isolated NuGet.Config.
+    const { home: toolHome, work: toolWork } = await isolatedWorkDir('nuget-tool-install');
+    await renderNugetConfig(toolHome, layout.repoName, layout.credential, {
+      destination: userNugetConfigPath(toolHome),
+    });
+
+    const toolDir = path.join(toolWork, 'tools');
+    await fs.mkdir(toolDir, { recursive: true });
+
+    const installed = await run(
+      'dotnet',
+      [
+        'tool',
+        'install',
+        '--tool-path',
+        toolDir,
+        packageId,
+        '--add-source',
+        serviceIndexUrl(layout.repoName),
+        '--version',
+        version,
+      ],
+      {
+        cwd: toolWork,
+        env: nugetEnv(toolHome),
+        timeoutMs: CLIENT_TIMEOUT_MS,
+        redact: [layout.credential.password ?? ''],
+        label: 'tool-install',
+      },
+    );
+    expect(installed.exitCode, describeRun('dotnet tool install', installed)).toBe(0);
+    expect(installed.stdout, 'the CLI reports installation').toContain(
+      'was successfully installed',
+    );
+
+    // Run the installed tool command.
+    const toolCmd = `e2e-${seeder.runId}-tool-cmd`;
+    const toolExe = path.join(toolDir, process.platform === 'win32' ? `${toolCmd}.exe` : toolCmd);
+    const ran = await run(toolExe, [], {
+      cwd: toolWork,
+      env: nugetEnv(toolHome),
+      timeoutMs: CLIENT_TIMEOUT_MS,
+      label: 'tool-run',
+    });
+    expect(ran.exitCode, describeRun('tool invocation', ran)).toBe(0);
+    expect(ran.stdout).toContain('Hello from e2e tool!');
+
+    // Verify the registration still exists and the package is queryable.
+    const idLower = packageId.toLowerCase();
+    const registration = await rawGetRegistrationIndex(layout.repoName, adminCredential(), idLower);
+    expect(registration.status).toBe(200);
+    const parsed = parseRegistrationIndex(registration.body);
+    expect(parsed.length).toBeGreaterThan(0);
+    const toolEntry = parsed[0];
+    expect(toolEntry.version).toBe(version);
+    // packageType would be 'DotnetTool' if the backend has been updated to parse and serve it;
+    // for now, the critical assertion is that the package installs and runs correctly.
   });
 });

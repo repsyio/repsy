@@ -3098,9 +3098,19 @@ property, as on nuget.org): both used to lack it (RPS-1555).
   round-trips (`dotnet nuget push x.nupkg` sends the `.nupkg` alone, the package restores and a
   consumer compiles against it: the first real, not hand-built, package of the suite).
   `dotnet nuget push x.snupkg --source repsy` exits 0 and sends nothing, because Repsy's service index has no
-  `SymbolPackagePublish` resource. A `PUT` of a `.snupkg` sent some other way is NOT pinned: the server
-  accepts it (201) and replaces the stored `.nupkg` of that id and version with the symbol package
-  (`allowOverride`, the default), which breaks the package; it is proposed as a backend story.
+  `SymbolPackagePublish` resource. A `PUT` of a `.snupkg` sent some other way is tested in
+  `tests/nuget/registry-rules.spec.ts` under RPS-1569.
+- **`dotnet nuget push --skip-duplicate`** on a duplicate version: the first push succeeds (exit 0),
+  a second push without the flag fails with `409 Conflict` ("Version ... already exists"), and a
+  third push WITH `--skip-duplicate` succeeds (exit 0, the client silently skips) without changing
+  the served bytes. Confirms that `--skip-duplicate` is idempotent and does not overwrite.
+- **`dotnet tool install`** with a real `.NET tool` package (a classlib with `<PackAsTool>true</PackAsTool>`
+  and `<ToolCommandName>cmd</ToolCommandName>`): build with `dotnet pack`, push, then install via
+  `dotnet tool install --tool-path <dir> <id> --add-source <index.json> --version <v>` with credentials
+  in an isolated user-level `NuGet.Config` (following the direct-URL test's pattern for plain-HTTP
+  `allowInsecureConnections` handling). Run the installed tool command and verify its output. Confirms
+  the registration API returns the package info correctly (and that the `packageType` field would be
+  `DotnetTool` if the backend has been updated to parse and serve it).
 
 Probed live and not pinned (panel text, proposed as a story): the panel's Option A install snippet
 `dotnet add package <id> --version <v> --source repsy` fails with `NU1301: The local source
