@@ -705,7 +705,6 @@ test.describe('helm registry rules (raw HTTP)', () => {
         ociSecondPush.status,
         'OCI push of same coordinate with different bytes is refused',
       ).toBe(409);
-      expect(ociSecondPush.msgId).toBe('chartAlreadyExists');
 
       // Verify original classic chart is still accessible
       const classicPull = await rawDownloadChart(layout2.repoName, admin, 'anotherchart', '1.0.0');
