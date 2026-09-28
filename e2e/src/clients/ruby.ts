@@ -23,13 +23,15 @@
  *
  * **H1, confirmed live, REFUTED the plan's central gating prediction**: a real `bundle install`
  * against a gem published on Repsy OS succeeds completely and resolves the exact published bytes,
- * even though `quick/Marshal.4.8/*.gemspec.rz` has no backend route at all (RPS-1233) and `/info` never
- * advertises `ruby:`/`rubygems:` requirement keys (RB-2) -- Bundler's compact-index client simply
- * never needs the gemspec side channel for a plain gem with no dependencies. `resolve()` therefore
- * drives the real `bundle` toolchain like every other protocol's consumer, and `rubyAdapter` has NO
+ * even though `/info` never advertises `ruby:`/`rubygems:` requirement keys (RB-2) -- Bundler's
+ * compact-index client simply never needs the `quick/Marshal.4.8/*.gemspec.rz` side channel for
+ * resolution at all (it now has a real backend route, RPS-1233, and carries the gem's runtime
+ * dependencies too, RPS-1554 -- see `ruby-raw.ts`'s file header). `resolve()` therefore drives the
+ * real `bundle` toolchain like every other protocol's consumer, and `rubyAdapter` has NO
  * `knownConsumeFailure`: every scenario's consume side is asserted for real. (`gem install`/`gem
- * fetch` ARE broken by RPS-1233/RPS-1234 respectively -- confirmed live, see the dedicated `test.fail()`-pinned
- * real-client tests in `tests/ruby/publish-consume.spec.ts`, never the catalog loop's own consumer.)
+ * fetch`, which DO need the gemspec route, are fixed by RPS-1233/RPS-1234 respectively -- confirmed
+ * live, see the real-client tests in `tests/ruby/publish-consume.spec.ts`, never the catalog loop's
+ * own consumer.)
  *
  * Like nuget/helm/golang (a REAL, toggleable override rule that answers a genuine `409`, confirmed
  * live): `publish`'s raw-HTTP companion probe (`rawPublish`, the exact same gem bytes `gem push` was

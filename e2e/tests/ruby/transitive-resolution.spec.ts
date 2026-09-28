@@ -33,11 +33,12 @@
  *  - `bundle install` locks A 1.0.0, B 1.1.0 (the highest `~> 1.0`, not 2.0.0) and C 1.3.0 (a dependency
  *    of B 1.1.0 only: per-version dependency lines are honoured), with the published sha256 of every gem
  *    in the lock's CHECKSUMS.
- *  - `gem install` of A installs the same graph. `quick/Marshal.4.8/*.gemspec.rz` is a stub that carries
- *    no dependencies (see the report of this story), so `gem dependency --remote` prints no dependency
- *    lines; that is deliberately NOT pinned here. It does carry the platform of a platform gem, and
- *    resolves a multi-segment platform such as `x86_64-linux` (RPS-1553, fixed): `gem install` of a platform
- *    gem, directly and as a dependency, is the last test of this file.
+ *  - `gem install` of A installs the same graph. `quick/Marshal.4.8/*.gemspec.rz` carries the platform of
+ *    a platform gem, and resolves a multi-segment platform such as `x86_64-linux` (RPS-1553, fixed):
+ *    `gem install` of a platform gem, directly and as a dependency, is the last test of the `describe`
+ *    block below. It also now carries the gem's real runtime dependencies (RPS-1554), and the legacy
+ *    `GET /api/v1/dependencies` route `gem dependency --remote` calls has a route too (RPS-1554/RPS-1724)
+ *    -- see this file's LAST `describe` block for both, never pinned in this one.
  *  - A yanked B version is skipped by a fresh resolution (RPS-1235). A lock that already names a
  *    yanked version cannot be installed on a fresh machine: Bundler looks locked versions up in the
  *    same compact index, which omits yanked versions, exactly as it does against rubygems.org.
@@ -57,9 +58,11 @@ import {
   buildGem,
   type GemDependencySpec,
   gemFilename,
+  gemspecRzRelPath,
   infoRelPath,
   parseInfo,
   rawGet,
+  rawGetDependencies,
   rawHead,
   rawPublish,
   rawYank,
@@ -254,6 +257,79 @@ async function infoLines(repoName: string, credential: MaterializedCredential, g
   const res = await rawGet(repoName, credential, infoRelPath(gem));
   expect(res.status, `GET /info/${gem}`).toBe(200);
   return parseInfo(res.body);
+}
+
+/** One entry of `/api/v1/dependencies`' decoded Marshal array (RPS-1554/RPS-1724): the gem's
+ *  runtime dependencies only, as `[name, requirement]` pairs. */
+interface DecodedDependencyEntry {
+  name: string;
+  number: string;
+  platform: string;
+  dependencies: [string, string][];
+}
+
+/** The minimal shape a `quick/Marshal.4.8/*.gemspec.rz` decodes to once `decodeMarshalViaRuby`
+ *  (below) has extracted it from the real `Gem::Specification`. */
+interface DecodedGemspec {
+  name: string;
+  version: string;
+  platform: string;
+  dependencies: [string, string][];
+}
+
+/**
+ * Decodes a Ruby Marshal 4.8 byte string INSIDE the Ruby runner container -- never a hand-rolled TS
+ * Marshal parser (`ruby-raw.ts`'s file header). The bytes are written to a file in the invocation's
+ * own work dir and read back by a `ruby -e` one-liner that `Marshal.load`s them (`require
+ * "rubygems"` first, so a `Gem::Specification` -- the gemspec.rz payload -- deserialises as itself,
+ * not an opaque struct Marshal can't resolve) and prints the result as JSON, which this function
+ * parses. A `Gem::Specification` is not directly JSON-able, so the script reduces it to
+ * `{name, version, platform, dependencies}` first, `dependencies` being its RUNTIME `Gem::Dependency`
+ * entries only, as `[name, requirement.to_s]` pairs -- the same shape `/api/v1/dependencies` itself
+ * decodes to, so both callers below share one return type.
+ */
+async function decodeMarshalViaRuby(label: string, bytes: Buffer): Promise<unknown> {
+  const ws = await isolatedWorkDir(label);
+  const file = path.join(ws.work, 'marshal.bin');
+  await fs.writeFile(file, bytes);
+  const script = [
+    'require "json"',
+    'require "rubygems"',
+    'data = Marshal.load(File.binread(ARGV[0]))',
+    'if data.is_a?(Gem::Specification)',
+    '  deps = data.dependencies.select { |d| d.type == :runtime }' +
+      '.map { |d| [d.name, d.requirement.to_s] }',
+    '  data = { name: data.name, version: data.version.to_s, ' +
+      'platform: data.platform.to_s, dependencies: deps }',
+    'end',
+    'puts JSON.generate(data)',
+  ].join('; ');
+  const result = await run('ruby', ['-e', script, file], {
+    cwd: ws.work,
+    env: gemEnv(ws.home, {}),
+    timeoutMs: 30_000,
+    label,
+  });
+  expect(result.exitCode, `${label} (Marshal decode in the ruby runner): ${result.stderr}`).toBe(0);
+  return JSON.parse(result.stdout.trim());
+}
+
+/** `GET /api/v1/dependencies` decoded: `rawGetDependencies` (`ruby-raw.ts`) then
+ *  `decodeMarshalViaRuby`, asserting the `200 application/octet-stream` envelope first. */
+async function getDependencies(
+  repoName: string,
+  credential: MaterializedCredential,
+  gems: string[],
+): Promise<DecodedDependencyEntry[]> {
+  const res = await rawGetDependencies(repoName, credential, gems);
+  expect(res.status, `GET /api/v1/dependencies?gems=${gems.join(',')}`).toBe(200);
+  expect(res.contentType, 'served as application/octet-stream, not text/plain').toBe(
+    'application/octet-stream',
+  );
+  return (await decodeMarshalViaRuby(
+    'ruby-dependencies-decode',
+    res.body,
+  )) as DecodedDependencyEntry[];
 }
 
 /** `gem install` of `gemName` from the Repsy repo only (never rubygems.org); what got installed is read back. */
@@ -650,6 +726,194 @@ test.describe('ruby > transitive resolution (RPS-1479)', () => {
     expect(asDependency.installed, 'B ~> 1.0 resolves to the platform 1.5.0').toEqual([
       `${a}-1.0.0`,
       `${b}-1.5.0-${platform}`,
+    ]);
+  });
+});
+
+/**
+ * RPS-1724 ("happy flow 1"): the LEGACY `GET /api/v1/dependencies` route (`RubyMarshalWriter
+ * .dumpDependencies`, `AbstractRubyDependenciesHandler`), which `gem dependency --remote` and some
+ * third-party tools still call -- never Bundler 2.x, which resolves through the compact index
+ * (`/info`, proven above) and never this route. Repsy Cloud implements the SAME route with its own,
+ * separate handler (`RubyGemDependenciesStubProtocolMethodHandler`); this file is the OS-side ground
+ * truth a later Cloud-repo batch diffs Cloud's implementation against, so every assertion here was
+ * probed against a running stack, never assumed from source.
+ *
+ * Probed live:
+ *  - `gem dependency <gem> --remote` prints the runtime dependency only; it has NO `--development`
+ *    flag at all (`gem help dependency`: only `--version`/`-v`, `--platform`, `--prerelease`,
+ *    `--reverse-dependencies`/`-R`, `--pipe`), so a development dependency is never requestable
+ *    through it, by any flag; `-v <version>` narrows to that one version's own dependencies.
+ *  - The route's Marshal payload is an Array of `{name:, number:, platform:, dependencies:}`
+ *    Hashes, one per NON-YANKED published version across the requested names -- RUNTIME
+ *    dependencies only, `[[depName, depRequirement]]`. A multi-clause requirement is spelled with
+ *    Ruby's own comma-space join (`">= 1.0, < 2.0"`), NOT `/info`'s `&`-joined form
+ *    (`CompactIndexFormatter` replaces `", "` with `"&"`; the legacy route's `RubyMarshalWriter`
+ *    does not).
+ *  - An unknown gem name, an empty `?gems=`, and no `gems` param at all each contribute nothing:
+ *    `200`, an empty Marshal array -- never an error.
+ *  - A yanked version is omitted, same as `/info`.
+ *  - Served as `200 application/octet-stream` (never `text/plain`).
+ *  - A private repo without a credential answers `401` (`RubyAuthPreProcessor`, same as every other
+ *    read route: skipped only for a public-repo READ).
+ *  - `quick/Marshal.4.8/<gem>-<version>.gemspec.rz` (RPS-1554) now carries the gem's real runtime
+ *    `Gem::Dependency` entries too (development ones left out), where before it always said
+ *    `dependencies = []`.
+ */
+test.describe('ruby > legacy /api/v1/dependencies route (RPS-1724)', () => {
+  /** Runs the real `gem dependency <gemName> --remote` against `source`, `--clear-sources` so
+   *  rubygems.org is never consulted; `extraArgs` for `-v <version>` (there is no `--development`
+   *  flag to pass -- this file's header). */
+  async function gemDependency(
+    label: string,
+    source: string,
+    gemName: string,
+    extraArgs: string[] = [],
+  ) {
+    const ws = await isolatedWorkDir(label);
+    return run(
+      'gem',
+      ['dependency', gemName, '--remote', '--clear-sources', '--source', source, ...extraArgs],
+      { cwd: ws.work, env: gemEnv(ws.home, {}), timeoutMs: CLIENT_TIMEOUT_MS, label },
+    );
+  }
+
+  test('gem dependency --remote prints the runtime dependency, never the development one, and -v narrows to one version', async ({
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
+    const { a, b, c } = await publishGraph(repo.name, seeder.runId);
+    const source = repoUrl(repo.name);
+
+    // FINDING (confirmed live): the pinned toolchain's `gem dependency` has NO `--development` flag
+    // at all (`Gem::OptionParser::InvalidOption`; `gem help dependency` lists only --version/-v,
+    // --platform, --prerelease, --reverse-dependencies/-R, --pipe). A development dependency is
+    // therefore never requestable through this legacy command by any flag, not just left out by
+    // default -- and the raw Marshal payload (the next test) can't show one either:
+    // `RubyMarshalWriter.dumpDependencies` only ever serialises `GemCompactEntry
+    // .runtimeDependencies`, which is pre-filtered to runtime already.
+    const runtimeOnly = await gemDependency('ruby-gem-dependency-runtime', source, a);
+    expect(runtimeOnly.exitCode, `gem dependency ${a}: ${runtimeOnly.stderr}`).toBe(0);
+    expect(runtimeOnly.stdout, 'the runtime dependency on B is printed').toContain(b);
+    expect(
+      runtimeOnly.stdout,
+      'the development dependency is never listed (no --development flag exists to ask for it)',
+    ).not.toContain(`e2e_${seeder.runId}_tr_devonly`);
+
+    // B 1.1.0 alone: its own dependency (C ~> 1.0) is printed; B 1.0.0 (no dependency) is not asked for.
+    const oneVersion = await gemDependency('ruby-gem-dependency-version', source, b, [
+      '-v',
+      '1.1.0',
+    ]);
+    expect(oneVersion.exitCode, `gem dependency ${b} -v 1.1.0: ${oneVersion.stderr}`).toBe(0);
+    expect(oneVersion.stdout, "B 1.1.0's own dependency on C is printed").toContain(c);
+  });
+
+  test('the decoded Marshal payload lists runtime-only dependencies, a multi-clause requirement spelling, and a platform gem entry', async ({
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
+    const platform = await localPlatform();
+    const d = `e2e_${seeder.runId}_ad_d`;
+    const e = `e2e_${seeder.runId}_ad_e`;
+    const devonly = `e2e_${seeder.runId}_ad_devonly`;
+
+    await publishGem(repo.name, d, '1.0.0', [
+      { name: e, requirement: ['>= 1.0', '< 2.0'] },
+      { name: devonly, requirement: '>= 0', type: 'development' },
+    ]);
+    await publishGem(repo.name, e, '1.0.0');
+    await publishGem(repo.name, e, '1.1.0');
+    await publishGem(repo.name, e, '1.5.0', [], platform);
+
+    const entries = await getDependencies(repo.name, {}, [d, e, `${d}_unknown`]);
+
+    const byNameVersion = new Map(entries.map((entry) => [`${entry.name} ${entry.number}`, entry]));
+    expect(byNameVersion.get(`${d} 1.0.0`), 'D 1.0.0 is one entry').toMatchObject({
+      platform: 'ruby',
+    });
+    expect(
+      byNameVersion.get(`${d} 1.0.0`)?.dependencies,
+      'the runtime dependency only, not the development one, as [name, requirement]',
+    ).toEqual([[e, '>= 1.0, < 2.0']]);
+
+    expect(byNameVersion.get(`${e} 1.0.0`)?.dependencies, 'E 1.0.0 has no dependency').toEqual([]);
+    expect(byNameVersion.get(`${e} 1.1.0`)?.dependencies, 'E 1.1.0 has no dependency').toEqual([]);
+    expect(
+      byNameVersion.get(`${e} 1.5.0`),
+      'the platform gem entry carries the native platform string',
+    ).toMatchObject({ platform, dependencies: [] });
+
+    expect(
+      [...byNameVersion.keys()].some((key) => key.startsWith(`${d}_unknown`)),
+      'an unknown gem name contributes no entry of its own',
+    ).toBe(false);
+  });
+
+  test('a yanked version is omitted from the decoded Marshal payload', async ({ seeder }) => {
+    const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
+    const g = `e2e_${seeder.runId}_yk_g`;
+    await publishGem(repo.name, g, '1.0.0');
+    await publishGem(repo.name, g, '1.1.0');
+
+    const before = await getDependencies(repo.name, {}, [g]);
+    expect(before.map((entry) => entry.number).sort()).toEqual(['1.0.0', '1.1.0']);
+
+    const yank = await rawYank(repo.name, adminCredential(), { gemName: g, version: '1.1.0' });
+    expect(yank.status, yank.body.toString('utf8')).toBe(200);
+
+    const after = await getDependencies(repo.name, {}, [g]);
+    expect(
+      after.map((entry) => entry.number),
+      'the yanked version is omitted',
+    ).toEqual(['1.0.0']);
+  });
+
+  test('an unknown gem, an empty ?gems=, and no gems param at all each answer an empty array with 200', async ({
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
+
+    expect(await getDependencies(repo.name, {}, [`e2e_${seeder.runId}_never_published`])).toEqual(
+      [],
+    );
+    expect(await getDependencies(repo.name, {}, [])).toEqual([]);
+
+    const noParamAtAll = await rawGet(repo.name, {}, 'api/v1/dependencies');
+    expect(noParamAtAll.status, 'GET /api/v1/dependencies with no gems param at all').toBe(200);
+    expect(await decodeMarshalViaRuby('ruby-dependencies-no-param', noParamAtAll.body)).toEqual([]);
+  });
+
+  test('a private repo without a credential answers 401', async ({ seeder }) => {
+    const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: true });
+    const res = await rawGetDependencies(repo.name, {}, [`e2e_${seeder.runId}_private_probe`]);
+    expect(res.status, 'GET /api/v1/dependencies on a private repo, no credential').toBe(401);
+  });
+
+  test('quick/Marshal.4.8/<gem>-<version>.gemspec.rz now carries the runtime dependency, not the development one (RPS-1554)', async ({
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
+    const h = `e2e_${seeder.runId}_gs_h`;
+    const i = `e2e_${seeder.runId}_gs_i`;
+    const devonly = `e2e_${seeder.runId}_gs_devonly`;
+    await publishGem(repo.name, i, '2.0.0');
+    await publishGem(repo.name, h, '1.0.0', [
+      { name: i, requirement: '~> 2.0' },
+      { name: devonly, requirement: '>= 0', type: 'development' },
+    ]);
+
+    const rel = gemspecRzRelPath(h, '1.0.0');
+    const res = await rawGet(repo.name, {}, rel);
+    expect(res.status, `GET ${rel}`).toBe(200);
+
+    const spec = (await decodeMarshalViaRuby(
+      'ruby-gemspec-deps-decode',
+      zlib.inflateSync(res.body),
+    )) as DecodedGemspec;
+    expect(spec).toMatchObject({ name: h, version: '1.0.0', platform: 'ruby' });
+    expect(spec.dependencies, 'the runtime dependency, not the development one').toEqual([
+      [i, '~> 2.0'],
     ]);
   });
 });
