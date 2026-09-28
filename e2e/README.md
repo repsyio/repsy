@@ -85,6 +85,7 @@ e2e/
   docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
   docker-compose.stack-trivy.yml  # OPT-IN overlay on either stack: the REAL repsy-scanner-trivy (built from ../repsy-scanner-trivy) + Repsy with the scanner enabled, `run.sh local up|down --trivy`, see "Real scanner stack"
   docker-compose.stack-limits.yml  # OPT-IN overlay on either stack: every configurable upload limit at 64 KiB, `run.sh local up|down --limits`, see "Size-limit leg"
+  docker-compose.stack-upload-ttl.yml  # OPT-IN overlay on either stack: short ABANDONED_UPLOAD_TTL (5 s) and cleanup intervals for testing abandoned upload cleanup, `run.sh local up|down --upload-ttl`, see "Abandoned upload cleanup"
   docker-compose.stack-cors.yml    # OPT-IN overlay on either stack: APP_ALLOWED_ORIGINS set to two origins, `run.sh local up|down --cors`, see "CORS leg"
   docker-compose.stack-proxy.yml   # OPT-IN overlay on either stack: an nginx in front of Repsy terminating TLS (RPS-1651), `run.sh local up|down --proxy`, see "Reverse proxy stack"
   proxy/default.conf.template  # the nginx configuration of that overlay (three listeners, the README's X-Forwarded-* example)
@@ -328,6 +329,7 @@ pnpm gen:api            # (re)generates src/api/generated from ../repsy-backend'
 | `REPSY_E2E_SCANNER`           | _(unset)_                           | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_E2E_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                    |
 | `REPSY_E2E_THROTTLE`          | _(unset)_                           | `1` makes `local up\|down` include the auth-throttle overlay (same as `--throttle`) and `test` add `throttle` to `REPSY_E2E_OPT_IN`, see "Auth-throttle leg"                                                                                                                                                                                                                                                                             |
 | `REPSY_E2E_LIMITS`            | _(unset)_                           | `1` makes `local up\|down` include the tiny-upload-limit overlay (same as `--limits`) and `test` add `limits` to `REPSY_E2E_OPT_IN`, see "Size-limit leg"                                                                                                                                                                                                                                                                                |
+| `REPSY_E2E_UPLOAD_TTL`        | _(unset)_                           | `1` makes `local up\|down` include the short-ttl abandoned-upload-cleanup overlay (same as `--upload-ttl`) and `test` add `upload-ttl` to `REPSY_E2E_OPT_IN`, see "Abandoned upload cleanup"                                                                                                                                                                                                                                               |
 | `REPSY_E2E_CORS`              | _(unset)_                           | `1` makes `local up\|down` include the APP_ALLOWED_ORIGINS overlay (same as `--cors`) and `test` add `cors` to `REPSY_E2E_OPT_IN`, see "CORS leg"                                                                                                                                                                                                                                                                                        |
 | `REPSY_E2E_TRIVY`             | _(unset)_                           | `1` makes `local up\|down` include the real-scanner overlay (same as `--trivy`) and `test` add `trivy` to `REPSY_E2E_OPT_IN`, see "Real scanner stack"                                                                                                                                                                                                                                                                                   |
 | `REPSY_E2E_SCANNER_PORT`      | `8090` + offset                     | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
@@ -4727,6 +4729,7 @@ and is never part of the default stack.
 | `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                     |
 | `cors`     | `--cors`                | `REPSY_E2E_CORS=1`     | `docker-compose.stack-cors.yml`     | `cors`      | `APP_ALLOWED_ORIGINS` set to two origins (default: unset)  | `@cors` (api), "CORS leg"                                                   |
 | `proxy`    | `--proxy`               | `REPSY_E2E_PROXY=1`    | `docker-compose.stack-proxy.yml`    | `proxy`     | an nginx in front of Repsy, TLS terminated there           | `@proxy` (ui, api), "Reverse proxy stack"                                   |
+| `upload-ttl` | `--upload-ttl`        | `REPSY_E2E_UPLOAD_TTL=1` | `docker-compose.stack-upload-ttl.yml` | `upload-ttl` | short `ABANDONED_UPLOAD_TTL` (5 s) and cleanup intervals   | `@upload-ttl` (docker, helm), "Abandoned upload cleanup"                    |
 | `upgrade`  | `--upgrade`             | `REPSY_E2E_UPGRADE=1`  | `docker-compose.stack-upgrade.yml`  | `upgrade`   | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                          |
 | `trivy`    | `--trivy`               | `REPSY_E2E_TRIVY=1`    | `docker-compose.stack-trivy.yml`    | `trivy`     | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                                        |
 
@@ -5244,6 +5247,33 @@ Flip checks: raising all six values to 1 MB in the overlay fails every over-limi
 cases, plus npm and every npm-family publisher -- pnpm, yarn classic, yarn berry, bun) and keeps every under-limit
 one green; running the specs on the default stack with `REPSY_E2E_OPT_IN=limits` does the same (every push
 succeeds); without the opt-in every `@limits` test skips, and the nightly leg fails on a skip.
+
+### Abandoned upload cleanup (RPS-1718)
+
+Docker and Helm OCI blob uploads that are started but never finished (abandoned when a `docker push`
+or `helm chart push` is aborted) are cleaned up after their TTL expires, releasing the disk space they
+were charged for. The default stack leaves this at its default TTL of 24 hours (`ABANDONED_UPLOAD_TTL`),
+so the overlay `docker-compose.stack-upload-ttl.yml` sets a short TTL of **5 seconds** and cleanup
+intervals of **1 second initial delay** and **2 seconds interval**, allowing tests to run without waiting
+24 hours. Only Docker and Helm OCI uploads are tested (Maven, npm, PyPI and others do not support OCI blob
+uploads).
+
+```bash
+./run.sh local up --upload-ttl                                           # (or REPSY_E2E_UPLOAD_TTL=1) add --h2 for H2
+REPSY_E2E_UPLOAD_TTL=1 ./run.sh test --protocol docker,helm --grep @upload-ttl
+./run.sh local down --upload-ttl
+```
+
+`tests/docker/abandoned-upload-ttl.spec.ts` (`@upload-ttl`) verifies that:
+
+- **Single abandoned upload is cleaned up**: Start a blob upload (POST to get an upload UUID) but never
+  finish it. After the TTL passes, attempting to check the status (HEAD on the upload) or resume it
+  (PATCH) returns 404 or 410.
+- **Concurrent abandoned uploads are all cleaned up**: Multiple concurrent abandoned uploads for different
+  images are all deleted after their TTL.
+
+No other suite may run on this stack: the short TTL means any long-running process that starts but does
+not finish an upload will be cleaned up before the test completes.
 
 ### CORS leg (RPS-1590)
 

@@ -18,16 +18,16 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (the embedded-H2 stack: @smoke of every wire runner, the full catalog of one rotating runner and the complete panel UI suite), scanner (the @scanner specs of the ui runner and of the npm-clients, docker, maven and pypi runners against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack), limits (the @limits specs of the pypi, helm, nuget, ruby, cargo, golang, npm, npm-clients and api runners against the tiny-upload-limit stack), cors (the @cors specs of the api runner against the stack that sets APP_ALLOWED_ORIGINS), browsers (@smoke of the panel UI in Firefox and in WebKit), proxy (@smoke of the panel UI and the @proxy specs of the ui and api runners behind an nginx reverse proxy that terminates TLS), upgrade (the previous release on a populated volume, upgraded to this image: PostgreSQL and H2), trivy (the @trivy contract spec of the api runner against the real repsy-scanner-trivy), tls (@smoke of every runner but stack over Repsy's own https listeners, every client trusting the generated CA, the ui runners in browsers that ignore the certificate error) or all"
+        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (the embedded-H2 stack: @smoke of every wire runner, the full catalog of one rotating runner and the complete panel UI suite), scanner (the @scanner specs of the ui runner and of the npm-clients, docker, maven and pypi runners against the stub scanner stack), throttle (the @throttle specs of the stack and ui runners against the auth-throttle stack), limits (the @limits specs of the pypi, helm, nuget, ruby, cargo, golang, npm, npm-clients and api runners against the tiny-upload-limit stack), upload-ttl (the @upload-ttl specs of the docker and helm runners against the abandoned-upload cleanup stack), cors (the @cors specs of the api runner against the stack that sets APP_ALLOWED_ORIGINS), browsers (@smoke of the panel UI in Firefox and in WebKit), proxy (@smoke of the panel UI and the @proxy specs of the ui and api runners behind an nginx reverse proxy that terminates TLS), upgrade (the previous release on a populated volume, upgraded to this image: PostgreSQL and H2), trivy (the @trivy contract spec of the api runner against the real repsy-scanner-trivy), tls (@smoke of every runner but stack over Repsy's own https listeners, every client trusting the generated CA, the ui runners in browsers that ignore the certificate error) or all"
         type: choice
-        options: [all, ui, wire, h2, scanner, throttle, limits, cors, browsers, proxy, upgrade, trivy, tls]
+        options: [all, ui, wire, h2, scanner, throttle, limits, upload-ttl, cors, browsers, proxy, upgrade, trivy, tls]
         default: all
       protocol:
         description: "Only these runner services, comma separated (skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,golang,ruby,stack,api,ui,ui-firefox,ui-webkit). Empty: every runner of the chosen legs"
         type: string
         default: ""
       grep:
-        description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 and tls legs then keep their default, @smoke; the h2-ui leg runs the whole panel UI suite). The scanner, throttle, limits, cors and trivy legs ignore it and always run @scanner, @throttle, @limits, @cors and @trivy. The browsers leg keeps its own filter on top of it (@smoke, @tls and the keyboard walkthrough)"
+        description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 and tls legs then keep their default, @smoke; the h2-ui leg runs the whole panel UI suite). The scanner, throttle, limits, upload-ttl, cors and trivy legs ignore it and always run @scanner, @throttle, @limits, @upload-ttl, @cors and @trivy. The browsers leg keeps its own filter on top of it (@smoke, @tls and the keyboard walkthrough)"
         type: string
         default: ""
       h2_full:
@@ -133,6 +133,10 @@ jobs:
               # golang and npm (plus npm-clients: pnpm, yarn classic, yarn berry, bun), plus the raw connector
               # cases (chunked uploads) of the api runner.
               "limits": ("limits", "--limits", ["pypi", "helm", "nuget", "ruby", "cargo", "golang", "npm", "npm-clients", "api"], "@limits", 60, "limits", False),
+              # The abandoned-upload TTL overlay (README.md "Abandoned upload cleanup", RPS-1718): short TTL (5 s)
+              # and cleanup intervals so tests don't wait 24 hours. Only Docker and Helm OCI blob uploads get
+              # abandoned and cleaned up, so only those runners; the opted-in @upload-ttl specs run there.
+              "upload-ttl": ("upload-ttl", "--upload-ttl", ["docker", "helm"], "@upload-ttl", 30, "upload-ttl", False),
               # The APP_ALLOWED_ORIGINS overlay (README.md "CORS leg", RPS-1590): the default stack leaves the variable
               # unset (same-origin only, @smoke in the api runner), this one sets two origins, so only the opted-in
               # @cors specs of the api runner run there.
@@ -163,7 +167,7 @@ jobs:
 
           # leg -> the env switches the `test` step sets (README.md "Stack overlays": `up` takes the flag,
           # `test` the env switch, and with it the https URLs).
-          SWITCHES = {"tls": "REPSY_E2E_TLS=1", "proxy": "REPSY_E2E_PROXY=1"}
+          SWITCHES = {"tls": "REPSY_E2E_TLS=1", "proxy": "REPSY_E2E_PROXY=1", "upload-ttl": "REPSY_E2E_UPLOAD_TTL=1"}
           # leg -> the spec file that proves the opt-in reached a runner: legs whose runners skip cases of
           # their own (the golang TLS-shim case cannot run over https) cannot demand zero skips, so the check
           # only fails when THIS file's cases skipped.

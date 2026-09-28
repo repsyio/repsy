@@ -1,0 +1,41 @@
+# Copyright 2026 the original author or authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# OPT-IN overlay that tests abandoned Docker and Helm OCI blob upload cleanup (RPS-1718): sets a
+# short ABANDONED_UPLOAD_TTL (5 seconds) and short cleanup intervals so e2e tests do not have to wait
+# 24 hours. Abandoned uploads are OCI blob uploads that were started (POST to get an upload UUID) but
+# never finished (never PUT to upload the blob), which happens when a docker push or helm chart push is
+# aborted. After the TTL, they are cleaned up and their disk space is reclaimed.
+#
+# With it, e2e tests can prove end to end that abandoned uploads are detected and cleaned up
+# (tests/docker/abandoned-upload-ttl.spec.ts, @upload-ttl).
+#
+# It is never part of the default stack: it changes nothing unless it is passed as an extra -f, which
+# `./run.sh local up --upload-ttl` (or REPSY_E2E_UPLOAD_TTL=1) does, on top of the postgres or the H2
+# stack:
+#
+#   docker compose -f docker-compose.stack.yml -f docker-compose.stack-upload-ttl.yml up -d --wait
+#
+# Give "down" the same flags as "up".
+services:
+  repsy:
+    environment:
+      # Short TTL so tests don't have to wait 24 hours
+      ABANDONED_UPLOAD_TTL: PT5S
+      # Start cleanup immediately to avoid waiting for the default 10-minute initial delay
+      ABANDONED_UPLOAD_CLEANUP_INITIAL_DELAY: PT1S
+      # Cleanup every 2 seconds to find abandoned uploads quickly
+      ABANDONED_UPLOAD_CLEANUP_INTERVAL: PT2S
+      # Ensure cleanup is enabled (it is by default, but make it explicit for the test)
+      ABANDONED_UPLOAD_CLEANUP_ENABLED: "true"
