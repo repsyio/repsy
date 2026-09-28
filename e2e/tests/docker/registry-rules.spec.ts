@@ -1383,4 +1383,175 @@ test.describe('docker registry rules (raw HTTP)', () => {
       expect(stillThere.status, 'nothing was deleted by the refused Basic-auth request').toBe(200);
     },
   );
+
+  test(
+    'R6a: re-pushing identical bytes (same digest) to a tag when allowOverride: false is ' +
+      'accepted (idempotent), not rejected',
+    { tag: ['@settings'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'idempotent-override');
+      const admin = adminCredential();
+
+      // Push an image to a tag
+      const first = await rawPushImage(layout, admin, 'tag1', 'r6a-v1');
+      expect(first.manifestRes.status, 'first push of a fresh tag').toBe(201);
+      const originalDigest = first.built.manifestDigest;
+
+      // Turn off override
+      await seeder.setSettings(layout.repoName, {
+        privateRepo: true,
+        allowOverride: false,
+      });
+
+      // Re-push the EXACT SAME manifest bytes to the same tag (blobs are already stored from first push)
+      // This should be accepted because the digest is identical (idempotent push)
+      const repushSame = await rawPutManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        'tag1',
+        first.built.manifestBytes, // identical bytes
+        first.built.manifestMediaType,
+      );
+
+      // Re-pushing identical bytes returns 201: manifest already exists with same digest, creation response is idempotent
+      expect(
+        repushSame.status,
+        `identical re-push status: ${repushSame.status}, expected 201 (created/idempotent)`,
+      ).toBe(201);
+
+      // Verify the tag still points to the same digest
+      const getTag = await rawGetManifest(layout.repoName, admin, layout.image, 'tag1');
+      expect(getTag.status).toBe(200);
+      expect(sha256Hex(getTag.body)).toBe(sha256Hex(first.built.manifestBytes));
+
+      // Verify the digest itself is still the same
+      const getByDigest = await rawGetManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        originalDigest,
+      );
+      expect(getByDigest.status, 'the manifest is pullable by its digest').toBe(200);
+      expect(sha256Hex(getByDigest.body)).toBe(sha256Hex(first.built.manifestBytes));
+    },
+  );
+
+  test(
+    'R16: when a multi-platform index is deleted by digest, its platform children (untagged ' +
+      'manifests) become orphaned (not reachable via the index edges)',
+    { tag: ['@settings'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'index-delete');
+      const admin = adminCredential();
+
+      // Push a platform child manifest
+      const child = await rawPushImage(layout, admin, 'child-tag', 'r16-child');
+      expect(child.manifestRes.status).toBe(201);
+      const childDigest = child.built.manifestDigest;
+
+      // Push the child again by its digest (untagged push, as a real multi-arch client would)
+      const childByDigest = await rawPutManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        childDigest,
+        child.built.manifestBytes,
+        child.built.manifestMediaType,
+      );
+      expect(childByDigest.status, 'pushing child by digest').toBeLessThanOrEqual(201);
+
+      // Verify child is pullable by digest before index is created
+      const getChildBefore = await rawGetManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        childDigest,
+      );
+      expect(getChildBefore.status, 'child is pullable by digest before index exists').toBe(200);
+
+      // Create a multi-platform index referencing this child
+      const indexObj = {
+        schemaVersion: 2,
+        mediaType: 'application/vnd.docker.distribution.manifest.list.v2+json',
+        manifests: [
+          {
+            mediaType: child.built.manifestMediaType,
+            digest: childDigest,
+            size: child.built.manifestBytes.length,
+            platform: { architecture: 'amd64', os: 'linux' },
+          },
+        ],
+      };
+      const indexBytes = Buffer.from(JSON.stringify(indexObj), 'utf8');
+      const indexRes = await rawPutManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        'multiarch-tag',
+        indexBytes,
+        indexObj.mediaType,
+      );
+      expect(indexRes.status, 'index creation').toBe(201);
+      const indexDigest = indexRes.digestHeader;
+      expect(indexDigest, 'index digest in response header').toBeDefined();
+
+      // Verify both index and child are pullable before deletion
+      const getIndexBefore = await rawGetManifest(layout.repoName, admin, layout.image, 'multiarch-tag');
+      expect(getIndexBefore.status, 'index is pullable by tag before deletion').toBe(200);
+
+      const getChildBeforeDel = await rawGetManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        childDigest,
+      );
+      expect(getChildBeforeDel.status, 'child is pullable by digest before index deletion').toBe(200);
+
+      // Delete the index by digest
+      const deleteIndex = await rawDeleteManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        indexDigest!,
+      );
+      expect(deleteIndex.status, 'DELETE index by digest').toBe(202);
+
+      // Verify index is no longer pullable
+      const getIndexAfter = await rawGetManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        'multiarch-tag',
+      );
+      expect(getIndexAfter.status, 'index tag is no longer reachable after index delete').toBe(404);
+
+      const getIndexByDigestAfter = await rawGetManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        indexDigest,
+      );
+      expect(
+        getIndexByDigestAfter.status,
+        'index is no longer pullable by its digest after delete',
+      ).toBe(404);
+
+      // Check if child is still pullable: per AGENTS.md's Docker manifest section, the child
+      // becomes orphaned (not reachable via index edges) after the index is deleted
+      const getChildAfter = await rawGetManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        childDigest,
+      );
+      // After the index is deleted, the child becomes orphaned but remains stored and accessible (200).
+      // Per UntaggedManifestFinder: children not reachable via index edges remain in storage.
+      // This is the correct behavior — deletion of the index does not cascade-delete orphaned children.
+      expect(
+        getChildAfter.status,
+        `orphaned child after index delete: ${getChildAfter.status}, expected 200 (still stored)`,
+      ).toBe(200);
+    },
+  );
 });

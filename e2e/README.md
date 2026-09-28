@@ -258,7 +258,7 @@ e2e/
       client-commands.spec.ts   # `dotnet add package` (the panel snippets), `dotnet nuget delete` (unlist), a real `dotnet pack --include-symbols` round trip and the `.snupkg` push (RPS-1486)
     docker/
       publish-consume.spec.ts   # registerPublishConsumeLoop(dockerAdapter) + D1-D4 real-client tests (OCI family, auth login, by-digest, retag)
-      registry-rules.spec.ts    # raw-HTTP pins R1-R15: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type, sha512 digests, protocol DELETE
+      registry-rules.spec.ts    # raw-HTTP pins R1-R16: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type, sha512 digests, protocol DELETE, R6a (identical re-push under Deny is idempotent), R16 (multi-platform index/child delete semantics)
       image-lifecycle.spec.ts   # crane: the last tag keeps the image (manifest pullable by digest), the last manifest removes it, a new push recreates it (RPS-1288)
       crane-delete.spec.ts      # crane delete: password deletes by tag and by digest, a deploy token is refused, an older crane's insufficient_scope round trip (RPS-1440)
       registry-api.spec.ts      # raw-HTTP pins RA1-RA6 of the Docker registry API: tags/list served with n/last + Link (RA1, RPS-1489), _catalog and referrers (404 no route), the referrers tag-schema fallback, mount= (202 fallback) (RPS-1478)
