@@ -184,18 +184,30 @@ public class VersionSignatureService {
 
   /**
    * Recomputes {@code signed} of one version of a repo by the repo's setting as it is now, in a
-   * transaction of its own when it is not called from one. The row lock comes first and the repo's
-   * setting is read after it, so a request that holds the lock and a toggle that commits meanwhile
-   * cannot leave the version computed by the setting that was replaced.
+   * transaction of its own when it is not called from one.
    *
-   * <p>The signatures that are stored but were never verified are verified first, by the key rules
-   * of the upload path (the repo's registered keys, then its key servers if it looks them up),
-   * under the lock: a repo that verifies every signature counts a {@code .asc} that was stored
-   * while it did not, so an honest publisher's version is not turned unsigned by the toggle alone
-   * (RPS-1323). A signature that does not verify, or whose key is not found, is not recorded and
-   * counts for nothing. What was recorded for a file and does not verify against the stored bytes
-   * any more (they were replaced while the setting was off) is forgotten; when the key cannot be
-   * found the record is left as it is, so an outage of a key server cannot unsign a version.
+   * <p>The signatures that are stored but were never verified are verified first (see {@link
+   * #verifyStoredSignatures}), by the key rules of the upload path (the repo's registered keys,
+   * then its key servers if it looks them up): a repo that verifies every signature counts a {@code
+   * .asc} that was stored while it did not, so an honest publisher's version is not turned unsigned
+   * by the toggle alone (RPS-1323). A signature that does not verify, or whose key is not found, is
+   * not recorded and counts for nothing. What was recorded for a file and does not verify against
+   * the stored bytes any more (they were replaced while the setting was off) is forgotten; when the
+   * key cannot be found the record is left as it is, so an outage of a key server cannot unsign a
+   * version.
+   *
+   * <p><b>This verification runs before the version's row lock is taken (RPS-1469).</b> Looking a
+   * key up that is not registered asks a key server, one file at a time; a key server that is slow
+   * or unreachable can turn what should be a lock held for a few milliseconds into one held for
+   * seconds, blocking a concurrent upload's {@link #lock} of the same version for as long. The row
+   * lock only needs to be held for the final, local read-modify-write of {@code signed} (below),
+   * not for the network calls that decide what gets recorded. The verification is best effort
+   * against the setting and the files as they are read here: the lock taken afterwards re-reads
+   * both fresh, so a toggle that commits while the network calls are in flight cannot leave the
+   * version computed by a setting it no longer has (RPS-1188, RPS-1320) &mdash; it only means this
+   * run verified with the rule it started with, and a run that finds the setting changed under it
+   * is not the last word: {@link SignedRecomputeService} queues another one behind it whenever a
+   * toggle or a key change commits while a run is going.
    *
    * <p>That is also why deleting a registered key or a key-server host does not unsign the versions
    * it verified (RPS-1334): the recomputation that follows the deletion finds the key gone, which
@@ -210,8 +222,6 @@ public class VersionSignatureService {
    * @return {@code false} when the version is gone
    */
   public boolean recompute(final UUID versionId) {
-
-    this.artifactVersionRepository.lockForSignedUpdate(versionId);
 
     final var version = this.artifactVersionRepository.findById(versionId).orElse(null);
 
@@ -228,15 +238,34 @@ public class VersionSignatureService {
             + "/"
             + version.getVersionName();
 
+    // Best effort, no row lock held: may include network calls to a key server (RPS-1469).
     if (repo.isPgpVerifyAllSignaturesEnabled()) {
       final var toSign = this.filesToSign(repo.getId(), versionPath);
 
       this.verifyStoredSignatures(repo, version, versionPath, toSign);
-      this.updateSigned(version, toSign, true);
     } else {
       this.verifyStoredPomSignatures(repo, version, versionPath);
-      this.updateSigned(version, List.of(), false);
     }
+
+    // The lock, and the setting that decides what is written, are taken and read fresh here: only
+    // local reads and writes happen under the lock, so a concurrent upload's lock of this version
+    // waits for this, not for whatever the verification above needed to do over the network.
+    this.artifactVersionRepository.lockForSignedUpdate(versionId);
+
+    final var verifyAllNow =
+        this.artifactVersionRepository
+            .findVerifyAllSignaturesEnabledByVersionId(versionId)
+            .orElse(null);
+
+    if (verifyAllNow == null) {
+      // The version was deleted while the verification above was running.
+      return false;
+    }
+
+    final var toSignNow =
+        verifyAllNow ? this.filesToSign(repo.getId(), versionPath) : List.<String>of();
+
+    this.updateSigned(version, toSignNow, verifyAllNow);
 
     return true;
   }

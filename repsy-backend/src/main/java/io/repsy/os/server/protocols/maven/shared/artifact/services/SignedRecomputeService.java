@@ -45,21 +45,25 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * (not even when the queue is full: the job is then rejected and logged, it never runs on the
  * request's thread) and a rolled back change starts nothing. A repo whose run is still waiting in
  * the queue is not queued again: the run reads the setting when it starts and again for every
- * version. The setting is read again for every version, under that version's row lock (see {@link
- * VersionSignatureService#recompute}), so what a run applies is always the rule of the setting as
- * it is when the version is done: a second toggle while a run is going, a second run, or a run that
- * overlaps an upload all end in the same state. The rule itself is the one of the upload path
- * ({@link VersionSignatureService#refreshSigned}), not a copy of it.
+ * version. The setting is read again for every version, right before that version's row lock is
+ * taken for the write of {@code signed} (see {@link VersionSignatureService#recompute}), so what a
+ * run applies is always the rule of the setting as it is when the version is done: a second toggle
+ * while a run is going, a second run, or a run that overlaps an upload all end in the same state.
+ * The rule itself is the one of the upload path ({@link VersionSignatureService#refreshSigned}),
+ * not a copy of it.
  *
  * <p>The versions are walked in pages of ids and each one is recomputed in a transaction of its
- * own, that holds one row lock and ends before the next version is touched: nothing waits for two
- * locks at once, so it cannot deadlock with an upload, which holds the row of its version only. A
- * version that fails is logged and skipped, the rest are still done.
+ * own, that holds one row lock, only briefly and only for the final write, and ends before the next
+ * version is touched: nothing waits for two locks at once, so it cannot deadlock with an upload,
+ * which holds the row of its version only. A version that fails is logged and skipped, the rest are
+ * still done.
  *
  * <p>A signature that was stored while the setting was off was never verified. When the setting is
- * turned on the recomputation verifies it, one file at a time and under the lock of its version, by
- * the same verifier and key rules as an upload, so that the toggle alone does not turn an honest
- * publisher's versions unsigned ({@link VersionSignatureService#recompute}, RPS-1323).
+ * turned on the recomputation verifies it, one file at a time and before the lock of its version is
+ * taken (RPS-1469: looking an unregistered key up asks a key server, so this must not sit under the
+ * lock, or a slow or unreachable one would block uploads to that version), by the same verifier and
+ * key rules as an upload, so that the toggle alone does not turn an honest publisher's versions
+ * unsigned ({@link VersionSignatureService#recompute}, RPS-1323).
  *
  * <p>It also runs when the places a signature's key is looked up change, for a repo that verifies
  * every signature ({@link #onKeySourcesChanged}, RPS-1334).
