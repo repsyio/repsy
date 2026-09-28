@@ -1,9 +1,7 @@
 <a href="https://repsy.io" target="_blank"><img src="./repsy-frontend/src/assets/images/repsy.png" alt="Repsy Logo" width="200"/></a>
-
 # Repsy: The Open Source Universal Package Repository
 
 **Repsy** is an open-source, universal package repository that makes it easy to host, manage, and distribute your packages across multiple ecosystems — all in one place. With support for popular formats including Golang, Cargo (Rust), Docker, Maven, NPM, PyPI, and more, Repsy helps streamline your development workflows and supports teams of any size.
-
 ## Table of Contents
 
 - [Features](#features)
@@ -11,10 +9,10 @@
 - [HTTPS / SSL](#https--ssl)
 - [Vulnerability Scanning](#vulnerability-scanning)
 - [Installation](#installation)
-  - [Using Docker (H2 - Embedded)](#option-1-docker-with-h2-embedded-database)
-  - [Using Docker (PostgreSQL)](#option-2-docker-with-postgresql)
-  - [Using Docker Compose (PostgreSQL)](#option-3-docker-compose-with-postgresql)
-  - [Manual Installation](#manual-installation)
+    - [Using Docker (H2 - Embedded)](#option-1-docker-with-h2-embedded-database)
+    - [Using Docker (PostgreSQL)](#option-2-docker-with-postgresql)
+    - [Using Docker Compose (PostgreSQL)](#option-3-docker-compose-with-postgresql)
+    - [Manual Installation](#manual-installation)
 - [Backward incompatible changes in this release](#backward-incompatible-changes-in-this-release)
 - [Upgrading](#upgrading)
 - [Configuration](#configuration)
@@ -52,12 +50,10 @@ docker run -d \
 ```
 
 Access the application:
-
 - **Backend API & Frontend (Web UI)**: http://localhost:8080
 - **Repository Operations**: http://localhost:9090
 
 **Default Admin Credentials:**
-
 - Username: `admin`
 - Password: since `ADMIN_INITIAL_PASSWORD` is not set, a random password is generated on first startup. Retrieve it from the logs:
   ```bash
@@ -88,20 +84,20 @@ keytool -genkeypair \
 
 ### Environment variables
 
-| Variable                      | Description                                             | Default  |
-| ----------------------------- | ------------------------------------------------------- | -------- |
-| `API_SSL_ENABLED`             | Enable HTTPS for the API port                           | `false`  |
-| `API_SSL_PORT`                | HTTPS port for the API                                  | `8443`   |
-| `API_SSL_KEY_STORE_PATH`      | Path to keystore file (e.g. `file:/app/certs/api.p12`)  | —        |
-| `API_SSL_KEY_STORE_PASSWORD`  | Keystore password                                       | —        |
-| `API_SSL_KEY_STORE_TYPE`      | Keystore type                                           | `PKCS12` |
-| `API_SSL_KEY_ALIAS`           | Key alias inside the keystore                           | `repsy`  |
-| `REPO_SSL_ENABLED`            | Enable HTTPS for the repo port                          | `false`  |
-| `REPO_SSL_PORT`               | HTTPS port for the repo                                 | `9443`   |
-| `REPO_SSL_KEY_STORE_PATH`     | Path to keystore file (e.g. `file:/app/certs/repo.p12`) | —        |
-| `REPO_SSL_KEY_STORE_PASSWORD` | Keystore password                                       | —        |
-| `REPO_SSL_KEY_STORE_TYPE`     | Keystore type                                           | `PKCS12` |
-| `REPO_SSL_KEY_ALIAS`          | Key alias inside the keystore                           | `repsy`  |
+| Variable | Description | Default |
+|---|---|---|
+| `API_SSL_ENABLED` | Enable HTTPS for the API port | `false` |
+| `API_SSL_PORT` | HTTPS port for the API | `8443` |
+| `API_SSL_KEY_STORE_PATH` | Path to keystore file (e.g. `file:/app/certs/api.p12`) | — |
+| `API_SSL_KEY_STORE_PASSWORD` | Keystore password | — |
+| `API_SSL_KEY_STORE_TYPE` | Keystore type | `PKCS12` |
+| `API_SSL_KEY_ALIAS` | Key alias inside the keystore | `repsy` |
+| `REPO_SSL_ENABLED` | Enable HTTPS for the repo port | `false` |
+| `REPO_SSL_PORT` | HTTPS port for the repo | `9443` |
+| `REPO_SSL_KEY_STORE_PATH` | Path to keystore file (e.g. `file:/app/certs/repo.p12`) | — |
+| `REPO_SSL_KEY_STORE_PASSWORD` | Keystore password | — |
+| `REPO_SSL_KEY_STORE_TYPE` | Keystore type | `PKCS12` |
+| `REPO_SSL_KEY_ALIAS` | Key alias inside the keystore | `repsy` |
 
 ### Docker run example
 
@@ -122,7 +118,6 @@ docker run \
 
 > Mounted keystore files must be readable by the container user.
 > On the host, ensure the file has at least mode `644`:
->
 > ```bash
 > chmod 644 /host/certs/keystore.p12
 > ```
@@ -145,12 +140,12 @@ Each repository has a security scan setting that controls whether newly pushed v
 
 A scan covers **what the artifact contains**, not what it declares. For Maven, npm and PyPI the scanner unpacks the stored file and runs `trivy rootfs` on it. `rootfs` reads installed packages (a `node_modules` directory, jars, a Python `.dist-info`); it does not read lock files and does not resolve declared dependencies. So:
 
-| Format | What is scanned                                                                                                              | What is not                                                                                                                                |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| npm    | the tarball: the package's own metadata (`package/package.json`) and packages bundled in it (`node_modules/*/package.json`)  | the package's declared `dependencies`, `devDependencies` and `peerDependencies`, and any `package-lock.json` or `yarn.lock` in the tarball |
-| Maven  | the main file of the version (a jar, or a war, ear or rar for that packaging), including the jars nested in it               | the dependencies declared in the POM: a thin jar is scanned as itself only                                                                 |
-| PyPI   | the sdist (`.tar.gz`) if the release has one, otherwise the first matching file, such as a wheel; the package's own metadata | the `Requires-Dist` dependencies                                                                                                           |
-| Docker | the whole image, which the scanner pulls from Repsy by reference                                                             |                                                                                                                                            |
+| Format | What is scanned | What is not |
+| --- | --- | --- |
+| npm | the tarball: the package's own metadata (`package/package.json`) and packages bundled in it (`node_modules/*/package.json`) | the package's declared `dependencies`, `devDependencies` and `peerDependencies`, and any `package-lock.json` or `yarn.lock` in the tarball |
+| Maven | the main file of the version (a jar, or a war, ear or rar for that packaging), including the jars nested in it | the dependencies declared in the POM: a thin jar is scanned as itself only |
+| PyPI | the sdist (`.tar.gz`) if the release has one, otherwise the first matching file, such as a wheel; the package's own metadata | the `Requires-Dist` dependencies |
+| Docker | the whole image, which the scanner pulls from Repsy by reference | |
 
 A package that declares vulnerable dependencies without bundling them is therefore reported as having no findings, and a clean scan does not mean the dependency tree is clean. Scans use the Trivy vulnerability database the scanner holds locally, and only the four formats above are scanned.
 
@@ -300,7 +295,7 @@ This supports two topologies:
   vars set directly, pointing at the stack's published ports:
   `DB_URL=jdbc:postgresql://localhost:5432/repsy`, `SECURITY_SCANNER=enabled`,
   `TRIVY_SCANNER_BASE_URL=http://localhost:8090`, `TRIVY_SCANNER_API_KEY=<same value as
-the compose stack's TRIVY_SCANNER_API_KEY>`, and
+  the compose stack's TRIVY_SCANNER_API_KEY>`, and
   `DOCKER_INTERNAL_REGISTRY_BASE_URL=http://host.docker.internal:9090` (this last one only
   resolves from inside `repsy-scanner-trivy` because of the `extra_hosts` entry above —
   without it, Linux Docker does not auto-map `host.docker.internal` the way Docker Desktop
@@ -312,7 +307,6 @@ details (standalone build/run instructions, its own environment variables, and A
 ### Manual Installation
 
 **Prerequisites:**
-
 - **Java**: JDK 25
 - **Spring Boot**: 4.0.5
 - **PostgreSQL**: 18 (unless you pass `DB_URL` for the embedded H2 database, see step 3)
@@ -338,7 +332,6 @@ mvn spring-boot:run
 ```
 
 Access at:
-
 - **Frontend (Web UI)**: http://localhost:4200
 - **Backend API**: http://localhost:8080
 - **Repository Operations**: http://localhost:9090
@@ -595,65 +588,65 @@ Deleting `1.0.0+a` when there is no such entry (the usual case) still deletes `1
 
 ### Environment Variables
 
-| Variable                                      | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Default                                                                                              |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `ADMIN_INITIAL_PASSWORD`                      | Initial admin password. Only applied on first startup when no admin exists.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | _(empty)_                                                                                            |
-| `DB_URL`                                      | JDBC database URL. The Docker image defaults to the embedded H2 database; running from source (`mvn spring-boot:run`) defaults to PostgreSQL on `localhost:5432` instead. `DB_HOST`, `DB_PORT` and `DB_DATABASE` are not read (Repsy warns at startup if they are set).                                                                                                                                                                                                                                                                                                                                          | `jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` (image only) |
-| `DB_USERNAME`                                 | Database username                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `repsy`                                                                                              |
-| `DB_PASSWORD`                                 | Database password                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `repsy123`                                                                                           |
-| `STORAGE_BASE_PATH`                           | Base directory for artifact file storage. Set to a path inside `/app/data` (e.g. `/app/data/storage`) to persist artifacts with a single volume mount (the Docker image already does). Deleting a repo, a package or a version moves its files into a `trash/` directory of the protocol (for example `maven/trash`) first; the trash older than `TRASH_RETENTION` is removed every day (see `TRASH_CLEANUP_ENABLED`).                                                                                                                                                                                           | `~/.repsy` (`/app/data/storage` in the Docker image)                                                 |
-| `OS_APP_JWT_SECRET`                           | JWT signing secret. If not set, a random 256-bit secret is generated on every startup — every restart/redeploy invalidates all existing sessions, forcing every user to log in again. Set a stable, secure random value for any production/self-host deployment.                                                                                                                                                                                                                                                                                                                                                 | _(random, regenerated on every startup)_                                                             |
-| `SERVER_PORT`                                 | Repository operations port                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `9090`                                                                                               |
-| `API_PORT`                                    | Backend API and Frontend web UI port                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | `8080`                                                                                               |
-| `SERVER_COMPRESSION_ENABLED`                  | Gzip-compress JSON answers of 1 KB or more on the repository port (an npm packument of a package with many versions is megabytes of JSON). Set to `false` when a reverse proxy in front already compresses                                                                                                                                                                                                                                                                                                                                                                                                       | `true`                                                                                               |
-| `H2_TCP_SERVER_ENABLED`                       | Enable the H2 TCP server. It binds loopback-only, so it is reachable only from inside the same container/host, not from an external client                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `false`                                                                                              |
-| `H2_TCP_SERVER_PORT`                          | H2 TCP server port                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `9092`                                                                                               |
-| `SECURITY_SCANNER`                            | Enables vulnerability scanning of pushed artifacts (`enabled`/`disabled`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `disabled`                                                                                           |
-| `TRIVY_SCANNER_BASE_URL`                      | Base URL of the `repsy-scanner-trivy` service                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `http://localhost:8090`                                                                              |
-| `TRIVY_SCANNER_API_KEY`                       | Shared API key sent to the scanner service (must match its `SCANNER_API_KEY`). **Required when `SECURITY_SCANNER=enabled`**: Repsy does not start with it blank or unset, and the scanner does not start without its own `SCANNER_API_KEY`. The scanner's own settings (`SCANNER_API_KEY`, `TRIVY_TIMEOUT_SECONDS`, `TRIVY_DB_REPOSITORY`, ...) are listed in [`repsy-scanner-trivy/README.md`](./repsy-scanner-trivy/README.md)                                                                                                                                                                                 | _(none; unused while the scanner is disabled)_                                                       |
-| `DOCKER_INTERNAL_REGISTRY_BASE_URL`           | Base URL the scanner uses to pull Docker images from this instance's own registry                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `http://localhost:9090`                                                                              |
-| `TRIVY_REQUEST_TIMEOUT_SECONDS`               | How long Repsy waits on the scanner at one time: for its answer once a request has been sent in full, and for the scanner to accept more of an upload it has stopped reading. It does not limit how long an artifact takes to upload, so a large artifact (up to 500 MB) still scans on a slow link; a submit as a whole is cut off after `TRIVY_MAX_SCAN_DURATION_SECONDS`. A submit that fails on this timeout is not retried                                                                                                                                                                                  | `10`                                                                                                 |
-| `TRIVY_ADVISORY_LOOKUP_MAX_CONCURRENCY`       | How many npm audit lookups (see [Auditing npm packages](#auditing-npm-packages)) run on the scanner at once; an audit that finds no free place within `TRIVY_ADVISORY_LOOKUP_MAX_WAIT_MILLIS` is answered from the stored findings only. Each lookup is bounded by `TRIVY_REQUEST_TIMEOUT_SECONDS` and never delays a scan                                                                                                                                                                                                                                                                                       | `2`                                                                                                  |
-| `TRIVY_ADVISORY_LOOKUP_MAX_WAIT_MILLIS`       | How long an npm audit waits for a free lookup place, in milliseconds                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | `2000`                                                                                               |
-| `TRIVY_POLL_INTERVAL_MS`                      | How often Repsy asks the scanner for the status of an unfinished scan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | `3000`                                                                                               |
-| `TRIVY_MAX_SCAN_DURATION_SECONDS`             | How long Repsy waits for a scan to finish, uploading the artifact to the scanner included, before it marks the scan failed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `330`                                                                                                |
-| `TRIVY_SUBMIT_MAX_ATTEMPTS`                   | How many times Repsy submits a scan when it cannot reach the scanner (connection refused, DNS failure, connection reset, as while the scanner restarts), the first submit included. `1` turns the retry off. A scanner that answers with an error or does not answer in time is not retried; re-run that scan from the panel (1 to 5)                                                                                                                                                                                                                                                                            | `3`                                                                                                  |
-| `TRIVY_SUBMIT_RETRY_INITIAL_DELAY_SECONDS`    | Wait before the first retry of an unreachable scanner (1 to 300)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | `15`                                                                                                 |
-| `TRIVY_SUBMIT_RETRY_MAX_DELAY_SECONDS`        | Longest wait before any retry; the wait grows fourfold per retry (15 s, then 60 s). Keep the waits well below `TRIVY_MAX_SCAN_DURATION_SECONDS`, and note a pending retry is lost when Repsy restarts (the scan is then marked failed after that duration) (initial delay to 300)                                                                                                                                                                                                                                                                                                                                | `60`                                                                                                 |
-| `BASIC_AUTH_CACHE_ENABLED`                    | Remember successful HTTP Basic password checks, so a client that sends its username and password on every request pays for one password verification instead of one per request. See [Authenticating from CI](#authenticating-from-ci).                                                                                                                                                                                                                                                                                                                                                                          | `true`                                                                                               |
-| `BASIC_AUTH_CACHE_TTL_SECONDS`                | How long a remembered password check stays valid                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | `300`                                                                                                |
-| `BASIC_AUTH_CACHE_MAX_ENTRIES`                | How many remembered password checks are kept                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `10000`                                                                                              |
-| `AUTH_THROTTLE_ENABLED`                       | Limit the failed password checks of one client (HTTP Basic, unrecognised Bearer tokens and web UI login), so a flood of wrong credentials cannot keep the CPU busy with password verification. A client over the limit is answered with `429 Too Many Requests`. See [Authenticating from CI](#authenticating-from-ci).                                                                                                                                                                                                                                                                                          | `true`                                                                                               |
-| `AUTH_THROTTLE_MAX_FAILURES`                  | How many failed password checks one client may make per window before its next password check is refused                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `20`                                                                                                 |
-| `AUTH_THROTTLE_WINDOW_SECONDS`                | Length of the window in seconds. When it ends, the client starts again with a clean count                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `60`                                                                                                 |
-| `AUTH_THROTTLE_MAX_CLIENTS`                   | How many clients are tracked at once                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | `10000`                                                                                              |
-| `PASSWORD_RESET_MARKER_ENABLED`               | Reset a user's password when a file named after the user is created in `PASSWORD_RESET_MARKER_DIR`. Nothing is reachable over the network: it takes write access to that directory. See [Forgot admin password?](#forgot-admin-password). Set it to `false` to switch the feature off                                                                                                                                                                                                                                                                                                                            | `true`                                                                                               |
-| `PASSWORD_RESET_MARKER_DIR`                   | Directory watched for password reset marker files. The Docker image sets it to `/app/data/password-reset`, on the persisted volume, whatever `STORAGE_BASE_PATH` is                                                                                                                                                                                                                                                                                                                                                                                                                                              | `<STORAGE_BASE_PATH>/password-reset` (`/app/data/password-reset` in the image)                       |
-| `PASSWORD_RESET_MARKER_POLL_INTERVAL`         | How often a running instance looks into the directory (ISO-8601 duration, at least `PT1S`). A marker created while the application is stopped is applied once at startup                                                                                                                                                                                                                                                                                                                                                                                                                                         | `PT5S`                                                                                               |
-| `ABANDONED_UPLOAD_CLEANUP_ENABLED`            | Periodically delete Docker and Helm OCI blob uploads that were started and never finished (aborted pushes), and release the disk usage they were charged for                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `true`                                                                                               |
-| `ABANDONED_UPLOAD_TTL`                        | How long an upload can go without receiving data before it counts as abandoned (ISO-8601 duration)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `PT24H`                                                                                              |
-| `ABANDONED_UPLOAD_CLEANUP_INTERVAL`           | How often the cleanup runs (ISO-8601 duration)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `PT1H`                                                                                               |
-| `ABANDONED_UPLOAD_CLEANUP_INITIAL_DELAY`      | How long after startup the first cleanup runs (ISO-8601 duration)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `PT10M`                                                                                              |
-| `PENDING_SIGNATURE_TTL`                       | How long a Maven signature that arrived before the file it signs is held (ISO-8601 duration, see [Signed Maven Deploys](#signed-maven-deploys)); older ones are deleted                                                                                                                                                                                                                                                                                                                                                                                                                                          | `PT24H`                                                                                              |
-| `PENDING_SIGNATURE_PURGE_INTERVAL`            | How often the held signatures older than `PENDING_SIGNATURE_TTL` are deleted (ISO-8601 duration)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | `PT15M`                                                                                              |
-| `PENDING_SIGNATURE_PURGE_ENABLED`             | Delete the expired held Maven signatures; set to `false` to keep them                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | `true`                                                                                               |
-| `TRASH_CLEANUP_ENABLED`                       | Periodically empty the storage trash: what you delete (a repo, a package or a version) is moved into a `trash/` directory of its protocol first, and this job removes it from the disk for good once it is older than `TRASH_RETENTION`. **The first run after an upgrade deletes all the trash older than `TRASH_RETENTION` that has piled up so far, and that cannot be undone.** Set it to `false` to keep the trash                                                                                                                                                                                          | `true`                                                                                               |
-| `TRASH_RETENTION`                             | How long deleted items stay in the trash before they are removed for good (ISO-8601 duration, at least `P1D`; a shorter value stops the application from starting). Raise it to keep deleted items recoverable for longer                                                                                                                                                                                                                                                                                                                                                                                        | `P7D`                                                                                                |
-| `TRASH_CLEANUP_INTERVAL`                      | How often the trash is emptied (ISO-8601 duration)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `PT24H`                                                                                              |
-| `TRASH_CLEANUP_INITIAL_DELAY`                 | How long after startup the first trash cleanup runs (ISO-8601 duration)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | `PT15M`                                                                                              |
-| `DOCKER_MANIFEST_LAYOUT_REPAIR_ENABLED`       | After upgrading past RPS-1216, rename the Docker manifest files of earlier versions (named after the tag they were pushed under) to `manifests/<digest>` and record their `sha512` digest. Until a manifest is repaired it is served from its old file name, so switching the job off only delays the cleanup. See [Upgrading](#docker-manifests-are-content-addressed-rps-1216)                                                                                                                                                                                                                                 | `true`                                                                                               |
-| `DOCKER_MANIFEST_LAYOUT_REPAIR_INITIAL_DELAY` | How long after startup the first repair pass runs (ISO-8601 duration)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | `PT10M`                                                                                              |
-| `DOCKER_MANIFEST_LAYOUT_REPAIR_INTERVAL`      | How often the repair pass runs again (ISO-8601 duration); once nothing is left to repair it costs one query                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `PT24H`                                                                                              |
-| `MULTIPART_MAX_FILE_SIZE`                     | Largest single file a multipart upload may carry: the package archive of a PyPI (`twine upload`), Helm (`POST /{repo}/api/charts`) or NuGet push. A larger upload is answered with `413`. Accepts a size such as `100MB` or `1GB`. A Helm chart is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory, so keep that directory on a disk with room for the largest chart                                                                                                                                                                                         | `500MB`                                                                                              |
-| `MULTIPART_MAX_REQUEST_SIZE`                  | Largest total size of a multipart request, all parts included. Keep it at least as large as `MULTIPART_MAX_FILE_SIZE`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | `500MB`                                                                                              |
-| `RUBY_MAX_GEM_SIZE`                           | Largest gem a `gem push` may carry (the raw request body, so the multipart limits do not apply to it). A larger gem is answered with `413`. The gem is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. Accepts a size such as `100MB` or `1GB`                                                                                                                                                                                                                                                                                                              | `500MB`                                                                                              |
-| `CARGO_MAX_CRATE_SIZE`                        | Largest `.crate` a `cargo publish` may carry (a length-prefixed field inside Cargo's own wire format, so neither the multipart limits nor `MULTIPART_MAX_FILE_SIZE` apply to it). A larger crate is answered with `413`. The crate is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. crates.io itself defaults to `10MB`; raise this if you publish larger internal crates. Accepts a size such as `100MB` or `1GB`                                                                                                                                        | `100MB`                                                                                              |
-| `NPM_MAX_PUBLISH_SIZE`                        | Largest `npm publish` body a client may send: the packument plus its base64-encoded tarball (the raw request body, so the multipart limits do not apply to it), roughly 4/3 of the tarball's own size. A larger publish is answered with `413`, checked from `Content-Length` and again while the body is read. Accepts a size such as `100MB` or `1GB`                                                                                                                                                                                                                                                          | `500MB`                                                                                              |
-| `APP_ALLOWED_ORIGINS`                         | Comma-separated list of exact origins (e.g. `https://panel.example.com,https://panel-staging.example.com`) the panel API accepts cross-origin, credentialed requests from. **Unset (the default) means same-origin only: the panel API sends no CORS headers**, which is what the Docker image needs, since it serves the panel and the API from one origin. Set it when the panel is served from a different origin than the API (a separately hosted SPA, or `API_BASE_URL` pointing elsewhere). The CSP `connect-src` names the same origins. See [Cross-Origin Requests (CORS)](#cross-origin-requests-cors) | _(empty, same-origin only)_                                                                          |
-| `APP_HSTS_MAX_AGE`                            | `max-age` in seconds of a `Strict-Transport-Security` header. `0` or unset never sends it (the default). When positive, it is sent only on a secure request (a TLS listener, or a reverse proxy that forwards `X-Forwarded-Proto: https`), on both ports. HSTS applies to a whole host, not a port, so leave it off when the same host also serves the panel over plain HTTP (for example `:8080` plain beside `:8443` TLS). See [Security headers](#security-headers)                                                                                                                                           | `0` (off)                                                                                            |
-| `APP_CSP_ENABLED`                             | Send a `Content-Security-Policy` header with the panel SPA and its static assets (JSON API responses are unaffected). See [Content Security Policy](#content-security-policy)                                                                                                                                                                                                                                                                                                                                                                                                                                    | `true`                                                                                               |
-| `APP_CSP_REPORT_ONLY`                         | Send `Content-Security-Policy-Report-Only` instead of the enforcing header: violations are reported (in a browser that supports the Reporting API and is told where to send reports), nothing is blocked. Useful while rolling out a widened or replaced policy                                                                                                                                                                                                                                                                                                                                                  | `false`                                                                                              |
-| `APP_CSP_POLICY`                              | Overrides the built-in Content-Security-Policy outright, so an operator can widen it (for example to allow a CDN or font host) without a rebuild. See [Content Security Policy](#content-security-policy) for the built-in policy                                                                                                                                                                                                                                                                                                                                                                                | _(empty, built-in policy)_                                                                           |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ADMIN_INITIAL_PASSWORD` | Initial admin password. Only applied on first startup when no admin exists. | *(empty)* |
+| `DB_URL` | JDBC database URL. The Docker image defaults to the embedded H2 database; running from source (`mvn spring-boot:run`) defaults to PostgreSQL on `localhost:5432` instead. `DB_HOST`, `DB_PORT` and `DB_DATABASE` are not read (Repsy warns at startup if they are set). | `jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` (image only) |
+| `DB_USERNAME` | Database username | `repsy` |
+| `DB_PASSWORD` | Database password | `repsy123` |
+| `STORAGE_BASE_PATH` | Base directory for artifact file storage. Set to a path inside `/app/data` (e.g. `/app/data/storage`) to persist artifacts with a single volume mount (the Docker image already does). Deleting a repo, a package or a version moves its files into a `trash/` directory of the protocol (for example `maven/trash`) first; the trash older than `TRASH_RETENTION` is removed every day (see `TRASH_CLEANUP_ENABLED`). | `~/.repsy` (`/app/data/storage` in the Docker image) |
+| `OS_APP_JWT_SECRET` | JWT signing secret. If not set, a random 256-bit secret is generated on every startup — every restart/redeploy invalidates all existing sessions, forcing every user to log in again. Set a stable, secure random value for any production/self-host deployment. | *(random, regenerated on every startup)* |
+| `SERVER_PORT` | Repository operations port | `9090` |
+| `API_PORT` | Backend API and Frontend web UI port | `8080` |
+| `SERVER_COMPRESSION_ENABLED` | Gzip-compress JSON answers of 1 KB or more on the repository port (an npm packument of a package with many versions is megabytes of JSON). Set to `false` when a reverse proxy in front already compresses | `true` |
+| `H2_TCP_SERVER_ENABLED` | Enable the H2 TCP server. It binds loopback-only, so it is reachable only from inside the same container/host, not from an external client | `false` |
+| `H2_TCP_SERVER_PORT` | H2 TCP server port | `9092` |
+| `SECURITY_SCANNER` | Enables vulnerability scanning of pushed artifacts (`enabled`/`disabled`) | `disabled` |
+| `TRIVY_SCANNER_BASE_URL` | Base URL of the `repsy-scanner-trivy` service | `http://localhost:8090` |
+| `TRIVY_SCANNER_API_KEY` | Shared API key sent to the scanner service (must match its `SCANNER_API_KEY`). **Required when `SECURITY_SCANNER=enabled`**: Repsy does not start with it blank or unset, and the scanner does not start without its own `SCANNER_API_KEY`. The scanner's own settings (`SCANNER_API_KEY`, `TRIVY_TIMEOUT_SECONDS`, `TRIVY_DB_REPOSITORY`, ...) are listed in [`repsy-scanner-trivy/README.md`](./repsy-scanner-trivy/README.md) | *(none; unused while the scanner is disabled)* |
+| `DOCKER_INTERNAL_REGISTRY_BASE_URL` | Base URL the scanner uses to pull Docker images from this instance's own registry | `http://localhost:9090` |
+| `TRIVY_REQUEST_TIMEOUT_SECONDS` | How long Repsy waits on the scanner at one time: for its answer once a request has been sent in full, and for the scanner to accept more of an upload it has stopped reading. It does not limit how long an artifact takes to upload, so a large artifact (up to 500 MB) still scans on a slow link; a submit as a whole is cut off after `TRIVY_MAX_SCAN_DURATION_SECONDS`. A submit that fails on this timeout is not retried | `10` |
+| `TRIVY_ADVISORY_LOOKUP_MAX_CONCURRENCY` | How many npm audit lookups (see [Auditing npm packages](#auditing-npm-packages)) run on the scanner at once; an audit that finds no free place within `TRIVY_ADVISORY_LOOKUP_MAX_WAIT_MILLIS` is answered from the stored findings only. Each lookup is bounded by `TRIVY_REQUEST_TIMEOUT_SECONDS` and never delays a scan | `2` |
+| `TRIVY_ADVISORY_LOOKUP_MAX_WAIT_MILLIS` | How long an npm audit waits for a free lookup place, in milliseconds | `2000` |
+| `TRIVY_POLL_INTERVAL_MS` | How often Repsy asks the scanner for the status of an unfinished scan | `3000` |
+| `TRIVY_MAX_SCAN_DURATION_SECONDS` | How long Repsy waits for a scan to finish, uploading the artifact to the scanner included, before it marks the scan failed | `330` |
+| `TRIVY_SUBMIT_MAX_ATTEMPTS` | How many times Repsy submits a scan when it cannot reach the scanner (connection refused, DNS failure, connection reset, as while the scanner restarts), the first submit included. `1` turns the retry off. A scanner that answers with an error or does not answer in time is not retried; re-run that scan from the panel (1 to 5) | `3` |
+| `TRIVY_SUBMIT_RETRY_INITIAL_DELAY_SECONDS` | Wait before the first retry of an unreachable scanner (1 to 300) | `15` |
+| `TRIVY_SUBMIT_RETRY_MAX_DELAY_SECONDS` | Longest wait before any retry; the wait grows fourfold per retry (15 s, then 60 s). Keep the waits well below `TRIVY_MAX_SCAN_DURATION_SECONDS`, and note a pending retry is lost when Repsy restarts (the scan is then marked failed after that duration) (initial delay to 300) | `60` |
+| `BASIC_AUTH_CACHE_ENABLED` | Remember successful HTTP Basic password checks, so a client that sends its username and password on every request pays for one password verification instead of one per request. See [Authenticating from CI](#authenticating-from-ci). | `true` |
+| `BASIC_AUTH_CACHE_TTL_SECONDS` | How long a remembered password check stays valid | `300` |
+| `BASIC_AUTH_CACHE_MAX_ENTRIES` | How many remembered password checks are kept | `10000` |
+| `AUTH_THROTTLE_ENABLED` | Limit the failed password checks of one client (HTTP Basic, unrecognised Bearer tokens and web UI login), so a flood of wrong credentials cannot keep the CPU busy with password verification. A client over the limit is answered with `429 Too Many Requests`. See [Authenticating from CI](#authenticating-from-ci). | `true` |
+| `AUTH_THROTTLE_MAX_FAILURES` | How many failed password checks one client may make per window before its next password check is refused | `20` |
+| `AUTH_THROTTLE_WINDOW_SECONDS` | Length of the window in seconds. When it ends, the client starts again with a clean count | `60` |
+| `AUTH_THROTTLE_MAX_CLIENTS` | How many clients are tracked at once | `10000` |
+| `PASSWORD_RESET_MARKER_ENABLED` | Reset a user's password when a file named after the user is created in `PASSWORD_RESET_MARKER_DIR`. Nothing is reachable over the network: it takes write access to that directory. See [Forgot admin password?](#forgot-admin-password). Set it to `false` to switch the feature off | `true` |
+| `PASSWORD_RESET_MARKER_DIR` | Directory watched for password reset marker files. The Docker image sets it to `/app/data/password-reset`, on the persisted volume, whatever `STORAGE_BASE_PATH` is | `<STORAGE_BASE_PATH>/password-reset` (`/app/data/password-reset` in the image) |
+| `PASSWORD_RESET_MARKER_POLL_INTERVAL` | How often a running instance looks into the directory (ISO-8601 duration, at least `PT1S`). A marker created while the application is stopped is applied once at startup | `PT5S` |
+| `ABANDONED_UPLOAD_CLEANUP_ENABLED` | Periodically delete Docker and Helm OCI blob uploads that were started and never finished (aborted pushes), and release the disk usage they were charged for | `true` |
+| `ABANDONED_UPLOAD_TTL` | How long an upload can go without receiving data before it counts as abandoned (ISO-8601 duration) | `PT24H` |
+| `ABANDONED_UPLOAD_CLEANUP_INTERVAL` | How often the cleanup runs (ISO-8601 duration) | `PT1H` |
+| `ABANDONED_UPLOAD_CLEANUP_INITIAL_DELAY` | How long after startup the first cleanup runs (ISO-8601 duration) | `PT10M` |
+| `PENDING_SIGNATURE_TTL` | How long a Maven signature that arrived before the file it signs is held (ISO-8601 duration, see [Signed Maven Deploys](#signed-maven-deploys)); older ones are deleted | `PT24H` |
+| `PENDING_SIGNATURE_PURGE_INTERVAL` | How often the held signatures older than `PENDING_SIGNATURE_TTL` are deleted (ISO-8601 duration) | `PT15M` |
+| `PENDING_SIGNATURE_PURGE_ENABLED` | Delete the expired held Maven signatures; set to `false` to keep them | `true` |
+| `TRASH_CLEANUP_ENABLED` | Periodically empty the storage trash: what you delete (a repo, a package or a version) is moved into a `trash/` directory of its protocol first, and this job removes it from the disk for good once it is older than `TRASH_RETENTION`. **The first run after an upgrade deletes all the trash older than `TRASH_RETENTION` that has piled up so far, and that cannot be undone.** Set it to `false` to keep the trash | `true` |
+| `TRASH_RETENTION` | How long deleted items stay in the trash before they are removed for good (ISO-8601 duration, at least `P1D`; a shorter value stops the application from starting). Raise it to keep deleted items recoverable for longer | `P7D` |
+| `TRASH_CLEANUP_INTERVAL` | How often the trash is emptied (ISO-8601 duration) | `PT24H` |
+| `TRASH_CLEANUP_INITIAL_DELAY` | How long after startup the first trash cleanup runs (ISO-8601 duration) | `PT15M` |
+| `DOCKER_MANIFEST_LAYOUT_REPAIR_ENABLED` | After upgrading past RPS-1216, rename the Docker manifest files of earlier versions (named after the tag they were pushed under) to `manifests/<digest>` and record their `sha512` digest. Until a manifest is repaired it is served from its old file name, so switching the job off only delays the cleanup. See [Upgrading](#docker-manifests-are-content-addressed-rps-1216) | `true` |
+| `DOCKER_MANIFEST_LAYOUT_REPAIR_INITIAL_DELAY` | How long after startup the first repair pass runs (ISO-8601 duration) | `PT10M` |
+| `DOCKER_MANIFEST_LAYOUT_REPAIR_INTERVAL` | How often the repair pass runs again (ISO-8601 duration); once nothing is left to repair it costs one query | `PT24H` |
+| `MULTIPART_MAX_FILE_SIZE` | Largest single file a multipart upload may carry: the package archive of a PyPI (`twine upload`), Helm (`POST /{repo}/api/charts`) or NuGet push. A larger upload is answered with `413`. Accepts a size such as `100MB` or `1GB`. A Helm chart is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory, so keep that directory on a disk with room for the largest chart | `500MB` |
+| `MULTIPART_MAX_REQUEST_SIZE` | Largest total size of a multipart request, all parts included. Keep it at least as large as `MULTIPART_MAX_FILE_SIZE` | `500MB` |
+| `RUBY_MAX_GEM_SIZE` | Largest gem a `gem push` may carry (the raw request body, so the multipart limits do not apply to it). A larger gem is answered with `413`. The gem is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. Accepts a size such as `100MB` or `1GB` | `500MB` |
+| `CARGO_MAX_CRATE_SIZE` | Largest `.crate` a `cargo publish` may carry (a length-prefixed field inside Cargo's own wire format, so neither the multipart limits nor `MULTIPART_MAX_FILE_SIZE` apply to it). A larger crate is answered with `413`. The crate is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. crates.io itself defaults to `10MB`; raise this if you publish larger internal crates. Accepts a size such as `100MB` or `1GB` | `100MB` |
+| `NPM_MAX_PUBLISH_SIZE` | Largest `npm publish` body a client may send: the packument plus its base64-encoded tarball (the raw request body, so the multipart limits do not apply to it), roughly 4/3 of the tarball's own size. A larger publish is answered with `413`, checked from `Content-Length` and again while the body is read. Accepts a size such as `100MB` or `1GB` | `500MB` |
+| `APP_ALLOWED_ORIGINS` | Comma-separated list of exact origins (e.g. `https://panel.example.com,https://panel-staging.example.com`) the panel API accepts cross-origin, credentialed requests from. **Unset (the default) means same-origin only: the panel API sends no CORS headers**, which is what the Docker image needs, since it serves the panel and the API from one origin. Set it when the panel is served from a different origin than the API (a separately hosted SPA, or `API_BASE_URL` pointing elsewhere). The CSP `connect-src` names the same origins. See [Cross-Origin Requests (CORS)](#cross-origin-requests-cors) | *(empty, same-origin only)* |
+| `APP_HSTS_MAX_AGE` | `max-age` in seconds of a `Strict-Transport-Security` header. `0` or unset never sends it (the default). When positive, it is sent only on a secure request (a TLS listener, or a reverse proxy that forwards `X-Forwarded-Proto: https`), on both ports. HSTS applies to a whole host, not a port, so leave it off when the same host also serves the panel over plain HTTP (for example `:8080` plain beside `:8443` TLS). See [Security headers](#security-headers) | `0` (off) |
+| `APP_CSP_ENABLED` | Send a `Content-Security-Policy` header with the panel SPA and its static assets (JSON API responses are unaffected). See [Content Security Policy](#content-security-policy) | `true` |
+| `APP_CSP_REPORT_ONLY` | Send `Content-Security-Policy-Report-Only` instead of the enforcing header: violations are reported (in a browser that supports the Reporting API and is told where to send reports), nothing is blocked. Useful while rolling out a widened or replaced policy | `false` |
+| `APP_CSP_POLICY` | Overrides the built-in Content-Security-Policy outright, so an operator can widen it (for example to allow a CDN or font host) without a rebuild. See [Content Security Policy](#content-security-policy) for the built-in policy | *(empty, built-in policy)* |
 
 **Important Notes:**
 
@@ -725,11 +718,11 @@ cross-origin and the clients never send an `Origin`, so nothing is answered ther
 Besides the [Content Security Policy](#content-security-policy), Repsy sends these browser-facing
 headers:
 
-| Header                                                  | Where                                                                                             |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `X-Content-Type-Options: nosniff`                       | Every response, on both ports (the repository port serves user-uploaded files)                    |
-| `Referrer-Policy: strict-origin-when-cross-origin`      | Every response on the panel API port                                                              |
-| `X-Frame-Options: DENY`                                 | Every response on the panel API port (the legacy twin of the CSP's `frame-ancestors 'none'`)      |
+| Header | Where |
+| --- | --- |
+| `X-Content-Type-Options: nosniff` | Every response, on both ports (the repository port serves user-uploaded files) |
+| `Referrer-Policy: strict-origin-when-cross-origin` | Every response on the panel API port |
+| `X-Frame-Options: DENY` | Every response on the panel API port (the legacy twin of the CSP's `frame-ancestors 'none'`) |
 | `Strict-Transport-Security: max-age=<APP_HSTS_MAX_AGE>` | Only when `APP_HSTS_MAX_AGE` is set to a positive number of seconds, and only on a secure request |
 
 HSTS is opt-in because it is scoped to a host, not to a port: a browser that has seen it for a host
@@ -770,8 +763,8 @@ If that happens, Repsy fails safe: the limit is generous (20 failures in 60 seco
 
 1. Navigate to http://localhost:8080
 2. Login with:
-   - **Username**: `admin`
-   - **Password**: the value you set for `ADMIN_INITIAL_PASSWORD`
+    - **Username**: `admin`
+    - **Password**: the value you set for `ADMIN_INITIAL_PASSWORD`
 
 ### Username Casing
 
@@ -788,15 +781,15 @@ for login unless its displayed casing is entered exactly.
 Repsy has no per-repository owners or access lists. What a caller may do depends only on whether
 they are signed in, and on their role:
 
-| Caller           | Public repository                       | Private repository                      |
-| ---------------- | --------------------------------------- | --------------------------------------- |
-| Anonymous        | Read                                    | No access                               |
-| Signed-in `USER` | Read and write                          | Read and write                          |
-| `ADMIN`          | Everything a `USER` can do, plus manage | Everything a `USER` can do, plus manage |
+| Caller | Public repository | Private repository |
+| --- | --- | --- |
+| Anonymous | Read | No access |
+| Signed-in `USER` | Read and write | Read and write |
+| `ADMIN` | Everything a `USER` can do, plus manage | Everything a `USER` can do, plus manage |
 
 "Private" therefore means **login required**, not "restricted to specific users". Every user account
 on the instance can read and modify every repository, including private ones, and can see their
-names. Only _manage_ operations need the `ADMIN` role: creating a repository, renaming it or
+names. Only *manage* operations need the `ADMIN` role: creating a repository, renaming it or
 changing its description and settings, deleting it, deleting its artifacts and versions, managing
 its deploy tokens, and managing users.
 
@@ -903,13 +896,13 @@ what is verified and where keys are looked up:
 
 - **Default (`pgpVerifyAllSignaturesEnabled` off):** only the `.pom.asc` is verified. Any other
   signature (`.jar.asc`, `-sources.jar.asc`, `.module.asc`, ...) is stored as it is sent, and a
-  version shows _Signed_ when its POM signature verified.
+  version shows *Signed* when its POM signature verified.
 - **Verify every signature (`pgpVerifyAllSignaturesEnabled` on):** every artifact `.asc` is verified
   against the file it signs before it is stored, exactly like the `.pom.asc`: a signature that does
-  not match answers `422` and stores nothing. A version then shows _Signed_ only when every file of
+  not match answers `422` and stores nothing. A version then shows *Signed* only when every file of
   it that a signing tool signs (the POM, the jar, every classifier jar, the `.module`, ... but not
   checksums, signatures or `maven-metadata.xml`) has a verified signature, so a partly signed
-  release stays _Unsigned_. Files and signatures may arrive in **any order**, which a real
+  release stays *Unsigned*. Files and signatures may arrive in **any order**, which a real
   `mvn deploy` needs: Maven uploads the files of a deploy in parallel, so the signature of a large
   file can reach Repsy before the file, or before the POM that registers the version. Such a
   signature is answered `200` and held: it is not stored, not served (`GET` answers `404`) and not
@@ -922,17 +915,17 @@ what is verified and where keys are looked up:
   replaces the one that is held. A signature that is not an OpenPGP signature at all is still
   refused at once with `422 artifactSignatureNotVerified`. A repository that does not verify every
   signature holds nothing: there a `.pom.asc` before its POM is refused with `404` as before.
-  Uploading a new file, or storing a file again (with _Allow override_), makes the version
-  _Unsigned_ until that file's signature is uploaded and verified. For a snapshot only the files of
-  its newest build count. Turning the setting on or off recomputes _Signed_ of every existing
+  Uploading a new file, or storing a file again (with *Allow override*), makes the version
+  *Unsigned* until that file's signature is uploaded and verified. For a snapshot only the files of
+  its newest build count. Turning the setting on or off recomputes *Signed* of every existing
   version of the repository in the background, under the rule of the new setting (with it off, a
-  version is _Signed_ when its POM signature is verified; with it on, when every file has a
+  version is *Signed* when its POM signature is verified; with it on, when every file has a
   verified signature). The settings request does not wait for it, so a large repository shows the
   new values within moments, not at once. A signature that was stored while the setting was off was
   never verified, so turning the setting on verifies it then, in that same background run, file by
   file and with the same key rules as an upload (registered keys first, key servers if the lookup
-  is on): an honest publisher's versions stay _Signed_. A stored signature that does not verify, or
-  whose key cannot be found, does not count and its version shows _Unsigned_ until the file and
+  is on): an honest publisher's versions stay *Signed*. A stored signature that does not verify, or
+  whose key cannot be found, does not count and its version shows *Unsigned* until the file and
   signature are uploaded again (or the key is registered and the setting turned off and on again). Turning it off
   leaves held signatures alone: they are deleted when they expire.
 - **Air-gapped registries (`pgpKeyServerLookupEnabled` off):** the repository consults its
@@ -941,9 +934,9 @@ what is verified and where keys are looked up:
   `keyserver.ubuntu.com` or `keys.openpgp.org`), so no network call and no timeout wait. Defaults to
   on.
 
-### Maven _Allow override_ and SNAPSHOTs
+### Maven *Allow override* and SNAPSHOTs
 
-With _Allow override_ off, a Maven repository refuses to store a file that already exists
+With *Allow override* off, a Maven repository refuses to store a file that already exists
 (`403 artifactOverrideIsProhibited`), with one exception: a SNAPSHOT can always be deployed again.
 
 - **Releases are immutable.** Any file of a release version that already exists is refused.
@@ -954,7 +947,7 @@ With _Allow override_ off, a Maven repository refuses to store a file that alrea
   their checksums, and classifier jars) under those literal names every time, so a repeated deploy
   replaces the files instead of adding a build. That is accepted, as it is on Nexus and Artifactory,
   and it is what makes the setting behave the same for every client.
-- The _Snapshots_ switch of the repository still decides: with it off, a SNAPSHOT is refused in
+- The *Snapshots* switch of the repository still decides: with it off, a SNAPSHOT is refused in
   both forms.
 
 The panel shows the version of a SNAPSHOT that carries no `maven-metadata.xml` (what sbt and Ivy
@@ -1027,7 +1020,7 @@ this in `ivysettings.xml` (`repo.example.com` is your `REPO_BASE_URL` host, `my-
   transitively.
 - **Republishing:** Ivy's `overwrite` defaults to `false`, so Ivy itself refuses to publish over a file
   that already exists ("destination file exists and overwrite == false"). Set `overwrite="true"` on
-  `ivy:publish` to republish a SNAPSHOT; for a release, Repsy's _Allow override_ setting still decides.
+  `ivy:publish` to republish a SNAPSHOT; for a release, Repsy's *Allow override* setting still decides.
 - **Reading:** the same `ivysettings.xml` resolves dependencies. A dependency on an artifact published
   like this can use the `default` configuration (`conf="default->default"`), as the dependency line on a
   version's page in the panel does, which asks for the jar only; a dependency without a `conf` resolves
@@ -1098,7 +1091,7 @@ changed role takes effect on the next request, and a wrong password or an unknow
 never remembered, so it is checked and answered exactly as before. Set `BASIC_AUTH_CACHE_ENABLED`
 to `false` to turn the cache off.
 
-The cache does not make a _failed_ login cheaper, so Repsy limits those instead. Every client, told
+The cache does not make a *failed* login cheaper, so Repsy limits those instead. Every client, told
 apart by its address (see [Reverse Proxy](#reverse-proxy)), may make `AUTH_THROTTLE_MAX_FAILURES`
 failed password checks (20 by default) per `AUTH_THROTTLE_WINDOW_SECONDS` (60 seconds by default).
 The repository ports, the `/api` routes that take Basic credentials and the web UI login all count
@@ -1113,7 +1106,7 @@ limit off.
   that was revoked, rotated or belongs to another repository, or a forged token (npm's
   `_authToken`, a NuGet API key, a Cargo or Ruby token). A validly signed token that has merely
   expired is recognised and does not count (it is answered `sessionExpired`), so a long `docker
-push` whose token runs out does not spend the budget of everyone behind the same address.
+  push` whose token runs out does not spend the budget of everyone behind the same address.
   All of them count the same and are refused the same way (`401 unAuthorized`), so the limit never
   reveals which usernames exist, and it is keyed on the client, never on the username. A request
   that succeeds, a valid deploy token, a valid bearer token, a recognised token that is refused
@@ -1149,7 +1142,6 @@ For detailed information on creating repositories, managing deploy tokens, and u
 ### Common Issues
 
 **Port already in use:**
-
 ```bash
 # Check what's using port 8080 or 9090
 lsof -i :8080
@@ -1157,7 +1149,6 @@ lsof -i :9090
 ```
 
 **Database connection failed:**
-
 ```bash
 # Check if PostgreSQL is running
 docker ps | grep postgres
@@ -1167,7 +1158,6 @@ docker logs repsy-postgres
 ```
 
 **Admin user not created:**
-
 ```bash
 # Check application logs
 docker logs repsy
@@ -1177,12 +1167,10 @@ docker exec repsy env | grep ADMIN
 ```
 
 **Can't login:**
-
 - Verify `ADMIN_INITIAL_PASSWORD` was set before the first startup
 - <a id="forgot-admin-password"></a>**Forgot admin password?** Create an empty file named after the user in the password reset
   directory, from inside the container. No database access is needed, and it works for any user, not
   only for an admin. In the Docker image the directory is `/app/data/password-reset`:
-
   ```bash
   # Docker
   docker exec repsy touch /app/data/password-reset/admin
@@ -1192,15 +1180,12 @@ docker exec repsy env | grep ADMIN
   kubectl exec deploy/repsy -- touch /app/data/password-reset/admin
   kubectl logs deploy/repsy | grep "New password"
   ```
-
   Within a few seconds (`PASSWORD_RESET_MARKER_POLL_INTERVAL`) Repsy removes the file, generates a
   new random password for that user, revokes every session and refresh token of the account, and
   logs one line at `WARN`:
-
   ```
   Password of user admin has been reset by the marker file /app/data/password-reset/admin. New password: <password>
   ```
-
   Copy the password from the log, sign in and change it under Profile: the log may be shipped
   elsewhere. The file is removed before the password is changed, so a marker is applied only once.
   The file name must be a valid username (lower-case letters, digits, `_` and `-`, 3 to 25
@@ -1216,7 +1201,6 @@ docker exec repsy env | grep ADMIN
   predates this feature and does not have it yet) belongs to the user Repsy runs as. A directory
   created by root cannot be emptied by Repsy: it logs the error `Could not apply the password reset marker`
   and leaves the file in place.
-
   ```bash
   docker stop repsy
   docker run --rm -v repsy-data:/app/data --entrypoint sh repo.repsy.io/repsy/os/repsy:latest \
@@ -1224,7 +1208,6 @@ docker exec repsy env | grep ADMIN
   docker start repsy
   docker logs repsy 2>&1 | grep "New password"
   ```
-
   If the log shows more than one `New password` line for the same user (a marker and an emptied
   hash, see below, applied at the same startup), use the last one.
 
@@ -1239,7 +1222,6 @@ docker exec repsy env | grep ADMIN
 
   **Alternative, without the marker directory (older images):** reset the password by setting the
   hash to an empty string in the database (`hash` is `NOT NULL`, so `NULL` is rejected):
-
   ```sql
   -- Connect to PostgreSQL
   docker exec -it repsy-postgres psql -U repsy -d repsy
@@ -1257,7 +1239,6 @@ docker exec repsy env | grep ADMIN
   -- Check logs for the new random password
   docker logs repsy | grep "Admin password"
   ```
-
   On the next startup the application generates a new random password for every admin whose hash
   is empty and logs it, one line per admin.
 
@@ -1266,7 +1247,6 @@ docker exec repsy env | grep ADMIN
   `DB_URL` (`/app/data/repsy` for the default URL in the
   [environment variables](#environment-variables)) with the `DB_USERNAME` and `DB_PASSWORD` the
   application uses (`repsy` / `repsy123` by default):
-
   ```bash
   docker stop repsy
 
@@ -1282,18 +1262,15 @@ docker exec repsy env | grep ADMIN
   # Check logs for the new random password
   docker logs repsy | grep "Admin password"
   ```
-
   Keep `MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE` in that URL even if your `DB_URL` differs: the tables
   have lower-case names, and without `DATABASE_TO_LOWER=TRUE` the statement fails with
   `Table "USERS" not found`. To reset a single admin, append `AND username = 'admin'` to the
   statement.
 
 **Vulnerability scans failing with 401/500:**
-
 - Check that `TRIVY_SCANNER_API_KEY` (repsy-backend) and `SCANNER_API_KEY` (`repsy-scanner-trivy`) are set to the exact same value — a mismatch causes the scanner to reject requests.
 
 **Docker scans failing:**
-
 - Remember that `DOCKER_INTERNAL_REGISTRY_BASE_URL` is resolved from the **scanner container's** point of view, not the backend's — it must never be `localhost`. Use `host.docker.internal` (hybrid topology, backend on host) or the backend's service name (e.g. `http://repsy:9090`, full-compose topology) instead.
 
 ### Logs
@@ -1379,12 +1356,12 @@ pnpm start
 ```
 
 Access development environment:
-
 - **Frontend (Web UI)**: http://localhost:4200 (with hot reload)
   (`mvn spring-boot:run` activates the `dev` profile, which lets the dev server at `:4200` call the API cross-origin; see [Cross-Origin Requests (CORS)](#cross-origin-requests-cors))
 - **Backend API**: http://localhost:8080
 - **Repository Operations**: http://localhost:9090
 - To inspect the embedded H2 database directly, stop the app and open the database file with the H2 shell (see "Troubleshooting" below) — the TCP server (`H2_TCP_SERVER_ENABLED=true`) only binds inside the container/host loopback, so it is not reachable from an external client and is not a supported inspection path
+
 
 ### Building for Production
 
@@ -1435,7 +1412,6 @@ Migrations are managed with Flyway in `src/main/resources/db/migration/`.
 5. Open Pull Request
 
 **Contribution Guidelines:**
-
 - Write tests for new features
 - Update documentation
 - Follow existing code style
