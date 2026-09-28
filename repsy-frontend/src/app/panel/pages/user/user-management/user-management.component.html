@@ -109,11 +109,12 @@
                 [always]="true"
               />
 
-              <!-- Last Login -->
+              <!-- Last Login: a visible label always, "Never logged in" included (RPS-1628), so the
+              cell has something to hover on a user's very first row, not an empty, unhoverable slot. -->
               <app-tooltip
                 data-testid="row-last-login"
                 class="text-secondary-500"
-                [text]="timeAgo(user.lastLoginAt)"
+                [text]="user.lastLoginAt ? timeAgo(user.lastLoginAt) : 'Never logged in'"
                 [textHover]="user.lastLoginAt ? (user.lastLoginAt | date: 'medium') : 'Never logged in'"
                 [always]="true"
               />

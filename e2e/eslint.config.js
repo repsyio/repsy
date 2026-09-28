@@ -120,6 +120,7 @@ export default tseslint.config(
             'expectCovers',
             'expectVisual',
             'expectSessionEndedOnNextRequest',
+            'expectDocsLink',
           ],
         },
       ],
