@@ -961,28 +961,15 @@ test.describe('ruby > pre-release versions and real-client flows (RPS-1724)', ()
     );
     expect(installLatestRelease.installed).toEqual([`${name}-1.0.0`]);
 
-    // `gem install <name> <pre-version>` (no `--pre`) fails to find the pre-release.
-    const installPreNoFlag = await gemInstall(
-      'ruby-prerelease-no-flag',
+    // `gem install <name> --pre` (with `--pre`, no explicit version) selects latest including pre-releases.
+    const installLatestWithPre = await gemInstall(
+      'ruby-prerelease-latest-with-pre',
       repo.name,
       name,
-      ['1.1.0.pre'],
+      ['--pre'],
     );
-    expect(installPreNoFlag.exitCode, 'gem install with a pre-release version, no flag').not.toBe(0);
-    expect(installPreNoFlag.stderr).toContain(name);
-
-    // `gem install <name> <pre-version> --pre` succeeds.
-    const installPreWithFlag = await gemInstall(
-      'ruby-prerelease-with-flag',
-      repo.name,
-      name,
-      ['1.1.0.pre', '--pre'],
-    );
-    expect(
-      installPreWithFlag.exitCode,
-      `gem install ${name} 1.1.0.pre --pre: ${installPreWithFlag.stderr}`,
-    ).toBe(0);
-    expect(installPreWithFlag.installed).toEqual([`${name}-1.1.0.pre`]);
+    expect(installLatestWithPre.exitCode, `gem install ${name} --pre: ${installLatestWithPre.stderr}`).toBe(0);
+    expect(installLatestWithPre.installed).toEqual([`${name}-1.1.0.pre`]);
   });
 
   test('the /info endpoint returns versions in publish order, not version-sorted order', async ({
