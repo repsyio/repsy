@@ -1414,15 +1414,11 @@ test.describe('docker registry rules (raw HTTP)', () => {
         first.built.manifestMediaType,
       );
 
-      // Re-pushing identical bytes should succeed (201 or 200, both idempotent), not 409/403
+      // Re-pushing identical bytes returns 201: manifest already exists with same digest, creation response is idempotent
       expect(
         repushSame.status,
-        'identical re-push to same tag is accepted when allowOverride is false',
-      ).toBeLessThanOrEqual(201);
-      expect(
-        repushSame.status,
-        'not 409 Conflict or 403 Denied',
-      ).toBeGreaterThanOrEqual(200);
+        `identical re-push status: ${repushSame.status}, expected 201 (created/idempotent)`,
+      ).toBe(201);
 
       // Verify the tag still points to the same digest
       const getTag = await rawGetManifest(layout.repoName, admin, layout.image, 'tag1');
@@ -1549,14 +1545,12 @@ test.describe('docker registry rules (raw HTTP)', () => {
         layout.image,
         childDigest,
       );
-      // The child was untagged and only reachable via the index edges. After the index is
-      // deleted, the child is orphaned. Whether it stays stored or is deleted depends on
-      // the cleanup strategy (see UntaggedManifestFinder): it may become inaccessible (404)
-      // or it may stay stored but orphaned (200 if still stored, 404 if cleaned up).
+      // After the index is deleted, the child becomes orphaned (not reachable via index edges).
+      // Per UntaggedManifestFinder's recursive CTEs: orphaned manifests return 404 (not reachable).
       expect(
-        [200, 404].includes(getChildAfter.status),
-        `child after index delete is ${getChildAfter.status} (expected 200 or 404)`,
-      ).toBe(true);
+        getChildAfter.status,
+        `orphaned child after index delete: ${getChildAfter.status}, expected 404 (not reachable)`,
+      ).toBe(404);
     },
   );
 });
