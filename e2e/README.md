@@ -4683,10 +4683,9 @@ containing a letter (e.g. `1.0.0.pre`, `1.0.0.rc1`, `2.0.0.alpha`) is a pre-rele
 (confirmed against a running stack):
 
 - **D-1a**: A pre-release version publishes with `200` like any other version; `/info/<gem>` lists both
-  releases and pre-releases (yanked ones still omitted). `gem install <name>` (no version) installs the
-  latest RELEASE, not a pre-release. `gem install <name> <version>` (without `--pre`) fails to find a
-  pre-release by version; `gem install <name> <version> --pre` succeeds. The installed gem bytes match
-  the published bytes.
+  releases and pre-releases (yanked ones still omitted). `gem install <name>` (no version, no `--pre`)
+  installs the latest RELEASE, never a pre-release; `gem install <name> --pre` (no version) installs the
+  latest version INCLUDING pre-releases. The installed gem bytes match the published bytes.
 - **D-2a**: The `/info` endpoint returns versions in publish order (the order they were pushed to Repsy),
   not version-sorted order. This matches how RubyGems itself serves `/info`: newer publishes are appended,
   not sorted. The test deliberately publishes out of order (1.0.0, 2.0.0, 1.5.0) and asserts the response
