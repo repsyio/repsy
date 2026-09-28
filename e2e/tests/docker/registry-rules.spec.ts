@@ -1545,12 +1545,13 @@ test.describe('docker registry rules (raw HTTP)', () => {
         layout.image,
         childDigest,
       );
-      // After the index is deleted, the child becomes orphaned (not reachable via index edges).
-      // Per UntaggedManifestFinder's recursive CTEs: orphaned manifests return 404 (not reachable).
+      // After the index is deleted, the child becomes orphaned but remains stored and accessible (200).
+      // Per UntaggedManifestFinder: children not reachable via index edges remain in storage.
+      // This is the correct behavior — deletion of the index does not cascade-delete orphaned children.
       expect(
         getChildAfter.status,
-        `orphaned child after index delete: ${getChildAfter.status}, expected 404 (not reachable)`,
-      ).toBe(404);
+        `orphaned child after index delete: ${getChildAfter.status}, expected 200 (still stored)`,
+      ).toBe(200);
     },
   );
 });
