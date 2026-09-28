@@ -42,8 +42,9 @@
  *    `AbstractRubyProtocolFacade.storeGem`, confirmed live and read from source):
  *    `metadata.gz` is gzipped **YAML** (`Gem::Specification#to_yaml`/`Gem::Specification.from_yaml`),
  *    loaded through SnakeYAML's `SafeConstructor` with every `!ruby/...` mapping tag retagged to a
- *    plain map first -- **not** Marshal (only the index side channels, `specs.4.8.gz` and the
- *    (unimplemented, RPS-1233) `quick/Marshal.4.8/*.gemspec.rz`, use Marshal). `name`/`version` are
+ *    plain map first -- **not** Marshal (only the index side channels -- `specs.4.8.gz`, the legacy
+ *    `api/v1/dependencies` (RPS-1554) and `quick/Marshal.4.8/*.gemspec.rz` (RPS-1233, fixed) -- use
+ *    Marshal). `name`/`version` are
  *    required (`400 gemNameMissing`/`gemVersionMissing`); `platform` defaults to `"ruby"`; every
  *    identifier has a column-length limit (RPS-1071, `400 gem{Name,Version,Platform,
  *    RequiredRubyVersion}TooLong`). The DB row (`ruby_gem`/`ruby_gem_version`) is created/updated and
@@ -75,10 +76,27 @@
  *    zlib/RFC1950 despite the `.gz` filename, so `gunzipSync` threw and only `inflateSync` could
  *    decode it; confirmed live post-fix: `gunzipSync` now succeeds and yields the Marshal `\x04\x08`
  *    header). Prerelease = "version contains a letter".
- *  - `GET /<repo>/quick/Marshal.4.8/<name>-<ver>[-<platform>].gemspec.rz`: **`404 unknownPath`** (RPS-1233,
- *    grep- and live-confirmed: no backend class extends `AbstractRubyGemspecHandler`, even though the
- *    abstract handler/writer exist in `repsy-protocols/ruby`). Breaks `gem install`/`gem fetch`
- *    (H12/RPS-1233 via `gem`, confirmed live below), but -- per H1's refutation -- NOT `bundle install`.
+ *  - `GET /<repo>/quick/Marshal.4.8/<name>-<ver>[-<platform>].gemspec.rz`: `200`, a zlib-deflated
+ *    Marshal 4.8 `Gem::Specification` (`RubyGemspecHandler` extends `AbstractRubyGemspecHandler`,
+ *    RPS-1233, fixed -- confirmed live in `tests/ruby/publish-consume.spec.ts`'s `gem install`/`gem
+ *    fetch` tests). It now carries the gem's real runtime `dependencies` too (RPS-1554, fixed,
+ *    confirmed live in `tests/ruby/transitive-resolution.spec.ts`: inflate then `Marshal.load` --
+ *    with `require "rubygems"` so it deserialises as a real `Gem::Specification` -- in the Ruby
+ *    runner, never a hand-rolled TS Marshal parser); before RPS-1554 it always said
+ *    `dependencies = []`. Unknown coordinate -> `404`.
+ *  - `GET /<repo>/api/v1/dependencies?gems=a,b,c`: the LEGACY Marshal dependency-resolution route
+ *    (`AbstractRubyDependenciesHandler`, RPS-1554/RPS-1724, fixed -- before this handler existed the
+ *    request matched no route and answered `404 unknownPath`, so `RubyMarshalWriter.dumpDependencies`
+ *    was dead code with nothing serving it). `permission: READ`. `200
+ *    application/octet-stream`, a Marshal 4.8 Array of `{name:, number:, platform:, dependencies:}`
+ *    Hashes, one per non-yanked version across the requested names (a yanked version, an unknown
+ *    name, an empty or missing `gems` param each contribute nothing -- an empty Marshal array,
+ *    `200`, never an error); `dependencies` is `[[depName, depRequirement]]` for the RUNTIME
+ *    dependencies only (a development dependency is left out, like `/info`). The requirement string
+ *    here is `dep.getRequirements()` UNCHANGED -- Ruby's own comma-space join (`">= 1.0, < 2.0"`) --
+ *    unlike `/info`'s `CompactIndexFormatter`, which replaces `", "` with `"&"`; confirmed live in
+ *    `tests/ruby/transitive-resolution.spec.ts`. Bundler 2.x never calls this route (compact index /
+ *    `/info` instead); it is the legacy `gem`-CLI / third-party-tool path.
  *  - `DELETE /<repo>/api/v1/gems/yank` (form-encoded `gem_name`, `version`, optional `platform`
  *    default `ruby`): `WRITE` permission (RPS-1317, RPS-1424: it used to be `MANAGE`; ADMIN, a
  *    `USER`-role password and a read-write deploy token may yank, a read-only token gets `401`,
@@ -181,6 +199,17 @@ export function namesRelPath(): string {
 
 export function infoRelPath(name: string): string {
   return `info/${name}`;
+}
+
+/** `undefined` omits the `gems` query param entirely (a bare `GET /api/v1/dependencies`, never
+ *  requested by a real client but a route this handler must still answer); `[]` sends `?gems=`
+ *  (present but empty); a non-empty array is comma-joined, matching `gem dependency --remote`'s own
+ *  query. */
+export function dependenciesRelPath(gems?: string[]): string {
+  if (gems === undefined) {
+    return 'api/v1/dependencies';
+  }
+  return `api/v1/dependencies?gems=${gems.join(',')}`;
 }
 
 export function gemRelPath(filename: string): string {
@@ -512,6 +541,19 @@ export async function rawDownload(
   filename: string,
 ): Promise<RubyRawResponse> {
   return rawGet(repoName, credential, gemRelPath(filename));
+}
+
+/** Raw `GET /<repo>/api/v1/dependencies?gems=<gems>` (RPS-1554/RPS-1724): the legacy Marshal
+ *  dependency-resolution route `gem dependency --remote` calls. The body is `application/
+ *  octet-stream`, Ruby Marshal 4.8 -- decode it with `Marshal.load` in the Ruby runner container
+ *  (`ruby -e ...`, piped through `run()`), never with a hand-rolled TS Marshal parser (this file's
+ *  header). */
+export async function rawGetDependencies(
+  repoName: string,
+  credential: MaterializedCredential,
+  gems: string[],
+): Promise<RubyRawResponse> {
+  return rawGet(repoName, credential, dependenciesRelPath(gems));
 }
 
 /** `/versions`' body -> `{ [gemName]: { versionsCsv, md5 } }`. The `-` yanked-prefix and any

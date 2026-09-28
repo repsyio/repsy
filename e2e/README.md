@@ -4564,13 +4564,42 @@ same graph. Probed live: `/info` lists runtime dependencies only (`<b>:~> 1.0`, 
 `<version>-<platform> <deps>|checksum:...`), a yanked B version is skipped by a fresh resolution
 (RPS-1235), and a lockfile that already names a yanked version cannot be replayed on a machine that
 does not have it installed (Bundler looks locked versions up in the compact index, which omits yanked
-versions, as against rubygems.org), although the `.gem` file itself stays downloadable (RPS-1238). Not
-pinned, because they look like backend gaps: `quick/Marshal.4.8/*.gemspec.rz` is a stub without
-dependencies, so `gem dependency --remote` prints no dependency lines; and `RubyMarshalWriter.dumpDependencies`
-(the legacy `/api/v1/dependencies`) has no route. The gemspec of a platform gem is resolved against the
-stored rows and carries its platform (RPS-1553, fixed): a `gem install` of a platform gem for the runner's
-own platform succeeds directly and as a dependency, and `GET`/`HEAD` of the `.gemspec.rz` of a
-multi-segment platform (`x86_64-linux`, `arm64-darwin`) answer 200.
+versions, as against rubygems.org), although the `.gem` file itself stays downloadable (RPS-1238). The
+gemspec of a platform gem is resolved against the stored rows and carries its platform (RPS-1553,
+fixed): a `gem install` of a platform gem for the runner's own platform succeeds directly and as a
+dependency, and `GET`/`HEAD` of the `.gemspec.rz` of a multi-segment platform (`x86_64-linux`,
+`arm64-darwin`) answer 200.
+
+`tests/ruby/transitive-resolution.spec.ts`'s last `describe` block (RPS-1724, "happy flow 1") covers
+the LEGACY `GET /api/v1/dependencies` route (`RubyMarshalWriter.dumpDependencies`,
+`AbstractRubyDependenciesHandler`) that `gem dependency --remote` and some third-party tools still
+call -- never Bundler 2.x, which resolves through the compact index proven above and never this
+route. Repsy Cloud implements the SAME route with its own, separate handler
+(`RubyGemDependenciesStubProtocolMethodHandler`); this OS-side test is the ground truth a later
+Cloud-repo batch diffs Cloud's implementation against. Probed live (D-1..D-7, confirmed live):
+
+- **D-1**: `gem dependency <gem> --remote` prints the runtime dependency only. It has NO
+  `--development` flag at all (`gem help dependency`: only `--version`/`-v`, `--platform`,
+  `--prerelease`, `--reverse-dependencies`/`-R`, `--pipe`), so a development dependency can never
+  be requested through it, by any flag -- not merely omitted by default. `-v <version>` narrows
+  the query to that one version's own dependencies.
+- **D-2**: the route's body is `200 application/octet-stream` (never `text/plain`), a Marshal 4.8
+  Array of `{name:, number:, platform:, dependencies:}` Hashes, one per NON-YANKED published
+  version across the requested names -- RUNTIME dependencies only, as `[[depName,
+depRequirement]]`.
+- **D-3**: a multi-clause requirement is spelled with Ruby's own comma-space join (`">= 1.0, <
+2.0"`), NOT `/info`'s `&`-joined form -- `CompactIndexFormatter` replaces `", "` with `"&"` for
+  `/info`, but `RubyMarshalWriter` (this route) does not, so the two routes spell the same
+  requirement differently.
+- **D-4**: an unknown gem name, an empty `?gems=`, and no `gems` param at all each contribute
+  nothing: `200`, an empty Marshal array, never an error.
+- **D-5**: a yanked version is omitted, same as `/info`.
+- **D-6**: a private repo without a credential answers `401` (`RubyAuthPreProcessor`, skipped only
+  for a public-repo READ, same as every other read route).
+- **D-7**: `quick/Marshal.4.8/<gem>-<version>.gemspec.rz` (RPS-1554) now carries the gem's real
+  runtime `Gem::Dependency` entries too (development ones left out), where before it always said
+  `dependencies = []`; decoded the same way, inflate (zlib) then `Marshal.load` (`require
+"rubygems"` first) INSIDE the Ruby runner container, never a hand-rolled TS Marshal parser.
 
 ## Stack overlays
 
