@@ -35,7 +35,8 @@ import {
   rawStartUpload,
   rawUploadStatus,
 } from '../../src/clients/docker-raw.js';
-import { expect, optedIn, test } from '../../src/scenarios/fixtures.js';
+import { expect, test } from '../../src/scenarios/fixtures.js';
+import { optedIn } from '../../src/stack-overlays.js';
 import type { Seeder } from '../../src/seed/seeder.js';
 
 /** Helper to wait for a duration (in milliseconds) with a delay. */
@@ -44,12 +45,11 @@ async function waitMs(ms: number): Promise<void> {
 }
 
 test.describe('docker > abandoned upload cleanup', () => {
-  test.beforeEach(({ skip }) => {
-    // This suite only runs with the upload-ttl overlay, which provides a short TTL.
-    if (!optedIn('upload-ttl')) {
-      skip();
-    }
-  });
+  test.skip(
+    !optedIn('upload-ttl'),
+    'opt-in: needs a stack started with the short-TTL abandoned upload overlay (./run.sh local up --upload-ttl); run with ' +
+      'REPSY_E2E_UPLOAD_TTL=1 ./run.sh test (README "Abandoned upload cleanup")',
+  );
 
   test(
     'D-TTL1: an abandoned OCI blob upload is cleaned up after the TTL expires',
