@@ -21,8 +21,9 @@ import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.handlers.AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.util.unit.DataSize;
 
 @Component
 @NullMarked
@@ -32,9 +33,9 @@ public class NpmPackagePublishOrDeprecateProtocolMethodHandler
   public NpmPackagePublishOrDeprecateProtocolMethodHandler(
       @Qualifier("osNpmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
-      final ObjectMapper objectMapper,
-      final NpmProtocolProvider provider) {
+      final NpmProtocolProvider provider,
+      @Value("${repsy.npm.max-publish-size:500MB}") final DataSize maxPublishSize) {
 
-    super(basePathParser, npmProtocolFacade, objectMapper, provider);
+    super(basePathParser, npmProtocolFacade, provider, maxPublishSize.toBytes());
   }
 }

@@ -37,7 +37,27 @@ final class NpmPublishBodies {
       final String version,
       final Map<String, Object> extra) {
 
-    final var tarball = "tarball".getBytes(StandardCharsets.UTF_8);
+    return body(
+        objectMapper,
+        repoName,
+        packageName,
+        version,
+        extra,
+        "tarball".getBytes(StandardCharsets.UTF_8));
+  }
+
+  /**
+   * Same as {@link #body(ObjectMapper, String, String, String, Map)}, with an explicit tarball
+   * instead of a fixed tiny one, so a caller can grow the body past a size limit (RPS-1561).
+   */
+  static byte[] body(
+      final ObjectMapper objectMapper,
+      final String repoName,
+      final String packageName,
+      final String version,
+      final Map<String, Object> extra,
+      final byte[] tarball) {
+
     final var fileName =
         packageName.substring(packageName.indexOf('/') + 1) + "-" + version + ".tgz";
 

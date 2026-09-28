@@ -48,7 +48,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 /**
  * RPS-1289: the PUT handler takes a publish or a deprecate ({@code PUT /pkg}) and never the
@@ -60,6 +60,9 @@ import tools.jackson.databind.ObjectMapper;
 @DisplayName("AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler (RPS-1289, RPS-1424)")
 class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandlerTest {
 
+  /** Generous enough that none of the small bodies these tests send ever trip it. */
+  private static final long MAX_PUBLISH_BYTES = 1024L * 1024;
+
   @Mock private PathParser basePathParser;
   @Mock private NpmProtocolFacade facade;
   @Mock private NpmProtocolProvider provider;
@@ -70,9 +73,9 @@ class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandlerTest {
     TestHandler(
         final PathParser basePathParser,
         final NpmProtocolFacade facade,
-        final ObjectMapper objectMapper,
-        final NpmProtocolProvider provider) {
-      super(basePathParser, facade, objectMapper, provider);
+        final NpmProtocolProvider provider,
+        final long maxPublishBytes) {
+      super(basePathParser, facade, provider, maxPublishBytes);
     }
   }
 
@@ -91,7 +94,7 @@ class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandlerTest {
   }
 
   private AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler handler() {
-    return new TestHandler(this.basePathParser, this.facade, new ObjectMapper(), this.provider);
+    return new TestHandler(this.basePathParser, this.facade, this.provider, MAX_PUBLISH_BYTES);
   }
 
   private Optional<ProtocolContext> parse(final String relativePath) {
@@ -118,18 +121,25 @@ class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandlerTest {
     assertThat(this.parse(relativePath).isPresent()).isEqualTo(matches);
   }
 
-  private MockHttpServletResponse put(final String relativePath, final String body)
-      throws Exception {
+  private MockHttpServletResponse put(
+      final String relativePath, final String body, final long maxPublishBytes) throws Exception {
 
     final var request = new MockHttpServletRequest("PUT", "/npm" + relativePath);
     request.setContent(body.getBytes());
     final var response = new MockHttpServletResponse();
 
-    final var result = this.handler().handle(context(relativePath), request, response);
+    final var result =
+        new TestHandler(this.basePathParser, this.facade, this.provider, maxPublishBytes)
+            .handle(context(relativePath), request, response);
     response.setStatus(result.getStatusCode().value());
     this.lastResult = result;
 
     return response;
+  }
+
+  private MockHttpServletResponse put(final String relativePath, final String body)
+      throws Exception {
+    return this.put(relativePath, body, MAX_PUBLISH_BYTES);
   }
 
   private ResponseEntity<Object> lastResult;
@@ -185,6 +195,42 @@ class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandlerTest {
     assertThatThrownBy(() -> this.put("/left-pad", ""))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("npmPublishBodyEmpty");
+
+    verifyNoInteractions(this.facade);
+  }
+
+  @Test
+  @DisplayName("handle() refuses a body declared larger than the limit (RPS-1561)")
+  void handleRefusesADeclaredOversizedBody() {
+    final var body = "{\"versions\":{}}";
+
+    assertThatThrownBy(() -> this.put("/left-pad", body, body.getBytes().length - 1L))
+        .isInstanceOf(MaxUploadSizeExceededException.class);
+
+    verifyNoInteractions(this.facade);
+  }
+
+  @Test
+  @DisplayName("handle() refuses a body that outgrows the limit while it is read (RPS-1561)")
+  void handleRefusesABodyThatOutgrowsTheLimitWhileReading() {
+    // A body whose declared Content-Length understates its real size still cannot outgrow the
+    // limit: BoundedEntryReader stops at the first byte past it while the body is being read.
+    final var body = "{\"versions\":{}}";
+    final var request =
+        new MockHttpServletRequest("PUT", "/npm/left-pad") {
+          @Override
+          public long getContentLengthLong() {
+            return 1;
+          }
+        };
+    request.setContent(body.getBytes());
+    final var response = new MockHttpServletResponse();
+    final var handler =
+        new TestHandler(
+            this.basePathParser, this.facade, this.provider, body.getBytes().length - 1L);
+
+    assertThatThrownBy(() -> handler.handle(context("/left-pad"), request, response))
+        .isInstanceOf(MaxUploadSizeExceededException.class);
 
     verifyNoInteractions(this.facade);
   }

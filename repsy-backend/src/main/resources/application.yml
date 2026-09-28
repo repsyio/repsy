@@ -99,6 +99,12 @@ repsy:
     # prefix or cannot send those headers, so that clients fetch tarballs from where they found the
     # registry (RPS-1333). It is the REPO_BASE_URL of the web UI's config snippets.
     public-url: ${REPO_BASE_URL:}
+    # Largest npm publish body (the packument plus its base64-encoded tarball, so roughly 4/3 of the
+    # tarball's own size) a client may send. It is read whole as JSON to decode the tarball, which
+    # the multipart limits above do not apply to, so a larger one is answered with 413
+    # payloadTooLarge instead of Jackson's default string-length ceiling failing the parse with an
+    # unrelated 500 once the body passes about 95MB (RPS-1561).
+    max-publish-size: ${NPM_MAX_PUBLISH_SIZE:500MB}
   nuget:
     # The address the NuGet service index, registration and search name their URLs with, e.g.
     # https://repo.example.com (a path prefix is fine): every `@id` of /v3/index.json, the
