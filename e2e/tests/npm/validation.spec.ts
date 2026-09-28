@@ -43,6 +43,32 @@ import {
 } from '../../src/clients/npm-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { MaterializedCredential, World } from '../../src/scenarios/world.js';
+import type { Scenario } from '../../src/scenarios/types.js';
+
+const SCENARIO: Scenario = {
+  id: 'validation-edge-cases',
+  tags: [],
+  repo: { privateRepo: true },
+  credential: 'admin-password',
+  expect: { publish: 'ok', consume: 'ok' },
+};
+
+function worldFor(
+  repoName: string,
+  packageName: string,
+  version: string,
+  credential: MaterializedCredential = adminCredential(),
+): World {
+  const target = { packageName, version };
+  return {
+    scenario: SCENARIO,
+    protocol: 'npm',
+    repoName,
+    credential,
+    publishTarget: target,
+    consumeTarget: target,
+  };
+}
 
 test.describe('npm validation edge cases (RPS-1717)', () => {
   test('package name at 214 chars (max) succeeds', { tag: ['@negative'] }, async ({ seeder }) => {
@@ -178,25 +204,106 @@ test.describe('npm validation edge cases (RPS-1717)', () => {
     expect(packument2.status, `no packument under JSON name`).toBe(404);
   });
 
-  test.skip('unpublish: once removed, package stays gone (invariant check)', { tag: ['@negative'] }, async ({
+  test('unpublish: once removed, package stays gone (invariant check)', { tag: ['@negative'] }, async ({
     seeder,
   }) => {
-    // Skip for now - needs proper World fixture
+    const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
+    const packageName = `e2e-${seeder.runId}-unpublish-check`;
+    const version = npmAdapter.version('release');
+
+    // Publish a version
+    const world = worldFor(repo.name, packageName, version);
+    await npm.seedPublish(world);
+
+    // Verify it's published
+    const packument1 = await rawGetPackument(repo.name, adminCredential(), packageName);
+    expect(packument1.status, `packument before unpublish`).toBe(200);
+
+    // Unpublish it
+    const unpubResult = await npm.unpublish(world, `${packageName}@${version}`, { force: true });
+    expect(unpubResult.exitCode, `npm unpublish should succeed: ${unpubResult.command}`).toBe(0);
+
+    // Invariant: once unpublished, the package is gone and stays gone
+    const packument2 = await rawGetPackument(repo.name, adminCredential(), packageName);
+    expect(packument2.status, `packument after unpublish should be gone`).toBe(404);
+
+    // Check again to verify it stays gone (not a race condition where it reappears)
+    const packument3 = await rawGetPackument(repo.name, adminCredential(), packageName);
+    expect(packument3.status, `repeated GET after unpublish stays 404`).toBe(404);
   });
 
-  test.skip(
-    'unpublish race: concurrent unpublish of same version (one succeeds, one retries or both succeed)',
+  test(
+    'unpublish race: concurrent unpublish of same version (at least one succeeds)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
-      // Skip for now - needs proper World fixture
+      const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
+      const packageName = `e2e-${seeder.runId}-unpublish-race`;
+      const version = npmAdapter.version('release');
+
+      // Publish a version
+      const world = worldFor(repo.name, packageName, version);
+      await npm.seedPublish(world);
+
+      // Verify it's published
+      const packument1 = await rawGetPackument(repo.name, adminCredential(), packageName);
+      expect(packument1.status, `packument before race`).toBe(200);
+
+      // Race: fire two concurrent unpublish commands on the same version
+      // Invariant: at least one must succeed, and package must be gone after both complete
+      const race1 = npm.unpublish(world, `${packageName}@${version}`, { force: true });
+      const race2 = npm.unpublish(world, `${packageName}@${version}`, { force: true });
+
+      const [result1, result2] = await Promise.all([race1, race2]);
+
+      // At least one should succeed
+      expect(
+        result1.exitCode === 0 || result2.exitCode === 0,
+        `at least one unpublish should succeed: race1=${result1.exitCode}, race2=${result2.exitCode}`,
+      ).toBe(true);
+
+      // Invariant: after the race, the package is gone
+      const packument2 = await rawGetPackument(repo.name, adminCredential(), packageName);
+      expect(packument2.status, `packument after concurrent unpublish should be gone`).toBe(404);
     },
   );
 
-  test.skip(
+  test(
     'cross-user token revoke: after revocation, all requests with that token are refused',
     { tag: ['@negative'] },
     async ({ seeder }) => {
-      // Skip for now - needs proper World fixture
+      const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
+      const packageName = `e2e-${seeder.runId}-token-revoke`;
+
+      // Create a deploy token
+      const token = await seeder.createToken(repo.name, { readOnly: false });
+      const credential: MaterializedCredential = {
+        transport: 'basic',
+        username: token.username,
+        password: token.token,
+        kind: 'token',
+      };
+
+      const version = npmAdapter.version('release');
+      const world = worldFor(repo.name, packageName, version, credential);
+
+      // Publish with the valid token (should succeed)
+      await npm.seedPublish(world);
+
+      // Verify it's published and readable with valid token
+      const packument1 = await rawGetPackument(repo.name, credential, packageName);
+      expect(packument1.status, `packument GET with valid token`).toBe(200);
+
+      // Revoke the token immediately
+      await seeder.revokeNow(repo.name, token.id);
+
+      // After revocation, BOTH publish and read with that token should be refused
+      const publishResult = await npm.publish(world);
+      expect(publishResult.outcome, `publish with revoked token should be refused`).not.toBe('ok');
+
+      const packument2 = await rawGetPackument(repo.name, credential, packageName);
+      expect(packument2.status, `packument GET with revoked token should be refused (401)`).toBe(
+        401,
+      );
     },
   );
 });
