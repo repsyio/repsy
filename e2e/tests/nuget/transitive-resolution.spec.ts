@@ -454,9 +454,7 @@ test.describe('nuget transitive dependency resolution (real dotnet restore)', ()
       ];
       const leaf = await rawGetRegistrationLeaf(l.repoName, admin, f, '1.0.0');
       expect(leaf.status, 'GET registration leaf').toBe(200);
-      expect(parseLeafDependencyGroups(leaf.body), 'leaf dependencyGroups').toEqual(
-        expectedGroups,
-      );
+      expect(parseLeafDependencyGroups(leaf.body), 'leaf dependencyGroups').toEqual(expectedGroups);
       const index = await rawGetRegistrationIndex(l.repoName, admin, f);
       expect(index.status, 'GET registration index').toBe(200);
       expect(parseIndexDependencyGroups(index.body, '1.0.0'), 'index dependencyGroups').toEqual(

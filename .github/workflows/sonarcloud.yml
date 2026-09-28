@@ -3,13 +3,10 @@ name: SonarCloud Analysis
 permissions:
   contents: read
 
-# TEMPORARILY DISABLED while the backlog is worked through: the push trigger is commented out, so
-# main gets no SonarCloud analysis. Restore the block below to turn it back on.
 on:
-  # push:
-  #   branches:
-  #     - main
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   # The scan runs in the "analyze" job and reads this report; a project has one analysis per

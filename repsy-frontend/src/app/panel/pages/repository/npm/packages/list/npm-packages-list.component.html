@@ -71,8 +71,8 @@
   @if (!this.error) {
     @if (packages?.length > 0) {
       <!-- RPS-1669: the table and pager stay mounted through a reload (a page change, a delete) so the
-           control that had the keyboard focus survives; a busy overlay stands in for the old full-block
-           spinner instead of destroying and recreating everything underneath it. -->
+          control that had the keyboard focus survives; a busy overlay stands in for the old full-block
+          spinner instead of destroying and recreating everything underneath it. -->
       <div class="text-body1 relative" [attr.aria-busy]="loading ? 'true' : null">
         @if (loading) {
           <div

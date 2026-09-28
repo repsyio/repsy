@@ -56,8 +56,8 @@ class AdvisoryLookupServiceTest {
       """
       {"Results":[{"Target":"Node.js","Class":"lang-pkgs","Type":"node-pkg","Vulnerabilities":[
         {"VulnerabilityID":"CVE-2021-23337","PkgName":"lodash","InstalledVersion":"4.17.20",
-         "FixedVersion":"4.17.21","Status":"fixed","Severity":"HIGH",
-         "PrimaryURL":"https://avd.aquasec.com/nvd/cve-2021-23337","Description":"Command injection"}
+        "FixedVersion":"4.17.21","Status":"fixed","Severity":"HIGH",
+        "PrimaryURL":"https://avd.aquasec.com/nvd/cve-2021-23337","Description":"Command injection"}
       ]}]}
       """;
 

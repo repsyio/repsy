@@ -691,7 +691,9 @@ test.describe('cargo install and cargo add, as the panel advertises them', () =>
       expect(garbage.status, JSON.stringify(bad)).toBe(400);
       const detail = cargoErrorDetail(garbage.body);
       expect(detail, 'cargo error envelope').toContain('must be a whole number');
-      expect(garbage.body.toString('utf8'), 'no Java exception text').not.toContain('NumberFormatException');
+      expect(garbage.body.toString('utf8'), 'no Java exception text').not.toContain(
+        'NumberFormatException',
+      );
     }
   });
 });
