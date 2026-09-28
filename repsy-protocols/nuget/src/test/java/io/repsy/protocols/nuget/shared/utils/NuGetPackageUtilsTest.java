@@ -609,8 +609,8 @@ class NuGetPackageUtilsTest {
       final var legacy =
           """
           [{"packageId":"A","versionRange":"1.0","targetFramework":"net8.0"},
-           {"packageId":"B","versionRange":"","targetFramework":null},
-           {"packageId":"C","versionRange":"2.0","targetFramework":"net8.0"}]
+          {"packageId":"B","versionRange":"","targetFramework":null},
+          {"packageId":"C","versionRange":"2.0","targetFramework":"net8.0"}]
           """;
 
       assertThat(NuGetPackageUtils.parseDependencyGroupsJson(legacy, "Some.Package", "1.2.3"))

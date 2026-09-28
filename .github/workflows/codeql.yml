@@ -3,12 +3,10 @@ name: CodeQL
 permissions:
   contents: read
 
-# TEMPORARILY DISABLED for pull requests while the backlog is worked through: restore the
-# commented pull_request trigger below to turn it back on. The weekly scan is unchanged.
 on:
-  # pull_request:
-  #   branches:
-  #     - main
+  pull_request:
+    branches:
+      - main
   schedule:
     - cron: "30 2 * * 1"
 
