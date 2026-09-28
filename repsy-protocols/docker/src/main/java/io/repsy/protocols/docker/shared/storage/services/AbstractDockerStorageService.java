@@ -24,6 +24,7 @@ import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Collection;
@@ -31,11 +32,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
-@Slf4j
 @RequiredArgsConstructor
 @NullMarked
 public abstract class AbstractDockerStorageService<ID> implements DockerStorageService<ID> {
@@ -117,20 +116,24 @@ public abstract class AbstractDockerStorageService<ID> implements DockerStorageS
   @Override
   public long deleteManifest(final BaseRepoInfo<ID> repoInfo, final String manifestName) {
 
+    final var storagePath =
+        StoragePath.of(
+            repoInfo.getStorageKey(), Paths.get(MANIFESTS_PATH, manifestName).toString());
+
+    // The usage has to be known before the file is gone, so it can be refunded. A failure here
+    // must not delete the file (or let the caller's transaction, which already removed the row,
+    // commit): propagate it as unchecked so it rolls back the same way a failure from
+    // storageStrategy.delete already does (RPS-1463).
+    final long usage;
     try {
-      final var storagePath =
-          StoragePath.of(
-              repoInfo.getStorageKey(), Paths.get(MANIFESTS_PATH, manifestName).toString());
-
-      final var usage = this.storageStrategy.getFileUsage(storagePath, repoInfo.getName());
-
-      this.storageStrategy.delete(storagePath);
-
-      return usage;
+      usage = this.storageStrategy.getFileUsage(storagePath, repoInfo.getName());
     } catch (final IOException e) {
-      log.warn("Failed to delete manifest {} while calculating manifest usage", manifestName, e);
-      return 0L;
+      throw new UncheckedIOException(e);
     }
+
+    this.storageStrategy.delete(storagePath);
+
+    return usage;
   }
 
   @Override
