@@ -830,6 +830,52 @@ class AuthControllerIT extends AbstractIntegrationTest {
       expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(childRefreshToken));
     }
 
+    /**
+     * {@code RefreshTokenService.consume()} calls {@code repository.revokeFamily(...)} and then
+     * throws inside one {@code @Transactional} method, so Spring's default rollback-on-{@code
+     * RuntimeException} could in principle undo the revocation along with the throw (RPS-1682).
+     * {@link #rejectsReplayAndRevokesFamily} cannot catch that: every test method there runs inside
+     * one shared, rolled-back transaction, so {@code consume()}'s inner transaction only joins it
+     * (same physical connection) and never issues a real {@code ROLLBACK} mid-test; the uncommitted
+     * revocation stays visible to the later calls in that same test regardless of whether the fix
+     * is in place. This variant runs {@code NOT_SUPPORTED}, like {@code updatesLastLoginAt} above,
+     * so each MockMvc request opens and commits (or rolls back) its own real transaction, the way a
+     * production request does, and can actually observe whether the revocation survived the throw.
+     */
+    @Test
+    @DisplayName(
+        "really revokes the family on replay: the revocation survives, committed (RPS-1682)")
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void reallyRevokesFamilyOnReplayAcrossCommits() throws Exception {
+      final var hash = VALID_PASSWORD_HASH;
+      final var userId =
+          AuthControllerIT.this
+              .userTxService
+              .create(uniqueUsername("replaycommit"), UserRole.USER, hash)
+              .getId();
+      final var username =
+          AuthControllerIT.this.userRepository.findById(userId).orElseThrow().getUsername();
+
+      try {
+        final var loginBody =
+            expectSuccess(AuthControllerIT.this.login(username, VALID_PASSWORD), "loginSucceeded");
+        final String originalRefreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
+
+        final var firstRefreshBody =
+            expectSuccess(
+                AuthControllerIT.this.refreshWith(originalRefreshToken), "tokenRefreshed");
+        final String childRefreshToken = JsonPath.read(firstRefreshBody, "$.data.refreshToken");
+
+        // Replay the spent original token: refused, and must really revoke the whole family.
+        expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(originalRefreshToken));
+
+        // The still-unspent child must be refused too, in a separate, later request/transaction.
+        expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(childRefreshToken));
+      } finally {
+        AuthControllerIT.this.deleteCommittedUsers(List.of(userId));
+      }
+    }
+
     @Test
     @DisplayName("needs no Authorization header, and ignores an invalid one")
     void ignoresAuthorizationHeader() throws Exception {
