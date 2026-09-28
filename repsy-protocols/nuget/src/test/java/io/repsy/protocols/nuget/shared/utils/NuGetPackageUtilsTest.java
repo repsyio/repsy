@@ -834,6 +834,73 @@ class NuGetPackageUtilsTest {
     }
   }
 
+  @Nested
+  @DisplayName("symbol packages (RPS-1569)")
+  class SymbolPackages {
+
+    private static final String REFUSAL_MESSAGE =
+        "This is a NuGet symbol package (.snupkg); Repsy does not accept symbol packages.";
+
+    @Test
+    @DisplayName("refuses a nuspec whose packageTypes declare SymbolsPackage, with a 400")
+    void refusesSymbolsPackage() throws IOException {
+      final var nupkg =
+          nupkgWithNuspec(
+              """
+              <package><metadata><id>Some.Package</id><version>1.2.3</version>
+                <packageTypes><packageType name="SymbolsPackage" /></packageTypes>
+              </metadata></package>
+              """);
+
+      assertThatThrownBy(() -> NuGetPackageUtils.readNuspecMetadata(nupkg))
+          .isInstanceOfSatisfying(
+              ResponseStatusException.class,
+              e -> {
+                assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                assertThat(e.getReason()).isEqualTo(REFUSAL_MESSAGE);
+              });
+    }
+
+    @Test
+    @DisplayName("matches the packageType name case-insensitively")
+    void refusesSymbolsPackageRegardlessOfCase() throws IOException {
+      final var nupkg =
+          nupkgWithNuspec(
+              """
+              <package><metadata><id>Some.Package</id><version>1.2.3</version>
+                <packageTypes><packageType name="symbolspackage" /></packageTypes>
+              </metadata></package>
+              """);
+
+      assertThatThrownBy(() -> NuGetPackageUtils.readNuspecMetadata(nupkg))
+          .isInstanceOfSatisfying(
+              ResponseStatusException.class,
+              e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    @DisplayName("still publishes a package that declares a different packageType")
+    void acceptsOtherPackageTypes() throws IOException {
+      final var nupkg =
+          nupkgWithNuspec(
+              """
+              <package><metadata><id>Some.Package</id><version>1.2.3</version>
+                <packageTypes><packageType name="Dependency" /></packageTypes>
+              </metadata></package>
+              """);
+
+      assertThat(NuGetPackageUtils.readNuspecMetadata(nupkg).packageId()).isEqualTo("Some.Package");
+    }
+
+    @Test
+    @DisplayName("still publishes a package with no packageTypes element at all")
+    void acceptsAbsentPackageTypes() throws IOException {
+      final var nupkg = nupkg("Some.Package", "1.2.3");
+
+      assertThat(NuGetPackageUtils.readNuspecMetadata(nupkg).packageId()).isEqualTo("Some.Package");
+    }
+  }
+
   private static NuGetRegistrationLeafItem leafItem(final String version) {
     final var entry =
         new NuGetCatalogEntry(
