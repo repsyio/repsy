@@ -203,7 +203,9 @@ describe('DockerImagesTagListComponent', () => {
     it('leaves for the image list when the image is gone, without a toast of its own', fakeAsync(() => {
       openEmpty('gone');
 
-      expect(router.navigate).toHaveBeenCalledOnceWith([`/${REPO_NAME}`]);
+      // The redirect REPLACES this entry (RPS-1693, the same class RPS-1650 fixed elsewhere): pushed on top of
+      // it, Back returned to the gone image's page, whose refresh 404s again, and Back could never leave it.
+      expect(router.navigate).toHaveBeenCalledOnceWith([`/${REPO_NAME}`], { replaceUrl: true });
       expect(component.hasNoTags).toBeFalse();
       expect(component.loadingSummary).toBeFalse();
     }));
@@ -217,7 +219,8 @@ describe('DockerImagesTagListComponent', () => {
       flushMicrotasks();
 
       expect(fixture.component.loading).toBeFalse();
-      expect(router.navigate).toHaveBeenCalledOnceWith([`/${REPO_NAME}`]);
+      // Same reasoning as the summary 404 above: replace, don't push, so Back leaves the gone image (RPS-1693).
+      expect(router.navigate).toHaveBeenCalledOnceWith([`/${REPO_NAME}`], { replaceUrl: true });
       expect(dockerService.fetchImageSummary).not.toHaveBeenCalled();
     }));
 
