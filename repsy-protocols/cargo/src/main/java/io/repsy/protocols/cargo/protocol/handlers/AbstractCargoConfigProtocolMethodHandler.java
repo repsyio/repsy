@@ -21,6 +21,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.ForwardedHostUtils;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -37,6 +38,9 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @NullMarked
 public abstract class AbstractCargoConfigProtocolMethodHandler implements ProtocolMethodHandler {
+
+  private static final int PORT_HTTP = 80;
+  private static final int PORT_HTTPS = 443;
 
   private final PathParser basePathParser;
 
@@ -84,8 +88,7 @@ public abstract class AbstractCargoConfigProtocolMethodHandler implements Protoc
     try {
       final var path = request.getServletPath();
       final var basePath = path.substring(0, path.lastIndexOf("/config.json"));
-      final var baseUrl =
-          ServletUriComponentsBuilder.fromCurrentContextPath().path(basePath).toUriString();
+      final var baseUrl = this.resolveBaseUrl(request, basePath);
 
       final var jsonConfig = this.getJsonConfig(context, baseUrl);
 
@@ -96,6 +99,34 @@ public abstract class AbstractCargoConfigProtocolMethodHandler implements Protoc
     } catch (final Exception e) {
       return this.buildCargoErrorResponse(e.getMessage());
     }
+  }
+
+  /**
+   * The base URL of {@code config.json}'s {@code dl}/{@code api} fields, built from the current
+   * request. RPS-1515: {@code ServletUriComponentsBuilder} reads the port off {@code
+   * HttpServletRequest#getServerPort()}, which Tomcat's {@code RemoteIpValve} (wired up by {@code
+   * server.forward-headers-strategy: native}) leaves at the scheme's default when a reverse proxy
+   * sent {@code X-Forwarded-Host} with an embedded port but no separate {@code X-Forwarded-Port}.
+   * Recover that port from the raw header before it is dropped.
+   */
+  private String resolveBaseUrl(final HttpServletRequest request, final String basePath) {
+
+    final var builder = ServletUriComponentsBuilder.fromCurrentContextPath();
+    final var scheme = request.getScheme();
+    final var port =
+        ForwardedHostUtils.resolvePort(
+            request.getHeader(ForwardedHostUtils.X_FORWARDED_HOST),
+            request.getHeader(ForwardedHostUtils.X_FORWARDED_PORT),
+            request.getServerPort());
+
+    if (("http".equals(scheme) && port != PORT_HTTP)
+        || ("https".equals(scheme) && port != PORT_HTTPS)) {
+      builder.port(port);
+    } else {
+      builder.port(-1);
+    }
+
+    return builder.path(basePath).toUriString();
   }
 
   private String getJsonConfig(final ProtocolContext context, final String baseUrl) {
