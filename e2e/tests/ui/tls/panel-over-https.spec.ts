@@ -35,7 +35,6 @@ import { TRUST_VARIABLES } from '../../../src/clients/client-env.js';
 import { env } from '../../../src/env.js';
 import { optedIn } from '../../../src/stack-overlays.js';
 import { RepoType } from '../../../src/api/panel-api.js';
-import { pinFirefoxWebLockRefresh } from '../../../src/ui/browser-gaps.js';
 import { copiedText, allowClipboard } from '../../../src/ui/clipboard.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
@@ -140,11 +139,13 @@ test.describe('The panel over https', { tag: ['@tls'] }, () => {
   // The two-tab refresh lock (RPS-1621) has two implementations: Web Locks in a secure context, a localStorage
   // entry without them (a plain-HTTP install on a LAN address). tests/ui/auth/multi-tab.spec.ts runs the first on
   // `localhost`, which is a secure context only by exception; here it is a real https origin.
+  //
+  // RPS-1672: used to be pinned to fail on Firefox for the same reason as multi-tab.spec.ts's Web Locks
+  // variant (see the comment there) -- Firefox's asynchronous `localStorage` replication between tabs, now
+  // covered by `AuthService`'s BroadcastChannel hand-over.
   test('TLS-04 two tabs whose access tokens expire together make one refresh between them (Web Locks, https)', async ({
     adminPage,
-    browserName,
   }) => {
-    pinFirefoxWebLockRefresh(browserName);
     const tabA = adminPage;
     const tabB = await tabA.context().newPage();
     await new DashboardPage(tabA).goto();

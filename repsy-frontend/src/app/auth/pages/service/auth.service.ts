@@ -42,6 +42,29 @@ const SESSION_KEYS = [USERNAME_KEY, TOKEN_KEY, REFRESH_TOKEN_KEY];
 /** Name of the Web Lock that lets one tab at a time spend the (single-use) refresh token. */
 const REFRESH_LOCK = 'repsy-refresh';
 
+/** Name of the BroadcastChannel a tab announces its rotated (or freshly logged-in) session pair on. */
+const SESSION_CHANNEL_NAME = 'repsy-session';
+
+/** What `_update` announces on {@link SESSION_CHANNEL_NAME}: the pair it just stored. */
+interface SessionBroadcastMessage {
+  readonly type: 'session';
+  readonly username: string;
+  readonly token: string;
+  readonly refreshToken: string;
+}
+
+/**
+ * How long `_refreshOnce` waits, once it holds the Web Lock and still sees the token it is about to
+ * spend, for another tab's BroadcastChannel hand-over of a pair that tab may already be rotating
+ * (RPS-1672). Firefox replicates `localStorage` between tabs asynchronously (a probe found 17 of 20
+ * first reads right after another tab released the Web Lock still returned the OLD value there, none in
+ * Chromium or WebKit), so the plain `localStorage` re-read `_syncFromStorage` does can lose that race.
+ * The BroadcastChannel message carries the rotated pair directly instead of relying on that replication
+ * timing, and {@link onBroadcast} resolves the wait the moment it arrives; this bound only matters when
+ * nothing was actually racing, so it is generous rather than tight.
+ */
+const HANDOVER_WAIT_MS = 150;
+
 /**
  * The same mutual exclusion where `navigator.locks` does not exist (it needs a secure context, and a
  * self-hosted Repsy is often served over plain HTTP): a `localStorage` entry `<tab id>:<expiry>`, taken
@@ -81,7 +104,11 @@ function sleep(ms: number): Promise<void> {
  * - a refresh takes a cross-tab lock (the Web Lock {@link REFRESH_LOCK}, or a `localStorage` one where the
  *   browser has no `navigator.locks`, see {@link REFRESH_LOCK_KEY}) and, holding it, first re-reads the
  *   storage: when another tab has rotated the tokens since the caller's copy was made, that tab's pair
- *   is adopted and no refresh call is made.
+ *   is adopted and no refresh call is made. On the Web Lock path that re-read is backed up by a
+ *   BroadcastChannel hand-over ({@link SESSION_CHANNEL_NAME}, {@link HANDOVER_WAIT_MS}): the tab that
+ *   rotates the pair announces it on the channel, so a tab that still sees its own spent token right
+ *   after acquiring the lock gets a short, bounded chance to adopt the announced pair instead of reading
+ *   a `localStorage` that has not caught up yet (RPS-1672, Firefox only).
  */
 @Injectable({
   providedIn: 'root',
@@ -94,6 +121,9 @@ export class AuthService {
   private readonly _authenticated$ = new BehaviorSubject<boolean>(false);
   private readonly _sessionEndedElsewhere$ = new Subject<void>();
   private readonly tabId = randomTabId();
+  private readonly channel: BroadcastChannel | null;
+  /** Resolvers of a pending {@link _waitForHandover}, woken as soon as {@link onBroadcast} adopts a pair. */
+  private readonly handoverWaiters = new Set<() => void>();
 
   /**
    * Whether a session exists, emitted again whenever that changes (login, logout). Views that
@@ -113,15 +143,34 @@ export class AuthService {
     }
   };
 
+  /** Adopts the pair another tab announced (RPS-1672): see the class doc and {@link HANDOVER_WAIT_MS}. */
+  private readonly onBroadcast = (event: MessageEvent<SessionBroadcastMessage>): void => {
+    const message = event.data;
+    if (!message || message.type !== 'session') {
+      return;
+    }
+    this._username = message.username;
+    this._accessToken = message.token;
+    this._refreshToken = message.refreshToken;
+    this._authenticated$.next(this.isAuthenticated());
+    this.handoverWaiters.forEach((wake) => wake());
+  };
+
   constructor(
     private readonly authControllerService: AuthControllerService,
     @Inject(PLATFORM_ID) platformId: object,
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
+    this.channel =
+      this.isBrowser && typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(SESSION_CHANNEL_NAME) : null;
     if (this.isBrowser) {
       this._readStorage();
       window.addEventListener('storage', this.onStorage);
       inject(DestroyRef).onDestroy(() => window.removeEventListener('storage', this.onStorage));
+    }
+    if (this.channel) {
+      this.channel.addEventListener('message', this.onBroadcast);
+      inject(DestroyRef).onDestroy(() => this.channel!.close());
     }
     this._authenticated$.next(this.isAuthenticated());
   }
@@ -202,6 +251,12 @@ export class AuthService {
       localStorage.setItem(USERNAME_KEY, this._username);
       localStorage.setItem(TOKEN_KEY, this._accessToken);
       localStorage.setItem(REFRESH_TOKEN_KEY, this._refreshToken);
+      this.channel?.postMessage({
+        type: 'session',
+        username: this._username,
+        token: this._accessToken,
+        refreshToken: this._refreshToken,
+      } satisfies SessionBroadcastMessage);
     }
     this._authenticated$.next(this.isAuthenticated());
   }
@@ -264,8 +319,17 @@ export class AuthService {
    * session, so its pair is adopted instead of spending a token that is not ours to spend any more.
    */
   private async _refreshOnce(spentBefore: string): Promise<string | null> {
-    if (this.isBrowser) {
+    // Skipped once something has already moved this tab past `spentBefore` (a broadcast that arrived
+    // while this tab was still queued for the lock, see `onBroadcast`): re-reading storage at that point
+    // could only replace a value already known good with a `localStorage` that has not caught up yet
+    // (RPS-1672, Firefox).
+    if (this.isBrowser && this._refreshToken === spentBefore) {
       this._syncFromStorage();
+    }
+    // Only the Web Lock path needs the hand-over: the `localStorage` lock's own settle delay already
+    // covers the plain-HTTP case (RPS-1672; see the class doc and `HANDOVER_WAIT_MS`).
+    if (this.isBrowser && navigator.locks && this._refreshToken === spentBefore) {
+      await this._waitForHandover(spentBefore);
     }
     if (!this._refreshToken) {
       return null;
@@ -284,5 +348,25 @@ export class AuthService {
       ),
       { defaultValue: null },
     );
+  }
+
+  /**
+   * Waits, bounded by {@link HANDOVER_WAIT_MS}, for {@link onBroadcast} to adopt another tab's rotated
+   * pair. Resolves at once if there is no channel (an old browser) or the token has already changed by
+   * the time it is called (the broadcast, or a `storage` event, got here first).
+   */
+  private _waitForHandover(spentBefore: string): Promise<void> {
+    if (!this.channel || this._refreshToken !== spentBefore) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      const wake = (): void => {
+        clearTimeout(timer);
+        this.handoverWaiters.delete(wake);
+        resolve();
+      };
+      const timer = setTimeout(wake, HANDOVER_WAIT_MS);
+      this.handoverWaiters.add(wake);
+    });
   }
 }

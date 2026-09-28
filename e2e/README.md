@@ -5424,14 +5424,16 @@ tests, PostgreSQL stack, plain HTTP and https):
   them in Chromium and reads the clipboard back; elsewhere it records what the page passed to
   `navigator.clipboard.writeText()` and returns the last value. That proves the copy button copied the right text; only
   the Chromium run proves it reached the clipboard. PKG-*-01 and TOK-01 use it.
-- **Two tabs and the Web Locks refresh: a product defect, pinned.** In Firefox `localStorage` is replicated between
-  tabs (content processes) asynchronously: probed, 17 of 20 first reads right after another tab's Web Lock was released
-  returned the OLD value (Chromium and WebKit: 0). `AuthService` re-reads the session inside the refresh lock to adopt the pair
-  another tab rotated, so in Firefox the second tab refreshes with a spent token (2 refresh calls, not 1), and the
-  backend answers a spent token by revoking the family: both tabs logged out (RPS-1621's failure, back in one engine). The plain-HTTP
-  `localStorage` lock is not affected (its settle delay covers it). It fails the Web Locks case of
-  `tests/ui/auth/multi-tab.spec.ts` and TLS-04 in Firefox and is pinned with `test.fail` through `pinFirefoxWebLockRefresh`
-  (`src/ui/browser-gaps.ts`), so it turns red the day it is fixed. No ticket key exists yet: see the PR of RPS-1651.
+- **Two tabs and the Web Locks refresh: a product defect, fixed (RPS-1672).** In Firefox `localStorage` is replicated
+  between tabs (content processes) asynchronously: probed, 17 of 20 first reads right after another tab's Web Lock was
+  released returned the OLD value (Chromium and WebKit: 0). `AuthService` re-read the session inside the refresh lock to
+  adopt the pair another tab rotated, so in Firefox the second tab refreshed with a spent token (2 refresh calls, not 1),
+  and the backend answered a spent token by revoking the family: both tabs logged out (RPS-1621's failure, back in one
+  engine). The plain-HTTP `localStorage` lock was not affected (its settle delay covers it). This failed the Web Locks
+  case of `tests/ui/auth/multi-tab.spec.ts` and TLS-04 in Firefox and was pinned with `test.fail` through
+  `pinFirefoxWebLockRefresh` (`src/ui/browser-gaps.ts`); `AuthService` now backs the storage re-read up with an explicit
+  `BroadcastChannel` announcement of the rotated pair (bounded, so a genuinely spent token still refreshes normally), the
+  pin is gone, and both tests pass in Firefox.
 - **Requests cancelled by a navigation.** PKG-*-01 goes to another page while the detail page's scan requests are still in
   flight. WebKit fires the `error` event of every XHR a navigation cancels, in the document that is going away, and the panel
   answers a status 0 with its "Connection error" toast and a `console.error`; Chromium says nothing. Firefox logs a font
@@ -5464,8 +5466,8 @@ whole suite with `REPSY_UI_BROWSER_GREP=.` to see what is left), and mobile emul
   every request the panel makes afterwards goes to that https origin.
 - **TLS-03** the install snippet copies through `navigator.clipboard` (a secure context has it) and the npmrc snippet names the
   https repo URL. **TLS-04** the two-tab refresh under a Web Lock on a real https origin (`localhost` is a secure context only by
-  exception; this is the case a production https install is in): one refresh between two tabs, in Chromium and WebKit; Firefox is
-  the pinned defect above.
+  exception; this is the case a production https install is in): one refresh between two tabs, in all three engines (RPS-1672,
+  the fixed defect above).
 - RPS-1559 (the https connectors and `%2F` in a path, npm scoped packages) is fixed on main, so the leg has nothing to pin
   there: no `test.fail` for it remains on the TLS stack.
 

@@ -671,5 +671,89 @@ describe('AuthService', () => {
         expect(refreshToken).toHaveBeenCalledTimes(2);
       });
     });
+
+    // RPS-1672: Firefox replicates `localStorage` between tabs asynchronously, so a tab that just got the
+    // Web Lock can still read its own spent token for a few milliseconds after another tab rotated it and
+    // released the lock. `_syncFromStorage` cannot see that (it is a plain, synchronous read in this spec,
+    // same as real Chromium/WebKit), so these drive the hand-over through a real BroadcastChannel instead,
+    // the way the two engines actually differ.
+    describe('the broadcast channel hand-over', () => {
+      let announcer: BroadcastChannel;
+
+      beforeEach(() => {
+        announcer = new BroadcastChannel('repsy-session');
+      });
+
+      afterEach(() => announcer.close());
+
+      it('adopts a pair another tab announces while still holding the spent token, without calling the API', async () => {
+        seedStorage(SESSION);
+        const service = createService();
+
+        const refreshed = firstValueFrom(service.refreshToken());
+        // Nothing was ever written to storage: only the announcement tells this tab about the rotation.
+        announcer.postMessage({ type: 'session', username: 'alice', token: 'access-2', refreshToken: 'refresh-2' });
+
+        expect(await refreshed).toBe('access-2');
+        expect(refreshToken).not.toHaveBeenCalled();
+        expect(service.accessToken).toBe('access-2');
+        expect(service.username).toBe('alice');
+      });
+
+      it('still emits isAuthenticated$ once for an adopted announcement', async () => {
+        seedStorage(SESSION);
+        const service = createService();
+        const states: boolean[] = [];
+        service.isAuthenticated$.subscribe((state) => states.push(state));
+
+        const refreshed = firstValueFrom(service.refreshToken());
+        announcer.postMessage({ type: 'session', username: 'alice', token: 'access-2', refreshToken: 'refresh-2' });
+        await refreshed;
+
+        expect(states).toEqual([true]);
+      });
+
+      it('refreshes normally, once, when nothing is announced before the hand-over window elapses', async () => {
+        seedStorage(SESSION);
+        refreshToken.and.returnValue(of(response(ROTATED)));
+        const service = createService();
+
+        expect(await firstValueFrom(service.refreshToken())).toBe('access-2');
+
+        expect(refreshToken).toHaveBeenCalledOnceWith({ refreshToken: 'refresh-1' });
+      });
+
+      it('ignores an announcement of a different shape', async () => {
+        seedStorage(SESSION);
+        refreshToken.and.returnValue(of(response(ROTATED)));
+        const service = createService();
+
+        announcer.postMessage({ type: 'something-else' });
+        announcer.postMessage(null);
+
+        expect(await firstValueFrom(service.refreshToken())).toBe('access-2');
+        expect(refreshToken).toHaveBeenCalledOnceWith({ refreshToken: 'refresh-1' });
+      });
+
+      it('does not react to an announcement once the service is destroyed', async () => {
+        seedStorage(SESSION);
+        const service = createService();
+        TestBed.resetTestingModule();
+
+        announcer.postMessage({ type: 'session', username: 'eve', token: 'access-9', refreshToken: 'refresh-9' });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        expect(service.accessToken).toBe('access-1');
+      });
+
+      it('does not react to an announcement when not running in a browser', async () => {
+        const service = createService('server');
+
+        announcer.postMessage({ type: 'session', username: 'eve', token: 'access-9', refreshToken: 'refresh-9' });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        expect(service.isAuthenticated()).toBeFalse();
+      });
+    });
   });
 });

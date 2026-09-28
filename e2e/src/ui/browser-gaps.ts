@@ -18,24 +18,10 @@
  * Differences of the panel between browsers that are product defects, pinned instead of hidden (RPS-1651).
  * A pin is `test.fail`: the test fails inside while the defect exists (Playwright reports an expected failure)
  * and fails with "Expected to fail, but passed" when it is fixed, which is the moment to delete the pin.
+ *
+ * Nothing is pinned here right now: the one entry this file held, the Firefox stale-`localStorage` read in
+ * the two-tab refresh lock (RPS-1672), was fixed and removed. See
+ * `tests/ui/auth/multi-tab.spec.ts` and `tests/ui/tls/panel-over-https.spec.ts` for the comments that still
+ * cite it where the pin used to be, and add the next `test.fail` entry here rather than inline when one is
+ * needed again.
  */
-import { test } from '@playwright/test';
-
-/**
- * Firefox replicates `localStorage` between tabs (content processes) asynchronously: a value one tab wrote
- * is read as missing by another tab for a few milliseconds, also right after the other tab released a Web
- * Lock (probed: 17 of 20 first reads right after the lock was granted returned the OLD value in Firefox, none
- * in Chromium and WebKit). `AuthService` re-reads the session from `localStorage` once it holds the refresh
- * lock, and adopts the pair another tab rotated instead of spending the spent refresh token; in Firefox that
- * read is stale, so the second tab refreshes with the spent token (two refresh calls instead of one), which
- * the backend answers by revoking the whole token family: both tabs are logged out. The `localStorage` lock
- * of a plain-HTTP origin is not affected (its settle delay covers it). The Karma spec of `AuthService` cannot
- * see it, no other engine shows it.
- */
-export const FIREFOX_STALE_LOCALSTORAGE_IN_REFRESH_LOCK =
-  'RPS-1672: Firefox: localStorage is replicated between tabs asynchronously, so a tab that just got the Web Lock re-reads a stale session and refreshes with a spent token';
-
-/** Marks the current test as an expected failure in Firefox, for the two-tab refresh under a Web Lock. */
-export function pinFirefoxWebLockRefresh(browserName: string): void {
-  test.fail(browserName === 'firefox', FIREFOX_STALE_LOCALSTORAGE_IN_REFRESH_LOCK);
-}

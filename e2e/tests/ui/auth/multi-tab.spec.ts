@@ -30,7 +30,6 @@
 import type { Page } from '@playwright/test';
 
 import { env } from '../../../src/env.js';
-import { pinFirefoxWebLockRefresh } from '../../../src/ui/browser-gaps.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
@@ -98,18 +97,21 @@ test.describe('AUTH-13 two tabs, one session', () => {
 
   // Web Locks exist only in a secure context: `localhost`, which the suite's stack is served from, has them, a
   // plain-HTTP install on any other host does not. `AuthService` locks with a `localStorage` entry there.
+  //
+  // RPS-1672: the Web Locks variant used to be pinned to fail on Firefox. Firefox replicates `localStorage`
+  // between tabs asynchronously, so a tab that had just been granted the Web Lock could still read its own
+  // spent refresh token for a few milliseconds (a probe found 17 of 20 first reads stale there, none in
+  // Chromium or WebKit); the second tab then refreshed with the already-spent token and the backend's
+  // single-use rotation revoked the whole family, logging both tabs out. `AuthService` now backs that
+  // re-read up with an explicit `BroadcastChannel` hand-over of the rotated pair instead of relying on
+  // `localStorage` replication timing.
   for (const { name, hasWebLocks } of [
     { name: 'Web Locks', hasWebLocks: true },
     { name: 'no Web Locks (plain HTTP)', hasWebLocks: false },
   ]) {
     test(`two tabs whose access tokens expire together make one refresh between them (${name})`, async ({
       adminPage,
-      browserName,
     }) => {
-      if (hasWebLocks) {
-        // RPS-1651: only the ui-firefox project can reach this (the test is not @smoke).
-        pinFirefoxWebLockRefresh(browserName);
-      }
       await withoutWebLocks(adminPage.context(), !hasWebLocks);
       const { tabA, tabB } = await openTwoTabs(adminPage);
       expect(await tabA.evaluate(() => 'locks' in navigator && !!navigator.locks)).toBe(
