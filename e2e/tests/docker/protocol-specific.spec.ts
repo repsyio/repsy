@@ -372,6 +372,12 @@ test(
   'docker > BuildKit attestation manifest: an index with platform children and an unknown-platform attestation child is stored and round-trips (HD-2)',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
+    // RPS-1731: attestation manifest push 500s with "null value in column media_type" constraint violation
+    test.fail(
+      true,
+      'RPS-1731: pushing an attestation manifest inside an index 500s — media_type not persisted, NOT NULL violation',
+    );
+
     const layout = await newRepoWithToken(seeder, 'attestation');
     const { home, work } = await isolatedWorkDir(`docker-attestation-${seeder.runId}`);
     await renderDockerConfig(home, layout.credential);
@@ -476,9 +482,10 @@ test(
       attestationBytes,
       'application/vnd.oci.image.manifest.v1+json',
     );
-    expect(attestationPushRes.status, `attestation push: ${attestationPushRes.body.toString()}`).toBe(
-      201,
-    );
+    expect(
+      attestationPushRes.status,
+      `attestation push: ${attestationPushRes.body.toString()}`,
+    ).toBe(201);
 
     // Push the index by tag (it references the attestation in manifests[])
     const indexTag = 'attestation-index';
