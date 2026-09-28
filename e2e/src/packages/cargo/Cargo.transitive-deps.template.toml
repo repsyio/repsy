@@ -1,0 +1,20 @@
+[package]
+name = "{{{crateName}}}"
+version = "{{{version}}}"
+edition = "2021"
+description = "Repsy e2e cargo crate with version-range dependencies (RPS-1721)"
+license = "MIT"
+publish = ["repsy"]
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+{{#deps}}
+{{{name}}} = { version = "{{{req}}}", registry = "repsy" }
+{{/deps}}
+{{#targetDeps}}
+
+[target.'cfg({{{cfg}}})'.dependencies]
+{{{name}}} = { version = "{{{req}}}", registry = "repsy" }
+{{/targetDeps}}

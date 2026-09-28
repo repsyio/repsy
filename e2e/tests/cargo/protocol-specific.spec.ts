@@ -97,10 +97,12 @@ import {
   rawDownload,
   rawGetIndex,
   rawOwners,
+  rawPublish,
   rawSearch,
   rawYank,
   sha256Hex,
 } from '../../src/clients/cargo-raw.js';
+import { clientEnv } from '../../src/clients/client-env.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Scenario } from '../../src/scenarios/types.js';
@@ -721,5 +723,278 @@ test(
         `app declares a dep on "${depName}". Got: ${JSON.stringify(appDeps)}`,
       ).toBeDefined();
     }
+  },
+);
+
+// ─── RPS-1721 (epic RPS-1712): newer sparse-index fields a newer cargo reads ─────────────────────
+//
+// `rust-version`, a renamed dependency (Cargo's `package = "..."` manifest key) and the `dev`/
+// `build` dependency `kind`s, published by a REAL `cargo publish` and read back off the served
+// sparse index (`CrateUtils.getIndexJsonLine`/`toIndexDep`). `renderCargoManifest`/`writeLibRs`/
+// `publishRealCrate`/`newRepoWithToken` above are reused as-is.
+//
+// **Probed live before this was written** (checked against this harness's pinned `rustc`,
+// `runners/cargo.Dockerfile`, this file's own header): does a real `cargo publish` of a manifest
+// using the `dep:` weak-dependency-feature syntax actually carry a `features2` field on the wire?
+// Confirmed live: YES, but EMPTY (`{}`) -- `dep:` alone is fully expressible in the v1 `features`
+// format (the feature itself is served there, unchanged), so cargo has nothing to put in v2's
+// payload; `CrateUtils.getIndexJsonLine`'s `v = features2 != null ? 2 : 1` mapping is presumably
+// written for crates.io's `?` weak-dependency-feature syntax, which a real client only emits a
+// non-empty `features2` for -- this manifest does not use it, and a separate, raw-HTTP test right
+// after this one exercises that `v=2` mapping directly and deterministically instead of depending
+// on a real client to trigger it. A second, unrelated finding surfaced while reading the served
+// entry: `features2` is served as `{}` even though `v` correctly stays `1` -- a backend quirk in
+// `CargoJsonConverter.jsonToFeatures` (repsy-backend), confirmed live and NOT fixed here; see the
+// comment at the assertion below.
+
+/** Confirms the runner's `rustc` is at least `minMajor.minMinor` before a test relies on a
+ *  `rust-version` manifest field it might not be new enough to honour. */
+async function assertRustcAtLeast(minMajor: number, minMinor: number): Promise<void> {
+  const { home } = await isolatedWorkDir('cargo-rustc-version');
+  const result = await run('rustc', ['-V'], {
+    cwd: home,
+    env: clientEnv(home, {}, ['RUSTUP_HOME']),
+    timeoutMs: 30_000,
+    label: 'rustc-V',
+  });
+  expect(result.exitCode, `rustc -V: ${result.command}`).toBe(0);
+  const match = result.stdout.match(/rustc (\d+)\.(\d+)\.(\d+)/);
+  expect(match, `rustc -V reports a parseable version. Got: "${result.stdout}"`).toBeDefined();
+  const major = Number(match![1]);
+  const minor = Number(match![2]);
+  expect(
+    major > minMajor || (major === minMajor && minor >= minMinor),
+    `the runner's rustc (${result.stdout.trim()}) must be at least ${minMajor}.${minMinor} to ` +
+      `publish rust-version = "${minMajor}.${minMinor}"`,
+  ).toBe(true);
+}
+
+/**
+ * The same wire layout as `cargo-raw.ts`'s `buildPublishBody`, plus an explicit `features2` field
+ * -- built locally, not in `cargo-raw.ts` (this file's RPS-1721 addition leaves `buildPublishBody`
+ * untouched), so the raw-probe test below can exercise `CrateUtils.getIndexJsonLine`'s `v =
+ * features2 != null ? 2 : 1` mapping directly and deterministically, independent of whatever a
+ * real `cargo publish` does or does not send.
+ */
+function buildPublishBodyWithFeatures2(opts: {
+  name: string;
+  version: string;
+  crateBytes: Buffer;
+  features2: Record<string, string[]>;
+}): Buffer {
+  const metadata = {
+    name: opts.name,
+    vers: opts.version,
+    deps: [] as unknown[],
+    features: {} as Record<string, unknown>,
+    authors: [] as string[],
+    description: `e2e ${opts.name}@${opts.version}`,
+    documentation: null,
+    homepage: null,
+    readme: null,
+    readme_file: null,
+    keywords: [] as string[],
+    categories: [] as string[],
+    license: 'MIT',
+    license_file: null,
+    repository: null,
+    badges: {} as Record<string, unknown>,
+    links: null,
+    features2: opts.features2,
+  };
+  const jsonBytes = Buffer.from(JSON.stringify(metadata), 'utf8');
+
+  const jsonLen = Buffer.alloc(4);
+  jsonLen.writeUInt32LE(jsonBytes.length, 0);
+  const crateLen = Buffer.alloc(4);
+  crateLen.writeUInt32LE(opts.crateBytes.length, 0);
+
+  return Buffer.concat([jsonLen, jsonBytes, crateLen, opts.crateBytes]);
+}
+
+test(
+  'cargo > publish records rust-version, a renamed dependency and dev/build dependency kinds (RPS-1721)',
+  { tag: ['@smoke'] },
+  async ({ seeder }) => {
+    await assertRustcAtLeast(1, 70);
+
+    const layout = await newRepoWithToken(seeder, 'richfields');
+    const admin = adminCredential();
+    // A fixed "1.0.0", NOT cargoAdapter.version('release') (`0.<seconds>.<seq>`, major always 0):
+    // the renamed/dev/build/optional dependencies below are declared with a "1" (^1) requirement,
+    // which only a major-1 published version satisfies.
+    const version = '1.0.0';
+
+    const realDepName = `${layout.packageName}_real`;
+    const devDepName = `${layout.packageName}_dev`;
+    const buildDepName = `${layout.packageName}_build`;
+    const optionalDepName = `${layout.packageName}_opt`;
+    const mainName = `${layout.packageName}_main`;
+    const renamedAs = 'foo';
+    const featureName = 'with_extra';
+
+    // Four ordinary, dependency-free registry crates: what the renamed/dev/build/optional
+    // dependencies below actually resolve against.
+    for (const depName of [realDepName, devDepName, buildDepName, optionalDepName]) {
+      const { home, work } = await isolatedWorkDir(`cargo-rf-${depName}`);
+      await renderCargoManifest('Cargo.template.toml', work, { crateName: depName, version });
+      await writeLibRs(work, `pub fn name() -> &'static str { "${depName}" }\n`);
+      await renderCargoConfig(work, layout.repoName);
+      const publish = await publishRealCrate(work, home, layout.credential, `cargo-rf-${depName}`);
+      expect(publish.exitCode, `cargo publish ${depName}: ${publish.command}`).toBe(0);
+    }
+
+    const { home: mainHome, work: mainWork } = await isolatedWorkDir(
+      `cargo-rf-main-${seeder.runId}`,
+    );
+    await renderCargoManifest('Cargo.rich-publish.template.toml', mainWork, {
+      crateName: mainName,
+      version,
+      rustVersion: '1.70',
+      featureName,
+      renamedAs,
+      renamedRealName: realDepName,
+      renamedReq: '1',
+      optionalDepName,
+      optionalDepReq: '1',
+      devDepName,
+      devDepReq: '1',
+      buildDepName,
+      buildDepReq: '1',
+    });
+    await writeLibRs(mainWork, `pub fn main_lib() -> &'static str { "${mainName}" }\n`);
+    await renderCargoConfig(mainWork, layout.repoName);
+    const mainPublish = await publishRealCrate(
+      mainWork,
+      mainHome,
+      layout.credential,
+      'cargo-rf-main',
+    );
+    expect(mainPublish.exitCode, `cargo publish main: ${mainPublish.command}`).toBe(0);
+
+    const indexRes = await rawGetIndex(layout.repoName, admin, mainName);
+    expect(indexRes.status, 'main is served in the sparse index').toBe(200);
+    const entry = parseIndex(indexRes.body).find((e) => e.vers === version);
+    expect(entry, `a main index entry for "${version}"`).toBeDefined();
+
+    expect(entry?.rust_version, 'the index entry records rust-version').toBe('1.70');
+
+    const renamedDep = entry?.deps.find((d) => d.name === renamedAs);
+    expect(
+      renamedDep,
+      `main declares a dep aliased "${renamedAs}". Got: ${JSON.stringify(entry?.deps)}`,
+    ).toBeDefined();
+    expect(renamedDep?.package, 'the renamed dep names the real crate under "package"').toBe(
+      realDepName,
+    );
+    expect(renamedDep?.kind, 'a plain [dependencies] entry is kind "normal"').toBe('normal');
+
+    const devDep = entry?.deps.find((d) => d.name === devDepName);
+    expect(devDep, `main declares a dev-dependency on "${devDepName}"`).toBeDefined();
+    expect(devDep?.kind, '[dev-dependencies] entries are served with kind "dev"').toBe('dev');
+
+    const buildDep = entry?.deps.find((d) => d.name === buildDepName);
+    expect(buildDep, `main declares a build-dependency on "${buildDepName}"`).toBeDefined();
+    expect(buildDep?.kind, '[build-dependencies] entries are served with kind "build"').toBe(
+      'build',
+    );
+
+    const optionalDep = entry?.deps.find((d) => d.name === optionalDepName);
+    expect(optionalDep, "main declares the dep: feature's optional dependency").toBeDefined();
+    expect(optionalDep?.optional, "the dep: feature's own dependency is optional").toBe(true);
+
+    // Probed live (this file's header): a real `cargo publish` of a manifest using the `dep:`
+    // syntax DOES send a `features2` field on the wire -- but EMPTY (`{}`), because `dep:` alone is
+    // fully expressible in the v1 `features` format (crates.io's real v2 payload is for the `?`
+    // weak-dependency-feature syntax, RFC 3143, which this manifest does not use); the served entry
+    // still stays at v=1 and the dep: feature itself is served in the plain `features` field,
+    // unchanged from the manifest.
+    expect(
+      entry?.v,
+      'a real cargo publish of a dep:-only feature sends an empty features2, so v stays 1',
+    ).toBe(1);
+    expect(
+      entry?.features[featureName],
+      'the dep: feature is served in the plain features field',
+    ).toEqual([`dep:${optionalDepName}`]);
+    // A backend quirk, confirmed live and NOT fixed here (RPS-1721 finding, see this file's
+    // header): `CargoJsonConverter.jsonToFeatures` (repsy-backend) collapses a stored NULL
+    // `features2` to `Collections.emptyMap()` -- the same coercion it correctly uses for the
+    // always-present `features` field -- so the served entry carries `"features2":{}` even at v=1,
+    // when `CrateIndexEntry`'s own `@JsonInclude(NON_NULL)` says an absent v2 payload should omit
+    // the field entirely. A real cargo client tolerates this fine (every real-client test in this
+    // file passes either way), so this is reported as a finding, not asserted as a requirement.
+    expect(
+      entry?.features2,
+      'features2 is always served as {} even at v=1 (the finding above)',
+    ).toEqual({});
+
+    // A fresh, separate consumer project resolves the renamed dependency correctly: Cargo.lock
+    // names the REAL crate, never the "foo" alias -- an alias is a source-level `extern crate`
+    // rename, not a Cargo.lock identity.
+    const { home: conHome, work: conWork } = await isolatedWorkDir(
+      `cargo-rf-consumer-${seeder.runId}`,
+    );
+    await renderCargoManifest('consumer-Cargo.template.toml', conWork, {
+      crateName: mainName,
+      version,
+    });
+    await writeLibRs(conWork, '');
+    await renderCargoConfig(conWork, layout.repoName);
+    const lockResult = await run('cargo', ['generate-lockfile'], {
+      cwd: conWork,
+      env: cargoEnv(conHome, layout.credential),
+      timeoutMs: 120_000,
+      redact: layout.credential.password ? [layout.credential.password] : [],
+      label: 'cargo-rf-generate-lockfile',
+    });
+    expect(lockResult.exitCode, `cargo generate-lockfile: ${lockResult.command}`).toBe(0);
+    const lockText = await fs.readFile(path.join(conWork, 'Cargo.lock'), 'utf8');
+    expect(
+      lockText.split('[[package]]').some((part) => part.includes(`name = "${realDepName}"`)),
+      'the consumer resolves the renamed dependency under its real crate name',
+    ).toBe(true);
+  },
+);
+
+test(
+  'cargo > a raw publish carrying features2 is served with v=2 (CrateUtils.getIndexJsonLine, RPS-1721)',
+  { tag: ['@smoke'] },
+  async ({ seeder }) => {
+    const layout = await newRepoWithToken(seeder, 'features2raw');
+    const admin = adminCredential();
+    const version = cargoAdapter.version('release');
+    const name = `${layout.packageName}_f2`;
+
+    const { home, work } = await isolatedWorkDir(`cargo-f2-${seeder.runId}`);
+    await renderCargoManifest('Cargo.template.toml', work, { crateName: name, version });
+    await writeLibRs(work, `pub fn name() -> &'static str { "${name}" }\n`);
+    await renderCargoConfig(work, layout.repoName);
+    const packaged = await run('cargo', ['package', '--no-verify', '--offline'], {
+      cwd: work,
+      env: cargoEnv(home, layout.credential),
+      timeoutMs: 60_000,
+      redact: layout.credential.password ? [layout.credential.password] : [],
+      label: 'cargo-f2-package',
+    });
+    expect(packaged.exitCode, `cargo package: ${packaged.command}`).toBe(0);
+    const crateBytes = await fs.readFile(
+      path.join(work, 'target', 'package', `${name}-${version}.crate`),
+    );
+
+    const body = buildPublishBodyWithFeatures2({
+      name,
+      version,
+      crateBytes,
+      features2: { extra: ['dep:bogus'] },
+    });
+    const rawRes = await rawPublish(layout.repoName, layout.credential, body);
+    expect(rawRes.status, `raw publish with features2: ${rawRes.body.toString('utf8')}`).toBe(200);
+
+    const indexRes = await rawGetIndex(layout.repoName, admin, name);
+    const entry = parseIndex(indexRes.body).find((e) => e.vers === version);
+    expect(entry, `an index entry for "${version}"`).toBeDefined();
+    expect(entry?.v, 'a publish carrying features2 is served with v=2').toBe(2);
+    expect(entry?.features2, 'features2 is served verbatim').toEqual({ extra: ['dep:bogus'] });
   },
 );

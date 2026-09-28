@@ -422,12 +422,45 @@ export function parseSearch(body: Buffer): ParsedSearchResult {
   return JSON.parse(body.toString('utf8')) as ParsedSearchResult;
 }
 
-/** One line of the sparse index's `text/plain` body, parsed (`CrateIndexEntry`'s JSON shape). */
+/**
+ * One `deps` entry of a served sparse-index `CrateIndexEntry` (`CrateIndexDep`'s JSON shape,
+ * RPS-1721): `name` is the alias a manifest declares for the dependency (`explicit_name_in_toml`
+ * when the manifest renames it, otherwise the crate's own name), and `package`, present only for a
+ * renamed dependency, is the real crate name (`CrateUtils.toIndexDep`). `kind` is `"normal"`,
+ * `"dev"` or `"build"`.
+ */
+export interface ParsedIndexDep {
+  name: string;
+  req: string;
+  features: string[];
+  optional: boolean;
+  default_features: boolean;
+  target?: string;
+  kind: string;
+  registry?: string;
+  package?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * One line of the sparse index's `text/plain` body, parsed (`CrateIndexEntry`'s JSON shape).
+ * `v`/`features2`/`rust_version` (RPS-1721): `v` is `1` unless the publish carried a `features2`
+ * (`CrateUtils.getIndexJsonLine`: `v = features2 != null ? 2 : 1`), in which case it is `2` and
+ * `features2` carries the modern (`dep:`/`?`-syntax) feature table; `rust_version` is the
+ * manifest's `package.rust-version`, omitted (`@JsonInclude(NON_NULL)`) when the crate declared
+ * none.
+ */
 export interface ParsedIndexEntry {
   name: string;
   vers: string;
+  deps: ParsedIndexDep[];
   cksum: string;
+  features: Record<string, string[]>;
   yanked: boolean;
+  links?: string;
+  v: number;
+  features2?: Record<string, string[]>;
+  rust_version?: string;
   [key: string]: unknown;
 }
 

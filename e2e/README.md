@@ -248,6 +248,7 @@ e2e/
       publish-consume.spec.ts   # registerPublishConsumeLoop(cargoAdapter) + a hyphenated-crate-name real-client test
       registry-rules.spec.ts    # raw-HTTP pins of the duplicate-version/version-validation/config.json/name-normalisation rules, HEAD mirroring GET (RPS-1465)
       install-add.spec.ts       # the commands the panel advertises: `cargo install` of a binary crate (built and run), `cargo add`, `cargo login`/`logout`, `cargo search --limit` (RPS-1486)
+      transitive-resolution.spec.ts # leaf -> mid -> root real `cargo generate-lockfile`/`cargo fetch --target`: highest ^1 leaf, a platform-independent Cargo.lock vs. a platform-specific --target fetch (RPS-1721)
     nuget/
       publish-consume.spec.ts   # registerPublishConsumeLoop(nugetAdapter) + api-key-only-push and mixed-case-id real-client tests
       registry-rules.spec.ts    # raw-HTTP pins of the 409/422 override & version-kind rules, service index, X-NuGet-ApiKey (H7), HEAD mirroring GET (RPS-1465)
@@ -2722,6 +2723,60 @@ in this registry"}"}`, since Repsy has no ownership model finer than the reposit
   from the workspace root, `--no-verify`: nothing here compiles)
   publishes cleanly member-by-member in dependency order; each member's served `deps` correctly names
   every crate it depends on.
+
+**Newer index fields a newer cargo reads (RPS-1721, epic RPS-1712).** Appended at the end of this
+file, plus a dedicated `tests/cargo/transitive-resolution.spec.ts`:
+
+- **Transitive resolution**: a `root` → `mid` → `leaf` chain in one repo (`mid` and `root` declare
+  a `^1` requirement, via a new `Cargo.transitive-deps.template.toml` that renders an arbitrary
+  version requirement instead of the catalog's exact `=<version>` pin), `leaf` published at 1.0.0,
+  1.2.0 and 2.0.0. A REAL `cargo generate-lockfile` against a separate consumer project (depending
+  on `root` alone) locks `leaf` at 1.2.0, the highest version satisfying `^1` (2.0.0 does not). `root`
+  also declares `[target.'cfg(windows)'.dependencies] win_only`; `Cargo.lock` locks it too even on
+  this non-Windows runner, confirmed live as CORRECT cargo behaviour (a lockfile is
+  platform-independent by design, holding every platform's dependencies) — not asserted as a bug. A
+  subsequent `cargo fetch --target <triple>` (the triple read live from `rustc -vV`'s own `host:`
+  line) then does NOT download `win_only`'s `.crate`, confirmed live that `--target` scopes a fetch
+  to one platform, unlike a plain `cargo fetch` with no `--target` (which fetches every platform and
+  was deliberately not what this test asserts against). Every published version's served index
+  `cksum` was also checked live against the sha256 of its raw-downloaded `.crate` bytes.
+- **`rust-version`, a renamed dependency and `dev`/`build` dependency kinds**: a real `cargo publish`
+  (manifest `rust-version = "1.70"`, checked live against the runner's own `rustc -V` first — see
+  `assertRustcAtLeast` — since this pins `rust:1.98.1-slim-bookworm`, well above it), a renamed
+  registry dependency (`foo = { package = "<real crate>", version = "1", registry = "repsy" }`) and
+  one `[dev-dependencies]`/`[build-dependencies]` entry each, published via a new
+  `Cargo.rich-publish.template.toml`. Confirmed live on the served sparse-index entry
+  (`CrateUtils.getIndexJsonLine`/`toIndexDep`, `CargoIndexDep`'s `package`/`kind` fields): `rust_version`
+  is `"1.70"`; the renamed dependency's `name` is the alias (`foo`) and its `package` is the real
+  crate name; the dev/build dependencies are served with `kind: "dev"`/`"build"` (a plain
+  `[dependencies]` entry stays `kind: "normal"`). A fresh, separate consumer project's own `cargo
+generate-lockfile` then resolves the renamed dependency correctly, locking it under its real crate
+  name (never the `foo` alias, which is a source-level `extern crate` rename, not a `Cargo.lock`
+  identity).
+- **`features2`/`v`, probed live, not assumed**: does a real `cargo publish` of a manifest that uses
+  the `dep:` weak-dependency-feature syntax (a feature gating an optional dependency, `with_extra =
+["dep:<crate>"]`) actually send a `features2` field on the wire at all? Confirmed live: **yes**, but
+  **empty** (`"features2":{}`) — `dep:` alone is fully expressible in the v1 `features` format (the
+  feature itself is served there, unmodified from the manifest: `{"with_extra":["dep:<crate>"]}`), so
+  cargo has nothing v2-specific to send; the served entry correctly stays at `v: 1`
+  (`CrateUtils.getIndexJsonLine`: `v = features2 != null ? 2 : 1`). crates.io's `?` weak-syntax (RFC
+  3143), which this manifest does not use, is presumably what a real client sends a non-empty
+  `features2` for. A separate, deterministic raw-HTTP test (`buildPublishBodyWithFeatures2`, built
+  locally in `protocol-specific.spec.ts`, not added to `cargo-raw.ts`'s own `buildPublishBody`) proves
+  the `v=2` mapping directly instead of depending on a real client to trigger it: a raw publish that
+  carries a non-null `features2` is served with `v: 2` and that `features2` verbatim.
+- **A second, unrelated finding, confirmed live and NOT fixed here**: the served entry's `features2`
+  field is **`{}` even when `v` is `1`** — `CargoJsonConverter.jsonToFeatures` (repsy-backend, the
+  MapStruct `@Named` method `CargoCrateConverter` calls for both `features` and `features2`) collapses
+  a stored `NULL` `features2` to `Collections.emptyMap()`, the coercion it correctly applies to the
+  always-present `features` field, but which is wrong for `features2`: `CrateIndexEntry.features2` is
+  `@Nullable` with `@JsonInclude(Include.NON_NULL)`, so an absent v2 payload should omit the field
+  entirely, not serve `{}`. A real cargo client tolerates this fine (every real-client test in this
+  suite, `cargo publish`/`fetch`/`generate-lockfile` alike, passes either way), so this is reported as
+  a finding, not fixed here (this step touches only `e2e/`).
+- `cargo-raw.ts`'s `ParsedIndexEntry`/new `ParsedIndexDep` gained typed `deps`, `features`, `v`,
+  `features2` and `rust_version` fields (previously reachable only through the loose `[key: string]:
+unknown` index signature); `parseIndex`'s own body is unchanged.
 
 ### Cargo install, add and login (RPS-1486)
 

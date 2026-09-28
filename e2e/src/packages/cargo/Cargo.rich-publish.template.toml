@@ -1,0 +1,25 @@
+[package]
+name = "{{{crateName}}}"
+version = "{{{version}}}"
+edition = "2021"
+description = "Repsy e2e crate publishing newer sparse-index fields (RPS-1721)"
+license = "MIT"
+rust-version = "{{{rustVersion}}}"
+publish = ["repsy"]
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+{{{featureName}}} = ["dep:{{{optionalDepName}}}"]
+
+[dependencies]
+{{{renamedAs}}} = { package = "{{{renamedRealName}}}", version = "{{{renamedReq}}}", registry = "repsy" }
+{{{optionalDepName}}} = { version = "{{{optionalDepReq}}}", registry = "repsy", optional = true }
+
+[dev-dependencies]
+{{{devDepName}}} = { version = "{{{devDepReq}}}", registry = "repsy" }
+
+[build-dependencies]
+{{{buildDepName}}} = { version = "{{{buildDepReq}}}", registry = "repsy" }
