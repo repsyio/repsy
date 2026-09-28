@@ -14,10 +14,10 @@
       <!-- Version badge -->
       <div
         data-testid="pkg-detail-version"
-        class="mb-4 inline-flex gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]"
+        class="mb-4 inline-flex min-w-0 items-center gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]"
       >
-        <img ngSrc="/assets/icons/cursor/tick.svg" alt="tick" height="12" width="16" />
-        {{ versionInfo.version }}
+        <img class="shrink-0" ngSrc="/assets/icons/cursor/tick.svg" alt="tick" height="12" width="16" />
+        <span class="break-all">{{ versionInfo.version }}</span>
       </div>
       <p data-testid="pkg-detail-published" class="font-courier mb-8 text-[12px] text-[#9C9C9D]">
         Published at: {{ versionInfo.createdAt | date: 'medium' }}
@@ -87,7 +87,7 @@
               class="flex items-center gap-3 border-b border-[#2A2A2A] p-4 last:border-0"
             >
               <span class="w-10 shrink-0 text-[12px] font-medium text-[#9FA0A0]">{{ endpoint.label }}</span>
-              <span class="flex-1 overflow-x-auto text-[13px] text-[#9C9C9D]">{{ endpoint.url }}</span>
+              <span class="min-w-0 flex-1 text-[13px] break-all text-[#9C9C9D]">{{ endpoint.url }}</span>
               <app-copy-clipboard [text]="endpoint.url" />
             </div>
           }
@@ -96,7 +96,7 @@
 
       <!-- Module path header block -->
       <div class="mb-8 rounded-lg bg-[#101112] p-[22px] text-[24px]">
-        <h3 data-testid="pkg-detail-name" class="text-neutral-200">{{ modulePath }}</h3>
+        <h3 data-testid="pkg-detail-name" class="break-all text-neutral-200">{{ modulePath }}</h3>
       </div>
 
       <!-- Metadata -->
@@ -104,7 +104,7 @@
       <div data-testid="pkg-detail-metadata" class="mb-8 flex flex-col gap-2 text-[14px]">
         <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
           <span class="text-white">Module Path: </span>
-          <span class="text-[#9C9C9D]">{{ modulePath }}</span>
+          <span class="break-all text-[#9C9C9D]">{{ modulePath }}</span>
         </div>
         <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
           <span class="text-white">Go Version: </span>

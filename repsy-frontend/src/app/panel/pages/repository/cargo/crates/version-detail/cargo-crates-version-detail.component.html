@@ -14,10 +14,10 @@
 
         <div
           data-testid="pkg-detail-version"
-          class="mb-4 inline-flex gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]"
+          class="mb-4 inline-flex min-w-0 items-center gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]"
         >
-          <img ngSrc="/assets/icons/cursor/tick.svg" alt="tick" height="12" width="16" />
-          {{ crateVersion.version }}
+          <img class="shrink-0" ngSrc="/assets/icons/cursor/tick.svg" alt="tick" height="12" width="16" />
+          <span class="break-all">{{ crateVersion.version }}</span>
           @if (crateVersion.yanked) {
             <span data-testid="pkg-detail-yanked" class="text-error-500 ml-1">(yanked)</span>
           }
@@ -85,14 +85,14 @@
         </div>
 
         <div class="mb-8 rounded-lg bg-[#101112] p-[22px] text-[24px]">
-          <h3 data-testid="pkg-detail-name" class="text-neutral-200">{{ packageName }}</h3>
+          <h3 data-testid="pkg-detail-name" class="break-all text-neutral-200">{{ packageName }}</h3>
         </div>
 
         <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Metadata</h2>
         <div data-testid="pkg-detail-metadata" class="mb-8 flex flex-col gap-2 text-[14px]">
           <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
             <span class="text-white">Crate: </span>
-            <span class="text-[#9C9C9D]">{{ crateVersion.name }}</span>
+            <span class="break-all text-[#9C9C9D]">{{ crateVersion.name }}</span>
           </div>
           <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
             <span class="text-white">Downloads: </span>

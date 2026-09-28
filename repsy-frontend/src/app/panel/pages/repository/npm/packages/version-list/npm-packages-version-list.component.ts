@@ -15,6 +15,7 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, ElementRef, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
@@ -211,10 +212,17 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
         next: (pagedData: PagedData<PackageVersionListItem>) => {
           this.pagedData.page = pagedData.page;
           this.versions = pagedData.content;
+          this.error = null;
           this.fetchPackageTags();
           restoreListFocus(previouslyFocused, this.elementRef.nativeElement);
         },
-        error: () => {},
+        // The error interceptor has already toasted the failure (RPS-1670): a package or repository
+        // deleted under this page must not leave its stale rows on screen, so the page keeps the
+        // error state, not the last data it had.
+        error: (err: HttpErrorResponse) => {
+          this.versions = undefined;
+          this.error = err.error?.text ?? 'Error Occurred';
+        },
       });
   }
 

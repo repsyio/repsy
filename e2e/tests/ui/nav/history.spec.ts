@@ -273,17 +273,18 @@ test.describe('Browser history: deleted things stay deleted', { tag: NAV }, () =
     seeder,
     pageErrors,
   }) => {
+    // RPS-1670 fixed the route resolver's own lookup (single-flight, silent), which used to fire about ten
+    // parallel "Repository not found" toasts here. Back still lands on the settings route with a cached repo
+    // type (canMatch answers from the cache, not a fresh 404), so the settings page itself mounts and its own
+    // data load - and the repo's permissions, for the sidebar/breadcrumb - are what answer 404 once each; that
+    // is a different pair of calls, not part of the resolver fix, and each still toasts or logs by design.
     pageErrors.allowToast(
       'Repository not found',
-      'known bug (see repo-management.spec.ts SET-05): an unknown repository route raises the toast several times',
+      'by design: the settings page mounts (its route type came from the cache) and its own data load 404s',
     );
-    // The same lookups, one of which is the repository's permissions: the deleted repository answers it 404 and
-    // the panel lets that reach its global error handler (a console error). Which of the lookups is still in
-    // flight when the route resolves to not-found depends on timing, so the test failed about one run in two
-    // on a busy runner (RPS-1652: the full UI suite on H2) and passed on its retry.
     pageErrors.allow(
       /Global error handler caught an error: Http failure response for \S+\/api\/repos\/[^/]+\/permissions: 404/,
-      'known bug (see repo-management.spec.ts SET-05): the lookups of an unknown repository route include its permissions, whose 404 is not handled',
+      'known bug: the lookups of an unknown repository route include its permissions, whose 404 is not handled',
     );
     const repo = await seeder.createRepo(RepoType.MAVEN);
     const repos = new RepositoriesPage(adminPage);
@@ -316,12 +317,7 @@ test.describe('Browser history: deleted things stay deleted', { tag: NAV }, () =
     test(`NAV-06: an unknown URL (${shape}) leaves no history entry of its own: Back leaves the 404 page`, async ({
       adminPage,
       seeder,
-      pageErrors,
     }) => {
-      pageErrors.allowToast(
-        'Repository not found',
-        'known bug (see repo-management.spec.ts SET-05): an unknown repository route raises the toast several times',
-      );
       const repos = new RepositoriesPage(adminPage);
       await repos.goto();
       const unknown = seeder.reserveRepoName(RepoType.MAVEN);

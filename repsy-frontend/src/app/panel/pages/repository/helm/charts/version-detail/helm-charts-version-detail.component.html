@@ -14,16 +14,18 @@
 
         <!-- Header -->
         <div class="mb-6 flex flex-wrap items-center gap-3">
-          <div class="flex items-center gap-2">
-            <img class="h-[20px] w-[20px]" src="assets/icons/helm/helm.svg" alt="Helm" />
-            <span data-testid="pkg-detail-name" class="text-[18px] font-medium text-[#FDFDFD]">{{ chart.name }}</span>
+          <div class="flex min-w-0 items-center gap-2">
+            <img class="h-[20px] w-[20px] shrink-0" src="assets/icons/helm/helm.svg" alt="Helm" />
+            <span data-testid="pkg-detail-name" class="text-[18px] font-medium break-all text-[#FDFDFD]">{{
+              chart.name
+            }}</span>
           </div>
           <div
             data-testid="pkg-detail-version"
-            class="inline-flex items-center gap-1 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[12px] py-[4px] text-[13px] text-[#FDFDFD]"
+            class="inline-flex min-w-0 items-center gap-1 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[12px] py-[4px] text-[13px] text-[#FDFDFD]"
           >
-            <img ngSrc="/assets/icons/repo/bookmark.svg" alt="version" height="14" width="14" />
-            {{ chart.version }}
+            <img class="shrink-0" ngSrc="/assets/icons/repo/bookmark.svg" alt="version" height="14" width="14" />
+            <span class="break-all">{{ chart.version }}</span>
           </div>
           @if (chart.type) {
             <span
@@ -50,7 +52,7 @@
           @if (chart.description) {
             <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
               <span class="text-white">Description: </span>
-              <span class="text-[#9C9C9D]">{{ chart.description }}</span>
+              <span class="break-all text-[#9C9C9D]">{{ chart.description }}</span>
             </div>
           }
           @if (chart.appVersion) {

@@ -14,10 +14,12 @@
 /// limitations under the License.
 ///
 
+import { HttpContext } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, map, Observable, of, tap } from 'rxjs';
+import { BehaviorSubject, finalize, map, Observable, of, share, tap } from 'rxjs';
 
 import { ProtocolRepoControllerService } from '../../../../../generated/api';
+import { SILENT_ERROR } from '../../../../shared/interceptor/error-handler.interceptor';
 import { RepoRouteSlug, toRouteSlug } from '../../../shared/util/repo-api-type';
 
 /** A repository type as the routes spell it (`maven`); the API's own spelling is the upper-case enum. */
@@ -34,6 +36,15 @@ export interface RepoContext {
 export class RepoLookupService {
   private readonly cache = new Map<string, RepoType>();
 
+  /**
+   * One request per repository name in flight at a time (RPS-1670): an unknown route's resolver and its
+   * nine `canMatch` guards (one per protocol, `repository-dynamic.routes.ts`) all ask for the same name
+   * before any of them can populate `cache`, so without this every one of them fired its own HTTP call -
+   * about ten - and the error interceptor toasted "Repository not found" once per call. `share()`
+   * multicasts the single underlying request (and its error) to every concurrent caller instead.
+   */
+  private readonly inFlight = new Map<string, Observable<RepoType>>();
+
   private readonly currentRepoSubject = new BehaviorSubject<RepoContext | null>(null);
   public readonly currentRepo$ = this.currentRepoSubject.asObservable();
 
@@ -44,42 +55,60 @@ export class RepoLookupService {
   }
 
   public getRepoType(repoName: string): Observable<RepoType> {
-    const cacheKey = repoName;
-    const cachedType = this.cache.get(cacheKey);
+    const cachedType = this.cache.get(repoName);
 
     if (cachedType) {
       this.currentRepoSubject.next({ repoName, repoType: cachedType });
       return of(cachedType);
     }
 
-    return this.fetchRepoType(repoName).pipe(
-      tap((repoType) => {
-        this.cache.set(cacheKey, repoType);
-        this.currentRepoSubject.next({ repoName, repoType });
-      }),
-    );
+    return this.sharedFetch(repoName).pipe(tap((repoType) => this.currentRepoSubject.next({ repoName, repoType })));
   }
 
   public checkRepoType(repoName: string): Observable<RepoType> {
-    const cacheKey = repoName;
-    const cachedType = this.cache.get(cacheKey);
+    const cachedType = this.cache.get(repoName);
 
     if (cachedType) {
       return of(cachedType);
     }
 
-    return this.fetchRepoType(repoName).pipe(tap((repoType) => this.cache.set(cacheKey, repoType)));
+    return this.sharedFetch(repoName);
+  }
+
+  /**
+   * The in-flight request for `repoName`, started fresh if none is running. Every caller in the same
+   * tick (the resolver, and each protocol's `canMatch`) shares the one HTTP request through `share()`;
+   * `cache` is filled once it succeeds, so the next lookup of the same name never re-fetches.
+   */
+  private sharedFetch(repoName: string): Observable<RepoType> {
+    const running = this.inFlight.get(repoName);
+    if (running) {
+      return running;
+    }
+
+    const request = this.fetchRepoType(repoName).pipe(
+      tap((repoType) => this.cache.set(repoName, repoType)),
+      finalize(() => this.inFlight.delete(repoName)),
+      share(),
+    );
+    this.inFlight.set(repoName, request);
+    return request;
   }
 
   private fetchRepoType(repoName: string): Observable<RepoType> {
-    return this.protocolRepoControllerService.getRepoFormat(repoName).pipe(
-      map((r) => {
-        const slug = toRouteSlug(r.data);
-        if (!slug) {
-          throw new Error(`Unknown repository type "${r.data}" for ${repoName}`);
-        }
-        return slug;
-      }),
-    );
+    // Structural: a route guard or resolver checking whether repoName exists, not a user action. Its
+    // caller decides the outcome (canMatch says no, the resolver redirects to /not-found), so a 404 here
+    // must not also raise the "Repository not found" toast (RPS-1670).
+    return this.protocolRepoControllerService
+      .getRepoFormat(repoName, 'body', false, { context: new HttpContext().set(SILENT_ERROR, true) })
+      .pipe(
+        map((r) => {
+          const slug = toRouteSlug(r.data);
+          if (!slug) {
+            throw new Error(`Unknown repository type "${r.data}" for ${repoName}`);
+          }
+          return slug;
+        }),
+      );
   }
 }

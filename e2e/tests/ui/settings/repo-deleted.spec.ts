@@ -20,8 +20,9 @@
  * control must go back to what it showed (the repo stores nothing any more, and the page must not claim a change),
  * and nothing may throw in the page.
  *
- * Reloading such a page is a different story: an unknown repository route fires about ten parallel lookups, each
- * raising the same toast (a known bug of its own, see `repo-management.spec.ts`, SET-05), so it is not asserted here.
+ * Reloading such a page is a different story (RPS-1670 fixed the repository route firing about ten parallel
+ * lookups on reload; the reload itself, and the repository-settings page it lands on afterwards, are not
+ * asserted here).
  */
 import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
