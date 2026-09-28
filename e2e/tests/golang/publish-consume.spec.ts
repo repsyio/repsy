@@ -356,6 +356,10 @@ test(
   'golang > .netrc authentication for module download (real-client)',
   { tag: ['@auth'] },
   async ({ seeder }) => {
+    // Go's net/http client respects ~/.netrc files for HTTP Basic Authentication.
+    // This test verifies that go mod download can authenticate to a private repo
+    // using only a .netrc file, without URL-embedded credentials.
+    // See: https://golang.org/pkg/net/#ParseNetrc
     const repo = await seeder.createRepo(RepoType.GOLANG, { privateRepo: true });
     const token = await seeder.createToken(repo.name, { readOnly: false });
     const modulePath = `${MODULE_DOMAIN}/e2e-${seeder.runId}-netrc`;
@@ -368,23 +372,38 @@ test(
 
     const { home, work } = await isolatedWorkDir(`golang-netrc-${seeder.runId}`);
 
-    // Create a .netrc file in the home directory with the token credentials
-    // Go's standard mechanism: machine <host> login <user> password <secret>
+    // Create a .netrc file in the home directory with token credentials
+    // Format: machine <host> login <user> password <secret>
+    // Go's net/http.Transport calls net.ParseNetrc() which reads this file.
     const hostUrl = new URL(env.repoBaseUrl);
     const netrcPath = path.join(home, '.netrc');
     const netrcContent = `machine ${hostUrl.hostname}\nlogin ${token.username}\npassword ${token.token}\n`;
     await fs.writeFile(netrcPath, netrcContent, { mode: 0o600 });
 
-    // Use GOPROXY without embedded credentials (relying on .netrc instead)
+    // Use GOPROXY without embedded credentials; net/http will look up credentials in .netrc
     const proxyUrl = `${env.repoBaseUrl}/${repoPath(repo.name)},off`;
-    const goEnvWithNetrc = await goEnv(home, { transport: 'basic', kind: 'anonymous' }, repo.name);
-    goEnvWithNetrc.GOPROXY = proxyUrl;
-    // Explicitly remove URL credentials since .netrc should be used instead
-    delete goEnvWithNetrc.SSL_CERT_FILE;
+    const goEnvAnon = clientEnv(home, {
+      GOPATH: path.join(home, 'gopath'),
+      GOMODCACHE: path.join(home, 'gomodcache'),
+      GOCACHE: path.join(home, 'gocache'),
+      GOENV: 'off',
+      GOTOOLCHAIN: 'local',
+      GOWORK: 'off',
+      CGO_ENABLED: '0',
+      GOFLAGS: '',
+      GOPRIVATE: '',
+      GONOPROXY: '',
+      GOINSECURE: '',
+      GOPROXY: proxyUrl,
+      GONOSUMDB: MODULE_DOMAIN,
+      NO_PROXY: '127.0.0.1,localhost',
+      HTTP_PROXY: '',
+      HTTPS_PROXY: '',
+    });
 
     const result = await run('go', ['mod', 'download', '-json', `${modulePath}@${version}`], {
       cwd: work,
-      env: goEnvWithNetrc,
+      env: goEnvAnon,
       timeoutMs: 60_000,
       label: 'golang-netrc',
     });
@@ -392,7 +411,7 @@ test(
     expect(result.exitCode, `.netrc authentication succeeds: ${result.command}`).toBe(0);
     const parsed = JSON.parse(result.stdout) as { Zip?: string; Version?: string };
     expect(parsed.Version).toBe(version);
-    expect(parsed.Zip, '.netrc-authenticated download should have Zip').toBeTruthy();
+    expect(parsed.Zip, '.netrc-authenticated download should retrieve Zip').toBeTruthy();
   },
 );
 
