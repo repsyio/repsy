@@ -298,6 +298,9 @@ export function buildNupkg(opts: {
       ? ''
       : `    <repository type="git" url="${extra.repositoryUrl}" />\n`) +
     (extra.readme === undefined ? '' : '    <readme>README.md</readme>\n') +
+    (extra.packageType === undefined
+      ? ''
+      : `    <packageTypes><packageType name="${extra.packageType}"/></packageTypes>\n`) +
     renderNuspecDependencies(opts.dependencies ?? [], opts.emptyGroups ?? []) +
     '  </metadata>\n' +
     '</package>\n';
@@ -326,6 +329,8 @@ export interface NuspecExtraMetadata {
   projectUrl?: string;
   repositoryUrl?: string;
   readme?: string;
+  /** Package type (e.g., "DotnetTool") rendered in `<packageTypes>` element. */
+  packageType?: string;
 }
 
 /** One `<dependency id="..." version="...">` of a nuspec (RPS-1479). `range` is a NuGet version
@@ -600,6 +605,7 @@ export interface RegistrationLeaf {
   listed: boolean;
   packageContent: string;
   packageId: string;
+  packageType?: string;
 }
 
 /**
@@ -611,7 +617,11 @@ export function parseRegistrationIndex(body: Buffer): RegistrationLeaf[] {
   const parsed = JSON.parse(body.toString('utf8')) as {
     items?: {
       items?: {
-        catalogEntry?: { id?: unknown; version?: unknown };
+        catalogEntry?: {
+          id?: unknown;
+          version?: unknown;
+          packageTypes?: { name?: unknown }[];
+        };
         listed?: unknown;
         packageContent?: unknown;
       }[];
@@ -622,12 +632,17 @@ export function parseRegistrationIndex(body: Buffer): RegistrationLeaf[] {
     for (const item of page.items ?? []) {
       const version = item.catalogEntry?.version;
       if (typeof version === 'string') {
-        leaves.push({
+        const leaf: RegistrationLeaf = {
           version,
           listed: item.listed === true,
           packageContent: typeof item.packageContent === 'string' ? item.packageContent : '',
           packageId: typeof item.catalogEntry?.id === 'string' ? item.catalogEntry.id : '',
-        });
+        };
+        const packageType = item.catalogEntry?.packageTypes?.[0]?.name;
+        if (typeof packageType === 'string') {
+          leaf.packageType = packageType;
+        }
+        leaves.push(leaf);
       }
     }
   }
