@@ -40,6 +40,7 @@ import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactVersionListItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactConverter;
@@ -66,6 +67,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -75,6 +77,7 @@ import java.util.zip.ZipOutputStream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -86,6 +89,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 /**
  * The {@code releases} / {@code snapshots} repo settings refuse a version of that kind, whether it
@@ -2353,5 +2359,125 @@ class ArtifactServiceImplTest {
     when(this.storageStrategy.get(pathOf(relativePath), eq("mvn"))).thenReturn(Optional.of(pom));
 
     return pom;
+  }
+
+  /**
+   * RPS-1665: {@code versionName} used to sort as a plain string in the database {@code ORDER BY},
+   * so {@code 1.9.0} sat above {@code 1.10.0} and a SNAPSHOT above the release it precedes. Sorting
+   * by {@code versionName} now loads the artifact's whole set of versions and orders it with the
+   * same {@link io.repsy.protocols.maven.shared.artifact.services.VersionComparator} ({@code
+   * ComparableVersion}-backed) that {@link ArtifactVersionWriteService} already uses to pick the
+   * latest and release version, then slices out the requested page.
+   */
+  @Nested
+  @DisplayName("sorting the versions list by versionName (RPS-1665)")
+  class VersionNameSort {
+
+    private final UUID repoId = UUID.randomUUID();
+
+    private void stubUnpagedVersions(final String... versionNames) {
+      final List<ArtifactVersionListItem> rows =
+          Arrays.stream(versionNames)
+              .map(VersionRow::new)
+              .map(row -> (ArtifactVersionListItem) row)
+              .toList();
+
+      when(ArtifactServiceImplTest.this.artifactVersionRepository
+              .findAllByRepoIdAndGroupNameAndArtifactName(this.repoId, "com.acme", "lib"))
+          .thenReturn(rows);
+
+      when(ArtifactServiceImplTest.this.artifactConverter.toArtifactVersionListItemDto(any()))
+          .thenAnswer(
+              invocation -> {
+                final ArtifactVersionListItem source = invocation.getArgument(0);
+                return io.repsy.os.generated.model.ArtifactVersionListItem.builder()
+                    .versionName(source.getVersionName())
+                    .build();
+              });
+    }
+
+    @Test
+    @DisplayName(
+        "orders 1.9.0 below 1.10.0 (numeric, not string) and a SNAPSHOT before its release")
+    void ordersByMavenVersionSemantics() {
+      this.stubUnpagedVersions("1.9.0", "1.10.0", "1.10.0-SNAPSHOT", "1.11.0");
+
+      final var descending =
+          ArtifactServiceImplTest.this.artifactService.getArtifactVersions(
+              this.repoId,
+              "com.acme",
+              "lib",
+              PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "versionName")));
+
+      assertThat(descending.getContent())
+          .extracting(io.repsy.os.generated.model.ArtifactVersionListItem::getVersionName)
+          .containsExactly("1.11.0", "1.10.0", "1.10.0-SNAPSHOT", "1.9.0");
+      assertThat(descending.getTotalElements()).isEqualTo(4);
+
+      final var ascending =
+          ArtifactServiceImplTest.this.artifactService.getArtifactVersions(
+              this.repoId,
+              "com.acme",
+              "lib",
+              PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "versionName")));
+
+      assertThat(ascending.getContent())
+          .extracting(io.repsy.os.generated.model.ArtifactVersionListItem::getVersionName)
+          .containsExactly("1.9.0", "1.10.0-SNAPSHOT", "1.10.0", "1.11.0");
+    }
+
+    @Test
+    @DisplayName("slices the requested page from the whole sorted set, not from a database page")
+    void pagesTheWholeSortedSet() {
+      this.stubUnpagedVersions("1.9.0", "1.10.0", "1.10.0-SNAPSHOT", "1.11.0");
+
+      final var secondPage =
+          ArtifactServiceImplTest.this.artifactService.getArtifactVersions(
+              this.repoId,
+              "com.acme",
+              "lib",
+              PageRequest.of(1, 2, Sort.by(Sort.Direction.DESC, "versionName")));
+
+      assertThat(secondPage.getContent())
+          .extracting(io.repsy.os.generated.model.ArtifactVersionListItem::getVersionName)
+          .containsExactly("1.10.0-SNAPSHOT", "1.9.0");
+      assertThat(secondPage.getTotalElements()).isEqualTo(4);
+      assertThat(secondPage.getTotalPages()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("a plain id/lastUpdatedAt sort stays a database page, no unpaged fetch")
+    void otherSortsStayOnTheDatabase() {
+      when(ArtifactServiceImplTest.this.artifactVersionRepository
+              .findAllByRepoIdAndGroupNameAndArtifactName(any(), any(), any(), any()))
+          .thenReturn(Page.empty());
+
+      ArtifactServiceImplTest.this.artifactService.getArtifactVersions(
+          this.repoId,
+          "com.acme",
+          "lib",
+          PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "id")));
+
+      verify(ArtifactServiceImplTest.this.artifactVersionRepository, never())
+          .findAllByRepoIdAndGroupNameAndArtifactName(any(), any(), any());
+    }
+  }
+
+  private record VersionRow(String versionName) implements ArtifactVersionListItem {
+
+    @Override
+    public String getVersionName() {
+      return this.versionName;
+    }
+
+    @Override
+    public LocalDateTime getLastUpdatedAt() {
+      return LocalDateTime.now();
+    }
+
+    @Override
+    public boolean isSigned() {
+      return false;
+    }
   }
 }
