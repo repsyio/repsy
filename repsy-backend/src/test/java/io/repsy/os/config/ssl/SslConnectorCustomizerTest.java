@@ -34,6 +34,7 @@ class SslConnectorCustomizerTest {
   private static final int API_SSL_PORT = 18443;
   private static final int REPO_SSL_PORT = 19443;
   private static final int TIMEOUT = 45_000;
+  private static final int MAX_PART_COUNT = 7;
 
   private static PortSslProperties port(final boolean enabled, final int port) {
     return new PortSslProperties(enabled, port, "/no/keystore.p12", "pw", "PKCS12", "repsy", null);
@@ -51,7 +52,10 @@ class SslConnectorCustomizerTest {
       final PortSslProperties api, final PortSslProperties repo, final boolean compression) {
     final var factory = new TomcatServletWebServerFactory();
     new SslConnectorCustomizer(
-            new RepsySslProperties(api, repo), serverProperties(compression), TIMEOUT)
+            new RepsySslProperties(api, repo),
+            serverProperties(compression),
+            TIMEOUT,
+            MAX_PART_COUNT)
         .customize(factory);
     return factory;
   }
@@ -88,6 +92,7 @@ class SslConnectorCustomizerTest {
       assertThat(connector.getEncodedSolidusHandling()).isEqualTo("decode");
       assertThat(protocolOf(connector).isSSLEnabled()).isTrue();
       assertThat(protocolOf(connector).getConnectionTimeout()).isEqualTo(TIMEOUT);
+      assertThat(connector.getMaxPartCount()).isEqualTo(MAX_PART_COUNT);
     }
   }
 

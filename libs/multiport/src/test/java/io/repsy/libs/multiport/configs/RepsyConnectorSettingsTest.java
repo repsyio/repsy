@@ -38,7 +38,7 @@ class RepsyConnectorSettingsTest {
 
     final var connector = newConnector();
 
-    RepsyConnectorSettings.apply(connector, 1_000, null);
+    RepsyConnectorSettings.apply(connector, 1_000, 50, null);
 
     assertThat(connector.getEncodedSolidusHandling()).isEqualTo("decode");
   }
@@ -48,9 +48,19 @@ class RepsyConnectorSettingsTest {
 
     final var connector = newConnector();
 
-    RepsyConnectorSettings.apply(connector, 120_000, null);
+    RepsyConnectorSettings.apply(connector, 120_000, 50, null);
 
     assertThat(protocolOf(connector).getConnectionTimeout()).isEqualTo(120_000);
+  }
+
+  @Test
+  void applyShouldSetTheMaxPartCount() {
+
+    final var connector = newConnector();
+
+    RepsyConnectorSettings.apply(connector, 1_000, 7, null);
+
+    assertThat(connector.getMaxPartCount()).isEqualTo(7);
   }
 
   @Test
@@ -58,7 +68,7 @@ class RepsyConnectorSettingsTest {
 
     final var connector = newConnector();
 
-    RepsyConnectorSettings.apply(connector, 1_000, null);
+    RepsyConnectorSettings.apply(connector, 1_000, 50, null);
 
     assertThat(protocolOf(connector).getCompression()).isEqualTo("off");
   }
@@ -70,7 +80,7 @@ class RepsyConnectorSettingsTest {
     final var compression = new Compression();
     compression.setEnabled(false);
 
-    RepsyConnectorSettings.apply(connector, 1_000, compression);
+    RepsyConnectorSettings.apply(connector, 1_000, 50, compression);
 
     assertThat(protocolOf(connector).getCompression()).isEqualTo("off");
   }
@@ -85,7 +95,7 @@ class RepsyConnectorSettingsTest {
         new String[] {"application/json", "application/vnd.npm.install-v1+json"});
     compression.setMinResponseSize(DataSize.ofKilobytes(1));
 
-    RepsyConnectorSettings.apply(connector, 1_000, compression);
+    RepsyConnectorSettings.apply(connector, 1_000, 50, compression);
 
     final var protocol = protocolOf(connector);
     assertThat(protocol.getCompression()).isEqualTo("on");

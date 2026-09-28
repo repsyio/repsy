@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { ElementRef } from '@angular/core';
 import { ComponentFixture, fakeAsync, flush, TestBed, tick } from '@angular/core/testing';
 import moment from 'moment';
 import { NEVER, of, Subject, throwError } from 'rxjs';
@@ -51,9 +52,13 @@ describe('UserManagementComponent', () => {
     userService.resetPassword.and.returnValue(of('N3w-Passw0rd'));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
-    component = new UserManagementComponent(userService, toastService, dangerModalService, {
-      username: 'admin',
-    } as AuthService);
+    component = new UserManagementComponent(
+      userService,
+      toastService,
+      dangerModalService,
+      { username: 'admin' } as AuthService,
+      new ElementRef(document.createElement('div')),
+    );
   });
 
   afterEach(() => component.ngOnDestroy());

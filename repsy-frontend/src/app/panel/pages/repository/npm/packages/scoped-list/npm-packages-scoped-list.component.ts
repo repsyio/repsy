@@ -15,7 +15,7 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, OnDestroy } from '@angular/core';
+import { Component, ElementRef, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
@@ -34,6 +34,7 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { restoreListFocus } from '../../../../../shared/util/list-focus-restore.util';
 import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
 import { NpmConfigComponent } from '../../config/npm-config.component';
 import { NpmService } from '../../service/npm.service';
@@ -83,6 +84,7 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
+    private readonly elementRef: ElementRef<HTMLElement>,
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.pagedData = new PagedData<NpmPackageListItem>();
@@ -101,8 +103,10 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
     this.registryChanges$.unsubscribe();
   }
 
-  public refreshPage(): void {
-    this.fetchPackages();
+  /** See `NpmPackagesListComponent.refreshPage` (RPS-1669): the caller can name the control that had
+   *  the focus before it started asking, for when this reload's own opener will not survive it. */
+  public refreshPage(previouslyFocused: Element | null = null): void {
+    this.fetchPackages(previouslyFocused);
   }
 
   public loadPage(pageNum: number): void {
@@ -129,7 +133,7 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
     return moment(date).fromNow();
   }
 
-  private fetchPackages(): void {
+  private fetchPackages(previouslyFocused: Element | null = null): void {
     this.loading = true;
     const call =
       this.scopeName !== '~'
@@ -151,12 +155,16 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
         next: (pagedData: PagedData<NpmPackageListItem>) => {
           this.pagedData.page = pagedData.page;
           this.packages = pagedData.content;
+          restoreListFocus(previouslyFocused, this.elementRef.nativeElement);
         },
         error: () => {},
       });
   }
 
   public deletePackage(pck: NpmPackageListItem) {
+    // Captured now (RPS-1669): by the time the reload actually fires, the danger modal has already
+    // closed and, since its own opener (this row's menu item) is gone, given up on restoring the focus.
+    const previouslyFocused = document.activeElement;
     this.dangerModalService.show('Delete Package', 'Delete', () => {
       this.loading = true;
       this.npmService
@@ -174,7 +182,7 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
               });
             } else {
               this.pageNum = pageAfterDelete(this.packages.length, this.pageNum);
-              this.refreshPage();
+              this.refreshPage(previouslyFocused);
               this.toastService.show('Package deleted successfully', 'success');
             }
           },

@@ -90,7 +90,14 @@ public class AuthUserService {
     return this.loginInfoFactory.create(user, Instant.now().truncatedTo(ChronoUnit.SECONDS));
   }
 
-  @Transactional
+  // consume() joins this method's transaction (both @Transactional, REQUIRED), so it is this
+  // method's own rollback rule, not consume()'s, that decides whether a replay's family-wide
+  // revocation survives: consume() is never the outermost transaction boundary here, so its own
+  // noRollbackFor only stops it from marking the shared transaction rollback-only, while this
+  // method's default rollback-on-RuntimeException would otherwise still roll the whole thing back
+  // once the UnAuthorizedException it rethrows reaches this method's transactional advice
+  // (RPS-1682).
+  @Transactional(noRollbackFor = UnAuthorizedException.class)
   public @NonNull LoginInfo refreshToken(final @NonNull RefreshTokenClaims claims) {
 
     this.refreshTokenService.consume(claims);

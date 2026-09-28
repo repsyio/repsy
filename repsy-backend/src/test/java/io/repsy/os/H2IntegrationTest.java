@@ -15,9 +15,17 @@
  */
 package io.repsy.os;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+
+import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -39,7 +47,11 @@ public abstract class H2IntegrationTest {
    */
   private static final String H2_URL = "jdbc:h2:mem:rps957;MODE=PostgreSQL;DB_CLOSE_DELAY=-1";
 
+  private static final Duration SEEDING_TIMEOUT = Duration.ofSeconds(30);
+
   private static final Path STORAGE_ROOT = createStorageRoot();
+
+  @Autowired private RepoRepository repoRepository;
 
   @DynamicPropertySource
   static void registerH2Properties(final DynamicPropertyRegistry registry) {
@@ -56,5 +68,28 @@ public abstract class H2IntegrationTest {
     } catch (final IOException e) {
       throw new IllegalStateException("Could not create H2 test storage", e);
     }
+  }
+
+  /**
+   * Waits for the startup seeding to have committed its default repo, one per {@link RepoType}
+   * (RPS-1070), before a test runs any assertion of its own.
+   *
+   * <p>{@code AdminUserInitializer} publishes a {@code UserCreatedEvent} at context startup and the
+   * {@code @Async} per-protocol {@code *AuthListener}s then each create one default repo, in their
+   * own committed transaction, independently of this class's test transaction. {@link
+   * AbstractIntegrationTest}'s classes wait for the same thing through {@code
+   * CommittedRowsGuard#awaitDefaultRepos} before their first test; the H2 suites share one context
+   * and database the same way but had no such barrier, so the first H2 class of a run could start,
+   * and read the repo counts, while a listener was still committing its insert (RPS-1674).
+   */
+  @BeforeEach
+  void awaitDefaultReposSeeded() {
+    await()
+        .atMost(SEEDING_TIMEOUT)
+        .pollInterval(Duration.ofMillis(50))
+        .untilAsserted(
+            () ->
+                assertThat(this.repoRepository.count())
+                    .isGreaterThanOrEqualTo(RepoType.values().length));
   }
 }

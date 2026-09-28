@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
 import io.repsy.os.generated.model.RepoSettingsForm;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.SignedRecomputeService;
@@ -52,7 +53,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -94,11 +97,38 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
   @Autowired private ArtifactVersionRepository artifactVersionRepository;
   @Autowired private VersionSignatureService versionSignatureService;
 
+  @Qualifier(SignedRecomputeExecutorConfig.BEAN_NAME)
+  @Autowired
+  private ThreadPoolTaskExecutor signedRecomputeExecutor;
+
   private final List<UUID> createdRepoIds = new ArrayList<>();
   private final List<UUID> createdUserIds = new ArrayList<>();
 
+  /**
+   * A {@code verify(..., timeout(ms))} on the {@link #signedRecomputeService} spy only proves that
+   * {@code recomputeRepo} was entered: Mockito records an invocation before it delegates to the
+   * real method, not after it returns. A run that started can still be walking the repo's versions,
+   * one row lock at a time, on {@link SignedRecomputeExecutorConfig}'s single background thread
+   * when a test method returns. Deleting the repo then races that thread's own locks against the
+   * cascade delete's (RPS-1655): under load the deadlock detector can catch the two, and the row
+   * the delete loses under {@code CommittedRowsGuard} makes the failure look like an unrelated
+   * class's leak. Waiting for the executor to be idle first closes the race regardless of which
+   * side loses it.
+   */
+  private void awaitRecomputeExecutorIdle() {
+    await()
+        .atMost(RECOMPUTE_TIMEOUT)
+        .pollInterval(Duration.ofMillis(20))
+        .untilAsserted(
+            () -> {
+              final var pool = this.signedRecomputeExecutor.getThreadPoolExecutor();
+              assertThat(pool.getActiveCount() + pool.getQueue().size()).isZero();
+            });
+  }
+
   @AfterEach
   void deleteCommittedData() {
+    this.awaitRecomputeExecutorIdle();
     this.createdRepoIds.forEach(
         id -> this.jdbcTemplate.update("delete from repo where id = ?", id));
     this.createdRepoIds.clear();

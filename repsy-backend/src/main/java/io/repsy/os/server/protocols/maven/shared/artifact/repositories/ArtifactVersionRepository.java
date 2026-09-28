@@ -74,6 +74,29 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
           @NonNull String versionName,
           @NonNull Pageable pageable);
 
+  /**
+   * Every version that {@link #findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName} would
+   * page through, unpaged. Maven version order (RPS-1665) is not a database {@code ORDER BY}:
+   * {@code versionName} sorts as a string there, so {@code 1.9.0} would sit above {@code 1.10.0}.
+   * The service sorts this whole set with {@code ComparableVersion} and slices the requested page
+   * from it instead.
+   */
+  @Query(
+      """
+        select av from ArtifactVersion av
+        join av.artifact a
+        where a.repo.id = :repoId
+        and a.groupName = :groupName
+        and a.artifactName = :artifactName
+        and av.versionName like %:versionName%
+      """)
+  @NonNull List<ArtifactVersionListItem>
+      findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName(
+          @NonNull UUID repoId,
+          @NonNull String groupName,
+          @NonNull String artifactName,
+          @NonNull String versionName);
+
   @Query(
       """
         select av from ArtifactVersion av
@@ -88,6 +111,22 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
       @NonNull String groupName,
       @NonNull String artifactName,
       @NonNull Pageable pageable);
+
+  /**
+   * Every version of the artifact, unpaged, for the version-name sort (see the note on {@link
+   * #findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName(UUID, String, String, String)}).
+   */
+  @Query(
+      """
+        select av from ArtifactVersion av
+        join av.artifact a
+        join a.repo r
+        where r.id = :repoId
+        and a.groupName = :groupName
+        and a.artifactName = :artifactName
+      """)
+  @NonNull List<ArtifactVersionListItem> findAllByRepoIdAndGroupNameAndArtifactName(
+      UUID repoId, @NonNull String groupName, @NonNull String artifactName);
 
   /**
    * Every version of an artifact with the time it was last registered, which is all the generated

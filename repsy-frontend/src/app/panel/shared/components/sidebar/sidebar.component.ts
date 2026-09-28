@@ -15,17 +15,18 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, EventEmitter, HostListener, Input, OnInit, Output, signal } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterModule } from '@angular/router';
 import { filter } from 'rxjs';
 
 import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { ProfileService } from '../../../pages/profile/service/profile.service';
+import { DialogDirective } from '../../directives/dialog.directive';
 
 @Component({
   selector: 'app-sidebar',
-  imports: [RouterModule, CommonModule, RouterLink, NgOptimizedImage],
+  imports: [RouterModule, CommonModule, RouterLink, NgOptimizedImage, DialogDirective],
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.css',
 })
@@ -78,8 +79,9 @@ export class SidebarComponent implements OnInit {
     this.router.navigateByUrl('login');
   }
 
-  @HostListener('document:keydown.escape')
-  closeIfOpen(): void {
+  // Escape itself is handled by the `appDialog` directive on the mobile drawer's content (RPS-1669):
+  // it only exists, and only reacts, while the drawer is actually open and is the topmost open dialog.
+  private closeIfOpen(): void {
     if (this.isMobileMenuOpen) {
       this.closeMobileMenu();
     }

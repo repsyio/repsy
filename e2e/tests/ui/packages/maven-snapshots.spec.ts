@@ -150,17 +150,13 @@ test.describe('Maven SNAPSHOT versions', { tag: '@packages' }, () => {
     expect(artifact).toBe('pkg-1');
   });
 
-  // RPS-1626 (proposed ticket): the "Newest" order is the version NAME as a string, so `1.9.0` is above
-  // `1.10.0` and `2.0.0-SNAPSHOT` above `2.0.0`, where Maven (and every reader) says the opposite.
+  // RPS-1665: the "Newest" order is by Maven version semantics, not the version NAME as a string
+  // (which would put `1.9.0` above `1.10.0` and `2.0.0-SNAPSHOT` above `2.0.0`).
   test('PKG-maven-11 Newest orders the versions by version, not by the characters of the name', async ({
     adminPage,
     seeder,
     seedVersions,
   }) => {
-    test.fail(
-      true,
-      'RPS-1665: the Maven versions list sorts versionName as a string (1.9.0 above 1.10.0, 1.0.0-SNAPSHOT above 1.0.0)',
-    );
     const repo = await seeder.createRepo(RepoType.MAVEN);
     const created = await seedVersions(repo, ['1.9.0', '1.10.0', '1.10.0-SNAPSHOT', '1.11.0']);
     const versions = protocolPages(adminPage, maven, repo.name).versions(created[0]);

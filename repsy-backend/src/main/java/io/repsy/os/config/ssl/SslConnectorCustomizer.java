@@ -45,14 +45,17 @@ public class SslConnectorCustomizer
   private final RepsySslProperties sslProperties;
   private final ServerProperties serverProperties;
   private final int connectionTimeout;
+  private final int maxPartCount;
 
   public SslConnectorCustomizer(
       final RepsySslProperties sslProperties,
       final ServerProperties serverProperties,
-      @Value("${multiport.tomcat.connection-timeout:120000}") final int connectionTimeout) {
+      @Value("${multiport.tomcat.connection-timeout:120000}") final int connectionTimeout,
+      @Value("${multiport.tomcat.max-part-count:50}") final int maxPartCount) {
     this.sslProperties = sslProperties;
     this.serverProperties = serverProperties;
     this.connectionTimeout = connectionTimeout;
+    this.maxPartCount = maxPartCount;
   }
 
   @Override
@@ -86,10 +89,13 @@ public class SslConnectorCustomizer
     connector.setSecure(true);
     connector.setPort(props.port());
     // Spring Boot's own customizers only ever reach the primary connector (RPS-1559): without the
-    // encoded slash setting Tomcat refuses every scoped npm package (@scope%2Fname) over TLS.
+    // encoded slash setting Tomcat refuses every scoped npm package (@scope%2Fname) over TLS, and
+    // without max-part-count (RPS-1657) it keeps Tomcat's own default instead of the configured
+    // one.
     RepsyConnectorSettings.apply(
         connector,
         this.connectionTimeout,
+        this.maxPartCount,
         compress ? this.serverProperties.getCompression() : null);
 
     final var protocol = (Http11NioProtocol) connector.getProtocolHandler();
