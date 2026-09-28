@@ -215,6 +215,12 @@ repsy:
 logging:
   level:
     root: WARN
+    # Flyway migration progress, visible during upgrades (RPS-1564)
+    org.flywaydb: INFO
+    # Docker manifest layout repair progress during upgrade (RPS-1564)
+    io.repsy.os.server.protocols.docker.shared.tag.services: INFO
+    # NuGet build-metadata version migration progress during upgrade (RPS-1564)
+    io.repsy.os.server.protocols.nuget.shared.packages.services: INFO
 
 storage-gateway:
   fs:
