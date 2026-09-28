@@ -174,5 +174,46 @@ class AbstractCargoConfigProtocolMethodHandlerTest {
           .isEqualTo(MediaType.APPLICATION_JSON_VALUE);
       assertThat(result.getBody()).isInstanceOf(CargoErrorResponse.class);
     }
+
+    /**
+     * RPS-1515: Tomcat's RemoteIpValve (server.forward-headers-strategy: native) parses the port
+     * out of X-Forwarded-Host and discards it, so request.getServerPort() falls back to the
+     * scheme's default when the proxy sends no separate X-Forwarded-Port. dl/api must still carry
+     * the port that was embedded in the host.
+     */
+    @Test
+    @DisplayName("keeps the port embedded in X-Forwarded-Host when X-Forwarded-Port is absent")
+    void keepsEmbeddedForwardedPort() {
+      request.setScheme("https");
+      request.setServerName("pub.e2e.test");
+      request.setServerPort(443);
+      request.addHeader("X-Forwarded-Proto", "https");
+      request.addHeader("X-Forwarded-Host", "pub.e2e.test:8443");
+
+      final var result =
+          handler.handle(context("/config.json", false), request, new MockHttpServletResponse());
+
+      assertThat((String) result.getBody())
+          .contains(
+              "\"dl\": \"https://pub.e2e.test:8443/cargo/api/v1/crates/{crate}/{version}/download\"")
+          .contains("\"api\": \"https://pub.e2e.test:8443/cargo\"");
+    }
+
+    @Test
+    @DisplayName("keeps the port when a separate X-Forwarded-Port is sent alongside the host")
+    void keepsSeparateForwardedPortHeader() {
+      request.setScheme("https");
+      request.setServerName("pub.e2e.test");
+      request.setServerPort(8443);
+      request.addHeader("X-Forwarded-Proto", "https");
+      request.addHeader("X-Forwarded-Host", "pub.e2e.test");
+      request.addHeader("X-Forwarded-Port", "8443");
+
+      final var result =
+          handler.handle(context("/config.json", false), request, new MockHttpServletResponse());
+
+      assertThat((String) result.getBody())
+          .contains("\"api\": \"https://pub.e2e.test:8443/cargo\"");
+    }
   }
 }
