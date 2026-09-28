@@ -159,26 +159,6 @@ export function goVersion(): string {
   return `v${boundedSemverVersion()}`;
 }
 
-/** Go's module-path escape encoding (`golang.org/x/mod/module.EscapePath`): every uppercase letter
- *  becomes `!` + its lower-case form, and a literal `!` becomes `!!` -- the exact inverse of
- *  `GoVersionUtils.decodeModulePath`. Only needed to build the URL a REAL `go` command would send for
- *  a mixed-case module path (`registry-rules.spec.ts`'s H18/G10 test); a raw HTTP probe from this
- *  harness can send the literal uppercase characters instead, since the server only un-escapes `!`
- *  sequences and then lower-cases everything regardless (confirmed live). */
-export function escapeModulePath(modulePath: string): string {
-  let out = '';
-  for (const ch of modulePath) {
-    if (ch === '!') {
-      out += '!!';
-    } else if (ch >= 'A' && ch <= 'Z') {
-      out += `!${ch.toLowerCase()}`;
-    } else {
-      out += ch;
-    }
-  }
-  return out;
-}
-
 export function moduleBaseUrl(repoName: string, modulePath: string): string {
   return repoUrl(repoName, modulePath);
 }

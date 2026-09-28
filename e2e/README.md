@@ -279,7 +279,7 @@ e2e/
       uv-client.spec.ts         # RPS-1486 U1-U9: uv's upload form, uv.lock hashes, netrc, uv pip --require-hashes, tampered lock, PEP 691 Accept, --check-url, deleted release
     golang/
       publish-consume.spec.ts   # registerPublishConsumeLoop(golangAdapter) + go-get-build-run, plain-http-creds-refused, dirhash cross-check, mixed-case and wire-trace real-client tests
-      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload) + G1/G2/G10 candidates
+      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload)
     ruby/
       publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install (RPS-1233, fixed)/gem-fetch (RPS-1234, fixed), anonymous-push, yank (RPS-1235, fixed), USER-role-push, bundle-install-e2e real-client tests
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow incl. RPS-1238 fixed, specs.4.8.gz gzip framing (RPS-1234, fixed), gemspec.rz (RPS-1233, fixed), HEAD mirrors GET (RPS-1237, fixed; its Content-Type too, RPS-1465), platform gem, RPS-1236 fixed) -- no remaining test.fail() pins
@@ -4128,7 +4128,7 @@ shape (R8, RPS-1428); `@latest`'s DB-backed highest-version selection (R9); a ma
 400 (R11); `sumdb/supported` 404ing on both ports (R12/G9); over-long module-path/version refusal
 (R13); a deleted version's clean re-upload, never a `410` (R14/RPS-1230); `HEAD` answering the status
 and headers of its `GET` for every module file (R15/H17, RPS-1465; it was a `404` for every path); and that `releases`/`snapshots` are never read
-(R16). Three backend bug candidates are pinned with `test.fail()` (G1/G2/G10, below).
+(R16).
 
 ### H1-H20, confirmed live
 
@@ -4256,14 +4256,12 @@ RPS-1227 and RPS-1228 are fixed (#447): `registry-rules.spec.ts` now pins `400 i
   own probe lands on the download handler and 404s by a plain storage-miss, purely by accident — a
   different code path producing the same status). Confirmed live: `registry-rules.spec.ts`'s R12
   test.
-- **RPS-1232** — module paths are LOWER-CASED for storage/lookup (`AbstractGoProtocolFacade
-.upload`'s `normalizedPath`/`AbstractGoProtocolFacade.decodePath`), so a mixed-case upload is stored
-  under the SAME module as its lower-case spelling, even though real Go treats module paths as
-  case-SENSITIVE identity. Confirmed live twice: a raw-HTTP collision test (`registry-rules.spec.ts`,
-  `test.fail()`) and a real-client round trip showing the mixed-case path still resolves through the
-  lower-cased storage (`publish-consume.spec.ts`'s H18 test — NOT `test.fail()`-pinned there, since a
-  real `go get` succeeding is itself the correct, desired behavior; only the raw-HTTP "are these two
-  DISTINCT modules" test is pinned as a candidate).
+- **RPS-1232** (fixed) — module paths are now case-SENSITIVE for storage/lookup, correctly treating
+  them as distinct identities the way real Go does. Confirmed by two tests: a raw-HTTP test
+  (`registry-rules.spec.ts`, lines 396–422) that verifies a mixed-case upload is stored and retrieved
+  separately from its lower-case spelling (each with its own version history), and a real-client round
+  trip (`publish-consume.spec.ts`, lines 193–224, H18/RPS-1232) showing that a real `go mod download`
+  of a mixed-case module path succeeds and the server reports back the original mixed-case path.
 
 ### Transitive resolution (RPS-1479, `tests/golang/transitive-resolution.spec.ts`)
 
