@@ -68,19 +68,14 @@ test.describe('docker > abandoned upload cleanup', () => {
 
       const uploadUuid = startRes.uploadUuid!;
       const uploadLocation = startRes.location!;
-      console.log('DEBUG: startRes.uploadUuid =', uploadUuid);
-      console.log('DEBUG: startRes.location =', uploadLocation);
 
       // Send at least one byte to ensure the upload session is persisted
-      // (The upload session may only be created after the first chunk)
       const testChunk = Buffer.from('test', 'utf8');
       const chunkRes = await rawUploadChunk(repo.name, credential, image, uploadLocation, testChunk, '0-3');
-      console.log('DEBUG: chunkRes.status =', chunkRes.status);
       expect(chunkRes.status, 'First chunk should succeed').toBe(202);
 
       // Verify the upload session exists by checking its status immediately
       const statusBeforeRes = await rawUploadStatus(repo.name, credential, image, uploadUuid);
-      console.log('DEBUG: statusBeforeRes.status =', statusBeforeRes.status);
       expect(statusBeforeRes.status, 'HEAD to check upload status before TTL').toBe(204);
 
       // Step 2: Wait for the TTL (5 seconds) + cleanup interval (2 seconds) + buffer (1 second)
@@ -90,9 +85,9 @@ test.describe('docker > abandoned upload cleanup', () => {
       // Step 3: Attempt to check the status of the abandoned upload; it should be gone
       const statusAfterRes = await rawUploadStatus(repo.name, credential, image, uploadUuid);
       expect(
-        statusAfterRes.status,
+        [404, 410].includes(statusAfterRes.status),
         'HEAD to abandoned upload after TTL should return 404 or 410',
-      ).toMatch(/40[4|]/);
+      ).toBe(true);
     },
   );
 
@@ -138,7 +133,10 @@ test.describe('docker > abandoned upload cleanup', () => {
       // Verify all uploads are cleaned up
       for (const { image, uploadUuid } of uploads) {
         const statusRes = await rawUploadStatus(repo.name, credential, image, uploadUuid);
-        expect(statusRes.status, `upload ${image} cleaned up after TTL`).toMatch(/40[4|]/);
+        expect(
+          [404, 410].includes(statusRes.status),
+          `upload ${image} cleaned up after TTL should return 404 or 410`,
+        ).toBe(true);
       }
     },
   );
