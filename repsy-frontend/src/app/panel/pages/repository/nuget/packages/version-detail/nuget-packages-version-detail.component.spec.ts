@@ -102,6 +102,28 @@ describe('NugetPackagesVersionDetailComponent README', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
+  it('drops --source from the .NET CLI install command (RPS-1570)', async () => {
+    // `dotnet add package --source` only accepts a URL or a folder, never a configured source's
+    // name, so `--source repsy` is not a valid invocation. NuGet.Config already provides the
+    // source once configured (Option A), so the CLI command needs no --source flag at all; the
+    // URL form (installCommandUrl) is the one that legitimately passes the full URL.
+    nugetService.fetchPackageVersion.and.resolveTo({
+      packageId: 'Acme.Lib',
+      version: '1.2.3',
+      listed: true,
+      downloadCount: 0,
+      publishedAt: '2026-01-01T00:00:00Z',
+    } as NuGetVersionInfo);
+    const fixture: ComponentFixture<NugetPackagesVersionDetailComponent> = TestBed.createComponent(
+      NugetPackagesVersionDetailComponent,
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(fixture.componentInstance.installCommand).toBe('dotnet add package Acme.Lib --version 1.2.3');
+    expect(fixture.componentInstance.installCommand).not.toContain('--source');
+  });
+
   it('shows the not-found state, not an empty detail, when the version does not exist', async () => {
     const el = await renderFailure(404);
 
