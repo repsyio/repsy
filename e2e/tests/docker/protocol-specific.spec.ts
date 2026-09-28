@@ -455,13 +455,16 @@ test(
     // Push with OCI manifest media type (the server requires a known type), but the config
     // is empty (application/vnd.oci.empty.v1+json), which makes the server recognize it as
     // an attestation and store it with unknown platform
-    await rawPutManifest(
+    const attestationPushRes = await rawPutManifest(
       layout.repoName,
       credential,
       layout.image,
       attestationDigest,
       attestationBytes,
       'application/vnd.oci.image.manifest.v1+json',
+    );
+    expect(attestationPushRes.status, `attestation push: ${attestationPushRes.body.toString()}`).toBe(
+      201,
     );
 
     // Push the index by tag (it references the attestation in manifests[])
