@@ -419,8 +419,12 @@ test(
 
     // Build the attestation manifest (with OCI empty config, no subject since it's referenced
     // by the index's manifests[] array, not through a subject field)
-    const { manifestBytes: attestationBytes, manifestDigest: attestationDigest } =
-      buildAttestationManifest();
+    const {
+      manifestBytes: attestationBytes,
+      manifestDigest: attestationDigest,
+      configBytes: attestationConfigBytes,
+      configDigest: attestationConfigDigest,
+    } = buildAttestationManifest();
 
     // Build the index from both children PLUS the attestation manifest in manifests[]
     // The attestation is included as an entry with unknown/unknown media type and annotations
@@ -451,15 +455,13 @@ test(
     const indexBytes = Buffer.from(JSON.stringify(indexObj), 'utf8');
     const indexDigest = sha256Hex(indexBytes);
 
-    // The attestation has an empty config blob that must be uploaded first
-    const emptyConfigBytes = Buffer.from(JSON.stringify({}), 'utf8');
-    const emptyConfigDigest = sha256Hex(emptyConfigBytes);
+    // The attestation has an empty config blob that must be uploaded first (use the exact bytes from the builder)
     await rawUploadBlob(
       layout.repoName,
       credential,
       layout.image,
-      emptyConfigBytes,
-      `sha256:${emptyConfigDigest}`,
+      attestationConfigBytes,
+      attestationConfigDigest,
     );
 
     // Push the attestation manifest by digest only (no tag, only reachable through index)

@@ -339,6 +339,8 @@ export function buildAttestationManifest(): {
   manifestBytes: Buffer;
   manifestDigest: string;
   manifestMediaType: string;
+  configBytes: Buffer;
+  configDigest: string;
 } {
   const configBytes = Buffer.from(JSON.stringify({}), 'utf8');
   const configDigest = sha256(configBytes);
@@ -356,5 +358,11 @@ export function buildAttestationManifest(): {
   const manifestBytes = Buffer.from(JSON.stringify(manifestObj), 'utf8');
   const manifestDigest = sha256(manifestBytes);
 
-  return { manifestBytes, manifestDigest, manifestMediaType: 'application/unknown+unknown' };
+  return {
+    manifestBytes,
+    manifestDigest,
+    manifestMediaType: 'application/unknown+unknown',
+    configBytes,
+    configDigest,
+  };
 }
