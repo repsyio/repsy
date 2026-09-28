@@ -87,7 +87,7 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
   }
 
   private static JsonMapper boundedBodyMapper(final long maxPublishBytes) {
-    final var maxStringLength = (int) Math.min(maxPublishBytes, Integer.MAX_VALUE - 1024);
+    final var maxStringLength = (int) Math.min(maxPublishBytes, (long) Integer.MAX_VALUE - 1024);
     return JsonMapper.builder(
             JsonFactory.builder()
                 .streamReadConstraints(
