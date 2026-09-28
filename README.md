@@ -435,9 +435,9 @@ This is the first release after `v26.08.4`. Read this section before you upgrade
   Check that it is your public repository URL; when it is unset they are derived from the request (`Host` and
   `X-Forwarded-*`). (RPS-1333, RPS-1432)
 - **Upload size limits:** multipart uploads (PyPI, Helm, NuGet) up to 500 MB (`MULTIPART_MAX_*`), `gem push` 500 MB
-  (`RUBY_MAX_GEM_SIZE`), Go module zips 500 MB (`GO_MAX_MODULE_ZIP_SIZE`), crates 100 MB (`CARGO_MAX_CRATE_SIZE`);
-  larger is `413`. Maven POM and `maven-metadata.xml` are limited to 10 MiB and a signature to 64 KiB. (RPS-1049,
-  RPS-1055, RPS-1119, RPS-1121)
+  (`RUBY_MAX_GEM_SIZE`), Go module zips 500 MB (`GO_MAX_MODULE_ZIP_SIZE`), crates 100 MB (`CARGO_MAX_CRATE_SIZE`),
+  `npm publish` 500 MB (`NPM_MAX_PUBLISH_SIZE`); larger is `413`. Maven POM and `maven-metadata.xml` are limited to
+  10 MiB and a signature to 64 KiB. (RPS-1049, RPS-1055, RPS-1119, RPS-1121, RPS-1561)
 - **Docker:** manifests are stored by digest and a tag is a pointer. Re-pushing a tag or deleting a tag keeps the old
   manifest (pullable by digest) and its layers on disk until you run **Delete untagged manifests** in the repository
   settings, and an image whose last tag is deleted stays listed as "No tags". Old manifest files are renamed by a
@@ -641,6 +641,7 @@ Deleting `1.0.0+a` when there is no such entry (the usual case) still deletes `1
 | `MULTIPART_MAX_REQUEST_SIZE` | Largest total size of a multipart request, all parts included. Keep it at least as large as `MULTIPART_MAX_FILE_SIZE` | `500MB` |
 | `RUBY_MAX_GEM_SIZE` | Largest gem a `gem push` may carry (the raw request body, so the multipart limits do not apply to it). A larger gem is answered with `413`. The gem is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. Accepts a size such as `100MB` or `1GB` | `500MB` |
 | `CARGO_MAX_CRATE_SIZE` | Largest `.crate` a `cargo publish` may carry (a length-prefixed field inside Cargo's own wire format, so neither the multipart limits nor `MULTIPART_MAX_FILE_SIZE` apply to it). A larger crate is answered with `413`. The crate is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. crates.io itself defaults to `10MB`; raise this if you publish larger internal crates. Accepts a size such as `100MB` or `1GB` | `100MB` |
+| `NPM_MAX_PUBLISH_SIZE` | Largest `npm publish` body a client may send: the packument plus its base64-encoded tarball (the raw request body, so the multipart limits do not apply to it), roughly 4/3 of the tarball's own size. A larger publish is answered with `413`, checked from `Content-Length` and again while the body is read. Accepts a size such as `100MB` or `1GB` | `500MB` |
 | `APP_ALLOWED_ORIGINS` | Comma-separated list of exact origins (e.g. `https://panel.example.com,https://panel-staging.example.com`) the panel API accepts cross-origin, credentialed requests from. **Unset (the default) means same-origin only: the panel API sends no CORS headers**, which is what the Docker image needs, since it serves the panel and the API from one origin. Set it when the panel is served from a different origin than the API (a separately hosted SPA, or `API_BASE_URL` pointing elsewhere). The CSP `connect-src` names the same origins. See [Cross-Origin Requests (CORS)](#cross-origin-requests-cors) | *(empty, same-origin only)* |
 | `APP_HSTS_MAX_AGE` | `max-age` in seconds of a `Strict-Transport-Security` header. `0` or unset never sends it (the default). When positive, it is sent only on a secure request (a TLS listener, or a reverse proxy that forwards `X-Forwarded-Proto: https`), on both ports. HSTS applies to a whole host, not a port, so leave it off when the same host also serves the panel over plain HTTP (for example `:8080` plain beside `:8443` TLS). See [Security headers](#security-headers) | `0` (off) |
 | `APP_CSP_ENABLED` | Send a `Content-Security-Policy` header with the panel SPA and its static assets (JSON API responses are unaffected). See [Content Security Policy](#content-security-policy) | `true` |

@@ -27,6 +27,8 @@ import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.shared.utils.ExtractPath;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.BoundedEntryReader;
+import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.RequestBodies;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,8 +44,11 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import tools.jackson.core.StreamReadConstraints;
+import tools.jackson.core.json.JsonFactory;
 import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @NullMarked
 public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
@@ -54,18 +59,41 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
 
   private final PathParser basePathParser;
   private final NpmProtocolFacade npmProtocolFacade;
-  private final ObjectMapper objectMapper;
+  private final long maxPublishBytes;
+
+  /**
+   * Parses the bounded publish body with a string-length ceiling as large as {@code
+   * maxPublishBytes} itself (RPS-1561): Jackson's own default ({@code
+   * StreamReadConstraints#DEFAULT_MAX_STRING_LEN}, 100,000,000 characters) sits below what the
+   * other protocols allow for an upload (500MB), so a publish whose {@code _attachments} value (the
+   * base64 tarball) is longer than that used to fail with an unrelated 500 even though the whole
+   * body was well inside {@code maxPublishBytes}. The bytes handed to this mapper are already
+   * bounded by {@link BoundedEntryReader} to at most {@code maxPublishBytes}, so no string it
+   * parses can ever be longer than that either.
+   */
+  private final JsonMapper bodyMapper;
 
   public AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler(
       @Qualifier("osNpmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
-      final ObjectMapper objectMapper,
-      final NpmProtocolProvider provider) {
+      final NpmProtocolProvider provider,
+      final long maxPublishBytes) {
     this.basePathParser = basePathParser;
     this.npmProtocolFacade = npmProtocolFacade;
-    this.objectMapper = objectMapper;
+    this.maxPublishBytes = maxPublishBytes;
+    this.bodyMapper = boundedBodyMapper(maxPublishBytes);
 
     provider.registerMethodHandler(this);
+  }
+
+  private static JsonMapper boundedBodyMapper(final long maxPublishBytes) {
+    final var maxStringLength = (int) Math.min(maxPublishBytes, Integer.MAX_VALUE - 1024);
+    return JsonMapper.builder(
+            JsonFactory.builder()
+                .streamReadConstraints(
+                    StreamReadConstraints.builder().maxStringLength(maxStringLength).build())
+                .build())
+        .build();
   }
 
   @Override
@@ -133,13 +161,32 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
     final var packagePath = matcher.group(1);
 
     try {
+      // A client that declares an oversized body is refused before any of it is read (RPS-1561).
+      if (request.getContentLengthLong() > this.maxPublishBytes) {
+        throw new MaxUploadSizeExceededException(this.maxPublishBytes);
+      }
+
       // The publish document is the whole body: none at all is the client's mistake, and used to
-      // end in the JSON reader's "no content" failure, a 500 (RPS-1466).
+      // end in the JSON reader's "no content" failure, a 500 (RPS-1466). The read itself is bounded
+      // too (RPS-1561), because a chunked body, or one that understates its Content-Length, can
+      // still outgrow the limit while it is read; everything below Jackson's default string-length
+      // ceiling used to be read into memory whole and a larger one failed with an unrelated 500
+      // instead of 413.
       final var body =
           RequestBodies.nonEmpty(request.getInputStream())
               .orElseThrow(() -> new BadRequestException("npmPublishBodyEmpty"));
+
+      final byte[] bytes;
+      try {
+        bytes =
+            BoundedEntryReader.readAllBytes(
+                body, request.getContentLengthLong(), this.maxPublishBytes);
+      } catch (final EntryTooLargeException e) {
+        throw new MaxUploadSizeExceededException(this.maxPublishBytes, e);
+      }
+
       final var payload =
-          this.objectMapper.readValue(body, new TypeReference<Map<String, Object>>() {});
+          this.bodyMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
 
       final var pathVars = ExtractPath.extractPathVars(packagePath);
       final @Nullable String scopeName = pathVars.scopeName();
