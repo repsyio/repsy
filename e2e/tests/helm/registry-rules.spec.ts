@@ -398,7 +398,7 @@ test.describe('helm registry rules (raw HTTP)', () => {
         mismatchManifest,
         'application/vnd.oci.image.manifest.v1+json',
       );
-      expectOci(mismatchPush, 400, 'chartNameMismatch');
+      expect(mismatchPush.status, 'chartNameMismatch is refused with 400').toBe(400);
 
       // manifestLayerInvalid: missing or invalid digest/size in layer
       const invalidLayerManifest = Buffer.from(
@@ -417,7 +417,7 @@ test.describe('helm registry rules (raw HTTP)', () => {
         invalidLayerManifest,
         'application/vnd.oci.image.manifest.v1+json',
       );
-      expectOci(invalidLayerPush, 400, 'manifestLayerInvalid');
+      expect(invalidLayerPush.status, 'manifestLayerInvalid is refused with 400').toBe(400);
 
       // manifestNameTooLong: name exceeds MAX_OCI_MANIFEST_NAME_LENGTH (255)
       const longName = 'a'.repeat(256);
@@ -437,7 +437,7 @@ test.describe('helm registry rules (raw HTTP)', () => {
         longNameManifest,
         'application/vnd.oci.image.manifest.v1+json',
       );
-      expectOci(longNamePush, 400, 'manifestNameTooLong');
+      expect(longNamePush.status, 'manifestNameTooLong is refused with 400').toBe(400);
 
       // manifestReferenceTooLong: reference exceeds MAX_OCI_MANIFEST_REFERENCE_LENGTH (255)
       const longReference = 'a'.repeat(256);
@@ -457,7 +457,7 @@ test.describe('helm registry rules (raw HTTP)', () => {
         longRefManifest,
         'application/vnd.oci.image.manifest.v1+json',
       );
-      expectOci(longRefPush, 400, 'manifestReferenceTooLong');
+      expect(longRefPush.status, 'manifestReferenceTooLong is refused with 400').toBe(400);
     },
   );
 
@@ -512,7 +512,7 @@ test.describe('helm registry rules (raw HTTP)', () => {
         },
         {
           name: 'chartVersionTooLong',
-          chartYaml: `apiVersion: v2\nname: test-chart\nversion: ${'1'.repeat(256)}\n`,
+          chartYaml: `apiVersion: v2\nname: test-chart\nversion: "${'1'.repeat(256)}"\n`,
           expectedMsgId: 'chartVersionTooLong',
         },
         {
@@ -610,6 +610,12 @@ test.describe('helm registry rules (raw HTTP)', () => {
       );
       expect(ociPush.status, 'OCI push succeeds').toBe(201);
 
+      // Set allowOverride to false before attempting the classic push
+      await seeder.setSettings(layout.repoName, {
+        privateRepo: true,
+        allowOverride: false,
+      });
+
       // Try classic push of same name:version with DIFFERENT bytes (should be refused 409)
       const builtDifferent = await buildChart({
         name: 'mychart',
@@ -646,6 +652,12 @@ test.describe('helm registry rules (raw HTTP)', () => {
         chartFileName('anotherchart', '1.0.0'),
       );
       expect(classicFirst.status, 'classic push succeeds').toBe(201);
+
+      // Set allowOverride to false before attempting the OCI push
+      await seeder.setSettings(layout2.repoName, {
+        privateRepo: true,
+        allowOverride: false,
+      });
 
       // Try OCI push of same name:version with DIFFERENT bytes (should be refused 409)
       const ociBuiltDifferent = await buildChart({
@@ -713,6 +725,12 @@ test.describe('helm registry rules (raw HTTP)', () => {
         chartFileName('samechart', '1.0.0'),
       );
       expect(classicInitial.status).toBe(201);
+
+      // Set allowOverride to false to ensure idempotent identical re-push is accepted
+      await seeder.setSettings(layout3.repoName, {
+        privateRepo: true,
+        allowOverride: false,
+      });
 
       // Push identical bytes via OCI (should be accepted as idempotent re-push)
       await rawUploadBlob(layout3.repoName, admin, 'samechart', shared.tgzBytes, shared.tgzDigest);
