@@ -1072,6 +1072,106 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
   }
 
   /**
+   * RPS-1569: a symbol package ({@code .snupkg}) shares the {@code PUT v3/package} push path with
+   * the real {@code .nupkg} of the same id and version, and its nuspec declares {@code
+   * <packageTypes><packageType name="SymbolsPackage" /></packageTypes>}. Before this fix, nothing
+   * inspected that element, so a raw {@code PUT} of a {@code .snupkg} answered 201 and silently
+   * replaced the stored {@code .nupkg}'s bytes with the symbol package's. {@link
+   * io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils#readNuspecMetadata} now refuses such a
+   * push with a 400 before anything is read or written.
+   */
+  @Nested
+  @DisplayName("a symbol package (.snupkg), RPS-1569")
+  class SymbolPackagePush {
+
+    private static final String REFUSAL_MESSAGE =
+        "This is a NuGet symbol package (.snupkg); Repsy does not accept symbol packages.";
+
+    /** A structurally real symbol package: its nuspec is the only thing that marks it as one. */
+    private static byte[] snupkg(final String id, final String version) {
+      final var nuspec =
+          """
+          <?xml version="1.0" encoding="utf-8"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+            <metadata>
+              <id>%s</id>
+              <version>%s</version>
+              <packageTypes>
+                <packageType name="SymbolsPackage" />
+              </packageTypes>
+            </metadata>
+          </package>
+          """
+              .formatted(id, version);
+
+      return zip(
+          entry("[Content_Types].xml", "<Types/>"),
+          entry("_rels/.rels", "<Relationships/>"),
+          entry(id + ".nuspec", nuspec),
+          entry("lib/net8.0/" + id + ".pdb", "PDB fixture debug symbols for " + id));
+    }
+
+    @Test
+    @DisplayName(
+        "is refused with a 400 and does not overwrite the .nupkg already pushed for the same id"
+            + " and version")
+    void doesNotOverwriteTheStoredNupkg() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), "1.0.0");
+      final var nupkg = pkg.nupkg();
+      final var token = NuGetPublishProtocolIT.this.adminProtocolBearerToken();
+
+      assertStatus(NuGetPublishProtocolIT.this.pushAs(repo, nupkg, token), 201);
+
+      final var snupkgResponse =
+          NuGetPublishProtocolIT.this.pushAs(repo, snupkg(pkg.id(), pkg.version()), token);
+
+      assertStatus(snupkgResponse, 400);
+      assertThat(snupkgResponse.getContentAsString(StandardCharsets.UTF_8))
+          .contains(REFUSAL_MESSAGE);
+
+      // The real .nupkg's row is untouched: still exactly one version stored for the id.
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, pkg.id())).hasSize(1);
+
+      // And its stored file is untouched too: reading it back gives the original bytes, not the
+      // symbol package's.
+      final var lowerId = pkg.id().toLowerCase(Locale.ROOT);
+      final var downloaded =
+          NuGetPublishProtocolIT.this
+              .protocol(
+                  get(
+                      "/{repo}/v3/package/{id}/1.0.0/{id}.1.0.0.nupkg",
+                      repo.getName(),
+                      lowerId,
+                      lowerId))
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsByteArray();
+      assertThat(downloaded).isEqualTo(nupkg);
+    }
+
+    @Test
+    @DisplayName(
+        "is refused with a 400 even as the first push of an id and version, stores nothing")
+    void refusedAsFirstPush() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+
+      NuGetPublishProtocolIT.this
+          .protocol(
+              push(
+                  repo,
+                  snupkg(id, "1.0.0"),
+                  NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.errors[0].message").value(REFUSAL_MESSAGE));
+
+      NuGetPublishProtocolIT.this.assertNothingStored(repo, id);
+    }
+  }
+
+  /**
    * RPS-1053: the nuspec was read whole out of the uploaded package, so a package a few kilobytes
    * long whose nuspec inflates to gigabytes exhausted the heap of the instance. A nuspec over the
    * limit is now refused with a 400 before anything is stored.

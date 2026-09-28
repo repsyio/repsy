@@ -118,6 +118,12 @@ public final class NuGetPackageUtils {
    */
   public static final int MAX_SEARCH_TAKE = 1000;
 
+  /**
+   * The {@code packageType} name a NuGet symbol package (a {@code .snupkg}) declares in its nuspec,
+   * inside {@code <packageTypes>}. See {@link #validateNotSymbolsPackage}.
+   */
+  private static final String SYMBOLS_PACKAGE_TYPE = "SymbolsPackage";
+
   private static final Pattern NUGET_ID_PATTERN =
       Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$");
   private static final Pattern NUGET_VERSION_PATTERN =
@@ -831,6 +837,7 @@ public final class NuGetPackageUtils {
     // must be rejected here first, with its own message, instead of surfacing as a missing id or
     // version.
     validateWellFormed(nuspecXml);
+    validateNotSymbolsPackage(nuspecXml);
 
     final var packageId = extractMetadataField(nuspecXml, "id");
     final var version = extractMetadataField(nuspecXml, "version");
@@ -857,6 +864,34 @@ public final class NuGetPackageUtils {
     } catch (final Exception e) {
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST, "The .nuspec in the package is not well-formed XML.", e);
+    }
+  }
+
+  /**
+   * Refuses a symbol package (a {@code .snupkg}, whose nuspec declares {@code <packageTypes>
+   * <packageType name="SymbolsPackage" /></packageTypes>}) with a 400. A symbol package carries
+   * only debug symbols, built and named after the same id and version as the real package it
+   * debugs; Repsy has no separate home for it and no {@code SymbolPackagePublish} service-index
+   * resource for a client to send it to. Storing it under the {@code v3/package} push path used by
+   * the real {@code .nupkg} would silently overwrite that package's files with the symbols
+   * (RPS-1569), so the push is refused here, before anything is written, instead.
+   */
+  private static void validateNotSymbolsPackage(final String nuspecXml) {
+    final NodeList packageTypes;
+    try {
+      packageTypes = parseNuspec(nuspecXml).getElementsByTagName("packageType");
+    } catch (final Exception e) {
+      // The caller already rejected a nuspec that is not well-formed XML before this runs.
+      return;
+    }
+
+    for (int i = 0; i < packageTypes.getLength(); i++) {
+      final var name = ((Element) packageTypes.item(i)).getAttribute("name");
+      if (SYMBOLS_PACKAGE_TYPE.equalsIgnoreCase(name)) {
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            "This is a NuGet symbol package (.snupkg); Repsy does not accept symbol packages.");
+      }
     }
   }
 
