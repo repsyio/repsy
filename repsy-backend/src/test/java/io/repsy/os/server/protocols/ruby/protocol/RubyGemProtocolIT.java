@@ -269,6 +269,128 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
   }
 
   /**
+   * RPS-1554: {@code gemspec.rz} used to hardcode {@code dependencies = []}, so a client reading
+   * the quick gemspec directly (as opposed to the compact index or the {@code .gem} itself, both of
+   * which already carried the dependency) saw none. The published gem's one runtime dependency
+   * ({@code rack >= 3.0.0}) now round-trips into the Marshal gemspec as a real {@code
+   * Gem::Dependency}.
+   */
+  @Test
+  @DisplayName("GET .../quick/Marshal.4.8/<gem>.gemspec.rz carries the gem's runtime dependency")
+  void gemspecRzCarriesRuntimeDependency() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    this.push(
+            repo.getName(),
+            gemWithDependency("dependent-gem", "1.0.0", "rack", "3.0.0"),
+            this.adminProtocolBearerToken())
+        .andExpect(status().isOk());
+
+    final var body =
+        this.protocol(
+                get("/{repo}/quick/Marshal.4.8/dependent-gem-1.0.0.gemspec.rz", repo.getName())
+                    .header(AUTHORIZATION, this.adminProtocolBearerToken()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    final byte[] inflated;
+    try (var inflater = new InflaterInputStream(new ByteArrayInputStream(body))) {
+      inflated = inflater.readAllBytes();
+    }
+    final var marshal = new String(inflated, StandardCharsets.ISO_8859_1);
+    assertThat(marshal)
+        .contains("Gem::Dependency")
+        .contains("Gem::Requirement")
+        .contains("dependent-gem")
+        .contains("rack")
+        .contains(">=")
+        .contains("3.0.0")
+        .contains("runtime");
+  }
+
+  /**
+   * RPS-1554: the legacy {@code GET /api/v1/dependencies?gems=...} Marshal endpoint (still used by
+   * older RubyGems clients and some Bundler resolution paths) had no registered route at all, so it
+   * always answered {@code 404 unknownPath} and {@code RubyMarshalWriter#dumpDependencies} was dead
+   * code.
+   */
+  @Test
+  @DisplayName("GET /{repo}/api/v1/dependencies?gems=... serves the legacy Marshal endpoint")
+  void servesLegacyDependenciesEndpoint() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    final var token = this.adminProtocolBearerToken();
+    this.push(repo.getName(), gemWithDependency("dependent-gem", "1.0.0", "rack", "3.0.0"), token)
+        .andExpect(status().isOk());
+    this.push(repo.getName(), gem("other-gem", "2.0.0"), token).andExpect(status().isOk());
+
+    final var body =
+        this.protocol(
+                get("/{repo}/api/v1/dependencies", repo.getName())
+                    .param("gems", "dependent-gem")
+                    .header(AUTHORIZATION, token))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    assertThat(body[0]).as("Marshal major version").isEqualTo((byte) 0x04);
+    assertThat(body[1]).as("Marshal minor version").isEqualTo((byte) 0x08);
+    final var marshal = new String(body, StandardCharsets.ISO_8859_1);
+    assertThat(marshal)
+        .contains("dependent-gem")
+        .contains("1.0.0")
+        .contains("rack")
+        .contains(">= 3.0.0");
+    // Only the requested gem is resolved, not every gem in the repo.
+    assertThat(marshal).doesNotContain("other-gem");
+  }
+
+  @Test
+  @DisplayName("GET /{repo}/api/v1/dependencies with no gems param serves an empty Marshal array")
+  void dependenciesEndpointWithNoGemsIsEmpty() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+
+    final var body =
+        this.protocol(
+                get("/{repo}/api/v1/dependencies", repo.getName())
+                    .header(AUTHORIZATION, this.adminProtocolBearerToken()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    assertThat(body).isEqualTo(new byte[] {0x04, 0x08, 0x5b, 0x00});
+  }
+
+  @Test
+  @DisplayName("GET /{repo}/api/v1/dependencies omits a yanked version")
+  void dependenciesEndpointOmitsYankedVersion() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    final var token = this.adminProtocolBearerToken();
+    this.push(repo.getName(), gem("yanked-dep-gem", "1.0.0"), token).andExpect(status().isOk());
+    this.protocol(
+            delete("/{repo}/api/v1/gems/yank", repo.getName())
+                .header(AUTHORIZATION, token)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .param("gem_name", "yanked-dep-gem")
+                .param("version", "1.0.0"))
+        .andExpect(status().isOk());
+
+    final var body =
+        this.protocol(
+                get("/{repo}/api/v1/dependencies", repo.getName())
+                    .param("gems", "yanked-dep-gem")
+                    .header(AUTHORIZATION, token))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    assertThat(body).isEqualTo(new byte[] {0x04, 0x08, 0x5b, 0x00});
+  }
+
+  /**
    * RPS-1553: the gemspec route stripped only the last {@code -segment} of {@code
    * <version>-<platform>}, so a multi-segment platform ({@code x86_64-linux}) never matched a row
    * and {@code gem install} of a platform gem failed; the gemspec also always said platform {@code

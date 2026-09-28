@@ -34,6 +34,15 @@ public interface RubyGemProtocolService<ID> {
   List<GemCompactEntry> getCompactEntriesByGemName(BaseRepoInfo<ID> repoInfo, String gemName);
 
   /**
+   * The non-yanked entries of every gem in {@code gemNames}, for the legacy {@code GET
+   * /api/v1/dependencies?gems=...} (RPS-1554). Unlike {@link #getCompactEntriesByGemName}, a name
+   * with no matching gem is silently omitted rather than rejected, matching the real RubyGems API:
+   * a client sends its whole candidate set and expects back only what a repo actually has.
+   */
+  List<GemCompactEntry> getCompactEntriesByGemNames(
+      BaseRepoInfo<ID> repoInfo, List<String> gemNames);
+
+  /**
    * Resolves a {@code .gem} filename against the stored rows, trying each of {@link
    * io.repsy.protocols.ruby.shared.utils.GemFilenameCandidates#split candidate} readings
    * longest-name first and returning the first that matches a real gem and version. Unlike {@link
