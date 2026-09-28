@@ -216,6 +216,7 @@ e2e/
     maven/
       publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
+      validation.spec.ts        # RPS-1716 maven validation edge cases: groupId/artifactId/version length limits (boundary probes), raw deploy-token Bearer auth behavior; pins RPS-1732 (255-char artifactId/version max 500s with FileSystemException)
       version-delete.spec.ts    # the panel's version delete for a raw-PUT artifact: with no stored maven-metadata.xml (the generated one drops the version, RPS-1331, RPS-1369), with one, with `<metadata/>`
       pgp-signature.spec.ts     # registered PGP public keys (RPS-1189): verify, reject, isolate, delete; every-signature verification (RPS-1188); key-server lookup off (RPS-1204); toggling every-signature verification recomputes `signed` and verifies stored `.asc` files (RPS-1316, RPS-1323)
       parallel-signed-deploy.spec.ts  # a REAL parallel `mvn deploy:deploy-file` of a signed release to a verify-all repo (RPS-1188), plus the one-thread control
