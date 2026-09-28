@@ -63,8 +63,8 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy] [--force]
-  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy]
+  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy] [--upload-ttl] [--force]
+  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy] [--upload-ttl]
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [--workers N] [--update-snapshots] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
@@ -172,6 +172,7 @@ OVERLAYS=(
   "trivy|--trivy|REPSY_E2E_TRIVY|docker-compose.stack-trivy.yml"
   "cors|--cors|REPSY_E2E_CORS|docker-compose.stack-cors.yml"
   "proxy|--proxy|REPSY_E2E_PROXY|docker-compose.stack-proxy.yml"
+  "upload-ttl|--upload-ttl|REPSY_E2E_UPLOAD_TTL|docker-compose.stack-upload-ttl.yml"
 )
 
 # Field $2 (1 name, 2 flag, 3 env switch, 4 file) of the overlay row $1.
