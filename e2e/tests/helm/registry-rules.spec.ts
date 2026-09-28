@@ -22,7 +22,11 @@
  * instance. Sections R1-R14 mirror the plan's own hypothesis/rule numbering.
  */
 import { RepoType } from '../../src/api/panel-api.js';
-import { buildChart, buildChartFromRawYaml } from '../../src/clients/helm-chart.js';
+import {
+  buildChart,
+  buildChartFromRawYaml,
+  buildChartWithoutChartYaml,
+} from '../../src/clients/helm-chart.js';
 import {
   adminCredential,
   chartFileName,
@@ -473,7 +477,7 @@ test.describe('helm registry rules (raw HTTP)', () => {
       const cases: TestCase[] = [
         {
           name: 'chartYamlNotFound',
-          chartYaml: '', // Will be built as empty Chart.yaml
+          chartYaml: '', // Placeholder; buildChartWithoutChartYaml handles this case
           expectedMsgId: 'chartYamlNotFound',
         },
         {
@@ -536,12 +540,10 @@ test.describe('helm registry rules (raw HTTP)', () => {
 
       for (const testCase of cases) {
         const built =
-          testCase.chartYaml === ''
-            ? await buildChartFromRawYaml({
-                chartYaml: testCase.chartYaml,
-                marker: `r11b-${testCase.name}`,
+          testCase.name === 'chartYamlNotFound'
+            ? await buildChartWithoutChartYaml({
                 name: 'test-chart',
-                version: '1.0.0',
+                marker: `r11b-${testCase.name}`,
               })
             : await buildChartFromRawYaml({
                 chartYaml: testCase.chartYaml,

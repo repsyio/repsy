@@ -165,6 +165,31 @@ export async function buildChartFromRawYaml(opts: {
   };
 }
 
+/** Builds a `.tgz` with NO Chart.yaml entry at all (only values.yaml and marker). Used to test
+ *  the `chartYamlNotFound` validation branch, which requires the complete absence of a Chart.yaml
+ *  entry in the tar, not just an empty or invalid one. HelmChartParser.parseChartYaml iterates
+ *  through all tar entries without finding any matching isChartYaml(), then throws chartYamlNotFound. */
+export async function buildChartWithoutChartYaml(opts: {
+  name: string;
+  marker: string;
+}): Promise<BuiltChart> {
+  const tar = buildTar([
+    { name: `${opts.name}/values.yaml`, data: Buffer.from('replicaCount: 1\n', 'utf8') },
+    { name: `${opts.name}/e2e-marker.txt`, data: Buffer.from(opts.marker, 'utf8') },
+  ]);
+  const tgzBytes = zlib.gzipSync(tar, { level: 6 });
+  const hex = sha256Hex(tgzBytes);
+
+  return {
+    tgzBytes,
+    tgzDigest: `sha256:${hex}`,
+    tgzDigestHex: hex,
+    chartYaml: '',
+    name: opts.name,
+    version: '0.0.0', // placeholder, not used
+  };
+}
+
 /** Writes `built.tgzBytes` to `<dir>/<name>-<version>.tgz` -- a real `.tgz` FILE PATH, which every
  *  real client here needs (`helm push`/`helm cm-push`/`helm pull`'s own file layout), and returns
  *  that path. */
