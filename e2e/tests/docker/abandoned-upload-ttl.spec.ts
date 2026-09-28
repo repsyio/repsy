@@ -63,11 +63,15 @@ test.describe('docker > abandoned upload cleanup', () => {
       const startRes = await rawStartUpload(repo.name, credential, image);
       expect(startRes.status, 'POST /blobs/uploads/ to start upload').toBe(202);
       expect(startRes.uploadUuid, 'upload UUID from Docker-Upload-UUID header').toBeDefined();
+      expect(startRes.location, 'location from Location header').toBeDefined();
 
       const uploadUuid = startRes.uploadUuid!;
+      console.log('DEBUG: startRes.uploadUuid =', uploadUuid);
+      console.log('DEBUG: startRes.location =', startRes.location);
 
       // Verify the upload session exists by checking its status immediately
       const statusBeforeRes = await rawUploadStatus(repo.name, credential, image, uploadUuid);
+      console.log('DEBUG: statusBeforeRes.status =', statusBeforeRes.status);
       expect(statusBeforeRes.status, 'HEAD to check upload status before TTL').toBe(204);
 
       // Step 2: Wait for the TTL (5 seconds) + cleanup interval (2 seconds) + buffer (1 second)
