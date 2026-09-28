@@ -3993,6 +3993,8 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVulnerabilityScanInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -4006,7 +4008,10 @@ paths:
       summary: Manually trigger a vulnerability re-scan for an artifact version
       description: >-
         Scans the version regardless of the repository's `securityScanEnabled` setting: that setting
-        only governs the automatic scan on push, and a manual scan is an explicit override.
+        only governs the automatic scan on push, and a manual scan is an explicit override. Answers
+        400 `scannerDisabled` instead when vulnerability scanning itself is off
+        (`SECURITY_SCANNER=disabled`, the default): no scanner is running, so there is nothing to
+        record a result for.
     parameters:
       - name: repoName
         in: path
