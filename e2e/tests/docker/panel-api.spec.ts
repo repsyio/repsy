@@ -57,7 +57,9 @@ import {
   imageRef,
   rawGetManifest,
   rawHeadBlob,
+  rawPutManifest,
   rawTagsList,
+  rawUploadBlob,
 } from '../../src/clients/docker-raw.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { env } from '../../src/env.js';
@@ -921,5 +923,103 @@ test.describe('the Docker panel API against what crane pushed', () => {
       await callOperation('listDockerImages', { repoName: session.repoName }),
     ) as { content: unknown[] };
     expect(empty.content).toEqual([]);
+  });
+
+  test('cleanup race: pushing a child by digest, running untagged cleanup, then pushing an index referencing the deleted digest documents the behavior', async ({
+    seeder,
+  }) => {
+    const session = await newSession(seeder, 'docker-panel-cleanup-race');
+    const imageA = `e2e-${seeder.runId}-race`;
+
+    // Build two child images
+    const child1 = await buildImage({
+      dir: path.join(session.work, 'child1'),
+      marker: 'race-child1',
+    });
+    const child2 = await buildImage({
+      dir: path.join(session.work, 'child2'),
+      marker: 'race-child2',
+    });
+
+    // Push child1 by digest only (not by tag) via raw HTTP
+    const admin = adminCredential();
+    await rawUploadBlob(session.repoName, admin, imageA, child1.layerBytes, child1.layerDigest);
+    await rawUploadBlob(session.repoName, admin, imageA, child1.configBytes, child1.configDigest);
+    await rawPutManifest(
+      session.repoName,
+      admin,
+      imageA,
+      child1.manifestDigest,
+      child1.manifestBytes,
+      child1.manifestMediaType,
+    );
+
+    // Child1 exists but is untagged at this point
+    expect(
+      (await rawGetManifest(session.repoName, admin, imageA, child1.manifestDigest)).status,
+      'child1 is pullable by digest before cleanup',
+    ).toBe(200);
+
+    // Run untagged manifest cleanup (per UntaggedManifestFinder javadoc: "untagged is computed at cleanup time",
+    // so child1 will be deleted since no tag reaches it)
+    expectContract(
+      'deleteDockerUntaggedManifests',
+      await callOperation('deleteDockerUntaggedManifests', { repoName: session.repoName }),
+    );
+
+    // Assert child1 is now gone (this proves cleanup actually deleted it)
+    expect(
+      (await rawGetManifest(session.repoName, admin, imageA, child1.manifestDigest)).status,
+      'child1 is gone after cleanup',
+    ).toBe(404);
+
+    // Push child2 with a tag so it survives cleanup
+    await push(session, child2.dir, imageA, 'child2');
+
+    // Now build and push an index referencing child1's digest (which was deleted by cleanup)
+    // WITHOUT re-uploading child1 first. This is the race: does the server accept an index
+    // referencing a deleted child, leave a dangling ref, or refuse the index?
+    const indexBytes = Buffer.from(
+      JSON.stringify({
+        schemaVersion: 2,
+        mediaType: 'application/vnd.oci.image.index.v1+json',
+        manifests: [
+          {
+            mediaType: child1.manifestMediaType,
+            digest: child1.manifestDigest,
+            size: child1.manifestBytes.length,
+            platform: { architecture: 'amd64', os: 'linux' },
+          },
+          {
+            mediaType: child2.manifestMediaType,
+            digest: child2.manifestDigest,
+            size: child2.manifestBytes.length,
+            platform: { architecture: 'arm64', os: 'linux' },
+          },
+        ],
+      }),
+      'utf8',
+    );
+    const indexTag = 'index';
+    const indexRes = await rawPutManifest(
+      session.repoName,
+      admin,
+      imageA,
+      indexTag,
+      indexBytes,
+      'application/vnd.oci.image.index.v1+json',
+    );
+
+    // Per createManifestList in AbstractDockerProtocolTxFacade (line 267-270), the server
+    // calls verifyManifestsExist BEFORE writing the index. If child1 is gone, this check fails
+    // and the index push should be refused with 400 or similar.
+    expect(
+      indexRes.status,
+      'index referencing deleted child is refused (per verifyManifestsExist)',
+    ).not.toBe(201);
+
+    // Verify child2 (which was tagged) is still reachable
+    const child2ByTagRes = await rawGetManifest(session.repoName, admin, imageA, 'child2');
+    expect(child2ByTagRes.status, 'child2 is still pullable by tag').toBe(200);
   });
 });

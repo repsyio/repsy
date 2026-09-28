@@ -3398,7 +3398,15 @@ IllegalArgumentException("unsupportedMediaType")` branch B4/RPS-1110 above pins 
   proven by reading the PULLED config blob's own `architecture` field back out, not merely trusting
   the index's platform label.
 
-- No new backend bug was found while building this suite. R13 (`registry-rules.spec.ts`) had
+- **HD-2 (BuildKit attestation manifest inside multi-platform index): pinned live at a backend bug
+  (RPS-1731)**. When an attestation manifest (empty config, no subject, referenced as an entry in an
+  index's manifests array with no platform field) is pushed, the backend returns HTTP 500: `null value
+  in column "media_type" of relation "docker_manifest" violates not-null constraint`. The test is
+  correct (requests a valid OCI manifest); the backend fails to persist the manifest media type for
+  attestation manifests. `test.fail(true, 'RPS-1731: ...')` marks the test until the backend fix
+  lands.
+
+- No other backend bugs were found while building this suite. R13 (`registry-rules.spec.ts`) had
   already pinned the raw-HTTP shape of an index push; RPS-946 ("Docker image manifest lookup by
   digest fails for per-platform manifests of multi-platform tags", filed independently, status
   Done) turned out to be about the _different_ panel UI endpoint
