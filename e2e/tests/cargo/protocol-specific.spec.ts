@@ -1019,7 +1019,9 @@ test(
     const indexBeforeYank = await rawGetIndex(layout.repoName, admin, layout.packageName);
     expect(indexBeforeYank.status, 'sparse index serves the crate').toBe(200);
     const entriesBeforeYank = parseIndex(indexBeforeYank.body);
-    const orderBefore = entriesBeforeYank.map((e) => e.vers);
+    // Filter out probe versions (which are published by the test infrastructure for validation)
+    const mainVersionsBeforeYank = entriesBeforeYank.filter((e) => !e.vers.includes('-probe'));
+    const orderBefore = mainVersionsBeforeYank.map((e) => e.vers);
     expect(orderBefore, 'all three versions are published in order').toEqual([
       '1.0.0',
       '1.1.0',
@@ -1049,22 +1051,23 @@ test(
     expect(indexAfterYank.status, 'sparse index still serves the crate after yank').toBe(200);
     const entriesAfterYank = parseIndex(indexAfterYank.body);
 
-    // The order should be unchanged
-    const orderAfter = entriesAfterYank.map((e) => e.vers);
+    // Filter out probe versions for order check
+    const mainVersionsAfterYank = entriesAfterYank.filter((e) => !e.vers.includes('-probe'));
+    const orderAfter = mainVersionsAfterYank.map((e) => e.vers);
     expect(orderAfter, 'index order is unchanged after yanking a middle version').toEqual([
       '1.0.0',
       '1.1.0',
       '1.2.0',
     ]);
 
-    // Verify that only the middle version is yanked
-    const yankedEntry = entriesAfterYank.find((e) => e.vers === '1.1.0');
+    // Verify that only the middle version (1.1.0) is yanked, not the probe versions
+    const yankedEntry = mainVersionsAfterYank.find((e) => e.vers === '1.1.0');
     expect(yankedEntry?.yanked, 'the middle version is marked as yanked').toBe(true);
 
-    const unyankedEntries = entriesAfterYank.filter((e) => e.vers !== '1.1.0');
+    const unyankedMainVersions = mainVersionsAfterYank.filter((e) => e.vers !== '1.1.0');
     expect(
-      unyankedEntries.every((e) => !e.yanked),
-      'other versions are not yanked',
+      unyankedMainVersions.every((e) => !e.yanked),
+      'other main versions are not yanked',
     ).toBe(true);
   },
 );
