@@ -373,6 +373,29 @@ export async function rawDeleteManifest(
   };
 }
 
+/** `DELETE /v2/<repo>/<image>/manifests/<ref>` with a Basic `Authorization` header sent directly, no
+ *  token exchange -- the route only ever accepts a Bearer value (`DockerAuthPreProcessor
+ *  .authenticateRequest`'s `authHeader.startsWith("Bearer ")` check runs before anything looks at
+ *  the credential itself), so a Basic header here is refused at the same operation hop a missing
+ *  header would be, with the same `delete`-scoped Bearer challenge (`registry-rules.spec.ts`'s
+ *  "R15b"). */
+export async function rawDeleteManifestBasicAuth(
+  repoName: string,
+  credential: MaterializedCredential,
+  image: string,
+  ref: string,
+): Promise<RawResponse & { wwwAuthenticate?: string }> {
+  const res = await rawFetch(v2RepoUrl(repoName, `${image}/manifests/${ref}`), {
+    method: 'DELETE',
+    headers: authHeader(credential),
+  });
+  return {
+    status: res.status,
+    body: res.body,
+    wwwAuthenticate: res.headers.get('www-authenticate') ?? undefined,
+  };
+}
+
 /** `HEAD /v2/<repo>/<image>/blobs/<digest>`. */
 export async function rawHeadBlob(
   repoName: string,
@@ -420,7 +443,7 @@ export async function rawStartUpload(
   credential: MaterializedCredential,
   image: string,
   opts?: { digestAlgorithm?: string },
-): Promise<RawResponse & { hop: 'token' | 'request'; location?: string }> {
+): Promise<RawResponse & { hop: 'token' | 'request'; location?: string; uploadUuid?: string }> {
   const res = await dockerRequest(credential, pushScope(repoName, image), (headers) =>
     rawFetch(v2RepoUrl(repoName, uploadStartPath(image, opts?.digestAlgorithm)), {
       method: 'POST',
@@ -432,6 +455,7 @@ export async function rawStartUpload(
     body: res.body,
     hop: res.hop,
     location: res.headers.get('location') ?? undefined,
+    uploadUuid: res.headers.get('docker-upload-uuid') ?? undefined,
   };
 }
 
@@ -450,17 +474,62 @@ export async function rawStartUploadWithToken(
   repoName: string,
   image: string,
   token: string,
-): Promise<RawResponse> {
-  return rawFetch(v2RepoUrl(repoName, `${image}/blobs/uploads/`), {
+): Promise<RawResponse & { wwwAuthenticate?: string }> {
+  const res = await rawFetch(v2RepoUrl(repoName, `${image}/blobs/uploads/`), {
     method: 'POST',
     headers: bearerHeader(token),
   });
+  return {
+    status: res.status,
+    body: res.body,
+    wwwAuthenticate: res.headers.get('www-authenticate') ?? undefined,
+  };
+}
+
+/** `GET /v2/<repo>/<image>/manifests/<ref>` with a Bearer value the caller already holds, no token
+ *  hop -- the READ-permission analogue of `rawStartUploadWithToken`, for a probe that needs to send
+ *  an already-issued token straight at an operation route instead of exchanging one (RPS-1171: a
+ *  token issued for one repo -- an anonymous pull token of a PUBLIC repo, in particular -- replayed
+ *  against a DIFFERENT repo's manifest). */
+export async function rawGetManifestWithToken(
+  repoName: string,
+  image: string,
+  ref: string,
+  token: string,
+): Promise<RawResponse & { wwwAuthenticate?: string }> {
+  const res = await rawFetch(v2RepoUrl(repoName, `${image}/manifests/${ref}`), {
+    headers: { ...bearerHeader(token), Accept: MANIFEST_ACCEPT },
+  });
+  return {
+    status: res.status,
+    body: res.body,
+    wwwAuthenticate: res.headers.get('www-authenticate') ?? undefined,
+  };
+}
+
+/** Splits `bytes` into `count` roughly-equal, non-empty, contiguous pieces (the last one carries any
+ *  remainder), for `rawUploadBlob`'s `'chunks'` mode. `count` is clamped to at most `bytes.length` so
+ *  a small blob never produces an empty chunk. */
+function splitIntoChunks(bytes: Buffer, count: number): Buffer[] {
+  const n = Math.max(1, Math.min(count, bytes.length));
+  const size = Math.ceil(bytes.length / n);
+  const chunks: Buffer[] = [];
+  for (let offset = 0; offset < bytes.length; offset += size) {
+    chunks.push(bytes.subarray(offset, Math.min(offset + size, bytes.length)));
+  }
+  return chunks;
 }
 
 /**
- * Uploads one blob start-to-finish: `POST` to start, then either one `PATCH` (`mode: 'patch'`) or
- * nothing (`mode: 'monolithic'`, the default) before the final `PUT ?digest=`. Mirrors ggcr's own
- * `remote/write.go` (one `PATCH` streaming the whole blob, or a bare monolithic `PUT`).
+ * Uploads one blob start-to-finish: `POST` to start, then one `PATCH` (`mode: 'patch'`), several
+ * `PATCH`es each with an explicit `Content-Range: <start>-<end>` header (`mode: 'chunks'`,
+ * `opts.chunkCount` chunks, default 3 -- RPS-1113), or nothing (`mode: 'monolithic'`, the default)
+ * before the final `PUT ?digest=`. `'patch'` mirrors ggcr's own `remote/write.go` (one `PATCH`
+ * streaming the whole blob, no declared `Content-Range`); `'chunks'` is what a client resuming an
+ * interrupted upload sends instead, one range at a time. For finer-grained control over individual
+ * chunks (inspecting progress between them, or sending a deliberately wrong one), start the session
+ * with `rawStartUpload` and drive `rawUploadChunk`/`rawUploadStatus` directly instead of this
+ * all-in-one helper.
  */
 export async function rawUploadBlob(
   repoName: string,
@@ -468,7 +537,11 @@ export async function rawUploadBlob(
   image: string,
   bytes: Buffer,
   digest: string,
-  opts?: { mode?: 'monolithic' | 'patch'; digestAlgorithm?: string },
+  opts?: {
+    mode?: 'monolithic' | 'patch' | 'chunks';
+    digestAlgorithm?: string;
+    chunkCount?: number;
+  },
 ): Promise<RawResponse & { hop: 'token' | 'request'; digestHeader?: string }> {
   const res = await dockerRequest(credential, pushScope(repoName, image), async (headers) => {
     const startRes = await rawFetch(
@@ -493,11 +566,28 @@ export async function rawUploadBlob(
         body: new Uint8Array(bytes),
       });
       location = patchRes.headers.get('location') ?? location;
+    } else if (opts?.mode === 'chunks') {
+      let start = 0;
+      for (const chunk of splitIntoChunks(bytes, opts.chunkCount ?? 3)) {
+        const end = start + chunk.length - 1;
+        const chunkRes = await rawFetch(new URL(location, env.repoBaseUrl).toString(), {
+          method: 'PATCH',
+          headers: {
+            ...headers,
+            'Content-Type': 'application/octet-stream',
+            'Content-Range': `${start}-${end}`,
+          },
+          body: new Uint8Array(chunk),
+        });
+        location = chunkRes.headers.get('location') ?? location;
+        start = end + 1;
+      }
     }
 
     const finalizeUrl = new URL(location, env.repoBaseUrl);
     finalizeUrl.searchParams.set('digest', digest);
-    const body = opts?.mode === 'patch' ? undefined : new Uint8Array(bytes);
+    const body =
+      opts?.mode === 'monolithic' || opts?.mode === undefined ? new Uint8Array(bytes) : undefined;
     return rawFetch(finalizeUrl.toString(), {
       method: 'PUT',
       headers: body ? { ...headers, 'Content-Type': 'application/octet-stream' } : headers,
@@ -509,6 +599,102 @@ export async function rawUploadBlob(
     body: res.body,
     hop: res.hop,
     digestHeader: res.headers.get('docker-content-digest') ?? undefined,
+  };
+}
+
+/**
+ * `PATCH <location>` with an explicit `Content-Range: <start>-<end>` header (the plain `<start>-<end>`
+ * form `AbstractDockerUploadChunkProtocolMethodHandler` parses, not RFC 7233's `bytes=.../...`), for a
+ * caller driving a chunked upload chunk by chunk instead of `rawUploadBlob`'s bundled `'chunks'` mode
+ * -- so a test can inspect the session's progress between chunks (`rawUploadStatus`) or send a
+ * deliberately out-of-order chunk and see the `416`'s own recovery `Range` (RPS-1113). `location` is
+ * the session's own `Location`, from `rawStartUpload` or from a previous `rawUploadChunk`'s own
+ * response (both absolute or relative; resolved against `env.repoBaseUrl` either way).
+ */
+export async function rawUploadChunk(
+  repoName: string,
+  credential: MaterializedCredential,
+  image: string,
+  location: string,
+  chunk: Buffer,
+  contentRange: string,
+): Promise<
+  RawResponse & {
+    hop: 'token' | 'request';
+    location?: string;
+    range?: string;
+    uploadUuid?: string;
+  }
+> {
+  const res = await dockerRequest(credential, pushScope(repoName, image), (headers) =>
+    rawFetch(new URL(location, env.repoBaseUrl).toString(), {
+      method: 'PATCH',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/octet-stream',
+        'Content-Range': contentRange,
+      },
+      body: new Uint8Array(chunk),
+    }),
+  );
+  return {
+    status: res.status,
+    body: res.body,
+    hop: res.hop,
+    location: res.headers.get('location') ?? undefined,
+    range: res.headers.get('range') ?? undefined,
+    uploadUuid: res.headers.get('docker-upload-uuid') ?? undefined,
+  };
+}
+
+/**
+ * `PUT <location>?digest=<digest>` with no body -- the finalize of a chunked upload whose bytes were
+ * already sent via one or more `rawUploadChunk` calls (the tail end of `rawUploadBlob`'s own
+ * `'chunks'` mode, factored out for a caller driving the chunks itself).
+ */
+export async function rawFinalizeUpload(
+  repoName: string,
+  credential: MaterializedCredential,
+  image: string,
+  location: string,
+  digest: string,
+): Promise<RawResponse & { hop: 'token' | 'request'; digestHeader?: string }> {
+  const res = await dockerRequest(credential, pushScope(repoName, image), (headers) => {
+    const finalizeUrl = new URL(location, env.repoBaseUrl);
+    finalizeUrl.searchParams.set('digest', digest);
+    return rawFetch(finalizeUrl.toString(), { method: 'PUT', headers });
+  });
+  return {
+    status: res.status,
+    body: res.body,
+    hop: res.hop,
+    digestHeader: res.headers.get('docker-content-digest') ?? undefined,
+  };
+}
+
+/**
+ * `GET /v2/<repo>/<image>/blobs/uploads/<uuid>` -- how a client resumes an interrupted upload
+ * (`AbstractDockerUploadStatusProtocolMethodHandler`): `204` with the `Range` of the bytes already
+ * written (`0-<writtenBytes-1>`, `0-0` for a session with nothing written yet), or `404
+ * BLOB_UPLOAD_UNKNOWN` for a session that does not exist (or has already been finalized). Needs
+ * WRITE, so it goes through the two-hop `dockerRequest` for `pushScope`, same as the upload it is
+ * checking on.
+ */
+export async function rawUploadStatus(
+  repoName: string,
+  credential: MaterializedCredential,
+  image: string,
+  uuid: string,
+): Promise<RawResponse & { hop: 'token' | 'request'; range?: string; location?: string }> {
+  const res = await dockerRequest(credential, pushScope(repoName, image), (headers) =>
+    rawFetch(v2RepoUrl(repoName, `${image}/blobs/uploads/${uuid}`), { headers }),
+  );
+  return {
+    status: res.status,
+    body: res.body,
+    hop: res.hop,
+    range: res.headers.get('range') ?? undefined,
+    location: res.headers.get('location') ?? undefined,
   };
 }
 

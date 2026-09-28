@@ -37,15 +37,21 @@ import {
   pullScope,
   pushScope,
   rawDeleteManifest,
+  rawDeleteManifestBasicAuth,
+  rawFinalizeUpload,
   rawGetAnonymous,
   rawGetManifest,
+  rawGetManifestWithToken,
   rawHeadBlob,
   rawHeadManifest,
   rawPing,
   rawPutManifest,
   rawStartUpload,
+  rawStartUploadWithToken,
   rawToken,
   rawUploadBlob,
+  rawUploadChunk,
+  rawUploadStatus,
   sha256Hex,
   v2Url,
   type RawResponse,
@@ -64,6 +70,30 @@ interface Layout {
  *  sha512 names it by (RPS-1244). */
 function sha512Digest(bytes: Buffer): string {
   return `sha512:${createHash('sha512').update(bytes).digest('hex')}`;
+}
+
+/**
+ * Flips one character of a JWT's own signature (its third, dot-separated segment) so the token is
+ * still well-formed but fails signature verification -- "R1c"'s tampered-JWT case (RPS-1171). Picks
+ * a character in the MIDDLE of the signature, not the last one: base64url packs 4 characters into 3
+ * bytes, so a signature whose length isn't a multiple of 4 (every HMAC/RSA signature here) ends with
+ * a final character whose low bits are padding a decoder ignores -- flipping only those changes
+ * nothing a verifier reads. A middle character sits inside a fully byte-aligned group, so a large
+ * value change (+32, half the 64-entry alphabet: this flips the top bit of the 6-bit group) is
+ * guaranteed to change the decoded bytes, however the sender aligns them.
+ */
+function tamperSignature(jwt: string): string {
+  const parts = jwt.split('.');
+  if (parts.length !== 3 || parts[2].length < 2) {
+    throw new Error(`not a well-formed JWT to tamper with: ${jwt}`);
+  }
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  const sig = parts[2];
+  const index = Math.floor(sig.length / 2);
+  const current = sig[index];
+  const replacement = alphabet[(alphabet.indexOf(current) + 32) % alphabet.length];
+  parts[2] = sig.slice(0, index) + replacement + sig.slice(index + 1);
+  return parts.join('.');
 }
 
 async function newRepo(
@@ -1092,6 +1122,265 @@ test.describe('docker registry rules (raw HTTP)', () => {
       expect(ociErrorOf(upload.body)?.code, "the token hop's 401 has an OCI body").toBe(
         'UNAUTHORIZED',
       );
+    },
+  );
+
+  test(
+    'R4c: chunked-upload progress (GET uploads/<uuid>) and an out-of-order Content-Range (416, ' +
+      'still reporting the resumable Range) (RPS-1113)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'chunkprogress');
+      const admin = adminCredential();
+
+      // A fresh upload, driven chunk by chunk (not `rawUploadBlob`'s bundled `'chunks'` mode), so
+      // `GET uploads/<uuid>` can be checked in between: each PATCH's own `Range` and the status
+      // endpoint's `Range` must agree, and must be the RUNNING total, not the last chunk's own size.
+      const bytes = Buffer.from('R4c chunked upload payload, sent in pieces. '.repeat(20), 'utf8');
+      const start = await rawStartUpload(layout.repoName, admin, layout.image);
+      expect(start.status, 'start a fresh upload session').toBe(202);
+      const uuid = start.uploadUuid;
+      const startLocation = start.location;
+      if (!uuid || !startLocation) {
+        throw new Error(
+          `no session Location/uuid from the upload start (got ${JSON.stringify(start)})`,
+        );
+      }
+
+      const sizes = [40, 90, bytes.length - 130];
+      expect(
+        sizes.reduce((a, b) => a + b, 0),
+        'the three chunk sizes cover the whole payload',
+      ).toBe(bytes.length);
+
+      let offset = 0;
+      let location = startLocation;
+      for (const size of sizes) {
+        const end = offset + size - 1;
+        const chunk = await rawUploadChunk(
+          layout.repoName,
+          admin,
+          layout.image,
+          location,
+          bytes.subarray(offset, offset + size),
+          `${offset}-${end}`,
+        );
+        expect(chunk.status, `PATCH ${offset}-${end}`).toBe(202);
+        expect(chunk.range, "the PATCH's own progress is the RUNNING total").toBe(`0-${end}`);
+        expect(chunk.uploadUuid).toBe(uuid);
+        location = chunk.location ?? location;
+
+        const status = await rawUploadStatus(layout.repoName, admin, layout.image, uuid);
+        expect(status.status, 'GET uploads/<uuid> after the chunk').toBe(204);
+        expect(status.range, 'the status endpoint reports the SAME progress as the PATCH did').toBe(
+          `0-${end}`,
+        );
+
+        offset = end + 1;
+      }
+      expect(offset).toBe(bytes.length);
+
+      const digest = `sha256:${sha256Hex(bytes)}`;
+      const finalize = await rawFinalizeUpload(
+        layout.repoName,
+        admin,
+        layout.image,
+        location,
+        digest,
+      );
+      expect(finalize.status, 'the finalize PUT after three correctly-ordered chunks').toBe(201);
+      expect(finalize.digestHeader).toBe(digest);
+
+      // A SECOND, fresh upload: send a chunk that skips ahead of where the session actually is.
+      const bytes2 = Buffer.from('R4c out-of-order payload for the 416 case. '.repeat(10), 'utf8');
+      const start2 = await rawStartUpload(layout.repoName, admin, layout.image);
+      expect(start2.status).toBe(202);
+      const uuid2 = start2.uploadUuid;
+      const start2Location = start2.location;
+      if (!uuid2 || !start2Location) {
+        throw new Error(`no session Location/uuid (got ${JSON.stringify(start2)})`);
+      }
+
+      const goodFirst = await rawUploadChunk(
+        layout.repoName,
+        admin,
+        layout.image,
+        start2Location,
+        bytes2.subarray(0, 50),
+        '0-49',
+      );
+      expect(goodFirst.status, 'the first, correctly-ordered chunk').toBe(202);
+      expect(goodFirst.range).toBe('0-49');
+      const location2 = goodFirst.location ?? start2Location;
+
+      // Skips bytes 50-59: the upload is at 50, this chunk claims to start at 60.
+      const badChunk = await rawUploadChunk(
+        layout.repoName,
+        admin,
+        layout.image,
+        location2,
+        bytes2.subarray(60, 100),
+        '60-99',
+      );
+      expect(badChunk.status, 'an out-of-order Content-Range is refused with 416').toBe(416);
+      expect(
+        badChunk.range,
+        "the 416 still reports the session's OWN current Range (not the rejected chunk's), so " +
+          'the client can resume correctly',
+      ).toBe('0-49');
+      expect(badChunk.uploadUuid, 'the same session, still open').toBe(uuid2);
+      expect(badChunk.location, 'a Location to resume the upload at').toBeTruthy();
+
+      // The status endpoint agrees: the rejected chunk left no trace on the session.
+      const statusAfterReject = await rawUploadStatus(layout.repoName, admin, layout.image, uuid2);
+      expect(statusAfterReject.status).toBe(204);
+      expect(statusAfterReject.range, 'unaffected by the refused chunk').toBe('0-49');
+
+      // Sending the CORRECT next chunk (starting where the upload actually is) succeeds.
+      const goodSecond = await rawUploadChunk(
+        layout.repoName,
+        admin,
+        layout.image,
+        badChunk.location ?? location2,
+        bytes2.subarray(50, bytes2.length),
+        `50-${bytes2.length - 1}`,
+      );
+      expect(goodSecond.status, 'the correct next chunk succeeds after the 416').toBe(202);
+      expect(goodSecond.range).toBe(`0-${bytes2.length - 1}`);
+
+      const digest2 = `sha256:${sha256Hex(bytes2)}`;
+      const finalize2 = await rawFinalizeUpload(
+        layout.repoName,
+        admin,
+        layout.image,
+        goodSecond.location ?? location2,
+        digest2,
+      );
+      expect(finalize2.status, 'finishes successfully after resuming correctly').toBe(201);
+      expect(finalize2.digestHeader).toBe(digest2);
+    },
+  );
+
+  test(
+    'R1c: Bearer auth edge cases -- a raw deploy-token secret as a Bearer value, a tampered JWT, ' +
+      "and a public repo's own anonymous pull token replayed against a DIFFERENT, PRIVATE repo, " +
+      'are all refused (RPS-1171)',
+    { tag: ['@auth', '@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'bearerauth1');
+
+      // A raw deploy-token secret handed to a registry request AS the Bearer value itself (skipping
+      // the /v2/token exchange every real docker client does) must be refused: Docker's own
+      // `acceptsRawDeployTokenBearer()` is false (`DockerAuthComponent`, RPS-1171) -- unlike every
+      // other protocol in this harness, which DOES accept a raw deploy-token Bearer. Confirmed live:
+      // this is a 401, not the silent-accept that would be a real security hole.
+      const rw = await seeder.createToken(layout.repoName, { readOnly: false });
+      const rawSecretRes = await rawStartUploadWithToken(layout.repoName, layout.image, rw.token);
+      expect(
+        rawSecretRes.status,
+        'a raw deploy-token secret used directly as a Bearer value is refused, not silently ' +
+          'accepted',
+      ).toBe(401);
+
+      // A tampered JWT: a real, valid token-exchange JWT with one byte of its own signature flipped.
+      const admin = adminCredential();
+      const real = await rawToken(admin, pushScope(layout.repoName, layout.image));
+      expect(real.status, 'issuing the real token to tamper with').toBe(200);
+      if (!real.token) {
+        throw new Error(`no token issued to tamper with (got ${JSON.stringify(real)})`);
+      }
+      const tamperedRes = await rawStartUploadWithToken(
+        layout.repoName,
+        layout.image,
+        tamperSignature(real.token),
+      );
+      expect(tamperedRes.status, 'a tampered signature is refused').toBe(401);
+
+      // An anonymous-scope JWT issued for a PUBLIC repo's own pull scope, replayed against a
+      // DIFFERENT, PRIVATE repo. A private repo's reads are not skipped the way a public repo's are
+      // (`DockerAuthPreProcessor.shouldSkipAuthentication`), so the token is actually inspected here
+      // -- and an ANONYMOUS-typed token is refused unconditionally by `ProtocolAuthService
+      // .handleBearerAuth`, whichever repo it names.
+      const publicLayout = await newRepo(seeder, 'bearerauth1pub', { privateRepo: false });
+      const privateLayout = await newRepo(seeder, 'bearerauth1priv');
+      const anon = await rawToken({}, pullScope(publicLayout.repoName, publicLayout.image));
+      expect(anon.status, "issuing the public repo's own anonymous pull token").toBe(200);
+      if (!anon.token) {
+        throw new Error(`no anonymous token issued (got ${JSON.stringify(anon)})`);
+      }
+      const replayed = await rawGetManifestWithToken(
+        privateLayout.repoName,
+        privateLayout.image,
+        'latest',
+        anon.token,
+      );
+      expect(
+        replayed.status,
+        'an anonymous pull token of a PUBLIC repo, replayed against a DIFFERENT PRIVATE repo',
+      ).toBe(401);
+      expect(
+        replayed.wwwAuthenticate,
+        'a Bearer challenge naming the pull scope the request actually needed',
+      ).toMatch(/^Bearer realm=/);
+      expect(replayed.wwwAuthenticate).toContain(
+        `scope="repository:${repoPath(privateLayout.repoName)}/${privateLayout.image}:pull"`,
+      );
+
+      // The same anonymous token still works for what it was actually issued for: a Bearer header is
+      // ALWAYS required (`DockerHeaderPreProcessor`, priority 50, refuses anything without one before
+      // `DockerAuthPreProcessor` even runs -- R1b pins this for a public repo's own manifest pull too),
+      // but for a PUBLIC repo's own read, once that gate is passed, the token's CONTENTS are never
+      // actually checked (`shouldSkipAuthentication`): so the anonymous token it was issued with still
+      // opens it, a 404 (no such tag) proving the request reached the handler, not a 401.
+      const ownRepoRead = await rawGetManifestWithToken(
+        publicLayout.repoName,
+        publicLayout.image,
+        'doesnotexist',
+        anon.token,
+      );
+      expect(
+        ownRepoRead.status,
+        'the SAME anonymous token still works for the public repo it was issued for ' +
+          '(404: no such tag, not a 401)',
+      ).toBe(404);
+    },
+  );
+
+  test(
+    'R15b: DELETE with a Basic Authorization header, instead of the expected Bearer ' +
+      'token-exchange flow, is refused (RPS-1216)',
+    { tag: ['@settings', '@auth', '@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'deletebasic', { privateRepo: false });
+      const admin = adminCredential();
+      const pushed = await rawPushImage(layout, admin, 'tag-basic', 'r15b');
+      expect(pushed.manifestRes.status).toBe(201);
+
+      const basicDelete = await rawDeleteManifestBasicAuth(
+        layout.repoName,
+        admin,
+        layout.image,
+        pushed.built.manifestDigest,
+      );
+      expect(
+        basicDelete.status,
+        'a Basic Authorization header on the DELETE route, instead of a Bearer token, is refused',
+      ).toBe(401);
+      expect(
+        basicDelete.wwwAuthenticate,
+        "the operation hop's own Bearer challenge, naming the delete scope this route needs",
+      ).toMatch(/^Bearer realm=/);
+      expect(basicDelete.wwwAuthenticate).toContain(
+        `scope="repository:${repoPath(layout.repoName)}/${layout.image}:delete"`,
+      );
+
+      const stillThere = await rawGetManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        pushed.built.manifestDigest,
+      );
+      expect(stillThere.status, 'nothing was deleted by the refused Basic-auth request').toBe(200);
     },
   );
 });
