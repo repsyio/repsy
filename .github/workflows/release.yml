@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    runs-on: warp-ubuntu-latest-x64-4x
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -81,7 +81,7 @@ jobs:
   # module's own directory: it is not part of the Maven reactor and needs neither the core submodule
   # nor the OpenAPI generator cache.
   build-and-push-scanner:
-    runs-on: ubuntu-latest
+    runs-on: warp-ubuntu-latest-x64-2x
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -116,7 +116,7 @@ jobs:
 
   helm-update:
     needs: build-and-push
-    runs-on: ubuntu-latest
+    runs-on: warp-ubuntu-latest-x64-2x
     steps:
       - name: Detect Image Tag
         run: |
@@ -156,7 +156,7 @@ jobs:
   helm-release:
     if: github.ref_type == 'tag'
     needs: [helm-update, build-and-push-scanner]
-    runs-on: ubuntu-latest
+    runs-on: warp-ubuntu-latest-x64-2x
     steps:
       - name: Tag repsy-os-helm with the release tag
         run: |
