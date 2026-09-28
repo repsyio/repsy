@@ -1497,10 +1497,8 @@ test.describe('docker registry rules (raw HTTP)', () => {
         indexObj.mediaType,
       );
       expect(indexRes.status, 'index creation').toBe(201);
-      const indexDigest = indexRes.digestHeader || indexRes.location?.match(/manifests\/(.+?)$/)?.[1];
-      if (!indexDigest) {
-        throw new Error('could not extract index digest from response');
-      }
+      const indexDigest = indexRes.digestHeader;
+      expect(indexDigest, 'index digest in response header').toBeDefined();
 
       // Verify both index and child are pullable before deletion
       const getIndexBefore = await rawGetManifest(layout.repoName, admin, layout.image, 'multiarch-tag');
@@ -1519,7 +1517,7 @@ test.describe('docker registry rules (raw HTTP)', () => {
         layout.repoName,
         admin,
         layout.image,
-        indexDigest,
+        indexDigest!,
       );
       expect(deleteIndex.status, 'DELETE index by digest').toBe(202);
 
