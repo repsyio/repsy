@@ -33,6 +33,7 @@ import { RepoType } from '../../src/api/panel-api.js';
 import {
   adminCredential,
   rawStartUpload,
+  rawUploadChunk,
   rawUploadStatus,
 } from '../../src/clients/docker-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
@@ -66,8 +67,16 @@ test.describe('docker > abandoned upload cleanup', () => {
       expect(startRes.location, 'location from Location header').toBeDefined();
 
       const uploadUuid = startRes.uploadUuid!;
+      const uploadLocation = startRes.location!;
       console.log('DEBUG: startRes.uploadUuid =', uploadUuid);
-      console.log('DEBUG: startRes.location =', startRes.location);
+      console.log('DEBUG: startRes.location =', uploadLocation);
+
+      // Send at least one byte to ensure the upload session is persisted
+      // (The upload session may only be created after the first chunk)
+      const testChunk = Buffer.from('test', 'utf8');
+      const chunkRes = await rawUploadChunk(repo.name, credential, image, uploadLocation, testChunk, '0-3');
+      console.log('DEBUG: chunkRes.status =', chunkRes.status);
+      expect(chunkRes.status, 'First chunk should succeed').toBe(202);
 
       // Verify the upload session exists by checking its status immediately
       const statusBeforeRes = await rawUploadStatus(repo.name, credential, image, uploadUuid);
@@ -105,6 +114,12 @@ test.describe('docker > abandoned upload cleanup', () => {
       for (const image of images) {
         const startRes = await rawStartUpload(repo.name, credential, image);
         expect(startRes.status, `start upload for ${image}`).toBe(202);
+
+        // Send at least one byte to ensure the upload session is persisted
+        const testChunk = Buffer.from('test', 'utf8');
+        const chunkRes = await rawUploadChunk(repo.name, credential, image, startRes.location!, testChunk, '0-3');
+        expect(chunkRes.status, `first chunk for ${image}`).toBe(202);
+
         uploads.push({
           image,
           uploadUuid: startRes.uploadUuid!,
