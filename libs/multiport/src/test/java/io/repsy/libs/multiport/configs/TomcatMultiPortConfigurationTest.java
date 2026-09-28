@@ -28,6 +28,7 @@ class TomcatMultiPortConfigurationTest {
 
   private static final int API_PORT = 8081;
   private static final int TIMEOUT = 45_000;
+  private static final int MAX_PART_COUNT = 7;
 
   @Test
   void additionalPlainConnectorShouldGetTheSharedConnectorSettings() {
@@ -37,6 +38,7 @@ class TomcatMultiPortConfigurationTest {
     properties.setPorts(Map.of("api", API_PORT));
     final var configuration = new TomcatMultiPortConfiguration(properties);
     ReflectionTestUtils.setField(configuration, "connectionTimeout", TIMEOUT);
+    ReflectionTestUtils.setField(configuration, "maxPartCount", MAX_PART_COUNT);
     final var factory = new TomcatServletWebServerFactory();
 
     configuration.repsyTomcatCustomizer().customize(factory);
@@ -48,6 +50,7 @@ class TomcatMultiPortConfigurationTest {
     assertThat(connector.getEncodedSolidusHandling()).isEqualTo("decode");
     assertThat(((Http11NioProtocol) connector.getProtocolHandler()).getConnectionTimeout())
         .isEqualTo(TIMEOUT);
+    assertThat(connector.getMaxPartCount()).isEqualTo(MAX_PART_COUNT);
     assertThat(factory.getConnectorCustomizers()).hasSize(1);
   }
 }

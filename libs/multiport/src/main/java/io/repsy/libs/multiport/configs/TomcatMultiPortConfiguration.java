@@ -38,6 +38,12 @@ public class TomcatMultiPortConfiguration {
   @Value("${multiport.tomcat.connection-timeout:120000}")
   private int connectionTimeout;
 
+  // 50 is Tomcat's own bare-connector default (Connector.maxPartCount), so an application that
+  // never sets multiport.tomcat.max-part-count (redirected from server.tomcat.max-part-count in
+  // application.yml) keeps what an unconfigured connector would already do.
+  @Value("${multiport.tomcat.max-part-count:50}")
+  private int maxPartCount;
+
   @Bean
   public WebServerFactoryCustomizer<@NonNull TomcatServletWebServerFactory>
       repsyTomcatCustomizer() {
@@ -82,7 +88,7 @@ public class TomcatMultiPortConfiguration {
 
     connector.setScheme("http");
     connector.setPort(port);
-    RepsyConnectorSettings.apply(connector, this.connectionTimeout, null);
+    RepsyConnectorSettings.apply(connector, this.connectionTimeout, this.maxPartCount, null);
 
     return connector;
   }

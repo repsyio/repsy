@@ -81,6 +81,10 @@ multiport:
   main-port: ${server.port}
   tomcat:
     connection-timeout: ${server.tomcat.connection-timeout}
+    # Spring Boot applies server.tomcat.max-part-count to the primary connector only; the
+    # additional connectors (TomcatMultiPortConfiguration's plain aliases, and the TLS listeners
+    # of SslConnectorCustomizer) take it from here through RepsyConnectorSettings.apply (RPS-1657).
+    max-part-count: ${server.tomcat.max-part-count}
   ports:
     api: ${API_PORT:8080}
   port-aliases:
