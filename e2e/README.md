@@ -237,6 +237,7 @@ e2e/
       packument-read.spec.ts    # raw-HTTP reads: abbreviated packument, no publish-only fields, HEAD, ETag/304/gzip, undeprecate, tarball header (RPS-1356..1360, 1363)
       unpublish.spec.ts         # real `npm unpublish` (RPS-1289): one version (unscoped/scoped), the only version, a whole package; refused for a read-write deploy token (RPS-1424)
       size-limits.spec.ts       # RPS-1482/RPS-1561 registerSizeLimitSpecs(npmAdapter): a real `npm publish` over NPM_MAX_PUBLISH_SIZE, @limits
+      validation.spec.ts        # RPS-1717 npm validation edge cases: package name/version length limits (boundary probes), packageNameMismatch (tarball name != URL), unpublish races (concurrent unpublish invariants), cross-user token revoke (all requests refused after revocation)
     npm-clients/
       npm/publish-consume.spec.ts   # registerPublishConsumeLoop(npmFamilyAdapter(npmClient)): the catalog through the npm-family harness
       pnpm/*.spec.ts            # pnpm: the catalog, `pnpm -r publish` (workspace: rewrite), native-command wire proof, resolution / minimumReleaseAge
