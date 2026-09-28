@@ -111,8 +111,9 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
   test('artifactId at 255 chars (max) succeeds', { tag: ['@negative'] }, async ({ seeder }) => {
     // MavenPublishLimits.MAX_ARTIFACT_ID_LENGTH = 255
     const maxArtifactId = 'a'.repeat(255);
-    const layout = await newRepo(seeder, undefined, maxArtifactId);
-    const version = '1.0';
+    // Use short groupId to keep path length reasonable (filesystem limits)
+    const layout = await newRepo(seeder, 'io', maxArtifactId);
+    const version = '1';
 
     const dir = versionDir(layout.groupId, maxArtifactId, version);
     const path = `${dir}/${maxArtifactId}-${version}.pom`;
@@ -128,8 +129,9 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
   }) => {
     // MavenPublishLimits.MAX_ARTIFACT_ID_LENGTH = 255. Test one over.
     const tooLongArtifactId = 'a'.repeat(256);
-    const layout = await newRepo(seeder, undefined, tooLongArtifactId);
-    const version = '1.0';
+    // Use short groupId to keep path length reasonable (filesystem limits)
+    const layout = await newRepo(seeder, 'io', tooLongArtifactId);
+    const version = '1';
 
     const dir = versionDir(layout.groupId, tooLongArtifactId, version);
     const path = `${dir}/${tooLongArtifactId}-${version}.pom`;
@@ -148,7 +150,8 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
   test('version at 255 chars (max) succeeds', { tag: ['@negative'] }, async ({ seeder }) => {
     // MavenPublishLimits.MAX_VERSION_LENGTH = 255
     const maxVersion = 'a'.repeat(255);
-    const layout = await newRepo(seeder);
+    // Use short groupId and artifactId to keep path length reasonable (filesystem limits)
+    const layout = await newRepo(seeder, 'io', 'a');
 
     const dir = versionDir(layout.groupId, layout.artifactId, maxVersion);
     const path = `${dir}/${layout.artifactId}-${maxVersion}.pom`;
@@ -164,7 +167,8 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
   }) => {
     // MavenPublishLimits.MAX_VERSION_LENGTH = 255. Test one over.
     const tooLongVersion = 'a'.repeat(256);
-    const layout = await newRepo(seeder);
+    // Use short groupId and artifactId to keep path length reasonable (filesystem limits)
+    const layout = await newRepo(seeder, 'io', 'a');
 
     const dir = versionDir(layout.groupId, layout.artifactId, tooLongVersion);
     const path = `${dir}/${layout.artifactId}-${tooLongVersion}.pom`;
