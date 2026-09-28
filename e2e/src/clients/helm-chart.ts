@@ -138,6 +138,33 @@ export async function buildChart(opts: {
   };
 }
 
+/** Builds a `.tgz` from raw `Chart.yaml` text (a string), packing it with `values.yaml` and a
+ *  marker, without calling `renderChartYaml`. Used to test validation branches by building charts
+ *  with intentionally invalid YAML structures. */
+export async function buildChartFromRawYaml(opts: {
+  chartYaml: string;
+  marker: string;
+  name: string;
+  version: string;
+}): Promise<BuiltChart> {
+  const tar = buildTar([
+    { name: `${opts.name}/Chart.yaml`, data: Buffer.from(opts.chartYaml, 'utf8') },
+    { name: `${opts.name}/values.yaml`, data: Buffer.from('replicaCount: 1\n', 'utf8') },
+    { name: `${opts.name}/e2e-marker.txt`, data: Buffer.from(opts.marker, 'utf8') },
+  ]);
+  const tgzBytes = zlib.gzipSync(tar, { level: 6 });
+  const hex = sha256Hex(tgzBytes);
+
+  return {
+    tgzBytes,
+    tgzDigest: `sha256:${hex}`,
+    tgzDigestHex: hex,
+    chartYaml: opts.chartYaml,
+    name: opts.name,
+    version: opts.version,
+  };
+}
+
 /** Writes `built.tgzBytes` to `<dir>/<name>-<version>.tgz` -- a real `.tgz` FILE PATH, which every
  *  real client here needs (`helm push`/`helm cm-push`/`helm pull`'s own file layout), and returns
  *  that path. */
