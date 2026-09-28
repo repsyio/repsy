@@ -15,7 +15,7 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import moment from 'moment';
@@ -33,6 +33,7 @@ import { PaginationComponent } from '../../../shared/components/pagination/pagin
 import { SearchboxComponent } from '../../../shared/components/searchbox/searchbox.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../shared/components/tooltip/tooltip.component';
+import { restoreListFocus } from '../../../shared/util/list-focus-restore.util';
 import {
   readListPageParam,
   readListQueryParam,
@@ -47,6 +48,9 @@ export const USER_SEARCH_DEBOUNCE_MS = 250;
 interface ListRequest {
   q: string;
   page: number;
+  /** Whatever had the keyboard focus when this request was dispatched (RPS-1669), or `null`/`body` for
+   *  a mouse-driven one; the fallback below only reclaims the focus once its own control is really gone. */
+  previouslyFocused?: Element | null;
 }
 
 @Component({
@@ -98,6 +102,7 @@ export class UserManagementComponent implements OnInit, OnDestroy {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly authService: AuthService,
+    private readonly elementRef: ElementRef<HTMLElement>,
   ) {
     // A request supersedes the one before it: switchMap unsubscribes from it, which cancels it on the wire,
     // so a slow answer of an old search never reaches the view.
@@ -106,14 +111,18 @@ export class UserManagementComponent implements OnInit, OnDestroy {
         .pipe(
           switchMap((request) =>
             this.userService.listUsers(request.q || undefined, request.page, this.pageSize).pipe(
+              map((pagedModel) => ({ request, pagedModel })),
               // The HTTP error interceptor already shows the toast; the rows on screen stay.
               catchError(() => EMPTY),
             ),
           ),
         )
-        .subscribe((pagedModel) => {
+        .subscribe(({ request, pagedModel }) => {
           this.pagedData = pagedModel;
           this.users = pagedModel.content ?? [];
+          // RPS-1669: a row's own menu button is gone once the row that had it is deleted, and nothing
+          // else claims the focus; this reclaims it once the new rows are in, only when that happened.
+          restoreListFocus(request.previouslyFocused, this.elementRef.nativeElement);
         }),
     );
 
@@ -145,10 +154,13 @@ export class UserManagementComponent implements OnInit, OnDestroy {
     this.adminCountSubscription?.unsubscribe();
   }
 
-  /** Loads the current page of the current search, and the admin count that goes with it. */
-  public fetchUsers(): void {
+  /** Loads the current page of the current search, and the admin count that goes with it.
+   *  `previouslyFocused` lets a caller (a delete, whose opener is about to vanish) name the control that
+   *  had the focus before it starts asking (RPS-1669), instead of the moment this reload actually goes
+   *  out; a plain reload needs no fallback and leaves it out. */
+  public fetchUsers(previouslyFocused: Element | null = null): void {
     this.syncUrl();
-    this.requests.next({ q: this.appliedQuery, page: this.pageNum });
+    this.requests.next({ q: this.appliedQuery, page: this.pageNum, previouslyFocused });
     this.adminCountSubscription?.unsubscribe();
     this.adminCountSubscription = this.userService.countAdmins().subscribe({
       next: (count) => {
@@ -250,6 +262,9 @@ export class UserManagementComponent implements OnInit, OnDestroy {
     }
 
     const successMsg = 'User deleted successfully';
+    // Captured now (RPS-1669): by the time the reload actually fires, the danger modal has already
+    // closed and, since its own opener (this row's menu item) is gone, given up on restoring the focus.
+    const previouslyFocused = document.activeElement;
     this.dangerModalService.show('Delete User', 'Delete', () => {
       this.operationLock = true;
 
@@ -267,7 +282,7 @@ export class UserManagementComponent implements OnInit, OnDestroy {
               this.pageNum = 0;
             }
             this.resetSearch();
-            this.fetchUsers();
+            this.fetchUsers(previouslyFocused);
             this.toastService.show(successMsg, 'success');
           },
           // The HTTP error interceptor already shows the failure; see resetPassword (RPS-1650).

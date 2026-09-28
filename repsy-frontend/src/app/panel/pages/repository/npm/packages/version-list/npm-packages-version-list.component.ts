@@ -15,7 +15,7 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, OnDestroy } from '@angular/core';
+import { Component, ElementRef, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
@@ -40,6 +40,7 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { restoreListFocus } from '../../../../../shared/util/list-focus-restore.util';
 import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
 import {
   readListPageParam,
@@ -101,6 +102,7 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
     private readonly securityService: SecurityService,
+    private readonly elementRef: ElementRef<HTMLElement>,
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.pagedData = new PagedData<PackageVersionListItem>();
@@ -142,8 +144,10 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
     this.fetchVersions();
   }
 
-  public refreshPage(): void {
-    this.fetchVersions();
+  /** See `NpmPackagesListComponent.refreshPage` (RPS-1669): the caller can name the control that had
+   *  the focus before it started asking, for when this reload's own opener will not survive it. */
+  public refreshPage(previouslyFocused: Element | null = null): void {
+    this.fetchVersions(previouslyFocused);
   }
 
   public sort(option: Sort) {
@@ -170,6 +174,9 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
   }
 
   public deleteVersion(version: PackageVersionListItem) {
+    // Captured now (RPS-1669): by the time the reload actually fires, the danger modal has already
+    // closed and, since its own opener (this version's row menu) is gone, given up on the focus.
+    const previouslyFocused = document.activeElement;
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       this.npmService
@@ -187,7 +194,7 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
               });
             } else {
               this.pageNum = pageAfterDelete(this.versions.length, this.pageNum);
-              this.refreshPage();
+              this.refreshPage(previouslyFocused);
               this.toastService.show('Version deleted successfully', 'success');
             }
           },
@@ -196,7 +203,7 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
     });
   }
 
-  private fetchVersions(): void {
+  private fetchVersions(previouslyFocused: Element | null = null): void {
     this.syncUrl();
     this.loading = true;
     this.npmService
@@ -218,6 +225,7 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
           this.pagedData.page = pagedData.page;
           this.versions = pagedData.content;
           this.fetchPackageTags();
+          restoreListFocus(previouslyFocused, this.elementRef.nativeElement);
         },
         error: () => {},
       });

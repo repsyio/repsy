@@ -15,7 +15,7 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, OnDestroy } from '@angular/core';
+import { Component, ElementRef, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { of, Subject, Subscription, timer } from 'rxjs';
@@ -43,6 +43,7 @@ import { TooltipComponent } from '../../shared/components/tooltip/tooltip.compon
 import { RepoListItem } from '../../shared/dto/repo/repo-list-item';
 import { RepoType } from '../../shared/dto/repo/repo-type';
 import { ByteFormatter } from '../../shared/util/byte-formatter';
+import { restoreListFocus } from '../../shared/util/list-focus-restore.util';
 import { readListPageParam, readListQueryParam, updateListQueryParams } from '../../shared/util/list-query-params.util';
 import { toApiRepoType, toRouteSlug } from '../../shared/util/repo-api-type';
 import { ProfileService } from '../profile/service/profile.service';
@@ -60,6 +61,9 @@ interface ListRequest {
   page: number;
   /** True for a load that starts from nothing (first load, type change, refresh); a page or search change keeps the rows until the answer arrives. */
   spinner: boolean;
+  /** Whatever had the keyboard focus when this request was dispatched (RPS-1669), or `null`/`body` for
+   *  a mouse-driven one; the fallback below only reclaims the focus once its own control is really gone. */
+  previouslyFocused?: Element | null;
 }
 
 @Component({
@@ -129,6 +133,7 @@ export class RepositoryComponent implements OnDestroy {
     private readonly profileFacadeService: ProfileService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
+    private readonly elementRef: ElementRef<HTMLElement>,
   ) {
     // A request supersedes the one before it: switchMap unsubscribes from it, which cancels it on the wire.
     this.subscriptions.add(
@@ -186,6 +191,8 @@ export class RepositoryComponent implements OnDestroy {
 
   public loadPage(pageNum: number): void {
     this.pageNum = pageNum;
+    // No `previouslyFocused` here: the pager stays mounted through a plain page change (its button keeps
+    // the focus by itself, see the pagination component), so there is nothing to fall back to.
     this.dispatch({ option: this.repoOption, q: this.appliedQuery, page: pageNum, spinner: false });
   }
 
@@ -195,21 +202,25 @@ export class RepositoryComponent implements OnDestroy {
     this.typedSearches.next(repoName);
   }
 
-  public refreshPage(): void {
-    this.filterRepos(this.repoOption);
+  /** `previouslyFocused` lets a caller (a delete, whose opener is about to vanish) name the control that
+   *  had the focus before it starts asking (RPS-1669), instead of the moment this reload actually goes
+   *  out; a plain refresh (the toolbar button, a modal's `created` event) needs no fallback and leaves it
+   *  out. */
+  public refreshPage(previouslyFocused: Element | null = null): void {
+    this.filterRepos(this.repoOption, previouslyFocused);
   }
 
   public formatBytes(bytes: number, decimals = 2): string {
     return ByteFormatter.formatBytes(bytes, decimals);
   }
 
-  public filterRepos(option: string) {
+  public filterRepos(option: string, previouslyFocused: Element | null = null) {
     // The list is unfiltered again and starts on its first page: the search box and the page index follow.
     this.repoOption = option as RepoType;
     this.searchQuery = '';
     this.appliedQuery = '';
     this.pageNum = 0;
-    this.dispatch({ option, q: '', page: 0, spinner: true });
+    this.dispatch({ option, q: '', page: 0, spinner: true, previouslyFocused });
   }
 
   public deleteRepository(repo: RepoListItem) {
@@ -217,6 +228,9 @@ export class RepositoryComponent implements OnDestroy {
       this.toastService.show('You do not have permission to delete repositories', 'error');
       return;
     }
+    // Captured now (RPS-1669): by the time the reload actually fires, the danger modal has already
+    // closed and, since its own opener (this row's menu item) is gone, given up on restoring the focus.
+    const previouslyFocused = document.activeElement;
     this.dangerModalService.show('Delete Repository', 'Delete', () => {
       this.operationLock = true;
       this.protocolRepoControllerService
@@ -229,7 +243,7 @@ export class RepositoryComponent implements OnDestroy {
         )
         .subscribe({
           next: () => {
-            this.refreshPage();
+            this.refreshPage(previouslyFocused);
             this.toastService.show('Repository deleted successfully', 'success');
           },
           // The HTTP error interceptor already shows the failure and the repository stays listed;
@@ -305,6 +319,9 @@ export class RepositoryComponent implements OnDestroy {
     this.paginatedRepos = content.map((repo) => this.toListItem(repo));
     this.securitySummary = {};
     this.fetchSecuritySummary();
+    // RPS-1669: a page change keeps its own focus (the pager stays mounted); this only does something
+    // when the control that had it (a deleted row's menu) is really gone once the new rows are in.
+    restoreListFocus(request.previouslyFocused, this.elementRef.nativeElement);
   }
 
   private toListItem(repo: RepoListInfo): RepoListItem {

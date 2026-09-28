@@ -130,9 +130,14 @@
 
     <!-- Content -->
     <div
+      data-testid="mobile-sidebar-content"
+      appDialog
+      #dialog="appDialog"
+      (appDialogClose)="closeMobileMenu()"
       animate.enter="fade-in-right"
       class="bg-primary-500 fixed top-0 left-0 z-5 h-full w-[240px] overflow-y-auto p-4"
     >
+      <h2 [id]="dialog.titleId" class="sr-only">Menu</h2>
       <div class="pb-6">
         <div class="flex items-center justify-between">
           <!-- Logo -->
@@ -148,6 +153,7 @@
           </a>
           <button
             data-testid="mobile-sidebar-close"
+            data-dialog-focus
             (click)="closeMobileMenu()"
             type="button"
             class="hover:text-secondary-500 inline-flex items-center justify-center rounded-md text-neutral-200"

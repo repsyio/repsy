@@ -12,6 +12,7 @@
 /// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
+import { ElementRef } from '@angular/core';
 import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
@@ -83,6 +84,7 @@ describe('RepositoryComponent', () => {
       profile as unknown as ProfileService,
       toast,
       dangerModal,
+      new ElementRef(document.createElement('div')),
     );
     created.push(component);
     return component;

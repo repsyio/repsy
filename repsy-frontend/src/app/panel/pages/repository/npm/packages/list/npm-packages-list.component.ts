@@ -15,7 +15,7 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, OnDestroy } from '@angular/core';
+import { Component, ElementRef, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
@@ -36,6 +36,7 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { restoreListFocus } from '../../../../../shared/util/list-focus-restore.util';
 import {
   readListPageParam,
   readListQueryParam,
@@ -95,6 +96,7 @@ export class NpmPackagesListComponent implements OnDestroy {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly securityService: SecurityService,
+    private readonly elementRef: ElementRef<HTMLElement>,
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.pagedData = new PagedData<NpmPackageListItem>();
@@ -127,8 +129,11 @@ export class NpmPackagesListComponent implements OnDestroy {
     this.fetchPackages();
   }
 
-  public refreshPage(): void {
-    this.fetchPackages();
+  /** `previouslyFocused` lets a caller (a delete, whose opener is about to vanish) name the control that
+   *  had the focus before it starts asking (RPS-1669), instead of the moment this reload actually goes
+   *  out; a plain refresh (the toolbar button) needs no fallback and leaves it out. */
+  public refreshPage(previouslyFocused: Element | null = null): void {
+    this.fetchPackages(previouslyFocused);
   }
 
   public sort(option: Sort) {
@@ -163,7 +168,7 @@ export class NpmPackagesListComponent implements OnDestroy {
     });
   }
 
-  private fetchPackages(): void {
+  private fetchPackages(previouslyFocused: Element | null = null): void {
     this.syncUrl();
     this.loading = true;
     this.npmService
@@ -177,12 +182,18 @@ export class NpmPackagesListComponent implements OnDestroy {
         next: (pagedData: PagedData<NpmPackageListItem>) => {
           this.pagedData.page = pagedData.page;
           this.packages = pagedData.content;
+          // RPS-1669: the pager stays mounted through the reload, so a page change keeps its focus by
+          // itself; this only fires when the control that had it (a deleted row's menu) is really gone.
+          restoreListFocus(previouslyFocused, this.elementRef.nativeElement);
         },
         error: () => {},
       });
   }
 
   public deletePackage(pck: NpmPackageListItem) {
+    // Captured now (RPS-1669), not when the reload actually fires: by then the danger modal has already
+    // closed and, since its own opener (this row's menu item) is gone, given up on restoring the focus.
+    const previouslyFocused = document.activeElement;
     this.dangerModalService.show('Delete Package', 'Delete', () => {
       this.loading = true;
       this.npmService
@@ -194,7 +205,7 @@ export class NpmPackagesListComponent implements OnDestroy {
         )
         .subscribe({
           next: () => {
-            this.refreshPage();
+            this.refreshPage(previouslyFocused);
             this.toastService.show('Package deleted successfully', 'success');
           },
           error: () => {},

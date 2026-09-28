@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { ElementRef } from '@angular/core';
 import { fakeAsync, flushMicrotasks } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import moment from 'moment';
@@ -67,6 +68,7 @@ describe('NpmPackagesListComponent', () => {
       toastService,
       dangerModalService,
       securityService,
+      new ElementRef(document.createElement('div')),
     );
     return {
       component,

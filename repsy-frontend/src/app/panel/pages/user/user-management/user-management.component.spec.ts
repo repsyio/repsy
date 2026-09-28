@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { ElementRef } from '@angular/core';
 import { ComponentFixture, fakeAsync, flush, TestBed, tick } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import moment from 'moment';
@@ -56,6 +57,7 @@ describe('UserManagementComponent', () => {
       {
         username: 'admin',
       } as AuthService,
+      new ElementRef(document.createElement('div')),
     );
   }
 
