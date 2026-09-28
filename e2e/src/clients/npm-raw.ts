@@ -73,12 +73,15 @@ const ABBREVIATED_ACCEPT = 'application/vnd.npm.install-v1+json';
  * (`anonymous`) sends no header at all -- a real npm client with no configured credential never
  * makes the request in the first place (`ENEEDAUTH`), which is why the fixture/adapter never expects
  * a client exit 0 for it, but the raw probe still needs a header-less request to pin the real status.
+ * `preferBasic` (RPS-1716, `token-rw-any-username`) overrides a `kind === 'token'` credential to
+ * Basic too: Bearer never puts a username on the wire, so a scenario about an arbitrary username
+ * needs Basic to reach the server at all -- see `world.ts`'s `MaterializedCredential.preferBasic`.
  */
 export function npmAuthHeader(credential: MaterializedCredential): Record<string, string> {
   if (credential.transport !== 'basic') {
     return {};
   }
-  if (credential.kind === 'token') {
+  if (credential.kind === 'token' && !credential.preferBasic) {
     return { Authorization: `Bearer ${credential.password ?? ''}` };
   }
   const basic = Buffer.from(`${credential.username ?? ''}:${credential.password ?? ''}`).toString(
@@ -154,6 +157,13 @@ export function buildPublishDocument(opts: {
   tarballUrl?: string;
   /** More fields of the version's manifest (`author`, `maintainers`, `keywords`, ...). */
   extra?: Record<string, unknown>;
+  /**
+   * Leaves `keywords` out of the version manifest entirely, instead of the empty array every other
+   * caller sends (RPS-1717, driven by `Scenario.omitKeywords`, never hardcoded or branched on a
+   * scenario id here): the exact shape `republish-without-keywords` redeploys, and RPS-1211 used to
+   * crash on -- see `package.template.json`'s comment and README.md's "RPS-1211 (fixed)".
+   */
+  omitKeywords?: boolean;
 }): Record<string, unknown> {
   const tag = opts.tag ?? 'latest';
   const filename = tarballFilename(opts.packageName, opts.version);
@@ -168,17 +178,9 @@ export function buildPublishDocument(opts: {
     name: opts.packageName,
     version: opts.version,
     description,
-    // Deliberately present (never left absent): `PackageUtils.liftFieldsToTopLevel` defaults a
-    // version's absent `keywords` to a native `String[]` on the top-level packument, and
-    // `NpmPackageServiceImpl.addKeywords` (reached via `updateVersionFromMetadata`, the "re-publish
-    // an EXISTING version" DB path) then casts that top-level value to `ArrayList<String>` -- which
-    // throws a `ClassCastException` (swallowed by `AbstractNpmProtocolFacade.publish`'s catch-all
-    // into a generic `400 badRequest`) for ANY republish/override of a version whose manifest has no
-    // `keywords`. This is a genuine backend bug distinct from RPS-1205, not something this harness
-    // works around by skipping the check -- it is out of scope to fix here (see the plan), so every
-    // manifest this adapter sends simply includes the field, the same way a real npm client's own
-    // normalized `package.json` almost always does.
-    keywords: [] as string[],
+    // Present by default (a real npm client's own normalised `package.json` almost always sends
+    // it too); left out entirely when `omitKeywords` is set (RPS-1717).
+    ...(opts.omitKeywords ? {} : { keywords: [] as string[] }),
     ...opts.extra,
     dist: { integrity, shasum, tarball },
   };

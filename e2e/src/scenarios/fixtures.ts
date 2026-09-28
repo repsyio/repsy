@@ -33,7 +33,7 @@ import { isUnsupportedPanelOperation, type PanelBackend, RepoType } from '../api
 import { ownerCredential } from '../clients/raw-http.js';
 import { env } from '../env.js';
 import { isCloudSkipped, testGapKey } from '../known-gaps.js';
-import { perTestRunId } from '../seed/run-id.js';
+import { perTestRunId, RUN_PREFIX } from '../seed/run-id.js';
 import { Seeder } from '../seed/seeder.js';
 import { target, type TargetCapabilities } from '../target.js';
 import type { ProtocolAdapter } from './adapter.js';
@@ -175,6 +175,22 @@ async function seedCredential(
     case 'token-ro': {
       const token = await seeder.createToken(repoName, { readOnly: true });
       return { transport: 'basic', username: token.username, password: token.token, kind: 'token' };
+    }
+
+    case 'token-rw-any-username': {
+      // The token's OWN username is deliberately discarded (RPS-1716): the credential is paired
+      // with an arbitrary username instead, so a publish/consume that authenticates with it proves
+      // the server validates a deploy token by its secret alone. `preferBasic` makes the npm
+      // renderers send it over Basic (`_auth`), the only transport that puts a username on the wire
+      // at all -- see `world.ts`'s `MaterializedCredential.preferBasic`.
+      const token = await seeder.createToken(repoName, { readOnly: false });
+      return {
+        transport: 'basic',
+        username: `${RUN_PREFIX}-${seeder.runId}-anyuser`,
+        password: token.token,
+        kind: 'token',
+        preferBasic: true,
+      };
     }
 
     case 'token-expired':

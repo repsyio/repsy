@@ -49,6 +49,9 @@ export interface PackageSpec {
   optionalDependencies?: Record<string, string>;
   /** Extra top-level package.json fields (`os`, `cpu`, `libc`, `funding`, `peerDependenciesMeta`, ...). */
   manifest?: Record<string, unknown>;
+  /** Drops `package.json`'s `keywords` field entirely, instead of the usual empty array (RPS-1717,
+   *  `republish-without-keywords`, driven by `Scenario.omitKeywords`). */
+  omitKeywords?: boolean;
 }
 
 async function renderFile(templateName: string, view: Record<string, unknown>): Promise<string> {
@@ -73,6 +76,9 @@ export async function renderPackage(dir: string, spec: PackageSpec): Promise<{ m
     manifest.optionalDependencies = spec.optionalDependencies;
   }
   Object.assign(manifest, spec.manifest ?? {});
+  if (spec.omitKeywords) {
+    delete manifest.keywords;
+  }
 
   await fs.writeFile(path.join(dir, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   await fs.writeFile(path.join(dir, 'index.js'), await renderFile('index.template.js', {}));

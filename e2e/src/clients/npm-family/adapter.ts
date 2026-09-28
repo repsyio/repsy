@@ -62,11 +62,12 @@ export function npmFamilyAdapter(
     const { packageName, version } = world.publishTarget;
 
     // `forceRepublish` for the `override`/`no-override` scenarios: the client would otherwise refuse
-    // the redeploy on its own before any request is sent (clients/npm.ts).
+    // the redeploy on its own before any request is sent (clients/npm.ts). `omitKeywords` for
+    // `republish-without-keywords` (RPS-1717).
     const published = await publishPackage(
       client,
       ctx,
-      { packageName, version },
+      { packageName, version, omitKeywords: world.scenario.omitKeywords },
       { forceRepublish: world.scenario.reuseCoordinates === true },
     );
 
@@ -86,6 +87,7 @@ export function npmFamilyAdapter(
       packageName: world.publishTarget.packageName,
       version: world.publishTarget.version,
       tarballBytes: published.tarballBytes,
+      omitKeywords: world.scenario.omitKeywords,
     });
     const rawRes = await rawPublish(
       world.repoName,

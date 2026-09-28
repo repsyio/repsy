@@ -213,6 +213,20 @@ export const SCENARIOS: readonly Scenario[] = [
     expect: { publish: 'unauthorized', consume: 'unauthorized' },
   },
   {
+    id: 'token-rw-any-username',
+    tags: ['@auth'],
+    repo: { privateRepo: true },
+    credential: 'token-rw-any-username',
+    protocols: ['maven', 'npm'],
+    // RPS-1716. Pinned live: a deploy token authenticates by its secret alone -- an arbitrary
+    // username paired with a valid read-write token's password still publishes and consumes.
+    // maven: `settings.xml`'s `<username>` already carries whatever the credential returns, no
+    // client change needed. npm: the credential MUST be rendered over Basic (`_auth`), not the
+    // default Bearer (`_authToken`) a token otherwise gets, or the username never reaches the
+    // server at all (`npm.ts`'s `npmrcView`, `MaterializedCredential.preferBasic`).
+    expect: { publish: 'ok', consume: 'ok' },
+  },
+  {
     id: 'wrong-password',
     tags: ['@auth', '@negative'],
     repo: { privateRepo: true },
@@ -363,5 +377,21 @@ export const SCENARIOS: readonly Scenario[] = [
     // as above.
     expect: { publish: 'forbidden', consume: 'ok' },
     expectByProtocol: { nuget: { publish: 'rejected' } },
+  },
+  {
+    id: 'republish-without-keywords',
+    tags: ['@settings'],
+    repo: { privateRepo: true, allowOverride: true },
+    credential: 'token-rw',
+    reuseCoordinates: true,
+    omitKeywords: true,
+    protocols: ['npm'],
+    // RPS-1717. A redeploy (`allowOverride: true`) of an existing version whose manifest carries NO
+    // `keywords` field at all, the exact shape RPS-1211 used to crash on with a swallowed
+    // `ClassCastException` (400 `badRequest`) -- see README.md's "RPS-1211 (fixed)". RPS-1211 is
+    // fixed, so this is a regression pin, not a known-gap scenario, on Repsy OS: pinned live, both
+    // sides succeed. The id is exactly what a Repsy Cloud known-gap pin (repsy-mono RPS-1633) keys
+    // its test on -- do not rename it.
+    expect: { publish: 'ok', consume: 'ok' },
   },
 ];
