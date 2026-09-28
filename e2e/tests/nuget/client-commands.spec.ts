@@ -631,10 +631,11 @@ test.describe('nuget > dotnet nuget push --skip-duplicate', () => {
     seeder,
   }) => {
     const layout = await newRepo(seeder, true);
+    await seeder.setSettings(layout.repoName, { allowOverride: false });
     const packageId = `e2e-${seeder.runId}-skip-dup`;
     const version = '1.0.0';
 
-    // First push with allowOverride OFF (the repo's default).
+    // First push with allowOverride OFF (explicitly set above).
     const { home, work } = await isolatedWorkDir('nuget-skip-dup');
     const nupkgBytes = buildNupkg({ packageId, version });
     const nupkgFile = path.join(work, 'package.nupkg');
