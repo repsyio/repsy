@@ -62,12 +62,12 @@ test.describe('docker > abandoned upload cleanup', () => {
       // Step 1: Start a blob upload but do not finish it (no PUT to complete)
       const startRes = await rawStartUpload(repo.name, credential, image);
       expect(startRes.status, 'POST /blobs/uploads/ to start upload').toBe(202);
-      expect(startRes.uploadUuid, 'upload UUID from Docker-Upload-UUID header').toBeDefined();
+      expect(startRes.location, 'location from Location header').toBeDefined();
 
-      const uploadUuid = startRes.uploadUuid!;
+      const uploadLocation = startRes.location!;
 
       // Verify the upload session exists by checking its status immediately
-      const statusBeforeRes = await rawUploadStatus(repo.name, credential, image, uploadUuid);
+      const statusBeforeRes = await rawUploadStatus(repo.name, credential, image, uploadLocation);
       expect(statusBeforeRes.status, 'HEAD to check upload status before TTL').toBe(204);
 
       // Step 2: Wait for the TTL (5 seconds) + cleanup interval (2 seconds) + buffer (1 second)
@@ -75,7 +75,7 @@ test.describe('docker > abandoned upload cleanup', () => {
       await waitMs(8000);
 
       // Step 3: Attempt to check the status of the abandoned upload; it should be gone
-      const statusAfterRes = await rawUploadStatus(repo.name, credential, image, uploadUuid);
+      const statusAfterRes = await rawUploadStatus(repo.name, credential, image, uploadLocation);
       expect(
         statusAfterRes.status,
         'HEAD to abandoned upload after TTL should return 404 or 410',
@@ -96,20 +96,20 @@ test.describe('docker > abandoned upload cleanup', () => {
         `e2e-${seeder.runId}-abandoned-2`,
         `e2e-${seeder.runId}-abandoned-3`,
       ];
-      const uploads: { image: string; uploadUuid: string }[] = [];
+      const uploads: { image: string; uploadLocation: string }[] = [];
 
       for (const image of images) {
         const startRes = await rawStartUpload(repo.name, credential, image);
         expect(startRes.status, `start upload for ${image}`).toBe(202);
         uploads.push({
           image,
-          uploadUuid: startRes.uploadUuid!,
+          uploadLocation: startRes.location!,
         });
       }
 
       // Verify all uploads exist
-      for (const { image, uploadUuid } of uploads) {
-        const statusRes = await rawUploadStatus(repo.name, credential, image, uploadUuid);
+      for (const { image, uploadLocation } of uploads) {
+        const statusRes = await rawUploadStatus(repo.name, credential, image, uploadLocation);
         expect(statusRes.status, `upload ${image} exists before TTL`).toBe(204);
       }
 
@@ -117,8 +117,8 @@ test.describe('docker > abandoned upload cleanup', () => {
       await waitMs(8000);
 
       // Verify all uploads are cleaned up
-      for (const { image, uploadUuid } of uploads) {
-        const statusRes = await rawUploadStatus(repo.name, credential, image, uploadUuid);
+      for (const { image, uploadLocation } of uploads) {
+        const statusRes = await rawUploadStatus(repo.name, credential, image, uploadLocation);
         expect(statusRes.status, `upload ${image} cleaned up after TTL`).toMatch(/40[4|]/);
       }
     },

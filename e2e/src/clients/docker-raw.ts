@@ -684,10 +684,16 @@ export async function rawUploadStatus(
   repoName: string,
   credential: MaterializedCredential,
   image: string,
-  uuid: string,
+  locationOrUuid: string,
 ): Promise<RawResponse & { hop: 'token' | 'request'; range?: string; location?: string }> {
+  // Support both location (from POST response) and uuid-only forms for compatibility
+  // If it starts with /, it's a location path; otherwise it's just a uuid and we reconstruct
+  const url = locationOrUuid.startsWith('/')
+    ? new URL(locationOrUuid, env.repoBaseUrl).toString()
+    : v2RepoUrl(repoName, `${image}/blobs/uploads/${locationOrUuid}`);
+
   const res = await dockerRequest(credential, pushScope(repoName, image), (headers) =>
-    rawFetch(v2RepoUrl(repoName, `${image}/blobs/uploads/${uuid}`), { headers }),
+    rawFetch(url, { headers }),
   );
   return {
     status: res.status,
