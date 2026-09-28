@@ -89,8 +89,11 @@ dotnet nuget push ./bin/Release/*.nupkg --source repsy --api-key any
 Install package:
 
 \`\`\`bash
-dotnet add package <PACKAGE_ID> --version <VERSION> --source repsy
+dotnet add package <PACKAGE_ID> --version <VERSION>
 \`\`\`
+
+\`dotnet add package --source\` only accepts a URL or a folder, never the name of a configured
+source, so once \`repsy\` is added to \`NuGet.Config\` you install without \`--source\` at all.
 
 ---
 

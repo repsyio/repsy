@@ -98,7 +98,9 @@ export class NugetPackagesVersionDetailComponent implements OnDestroy {
     this.packageId = packageId;
     this.versionName = version;
     const sourceUrl = `${environment.repoBaseUrl}/${this.activeRepo.repoName}/v3/index.json`;
-    this.installCommand = `dotnet add package ${packageId} --version ${version} --source repsy`;
+    // `dotnet add package --source` only accepts a URL or a folder, never a configured source's
+    // name, so once "repsy" is added to NuGet.Config the plain form (no --source) picks it up.
+    this.installCommand = `dotnet add package ${packageId} --version ${version}`;
     this.installCommandUrl = `dotnet add package ${packageId} --version ${version} --source "${sourceUrl}"`;
     this.packageReferenceCommand = `<PackageReference Include="${packageId}" Version="${version}" />`;
     this.packageManagerCommand = `Install-Package ${packageId} -Version ${version} -Source repsy`;
