@@ -116,8 +116,55 @@ test.describe('USR-01 create a user', { tag: ['@cloud-skip'] }, () => {
     await login.goto();
     await login.login(username, pwd);
     await new DashboardPage(adminTab).expectLoaded();
+    // `toBeVisible()` polls the real DOM rather than a fixed wait; it flaked once (RPS-1596, nightly
+    // run 36082924232) before RPS-1456 (PR #684) made `SidebarComponent.isAdmin` a signal, because the
+    // OnPush view genuinely never re-rendered until something else marked it, no matter how long this
+    // polled. See the parametrised regression test below for the deterministic reproduction.
     await expect(new Shell(adminTab).sidebar.users).toBeVisible();
   });
+
+  // RPS-1596: the same race as RPS-1456 (AUTH-07, PR #684), but for a brand-new admin's very first
+  // dashboard load right after `usersPage` created the account, instead of an already-authenticated
+  // fixture. "/" renders inside the OnPush `AuthRedirectComponent`, and the sidebar takes its role from
+  // its own `GET /api/profile`, independently of the dashboard's own profile call; whichever of the two
+  // answers arrives last used to leave Users hidden until the next unrelated change detection (a slow
+  // CI runner). `SidebarComponent.isAdmin` is a signal since RPS-1456, so the view now refreshes itself
+  // once the held-back answer lands; holding back one answer at a time, after everything else has
+  // arrived, pins both orders for this fresh-login path too.
+  for (const heldBack of [1, 2]) {
+    test(`a freshly created Admin sees Users when profile answer ${heldBack} of 2 arrives last`, async ({
+      usersPage,
+      seeder,
+      trackUiUser,
+      openUiPage,
+    }) => {
+      const username = seeder.reserveUsername();
+      const pwd = runPassword(seeder.runId);
+      trackUiUser(username);
+
+      await usersPage.goto();
+      await usersPage.createUser({ username, password: pwd, admin: true });
+      await usersPage.shell.toasts.expectSuccess('User created successfully.');
+
+      const adminTab = await openUiPage();
+      let asked = 0;
+      await adminTab.route('**/api/profile', async (route) => {
+        asked += 1;
+        if (asked === heldBack) {
+          await new Promise((resolve) => setTimeout(resolve, 1_500));
+        }
+        await route.fallback();
+      });
+
+      const login = new LoginPage(adminTab);
+      await login.goto();
+      await login.login(username, pwd);
+      await new DashboardPage(adminTab).expectLoaded();
+
+      await expect(new Shell(adminTab).sidebar.users).toBeVisible();
+      expect(asked).toBe(2);
+    });
+  }
 
   test('cancelling the modal creates nothing and resets the form', async ({
     usersPage,
