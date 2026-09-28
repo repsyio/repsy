@@ -417,10 +417,10 @@ test(
       );
     }
 
-    // Build the attestation manifest with subject referencing the index-to-be
-    // Use a placeholder digest since we'll compute the actual index bytes below
+    // Build the attestation manifest (with OCI empty config, no subject since it's referenced
+    // by the index's manifests[] array, not through a subject field)
     const { manifestBytes: attestationBytes, manifestDigest: attestationDigest } =
-      buildAttestationManifest({ indexDigest: 'sha256:placeholder' });
+      buildAttestationManifest();
 
     // Build the index from both children PLUS the attestation manifest in manifests[]
     // The attestation is included as an entry with unknown/unknown media type and annotations
