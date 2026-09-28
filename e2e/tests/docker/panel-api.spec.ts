@@ -57,7 +57,10 @@ import {
   imageRef,
   rawGetManifest,
   rawHeadBlob,
+  rawPutManifest,
   rawTagsList,
+  rawUploadBlob,
+  sha256Hex,
 } from '../../src/clients/docker-raw.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { env } from '../../src/env.js';
@@ -921,5 +924,110 @@ test.describe('the Docker panel API against what crane pushed', () => {
       await callOperation('listDockerImages', { repoName: session.repoName }),
     ) as { content: unknown[] };
     expect(empty.content).toEqual([]);
+  });
+
+  test('cleanup race: pushing a child by digest, running untagged cleanup, then pushing an index by tag follows documented behavior', async ({
+    seeder,
+  }) => {
+    const session = await newSession(seeder, 'docker-panel-cleanup-race');
+    const imageA = `e2e-${seeder.runId}-race`;
+
+    // Build two child images
+    const child1 = await buildImage({
+      dir: path.join(session.work, 'child1'),
+      marker: 'race-child1',
+    });
+    const child2 = await buildImage({
+      dir: path.join(session.work, 'child2'),
+      marker: 'race-child2',
+    });
+
+    // Push child1 by digest only (not by tag) via raw HTTP
+    const admin = adminCredential();
+    await rawUploadBlob(session.repoName, admin, imageA, child1.layerBytes, child1.layerDigest);
+    await rawUploadBlob(session.repoName, admin, imageA, child1.configBytes, child1.configDigest);
+    await rawPutManifest(
+      session.repoName,
+      admin,
+      imageA,
+      child1.manifestDigest,
+      child1.manifestBytes,
+      child1.manifestMediaType,
+    );
+
+    // Child1 exists but is untagged at this point
+    expect(
+      (await rawGetManifest(session.repoName, admin, imageA, child1.manifestDigest)).status,
+      'child1 is pullable by digest before cleanup',
+    ).toBe(200);
+
+    // Run untagged manifest cleanup (it should delete child1 since it has no tag)
+    expectContract(
+      'deleteDockerUntaggedManifests',
+      await callOperation('deleteDockerUntaggedManifests', { repoName: session.repoName }),
+    );
+
+    // Push child2 by tag via crane
+    await push(session, child2.dir, imageA, 'child2');
+
+    // Now push child1 again and build an index referencing both
+    // This time child1 is pushed with a tag (child1tag) so it won't be untagged
+    await push(session, child1.dir, imageA, 'child1tag');
+
+    // Build and push an index referencing both children
+    const indexBytes = Buffer.from(
+      JSON.stringify({
+        schemaVersion: 2,
+        mediaType: 'application/vnd.oci.image.index.v1+json',
+        manifests: [
+          {
+            mediaType: child1.manifestMediaType,
+            digest: child1.manifestDigest,
+            size: child1.manifestBytes.length,
+            platform: { architecture: 'amd64', os: 'linux' },
+          },
+          {
+            mediaType: child2.manifestMediaType,
+            digest: child2.manifestDigest,
+            size: child2.manifestBytes.length,
+            platform: { architecture: 'arm64', os: 'linux' },
+          },
+        ],
+      }),
+      'utf8',
+    );
+    const indexDigest = sha256Hex(indexBytes);
+    const indexTag = 'index';
+    const indexRes = await rawPutManifest(
+      session.repoName,
+      admin,
+      imageA,
+      indexTag,
+      indexBytes,
+      'application/vnd.oci.image.index.v1+json',
+    );
+
+    // Verify the index push succeeds (this documents the expected behavior)
+    expect(indexRes.status, 'index push should succeed').toBe(201);
+    expect(indexRes.hop, 'index push goes to the request hop').toBe('request');
+
+    // Verify the index is servable and the children are reachable through it
+    const indexByTagRes = await rawGetManifest(session.repoName, admin, imageA, indexTag);
+    expect(indexByTagRes.status, 'index is servable by tag').toBe(200);
+
+    const indexByDigestRes = await rawGetManifest(
+      session.repoName,
+      admin,
+      imageA,
+      `sha256:${indexDigest}`,
+    );
+    expect(indexByDigestRes.status, 'index is servable by digest').toBe(200);
+
+    // Verify both children are still pullable
+    const child1ByTagRes = await rawGetManifest(session.repoName, admin, imageA, 'child1tag');
+    expect(child1ByTagRes.status, 'child1 is pullable by tag').toBe(200);
+
+    const child2ByTagRes = await rawGetManifest(session.repoName, admin, imageA, 'child2');
+    expect(child2ByTagRes.status, 'child2 is pullable by tag').toBe(200);
   });
 });

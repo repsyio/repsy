@@ -81,11 +81,17 @@ import path from 'node:path';
 
 import { RepoType } from '../../src/api/panel-api.js';
 import { craneEnv, dockerAdapter, renderDockerConfig } from '../../src/clients/docker.js';
-import { buildImage, type BuiltImage } from '../../src/clients/docker-image.js';
+import {
+  buildImage,
+  buildAttestationManifest,
+  type BuiltImage,
+} from '../../src/clients/docker-image.js';
 import {
   adminCredential,
   imageRef,
   rawGetManifest,
+  rawPutManifest,
+  rawUploadBlob,
   sha256Hex,
 } from '../../src/clients/docker-raw.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
@@ -359,5 +365,155 @@ test(
       parsed.manifests.map((m) => m.digest).sort(),
       'the two children are exactly the earlier two pushes, no more, no fewer',
     ).toEqual([amd64.manifestDigest, arm64.manifestDigest].sort());
+  },
+);
+
+test(
+  'docker > BuildKit attestation manifest: an index with platform children and an unknown-platform attestation child is stored and round-trips (HD-2)',
+  { tag: ['@smoke'] },
+  async ({ seeder }) => {
+    const layout = await newRepoWithToken(seeder, 'attestation');
+    const { home, work } = await isolatedWorkDir(`docker-attestation-${seeder.runId}`);
+    await renderDockerConfig(home, layout.credential);
+
+    // Build the two platform-specific image children
+    const amd64 = await buildImage({
+      dir: path.join(work, 'amd64'),
+      marker: 'attestation-amd64',
+      os: 'linux',
+      arch: 'amd64',
+    });
+    const arm64 = await buildImage({
+      dir: path.join(work, 'arm64'),
+      marker: 'attestation-arm64',
+      os: 'linux',
+      arch: 'arm64',
+    });
+
+    // Push both children by digest via raw HTTP (blobs, then manifests)
+    const { credential } = layout;
+    for (const child of [amd64, arm64]) {
+      await rawUploadBlob(
+        layout.repoName,
+        credential,
+        layout.image,
+        child.layerBytes,
+        child.layerDigest,
+      );
+      await rawUploadBlob(
+        layout.repoName,
+        credential,
+        layout.image,
+        child.configBytes,
+        child.configDigest,
+      );
+      await rawPutManifest(
+        layout.repoName,
+        credential,
+        layout.image,
+        child.manifestDigest,
+        child.manifestBytes,
+        child.manifestMediaType,
+      );
+    }
+
+    // Build the index from both children
+    const indexObj = {
+      schemaVersion: 2,
+      mediaType: 'application/vnd.oci.image.index.v1+json',
+      manifests: [
+        {
+          mediaType: amd64.manifestMediaType,
+          digest: amd64.manifestDigest,
+          size: amd64.manifestBytes.length,
+          platform: { architecture: 'amd64', os: 'linux' },
+        },
+        {
+          mediaType: arm64.manifestMediaType,
+          digest: arm64.manifestDigest,
+          size: arm64.manifestBytes.length,
+          platform: { architecture: 'arm64', os: 'linux' },
+        },
+      ],
+    };
+    const indexBytes = Buffer.from(JSON.stringify(indexObj), 'utf8');
+    const indexDigest = sha256Hex(indexBytes);
+
+    // Push the index
+    const indexTag = 'attestation-index';
+    await rawPutManifest(
+      layout.repoName,
+      credential,
+      layout.image,
+      indexTag,
+      indexBytes,
+      'application/vnd.oci.image.index.v1+json',
+    );
+
+    // Build and push the attestation manifest
+    const { manifestBytes: attestationBytes, manifestDigest: attestationDigest } =
+      buildAttestationManifest({ indexDigest: `sha256:${indexDigest}` });
+    const attestationTag = 'attestation-manifest';
+    await rawPutManifest(
+      layout.repoName,
+      credential,
+      layout.image,
+      attestationTag,
+      attestationBytes,
+      'application/unknown+unknown',
+    );
+
+    // Verify the attestation is servable by tag and has the correct digest header
+    const admin = adminCredential();
+    const attestationRes = await rawGetManifest(
+      layout.repoName,
+      admin,
+      layout.image,
+      attestationTag,
+    );
+    expect(attestationRes.status, 'attestation manifest is servable by tag').toBe(200);
+    expect(attestationRes.contentType?.split(';')[0], 'attestation has unknown media type').toBe(
+      'application/unknown+unknown',
+    );
+    expect(attestationRes.digestHeader, 'attestation digest header is correct').toBe(
+      `sha256:${sha256Hex(attestationBytes)}`,
+    );
+
+    // Verify the attestation is also servable by digest
+    const attestationByDigestRes = await rawGetManifest(
+      layout.repoName,
+      admin,
+      layout.image,
+      attestationDigest,
+    );
+    expect(attestationByDigestRes.status, 'attestation is pullable by digest').toBe(200);
+    expect(sha256Hex(attestationByDigestRes.body)).toBe(attestationDigest.slice('sha256:'.length));
+
+    // Verify both children are still pullable
+    const amd64ByDigestRes = await rawGetManifest(
+      layout.repoName,
+      admin,
+      layout.image,
+      amd64.manifestDigest,
+    );
+    expect(amd64ByDigestRes.status, 'amd64 child is pullable by digest').toBe(200);
+    const arm64ByDigestRes = await rawGetManifest(
+      layout.repoName,
+      admin,
+      layout.image,
+      arm64.manifestDigest,
+    );
+    expect(arm64ByDigestRes.status, 'arm64 child is pullable by digest').toBe(200);
+
+    // Verify the index is also servable
+    const indexByTagRes = await rawGetManifest(layout.repoName, admin, layout.image, indexTag);
+    expect(indexByTagRes.status, 'index is servable by tag').toBe(200);
+    const indexByDigestRes = await rawGetManifest(
+      layout.repoName,
+      admin,
+      layout.image,
+      `sha256:${indexDigest}`,
+    );
+    expect(indexByDigestRes.status, 'index is servable by digest').toBe(200);
   },
 );

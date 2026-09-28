@@ -328,3 +328,33 @@ export async function buildIndexImage(opts: {
 
   return { dir: opts.dir, indexBytes, indexDigest, indexMediaType, children };
 }
+
+/**
+ * Builds an attestation manifest that references an index, with the OCI empty config.
+ * The attestation has no platform and follows the BuildKit pattern: a subject field, an empty config,
+ * and media type `application/unknown+unknown`.
+ */
+export function buildAttestationManifest(opts: { indexDigest: string }): {
+  manifestBytes: Buffer;
+  manifestDigest: string;
+  manifestMediaType: string;
+} {
+  const configBytes = Buffer.from(JSON.stringify({}), 'utf8');
+  const configDigest = sha256(configBytes);
+
+  const manifestObj = {
+    mediaType: 'application/unknown+unknown',
+    schemaVersion: 2,
+    config: {
+      mediaType: 'application/vnd.oci.empty.v1+json',
+      digest: configDigest,
+      size: configBytes.length,
+    },
+    subject: { mediaType: 'application/vnd.oci.image.index.v1+json', digest: opts.indexDigest },
+    annotations: { 'vnd.docker.reference.type': 'attestation-manifest' },
+  };
+  const manifestBytes = Buffer.from(JSON.stringify(manifestObj), 'utf8');
+  const manifestDigest = sha256(manifestBytes);
+
+  return { manifestBytes, manifestDigest, manifestMediaType: 'application/unknown+unknown' };
+}
