@@ -16,7 +16,7 @@
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, ElementRef, OnDestroy } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { of, Subject, Subscription, timer } from 'rxjs';
 import { catchError, filter, finalize, map, switchMap, tap } from 'rxjs/operators';
@@ -44,6 +44,7 @@ import { RepoListItem } from '../../shared/dto/repo/repo-list-item';
 import { RepoType } from '../../shared/dto/repo/repo-type';
 import { ByteFormatter } from '../../shared/util/byte-formatter';
 import { restoreListFocus } from '../../shared/util/list-focus-restore.util';
+import { readListPageParam, readListQueryParam, updateListQueryParams } from '../../shared/util/list-query-params.util';
 import { toApiRepoType, toRouteSlug } from '../../shared/util/repo-api-type';
 import { ProfileService } from '../profile/service/profile.service';
 import { SecurityService } from '../security/service/security.service';
@@ -124,6 +125,8 @@ export class RepositoryComponent implements OnDestroy {
   private readonly subscriptions = new Subscription();
 
   constructor(
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
     private readonly repoCollectionControllerService: RepoCollectionControllerService,
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly securityService: SecurityService,
@@ -132,12 +135,6 @@ export class RepositoryComponent implements OnDestroy {
     private readonly dangerModalService: DangerModalService,
     private readonly elementRef: ElementRef<HTMLElement>,
   ) {
-    const state = window.history.state;
-
-    if (state && this.repoOptions.includes(state.repoType)) {
-      this.repoOption = state.repoType as RepoType;
-    }
-
     // A request supersedes the one before it: switchMap unsubscribes from it, which cancels it on the wire.
     this.subscriptions.add(
       this.requests
@@ -169,7 +166,22 @@ export class RepositoryComponent implements OnDestroy {
     );
 
     this.loadUserRole();
-    this.filterRepos(this.repoOption);
+
+    // RPS-1668: the type, search and page of the list live in the URL, so a reload or a Back
+    // navigation restores exactly what was left instead of an unfiltered, first page. A dashboard
+    // count card also lands here through `type` now (it used to set `history.state`, which a reload
+    // does not carry).
+    const typeParam = readListQueryParam(this.route, 'type');
+    const initialType =
+      typeParam !== null && this.repoOptions.includes(typeParam as RepoType) ? (typeParam as RepoType) : RepoType.ALL;
+    const initialQuery = readListQueryParam(this.route, 'q') ?? '';
+    const initialPage = readListPageParam(this.route, 'page', 0);
+
+    this.repoOption = initialType;
+    this.searchQuery = initialQuery;
+    this.appliedQuery = initialQuery;
+    this.pageNum = initialPage;
+    this.dispatch({ option: initialType, q: initialQuery, page: initialPage, spinner: true });
   }
 
   public ngOnDestroy(): void {
@@ -181,7 +193,7 @@ export class RepositoryComponent implements OnDestroy {
     this.pageNum = pageNum;
     // No `previouslyFocused` here: the pager stays mounted through a plain page change (its button keeps
     // the focus by itself, see the pagination component), so there is nothing to fall back to.
-    this.requests.next({ option: this.repoOption, q: this.appliedQuery, page: pageNum, spinner: false });
+    this.dispatch({ option: this.repoOption, q: this.appliedQuery, page: pageNum, spinner: false });
   }
 
   /** Called on every keystroke; the request goes out when the typing pauses, and it starts from the first page. */
@@ -208,7 +220,7 @@ export class RepositoryComponent implements OnDestroy {
     this.searchQuery = '';
     this.appliedQuery = '';
     this.pageNum = 0;
-    this.requests.next({ option, q: '', page: 0, spinner: true, previouslyFocused });
+    this.dispatch({ option, q: '', page: 0, spinner: true, previouslyFocused });
   }
 
   public deleteRepository(repo: RepoListItem) {
@@ -252,7 +264,21 @@ export class RepositoryComponent implements OnDestroy {
   private applySearch(text: string): void {
     this.appliedQuery = text;
     this.pageNum = 0;
-    this.requests.next({ option: this.repoOption, q: text, page: 0, spinner: false });
+    this.dispatch({ option: this.repoOption, q: text, page: 0, spinner: false });
+  }
+
+  /**
+   * Sends `request` and, with `replaceUrl: true`, keeps the URL's `type`, `q` and `page` query
+   * params in step with it (RPS-1668) so the current history entry always reflects what the list is
+   * actually showing.
+   */
+  private dispatch(request: ListRequest): void {
+    updateListQueryParams(this.router, this.route, {
+      type: request.option === RepoType.ALL ? null : request.option,
+      q: request.q || null,
+      page: request.page || null,
+    });
+    this.requests.next(request);
   }
 
   private startLoading(request: ListRequest): void {
@@ -285,7 +311,7 @@ export class RepositoryComponent implements OnDestroy {
     if (content.length === 0 && request.page > 0) {
       // The page is gone (repositories were deleted meanwhile): show the last one that is left.
       this.pageNum = Math.max(0, totalPages - 1);
-      this.requests.next({ ...request, page: this.pageNum, spinner: false });
+      this.dispatch({ ...request, page: this.pageNum, spinner: false });
       return;
     }
 

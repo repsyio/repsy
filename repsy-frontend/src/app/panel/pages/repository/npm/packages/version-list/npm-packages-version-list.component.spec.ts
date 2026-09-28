@@ -46,7 +46,8 @@ describe('NpmPackagesVersionListComponent', () => {
   let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
   const VERSION = { version: '1.0.0' } as Parameters<NpmPackagesVersionListComponent['deleteVersion']>[0];
 
-  function build(scope = 'acme'): ListFixture {
+  /** Builds the component; `queryParams` is the URL it starts from (RPS-1668: `q`, `sort`, `page`). */
+  function build(scope = 'acme', queryParams: Record<string, string> = {}): ListFixture {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
     npmService = jasmine.createSpyObj<NpmService>(
       'NpmService',
@@ -57,10 +58,15 @@ describe('NpmPackagesVersionListComponent', () => {
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
-    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
+    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl', 'navigate']);
     dangerModalService = new DangerModalService();
     component = new NpmPackagesVersionListComponent(
-      { snapshot: { paramMap: convertToParamMap({ scope, package: 'ui' }) } } as ActivatedRoute,
+      {
+        snapshot: {
+          paramMap: convertToParamMap({ scope, package: 'ui' }),
+          queryParamMap: convertToParamMap(queryParams),
+        },
+      } as ActivatedRoute,
       npmService,
       toastService,
       dangerModalService,
@@ -125,6 +131,101 @@ describe('NpmPackagesVersionListComponent', () => {
     }));
   });
 
+  describe('the URL (RPS-1668: a reload or Back restores the list, not an empty one)', () => {
+    it('starts with the search, sort and page given in the URL', fakeAsync(() => {
+      build('acme', { q: '1.0', sort: 'Oldest', page: '2' }).respond([VERSION], 3);
+
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+
+      expect(component.searchText).toBe('1.0');
+      expect(component.sortOption.name).toBe('Oldest');
+      expect(component.pageNum).toBe(2);
+      expect(npmService.searchPackageVersions).toHaveBeenCalledOnceWith(
+        'ui',
+        'acme',
+        '1.0',
+        component.sortOption,
+        2,
+        10,
+      );
+    }));
+
+    it('falls back to the default sort for a URL sort that names no option', fakeAsync(() => {
+      build('acme', { sort: 'bogus' }).respond([VERSION], 1);
+
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+
+      expect(component.sortOption).toBe(component.sortOptions[0]);
+    }));
+
+    it('does not navigate when the URL already matches what is loaded (no reload loop)', fakeAsync(() => {
+      build().respond([VERSION], 1);
+
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+
+      expect(router.navigate).not.toHaveBeenCalled();
+    }));
+
+    it('puts the sort and page into the URL, replacing the current entry', fakeAsync(() => {
+      build().respond([VERSION], 3);
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+      router.navigate.calls.reset();
+
+      component.sort(component.sortOptions[1]);
+      flushMicrotasks();
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ sort: component.sortOptions[1].name }) }),
+      );
+
+      router.navigate.calls.reset();
+      component.loadPage(2);
+      flushMicrotasks();
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ page: 2 }) }),
+      );
+    }));
+
+    it('puts the search into the URL and drops it again once the box is emptied', fakeAsync(() => {
+      build().respond([VERSION], 1);
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+      router.navigate.calls.reset();
+
+      component.search('1.0.0');
+      flushMicrotasks();
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ q: '1.0.0' }) }),
+      );
+    }));
+
+    it('drops q from the URL once the search box is emptied', fakeAsync(() => {
+      // A fresh fixture starting from `q=1.0.0` (the fake ActivatedRoute is a frozen snapshot, so a
+      // second `search` on the same component would still compare against this same starting point).
+      build('acme', { q: '1.0.0' }).respond([VERSION], 1);
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+      router.navigate.calls.reset();
+
+      component.search('');
+      flushMicrotasks();
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ q: null }) }),
+      );
+    }));
+  });
+
   describe('deleteVersion', () => {
     describeEmptyingDelete(() => ({
       list: build(),
@@ -181,7 +282,12 @@ describe('NpmPackagesVersionListComponent template', () => {
     const { el } = await renderComponent(NpmPackagesVersionListComponent, [
       {
         provide: ActivatedRoute,
-        useValue: { snapshot: { paramMap: convertToParamMap({ scope: '~', package: 'ui' }) } },
+        useValue: {
+          snapshot: {
+            paramMap: convertToParamMap({ scope: '~', package: 'ui' }),
+            queryParamMap: convertToParamMap({}),
+          },
+        },
       },
       { provide: NpmService, useValue: npmService },
       { provide: SecurityService, useValue: securityService },

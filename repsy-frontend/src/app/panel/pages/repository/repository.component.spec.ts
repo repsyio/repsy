@@ -15,7 +15,7 @@
 import { ElementRef } from '@angular/core';
 import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
 import {
@@ -55,6 +55,11 @@ interface ListCall {
   answer: Subject<unknown>;
 }
 
+/** A fake `ActivatedRoute` carrying the query params a test wants the component to start from. */
+function activatedRoute(queryParams: Record<string, string> = {}): ActivatedRoute {
+  return { snapshot: { queryParamMap: convertToParamMap(queryParams) } } as ActivatedRoute;
+}
+
 describe('RepositoryComponent', () => {
   let calls: ListCall[];
   let repoApi: jasmine.SpyObj<RepoCollectionControllerService>;
@@ -63,12 +68,16 @@ describe('RepositoryComponent', () => {
   let toast: jasmine.SpyObj<ToastService>;
   let dangerModal: DangerModalService;
   let profile: { get: jasmine.Spy };
+  let router: jasmine.SpyObj<Router>;
   let watched: Subject<Record<string, RepoSecuritySummary>>;
   let created: RepositoryComponent[];
   let fixtures: ComponentFixture<RepositoryComponent>[];
 
-  function create(): RepositoryComponent {
+  /** Builds the component with `queryParams` as the URL it starts from (RPS-1668: `type`, `q`, `page`). */
+  function create(queryParams: Record<string, string> = {}): RepositoryComponent {
     const component = new RepositoryComponent(
+      activatedRoute(queryParams),
+      router,
       repoApi,
       protocolApi,
       securityService,
@@ -117,13 +126,12 @@ describe('RepositoryComponent', () => {
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModal = new DangerModalService();
     profile = { get: jasmine.createSpy('get').and.returnValue(of({ role: 'ADMIN' })) };
-    window.history.replaceState(null, '');
+    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
   });
 
   afterEach(() => {
     fixtures.forEach((fixture) => fixture.destroy());
     created.forEach((component) => component.ngOnDestroy());
-    window.history.replaceState(null, '');
   });
 
   describe('the request', () => {
@@ -150,23 +158,114 @@ describe('RepositoryComponent', () => {
       ]);
     });
 
-    it('starts with the type the dashboard card put into the router state', () => {
-      window.history.replaceState({ repoType: 'docker' }, '');
-
-      const component = create();
+    it('starts with the type given in the URL (the dashboard card, or a reload)', () => {
+      const component = create({ type: 'docker' });
 
       expect(component.repoOption).toBe(RepoType.DOCKER);
       expect(last().type).toBe(ApiRepoType.Docker);
     });
 
-    it('ignores a router state that is not a repository type', () => {
-      window.history.replaceState({ repoType: 'bogus' }, '');
-
-      const component = create();
+    it('ignores a URL type that is not a repository type', () => {
+      const component = create({ type: 'bogus' });
 
       expect(component.repoOption).toBe(RepoType.ALL);
       expect(last().type).toBeUndefined();
     });
+  });
+
+  describe('the URL (RPS-1668: a reload or Back restores the list, not an empty one)', () => {
+    it('starts with the search and page given in the URL', () => {
+      const component = create({ q: 'maven', page: '2' });
+
+      expect(component.searchQuery).toBe('maven');
+      expect(component.pageNum).toBe(2);
+      expect(last()).toEqual(jasmine.objectContaining({ q: 'maven', page: 2 }));
+    });
+
+    it('falls back to page 0 for a page that is not a non-negative integer', () => {
+      create({ page: '-3' });
+
+      expect(last().page).toBe(0);
+    });
+
+    it('does not navigate on a fresh load: the URL already matches (no page reload loop)', () => {
+      create();
+
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it('does not navigate again when the URL already carries the state being loaded', () => {
+      create({ q: 'maven', page: '2' });
+
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it('puts the type into the URL on a type change, replacing the current entry', () => {
+      const component = create();
+      router.navigate.calls.reset();
+
+      component.filterRepos(RepoType.NPM);
+
+      expect(router.navigate).toHaveBeenCalledOnceWith([], {
+        relativeTo: jasmine.anything(),
+        queryParams: { type: RepoType.NPM, q: null, page: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    });
+
+    it('drops the type from the URL when the filter goes back to All', () => {
+      const component = create({ type: 'npm' });
+      router.navigate.calls.reset();
+
+      component.filterRepos(RepoType.ALL);
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ type: null }) }),
+      );
+    });
+
+    it('puts the page into the URL on loadPage', () => {
+      const component = create();
+      router.navigate.calls.reset();
+
+      component.loadPage(3);
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ page: 3 }) }),
+      );
+    });
+
+    it('puts the applied search into the URL once the typing pauses, not on every keystroke', fakeAsync(() => {
+      create();
+      router.navigate.calls.reset();
+
+      const component = created[created.length - 1];
+      component.search('mav');
+      expect(router.navigate).not.toHaveBeenCalled();
+
+      tick(SEARCH_DEBOUNCE_MS);
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ q: 'mav', page: null }) }),
+      );
+    }));
+
+    it('drops q from the URL once the search box is emptied', fakeAsync(() => {
+      const component = create({ q: 'maven' });
+      router.navigate.calls.reset();
+
+      component.search('');
+      tick(SEARCH_DEBOUNCE_MS);
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ q: null }) }),
+      );
+    }));
   });
 
   describe('the rows', () => {
@@ -626,6 +725,7 @@ describe('RepositoryComponent', () => {
         imports: [RepositoryComponent],
         providers: [
           provideRouter([]),
+          { provide: ActivatedRoute, useValue: activatedRoute() },
           { provide: RepoCollectionControllerService, useValue: repoApi },
           { provide: ProtocolRepoControllerService, useValue: protocolApi },
           { provide: SecurityService, useValue: securityService },

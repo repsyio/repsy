@@ -43,6 +43,7 @@ import {
   stubSupportedRepoTypes,
 } from '../../../src/ui/security-stubs.js';
 import { UsersPage } from '../../../src/ui/pages/users.js';
+import { urlHasPath } from '../../../src/ui/routes.js';
 
 const insideOf = (dialog: Locator): Promise<boolean> =>
   dialog.evaluate((element) => element.contains(document.activeElement));
@@ -228,7 +229,7 @@ test.describe('Dialogs: semantics, focus and keyboard', { tag: '@a11y' }, () => 
         opener: badge,
       });
       // Still a child of the body (the row underneath is not its parent), and the row did not open.
-      await expect(adminPage).toHaveURL(/\/repositories$/);
+      await expect(adminPage).toHaveURL(urlHasPath('/repositories'));
     },
   );
 

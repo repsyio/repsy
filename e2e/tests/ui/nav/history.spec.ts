@@ -17,23 +17,20 @@
 /**
  * NAV-04..09 (RPS-1650, G12): the browser's Back and Forward buttons across the panel.
  *
- * The panel keeps NO list state in the URL: the search text, sort, page and type of a list live in the
- * component, so a Back to a list re-creates it from nothing (one fresh `GET` with no search, page 0).
- * What is pinned as it is (passing):
+ * The panel keeps a list's search text, sort, page and type in the URL's query string (RPS-1668:
+ * `?q=&sort=&page=&type=`, `replaceUrl: true` while the user is typing or filtering, so a keystroke
+ * never spams the browser history), so a Back to a list restores exactly what was left, and so does a
+ * reload. What is pinned:
  *
- *  - NAV-04/05: list -> detail -> Back reloads the list from the server (never a bfcache copy), the search
- *    box and the rows agree, Forward reopens what was left, at every level of every protocol, and no
- *    page error is raised on the way.
+ *  - NAV-04/05: list -> detail -> Back reloads the list from the server (never a bfcache copy), with
+ *    the search, sort, page and type it was left with; the search box and the rows agree, Forward
+ *    reopens what was left, at every level of every protocol, and no page error is raised on the way.
  *  - NAV-06: a deleted repository or version is never resurrected by Back: the entry of the deleted
  *    thing shows the not-found state, the entry before it shows fresh data.
  *  - NAV-07: Back after a login lands on the dashboard, never on the form again; Back after a logout never
  *    shows a private page (the guard sends the visitor to the login form).
  *  - NAV-08: an open modal or the mobile menu does not survive a Back, and leaves no scroll lock behind.
  *  - NAV-09: a reload in the middle of the history keeps the entries around it working.
- *
- * What is pinned as a known failure (`test.fail`, NAV-04 "keeps its search, sort and page"): the list
- * comes back reset instead of as it was left. `RPS-1668` is the ticket proposed in the PR of
- * RPS-1650; replace it with the key once filed.
  */
 import type { Page } from '@playwright/test';
 
@@ -65,7 +62,6 @@ function endsWith(path: string): RegExp {
 import type { PackageProtocol, PackageRef } from '../../../src/seed/packages.js';
 
 const NAV = '@nav';
-const LIST_STATE = 'RPS-1668';
 
 /** The repository's row: click the free point of the row (the row is one stretched link). */
 async function openRepoRow(repos: RepositoriesPage, name: string): Promise<void> {
@@ -113,7 +109,7 @@ async function openWalk(
 }
 
 test.describe('Browser history: lists and details', { tag: NAV }, () => {
-  test('NAV-04: list -> repository -> Back reloads the list, Forward reopens the repository', async ({
+  test('NAV-04: list -> repository -> Back reloads the list from the server, keeping the search it was left with', async ({
     adminPage,
     seeder,
   }) => {
@@ -126,13 +122,17 @@ test.describe('Browser history: lists and details', { tag: NAV }, () => {
     await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
     await pages.list().expectLoaded();
 
-    // A repository made while the list was away is found through the list that Back brings up: the
-    // list asks the server again (unfiltered, page 0), it is not a copy of what was left.
+    // A repository made while the list was away is found once the search that was left is cleared:
+    // Back asks the server again, with the search restored from the URL, not a bfcache copy.
     const other = await seeder.createRepo(RepoType.MAVEN);
-    await repos.afterListResponse(() => step(adminPage, 'back'), { type: 'all', q: '', page: 0 });
-    await expect(adminPage).toHaveURL(/\/repositories$/);
+    await repos.afterListResponse(() => step(adminPage, 'back'), {
+      type: 'all',
+      q: repo.name,
+      page: 0,
+    });
+    await expect(adminPage).toHaveURL(/\/repositories\?q=/);
     await expect(repos.title).toBeVisible();
-    await expect(repos.searchInput).toHaveValue(''); // the box agrees with the list it sits over
+    await expect(repos.searchInput).toHaveValue(repo.name); // the box agrees with the list it sits over
     await expect(repos.typeFilterText()).toContainText('All');
     await expect(repos.spinner.root).toBeHidden();
     await repos.search(other.name);
@@ -144,34 +144,32 @@ test.describe('Browser history: lists and details', { tag: NAV }, () => {
     await pages.list().expectLoaded();
   });
 
-  test('NAV-04: a type chosen on the list is dropped by Back too, and the list still works', async ({
+  test('NAV-04: a type chosen on the list survives Back too, and the list still works', async ({
     adminPage,
     seeder,
   }) => {
     const repo = await seeder.createRepo(RepoType.NPM);
     const repos = new RepositoriesPage(adminPage);
+    const npm = uiRepoType(RepoType.NPM);
     await repos.goto();
-    await repos.selectType(uiRepoType(RepoType.NPM));
+    await repos.selectType(npm);
     await repos.search(repo.name);
     await openRepoRow(repos, repo.name);
     await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
 
-    await repos.afterListResponse(() => step(adminPage, 'back'), { q: '', page: 0 });
-    // Whatever type the list comes back with, its box and its rows are one state: an unfiltered
-    // search over that type, with its selector saying which.
-    await expect(repos.searchInput).toHaveValue('');
+    await repos.afterListResponse(() => step(adminPage, 'back'), {
+      type: npm,
+      q: repo.name,
+      page: 0,
+    });
+    // Whatever was left is what Back brings up: the box, the type selector and the rows are one state.
+    await expect(repos.searchInput).toHaveValue(repo.name);
     await expect(repos.error).toHaveCount(0);
-    await expect(repos.typeFilterText()).toBeVisible();
-    await repos.search(repo.name);
+    await expect(repos.typeFilterText()).toContainText(npm.label);
     await expect(repos.row(repo.name)).toBeVisible();
   });
 
-  // Pinned: the state of a list is not in the URL and is not restored by Back (or by a reload).
-  test('NAV-04: the repository list keeps its search after Back [known failure: RPS-1668]', async ({
-    adminPage,
-    seeder,
-  }) => {
-    test.fail(true, `${LIST_STATE}: the list comes back without the search it was left with`);
+  test('NAV-04: the repository list keeps its search after Back', async ({ adminPage, seeder }) => {
     const repo = await seeder.createRepo(RepoType.MAVEN);
     const repos = new RepositoriesPage(adminPage);
     await repos.goto();
@@ -185,12 +183,11 @@ test.describe('Browser history: lists and details', { tag: NAV }, () => {
     await expect(repos.rows()).toHaveCount(1);
   });
 
-  test('NAV-04: a package list keeps its page and sort after Back [known failure: RPS-1668]', async ({
+  test('NAV-04: a package list keeps its page and sort after Back', async ({
     adminPage,
     seeder,
     seedPackages,
   }) => {
-    test.fail(true, `${LIST_STATE}: the list comes back on page 1 with the default sort`);
     const repo = await seeder.createRepo(RepoType.NPM);
     await seedPackages(repo, 12);
     const list = protocolPages(adminPage, DESCRIPTORS.npm, repo.name).list();
@@ -212,10 +209,9 @@ test.describe('Browser history: lists and details', { tag: NAV }, () => {
 
   // @cloud-skip: the Users page exists on Repsy OS only.
   test(
-    'NAV-04: the users list keeps its search after Back [known failure: RPS-1668]',
+    'NAV-04: the users list keeps its search after Back',
     { tag: ['@cloud-skip'] },
     async ({ adminPage, seededUser }) => {
-      test.fail(true, `${LIST_STATE}: the list comes back without the search it was left with`);
       const users = new UsersPage(adminPage);
       await users.goto();
       await users.search(seededUser.username);
@@ -304,10 +300,11 @@ test.describe('Browser history: deleted things stay deleted', { tag: NAV }, () =
     await expect(settings.root).toHaveCount(0);
     await expect(settings.title).toHaveCount(0);
 
-    // Forward is the list again, and the repository is not in it.
-    await repos.afterListResponse(() => step(adminPage, 'forward'), { q: '', page: 0 });
+    // Forward is the list again, with the search it was left with (RPS-1668) restored from the URL,
+    // and the deleted repository is not in it.
+    await repos.afterListResponse(() => step(adminPage, 'forward'), { q: repo.name, page: 0 });
     await expect(repos.title).toBeVisible();
-    await repos.search(repo.name);
+    await expect(repos.searchInput).toHaveValue(repo.name);
     await expect(repos.rows()).toHaveCount(0);
   });
 

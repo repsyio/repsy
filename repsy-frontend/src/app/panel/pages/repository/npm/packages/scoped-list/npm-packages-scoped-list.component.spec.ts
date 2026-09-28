@@ -45,7 +45,8 @@ describe('NpmPackagesScopeFilterComponent', () => {
   let dangerModalService: DangerModalService;
   let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
 
-  function build(scope = 'acme'): ListFixture {
+  /** Builds the component; `queryParams` is the URL it starts from (RPS-1668: `q`, `sort`, `page`). */
+  function build(scope = 'acme', queryParams: Record<string, string> = {}): ListFixture {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
     npmService = jasmine.createSpyObj<NpmService>(
       'NpmService',
@@ -53,10 +54,12 @@ describe('NpmPackagesScopeFilterComponent', () => {
       { repoChanges },
     );
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
-    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
+    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl', 'navigate']);
     dangerModalService = new DangerModalService();
     component = new NpmPackagesScopeFilterComponent(
-      { snapshot: { paramMap: convertToParamMap({ scope }) } } as ActivatedRoute,
+      {
+        snapshot: { paramMap: convertToParamMap({ scope }), queryParamMap: convertToParamMap(queryParams) },
+      } as ActivatedRoute,
       npmService,
       toastService,
       dangerModalService,
@@ -97,6 +100,53 @@ describe('NpmPackagesScopeFilterComponent', () => {
 
       expect(npmService.searchUnscopedPackages).toHaveBeenCalledOnceWith('', component.sortOption, 0, 10);
       expect(npmService.searchScopedPackages).not.toHaveBeenCalled();
+    }));
+  });
+
+  describe('the URL (RPS-1668: a reload or Back restores the list, not an empty one)', () => {
+    it('starts with the search, sort and page given in the URL', fakeAsync(() => {
+      build('acme', { q: 'ui', sort: 'Oldest', page: '2' }).respond([], 1);
+
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+
+      expect(component.searchText).toBe('ui');
+      expect(component.sortOption.name).toBe('Oldest');
+      expect(component.pageNum).toBe(2);
+      expect(npmService.searchScopedPackages).toHaveBeenCalledOnceWith('acme', 'ui', component.sortOption, 2, 10);
+    }));
+
+    it('does not navigate when the URL already matches what is loaded (no reload loop)', fakeAsync(() => {
+      build().respond([], 1);
+
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+
+      expect(router.navigate).not.toHaveBeenCalled();
+    }));
+
+    it('puts the sort and page into the URL, replacing the current entry', fakeAsync(() => {
+      build().respond([], 3);
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+      router.navigate.calls.reset();
+
+      component.sort(component.sortOptions[1]);
+      flushMicrotasks();
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ sort: component.sortOptions[1].name }) }),
+      );
+
+      router.navigate.calls.reset();
+      component.loadPage(2);
+      flushMicrotasks();
+
+      expect(router.navigate).toHaveBeenCalledOnceWith(
+        [],
+        jasmine.objectContaining({ queryParams: jasmine.objectContaining({ page: 2 }) }),
+      );
     }));
   });
 
@@ -149,7 +199,12 @@ describe('NpmPackagesScopeFilterComponent template', () => {
     npmService.searchScopedPackages.and.returnValue(of(pageOf([PACKAGE], 1) as never));
 
     const { el } = await renderComponent(NpmPackagesScopeFilterComponent, [
-      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ scope: 'acme' }) } } },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: { paramMap: convertToParamMap({ scope: 'acme' }), queryParamMap: convertToParamMap({}) },
+        },
+      },
       { provide: NpmService, useValue: npmService },
     ]);
     return el;

@@ -16,7 +16,7 @@
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, ElementRef, OnDestroy } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
@@ -37,6 +37,11 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { restoreListFocus } from '../../../../../shared/util/list-focus-restore.util';
+import {
+  readListPageParam,
+  readListQueryParam,
+  updateListQueryParams,
+} from '../../../../../shared/util/list-query-params.util';
 import { SecurityService } from '../../../../security/service/security.service';
 import { NpmConfigComponent } from '../../config/npm-config.component';
 import { NpmService } from '../../service/npm.service';
@@ -84,6 +89,8 @@ export class NpmPackagesListComponent implements OnDestroy {
   private securitySummarySubscription?: Subscription;
 
   constructor(
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
     private readonly npmService: NpmService,
     private readonly authService: AuthService,
     private readonly toastService: ToastService,
@@ -98,6 +105,14 @@ export class NpmPackagesListComponent implements OnDestroy {
     this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
         this.activeRegistry = Object.assign({}, registry);
+
+        // RPS-1668: the search, sort and page live in the URL, so a reload or a Back navigation
+        // restores exactly what was left instead of an unfiltered, first page.
+        this.searchText = readListQueryParam(this.route, 'q') ?? '';
+        const sortParam = readListQueryParam(this.route, 'sort');
+        this.sortOption = this.sortOptions.find((option) => option.name === sortParam) ?? this.sortOptions[0];
+        this.pageNum = readListPageParam(this.route, 'page', 0);
+
         this.fetchPackages();
         this.fetchSecuritySummary();
       }
@@ -144,7 +159,17 @@ export class NpmPackagesListComponent implements OnDestroy {
     return moment(date).fromNow();
   }
 
+  /** Keeps the URL's `q`, `sort` and `page` query params in step with what is about to be fetched (RPS-1668). */
+  private syncUrl(): void {
+    updateListQueryParams(this.router, this.route, {
+      q: this.searchText || null,
+      sort: this.sortOption.name === this.sortOptions[0].name ? null : this.sortOption.name,
+      page: this.pageNum || null,
+    });
+  }
+
   private fetchPackages(previouslyFocused: Element | null = null): void {
+    this.syncUrl();
     this.loading = true;
     this.npmService
       .searchPackages(this.searchText === '' ? null : this.searchText, this.sortOption, this.pageNum, this.pageSize)
