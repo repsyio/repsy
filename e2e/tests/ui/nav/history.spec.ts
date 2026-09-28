@@ -370,6 +370,46 @@ test.describe('Browser history: deleted things stay deleted', { tag: NAV }, () =
       await versions.expectRow(second);
     });
   }
+
+  // RPS-1693 (fixed here, the same class RPS-1650 fixed for the other shells, noted but not probed by
+  // PR #796): the tag list's own 404 handlers (a stale refresh, or the tag list's own load) pushed a new
+  // image-list entry on top of the deleted image's tag-list page instead of replacing it. `history.length`
+  // is the reliable witness for that: a push grows it, a `replaceUrl` navigation does not.
+  test('NAV-06: docker: the tag list 404 that follows its image being deleted elsewhere replaces its own entry', async ({
+    adminPage,
+    seeder,
+    seedVersions,
+    pageErrors,
+  }) => {
+    allowNotFoundToast(pageErrors);
+    const repo = await seeder.createRepo(RepoType.DOCKER);
+    const [tag] = await seedVersions(repo, ['1.0.0']);
+    const pages = protocolPages(adminPage, DESCRIPTORS.docker, repo.name);
+    const list = pages.list();
+    await list.goto();
+    const versions = pages.versions(tag);
+    await versions.goto();
+    await versions.expectRow(tag);
+    const entriesBeforeRedirect = await adminPage.evaluate(() => window.history.length);
+
+    // Somebody else deletes the image outright (a second tab does what a second admin would).
+    const other = await adminPage.context().newPage();
+    try {
+      const listB = protocolPages(other, DESCRIPTORS.docker, repo.name).list();
+      await listB.goto();
+      await listB.deleteRow(tag);
+    } finally {
+      await other.close();
+    }
+
+    // This tab does not know yet: its own refresh 404s, and the page leaves for the image list on its own.
+    await versions.refresh();
+    await expect(adminPage).toHaveURL(endsWith(list.path()));
+
+    // The redirect REPLACED the tag-list entry: no new entry was pushed on top of it, so a single Back
+    // (unlike before RPS-1693) does not land back on the stale tag list and re-trigger the same 404.
+    expect(await adminPage.evaluate(() => window.history.length)).toBe(entriesBeforeRedirect);
+  });
 });
 
 test.describe('Browser history: login and logout', { tag: NAV }, () => {

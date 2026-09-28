@@ -222,8 +222,10 @@ export class DockerImagesTagListComponent implements OnDestroy {
         error: (error: HttpErrorResponse) => {
           // The tag list of an image that no longer exists is a 404 since RPS-1579 (it used to be an empty page, which
           // sent us through `fetchSummary`): the same "image is gone" case, so the same way out (RPS-1617).
+          // The redirect REPLACES this entry (RPS-1693, the same pattern as RPS-1650): pushed on top of it, Back
+          // returned to the gone image's tag list, whose refresh 404s again, and the visitor could not leave.
           if (error?.status === 404) {
-            this.router.navigate([`/${this.activeRepo.repoName}`]);
+            this.router.navigate([`/${this.activeRepo.repoName}`], { replaceUrl: true });
           }
         },
       });
@@ -244,8 +246,9 @@ export class DockerImagesTagListComponent implements OnDestroy {
       error: (error: HttpErrorResponse) => {
         this.loadingSummary = false;
 
+        // Same reason as the fetchTags 404 above: replace, don't push, so Back leaves the gone image (RPS-1693).
         if (error?.status === 404) {
-          this.router.navigate([`/${this.activeRepo.repoName}`]);
+          this.router.navigate([`/${this.activeRepo.repoName}`], { replaceUrl: true });
         }
       },
     });
