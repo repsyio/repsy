@@ -22,7 +22,11 @@
  * instance. Sections R1-R14 mirror the plan's own hypothesis/rule numbering.
  */
 import { RepoType } from '../../src/api/panel-api.js';
-import { buildChart } from '../../src/clients/helm-chart.js';
+import {
+  buildChart,
+  buildChartFromRawYaml,
+  buildChartWithoutChartYaml,
+} from '../../src/clients/helm-chart.js';
 import {
   adminCredential,
   chartFileName,
@@ -314,8 +318,7 @@ test.describe('helm registry rules (raw HTTP)', () => {
   });
 
   test(
-    'R11: classic upload rules (missing chart part, missing/invalid Chart.yaml, uppercase name, ' +
-      'both routes accept the same request)',
+    'R11: classic upload routes (missing chart part, both routes accept the same request)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'classicupload');
@@ -354,6 +357,406 @@ test.describe('helm registry rules (raw HTTP)', () => {
         chartMuseumRoute.status,
         "POST /<repo>/api/charts (ChartMuseum's own historical route) accepts the same request",
       ).toBe(201);
+    },
+  );
+
+  test(
+    'R4b: OCI manifest refusals (chartNameMismatch, manifestLayerInvalid, manifestNameTooLong, ' +
+      'manifestReferenceTooLong)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'ocimanifestrefusals');
+      const admin = adminCredential();
+
+      // chartNameMismatch: path name differs from Chart.yaml name field
+      const built = await buildChart({
+        name: 'correct-name',
+        version: '1.0.0',
+        marker: 'r4b-namemismatch',
+      });
+      const mismatchManifest = Buffer.from(
+        JSON.stringify({
+          schemaVersion: 2,
+          mediaType: 'application/vnd.oci.image.manifest.v1+json',
+          config: { mediaType: 'x', digest: `sha256:${'1'.repeat(64)}`, size: 1 },
+          layers: [{ mediaType: 'x', digest: built.tgzDigest, size: built.tgzBytes.length }],
+        }),
+      );
+      await rawUploadBlob(layout.repoName, admin, 'correct-name', built.tgzBytes, built.tgzDigest);
+      await rawUploadBlob(
+        layout.repoName,
+        admin,
+        'correct-name',
+        Buffer.from('{}'),
+        `sha256:${'1'.repeat(64)}`,
+      );
+      const mismatchPush = await rawPutManifest(
+        layout.repoName,
+        admin,
+        'wrong-name',
+        '1.0.0',
+        mismatchManifest,
+        'application/vnd.oci.image.manifest.v1+json',
+      );
+      expect(mismatchPush.status, 'chartNameMismatch is refused with 400').toBe(400);
+
+      // manifestLayerInvalid: missing or invalid digest/size in layer
+      const invalidLayerManifest = Buffer.from(
+        JSON.stringify({
+          schemaVersion: 2,
+          mediaType: 'application/vnd.oci.image.manifest.v1+json',
+          config: { mediaType: 'x', digest: `sha256:${'2'.repeat(64)}`, size: 1 },
+          layers: [{ mediaType: 'x', size: built.tgzBytes.length }],
+        }),
+      );
+      const invalidLayerPush = await rawPutManifest(
+        layout.repoName,
+        admin,
+        'correct-name',
+        '2.0.0',
+        invalidLayerManifest,
+        'application/vnd.oci.image.manifest.v1+json',
+      );
+      expect(invalidLayerPush.status, 'manifestLayerInvalid is refused with 400').toBe(400);
+
+      // manifestNameTooLong: name exceeds MAX_OCI_MANIFEST_NAME_LENGTH (255)
+      const longName = 'a'.repeat(256);
+      const longNameManifest = Buffer.from(
+        JSON.stringify({
+          schemaVersion: 2,
+          mediaType: 'application/vnd.oci.image.manifest.v1+json',
+          config: { mediaType: 'x', digest: `sha256:${'3'.repeat(64)}`, size: 1 },
+          layers: [{ mediaType: 'x', digest: built.tgzDigest, size: built.tgzBytes.length }],
+        }),
+      );
+      const longNamePush = await rawPutManifest(
+        layout.repoName,
+        admin,
+        longName,
+        '3.0.0',
+        longNameManifest,
+        'application/vnd.oci.image.manifest.v1+json',
+      );
+      expect(longNamePush.status, 'manifestNameTooLong is refused with 400').toBe(400);
+
+      // manifestReferenceTooLong: reference exceeds MAX_OCI_MANIFEST_REFERENCE_LENGTH (255)
+      const longReference = 'a'.repeat(256);
+      const longRefManifest = Buffer.from(
+        JSON.stringify({
+          schemaVersion: 2,
+          mediaType: 'application/vnd.oci.image.manifest.v1+json',
+          config: { mediaType: 'x', digest: `sha256:${'4'.repeat(64)}`, size: 1 },
+          layers: [{ mediaType: 'x', digest: built.tgzDigest, size: built.tgzBytes.length }],
+        }),
+      );
+      const longRefPush = await rawPutManifest(
+        layout.repoName,
+        admin,
+        'correct-name',
+        longReference,
+        longRefManifest,
+        'application/vnd.oci.image.manifest.v1+json',
+      );
+      expect(longRefPush.status, 'manifestReferenceTooLong is refused with 400').toBe(400);
+    },
+  );
+
+  test(
+    'R11b: classic Chart.yaml validation (12 refusal branches from HelmChartParser)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'chartyamlvalidation');
+      const admin = adminCredential();
+
+      interface TestCase {
+        name: string;
+        chartYaml: string;
+        expectedMsgId: string;
+      }
+
+      const cases: TestCase[] = [
+        {
+          name: 'chartYamlNotFound',
+          chartYaml: '', // Placeholder; buildChartWithoutChartYaml handles this case
+          expectedMsgId: 'chartYamlNotFound',
+        },
+        {
+          name: 'chartYamlInvalid',
+          chartYaml: '{ invalid yaml : [}',
+          expectedMsgId: 'chartYamlInvalid',
+        },
+        {
+          name: 'chartNameMissing',
+          chartYaml: 'apiVersion: v2\nversion: 1.0.0\n',
+          expectedMsgId: 'chartNameMissing',
+        },
+        {
+          name: 'chartNameInvalid',
+          chartYaml: 'apiVersion: v2\nname: UPPERCASE\nversion: 1.0.0\n',
+          expectedMsgId: 'chartNameInvalid',
+        },
+        {
+          name: 'chartNameTooLong',
+          chartYaml: `apiVersion: v2\nname: ${'a'.repeat(256)}\nversion: 1.0.0\n`,
+          expectedMsgId: 'chartNameTooLong',
+        },
+        {
+          name: 'chartVersionMissing',
+          chartYaml: 'apiVersion: v2\nname: test-chart\n',
+          expectedMsgId: 'chartVersionMissing',
+        },
+        {
+          name: 'chartVersionInvalid',
+          chartYaml: 'apiVersion: v2\nname: test-chart\nversion: not-a-version\n',
+          expectedMsgId: 'chartVersionInvalid',
+        },
+        {
+          name: 'chartVersionTooLong',
+          chartYaml: `apiVersion: v2\nname: test-chart\nversion: "${'1'.repeat(256)}"\n`,
+          expectedMsgId: 'chartVersionTooLong',
+        },
+        {
+          name: 'chartApiVersionInvalid',
+          chartYaml: `apiVersion: ${'x'.repeat(256)}\nname: test-chart\nversion: 1.0.0\n`,
+          expectedMsgId: 'chartApiVersionInvalid',
+        },
+        {
+          name: 'chartDependenciesInvalid (non-list)',
+          chartYaml:
+            'apiVersion: v2\nname: test-chart\nversion: 1.0.0\ndependencies: "not-a-list"\n',
+          expectedMsgId: 'chartDependenciesInvalid',
+        },
+        {
+          name: 'chartAppVersionTooLong',
+          chartYaml: `apiVersion: v2\nname: test-chart\nversion: 1.0.0\nappVersion: ${'x'.repeat(256)}\n`,
+          expectedMsgId: 'chartAppVersionTooLong',
+        },
+        {
+          name: 'chartTypeInvalid',
+          chartYaml: `apiVersion: v2\nname: test-chart\nversion: 1.0.0\ntype: ${'x'.repeat(256)}\n`,
+          expectedMsgId: 'chartTypeInvalid',
+        },
+      ];
+
+      for (const testCase of cases) {
+        const built =
+          testCase.name === 'chartYamlNotFound'
+            ? await buildChartWithoutChartYaml({
+                name: 'test-chart',
+                marker: `r11b-${testCase.name}`,
+              })
+            : await buildChartFromRawYaml({
+                chartYaml: testCase.chartYaml,
+                marker: `r11b-${testCase.name}`,
+                name: 'test-chart',
+                version: '1.0.0',
+              });
+
+        const push = await rawUploadChart(
+          layout.repoName,
+          admin,
+          built.tgzBytes,
+          chartFileName('test-chart', '1.0.0'),
+        );
+
+        expect(push.status, `${testCase.name} should be 400`).toBe(400);
+        expect(push.msgId, `${testCase.name} should have msgId ${testCase.expectedMsgId}`).toBe(
+          testCase.expectedMsgId,
+        );
+
+        // Verify nothing was stored
+        const downloaded = await rawDownloadChart(layout.repoName, admin, 'test-chart', '1.0.0');
+        expect(downloaded.status, `${testCase.name} should not store anything`).toBe(404);
+      }
+    },
+  );
+
+  test(
+    'R15: Deny holds across protocols (OCI then classic, classic then OCI, identical re-push)',
+    { tag: ['@settings', '@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'crossprotocoldeny');
+      const admin = adminCredential();
+
+      // Setup: OCI push first
+      const built = await buildChart({
+        name: 'mychart',
+        version: '1.0.0',
+        marker: 'r15-oci-first',
+      });
+      await rawUploadBlob(layout.repoName, admin, 'mychart', built.tgzBytes, built.tgzDigest);
+      await rawUploadBlob(
+        layout.repoName,
+        admin,
+        'mychart',
+        Buffer.from('{}'),
+        `sha256:${'1'.repeat(64)}`,
+      );
+      const ociManifest = Buffer.from(
+        JSON.stringify({
+          schemaVersion: 2,
+          mediaType: 'application/vnd.oci.image.manifest.v1+json',
+          config: { mediaType: 'x', digest: `sha256:${'1'.repeat(64)}`, size: 1 },
+          layers: [{ mediaType: 'x', digest: built.tgzDigest, size: built.tgzBytes.length }],
+        }),
+      );
+      const ociPush = await rawPutManifest(
+        layout.repoName,
+        admin,
+        'mychart',
+        '1.0.0',
+        ociManifest,
+        'application/vnd.oci.image.manifest.v1+json',
+      );
+      expect(ociPush.status, 'OCI push succeeds').toBe(201);
+
+      // Set allowOverride to false before attempting the classic push
+      await seeder.setSettings(layout.repoName, {
+        privateRepo: true,
+        allowOverride: false,
+      });
+
+      // Try classic push of same name:version with DIFFERENT bytes (should be refused 409)
+      const builtDifferent = await buildChart({
+        name: 'mychart',
+        version: '1.0.0',
+        marker: 'r15-classic-different',
+      });
+      const classicPush = await rawUploadChart(
+        layout.repoName,
+        admin,
+        builtDifferent.tgzBytes,
+        chartFileName('mychart', '1.0.0'),
+      );
+      expect(
+        classicPush.status,
+        'classic push of same coordinate with different bytes is refused',
+      ).toBe(409);
+      expect(classicPush.msgId).toBe('chartAlreadyExists');
+
+      // Verify original OCI chart is still accessible
+      const ociPull = await rawGetManifest(layout.repoName, admin, 'mychart', '1.0.0');
+      expect(ociPull.status, 'OCI chart still accessible').toBe(200);
+
+      // Now test reverse: classic push first
+      const layout2 = await newRepo(seeder, 'crossprotocoldeny2');
+      const classicBuilt = await buildChart({
+        name: 'anotherchart',
+        version: '1.0.0',
+        marker: 'r15-classic-first',
+      });
+      const classicFirst = await rawUploadChart(
+        layout2.repoName,
+        admin,
+        classicBuilt.tgzBytes,
+        chartFileName('anotherchart', '1.0.0'),
+      );
+      expect(classicFirst.status, 'classic push succeeds').toBe(201);
+
+      // Set allowOverride to false before attempting the OCI push
+      await seeder.setSettings(layout2.repoName, {
+        privateRepo: true,
+        allowOverride: false,
+      });
+
+      // Try OCI push of same name:version with DIFFERENT bytes (should be refused 409)
+      const ociBuiltDifferent = await buildChart({
+        name: 'anotherchart',
+        version: '1.0.0',
+        marker: 'r15-oci-different',
+      });
+      await rawUploadBlob(
+        layout2.repoName,
+        admin,
+        'anotherchart',
+        ociBuiltDifferent.tgzBytes,
+        ociBuiltDifferent.tgzDigest,
+      );
+      await rawUploadBlob(
+        layout2.repoName,
+        admin,
+        'anotherchart',
+        Buffer.from('{}'),
+        `sha256:${'2'.repeat(64)}`,
+      );
+      const ociManifestDifferent = Buffer.from(
+        JSON.stringify({
+          schemaVersion: 2,
+          mediaType: 'application/vnd.oci.image.manifest.v1+json',
+          config: { mediaType: 'x', digest: `sha256:${'2'.repeat(64)}`, size: 1 },
+          layers: [
+            {
+              mediaType: 'x',
+              digest: ociBuiltDifferent.tgzDigest,
+              size: ociBuiltDifferent.tgzBytes.length,
+            },
+          ],
+        }),
+      );
+      const ociSecondPush = await rawPutManifest(
+        layout2.repoName,
+        admin,
+        'anotherchart',
+        '1.0.0',
+        ociManifestDifferent,
+        'application/vnd.oci.image.manifest.v1+json',
+      );
+      expect(
+        ociSecondPush.status,
+        'OCI push of same coordinate with different bytes is refused',
+      ).toBe(409);
+
+      // Verify original classic chart is still accessible
+      const classicPull = await rawDownloadChart(layout2.repoName, admin, 'anotherchart', '1.0.0');
+      expect(classicPull.status, 'classic chart still accessible').toBe(200);
+
+      // Test idempotent re-push: identical bytes over OCI after a classic push should be accepted
+      const layout3 = await newRepo(seeder, 'crossprotocolidempotent');
+      const shared = await buildChart({
+        name: 'samechart',
+        version: '1.0.0',
+        marker: 'r15-shared',
+      });
+      const classicInitial = await rawUploadChart(
+        layout3.repoName,
+        admin,
+        shared.tgzBytes,
+        chartFileName('samechart', '1.0.0'),
+      );
+      expect(classicInitial.status).toBe(201);
+
+      // Set allowOverride to false to ensure idempotent identical re-push is accepted
+      await seeder.setSettings(layout3.repoName, {
+        privateRepo: true,
+        allowOverride: false,
+      });
+
+      // Push identical bytes via OCI (should be accepted as idempotent re-push)
+      await rawUploadBlob(layout3.repoName, admin, 'samechart', shared.tgzBytes, shared.tgzDigest);
+      await rawUploadBlob(
+        layout3.repoName,
+        admin,
+        'samechart',
+        Buffer.from('{}'),
+        `sha256:${'3'.repeat(64)}`,
+      );
+      const ociIdentical = Buffer.from(
+        JSON.stringify({
+          schemaVersion: 2,
+          mediaType: 'application/vnd.oci.image.manifest.v1+json',
+          config: { mediaType: 'x', digest: `sha256:${'3'.repeat(64)}`, size: 1 },
+          layers: [{ mediaType: 'x', digest: shared.tgzDigest, size: shared.tgzBytes.length }],
+        }),
+      );
+      const ociIdempotent = await rawPutManifest(
+        layout3.repoName,
+        admin,
+        'samechart',
+        '1.0.0',
+        ociIdentical,
+        'application/vnd.oci.image.manifest.v1+json',
+      );
+      expect(ociIdempotent.status, 'identical re-push via OCI is accepted').toBe(201);
     },
   );
 
@@ -499,6 +902,59 @@ test.describe('helm registry rules (raw HTTP)', () => {
 
       const manifestAfterDelete = await rawGetManifest(layout.repoName, admin, ociChart, '0.1.0');
       expect(manifestAfterDelete.status, 'the manifest is gone too').toBe(404);
+
+      // R14 extension: tags/list no longer lists the deleted version
+      const tagsAfterDelete = await rawGetTagsList(layout.repoName, admin, ociChart);
+      expect(tagsAfterDelete.status, 'tags/list still works').toBe(200);
+      const tagsBody = JSON.parse(tagsAfterDelete.body.toString('utf8'));
+      expect(tagsBody.tags, 'the deleted version is gone from tags/list').not.toContain('0.1.0');
+
+      // R14 extension: republish of same name:version under Deny (override off) is now accepted
+      const republished = await buildChart({
+        name: ociChart,
+        version: '0.1.0',
+        marker: 'r14-republish',
+      });
+      await rawUploadBlob(
+        layout.repoName,
+        admin,
+        ociChart,
+        republished.tgzBytes,
+        republished.tgzDigest,
+      );
+      await rawUploadBlob(
+        layout.repoName,
+        admin,
+        ociChart,
+        Buffer.from('{}'),
+        `sha256:${'5'.repeat(64)}`,
+      );
+      const republishManifest = Buffer.from(
+        JSON.stringify({
+          schemaVersion: 2,
+          mediaType: 'application/vnd.oci.image.manifest.v1+json',
+          config: { mediaType: 'x', digest: `sha256:${'5'.repeat(64)}`, size: 1 },
+          layers: [
+            { mediaType: 'x', digest: republished.tgzDigest, size: republished.tgzBytes.length },
+          ],
+        }),
+      );
+      const republishPush = await rawPutManifest(
+        layout.repoName,
+        admin,
+        ociChart,
+        '0.1.0',
+        republishManifest,
+        'application/vnd.oci.image.manifest.v1+json',
+      );
+      expect(
+        republishPush.status,
+        'republish of same name:version after delete is accepted (old version is gone)',
+      ).toBe(201);
+
+      // Verify the republished version is now accessible
+      const republishedManifest = await rawGetManifest(layout.repoName, admin, ociChart, '0.1.0');
+      expect(republishedManifest.status, 'republished manifest is accessible').toBe(200);
     },
   );
 });
