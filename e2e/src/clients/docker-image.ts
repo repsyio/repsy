@@ -344,7 +344,6 @@ export function buildAttestationManifest(): {
   const configDigest = sha256(configBytes);
 
   const manifestObj = {
-    mediaType: 'application/unknown+unknown',
     schemaVersion: 2,
     config: {
       mediaType: 'application/vnd.oci.empty.v1+json',
