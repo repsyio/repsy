@@ -180,7 +180,9 @@ test.describe('NuGet package pages', { tag: '@packages' }, () => {
     await expect(detail.snippet('package-reference')).toContainText(
       `<PackageReference Include="${pkg.name}" Version="1.0.0" />`,
     );
-    await expect(detail.installText).toContainText(`dotnet add package ${pkg.name} --version 1.0.0`);
+    await expect(detail.installText).toContainText(
+      `dotnet add package ${pkg.name} --version 1.0.0`,
+    );
     // `dotnet add package --source` only accepts a URL or a folder, never a configured source's
     // name, so the .NET CLI snippet must not suggest `--source repsy` (RPS-1570).
     await expect(detail.installText).not.toContainText('--source repsy');
