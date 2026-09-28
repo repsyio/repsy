@@ -205,4 +205,43 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
 
     Long getSize();
   }
+
+  /**
+   * A tagged image that a release before RPS-1216 pushed without ever filling {@code size} and
+   * {@code digest} (RPS-1563): {@code refreshImageSize} sets the digest from the image's most
+   * recently moved tag, so a tagged image that still has none was never recomputed. An image with
+   * no tag is untagged on purpose and keeps {@code digest} null, so it never matches. Ordered by id
+   * for the same resumable, idempotent paging {@link
+   * io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository#findRepairableIds}
+   * uses: a row that {@code
+   * io.repsy.os.server.protocols.docker.shared.image.services.DockerImageStatsBackfillService}
+   * recomputed no longer matches the query that found it.
+   */
+  @Query(
+      """
+      select i.id as imageId, i.repo.id as repoId from Image i
+      where i.digest is null
+        and exists (select 1 from Tag t where t.image = i)
+      order by i.id
+    """)
+  List<ImageStatsBackfillRow> findBackfillableIds(Pageable pageable);
+
+  /** The batch that follows {@link #findBackfillableIds}, after the last id it returned. */
+  @Query(
+      """
+      select i.id as imageId, i.repo.id as repoId from Image i
+      where i.digest is null
+        and exists (select 1 from Tag t where t.image = i)
+        and i.id > :after
+      order by i.id
+    """)
+  List<ImageStatsBackfillRow> findBackfillableIdsAfter(UUID after, Pageable pageable);
+
+  /** The (image, repo) pair a backfill batch needs, without loading the whole entity. */
+  interface ImageStatsBackfillRow {
+
+    UUID getImageId();
+
+    UUID getRepoId();
+  }
 }
