@@ -203,13 +203,11 @@ test(
   { tag: ['@auth'] },
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: true });
-    const user = await seeder.createUser();
-    const credential = {
-      transport: 'basic' as const,
-      username: user.username,
-      password: user.password,
-      kind: 'password' as const,
-    };
+    const credential = await seeder.backend.seedUserCredential({
+      seeder,
+      repoName: repo.name,
+      repoType: RepoType.RUBY,
+    });
     const name = `e2e_${seeder.runId}_userpush`;
     const version = rubyAdapter.version('release');
     const marker = randomUUID();
