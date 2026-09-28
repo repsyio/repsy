@@ -4687,6 +4687,21 @@ depRequirement]]`.
   `dependencies = []`; decoded the same way, inflate (zlib) then `Marshal.load` (`require
 "rubygems"` first) INSIDE the Ruby runner container, never a hand-rolled TS Marshal parser.
 
+### Pre-release versions and real-client flows (RPS-1724)
+
+`tests/ruby/transitive-resolution.spec.ts` covers the real-client flows of pre-release versions: a version
+containing a letter (e.g. `1.0.0.pre`, `1.0.0.rc1`, `2.0.0.alpha`) is a pre-release. Probed live
+(confirmed against a running stack):
+
+- **D-1a**: A pre-release version publishes with `200` like any other version; `/info/<gem>` lists both
+  releases and pre-releases (yanked ones still omitted). `gem install <name>` (no version, no `--pre`)
+  installs the latest RELEASE, never a pre-release; `gem install <name> --pre` (no version) installs the
+  latest version INCLUDING pre-releases. The installed gem bytes match the published bytes.
+- **D-2a**: The `/info` endpoint returns versions in publish order (the order they were pushed to Repsy),
+  not version-sorted order. This matches how RubyGems itself serves `/info`: newer publishes are appended,
+  not sorted. The test deliberately publishes out of order (1.0.0, 2.0.0, 1.5.0) and asserts the response
+  matches that order.
+
 ## Stack overlays
 
 The default stack is tuned so that every suite can run against it (the auth throttle at 100000 failures,

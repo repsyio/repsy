@@ -917,3 +917,77 @@ test.describe('ruby > legacy /api/v1/dependencies route (RPS-1724)', () => {
     ]);
   });
 });
+
+/**
+ * RPS-1724: Ruby pre-release versions and real-client flows. Pre-releases follow RubyGems
+ * convention: a version containing a letter (e.g. `1.0.0.pre`, `1.0.0.rc1`) is a pre-release.
+ * A pre-release is NOT selected by a plain `gem install <name>` or `bundle install` resolving a
+ * dependency, but IS installable with `gem install <name> --pre`. The `/info` endpoint includes
+ * pre-releases in its version list alongside releases.
+ *
+ * Probed live:
+ *  - A pre-release version publishes with `200`, like any other version.
+ *  - `/info/<gem>` lists pre-releases (one line per version, released or pre-release alike).
+ *  - `gem install <gem>` (without version) installs the latest RELEASE, not pre-release.
+ *  - `gem install <gem> <pre-version>` (without `--pre`) fails to find the pre-release.
+ *  - `gem install <gem> <pre-version> --pre` succeeds and installs the pre-release.
+ *  - The `/info` endpoint returns versions in publish order, not version-sorted order.
+ */
+test.describe('ruby > pre-release versions and real-client flows (RPS-1724)', () => {
+  test('a pre-release version publishes, is NOT installed without --pre, is installed with --pre', async ({
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
+    const name = `e2e_${seeder.runId}_pr_gem`;
+
+    // Publish a release and a pre-release.
+    const release = await publishGem(repo.name, name, '1.0.0');
+    expect(release.sha256Hex).toBeDefined();
+    const prerelease = await publishGem(repo.name, name, '1.1.0.pre');
+    expect(prerelease.sha256Hex).toBeDefined();
+
+    // `/info` lists both: one line per version, no omission of pre-releases.
+    const infoOutput = await infoLines(repo.name, {}, name);
+    expect(infoOutput.map((l) => l.version).sort()).toEqual(['1.0.0', '1.1.0.pre']);
+
+    // `gem install <name>` (no version) installs the latest RELEASE, not the pre-release.
+    const installLatestRelease = await gemInstall(
+      'ruby-prerelease-latest-release',
+      repo.name,
+      name,
+    );
+    expect(installLatestRelease.exitCode, `gem install ${name}: ${installLatestRelease.stderr}`).toBe(
+      0,
+    );
+    expect(installLatestRelease.installed).toEqual([`${name}-1.0.0`]);
+
+    // `gem install <name> --pre` (with `--pre`, no explicit version) selects latest including pre-releases.
+    const installLatestWithPre = await gemInstall(
+      'ruby-prerelease-latest-with-pre',
+      repo.name,
+      name,
+      ['--pre'],
+    );
+    expect(installLatestWithPre.exitCode, `gem install ${name} --pre: ${installLatestWithPre.stderr}`).toBe(0);
+    expect(installLatestWithPre.installed).toEqual([`${name}-1.1.0.pre`]);
+  });
+
+  test('the /info endpoint returns versions in publish order, not version-sorted order', async ({
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
+    const name = `e2e_${seeder.runId}_info_order`;
+
+    // Publish in a deliberate order: 1.0.0, 2.0.0, 1.5.0 (not sorted).
+    await publishGem(repo.name, name, '1.0.0');
+    await publishGem(repo.name, name, '2.0.0');
+    await publishGem(repo.name, name, '1.5.0');
+
+    const infoOutput = await infoLines(repo.name, {}, name);
+    const versions = infoOutput.map((l) => l.version);
+
+    // The order should match publish order (first, second, third), not version-sorted order.
+    // This is consistent with how RubyGems itself serves /info: newer publishes are appended.
+    expect(versions).toEqual(['1.0.0', '2.0.0', '1.5.0']);
+  });
+});

@@ -337,13 +337,11 @@ test.describe('ruby registry rules (raw HTTP)', () => {
       });
       expect(roYank.status, 'a read-only token cannot yank (WRITE)').toBe(401);
 
-      const user = await seeder.createUser();
-      const userCred = {
-        transport: 'basic' as const,
-        username: user.username,
-        password: user.password,
-        kind: 'password' as const,
-      };
+      const userCred = await seeder.backend.seedUserCredential({
+        seeder,
+        repoName: layout.repoName,
+        repoType: RepoType.RUBY,
+      });
       // Yank is a WRITE (RPS-1317), like Cargo yank and NuGet unlist: a USER-role account may
       // yank, and it is this yank that the admin's re-yank below finds already done.
       const userYank = await rawYank(layout.repoName, userCred, {
