@@ -69,7 +69,7 @@ public interface CargoCrateConverter {
     @Mapping(target = "yanked", source = "yanked"),
     @Mapping(target = "links", source = "links"),
     @Mapping(target = "v", source = "v"),
-    @Mapping(target = "features2", source = "features2", qualifiedByName = "jsonToFeatures"),
+    @Mapping(target = "features2", source = "features2", qualifiedByName = "jsonToFeatures2"),
     @Mapping(target = "rustVersion", source = "rustVersion")
   })
   CrateIndexEntry toCrateIndexEntry(CargoCrateIndex index);
