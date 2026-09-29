@@ -149,6 +149,35 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
   }
 
   @Test
+  @DisplayName(
+      "finds the chart layer by media type, not array position, in a signed push's "
+          + "two-layer manifest (RPS-1719): a real client does not keep the chart layer first")
+  void acceptsChartLayerNotFirst() throws Exception {
+    final var context = context("/payments/manifests/1.0.0");
+    this.stubChartLayer("payments", "1.0.0");
+    this.stubPush();
+    final var provDigest = "sha256:" + "c".repeat(64);
+    final var manifest =
+        "{\"layers\":["
+            + "{\"mediaType\":\"application/vnd.cncf.helm.chart.provenance.v1.prov\","
+            + "\"digest\":\""
+            + provDigest
+            + "\",\"size\":5},"
+            + "{\"mediaType\":\""
+            + HelmConstants.CHART_CONTENT_MEDIA_TYPE
+            + "\",\"digest\":\""
+            + LAYER_DIGEST
+            + "\",\"size\":10}]}";
+
+    final var response = this.push(context, manifest);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    final var form = ArgumentCaptor.forClass(HelmOciManifestPushForm.class);
+    verify(this.facade).pushManifest(eq(context), form.capture(), any(byte[].class));
+    assertThat(form.getValue().getChart().getDigest()).isEqualTo(LAYER_DIGEST);
+  }
+
+  @Test
   @DisplayName("reports the manifest file's usage once, after the push has succeeded")
   void reportsUsagesOnce() throws Exception {
     final var context = context("/payments/manifests/1.0.0");
@@ -326,6 +355,16 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
         arguments("{\"layers\":null}", "manifestLayersMissing"),
         arguments("{\"layers\":{}}", "manifestLayersMissing"),
         arguments("{\"layers\":[]}", "manifestLayersMissing"),
+        arguments(
+            "{\"layers\":["
+                + "{\"mediaType\":\"application/vnd.cncf.helm.chart.provenance.v1.prov\","
+                + "\"digest\":\""
+                + LAYER_DIGEST
+                + "\",\"size\":10},"
+                + "{\"mediaType\":\"application/octet-stream\",\"digest\":\""
+                + LAYER_DIGEST
+                + "\",\"size\":10}]}",
+            "manifestChartLayerMissing"),
         arguments("{\"layers\":[null]}", "manifestLayerInvalid"),
         arguments("{\"layers\":[{}]}", "manifestLayerInvalid"),
         arguments("{\"layers\":[{\"size\":10}]}", "manifestLayerInvalid"),

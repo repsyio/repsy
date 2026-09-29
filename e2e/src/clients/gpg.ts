@@ -41,6 +41,13 @@ export interface GpgKey {
   fingerprint: string;
   /** The 64 bit key id, upper-case hex, as the panel API reports a registered key. */
   keyIdHex: string;
+  /**
+   * `<Name-Real> <<Name-Email>>`, the gpg USER ID string below -- what a tool that selects a key by
+   * NAME rather than by fingerprint needs (`helm package --sign --key`, RPS-1719: confirmed live
+   * that its `--key` does NOT accept a bare fingerprint, "Error: private key not found", only a
+   * uid substring match).
+   */
+  uid: string;
   passphrase: string;
   /** `gpg --armor --export`: what a publisher uploads to a key store. */
   publicKeyArmored: string;
@@ -52,6 +59,9 @@ export interface GpgKey {
 export function gpgEnv(key: Pick<GpgKey, 'gnupgHome'>, home: string): NodeJS.ProcessEnv {
   return clientEnv(home, { GNUPGHOME: key.gnupgHome });
 }
+
+const KEY_NAME_REAL = 'repsy e2e';
+const KEY_NAME_EMAIL = 'e2e@repsy.test';
 
 /** Generates a fresh 2048 bit RSA signing key with `gpg --batch --gen-key` in its own GNUPGHOME. */
 export async function generateGpgKey(): Promise<GpgKey> {
@@ -74,8 +84,8 @@ export async function generateGpgKey(): Promise<GpgKey> {
         'Key-Type: RSA',
         'Key-Length: 2048',
         'Key-Usage: sign',
-        'Name-Real: repsy e2e',
-        'Name-Email: e2e@repsy.test',
+        `Name-Real: ${KEY_NAME_REAL}`,
+        `Name-Email: ${KEY_NAME_EMAIL}`,
         'Expire-Date: 0',
         `Passphrase: ${passphrase}`,
         '%commit',
@@ -117,6 +127,7 @@ export async function generateGpgKey(): Promise<GpgKey> {
       gnupgHome,
       fingerprint: fingerprint.toUpperCase(),
       keyIdHex: fingerprint.slice(-16).toUpperCase(),
+      uid: `${KEY_NAME_REAL} <${KEY_NAME_EMAIL}>`,
       passphrase,
       publicKeyArmored: `${exported.stdout}\n`,
       dispose,
@@ -125,4 +136,34 @@ export async function generateGpgKey(): Promise<GpgKey> {
     await dispose();
     throw err;
   }
+}
+
+/**
+ * `gpg --export-secret-keys`: an armored PRIVATE key export, for a signer that reads its keyring as
+ * a plain FILE rather than shelling out to `gpg` itself (`helm package --sign --keyring
+ * <path>`, RPS-1719) -- unlike `maven-gpg-plugin`/Gradle's `signing` plugin (`maven-signing.ts`),
+ * which drive the real `gpg` binary against `key.gnupgHome` and never need this. Confirmed live:
+ * Helm's own PGP implementation parses this armored file directly (`pkg/provenance`), so the
+ * signing step itself never touches `gpg` or `key.gnupgHome` again once this is on disk.
+ */
+export async function exportSecretKeyArmored(key: GpgKey, cwd: string): Promise<string> {
+  const env = gpgEnv(key, cwd);
+  const exported = await run(
+    'gpg',
+    [
+      '--batch',
+      '--pinentry-mode',
+      'loopback',
+      '--passphrase',
+      key.passphrase,
+      '--armor',
+      '--export-secret-keys',
+      key.fingerprint,
+    ],
+    { cwd, env, redact: [key.passphrase], label: 'gpg-export-secret' },
+  );
+  if (exported.exitCode !== 0 || !exported.stdout.includes('BEGIN PGP PRIVATE KEY BLOCK')) {
+    throw new Error(`gpg --export-secret-keys failed (${exported.exitCode}): ${exported.stderr}`);
+  }
+  return `${exported.stdout}\n`;
 }

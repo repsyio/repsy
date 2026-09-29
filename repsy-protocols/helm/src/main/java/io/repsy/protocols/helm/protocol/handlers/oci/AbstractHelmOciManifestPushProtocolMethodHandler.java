@@ -273,8 +273,22 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
   }
 
   /**
-   * The chart archive is the first layer of the manifest. A manifest without one, or whose layer
+   * The chart archive layer of the manifest. A manifest without any layer, or whose chosen layer
    * lacks a digest or a size, is the client's mistake and is answered with a 400 that names it.
+   *
+   * <p>A manifest with exactly one layer uses it unconditionally, whatever its media type (or
+   * none): every existing client and fixture here builds a bare single-layer manifest with no
+   * {@code mediaType} on the layer itself, and there is no other layer it could be.
+   *
+   * <p>A manifest with MORE than one layer -- a signed push ({@code helm package --sign} + {@code
+   * helm push}), which adds a second layer for the {@code .prov} file (RPS-1719) -- picks the layer
+   * whose media type is the Helm chart-content type, never {@code layers[0]} by position. Confirmed
+   * live: a real Helm client's OCI pusher does NOT keep the chart layer first -- {@code
+   * pkg/registry/client.go} orders {@code layers} by ascending digest, so which layer lands at
+   * index 0 is effectively arbitrary per push. Trusting {@code layers[0]} unconditionally (the
+   * pre-RPS-1719 behavior) made a signed push fail with an unhandled {@code GZIPException} (a bare
+   * 500) whenever the {@code .prov} layer's digest happened to sort before the chart layer's --
+   * roughly half the time, confirmed live with the real client against both orderings.
    */
   private ChartLayer parseChartLayer(final String manifestJson) {
     final var layers = this.parseManifest(manifestJson).get("layers");
@@ -282,7 +296,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
       throw new BadRequestException("manifestLayersMissing");
     }
 
-    final var layer = layers.get(0);
+    final var layer = this.findChartLayer(layers);
     final var digest = layer.get("digest");
     final var size = layer.get("size");
     if (!isSha256Digest(digest) || !isNonNegativeInteger(size)) {
@@ -290,6 +304,21 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     }
 
     return new ChartLayer(digest.asString(), size.asLong());
+  }
+
+  private JsonNode findChartLayer(final JsonNode layers) {
+    if (layers.size() == 1) {
+      return layers.get(0);
+    }
+    for (final var candidate : layers) {
+      final var mediaType = candidate.get("mediaType");
+      if (mediaType != null
+          && mediaType.isString()
+          && HelmConstants.CHART_CONTENT_MEDIA_TYPE.equals(mediaType.asString())) {
+        return candidate;
+      }
+    }
+    throw new BadRequestException("manifestChartLayerMissing");
   }
 
   private JsonNode parseManifest(final String manifestJson) {

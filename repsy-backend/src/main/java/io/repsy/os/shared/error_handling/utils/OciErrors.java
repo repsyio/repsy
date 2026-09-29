@@ -55,6 +55,7 @@ public final class OciErrors {
           Map.entry("dockerPlatformTooLong", OciErrorCode.MANIFEST_INVALID),
           Map.entry("manifestInvalidJson", OciErrorCode.MANIFEST_INVALID),
           Map.entry("manifestLayersMissing", OciErrorCode.MANIFEST_INVALID),
+          Map.entry("manifestChartLayerMissing", OciErrorCode.MANIFEST_INVALID),
           Map.entry("manifestLayerInvalid", OciErrorCode.MANIFEST_INVALID),
           Map.entry("digestMismatch", OciErrorCode.DIGEST_INVALID),
           Map.entry("blobDigestUnsupported", OciErrorCode.DIGEST_INVALID),
