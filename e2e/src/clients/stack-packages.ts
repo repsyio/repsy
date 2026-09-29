@@ -116,6 +116,13 @@ export async function consume(
   );
 }
 
+/** `{ name, latestVersion }` (or, for Docker, `{ name, digest }`) listing endpoints, keyed by protocol. */
+const NAME_VERSION_LISTING_PATH: Record<string, string> = {
+  npm: '/api/npm/packages',
+  helm: '/api/helm/charts',
+  docker: '/api/docker/images',
+};
+
 /** What the panel lists for the package: the name, the version (or, for Docker, the manifest digest). */
 export async function expectListedInPanel(
   panelApi: PanelBackend,
@@ -137,10 +144,33 @@ export async function expectListedInPanel(
     ).toContain(version);
     return;
   }
-  const path =
-    pkg.adapter.protocol === 'npm'
-      ? `/api/npm/packages/${encodeURIComponent(repoName)}?size=100`
-      : `/api/docker/images/${encodeURIComponent(repoName)}?size=100`;
+  if (pkg.adapter.protocol === 'golang') {
+    // No `{ name, latestVersion }` listing (RPS-1720): a module lists only its path, so this is the
+    // same two-step lookup as maven's, against `/api/go/modules` instead of dedicated helpers.
+    const modulesPath = `/api/go/modules/${encodeURIComponent(repoName)}?size=100`;
+    const modulesRes = await panelApi.rawRequest('GET', modulesPath);
+    expect(modulesRes.status, `${what}: GET ${modulesPath}`).toBe(200);
+    const modules = (modulesRes.body.data as { content?: { modulePath?: string }[] }).content;
+    expect(
+      (modules ?? []).some((candidate) => candidate.modulePath === packageName),
+      `${what} lists the module ${packageName}`,
+    ).toBe(true);
+    const versionsPath = `/api/go/modules/${encodeURIComponent(repoName)}/versions?modulePath=${encodeURIComponent(packageName)}&size=100`;
+    const versionsRes = await panelApi.rawRequest('GET', versionsPath);
+    expect(versionsRes.status, `${what}: GET ${versionsPath}`).toBe(200);
+    const versions = (versionsRes.body.data as { content?: { version?: string }[] }).content;
+    expect(
+      (versions ?? []).some((candidate) => candidate.version === version),
+      `${what} lists the version ${version}`,
+    ).toBe(true);
+    return;
+  }
+  const base = NAME_VERSION_LISTING_PATH[pkg.adapter.protocol];
+  expect(
+    base,
+    `expectListedInPanel: no panel listing path known for ${pkg.adapter.protocol}`,
+  ).toBeDefined();
+  const path = `${base}/${encodeURIComponent(repoName)}?size=100`;
   const res = await panelApi.rawRequest('GET', path);
   expect(res.status, `${what}: GET ${path}`).toBe(200);
   const content = (
@@ -148,9 +178,9 @@ export async function expectListedInPanel(
   ).content;
   const item = (content ?? []).find((candidate) => candidate.name === packageName);
   expect(item, `${what} lists ${packageName}`).toBeDefined();
-  if (pkg.adapter.protocol === 'npm') {
-    expect(item?.latestVersion, `${what}: the npm latest version`).toBe(version);
-  } else {
+  if (pkg.adapter.protocol === 'docker') {
     expect(item?.digest, `${what}: the image digest`).toBe(`sha256:${pkg.contentSha256}`);
+  } else {
+    expect(item?.latestVersion, `${what}: the latest version`).toBe(version);
   }
 }

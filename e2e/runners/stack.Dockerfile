@@ -24,16 +24,53 @@
 # which no HTTP client can see. Read docker.Dockerfile's "Why no daemon" section in README.md for why
 # the protocol runners do not do this: a socket is root on the host, so the runner is only run
 # against a local stack the harness owns (the specs skip themselves on a remote target).
+# RPS-1719/RPS-1720: the upgrade-path and persistence-across-restart legs also publish a Helm chart and a
+# Go module against the previous release and pull them again with the real `helm`/`go` clients, so this
+# runner needs both -- the same static `helm` binary as helm.Dockerfile (no `cm-push` plugin: only the OCI
+# adapter is used here, never the ChartMuseum one) and the same Go toolchain (copied in, not run as a
+# daemon) plus the build-time TLS shim certificate as golang.Dockerfile (a credentialed `go` invocation
+# refuses a plain-http GOPROXY, see clients/golang-tls-shim.ts's file header). Keep these pins equal to the
+# helm/golang services' in docker-compose.runners.yml (runners/bump-pins.sh fails when they differ). This
+# grows the image by roughly the size of the Go toolchain plus the helm binary (~250 MB).
 ARG DOCKER_CLI_VERSION=29.8.1
 # crane, copied the way docker.Dockerfile does it (a named stage, only a `COPY --from` source).
 ARG CRANE_VERSION=v0.22.1
+ARG HELM_VERSION=v4.3.0
+ARG GO_VERSION=1.27.1
 # The digests have no default on purpose (RPS-1597): docker-compose.runners.yml is their single source and
 # runners/bump-pins.sh keeps them (README.md "Runner images and pins"), so a build without them fails loudly.
 ARG DOCKER_CLI_IMAGE_DIGEST
 ARG CRANE_IMAGE_DIGEST
+ARG GO_IMAGE_DIGEST
+ARG HELM_SHA256_AMD64
+ARG HELM_SHA256_ARM64
 FROM docker:${DOCKER_CLI_VERSION}-cli@${DOCKER_CLI_IMAGE_DIGEST} AS docker-cli
 
 FROM gcr.io/go-containerregistry/crane:${CRANE_VERSION}@${CRANE_IMAGE_DIGEST} AS crane
+
+FROM golang:${GO_VERSION}-bookworm@${GO_IMAGE_DIGEST} AS go-toolchain
+
+# The static `helm` binary, downloaded and verified exactly like helm.Dockerfile's `helm-tools` stage
+# (see there for why there is no daemon and why the checksum is pinned by content); the `cm-push` plugin
+# is deliberately left out, this runner never drives the ChartMuseum protocol.
+FROM debian:bookworm-slim AS helm-tools
+ARG HELM_VERSION
+ARG HELM_SHA256_AMD64
+ARG HELM_SHA256_ARM64
+ARG TARGETARCH
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl tar gzip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN case "${TARGETARCH:-amd64}" in \
+      amd64) sha="${HELM_SHA256_AMD64}" ;; \
+      arm64) sha="${HELM_SHA256_ARM64}" ;; \
+      *) echo "helm: no pinned checksum for ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
+    && echo "${sha}  helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" | sha256sum -c - \
+    && tar -xzf "helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
+    && install -m 0755 "linux-${TARGETARCH}/helm" /usr/local/bin/helm
 
 FROM node:24-bookworm-slim
 
@@ -105,6 +142,31 @@ RUN chmod a+rx /usr/local/bin/crane
 # owned openly in the image so a fresh volume is writable by the host uid (see maven.Dockerfile).
 RUN mkdir -p /app/.maven-shared-m2 && chmod 777 /app/.maven-shared-m2
 
-RUN java --version && mvn --version && crane version && npm --version
+# helm (RPS-1719): the binary only, copied from the helm-tools stage above (see it for the checksum and
+# why no cm-push plugin).
+COPY --from=helm-tools /usr/local/bin/helm /usr/local/bin/helm
+RUN chmod a+rx /usr/local/bin/helm
+
+# go (RPS-1720): the toolchain copied from the go-toolchain stage above, the same "copy the toolchain,
+# not the whole image" approach as golang.Dockerfile's.
+COPY --from=go-toolchain /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:${PATH}" GOTOOLCHAIN=local
+RUN chmod -R a+rX /usr/local/go
+
+# The TLS shim's certificate/key (RPS-1720), generated ONCE at build time exactly as golang.Dockerfile
+# does (see there): a credentialed `go` invocation against this harness's plain-http stack needs an
+# `https://` endpoint in front of it, and `clients/golang-tls-shim.ts` refuses to start without these two
+# files. World-readable on purpose: a throwaway, test-only key that signs nothing outside this
+# container's own loopback interface.
+RUN mkdir -p /opt/e2e-tls && cd /opt/e2e-tls \
+    && HOME=/tmp GOPATH=/tmp/gopath GOCACHE=/tmp/gocache CGO_ENABLED=0 \
+       go run /usr/local/go/src/crypto/tls/generate_cert.go \
+         --host localhost,127.0.0.1 --ecdsa-curve P256 --duration 87600h \
+    && chmod a+r /opt/e2e-tls/cert.pem /opt/e2e-tls/key.pem \
+    && rm -rf /tmp/gopath /tmp/gocache
+ENV REPSY_E2E_TLS_CERT=/opt/e2e-tls/cert.pem REPSY_E2E_TLS_KEY=/opt/e2e-tls/key.pem
+
+RUN java --version && mvn --version && crane version && npm --version && helm version \
+    && go version && test -s /opt/e2e-tls/cert.pem && test -s /opt/e2e-tls/key.pem
 
 CMD ["./entrypoint.sh", "stack"]

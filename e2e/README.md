@@ -330,7 +330,7 @@ pnpm gen:api            # (re)generates src/api/generated from ../repsy-backend'
 | `REPSY_E2E_SCANNER`           | _(unset)_                           | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_E2E_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                    |
 | `REPSY_E2E_THROTTLE`          | _(unset)_                           | `1` makes `local up\|down` include the auth-throttle overlay (same as `--throttle`) and `test` add `throttle` to `REPSY_E2E_OPT_IN`, see "Auth-throttle leg"                                                                                                                                                                                                                                                                             |
 | `REPSY_E2E_LIMITS`            | _(unset)_                           | `1` makes `local up\|down` include the tiny-upload-limit overlay (same as `--limits`) and `test` add `limits` to `REPSY_E2E_OPT_IN`, see "Size-limit leg"                                                                                                                                                                                                                                                                                |
-| `REPSY_E2E_UPLOAD_TTL`        | _(unset)_                           | `1` makes `local up\|down` include the short-ttl abandoned-upload-cleanup overlay (same as `--upload-ttl`) and `test` add `upload-ttl` to `REPSY_E2E_OPT_IN`, see "Abandoned upload cleanup"                                                                                                                                                                                                                                               |
+| `REPSY_E2E_UPLOAD_TTL`        | _(unset)_                           | `1` makes `local up\|down` include the short-ttl abandoned-upload-cleanup overlay (same as `--upload-ttl`) and `test` add `upload-ttl` to `REPSY_E2E_OPT_IN`, see "Abandoned upload cleanup"                                                                                                                                                                                                                                             |
 | `REPSY_E2E_CORS`              | _(unset)_                           | `1` makes `local up\|down` include the APP_ALLOWED_ORIGINS overlay (same as `--cors`) and `test` add `cors` to `REPSY_E2E_OPT_IN`, see "CORS leg"                                                                                                                                                                                                                                                                                        |
 | `REPSY_E2E_TRIVY`             | _(unset)_                           | `1` makes `local up\|down` include the real-scanner overlay (same as `--trivy`) and `test` add `trivy` to `REPSY_E2E_OPT_IN`, see "Real scanner stack"                                                                                                                                                                                                                                                                                   |
 | `REPSY_E2E_SCANNER_PORT`      | `8090` + offset                     | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
@@ -3891,7 +3891,7 @@ login` used to succeed with a WRONG password. Docker's `/v2/token` answered the 
   client-side (not Repsy) finding: Helm v4.3.0's own `--help` says a `--verify` failure means "the
   chart will not be saved locally" — confirmed live that Helm still writes the unverified files to
   the destination directory despite the non-zero exit and a genuine `openpgp: signature made by
-  unknown entity` error.
+unknown entity` error.
 - **B-H7 (pre-existing story, [RPS-1110](https://zyfera.atlassian.net/browse/RPS-1110) — commented
   with this live evidence, not a new ticket)** — An OCI manifest push with NO `Content-Type` header
   at all answers a bodyless `400` — no OCI envelope despite RPS-1039 (`OciErrorBodyAdvice`); RPS-1110
@@ -4774,17 +4774,17 @@ differently, so each of them is an **opt-in overlay**: a compose file layered on
 PostgreSQL one or the H2 one) with one more `-f`, that changes what Repsy runs with for one nightly leg
 and is never part of the default stack.
 
-| Overlay    | Flag (`local up\|down`) | Switch (env)           | Compose file                        | Opt-in name | What it changes                                            | Specs                                                                       |
-| ---------- | ----------------------- | ---------------------- | ----------------------------------- | ----------- | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `scanner`  | `--scanner`             | `REPSY_E2E_SCANNER=1`  | `docker-compose.stack-scanner.yml`  | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack"          |
-| `throttle` | `--throttle`            | `REPSY_E2E_THROTTLE=1` | `docker-compose.stack-throttle.yml` | `throttle`  | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                                |
-| `tls`      | `--tls`                 | `REPSY_E2E_TLS=1`      | `docker-compose.stack-tls.yml`      | `tls`       | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang, ui), "TLS stack"; nightly `@smoke` of all clients |
-| `limits`   | `--limits`              | `REPSY_E2E_LIMITS=1`   | `docker-compose.stack-limits.yml`   | `limits`    | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                     |
-| `cors`     | `--cors`                | `REPSY_E2E_CORS=1`     | `docker-compose.stack-cors.yml`     | `cors`      | `APP_ALLOWED_ORIGINS` set to two origins (default: unset)  | `@cors` (api), "CORS leg"                                                   |
-| `proxy`    | `--proxy`               | `REPSY_E2E_PROXY=1`    | `docker-compose.stack-proxy.yml`    | `proxy`     | an nginx in front of Repsy, TLS terminated there           | `@proxy` (ui, api), "Reverse proxy stack"                                   |
-| `upload-ttl` | `--upload-ttl`        | `REPSY_E2E_UPLOAD_TTL=1` | `docker-compose.stack-upload-ttl.yml` | `upload-ttl` | short `ABANDONED_UPLOAD_TTL` (5 s) and cleanup intervals   | `@upload-ttl` (docker, helm), "Abandoned upload cleanup"                    |
-| `upgrade`  | `--upgrade`             | `REPSY_E2E_UPGRADE=1`  | `docker-compose.stack-upgrade.yml`  | `upgrade`   | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                          |
-| `trivy`    | `--trivy`               | `REPSY_E2E_TRIVY=1`    | `docker-compose.stack-trivy.yml`    | `trivy`     | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                                        |
+| Overlay      | Flag (`local up\|down`) | Switch (env)             | Compose file                          | Opt-in name  | What it changes                                            | Specs                                                                       |
+| ------------ | ----------------------- | ------------------------ | ------------------------------------- | ------------ | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `scanner`    | `--scanner`             | `REPSY_E2E_SCANNER=1`    | `docker-compose.stack-scanner.yml`    | `scanner`    | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack"          |
+| `throttle`   | `--throttle`            | `REPSY_E2E_THROTTLE=1`   | `docker-compose.stack-throttle.yml`   | `throttle`   | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                                |
+| `tls`        | `--tls`                 | `REPSY_E2E_TLS=1`        | `docker-compose.stack-tls.yml`        | `tls`        | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang, ui), "TLS stack"; nightly `@smoke` of all clients |
+| `limits`     | `--limits`              | `REPSY_E2E_LIMITS=1`     | `docker-compose.stack-limits.yml`     | `limits`     | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                     |
+| `cors`       | `--cors`                | `REPSY_E2E_CORS=1`       | `docker-compose.stack-cors.yml`       | `cors`       | `APP_ALLOWED_ORIGINS` set to two origins (default: unset)  | `@cors` (api), "CORS leg"                                                   |
+| `proxy`      | `--proxy`               | `REPSY_E2E_PROXY=1`      | `docker-compose.stack-proxy.yml`      | `proxy`      | an nginx in front of Repsy, TLS terminated there           | `@proxy` (ui, api), "Reverse proxy stack"                                   |
+| `upload-ttl` | `--upload-ttl`          | `REPSY_E2E_UPLOAD_TTL=1` | `docker-compose.stack-upload-ttl.yml` | `upload-ttl` | short `ABANDONED_UPLOAD_TTL` (5 s) and cleanup intervals   | `@upload-ttl` (docker, helm), "Abandoned upload cleanup"                    |
+| `upgrade`    | `--upgrade`             | `REPSY_E2E_UPGRADE=1`    | `docker-compose.stack-upgrade.yml`    | `upgrade`    | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                          |
+| `trivy`      | `--trivy`               | `REPSY_E2E_TRIVY=1`      | `docker-compose.stack-trivy.yml`      | `trivy`      | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                                        |
 
 How it fits together, so a later overlay is one row:
 
@@ -4852,12 +4852,13 @@ the PostgreSQL stack and on the H2 stack alike (`./run.sh local up [--h2]`, then
 assertion is profile specific). RPS-1401 put the default storage on the `/app/data` volume without a test
 that a package outlives its container, and the H2 file database (same volume) is the riskier half.
 
-It publishes a Maven artifact (`mvn deploy`), an npm package (`npm publish`) and a Docker image
-(`crane push`) into one repo each, with the scenario adapters' `seedPublish` (the real client, no raw
-probe), takes a deploy token per repo and a panel user, and after each event checks that every package is
-consumed again by the real client with the admin password AND with the deploy token, byte for byte, that
-the panel lists it (Maven versions, the npm latest version, the Docker image digest) and that the user and
-the admin still log in:
+It publishes a Maven artifact (`mvn deploy`), an npm package (`npm publish`), a Docker image (`crane push`),
+a Helm chart (`helm push`) and a Go module (RPS-1719/RPS-1720) into one repo each, with the scenario
+adapters' `seedPublish` (the real client, no raw probe), takes a deploy token per repo and a panel user,
+and after each event checks that every package is consumed again by the real client with the admin
+password AND with the deploy token, byte for byte, that the panel lists it (Maven versions, the npm latest
+version, the Docker image digest, the Helm chart's latest version, the Go module's version) and that the
+user and the admin still log in:
 
 1. control: `/app/data` is a volume (not the container layer), `STORAGE_BASE_PATH` is under it, the
    storage holds files, and on H2 `/app/data/repsy.mv.db` exists;
@@ -4890,8 +4891,12 @@ Every panel session the harness holds dies with a restart of a stack without a f
 `relogin()` (a fresh `PanelBackend.login`) comes before any further panel call and before the seeder's cleanup;
 a Basic-auth client authenticates per request and never notices. The runner runs with
 `REPSY_E2E_WORKERS=1` (`playwright.config.ts`), never against a shared stack. The stack runner image is
-about 1.5 GB (JDK, Maven, crane, compose plugin; versions pinned in `docker-compose.runners.yml` next to
-the maven and docker runners' and to be kept equal to them).
+about 1.75 GB (JDK, Maven, crane, compose plugin, the helm binary and the Go toolchain; versions pinned in
+`docker-compose.runners.yml` next to the maven, docker, helm and golang runners' and to be kept equal to
+them). Helm and Go grow it by roughly 250 MB (mostly the Go toolchain, RPS-1719/RPS-1720): the packages
+and persistence specs publish a chart and a module with the same real `helm`/`go` clients as the helm and
+golang runners, including golang's build-time TLS shim certificate (`golang.Dockerfile`'s header) that a
+credentialed `go` invocation needs.
 
 Flip checks (each made the named test fail, then reverted): `--renew-anon-volumes` on the recreate (the
 volume is another one), the secret set in the "unset" case (the token after the restart is accepted),
@@ -4951,7 +4956,9 @@ today's (`POST /api/repos/{type}` and not `POST /api/repos`, `?search=` and not 
 create repo, create user, create deploy token; the envelope and `POST /api/auth/login` are the same). Packages
 go through the real clients with the same adapters as the other stack specs (`src/clients/stack-packages.ts`,
 shared with the persistence spec): `mvn deploy`, `npm publish`, `crane push` (two tags of an image and a
-multi-platform index made with `crane index append`, whose children the previous release stores per tag).
+multi-platform index made with `crane index append`, whose children the previous release stores per tag),
+`helm push` and `go` (RPS-1719/RPS-1720: a chart and a module, both protocols long predating the previous
+release, so no legacy-client quirk applies to them the way it does to npm below).
 Accounts: the admin, a second `ADMIN` and a plain `USER`.
 
 The five tests, in order (the stack keeps its state between them):
