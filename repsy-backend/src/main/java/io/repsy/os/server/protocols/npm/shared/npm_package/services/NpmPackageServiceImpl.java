@@ -41,9 +41,11 @@ import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.utils.VersionSortPaging;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
+import io.repsy.protocols.npm.shared.utils.NpmVersionComparator;
 import io.repsy.protocols.npm.shared.utils.PackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
@@ -604,6 +606,22 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
       final Pageable pageable) {
 
     final var npmPackage = this.findPackageByRepoIdAndScopeAndName(repoId, scopeName, packageName);
+
+    final var versionOrder = VersionSortPaging.directionFor(pageable, "version");
+
+    if (versionOrder != null) {
+      final var versions =
+          this.packageVersionRepository.findAllByNpmPackageIdContainsVersion(
+              npmPackage.getId(), version);
+
+      return VersionSortPaging.sortAndPage(
+          versions.stream().map(this.npmPackageConverter::toPackageVersionListItemDto).toList(),
+          pageable,
+          versionOrder,
+          Comparator.comparing(
+              io.repsy.os.generated.model.PackageVersionListItem::getVersion,
+              new NpmVersionComparator()));
+    }
 
     return this.packageVersionRepository
         .findAllByNpmPackageIdContainsVersion(npmPackage.getId(), version, pageable)

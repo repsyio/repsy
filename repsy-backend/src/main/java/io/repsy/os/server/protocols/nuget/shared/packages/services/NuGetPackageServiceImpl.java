@@ -27,6 +27,7 @@ import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPack
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.utils.LikePatterns;
 import io.repsy.os.shared.utils.OffsetPageRequest;
+import io.repsy.os.shared.utils.VersionSortPaging;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
@@ -200,6 +201,20 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final Pageable pageable) {
 
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
+
+    final var versionOrder = VersionSortPaging.directionFor(pageable, "version");
+
+    if (versionOrder != null) {
+      final var versions =
+          this.packageVersionRepository.searchByNugetPackageId(
+              pkg.getId(), LikePatterns.of("%", query, "%"));
+
+      return VersionSortPaging.sortAndPage(
+          versions.stream().map(v -> this.converter.toVersionInfo(v, packageId)).toList(),
+          pageable,
+          versionOrder,
+          Comparator.comparing(NuGetVersionInfo::version, NuGetPackageUtils.VERSION_COMPARATOR));
+    }
 
     final var sortedPageable =
         PageRequest.of(

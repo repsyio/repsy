@@ -47,4 +47,18 @@ public interface PackageVersionRepository extends JpaRepository<PackageVersion, 
       and p.id = :packageId""")
   Page<PackageVersionListItem> findAllByNpmPackageIdContainsVersion(
       UUID packageId, String version, Pageable pageable);
+
+  /**
+   * Every version {@link #findAllByNpmPackageIdContainsVersion(UUID, String, Pageable)} would page
+   * through, unpaged. A version sort (RPS-1688) is not a database {@code ORDER BY}: {@code version}
+   * sorts as a string there, so {@code 10.0.0} would sit above {@code 9.0.0}. The service sorts
+   * this whole set with {@code NpmVersionComparator} and slices the requested page from it instead.
+   */
+  @Query(
+      """
+      select pv from PackageVersion pv
+      join pv.npmPackage p
+      where pv.version like %:version%
+      and p.id = :packageId""")
+  List<PackageVersionListItem> findAllByNpmPackageIdContainsVersion(UUID packageId, String version);
 }

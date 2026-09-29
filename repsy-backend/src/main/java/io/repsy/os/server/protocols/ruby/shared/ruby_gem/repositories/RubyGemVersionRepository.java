@@ -52,6 +52,22 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
       """)
   Page<GemVersionListItem> findAllByGemId(UUID gemId, String version, Pageable pageable);
 
+  /**
+   * Every version {@link #findAllByGemId(UUID, String, Pageable)} would page through, unpaged. A
+   * {@code version} sort (RPS-1688) is not a database {@code ORDER BY}: the column sorts as a
+   * string there, so {@code 10.0.0} would sit above {@code 9.0.0}. The service sorts this whole set
+   * with {@code RubyGemVersionComparator} and slices the requested page from it instead.
+   */
+  @Query(
+      """
+      select gv.version as version, gv.platform as platform,
+        gv.yanked as yanked, gv.createdAt as createdAt
+      from RubyGemVersion gv
+      where gv.gem.id = :gemId
+        and (:version is null or gv.version like %:version%)
+      """)
+  List<GemVersionListItem> findAllByGemId(UUID gemId, String version);
+
   @Query(
       """
       select gv.id as gemVersionId, g.name as gemName,
