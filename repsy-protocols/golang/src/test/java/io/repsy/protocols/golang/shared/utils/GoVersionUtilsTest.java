@@ -162,4 +162,39 @@ class GoVersionUtilsTest {
     assertThat(GoVersionUtils.COMPARATOR.compare("v9.9.9", huge)).isNegative();
     assertThat(GoVersionUtils.COMPARATOR.compare(huge, huge)).isZero();
   }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"v1.0.0-rc1", "v1.0.0-beta.1", "v1.0.0-20240101120000-0123456789ab"})
+  @DisplayName("hasPreRelease() is true for any version with a '-' suffix, pseudo or not")
+  void hasPreReleaseIsTrueForAnyPreReleaseSuffix(final String version) {
+    assertThat(GoVersionUtils.hasPreRelease(version)).isTrue();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"v1.0.0", "v2.3.4+incompatible", "banana"})
+  @DisplayName("hasPreRelease() is false for a release, build-metadata-only, or malformed version")
+  void hasPreReleaseIsFalseWithoutAPreReleaseSuffix(final String version) {
+    assertThat(GoVersionUtils.hasPreRelease(version)).isFalse();
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "v1.0.0-20240101120000-0123456789ab",
+        "v0.0.0-0.20240101120000-0123456789ab",
+        "v1.0.0-20240101120000-0123456789abcdef"
+      })
+  @DisplayName(
+      "isPseudoVersion() recognizes the 14-digit-timestamp + 12+-hex-commit shape (RPS-1720 C8)")
+  void isPseudoVersionRecognizesThePseudoShape(final String version) {
+    assertThat(GoVersionUtils.isPseudoVersion(version)).isTrue();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"v1.0.0", "v1.0.0-rc1", "v1.0.0-beta.1", "v1.0.0+incompatible", "banana"})
+  @DisplayName(
+      "isPseudoVersion() is false for a release, a tagged pre-release, or a malformed version")
+  void isPseudoVersionIsFalseForNonPseudoVersions(final String version) {
+    assertThat(GoVersionUtils.isPseudoVersion(version)).isFalse();
+  }
 }

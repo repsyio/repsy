@@ -16,7 +16,9 @@
 package io.repsy.protocols.golang.shared.utils;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
@@ -83,6 +85,59 @@ public class GoVersionUtils {
    */
   public static boolean isValidSemver(final String version) {
     return STRICT_SEMVER.matcher(version).matches();
+  }
+
+  /**
+   * Whether {@code version} carries a pre-release suffix at all (e.g. {@code v1.0.0-rc1} or a
+   * pseudo-version), as opposed to a plain release such as {@code v1.2.3}. A version that does not
+   * match {@link #SEMVER_PATTERN} is treated as not having one.
+   */
+  public static boolean hasPreRelease(final String version) {
+    final var matcher = SEMVER_PATTERN.matcher(version);
+    return matcher.matches() && matcher.group(SEMVER_PRE_RELEASE_GROUP) != null;
+  }
+
+  /**
+   * Whether {@code version}'s pre-release suffix is a Go pseudo-version: a 14-digit timestamp
+   * followed by a 12+ hex commit hash (e.g. {@code v1.0.0-20240101120000-0123456789ab} or {@code
+   * v0.0.0-0.20240101120000-0123456789ab}), as opposed to an ordinary tagged pre-release like
+   * {@code v1.0.0-rc1}. The GOPROXY protocol excludes pseudo-versions from {@code @v/list}
+   * (go.dev/ref/mod#goproxy-protocol), and the go command's own "latest" query only ever picks one
+   * when no tagged version exists at all (go.dev/ref/mod#version-queries).
+   */
+  public static boolean isPseudoVersion(final String version) {
+    final var matcher = SEMVER_PATTERN.matcher(version);
+    if (!matcher.matches()) {
+      return false;
+    }
+    final var preRelease = matcher.group(SEMVER_PRE_RELEASE_GROUP);
+    return preRelease != null && PSEUDO_PRE_PATTERN.matcher(preRelease).matches();
+  }
+
+  /**
+   * Picks "the latest version" among {@code versions}, following the go command's own "latest"
+   * version query (go.dev/ref/mod#version-queries) rather than a plain {@code max()} (RPS-1720
+   * C8/RPS-1733): the highest release wins; only when there is no release at all does the highest
+   * TAGGED pre-release (e.g. {@code v1.3.0-beta.1}) win; only when there is no tagged version at
+   * all -- release or pre-release -- does the highest pseudo-version win, so this still answers
+   * rather than being empty for a module whose only versions are pseudo-versions. Shared by the
+   * wire protocol's {@code @latest} ({@code GoModuleServiceImpl.computeLatestVersion}) and the
+   * panel's module info ({@code GoModuleMapper.toGoModuleInfo}), so the two agree.
+   */
+  public static Optional<String> latestOf(final Collection<String> versions) {
+    final var release =
+        versions.stream().filter(version -> !hasPreRelease(version)).max(COMPARATOR);
+    if (release.isPresent()) {
+      return release;
+    }
+
+    final var taggedPreRelease =
+        versions.stream().filter(version -> !isPseudoVersion(version)).max(COMPARATOR);
+    if (taggedPreRelease.isPresent()) {
+      return taggedPreRelease;
+    }
+
+    return versions.stream().max(COMPARATOR);
   }
 
   /**
