@@ -47,7 +47,7 @@ import {
   MODULE_DOMAIN,
   rawUpload,
 } from '../../src/clients/golang-raw.js';
-import { shimTraceSoFar } from '../../src/clients/golang-tls-shim.js';
+import { ensureTlsShim, shimTraceSoFar } from '../../src/clients/golang-tls-shim.js';
 import { clientEnv } from '../../src/clients/client-env.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { env } from '../../src/env.js';
@@ -356,14 +356,19 @@ test(
   'golang > .netrc authentication for module download (real-client)',
   { tag: ['@auth'] },
   async ({ seeder }) => {
-    // Go's net/http client respects ~/.netrc files for HTTP Basic Authentication according
-    // to documentation (https://golang.org/pkg/net/#ParseNetrc). However, Go's module proxy
-    // client does not apply .netrc credentials when GOPROXY is set without embedded credentials.
-    // This test probes that behavior and documents the current limitation.
-    // See: https://github.com/golang/go/issues/XXXXX (needs investigation)
-    test.fail(
-      true,
-      'Go module proxy does not consult .netrc for authentication; go mod download fails with 401 or connection error when GOPROXY has no embedded credentials and .netrc is the only credential source',
+    // Like URL-embedded userinfo (H3/RPS-1229, this file's "plain-http GOPROXY with embedded
+    // credentials" test), cmd/go's `web` package refuses to send netrc-sourced Basic Auth over a
+    // plain (non-https) GOPROXY URL too -- the same "refusing to pass credentials to insecure URL"
+    // policy applies to both credential sources, not just URL userinfo. Confirmed live: a .netrc
+    // file alone against `env.repoBaseUrl` (plain http) produces a client-side refusal before any
+    // request reaches the server, identical in shape to H3. So a real netrc round trip needs the
+    // same TLS shim (`golang-tls-shim.ts`) H4/H8 use for embedded credentials over plain http --
+    // started here directly (not through `goEnv`/`goProxyUrlFor`, since those embed credentials in
+    // the URL, which is exactly what this test must NOT do) with no userinfo in the URL, so `go`
+    // falls through to its netrc lookup.
+    test.skip(
+      new URL(env.repoBaseUrl).protocol !== 'http:',
+      'the shim (and so this netrc probe) only makes sense against a plain-http target',
     );
 
     const repo = await seeder.createRepo(RepoType.GOLANG, { privateRepo: true });
@@ -378,22 +383,17 @@ test(
 
     const { home, work } = await isolatedWorkDir(`golang-netrc-${seeder.runId}`);
 
-    // Create a .netrc file in the home directory with token credentials
-    // Format: machine <host>[:port] login <user> password <secret>
-    // Go's net/http.Transport calls net.ParseNetrc() which reads this file,
-    // but the module proxy client does not use it.
-    const hostUrl = new URL(env.repoBaseUrl);
-    const netrcHost =
-      hostUrl.port && (hostUrl.protocol === 'http:' ? hostUrl.port !== '80' : hostUrl.port !== '443')
-        ? `${hostUrl.hostname}:${hostUrl.port}`
-        : hostUrl.hostname;
+    // Start (or reuse) the shim FIRST, so the netrc `machine` line names the shim's own
+    // 127.0.0.1:<ephemeral-port>, not the plain-http backend's host.
+    const shim = await ensureTlsShim();
+    const shimUrl = new URL(shim.baseUrl);
     const netrcPath = path.join(home, '.netrc');
-    const netrcContent = `machine ${netrcHost}\nlogin ${token.username}\npassword ${token.token}\n`;
+    const netrcContent = `machine ${shimUrl.hostname}:${shimUrl.port}\nlogin ${token.username}\npassword ${token.token}\n`;
     await fs.writeFile(netrcPath, netrcContent, { mode: 0o600 });
 
-    // Use GOPROXY without embedded credentials; net/http would look up credentials in .netrc,
-    // but go mod download does not.
-    const proxyUrl = `${env.repoBaseUrl}/${repoPath(repo.name)},off`;
+    // GOPROXY with NO embedded userinfo, over the shim's https:// -- go must fall through to its
+    // netrc lookup to authenticate at all.
+    const proxyUrl = `${shim.baseUrl}/${repoPath(repo.name)},off`;
     const goEnvAnon = clientEnv(home, {
       GOPATH: path.join(home, 'gopath'),
       GOMODCACHE: path.join(home, 'gomodcache'),
@@ -411,6 +411,7 @@ test(
       NO_PROXY: '127.0.0.1,localhost',
       HTTP_PROXY: '',
       HTTPS_PROXY: '',
+      SSL_CERT_FILE: process.env.REPSY_E2E_TLS_CERT ?? '',
     });
 
     const result = await run('go', ['mod', 'download', '-json', `${modulePath}@${version}`], {
@@ -420,7 +421,7 @@ test(
       label: 'golang-netrc',
     });
 
-    expect(result.exitCode, `.netrc authentication should succeed: ${result.command}`).toBe(0);
+    expect(result.exitCode, `.netrc authentication succeeds: ${result.command}`).toBe(0);
     const parsed = JSON.parse(result.stdout) as { Zip?: string; Version?: string };
     expect(parsed.Version).toBe(version);
     expect(parsed.Zip, '.netrc-authenticated download should retrieve Zip').toBeTruthy();
