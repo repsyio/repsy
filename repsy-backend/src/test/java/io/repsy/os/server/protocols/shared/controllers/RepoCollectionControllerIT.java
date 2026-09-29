@@ -659,7 +659,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("creates a public repo without a description when only name and type are sent")
+    @DisplayName("creates a private repo without a description when only name and type are sent")
     void defaults() throws Exception {
       final var name = uniqueRepoName("defaults");
 
@@ -671,7 +671,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
               "Repo created.");
 
       assertThat(JsonPath.<Map<String, Object>>read(body, "$.data"))
-          .containsEntry("privateRepo", false)
+          .containsEntry("privateRepo", true)
           .doesNotContainKey("description");
     }
 
@@ -718,7 +718,8 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "privateRepo={0}")
     @ValueSource(strings = {"true", "false", "null"})
-    @DisplayName("honors an explicit private flag, and treats null as false")
+    @DisplayName(
+        "honors an explicit private flag, and treats an explicit null the same as omitting it (private)")
     void explicitPrivateFlag(final String flag) throws Exception {
       final var name = uniqueRepoName("flag");
 
@@ -730,7 +731,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
           "Repo created.");
 
       assertThat(RepoCollectionControllerIT.this.reloadRepo(name).isPrivateRepo())
-          .isEqualTo(Boolean.parseBoolean(flag));
+          .isEqualTo(!"false".equals(flag));
     }
 
     @ParameterizedTest(name = "\"{0}\"")

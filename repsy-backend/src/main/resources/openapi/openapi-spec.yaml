@@ -5254,6 +5254,7 @@ components:
         privateRepo:
           type: boolean
           nullable: false
+          default: true
         type:
           "$ref": "#/components/schemas/RepoType"
       required:
