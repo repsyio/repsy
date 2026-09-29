@@ -35,7 +35,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
 
-  private static final int PRIORITY = Integer.MAX_VALUE - 1;
+  // Before UsagePostProcessor (Integer.MAX_VALUE - 1) and H2CheckpointPostProcessor (Integer.
+  // MAX_VALUE, RPS-1556), which must run after every write -- including usage tracking's own -- has
+  // committed.
+  private static final int PRIORITY = Integer.MAX_VALUE - 2;
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final String STORAGE_PATH = "storagePath";

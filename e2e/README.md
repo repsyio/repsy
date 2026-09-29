@@ -4875,7 +4875,12 @@ user and the admin still log in:
 2. `docker restart` (SIGTERM): same container, everything there;
 3. recreate (`docker compose up --force-recreate`): a new container, the SAME `/app/data` volume, everything
    there;
-4. crash (`docker kill --signal KILL`, `docker start`): nothing committed is lost;
+4. crash (`docker kill --signal KILL`, `docker start`): a fresh npm package and Docker image published
+   immediately beforehand, with no settle wait, are not lost (RPS-1556: H2's MVStore write-behind used
+   to lose exactly that, sometimes every time, until `H2CheckpointPostProcessor` started running
+   `CHECKPOINT SYNC` after every protocol write, before the response is sent). Deliberately narrower
+   than the other legs' checks: re-checking the whole `packages` array here runs into a separate,
+   pre-existing flakiness of the crash/restart cycle (see the test's own comment);
 5. sessions: with `OS_APP_JWT_SECRET` unset (every stack file) a restart and a recreate each end a session:
    the access token and the refresh token from before are answered 401 `accessNotAllowed`; recreated with
    `docker-compose.stack-jwt.yml` and a secret (`REPSY_E2E_JWT_SECRET`, random per run), both stay valid

@@ -180,6 +180,17 @@ COPY --chown=appuser:appgroup --from=frontend-build /app/dist/panel-frontend/bro
 # with no external dependencies (see README.md's Quick Start). Running from source (mvn
 # spring-boot:run) keeps application.yml's own PostgreSQL default instead -- this ENV only affects
 # the image. Any DB_URL passed at "docker run" time overrides this. See RPS-1173.
+#
+# RPS-1556: a crash (SIGKILL, OOM) right after a publish can lose the just-committed row(s) although
+# the client was already told it succeeded -- H2's MVStore defers writing a committed transaction to
+# this file by up to autoCommitDelay (default 500ms) AND only once enough unsaved memory has piled up,
+# so a small, infrequent write can sit unflushed for longer still. Left at H2's default here on
+# purpose (not WRITE_DELAY=0): that setting alone measurably still lost data under the app's real
+# connection pool (2 of 5 crash/restart trials), because it disables the one periodic safety net
+# (H2's own background writer) without replacing it with anything deterministic. The actual fix is
+# H2CheckpointPostProcessor (repsy-backend), which runs `CHECKPOINT SYNC` -- a synchronous, whole-
+# database flush+fsync -- after every protocol write, before the HTTP response is sent; that closes
+# the race regardless of this URL's write-delay setting.
 ENV DB_URL="jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
 
 # Where an operator drops a marker file to reset a user's password (README "Forgot admin password?").
