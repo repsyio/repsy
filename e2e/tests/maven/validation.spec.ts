@@ -86,9 +86,7 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
     expect(result.status, `groupId at max length (255 chars) should succeed`).toBe(200);
   });
 
-  test('groupId at 256 chars (over max) is refused', { tag: ['@negative'] }, async ({
-    seeder,
-  }) => {
+  test('groupId at 256 chars (over max) is refused', { tag: ['@negative'] }, async ({ seeder }) => {
     // MavenPublishLimits.MAX_GROUP_ID_LENGTH = 255. Test one over.
     const tooLongGroupId = 'a'.repeat(256);
     const layout = await newRepo(seeder, tooLongGroupId, 'test');
@@ -108,115 +106,144 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
     );
   });
 
-  test('artifactId at 245 chars (safe within filesystem limit) succeeds', { tag: ['@negative'] }, async ({
-    seeder,
-  }) => {
-    // MavenPublishLimits.MAX_ARTIFACT_ID_LENGTH = 255, but filesystem limits individual filenames
-    // to 255 bytes. Storage layer appends `-<version>.pom` (7 bytes for `-1.pom`), so safe limit is
-    // 255 - 7 = 248. Test at 245 chars to stay safely under filesystem limit. RPS-1732.
-    const safeArtifactId = 'a'.repeat(245);
-    const layout = await newRepo(seeder, 'io', safeArtifactId);
-    const version = '1';
+  test(
+    'artifactId sized so the stored file name is exactly 255 bytes succeeds',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      // RPS-1732: MavenPublishLimits.MAX_ARTIFACT_ID_LENGTH = 255, but the storage layer names the
+      // stored file `<artifactId>-<version>.pom`, and most POSIX file systems (ext4 included) cap a
+      // single file name component at 255 bytes. With a 1-char version ("1"), the file name is
+      // `<artifactId>-1.pom` = artifactId.length + 6 bytes, so artifactId.length = 249 is the exact
+      // byte-for-byte boundary the file system still accepts. This is the real, storage-safe limit;
+      // MavenPublishLimits.checkFileNameLength enforces it as a 400 rather than letting a longer
+      // combination reach the storage layer.
+      const boundaryArtifactId = 'a'.repeat(249);
+      const layout = await newRepo(seeder, 'io', boundaryArtifactId);
+      const version = '1';
 
-    const dir = versionDir(layout.groupId, safeArtifactId, version);
-    const path = `${dir}/${safeArtifactId}-${version}.pom`;
-    const body = minimalPom(layout.groupId, safeArtifactId, version);
+      const dir = versionDir(layout.groupId, boundaryArtifactId, version);
+      const path = `${dir}/${boundaryArtifactId}-${version}.pom`;
+      const body = minimalPom(layout.groupId, boundaryArtifactId, version);
 
-    const result = await layout.put(path, body, OCTET);
+      const result = await layout.put(path, body, OCTET);
 
-    expect(result.status, `artifactId at 245 chars (safe) should succeed`).toBe(200);
-  });
+      expect(
+        result.status,
+        `artifactId at 249 chars (file name exactly 255 bytes) should succeed`,
+      ).toBe(200);
+    },
+  );
 
-  test('artifactId at 255 chars (max, currently 500s due to filesystem limit)', {
-    tag: ['@negative'],
-  }, async ({ seeder }) => {
-    // RPS-1732: Publishing at the documented 255-char artifactId max fails with 500 FilenameToLong
-    // because storage appends `-<version>.pom`, making filename 260+ bytes > filesystem 255-byte limit.
-    // Once fixed, this should succeed (200); until then it correctly pins the bug.
-    test.fail(true, 'RPS-1732: artifactId at 255-char boundary causes FileSystemException');
+  test(
+    'artifactId at 255 chars (documented max) is cleanly refused, not a raw 500',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      // RPS-1732: an artifactId at its own documented 255-char maximum used to reach the storage
+      // layer, which then failed opening `<artifactId>-1.pom` (261 bytes) with a raw HTTP 500
+      // (java.nio.file.FileSystemException: File name too long). MavenPublishLimits.MAX_ARTIFACT_ID_
+      // LENGTH is unchanged (it matches the maven_artifact.artifact_name column, RPS-1138); instead
+      // the combined file name is validated separately and refused with a clean 400 before anything
+      // is stored.
+      const maxArtifactId = 'a'.repeat(255);
+      const layout = await newRepo(seeder, 'io', maxArtifactId);
+      const version = '1';
 
-    const maxArtifactId = 'a'.repeat(255);
-    const layout = await newRepo(seeder, 'io', maxArtifactId);
-    const version = '1';
+      const dir = versionDir(layout.groupId, maxArtifactId, version);
+      const path = `${dir}/${maxArtifactId}-${version}.pom`;
+      const body = minimalPom(layout.groupId, maxArtifactId, version);
 
-    const dir = versionDir(layout.groupId, maxArtifactId, version);
-    const path = `${dir}/${maxArtifactId}-${version}.pom`;
-    const body = minimalPom(layout.groupId, maxArtifactId, version);
+      const result = await layout.put(path, body, OCTET);
 
-    const result = await layout.put(path, body, OCTET);
+      expectPut(
+        result,
+        400,
+        'mavenFileNameTooLong',
+        'artifactId at 255 chars (max) combines into an over-long file name and should be' +
+          ' refused with mavenFileNameTooLong, not a raw 500',
+      );
+    },
+  );
 
-    expect(result.status, `artifactId at 255 chars (max) should succeed once RPS-1732 is fixed`).toBe(
-      200,
-    );
-  });
+  test(
+    'artifactId at 256 chars (over max) is refused',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      // MavenPublishLimits.MAX_ARTIFACT_ID_LENGTH = 255. Test one over.
+      const tooLongArtifactId = 'a'.repeat(256);
+      // Use short groupId to keep path length reasonable (filesystem limits)
+      const layout = await newRepo(seeder, 'io', tooLongArtifactId);
+      const version = '1';
 
-  test('artifactId at 256 chars (over max) is refused', { tag: ['@negative'] }, async ({
-    seeder,
-  }) => {
-    // MavenPublishLimits.MAX_ARTIFACT_ID_LENGTH = 255. Test one over.
-    const tooLongArtifactId = 'a'.repeat(256);
-    // Use short groupId to keep path length reasonable (filesystem limits)
-    const layout = await newRepo(seeder, 'io', tooLongArtifactId);
-    const version = '1';
+      const dir = versionDir(layout.groupId, tooLongArtifactId, version);
+      const path = `${dir}/${tooLongArtifactId}-${version}.pom`;
+      const body = minimalPom(layout.groupId, tooLongArtifactId, version);
 
-    const dir = versionDir(layout.groupId, tooLongArtifactId, version);
-    const path = `${dir}/${tooLongArtifactId}-${version}.pom`;
-    const body = minimalPom(layout.groupId, tooLongArtifactId, version);
+      const result = await layout.put(path, body, OCTET);
 
-    const result = await layout.put(path, body, OCTET);
+      expectPut(
+        result,
+        400,
+        'artifactIdTooLong',
+        'artifactId over max length (256 chars) should fail with artifactIdTooLong',
+      );
+    },
+  );
 
-    expectPut(
-      result,
-      400,
-      'artifactIdTooLong',
-      'artifactId over max length (256 chars) should fail with artifactIdTooLong',
-    );
-  });
+  test(
+    'version sized so the stored file name is exactly 255 bytes succeeds',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      // RPS-1732: symmetric to the artifactId boundary above. With a 1-char artifactId ("a"), the
+      // file name is `a-<version>.pom` = version.length + 6 bytes, so version.length = 249 is the
+      // exact byte-for-byte boundary the file system still accepts.
+      const boundaryVersion = 'a'.repeat(249);
+      // Use short groupId and artifactId to keep the test simple.
+      const layout = await newRepo(seeder, 'io', 'a');
 
-  test('version at 245 chars (safe within filesystem limit) succeeds', { tag: ['@negative'] }, async ({
-    seeder,
-  }) => {
-    // MavenPublishLimits.MAX_VERSION_LENGTH = 255, but filesystem limits individual filenames
-    // to 255 bytes. Storage layer appends `.pom` (4 bytes) after version, plus artifactId prefix
-    // and hyphen. Safe limit depends on artifactId length. Test at 245 chars to stay safely under
-    // filesystem limit with short artifactId. RPS-1732.
-    const safeVersion = 'a'.repeat(245);
-    // Use short groupId and artifactId to keep test simple
-    const layout = await newRepo(seeder, 'io', 'a');
+      const dir = versionDir(layout.groupId, layout.artifactId, boundaryVersion);
+      const path = `${dir}/${layout.artifactId}-${boundaryVersion}.pom`;
+      const body = minimalPom(layout.groupId, layout.artifactId, boundaryVersion);
 
-    const dir = versionDir(layout.groupId, layout.artifactId, safeVersion);
-    const path = `${dir}/${layout.artifactId}-${safeVersion}.pom`;
-    const body = minimalPom(layout.groupId, layout.artifactId, safeVersion);
+      const result = await layout.put(path, body, OCTET);
 
-    const result = await layout.put(path, body, OCTET);
+      expect(
+        result.status,
+        `version at 249 chars (file name exactly 255 bytes) should succeed`,
+      ).toBe(200);
+    },
+  );
 
-    expect(result.status, `version at 245 chars (safe) should succeed`).toBe(200);
-  });
+  test(
+    'version at 255 chars (documented max) is cleanly refused, not a raw 500',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      // RPS-1732: a version at its own documented 255-char maximum used to reach the storage layer,
+      // which then failed opening `a-<version>.pom` (261 bytes) with a raw HTTP 500
+      // (java.nio.file.FileSystemException: File name too long). MavenPublishLimits.MAX_VERSION_
+      // LENGTH is unchanged (it matches maven_artifact.latest / release, RPS-1138); instead the
+      // combined file name is validated separately and refused with a clean 400 before anything is
+      // stored.
+      const maxVersion = 'a'.repeat(255);
+      // Use short groupId and artifactId to keep the test simple.
+      const layout = await newRepo(seeder, 'io', 'a');
 
-  test('version at 255 chars (max, currently 500s due to filesystem limit)', {
-    tag: ['@negative'],
-  }, async ({ seeder }) => {
-    // RPS-1732: Publishing at the documented 255-char version max fails with 500 FilenameToLong
-    // because storage appends version after artifactId: `<artifactId>-<version>.pom`, making
-    // filename 260+ bytes > filesystem 255-byte limit. Once fixed, this should succeed (200).
-    test.fail(true, 'RPS-1732: version at 255-char boundary causes FileSystemException');
+      const dir = versionDir(layout.groupId, layout.artifactId, maxVersion);
+      const path = `${dir}/${layout.artifactId}-${maxVersion}.pom`;
+      const body = minimalPom(layout.groupId, layout.artifactId, maxVersion);
 
-    const maxVersion = 'a'.repeat(255);
-    // Use short groupId and artifactId to keep test simple
-    const layout = await newRepo(seeder, 'io', 'a');
+      const result = await layout.put(path, body, OCTET);
 
-    const dir = versionDir(layout.groupId, layout.artifactId, maxVersion);
-    const path = `${dir}/${layout.artifactId}-${maxVersion}.pom`;
-    const body = minimalPom(layout.groupId, layout.artifactId, maxVersion);
+      expectPut(
+        result,
+        400,
+        'mavenFileNameTooLong',
+        'version at 255 chars (max) combines into an over-long file name and should be refused' +
+          ' with mavenFileNameTooLong, not a raw 500',
+      );
+    },
+  );
 
-    const result = await layout.put(path, body, OCTET);
-
-    expect(result.status, `version at 255 chars (max) should succeed once RPS-1732 is fixed`).toBe(200);
-  });
-
-  test('version at 256 chars (over max) is refused', { tag: ['@negative'] }, async ({
-    seeder,
-  }) => {
+  test('version at 256 chars (over max) is refused', { tag: ['@negative'] }, async ({ seeder }) => {
     // MavenPublishLimits.MAX_VERSION_LENGTH = 255. Test one over.
     const tooLongVersion = 'a'.repeat(256);
     // Use short groupId and artifactId to keep path length reasonable (filesystem limits)

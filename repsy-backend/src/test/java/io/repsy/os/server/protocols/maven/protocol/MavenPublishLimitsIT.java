@@ -54,6 +54,14 @@ import org.springframework.transaction.annotation.Transactional;
  * anything is stored; every descriptive value of the POM (name, url, organization, SCM url, parent,
  * license and developer fields) is dropped instead, and the version is registered.
  *
+ * <p>RPS-1732: an artifactId or version can each individually fit {@link
+ * io.repsy.protocols.maven.shared.utils.MavenPublishLimits#MAX_ARTIFACT_ID_LENGTH} / {@link
+ * io.repsy.protocols.maven.shared.utils.MavenPublishLimits#MAX_VERSION_LENGTH} (255, matching their
+ * columns) and still combine, once the storage layer builds the stored file name from them, into
+ * something over the file system's 255-byte single-path-component limit. That combination used to
+ * reach the storage layer unrefused and fail with a raw 500 ({@code FileSystemException: File name
+ * too long}); it is now refused the same way as every other guard here, before anything is stored.
+ *
  * <p>Runs without a test transaction, like {@link MavenPomGroupIdIT}: an accepted POM inserts its
  * artifact row in its own transaction, which cannot see an uncommitted repo row. It deletes the
  * repos and users it commits.
@@ -171,7 +179,27 @@ class MavenPublishLimitsIT extends AbstractIntegrationTest {
             pomPath("com.acme", "lib", "1.0"),
             pom("com.acme", "lib", "1.0", "<packaging>" + "p".repeat(51) + "</packaging>"),
             "pomPackagingTooLong",
-            "The packaging of the POM is longer than 50 characters."));
+            "The packaging of the POM is longer than 50 characters."),
+        // RPS-1732: an artifactId or version at its own 255-character maximum (accepted by
+        // checkCoordinates, since each fits maven_artifact.artifact_name / latest / release on
+        // its own) still combines, once the storage layer builds the file name from it, into a
+        // file name over the file system's 255-byte single-component limit. This used to reach
+        // the storage layer unrefused and fail with a raw 500 (FileSystemException); it must now
+        // be refused before anything is stored, like every other guard here.
+        Arguments.of(
+            "an artifactId at its own 255-char maximum, whose file name is then too long",
+            "com/acme/" + "a".repeat(255) + "/1/" + "a".repeat(255) + "-1.pom",
+            pom("com.acme", "a".repeat(255), "1", ""),
+            "mavenFileNameTooLong",
+            "The artifactId and version combine into a file name longer than 255 characters,"
+                + " which no file system can store; shorten one of them."),
+        Arguments.of(
+            "a version at its own 255-char maximum, whose file name is then too long",
+            "com/acme/a/" + "1".repeat(255) + "/a-" + "1".repeat(255) + ".pom",
+            pom("com.acme", "a", "1".repeat(255), ""),
+            "mavenFileNameTooLong",
+            "The artifactId and version combine into a file name longer than 255 characters,"
+                + " which no file system can store; shorten one of them."));
   }
 
   @ParameterizedTest(name = "{0} is refused and stores nothing")
@@ -224,6 +252,29 @@ class MavenPublishLimitsIT extends AbstractIntegrationTest {
         .containsEntry("packaging", packaging)
         .containsEntry("version_packaging", packaging)
         .containsEntry("latest", "1.0");
+  }
+
+  @Test
+  @DisplayName(
+      "registers a POM whose artifactId and version combine into a file name exactly at the"
+          + " file system's 255-byte limit (RPS-1732)")
+  void registersAFileNameAtTheLimit() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    final var artifactId = "lib";
+    // "lib-" + version + ".pom" totals exactly 255 bytes.
+    final var version = "1".repeat(255 - (artifactId + "-").length() - ".pom".length());
+
+    this.uploadOk(
+        repo,
+        admin,
+        pomPath("com.acme", artifactId, version),
+        pom("com.acme", artifactId, version, ""));
+
+    final var row =
+        this.jdbcTemplate.queryForMap(
+            "select latest, release from maven_artifact where repo_id = ?", repo.getId());
+    assertThat(row).containsEntry("latest", version).containsEntry("release", version);
   }
 
   @Test
