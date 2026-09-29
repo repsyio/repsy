@@ -96,4 +96,18 @@ public class CargoJsonConverter {
       return Collections.emptyMap();
     }
   }
+
+  @Named("jsonToFeatures2")
+  public @Nullable Map<String, List<String>> jsonToFeatures2(final @Nullable String json) {
+
+    try {
+      if (json == null) {
+        return null;
+      }
+
+      return this.objectMapper.readValue(json, new TypeReference<>() {});
+    } catch (final JacksonIOException e) {
+      return null;
+    }
+  }
 }

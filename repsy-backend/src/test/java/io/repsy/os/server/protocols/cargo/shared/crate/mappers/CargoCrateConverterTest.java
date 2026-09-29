@@ -89,4 +89,41 @@ class CargoCrateConverterTest {
     assertThat(entry.v()).isEqualTo(2);
     assertThat(entry.rustVersion()).isEqualTo("1.75");
   }
+
+  @Test
+  @DisplayName("RPS-1730: features must be empty map when null, not null")
+  void featuresIsEmptyMapWhenNull() {
+    final var idx = index("my_crate", "my-crate");
+    idx.setFeatures(null);
+    final var entry = this.converter.toCrateIndexEntry(idx);
+
+    assertThat(entry.features()).isNotNull().isEmpty();
+  }
+
+  @Test
+  @DisplayName("RPS-1730: features2 must be null when no v2 data, to be omitted from JSON")
+  void features2IsNullWhenNoV2Data() {
+    final var idx = index("my_crate", "my-crate");
+    idx.setFeatures2(null);
+    idx.setV(1);
+    final var entry = this.converter.toCrateIndexEntry(idx);
+
+    assertThat(entry.features2()).isNull();
+  }
+
+  @Test
+  @DisplayName("RPS-1730: features2 absent from JSON when null due to JsonInclude.NON_NULL")
+  void features2OmittedFromJsonWhenNull() throws Exception {
+    final var idx = index("my_crate", "my-crate");
+    idx.setFeatures(null);
+    idx.setFeatures2(null);
+    idx.setV(1);
+    final var entry = this.converter.toCrateIndexEntry(idx);
+
+    final var objectMapper = new ObjectMapper();
+    final var json = objectMapper.writeValueAsString(entry);
+
+    assertThat(json).doesNotContain("features2");
+    assertThat(json).contains("\"features\":{}");
+  }
 }
