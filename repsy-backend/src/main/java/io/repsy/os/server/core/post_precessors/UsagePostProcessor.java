@@ -36,7 +36,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class UsagePostProcessor extends ProtocolProcessor {
 
-  private static final int PRIORITY = Integer.MAX_VALUE;
+  // Last but one: H2CheckpointPostProcessor (Integer.MAX_VALUE, RPS-1556) must run after this one's
+  // own write, so that write is checkpointed too.
+  private static final int PRIORITY = Integer.MAX_VALUE - 1;
 
   private final @NonNull UsageUpdateService usageUpdateService;
 
