@@ -344,7 +344,10 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
       // Verify classifiers were stored (may be empty array if not yet implemented, but we're probing for it)
       expect(Array.isArray(release.classifiers), 'classifiers should be an array').toBe(true);
       if ((release.classifiers as unknown[]).length > 0) {
-        expect(release.classifiers).toEqual(expect.arrayContaining(classifiers));
+        // Classifiers are stored as {classifier: string, value: string} objects, not as single strings
+        const classifierList = release.classifiers as Array<{ classifier: string; value: string }>;
+        const classifierTexts = classifierList.map((c) => `${c.classifier} :: ${c.value}`);
+        expect(classifierTexts).toEqual(expect.arrayContaining(classifiers));
       }
 
       // Verify project URLs were stored (may be empty array if not yet implemented, but we're probing for it)
