@@ -33,7 +33,6 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -62,7 +61,7 @@ class ProfileController {
     return this.resp.success("profileFetched", profileInfo);
   }
 
-  @PatchMapping("/username")
+  @PutMapping("/username")
   public @NonNull RestResponse<LoginInfo> updateUsername(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestBody @Valid final @NonNull UpdateUsernameForm form) {
