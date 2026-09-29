@@ -32,7 +32,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { callOperation } from '../../src/api/contract-checks.js';
+import { callOperation, expectContract } from '../../src/api/contract-checks.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import * as pypi from '../../src/clients/pypi.js';
 import { pipEnv } from '../../src/clients/pypi.js';
@@ -326,14 +326,14 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
       expect(uploadResult.exitCode, `twine upload (with metadata): ${uploadResult.command}`).toBe(0);
 
       // Query the panel API to verify metadata was stored
-      const response = await callOperation('getPypiRelease', {
-        repoName: repo.name,
-        packageName,
-        version,
-      });
-
-      expect(response.status).toBe(200);
-      const release = (response.body ?? response) as Record<string, unknown>;
+      const release = expectContract(
+        'getPypiRelease',
+        await callOperation('getPypiRelease', {
+          repoName: repo.name,
+          packageName,
+          version,
+        }),
+      ) as Record<string, unknown>;
 
       // Verify metadata fields are present and correct
       expect(release.packageName).toBe(packageName);
