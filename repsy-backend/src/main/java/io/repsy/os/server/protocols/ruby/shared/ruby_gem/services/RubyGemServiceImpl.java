@@ -35,6 +35,7 @@ import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemVer
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.utils.VersionSortPaging;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemCompactEntry;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
@@ -43,9 +44,11 @@ import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
 import io.repsy.protocols.ruby.shared.storage.services.AbstractRubyStorageService;
 import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
 import io.repsy.protocols.ruby.shared.utils.GemFilenameCandidates;
+import io.repsy.protocols.ruby.shared.utils.RubyGemVersionComparator;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -240,6 +243,19 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
 
   public Page<GemVersionListItem> findAllVersions(
       final UUID gemId, final String version, final Pageable pageable) {
+
+    final var versionOrder = VersionSortPaging.directionFor(pageable, "version");
+
+    if (versionOrder != null) {
+      final var versions = this.versionRepository.findAllByGemId(gemId, version);
+
+      return VersionSortPaging.sortAndPage(
+          versions.stream().map(this.converter::toGemVersionListItemDto).toList(),
+          pageable,
+          versionOrder,
+          Comparator.comparing(GemVersionListItem::getVersion, new RubyGemVersionComparator()));
+    }
+
     return this.versionRepository
         .findAllByGemId(gemId, version, pageable)
         .map(this.converter::toGemVersionListItemDto);

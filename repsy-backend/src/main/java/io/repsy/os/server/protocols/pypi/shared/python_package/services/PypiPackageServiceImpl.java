@@ -25,6 +25,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.ReleaseDetail;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PackageInfo;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PypiDeletion;
+import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseListItem;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.PypiPackage;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.Release;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.ReleaseClassifier;
@@ -37,15 +38,19 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.Rele
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.utils.VersionSortPaging;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
 import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseVersionRequiresPython;
 import io.repsy.protocols.pypi.shared.python_package.services.PypiPackageService;
 import io.repsy.protocols.pypi.shared.utils.PackageUtils;
+import io.repsy.protocols.pypi.shared.utils.Pep440Version;
+import io.repsy.protocols.pypi.shared.utils.PypiVersionComparator;
 import io.repsy.protocols.pypi.shared.utils.ReleaseVersion;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -57,6 +62,7 @@ import org.springframework.core.convert.ConversionService;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
@@ -278,6 +284,15 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
             .findByRepoIdAndNormalizedName(repoId, PackageUtils.normalizePackageName(packageName))
             .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
 
+    final var versionOrder = VersionSortPaging.directionFor(pageable, "version");
+
+    if (versionOrder != null) {
+      final var releases =
+          this.releaseRepository.findAllReleaseListItemsByPypiPackageId(pythonPypiPackage.getId());
+
+      return this.sortAndPageReleases(releases, pageable, versionOrder);
+    }
+
     return this.releaseRepository
         .findAllByPypiPackageId(pythonPypiPackage.getId(), pageable)
         .map(this.pypiPackageConverter::toReleaseListItemDto);
@@ -291,9 +306,38 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
             .findByRepoIdAndNormalizedName(repoId, PackageUtils.normalizePackageName(packageName))
             .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
 
+    final var versionOrder = VersionSortPaging.directionFor(pageable, "version");
+
+    if (versionOrder != null) {
+      final var releases =
+          this.releaseRepository.findAllByPypiPackageIdContainsName(
+              pythonPypiPackage.getId(), version);
+
+      return this.sortAndPageReleases(releases, pageable, versionOrder);
+    }
+
     return this.releaseRepository
         .findAllByPypiPackageIdContainsName(pythonPypiPackage.getId(), version, pageable)
         .map(this.pypiPackageConverter::toReleaseListItemDto);
+  }
+
+  /**
+   * Orders a whole set of a PyPI package's releases by PEP 440 precedence (RPS-1688) and slices out
+   * the requested page: a database {@code ORDER BY version} sorts the column as a string, so {@code
+   * "10.0"} would sit above {@code "9.0"}. {@link PypiVersionComparator} (backed by {@link
+   * Pep440Version}) gets that right.
+   */
+  private Page<io.repsy.os.generated.model.ReleaseListItem> sortAndPageReleases(
+      final List<ReleaseListItem> releases,
+      final Pageable pageable,
+      final Sort.Direction versionOrder) {
+
+    return VersionSortPaging.sortAndPage(
+        releases.stream().map(this.pypiPackageConverter::toReleaseListItemDto).toList(),
+        pageable,
+        versionOrder,
+        Comparator.comparing(
+            io.repsy.os.generated.model.ReleaseListItem::getVersion, new PypiVersionComparator()));
   }
 
   public Page<io.repsy.os.generated.model.PypiPackageListItem> getPackageList(
