@@ -111,7 +111,7 @@ public class RepoCollectionController {
         this.repoTxService.createRepo(
             form.getName(),
             repoType,
-            Boolean.TRUE.equals(form.getPrivateRepo()),
+            !Boolean.FALSE.equals(form.getPrivateRepo()),
             form.getDescription());
 
     this.apiFacadeMap.get(repoType).createRepo(repoInfo.getStorageKey());
