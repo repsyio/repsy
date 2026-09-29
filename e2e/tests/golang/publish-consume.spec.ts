@@ -47,7 +47,7 @@ import {
   MODULE_DOMAIN,
   rawUpload,
 } from '../../src/clients/golang-raw.js';
-import { shimTraceSoFar } from '../../src/clients/golang-tls-shim.js';
+import { ensureTlsShim, shimTraceSoFar } from '../../src/clients/golang-tls-shim.js';
 import { clientEnv } from '../../src/clients/client-env.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { env } from '../../src/env.js';
@@ -349,5 +349,215 @@ test(
       (await shimTraceSoFar())?.length ?? 0,
       'the consume never went through the in-process TLS shim',
     ).toBe(before);
+  },
+);
+
+test(
+  'golang > .netrc authentication for module download (real-client)',
+  { tag: ['@auth'] },
+  async ({ seeder }) => {
+    // Like URL-embedded userinfo (H3/RPS-1229, this file's "plain-http GOPROXY with embedded
+    // credentials" test), cmd/go's `web` package refuses to send netrc-sourced Basic Auth over a
+    // plain (non-https) GOPROXY URL too -- the same "refusing to pass credentials to insecure URL"
+    // policy applies to both credential sources, not just URL userinfo. Confirmed live: a .netrc
+    // file alone against `env.repoBaseUrl` (plain http) produces a client-side refusal before any
+    // request reaches the server, identical in shape to H3. So a real netrc round trip needs the
+    // same TLS shim (`golang-tls-shim.ts`) H4/H8 use for embedded credentials over plain http --
+    // started here directly (not through `goEnv`/`goProxyUrlFor`, since those embed credentials in
+    // the URL, which is exactly what this test must NOT do) with no userinfo in the URL, so `go`
+    // falls through to its netrc lookup.
+    test.skip(
+      new URL(env.repoBaseUrl).protocol !== 'http:',
+      'the shim (and so this netrc probe) only makes sense against a plain-http target',
+    );
+
+    const repo = await seeder.createRepo(RepoType.GOLANG, { privateRepo: true });
+    const token = await seeder.createToken(repo.name, { readOnly: false });
+    const modulePath = `${MODULE_DOMAIN}/e2e-${seeder.runId}-netrc`;
+    const version = golangAdapter.version('release');
+
+    const admin = adminCredential();
+    const built = await buildModuleZip({ modulePath, version });
+    const uploadRes = await rawUpload(repo.name, admin, built);
+    expect(uploadRes.status, 'module upload succeeds').toBe(200);
+
+    const { home, work } = await isolatedWorkDir(`golang-netrc-${seeder.runId}`);
+
+    // Start (or reuse) the shim FIRST, so the netrc `machine` line names the shim's own
+    // 127.0.0.1:<ephemeral-port>, not the plain-http backend's host.
+    const shim = await ensureTlsShim();
+    const shimUrl = new URL(shim.baseUrl);
+    const netrcPath = path.join(home, '.netrc');
+    const netrcContent = `machine ${shimUrl.hostname}:${shimUrl.port}\nlogin ${token.username}\npassword ${token.token}\n`;
+    await fs.writeFile(netrcPath, netrcContent, { mode: 0o600 });
+
+    // GOPROXY with NO embedded userinfo, over the shim's https:// -- go must fall through to its
+    // netrc lookup to authenticate at all.
+    const proxyUrl = `${shim.baseUrl}/${repoPath(repo.name)},off`;
+    const goEnvAnon = clientEnv(home, {
+      GOPATH: path.join(home, 'gopath'),
+      GOMODCACHE: path.join(home, 'gomodcache'),
+      GOCACHE: path.join(home, 'gocache'),
+      GOENV: 'off',
+      GOTOOLCHAIN: 'local',
+      GOWORK: 'off',
+      CGO_ENABLED: '0',
+      GOFLAGS: '',
+      GOPRIVATE: '',
+      GONOPROXY: '',
+      GOINSECURE: '',
+      GOPROXY: proxyUrl,
+      GONOSUMDB: MODULE_DOMAIN,
+      NO_PROXY: '127.0.0.1,localhost',
+      HTTP_PROXY: '',
+      HTTPS_PROXY: '',
+      SSL_CERT_FILE: process.env.REPSY_E2E_TLS_CERT ?? '',
+    });
+
+    const result = await run('go', ['mod', 'download', '-json', `${modulePath}@${version}`], {
+      cwd: work,
+      env: goEnvAnon,
+      timeoutMs: 60_000,
+      label: 'golang-netrc',
+    });
+
+    expect(result.exitCode, `.netrc authentication succeeds: ${result.command}`).toBe(0);
+    const parsed = JSON.parse(result.stdout) as { Zip?: string; Version?: string };
+    expect(parsed.Version).toBe(version);
+    expect(parsed.Zip, '.netrc-authenticated download should retrieve Zip').toBeTruthy();
+  },
+);
+
+test(
+  'golang > escape-encoded module path with uppercase letters (RPS-1232, real-client)',
+  { tag: ['@smoke'] },
+  async ({ seeder }) => {
+    const repo = await seeder.createRepo(RepoType.GOLANG, { privateRepo: false });
+    const admin = adminCredential();
+    // Module path with multiple uppercase letters: example.com/CamelCase
+    // These should be properly handled through Go's !-escape encoding
+    const modulePath = `${MODULE_DOMAIN}/e2e-${seeder.runId}-CapitalLetters`;
+    const version = golangAdapter.version('release');
+
+    const built = await buildModuleZip({ modulePath, version });
+    const uploadRes = await rawUpload(repo.name, admin, built);
+    expect(uploadRes.status, 'upload with uppercase in module path succeeds').toBe(200);
+
+    const { home, work } = await isolatedWorkDir(`golang-escape-${seeder.runId}`);
+    const goGetEnv = await goEnv(home, {}, repo.name);
+    const result = await run('go', ['mod', 'download', '-json', `${modulePath}@${version}`], {
+      cwd: work,
+      env: goGetEnv,
+      timeoutMs: 60_000,
+      label: 'golang-escape',
+    });
+
+    expect(result.exitCode, `go mod download of escaped path: ${result.command}`).toBe(0);
+    const parsed = JSON.parse(result.stdout) as { Path?: string; Zip?: string };
+    // Go should report back the original (mixed-case) path as requested
+    expect(parsed.Path).toBe(modulePath);
+    expect(parsed.Zip, 'escaped path download should retrieve zip').toBeTruthy();
+
+    const bytes = await fs.readFile(parsed.Zip as string);
+    expect(bytes).toHaveLength(built.bytes.length);
+  },
+);
+
+test(
+  'golang > retract directive: Repsy serves retracted versions normally (probe real-client)',
+  { tag: ['@smoke'] },
+  async ({ seeder }) => {
+    // Go's retraction mechanism is CLIENT-SIDE metadata in go.mod files.
+    // Repsy has no knowledge of retractions - it simply serves modules by version.
+    // This test verifies that Repsy does NOT enforce or recognize retraction directives.
+
+    const repo = await seeder.createRepo(RepoType.GOLANG, { privateRepo: false });
+    const admin = adminCredential();
+    const modulePath = `${MODULE_DOMAIN}/e2e-${seeder.runId}-retract`;
+    const v1 = 'v1.0.0';
+    const v2 = 'v1.0.1';
+
+    // Upload two versions normally
+    const built1 = await buildModuleZip({ modulePath, version: v1 });
+    const built2 = await buildModuleZip({ modulePath, version: v2 });
+
+    expect((await rawUpload(repo.name, admin, built1)).status, 'v1 upload').toBe(200);
+    expect((await rawUpload(repo.name, admin, built2)).status, 'v2 upload').toBe(200);
+
+    const { home, work } = await isolatedWorkDir(`golang-retract-${seeder.runId}`);
+    const goGetEnv = await goEnv(home, {}, repo.name);
+
+    // Verify both versions are accessible (Repsy doesn't know one might be "retracted" by a consumer)
+    for (const version of [v1, v2]) {
+      const result = await run('go', ['mod', 'download', '-json', `${modulePath}@${version}`], {
+        cwd: work,
+        env: goGetEnv,
+        timeoutMs: 60_000,
+        label: `golang-retract-${version}`,
+      });
+
+      expect(
+        result.exitCode,
+        `go mod download of ${version} succeeds on Repsy: ${result.command}`,
+      ).toBe(0);
+      const parsed = JSON.parse(result.stdout) as { Zip?: string; Version?: string };
+      expect(parsed.Version).toBe(version);
+      expect(parsed.Zip, `version ${version} is downloadable from Repsy`).toBeTruthy();
+    }
+  },
+);
+
+test(
+  'golang > GOSUMDB variations: off vs. empty (probe)',
+  { tag: ['@smoke'] },
+  async ({ seeder }) => {
+    const repo = await seeder.createRepo(RepoType.GOLANG, { privateRepo: false });
+    const admin = adminCredential();
+    const modulePath = `${MODULE_DOMAIN}/e2e-${seeder.runId}-gosumdb`;
+    const version = golangAdapter.version('release');
+
+    const built = await buildModuleZip({ modulePath, version });
+    const uploadRes = await rawUpload(repo.name, admin, built);
+    expect(uploadRes.status).toBe(200);
+
+    // Test 1: GOSUMDB=off (disable checksum verification)
+    {
+      const { home, work } = await isolatedWorkDir(`golang-gosumdb-off-${seeder.runId}`);
+      const goGetEnv = await goEnv(home, {}, repo.name);
+      goGetEnv.GOSUMDB = 'off';
+
+      const result = await run('go', ['mod', 'download', '-json', `${modulePath}@${version}`], {
+        cwd: work,
+        env: goGetEnv,
+        timeoutMs: 60_000,
+        label: 'golang-gosumdb-off',
+      });
+
+      expect(result.exitCode, 'GOSUMDB=off allows download without sumdb: ' + result.command).toBe(
+        0,
+      );
+      const parsed = JSON.parse(result.stdout) as { Zip?: string };
+      expect(parsed.Zip).toBeTruthy();
+    }
+
+    // Test 2: Unset GOSUMDB (relies on GONOSUMDB to skip sumdb)
+    {
+      const { home, work } = await isolatedWorkDir(`golang-gosumdb-unset-${seeder.runId}`);
+      const goGetEnv = await goEnv(home, {}, repo.name);
+      delete goGetEnv.GOSUMDB;
+
+      const result = await run('go', ['mod', 'download', '-json', `${modulePath}@${version}`], {
+        cwd: work,
+        env: goGetEnv,
+        timeoutMs: 60_000,
+        label: 'golang-gosumdb-unset',
+      });
+
+      // With GONOSUMDB set to MODULE_DOMAIN (which it is from goEnv),
+      // this should still succeed even without GOSUMDB=off
+      expect(result.exitCode, 'GONOSUMDB skips sumdb verification: ' + result.command).toBe(0);
+      const parsed = JSON.parse(result.stdout) as { Zip?: string };
+      expect(parsed.Zip).toBeTruthy();
+    }
   },
 );
