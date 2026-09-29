@@ -14,13 +14,40 @@
 /// limitations under the License.
 
 /**
+ * RPS-1481 for Cargo: the real `cargo publish` with a credential that has just stopped being valid (a
+ * changed password, a deleted user, a revoked or rotated deploy token). The scenarios live in
+ * `scenarios/credential-invalidation.ts`, shared with `tests/maven/credential-invalidation.spec.ts`.
+ *
  * RPS-1552 for Cargo: the token `GET /{repo}/me` answers a user's password with is bound to the user's
  * `token_version`, so a password change ends it at once (it lives 30 minutes otherwise), and `/me` does not
  * renew a token that was ended. The scenarios live in `scenarios/credential-invalidation.ts`.
  */
 import { RepoType } from '../../src/api/panel-api.js';
-import { rawGetIndexWithBearer, rawMe } from '../../src/clients/cargo-raw.js';
-import { registerLoginTokenInvalidation } from '../../src/scenarios/credential-invalidation.js';
+import { adminCredential, parseIndex, rawGetIndex, rawGetIndexWithBearer, rawMe } from '../../src/clients/cargo-raw.js';
+import { cargoAdapter } from '../../src/clients/cargo.js';
+import { expect, test } from '../../src/scenarios/fixtures.js';
+import {
+  registerCredentialInvalidation,
+  registerLoginTokenInvalidation,
+} from '../../src/scenarios/credential-invalidation.js';
+import { repoUrl } from '../../src/repo-url.js';
+import { rawRequest } from '../../src/clients/raw-http.js';
+
+registerCredentialInvalidation({
+  adapter: cargoAdapter,
+  repoType: RepoType.CARGO,
+  isStored: async (repoName, packageName, version) => {
+    const res = await rawGetIndex(repoName, adminCredential(), packageName);
+    if (res.status === 404) {
+      return false;
+    }
+    if (res.status !== 200) {
+      throw new Error(`GET sparse-index of ${packageName} as admin answered ${res.status}`);
+    }
+    const entries = parseIndex(res.body);
+    return entries.some((e) => e.vers === version);
+  },
+});
 
 registerLoginTokenInvalidation({
   name: 'cargo',
@@ -41,3 +68,38 @@ registerLoginTokenInvalidation({
   },
   probe: (repoName, token) => rawGetIndexWithBearer(repoName, 'no_such_crate_rps1552', token),
 });
+
+/**
+ * RPS-1576 for Cargo: the `cargo:token` credential provider sends a renewed token bare (with no
+ * `Bearer ` scheme prefix), and the `/me` endpoint must accept and renew it. This is orthogonal to
+ * the login token invalidation tests above: here we prove the scheme-less format is accepted.
+ */
+test(
+  'cargo > /me accepts and renews a bare (scheme-less) token from cargo:token credential provider (RPS-1576)',
+  { tag: ['@smoke'] },
+  async ({ seeder }) => {
+    const repo = await seeder.createRepo(RepoType.CARGO, { privateRepo: true });
+    const user = await seeder.createUser();
+    const cred = { transport: 'basic' as const, username: user.username, password: user.password, kind: 'password' as const };
+
+    // Get the initial token via /me with Basic auth
+    const initialRes = await rawMe(repo.name, cred);
+    expect(initialRes.status).toBe(200);
+    const initialToken = initialRes.token;
+    expect(initialToken).toBeTruthy();
+
+    // Renew the token by sending it back bare (no "Bearer " prefix), exactly as cargo:token does
+    const bareRenewalRes = await rawRequest(`${repoUrl(repo.name)}me`, {
+      headers: { Authorization: initialToken }, // bare token, no scheme
+    });
+    expect(bareRenewalRes.status, `bare token renewal should succeed`).toBe(200);
+    const renewedData = JSON.parse(bareRenewalRes.body.toString('utf8')) as { token?: unknown };
+    const renewedToken = typeof renewedData.token === 'string' ? renewedData.token : undefined;
+    expect(renewedToken).toBeTruthy();
+
+    // Use the renewed token with Bearer prefix to verify it works
+    const probeRes = await rawGetIndexWithBearer(repo.name, 'any-crate', renewedToken!);
+    // The crate doesn't exist, so we expect 404, but the token is accepted (not 401)
+    expect(probeRes.status, `renewed token should be accepted for index access`).toBe(404);
+  },
+);
