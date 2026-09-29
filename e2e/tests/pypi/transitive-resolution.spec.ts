@@ -333,7 +333,7 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
       });
 
       expect(response.status).toBe(200);
-      const release = response.body as Record<string, unknown>;
+      const release = (response.body ?? response) as Record<string, unknown>;
 
       // Verify metadata fields are present and correct
       expect(release.packageName).toBe(packageName);
