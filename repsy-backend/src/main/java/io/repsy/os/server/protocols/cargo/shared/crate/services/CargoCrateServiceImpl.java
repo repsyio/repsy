@@ -152,6 +152,7 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
 
     if (existingCrate.isPresent()) {
       crate = existingCrate.get();
+      checkNameSpelling(crate, request);
       this.checkExistsVersion(crate, request);
       crate.setLastUpdatedAt(Instant.now());
     } else {
@@ -328,6 +329,31 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
   }
 
   /**
+   * Refuses a publish whose name is spelled differently from the crate's first publish (RPS-1721).
+   * {@link CrateUtils#normalizeCrateName(String)} folds case and {@code -}/{@code _} together to
+   * find the same crate, exactly as real {@code cargo} does when resolving a dependency, but
+   * crates.io itself does not let a second version silently join the crate under a new spelling of
+   * its name: {@code Foo-Bar} 1.0.0 followed by {@code foo_bar} 1.1.0 is refused, not folded into
+   * {@code Foo-Bar}'s version list. Live-probed against a running Repsy instance (RPS-1721): before
+   * this check, the second publish above answered 200 and the version was silently added under the
+   * first spelling.
+   */
+  private static void checkNameSpelling(final CargoCrate crate, final CratePublishRequest request) {
+
+    if (crate.getOriginalName().equals(request.name())) {
+      return;
+    }
+
+    log.warn(
+        "crate {} publish refused: spelled {} but first published as {}",
+        crate.getName(),
+        request.name(),
+        crate.getOriginalName());
+
+    throw new ItemAlreadyExistException("crateNameSpellingMismatch");
+  }
+
+  /**
    * Returns the crate row, inserting it when this is the first version of the crate.
    *
    * <p>The insert skips a row that already exists instead of failing on the unique index: on
@@ -357,6 +383,7 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
             .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_NOT_FOUND));
 
     if (inserted == 0) {
+      checkNameSpelling(crate, request);
       this.checkExistsVersion(crate, request);
     }
 

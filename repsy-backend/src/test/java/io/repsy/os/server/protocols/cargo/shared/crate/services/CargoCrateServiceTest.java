@@ -118,6 +118,7 @@ class CargoCrateServiceTest {
 
       final var existingCrate = new CargoCrate();
       existingCrate.setId(UUID.randomUUID());
+      existingCrate.setOriginalName("test-crate");
 
       when(CargoCrateServiceTest.this.repoRepository.findById(repoId))
           .thenReturn(Optional.of(new Repo()));
@@ -131,6 +132,36 @@ class CargoCrateServiceTest {
               () -> CargoCrateServiceTest.this.cargoCrateService.publish(repoInfo, request))
           .isInstanceOf(ItemAlreadyExistException.class)
           .hasMessage("crateVersionAlreadyExists");
+    }
+
+    @Test
+    @DisplayName(
+        "throws ItemAlreadyExistException when a second version is published under a different"
+            + " spelling of the crate's name (RPS-1721)")
+    void throwsExceptionWhenNameSpellingDiffers() {
+      final var repoId = UUID.randomUUID();
+      final var repoInfo = CargoCrateServiceTest.this.createRepoInfo(repoId);
+      // Normalizes to the same "foo_bar" lookup key as the crate published under "Foo-Bar", but is
+      // not the exact spelling it was first published under.
+      final var request = CargoCrateServiceTest.this.createPublishRequest("foo_bar", "1.1.0");
+
+      final var existingCrate = new CargoCrate();
+      existingCrate.setId(UUID.randomUUID());
+      existingCrate.setName("foo_bar");
+      existingCrate.setOriginalName("Foo-Bar");
+
+      when(CargoCrateServiceTest.this.repoRepository.findById(repoId))
+          .thenReturn(Optional.of(new Repo()));
+      when(CargoCrateServiceTest.this.crateRepository.findByRepoIdAndName(repoId, "foo_bar"))
+          .thenReturn(Optional.of(existingCrate));
+
+      assertThatThrownBy(
+              () -> CargoCrateServiceTest.this.cargoCrateService.publish(repoInfo, request))
+          .isInstanceOf(ItemAlreadyExistException.class)
+          .hasMessage("crateNameSpellingMismatch");
+
+      verify(CargoCrateServiceTest.this.crateIndexRepository, never())
+          .save(any(CargoCrateIndex.class));
     }
 
     @Test
@@ -192,6 +223,7 @@ class CargoCrateServiceTest {
 
       final var existingCrate = new CargoCrate();
       existingCrate.setId(UUID.randomUUID());
+      existingCrate.setOriginalName("test-crate");
       when(CargoCrateServiceTest.this.repoRepository.findById(repoId))
           .thenReturn(Optional.of(new Repo()));
       when(CargoCrateServiceTest.this.crateRepository.findByRepoIdAndName(repoId, "test_crate"))
@@ -240,6 +272,7 @@ class CargoCrateServiceTest {
       final var existingCrate = new CargoCrate();
       existingCrate.setId(UUID.randomUUID());
       existingCrate.setName("test_crate");
+      existingCrate.setOriginalName("test-crate");
       existingCrate.setMaxVersion("1.0.0");
 
       when(CargoCrateServiceTest.this.repoRepository.findById(repoId))
@@ -275,6 +308,7 @@ class CargoCrateServiceTest {
       this.existingCrate = new CargoCrate();
       this.existingCrate.setId(UUID.randomUUID());
       this.existingCrate.setName("test_crate");
+      this.existingCrate.setOriginalName("test-crate");
       this.existingCrate.setMaxVersion("1.0.0");
 
       lenient()
