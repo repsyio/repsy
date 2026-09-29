@@ -659,7 +659,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("creates a public repo without a description when only name and type are sent")
+    @DisplayName("creates a private repo without a description when only name and type are sent")
     void defaults() throws Exception {
       final var name = uniqueRepoName("defaults");
 
@@ -671,7 +671,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
               "Repo created.");
 
       assertThat(JsonPath.<Map<String, Object>>read(body, "$.data"))
-          .containsEntry("privateRepo", false)
+          .containsEntry("privateRepo", true)
           .doesNotContainKey("description");
     }
 
