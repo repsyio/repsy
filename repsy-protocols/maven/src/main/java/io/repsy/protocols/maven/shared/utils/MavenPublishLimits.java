@@ -16,6 +16,7 @@
 package io.repsy.protocols.maven.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.libs.storage.core.dtos.StoragePath;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.maven.index.artifact.Gav;
@@ -67,6 +68,24 @@ public final class MavenPublishLimits {
   public static final int MAX_VERSION_LENGTH = 255;
   public static final int MAX_PACKAGING_LENGTH = 50;
 
+  // Reject: the stored file's own name, once the storage layer has built it from the artifactId,
+  // the version, an optional classifier and an extension (RPS-1732). Most POSIX file systems,
+  // ext4 included, cap a single path component (a directory name or a file name) at 255 bytes.
+  // The groupId, artifactId and version are each guarded to 255 characters on their own by {@link
+  // #checkCoordinates}, matching the columns they are stored in, but the artifactId and version
+  // are also concatenated into one file name component (`<artifactId>-<version>[-<classifier>]
+  // .<extension>`, and one byte longer still for a checksum's `.sha1`/`.md5`/`.sha256`/`.sha512`
+  // suffix or a signature's `.asc`), so an artifactId or version at its own 255-character maximum
+  // already leaves that file name over the 255-byte limit before the extension is even added. The
+  // two guards were never reconciled against each other, and the resulting {@code
+  // java.nio.file.FileSystemException} used to propagate as an unhandled 500 instead of a clean
+  // refusal. {@link #checkFileNameLength} measures the actual file name the storage layer is
+  // about to write, so it catches every classifier and extension combination in one check, rather
+  // than trying to carve a smaller static limit out of {@link #MAX_ARTIFACT_ID_LENGTH} and {@link
+  // #MAX_VERSION_LENGTH} that would not, by itself, account for a classifier or a checksum
+  // suffix. It must run before the file is opened for writing, matching {@link #checkCoordinates}.
+  public static final int MAX_FILE_NAME_LENGTH = 255;
+
   // Drop (null): the descriptive fields of maven_artifact and maven_artifact_version.
   public static final int MAX_NAME_LENGTH = 255;
   public static final int MAX_URL_LENGTH = 255;
@@ -100,6 +119,27 @@ public final class MavenPublishLimits {
 
     if (version.length() > MAX_VERSION_LENGTH) {
       throw new BadRequestException("mavenVersionTooLong");
+    }
+  }
+
+  /**
+   * Refuses a path whose file name (the last path segment: {@code <artifactId>-<version>[-
+   * <classifier>].<extension>}, one byte longer still for a checksum or signature suffix) would not
+   * fit as a single POSIX path component (RPS-1732). This is checked independently of {@link
+   * #checkCoordinates}: a groupId, artifactId and version can each individually fit their own
+   * 255-character maximum and still combine, once the storage layer builds the file name from them,
+   * into something the file system refuses to create. Measuring the actual file name here, rather
+   * than the artifactId and version on their own, also catches an over-long classifier or
+   * checksum/signature suffix that {@code checkCoordinates} has no visibility into.
+   *
+   * @throws BadRequestException With {@code mavenFileNameTooLong}.
+   */
+  public static void checkFileNameLength(final StoragePath storagePath) {
+
+    final var fileName = storagePath.getRelativePath().getFileName();
+
+    if (fileName.length() > MAX_FILE_NAME_LENGTH) {
+      throw new BadRequestException("mavenFileNameTooLong");
     }
   }
 

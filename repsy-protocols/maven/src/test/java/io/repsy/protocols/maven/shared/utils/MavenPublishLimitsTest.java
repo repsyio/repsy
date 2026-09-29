@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.libs.storage.core.dtos.StoragePath;
 import java.nio.charset.StandardCharsets;
 import org.apache.maven.model.Model;
 import org.junit.jupiter.api.DisplayName;
@@ -45,8 +46,14 @@ class MavenPublishLimitsTest {
     return ArtifactUtils.convertPathToGav(path);
   }
 
+  private static StoragePath storagePath(final String path) {
+    return new StoragePath(path);
+  }
+
   @Test
-  @DisplayName("accepts coordinates exactly as long as their columns")
+  @DisplayName(
+      "accepts coordinates exactly as long as their columns (checkCoordinates alone, regardless"
+          + " of the combined file name checkFileNameLength separately guards, RPS-1732)")
   void acceptsCoordinatesAtTheLimit() {
     final var artifact = "a".repeat(255);
     final var version = "1".repeat(255);
@@ -87,6 +94,65 @@ class MavenPublishLimitsTest {
                     gav("g/a/" + tooLong + "/a-" + tooLong + ".pom")))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("mavenVersionTooLong");
+  }
+
+  @Test
+  @DisplayName("accepts a file name exactly at the POSIX 255-byte path-component limit")
+  void acceptsAFileNameAtTheLimit() {
+    final var version = "1".repeat(255 - "a-".length() - ".pom".length());
+    final var path = "g/a/" + version + "/a-" + version + ".pom";
+
+    assertThatCode(() -> MavenPublishLimits.checkFileNameLength(storagePath(path)))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("refuses a file name one byte over the POSIX 255-byte path-component limit")
+  void refusesAFileNameOverTheLimit() {
+    final var version = "1".repeat(255 - "a-".length() - ".pom".length() + 1);
+    final var path = "g/a/" + version + "/a-" + version + ".pom";
+
+    assertThatThrownBy(() -> MavenPublishLimits.checkFileNameLength(storagePath(path)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("mavenFileNameTooLong");
+  }
+
+  @Test
+  @DisplayName(
+      "refuses the RPS-1732 boundary: an artifactId or version at its own 255-char maximum,"
+          + " which checkCoordinates alone accepts, but which combines into an over-long file"
+          + " name")
+  void refusesTheDocumentedMaxCombination() {
+    final var maxArtifactId = "a".repeat(255);
+    final var artifactPath = "g/" + maxArtifactId + "/1/" + maxArtifactId + "-1.pom";
+    final var maxVersion = "1".repeat(255);
+    final var versionPath = "g/a/" + maxVersion + "/a-" + maxVersion + ".pom";
+
+    assertThatCode(() -> MavenPublishLimits.checkCoordinates(gav(artifactPath)))
+        .doesNotThrowAnyException();
+    assertThatThrownBy(() -> MavenPublishLimits.checkFileNameLength(storagePath(artifactPath)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("mavenFileNameTooLong");
+
+    assertThatCode(() -> MavenPublishLimits.checkCoordinates(gav(versionPath)))
+        .doesNotThrowAnyException();
+    assertThatThrownBy(() -> MavenPublishLimits.checkFileNameLength(storagePath(versionPath)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("mavenFileNameTooLong");
+  }
+
+  @Test
+  @DisplayName("accounts for a checksum suffix, which checkCoordinates never sees")
+  void accountsForAChecksumSuffix() {
+    // The base file name sits exactly at the limit; its checksum is one segment longer.
+    final var version = "1".repeat(255 - "a-".length() - ".pom".length());
+    final var path = "g/a/" + version + "/a-" + version + ".pom";
+
+    assertThatCode(() -> MavenPublishLimits.checkFileNameLength(storagePath(path)))
+        .doesNotThrowAnyException();
+    assertThatThrownBy(() -> MavenPublishLimits.checkFileNameLength(storagePath(path + ".sha1")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("mavenFileNameTooLong");
   }
 
   @Test

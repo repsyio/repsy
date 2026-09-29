@@ -1974,16 +1974,57 @@ class ArtifactServiceImplTest {
   }
 
   @Test
-  @DisplayName("accepts coordinates exactly as long as their columns (RPS-1138)")
-  void acceptsCoordinatesAtTheLimit() {
+  @DisplayName("accepts a groupId exactly as long as its column (RPS-1138)")
+  void acceptsAGroupIdAtTheLimit() {
     final var id = UUID.randomUUID();
-    final var limit = "a".repeat(255);
-    final var path = "com/" + limit + "/1.0/" + limit + "-1.0.jar";
+    // The group only ever becomes directory components, never part of the stored file name, so
+    // it is not subject to the combined file-name guard below (RPS-1732).
+    final var group = "a".repeat(255);
+    final var path = group + "/lib/1.0/lib-1.0.jar";
 
     assertThat(
             this.artifactService.getVersionType(
                 repo(id, true, true, true), StoragePath.of(id, path)))
         .isEqualTo(RELEASE);
+  }
+
+  @Test
+  @DisplayName(
+      "accepts an artifactId and version whose combined file name is exactly at the file"
+          + " system's 255-byte limit (RPS-1732)")
+  void acceptsAFileNameAtTheLimit() {
+    final var id = UUID.randomUUID();
+    final var artifactId = "lib";
+    // "lib-" + version + ".jar" totals exactly 255 bytes.
+    final var version = "1".repeat(255 - (artifactId + "-").length() - ".jar".length());
+    final var path =
+        "com/acme/" + artifactId + "/" + version + "/" + artifactId + "-" + version + ".jar";
+
+    assertThat(
+            this.artifactService.getVersionType(
+                repo(id, true, true, true), StoragePath.of(id, path)))
+        .isEqualTo(RELEASE);
+  }
+
+  @Test
+  @DisplayName(
+      "refuses an artifactId or version at its own 255-char maximum whose combined file name"
+          + " does not fit the file system (RPS-1732)")
+  void refusesAFileNameOverTheLimit() {
+    final var id = UUID.randomUUID();
+    // Each coordinate fits MAX_ARTIFACT_ID_LENGTH / MAX_VERSION_LENGTH (255) on its own, so
+    // checkCoordinates alone would accept this; the combined file name is what must be refused.
+    final var limit = "a".repeat(255);
+    final var path = "com/" + limit + "/1.0/" + limit + "-1.0.jar";
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.getVersionType(
+                    repo(id, true, true, true), StoragePath.of(id, path)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("mavenFileNameTooLong");
+
+    verifyNoInteractions(this.artifactRepository, this.artifactVersionRepository);
   }
 
   @Test

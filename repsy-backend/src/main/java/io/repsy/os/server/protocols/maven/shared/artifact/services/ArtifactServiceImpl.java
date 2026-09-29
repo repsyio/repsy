@@ -133,7 +133,11 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    *
    * <p>A groupId, artifactId or version longer than the columns it is registered in is refused the
    * same way, with {@code groupIdTooLong}, {@code artifactIdTooLong} or {@code mavenVersionTooLong}
-   * (RPS-1138), instead of failing the row insert after the file was stored.
+   * (RPS-1138), instead of failing the row insert after the file was stored. An artifactId and
+   * version that each individually fit those limits can still combine, once the storage layer
+   * builds the file name from them, into something no POSIX file system accepts as a single path
+   * component; that combination is refused too, with {@code mavenFileNameTooLong}, instead of
+   * surfacing the file system's own {@code FileSystemException} as a raw 500 (RPS-1732).
    *
    * @throws BadRequestException {@code invalidArtifactPath} if the path does not parse to a GAV
    */
@@ -152,6 +156,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     }
 
     MavenPublishLimits.checkCoordinates(gav);
+    MavenPublishLimits.checkFileNameLength(storagePath);
 
     return gav.isSnapshot() ? SNAPSHOT : RELEASE;
   }
