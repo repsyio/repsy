@@ -348,7 +348,9 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
 
       const formerApi = await createPanelBackend();
       await formerApi.login(former.username, former.password);
-      const renamed = await formerApi.rawRequest('PATCH', '/api/profile/username', {
+      // RPS-1727: OS accepts PUT, Cloud only accepts PATCH for /api/profile/username
+      const method = target.kind === 'cloud' ? 'PATCH' : 'PUT';
+      const renamed = await formerApi.rawRequest(method, '/api/profile/username', {
         username: seeder.reserveUsername(),
       });
       expect(renamed.status, `rename: ${JSON.stringify(renamed.body)}`).toBe(200);
