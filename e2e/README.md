@@ -1858,6 +1858,39 @@ npm-family client, and pins `200 ok` on both sides, a regression guard for this 
 of this scenario is a known gap (repsy-mono RPS-1633) the id `republish-without-keywords` is chosen to
 match, so it can be lifted once Cloud's backend carries the same fix.
 
+### npm login (real interactive client, RPS-1717)
+
+`tests/npm/login.spec.ts` drives a REAL, interactive `npm login` -- unscoped and with `--scope`, the
+form repsy-docs documents (`npm login --scope foo --registry ...`) -- instead of writing a `.npmrc`
+directly the way every other npm spec does. `npm login`'s prompts (`lib/utils/read-user-info.js`) are
+TTY-gated, and this harness vendors no PTY library (no `node-pty` in `e2e/package.json`), so
+`src/clients/npm-login.ts` uses the `script(1)` fallback: confirmed present with no Dockerfile change
+in the `node:24-bookworm-slim` runner image (`bsdutils`'s `/usr/bin/script`, util-linux 2.39.3), which
+allocates a real pseudo-terminal for its child regardless of its own stdin.
+
+**The race that made the first version of this hang, not fail.** Piping both answers to stdin upfront
+(the shape execa's `input` option, or `crane auth login --password-stdin`, normally use) worked for
+the FIRST prompt (Username) and then hung forever on the second (Password) until the harness's own
+timeout killed it -- confirmed live with `--loglevel=silly` and npm's own debug log, which showed a
+genuinely stuck process, not a crash. `npm login` calls the `read` package fresh for EACH prompt, and
+every call builds its own `readline` interface over the same `process.stdin` and closes it (unsetting
+raw mode) once its one line resolves; when both answers are already sitting in the pty's buffer before
+the second interface exists, the bytes meant for the password are consumed by -- and lost with -- the
+first interface during that close/recreate window, so the second one has nothing left to read.
+`npm-login.ts` instead watches stdout for each literal prompt (`Username:`/`Password:`) and writes the
+matching answer only once that prompt has actually been rendered, which resolved it: the whole login,
+couch `PUT` included, completes in well under a second.
+
+Every "login succeeded" case is proved with a REAL follow-up `npm publish`/`npm install` using exactly
+the credential state login itself wrote (a content-hash round trip, the same idiom `npm.ts`'s
+`MARKER_FILENAME` uses elsewhere), not just an exit code: an unscoped login's token publishes and then
+installs its own package; a `--scope` login's `<scope>:registry=` mapping alone (no `--registry` on the
+follow-up call) resolves an install of a pre-seeded scoped package; a deploy-token secret as the
+password, with a username that belongs to no real account, still logs in and can install (RPS-1045).
+A wrong password is refused (a real `401`/`E401`, not a silent success), and the userconfig file is
+asserted to carry no new credential line at all -- `npm login` only calls `config.save('user')` after
+a successful read, so a thrown error never touches the file.
+
 ## npm-family clients (RPS-1330)
 
 The npm registry under the other package managers that talk to it: **pnpm, yarn classic (1.x), yarn
@@ -2003,7 +2036,8 @@ depends on a public package).
 | H-11 (partly) | bun reads `.npmrc`                                                                                            | confirmed by hand: bun 1.3.14 and pnpm 12.6.0 read `registry` + `_authToken` from `$HOME/.npmrc` alone (`whoami`, `view` of a private package)                                                    |
 | H-3           | yarn classic sends no auth unless always-auth                                                                 | confirmed for an unscoped packument GET, and a scoped one does send it; see "Yarn classic". (Also refuted: yarn classic does NOT need a `.yarnrc` for its registry, `.npmrc` alone is read.)      |
 | H-7           | yarn berry needs `npmAlwaysAuth` for an unscoped private read, and scoped uses best-effort auth               | confirmed, asserted (PR 4): unscoped without it is `YN0041` and an anonymous 401; a scoped read still sends the token; see "yarn berry"                                                           |
-| H-20, 18      | `npm login` fallback, npm workspaces                                                                          | not probed here                                                                                                                                                                                   |
+| H-18 (B7)     | npm workspaces (`npm publish --workspaces`)                                                                   | confirmed, `tests/npm-clients/npm/workspace-publish.spec.ts`                                                                                                                                      |
+| H-20 (RPS-1717) | `npm login` needs a TTY, so this harness could only reach it through the couch flow's raw HTTP shape        | probed for real: `script(1)` gives the real client a pty (no `node-pty` vendored here); `npm login` prompts Username then Password only (`adduser` is the one that also asks Email) and its default web-login attempt 404s against Repsy and falls back to the same couch prompts `--auth-type=legacy` selects directly. See "npm login (real interactive client, RPS-1717)" below and `tests/npm/login.spec.ts` |
 
 ### Backend candidates found (npm baseline; each has its ticket)
 
