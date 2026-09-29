@@ -211,7 +211,7 @@ export function ownersUrl(name: string): string {
   return `api/v1/crates/${name}/owners`;
 }
 
-async function rawRequest(
+export async function rawRequest(
   url: string,
   init: { method?: string; headers?: Record<string, string>; body?: Buffer },
 ): Promise<RawResponse> {

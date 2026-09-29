@@ -23,7 +23,14 @@
  * renew a token that was ended. The scenarios live in `scenarios/credential-invalidation.ts`.
  */
 import { RepoType } from '../../src/api/panel-api.js';
-import { adminCredential, parseIndex, rawGetIndex, rawGetIndexWithBearer, rawMe } from '../../src/clients/cargo-raw.js';
+import {
+  adminCredential,
+  parseIndex,
+  rawGetIndex,
+  rawGetIndexWithBearer,
+  rawMe,
+  rawRequest,
+} from '../../src/clients/cargo-raw.js';
 import { cargoAdapter } from '../../src/clients/cargo.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import {
@@ -31,7 +38,6 @@ import {
   registerLoginTokenInvalidation,
 } from '../../src/scenarios/credential-invalidation.js';
 import { repoUrl } from '../../src/repo-url.js';
-import { rawRequest } from '../../src/clients/raw-http.js';
 
 registerCredentialInvalidation({
   adapter: cargoAdapter,
@@ -80,7 +86,12 @@ test(
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.CARGO, { privateRepo: true });
     const user = await seeder.createUser();
-    const cred = { transport: 'basic' as const, username: user.username, password: user.password, kind: 'password' as const };
+    const cred = {
+      transport: 'basic' as const,
+      username: user.username,
+      password: user.password,
+      kind: 'password' as const,
+    };
 
     // Get the initial token via /me with Basic auth
     const initialRes = await rawMe(repo.name, cred);
@@ -88,9 +99,13 @@ test(
     const initialToken = initialRes.token;
     expect(initialToken).toBeTruthy();
 
-    // Renew the token by sending it back bare (no "Bearer " prefix), exactly as cargo:token does
-    const bareRenewalRes = await rawRequest(`${repoUrl(repo.name)}me`, {
-      headers: { Authorization: initialToken }, // bare token, no scheme
+    // Renew the token by sending it back bare (no "Bearer " prefix), exactly as cargo:token does.
+    // repoUrl's one-arg form has no trailing slash (repo-url.ts's own doc comment: pass `rel` for a
+    // path under it), unlike cargo-raw.ts's internal repoUrl(name) wrapper that rawMe() uses above --
+    // two different functions sharing a name. Use the documented two-arg form here to avoid a
+    // concatenated, un-routable URL (confirmed live: this previously 404'd as "unknownPath").
+    const bareRenewalRes = await rawRequest(repoUrl(repo.name, 'me'), {
+      headers: { Authorization: initialToken! }, // bare token, no scheme
     });
     expect(bareRenewalRes.status, `bare token renewal should succeed`).toBe(200);
     const renewedData = JSON.parse(bareRenewalRes.body.toString('utf8')) as { token?: unknown };
