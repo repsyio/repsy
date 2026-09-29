@@ -228,9 +228,14 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
     return this.goModuleMapper.toGoModuleInfo(goModule, versions);
   }
 
+  /**
+   * Picks the version {@code @latest} serves. Delegates to {@link GoVersionUtils#latestOf}, the go
+   * command's own "latest" version query (go.dev/ref/mod#version-queries), not a plain max over
+   * every published version (RPS-1720 C8/RPS-1733) -- the same rule {@link GoModuleMapper} uses for
+   * the panel's {@code latestVersion}, so the wire protocol and the panel agree.
+   */
   private Optional<String> computeLatestVersion(final List<GoModuleVersionListItem> versions) {
-    return versions.stream()
-        .map(GoModuleVersionListItem::getVersion)
-        .max(GoVersionUtils.COMPARATOR);
+    return GoVersionUtils.latestOf(
+        versions.stream().map(GoModuleVersionListItem::getVersion).toList());
   }
 }

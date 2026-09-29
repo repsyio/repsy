@@ -372,6 +372,25 @@ test.describe('golang registry rules (raw HTTP)', () => {
   );
 
   test(
+    '@v/list excludes pseudo-versions but keeps a tagged pre-release (R8b, RPS-1733): the GOPROXY ' +
+      'protocol says the list "should not include pseudo-versions"',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'listpseudo');
+      const admin = adminCredential();
+
+      for (const version of ['v1.0.0', 'v1.1.0-rc1', 'v1.2.0-20240101120000-0123456789ab']) {
+        const built = await buildModuleZip({ modulePath: layout.modulePath, version });
+        expectMsgId(await rawUpload(layout.repoName, admin, built), 200, undefined);
+      }
+
+      const res = await rawGet(layout.repoName, admin, listRelPath(layout.modulePath));
+      // The pseudo-version (v1.2.0-...) is not listed; the tagged pre-release (v1.1.0-rc1) is.
+      expect(parseVersionList(res.body)).toEqual(['v1.0.0', 'v1.1.0-rc1']);
+    },
+  );
+
+  test(
     '@latest serves the highest published version’s .info; an unknown module 404s (R9)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
@@ -390,6 +409,62 @@ test.describe('golang registry rules (raw HTTP)', () => {
       expect(res.status).toBe(200);
       expect(res.contentType).toBe('application/json');
       expect(parseInfo(res.body).Version).toBe('v0.3.0');
+    },
+  );
+
+  test(
+    '@latest prefers a real RELEASE over a numerically higher tagged pre-release (R9b, RPS-1733): ' +
+      'go get m@latest resolves the release, per repsy-docs using-go-modules-from-repsy',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'latestrelease');
+      const admin = adminCredential();
+
+      for (const version of ['v1.2.0', 'v1.3.0-beta.1']) {
+        const built = await buildModuleZip({ modulePath: layout.modulePath, version });
+        expectMsgId(await rawUpload(layout.repoName, admin, built), 200, undefined);
+      }
+
+      const res = await rawGet(layout.repoName, admin, latestRelPath(layout.modulePath));
+      expect(res.status).toBe(200);
+      expect(parseInfo(res.body).Version, 'v1.2.0 is a real release; v1.3.0-beta.1 is not').toBe(
+        'v1.2.0',
+      );
+    },
+  );
+
+  test(
+    '@latest falls back to the highest tagged pre-release, then to a pseudo-version, when no ' +
+      'release is published (R9b, RPS-1733)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const preReleaseOnly = await newRepo(seeder, 'latestprereleaseonly');
+      const admin = adminCredential();
+
+      for (const version of ['v1.0.0-alpha.1', 'v1.0.0-beta.1']) {
+        const built = await buildModuleZip({ modulePath: preReleaseOnly.modulePath, version });
+        expectMsgId(await rawUpload(preReleaseOnly.repoName, admin, built), 200, undefined);
+      }
+      const preReleaseRes = await rawGet(
+        preReleaseOnly.repoName,
+        admin,
+        latestRelPath(preReleaseOnly.modulePath),
+      );
+      expect(parseInfo(preReleaseRes.body).Version).toBe('v1.0.0-beta.1');
+
+      const pseudoOnly = await newRepo(seeder, 'latestpseudoonly');
+      const pseudoVersion = 'v1.0.0-20240101120000-0123456789ab';
+      const pseudoBuilt = await buildModuleZip({
+        modulePath: pseudoOnly.modulePath,
+        version: pseudoVersion,
+      });
+      expectMsgId(await rawUpload(pseudoOnly.repoName, admin, pseudoBuilt), 200, undefined);
+
+      const pseudoRes = await rawGet(pseudoOnly.repoName, admin, latestRelPath(pseudoOnly.modulePath));
+      expect(
+        parseInfo(pseudoRes.body).Version,
+        'a pseudo-version still answers @latest rather than 404ing, when it is the only version',
+      ).toBe(pseudoVersion);
     },
   );
 

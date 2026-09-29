@@ -266,6 +266,13 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     return new ByteArrayResource(fallbackVersions.getBytes(StandardCharsets.UTF_8));
   }
 
+  /**
+   * {@code @v/list} lists every known, non-pseudo version, one per line, sorted (RPS-1720 C8): the
+   * GOPROXY protocol says the list "should not include pseudo-versions"
+   * (go.dev/ref/mod#goproxy-protocol), since those name an untagged commit rather than a real
+   * release a caller would pick. A tagged pre-release (e.g. {@code v1.0.0-rc1}) is a real version
+   * and stays in the list; only the {@code isPseudoVersion} shape is excluded.
+   */
   private String listVersions(final BaseRepoInfo<I> repoInfo, final String path) {
     final var atVPath = path.substring(0, path.length() - "list".length());
     final var atVStoragePath = StoragePath.of(repoInfo.getStorageKey(), atVPath);
@@ -273,6 +280,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     return this.goStorageService.listDirectory(atVStoragePath).stream()
         .filter(item -> !item.isDirectory() && item.getName().endsWith(INFO_EXTENSION))
         .map(item -> item.getName().substring(0, item.getName().length() - INFO_EXTENSION.length()))
+        .filter(version -> !GoVersionUtils.isPseudoVersion(version))
         .sorted(GoVersionUtils.COMPARATOR)
         .collect(Collectors.joining("\n"));
   }

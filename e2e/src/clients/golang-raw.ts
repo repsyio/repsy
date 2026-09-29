@@ -61,15 +61,24 @@
  *    grep-confirmed dead -- nothing in either Go package ever throws it; the `deleted` column
  *    `V0002__Golang_Protocol.sql` created has no entity field reading it).
  *  - `@v/list`: lists the storage directory `/<modulePath>/@v/`, keeps `*.info` names, strips the
- *    extension, sorts with `GoVersionUtils.COMPARATOR` (real semver precedence; a non-semver string --
- *    `banana` -- falls back to `String.compareTo` against ANY other operand, even a real semver one,
- *    confirmed live), joins with `\n`, `text/plain`. An unknown module (or one whose last version
- *    was deleted) is a `text/plain` `404` (`not found: <path>`), so `go` tries the next GOPROXY entry
- *    (RPS-1428).
- *  - `@latest`: reads the DB (`findLatestPublishedVersion`, `max()` under the same `COMPARATOR`) --
- *    a DIFFERENT source of truth than `@v/list`'s storage directory listing (G5, architectural: the
- *    two routes call `goStorageService.listDirectory` and `goModuleService.findLatestPublishedVersion`
- *    respectively, confirmed from source, not independently forced live in this harness). Unknown
+ *    extension, EXCLUDES pseudo-versions (`GoVersionUtils.isPseudoVersion`, RPS-1720 C8/RPS-1733 --
+ *    the GOPROXY protocol says the list "should not include pseudo-versions",
+ *    go.dev/ref/mod#goproxy-protocol; a tagged pre-release like `v1.0.0-rc1` is NOT a pseudo-version
+ *    and still lists, confirmed live/R8b), sorts with `GoVersionUtils.COMPARATOR` (real semver
+ *    precedence; a non-semver string -- `banana` -- falls back to `String.compareTo` against ANY
+ *    other operand, even a real semver one, confirmed live), joins with `\n`, `text/plain`. An
+ *    unknown module (or one whose last version was deleted) is a `text/plain` `404`
+ *    (`not found: <path>`), so `go` tries the next GOPROXY entry (RPS-1428).
+ *  - `@latest`: reads the DB (`findLatestPublishedVersion` -> `computeLatestVersion`) -- a DIFFERENT
+ *    source of truth than `@v/list`'s storage directory listing (G5, architectural: the two routes
+ *    call `goStorageService.listDirectory` and `goModuleService.findLatestPublishedVersion`
+ *    respectively, confirmed from source, not independently forced live in this harness). It is NOT
+ *    a plain `max()` under `COMPARATOR` (RPS-1720 C8/RPS-1733, fixed): it follows the go command's own
+ *    "latest" version query (go.dev/ref/mod#version-queries) -- the highest RELEASE wins over any
+ *    pre-release, even a numerically higher one (`v1.2.0` beats `v1.3.0-beta.1`, confirmed live/R9b);
+ *    only when the module has no release at all does the highest TAGGED pre-release win; only when it
+ *    has no tagged version at all (release or pre-release) does a pseudo-version win, so `@latest`
+ *    still answers rather than 404ing for a module whose only versions are pseudo-versions. Unknown
  *    module -> `404`; found -> serves that version's `.info` FILE, `application/json`.
  *  - Plain `GET .../@v/<version>.mod|.info|.zip` serves the literal stored path (`text/plain`/
  *    `application/json`/`application/octet-stream`); missing -> `404`.
