@@ -45,10 +45,12 @@ import {
   registrationIndexPath,
   versionsPath,
   normalizeVersion,
+  parseRegistrationIndex,
   parseServiceIndex,
   parseVersions,
   publishUrl,
   rawDownloadNupkg,
+  rawGetRegistrationIndex,
   rawGetServiceIndex,
   rawGetVersions,
   rawPublish,
@@ -529,6 +531,166 @@ test.describe('nuget registry rules (raw HTTP)', () => {
       // The same credential rules as the GET: no credentials on a private repo is a 401.
       const anonymous = await fetch(at(nupkgPath(idLower, verLower)), { method: 'HEAD' });
       expect(anonymous.status, 'HEAD of a private package without credentials').toBe(401);
+    },
+  );
+
+  test(
+    'a symbol package (.snupkg) push is refused with 400, whether or not the .nupkg exists (RPS-1569)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'snupkg-reject');
+      const admin = adminCredential();
+      const idLower = layout.packageId.toLowerCase();
+
+      // Case 1: Push a .snupkg when the .nupkg does not exist
+      const v1 = nugetAdapter.version('release');
+      const verLower1 = normalizeVersion(v1);
+      const snupkgNoNupkg = buildNupkg({
+        packageId: layout.packageId,
+        version: v1,
+        marker: 'symbol-only',
+        metadata: { packageType: 'SymbolsPackage' },
+      });
+      expectPublish(
+        await rawPublish(layout.repoName, admin, snupkgNoNupkg),
+        400,
+        'symbol package',
+      );
+
+      // Verify nothing was stored for this version
+      const dlAfterSnupkg = await rawDownloadNupkg(layout.repoName, admin, idLower, verLower1);
+      expect(dlAfterSnupkg.status, 'no package is stored after rejected snupkg without nupkg').toBe(
+        404,
+      );
+
+      // Case 2: Push a real .nupkg first, then try to push a .snupkg with the same id/version
+      const v2 = nugetAdapter.version('release');
+      const verLower2 = normalizeVersion(v2);
+      const nupkgBytes = buildNupkg({
+        packageId: layout.packageId,
+        version: v2,
+        marker: 'real-package',
+      });
+      expectPublish(await rawPublish(layout.repoName, admin, nupkgBytes), 201, undefined);
+
+      // Verify the .nupkg is stored
+      const nupkgBefore = await rawDownloadNupkg(layout.repoName, admin, idLower, verLower2);
+      expect(nupkgBefore.status, 'the real .nupkg is stored').toBe(200);
+      expect(sha256Hex(nupkgBefore.body), 'nupkg hash matches').toBe(sha256Hex(nupkgBytes));
+
+      // Now, push a .snupkg (symbol package) with the same id and version
+      const snupkgBytes = buildNupkg({
+        packageId: layout.packageId,
+        version: v2,
+        marker: 'symbol-package',
+        metadata: { packageType: 'SymbolsPackage' },
+      });
+      expectPublish(
+        await rawPublish(layout.repoName, admin, snupkgBytes),
+        400,
+        'symbol package',
+      );
+
+      // Verify the .nupkg is still intact and unchanged
+      const nupkgAfter = await rawDownloadNupkg(layout.repoName, admin, idLower, verLower2);
+      expect(nupkgAfter.status, 'the .nupkg is still downloadable after rejected snupkg').toBe(200);
+      expect(sha256Hex(nupkgAfter.body), 'the .nupkg bytes are unchanged').toBe(
+        sha256Hex(nupkgBytes),
+      );
+    },
+  );
+
+  test(
+    'floating versions resolve to the highest matching version (e.g., 1.0.* matches latest 1.0.x)',
+    { tag: ['@settings'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'floating');
+      const admin = adminCredential();
+      const packageId = layout.packageId;
+
+      // Seed multiple versions: 1.0.0, 1.0.1, 1.1.0, 2.0.0
+      const versions = ['1.0.0', '1.0.1', '1.1.0', '2.0.0'];
+      for (const version of versions) {
+        const bytes = buildNupkg({ packageId, version });
+        expectPublish(await rawPublish(layout.repoName, admin, bytes), 201, undefined);
+      }
+
+      const idLower = packageId.toLowerCase();
+
+      // Test: the version list should have all versions
+      const versionsList = await rawGetVersions(layout.repoName, admin, idLower);
+      expect(versionsList.status, 'versions list is served').toBe(200);
+      const allVersions = parseVersions(versionsList.body).sort();
+      expect(allVersions).toEqual(versions.sort());
+
+      // Test: the registration index includes all versions with proper structure for resolution
+      const regIndex = await rawGetRegistrationIndex(layout.repoName, admin, idLower);
+      expect(regIndex.status, 'registration index is served').toBe(200);
+      const indexLeaves = parseRegistrationIndex(regIndex.body);
+      expect(indexLeaves.map((l) => l.version).sort()).toEqual(versions.sort());
+      expect(indexLeaves.every((l) => l.listed === true), 'all versions are listed').toBe(true);
+
+      // Each version should be downloadable and have a valid packageContent URL
+      for (const version of versions) {
+        const verLower = normalizeVersion(version);
+        const dl = await rawDownloadNupkg(layout.repoName, admin, idLower, verLower);
+        expect(dl.status, `version ${version} is downloadable`).toBe(200);
+
+        const leaf = indexLeaves.find((l) => l.version === version);
+        expect(leaf?.packageContent, `version ${version} has packageContent URL`).toBeTruthy();
+      }
+    },
+  );
+
+  test(
+    'registration index pages when a package has more than 64 versions, and the page structure follows NuGet V3 spec',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'paging');
+      const admin = adminCredential();
+      const packageId = layout.packageId;
+
+      // Seed 70 versions to force paging (page size is 64)
+      const versions = Array.from({ length: 70 }, (_, i) => `1.0.${i}`);
+      for (const version of versions) {
+        const bytes = buildNupkg({ packageId, version });
+        expectPublish(await rawPublish(layout.repoName, admin, bytes), 201, undefined);
+      }
+
+      const idLower = packageId.toLowerCase();
+
+      // Fetch the registration index
+      const regIndex = await rawGetRegistrationIndex(layout.repoName, admin, idLower);
+      expect(regIndex.status, 'registration index is served').toBe(200);
+
+      // Parse the raw JSON to check pagination structure
+      const indexJson = JSON.parse(regIndex.body.toString('utf8')) as {
+        items?: { '@id'?: string; items?: unknown[] }[];
+      };
+
+      // With 70 versions and page size 64, we should have 2 pages
+      expect(indexJson.items?.length, 'registration index has multiple pages').toBeGreaterThan(1);
+
+      // Each page should have an @id URL
+      const pageUrls = indexJson.items
+        ?.map((page) => page['@id'])
+        .filter((id): id is string => typeof id === 'string');
+      expect(pageUrls?.length, 'all pages have @id URLs').toBeGreaterThan(1);
+
+      // The page URLs should be distinct and follow the pattern /page/N.json
+      expect(new Set(pageUrls).size, 'page URLs are unique').toBe(pageUrls?.length ?? 0);
+
+      // Verify all versions are represented across pages
+      const allLeaves = parseRegistrationIndex(regIndex.body);
+      expect(allLeaves.length, 'all 70 versions are in the index').toBe(70);
+      expect(allLeaves.map((l) => l.version).sort()).toEqual(versions.sort());
+
+      // Verify each version is downloadable
+      for (const version of versions) {
+        const verLower = normalizeVersion(version);
+        const dl = await rawDownloadNupkg(layout.repoName, admin, idLower, verLower);
+        expect(dl.status, `version ${version} is downloadable`).toBe(200);
+      }
     },
   );
 });
