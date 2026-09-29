@@ -372,12 +372,6 @@ test(
   'docker > BuildKit attestation manifest: an index with platform children and an unknown-platform attestation child is stored and round-trips (HD-2)',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
-    // RPS-1731: attestation manifest push 500s with "null value in column media_type" constraint violation
-    test.fail(
-      true,
-      'RPS-1731: pushing an attestation manifest inside an index 500s — media_type not persisted, NOT NULL violation',
-    );
-
     const layout = await newRepoWithToken(seeder, 'attestation');
     const { home, work } = await isolatedWorkDir(`docker-attestation-${seeder.runId}`);
     await renderDockerConfig(home, layout.credential);
@@ -423,17 +417,21 @@ test(
       );
     }
 
-    // Build the attestation manifest (with OCI empty config, no subject since it's referenced
-    // by the index's manifests[] array, not through a subject field)
+    // Build the attestation manifest: OCI empty config, no subject since it's referenced by the
+    // index's manifests[] array (not through a subject field), attesting to the amd64 child --
+    // real BuildKit produces one attestation manifest per attested platform manifest.
     const {
       manifestBytes: attestationBytes,
       manifestDigest: attestationDigest,
+      manifestMediaType: attestationManifestMediaType,
       configBytes: attestationConfigBytes,
       configDigest: attestationConfigDigest,
-    } = buildAttestationManifest();
+    } = buildAttestationManifest(amd64.manifestDigest);
 
-    // Build the index from both children PLUS the attestation manifest in manifests[]
-    // The attestation is included as an entry with unknown/unknown media type and annotations
+    // Build the index from both children PLUS the attestation manifest in manifests[]. The
+    // attestation's own entry follows BuildKit's real shape (RPS-1731): the real OCI manifest media
+    // type (not a synthetic placeholder), platform "unknown/unknown" (present, not omitted), and
+    // the vnd.docker.reference.* annotations linking it to the platform manifest it attests to.
     const indexObj = {
       schemaVersion: 2,
       mediaType: 'application/vnd.oci.image.index.v1+json',
@@ -451,10 +449,14 @@ test(
           platform: { architecture: 'arm64', os: 'linux' },
         },
         {
-          mediaType: 'application/unknown+unknown',
+          mediaType: attestationManifestMediaType,
           digest: attestationDigest,
           size: attestationBytes.length,
-          annotations: { 'vnd.docker.reference.type': 'attestation-manifest' },
+          platform: { architecture: 'unknown', os: 'unknown' },
+          annotations: {
+            'vnd.docker.reference.digest': amd64.manifestDigest,
+            'vnd.docker.reference.type': 'attestation-manifest',
+          },
         },
       ],
     };
@@ -470,10 +472,12 @@ test(
       attestationConfigDigest,
     );
 
-    // Push the attestation manifest by digest only (no tag, only reachable through index)
-    // Push with OCI manifest media type (the server requires a known type), but the config
-    // is empty (application/vnd.oci.empty.v1+json), which makes the server recognize it as
-    // an attestation and store it with unknown platform
+    // Push the attestation manifest by digest only (no tag, only reachable through index). Pushed
+    // with the real OCI manifest Content-Type (the server requires a recognised header, and the
+    // manifest's own JSON body -- realistically -- omits its top-level mediaType field, see
+    // buildAttestationManifest). The config is empty (application/vnd.oci.empty.v1+json), which
+    // makes the server recognize it as an attestation and store it with the "unknown" platform
+    // (RPS-1731).
     const attestationPushRes = await rawPutManifest(
       layout.repoName,
       credential,
@@ -507,10 +511,12 @@ test(
       attestationDigest,
     );
     expect(attestationByDigestRes.status, 'attestation is pullable by digest').toBe(200);
+    // Stored media type is the pushed Content-Type header, not the (omitted) JSON body field
+    // (RPS-1731's fix), and matches what a real BuildKit-produced attestation manifest is pushed as.
     expect(
       attestationByDigestRes.contentType?.split(';')[0],
-      'attestation has unknown media type',
-    ).toBe('application/unknown+unknown');
+      'attestation is served with the real OCI manifest media type, not null/an error',
+    ).toBe('application/vnd.oci.image.manifest.v1+json');
     expect(sha256Hex(attestationByDigestRes.body)).toBe(attestationDigest.slice('sha256:'.length));
 
     // Verify both children are still pullable

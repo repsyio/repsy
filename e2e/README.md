@@ -3467,13 +3467,23 @@ IllegalArgumentException("unsupportedMediaType")` branch B4/RPS-1110 above pins 
   proven by reading the PULLED config blob's own `architecture` field back out, not merely trusting
   the index's platform label.
 
-- **HD-2 (BuildKit attestation manifest inside multi-platform index): pinned live at a backend bug
-  (RPS-1731)**. When an attestation manifest (empty config, no subject, referenced as an entry in an
-  index's manifests array with no platform field) is pushed, the backend returns HTTP 500: `null value
-in column "media_type" of relation "docker_manifest" violates not-null constraint`. The test is
-  correct (requests a valid OCI manifest); the backend fails to persist the manifest media type for
-  attestation manifests. `test.fail(true, 'RPS-1731: ...')` marks the test until the backend fix
-  lands.
+- **HD-2 (BuildKit attestation manifest inside multi-platform index): fixed (RPS-1731)**. Pushing an
+  attestation manifest the real way BuildKit's `docker buildx build --attest` does -- empty config, no
+  subject (it is referenced as an entry in an index's `manifests[]` array instead), pushed with a
+  real `Content-Type: application/vnd.oci.image.manifest.v1+json` header whose own JSON body omits
+  the top-level `mediaType` field (OPTIONAL per the OCI image-spec, and BuildKit does not set it) --
+  used to answer HTTP 500: `null value in column "media_type" of relation "docker_manifest" violates
+  not-null constraint`. `ManifestTxService#createManifest` (`repsy-backend`) took
+  `docker_manifest.media_type` from the manifest's own optional JSON field (`manifestInfo.
+getMediaType()`) instead of the pushed, required, already-validated `Content-Type` header, so an
+  attestation manifest that legitimately omitted it inserted `null` into a `NOT NULL` column. Fixed
+  by taking it from the header (`TagForm#getMediaType()`), the same source already used for a
+  single-manifest tag's own media type. Proven with a flip-and-fail backend test,
+  `DockerManifestPushIT#attestationManifestWithoutBodyMediaTypeIsStored`, and this test (no longer
+  `test.fail`-pinned): the index entry's own shape was also corrected to match real BuildKit output
+  confirmed against `moby/buildkit`'s attestation-storage spec -- the real OCI manifest media type
+  (not a placeholder), platform `unknown/unknown` (present, not omitted), and both
+  `vnd.docker.reference.digest`/`vnd.docker.reference.type` annotations.
 
 - No other backend bugs were found while building this suite. R13 (`registry-rules.spec.ts`) had
   already pinned the raw-HTTP shape of an index push; RPS-946 ("Docker image manifest lookup by

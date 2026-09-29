@@ -441,7 +441,12 @@ public class ManifestTxService implements ManifestService<UUID> {
     allLayers.add(configLayer);
 
     final var manifest = this.newManifest(image, form);
-    manifest.setMediaType(manifestInfo.getMediaType());
+    // The manifest's own mediaType field is OPTIONAL per the OCI image-spec, so a well-formed push
+    // can omit it -- BuildKit's provenance attestation manifests do (RPS-1731). docker_manifest.
+    // media_type is NOT NULL, so it is taken from the pushed Content-Type header (already required
+    // and validated by DockerManifestValidator/the saveManifest switch), the same source
+    // TagForm#getCalculatedMediaType already uses for a single-manifest tag's own media type.
+    manifest.setMediaType(form.getMediaType());
     manifest.setConfigMediaType(manifestInfo.getConfig().getMediaType());
     manifest.setConfigDigest(manifestInfo.getConfig().getDigest());
     manifest.setConfigSize(configLayer.getSize());
