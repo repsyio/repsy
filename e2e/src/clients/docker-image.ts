@@ -330,12 +330,16 @@ export async function buildIndexImage(opts: {
 }
 
 /**
- * Builds an attestation manifest with the OCI empty config. The attestation has no platform,
- * no layers (unlike regular image manifests), and follows the BuildKit pattern: empty config
- * (application/vnd.oci.empty.v1+json). The attestation is referenced as an entry in
- * the index's manifests[] array, not through a subject field.
+ * Builds an attestation manifest with the OCI empty config, following the real shape BuildKit's
+ * `docker buildx build --attest` produces (RPS-1731; confirmed against `moby/buildkit`'s attestation
+ * storage: `docs/attestations/attestation-storage.md`): an OCI image manifest (empty config, empty
+ * layers, `vnd.docker.reference.type`/`vnd.docker.reference.digest` annotations pointing at the
+ * platform manifest it attests to) whose own top-level `mediaType` JSON field is OMITTED -- that
+ * field is OPTIONAL per the OCI image-spec, and BuildKit does not set it. It is still pushed with a
+ * real, well-formed `Content-Type` header (`application/vnd.oci.image.manifest.v1+json`), which is
+ * what the registry must store as the manifest's media type (RPS-1731's fix).
  */
-export function buildAttestationManifest(): {
+export function buildAttestationManifest(subjectManifestDigest: string): {
   manifestBytes: Buffer;
   manifestDigest: string;
   manifestMediaType: string;
@@ -353,7 +357,10 @@ export function buildAttestationManifest(): {
       size: configBytes.length,
     },
     layers: [] as { mediaType: string; digest: string; size: number }[],
-    annotations: { 'vnd.docker.reference.type': 'attestation-manifest' },
+    annotations: {
+      'vnd.docker.reference.digest': subjectManifestDigest,
+      'vnd.docker.reference.type': 'attestation-manifest',
+    },
   };
   const manifestBytes = Buffer.from(JSON.stringify(manifestObj), 'utf8');
   const manifestDigest = sha256(manifestBytes);
@@ -361,7 +368,9 @@ export function buildAttestationManifest(): {
   return {
     manifestBytes,
     manifestDigest,
-    manifestMediaType: 'application/unknown+unknown',
+    // The index entry BuildKit lists this attestation under uses the real OCI manifest media type,
+    // not a synthetic placeholder: only the manifest's OWN JSON body omits `mediaType`.
+    manifestMediaType: 'application/vnd.oci.image.manifest.v1+json',
     configBytes,
     configDigest,
   };

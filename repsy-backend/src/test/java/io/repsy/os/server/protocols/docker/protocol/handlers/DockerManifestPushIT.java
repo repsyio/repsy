@@ -27,6 +27,7 @@ import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepos
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.docker.shared.utils.DockerConstants;
+import io.repsy.protocols.docker.shared.utils.MediaTypes;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -415,6 +416,38 @@ class DockerManifestPushIT extends AbstractIntegrationTest {
         this.manifestRepository.findByImageIdAndDigest(image.getId(), manifestDigest);
     assertThat(stored).isPresent();
     assertThat(stored.get().getPlatform()).isEqualTo(DockerConstants.UNKNOWN_PLATFORM);
+  }
+
+  @Test
+  @DisplayName(
+      "a BuildKit-style attestation manifest (empty config, empty layers, no body-level mediaType"
+          + " field) is stored with the pushed Content-Type as its media type, not a 500"
+          + " (RPS-1731)")
+  void attestationManifestWithoutBodyMediaTypeIsStored() throws Exception {
+    final var repo = this.dockerRepo();
+    final var token = this.adminProtocolBearerToken();
+    final var emptyConfig = "{}".getBytes(StandardCharsets.UTF_8);
+    this.pushBlob(repo, emptyConfig, token);
+    // The OCI image-spec makes the manifest's own top-level "mediaType" field OPTIONAL: real
+    // BuildKit provenance-attestation manifests omit it, unlike every other manifest this test
+    // class builds.
+    final var manifest =
+        "{\"schemaVersion\":2,\"config\":{\"mediaType\":\"%s\",\"digest\":\"%s\",\"size\":%d},\"layers\":[],\"annotations\":{\"vnd.docker.reference.type\":\"attestation-manifest\"}}"
+            .formatted(MediaTypes.OCI_EMPTY, sha256(emptyConfig), emptyConfig.length);
+
+    // Pushed by digest only, as BuildKit does: reachable through an index's manifests[], not a tag.
+    final var manifestDigest = sha256(manifest.getBytes(StandardCharsets.UTF_8));
+    final var response = this.putManifest(repo, manifestDigest, OCI_MANIFEST, manifest);
+
+    assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(201);
+    final var image = this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE).orElseThrow();
+    final var stored =
+        this.manifestRepository.findByImageIdAndDigest(image.getId(), manifestDigest).orElseThrow();
+    // docker_manifest.media_type is NOT NULL: the missing body field is not persisted as null, it
+    // falls back to the pushed Content-Type header.
+    assertThat(stored.getMediaType()).isEqualTo(OCI_MANIFEST);
+    assertThat(stored.getConfigMediaType()).isEqualTo(MediaTypes.OCI_EMPTY);
+    assertThat(stored.getPlatform()).isEqualTo(DockerConstants.UNKNOWN_PLATFORM);
   }
 
   @Test
