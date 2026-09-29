@@ -48,7 +48,6 @@ import { env } from '../../src/env.js';
 import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 
-const OCTET = 'application/octet-stream';
 const DEPLOY_TIMEOUT_MS = 180_000;
 const RESOLVE_TIMEOUT_MS = 180_000;
 
@@ -109,12 +108,20 @@ async function deployArtifact(
 /**
  * Resolve a Maven artifact with a dependency version spec (range or metaversion) using
  * mvn dependency:get. Returns the exit code, stdout, and resolved version strings.
+ *
+ * `checksumPolicy` (default `'warn'`, Maven's own default) is only settable via a `<repository>`
+ * block in the consumer POM -- the `-DremoteRepositories=id::layout::url` shorthand used otherwise
+ * has no policy component. Passing `'fail'` is how a genuinely strict-checksum resolve is tested
+ * (live-confirmed: Maven's actual out-of-the-box default checksum policy is `warn`, so a resolve
+ * against a corrupted server checksum succeeds-with-a-warning unless the repository is configured
+ * this way).
  */
 async function resolveArtifactDynamic(
   repoName: string,
   groupId: string,
   artifactId: string,
   versionSpec: string,
+  checksumPolicy: 'warn' | 'fail' = 'warn',
 ): Promise<{
   exitCode: number;
   stdout: string;
@@ -122,6 +129,18 @@ async function resolveArtifactDynamic(
   resolvedSha?: string;
 }> {
   const { home, work } = await isolatedWorkDir('mvn-resolve');
+
+  const repositoryBlock =
+    checksumPolicy === 'fail'
+      ? '  <repositories>\n' +
+        '    <repository>\n' +
+        '      <id>repsy</id>\n' +
+        `      <url>${repoUrl(repoName)}</url>\n` +
+        '      <releases><enabled>true</enabled><checksumPolicy>fail</checksumPolicy></releases>\n' +
+        '      <snapshots><enabled>true</enabled><checksumPolicy>fail</checksumPolicy></snapshots>\n' +
+        '    </repository>\n' +
+        '  </repositories>\n'
+      : '';
 
   await fs.writeFile(
     path.join(work, 'pom.xml'),
@@ -131,6 +150,7 @@ async function resolveArtifactDynamic(
       `  <groupId>${groupId}.consumer</groupId>\n` +
       `  <artifactId>${artifactId}-consumer</artifactId>\n` +
       '  <version>0.0.0</version>\n' +
+      repositoryBlock +
       '</project>\n',
   );
 
@@ -144,6 +164,11 @@ async function resolveArtifactDynamic(
   const localRepo = path.join(home, 'repo-local');
   await fs.mkdir(localRepo, { recursive: true });
 
+  // With the policy configured in the POM's own <repositories>, dependency:get resolves through
+  // it without -DremoteRepositories (that shorthand cannot express a checksum policy).
+  const remoteRepositoriesArgs =
+    checksumPolicy === 'fail' ? [] : [`-DremoteRepositories=repsy::default::${repoUrl(repoName)}`];
+
   const result = await run(
     'mvn',
     [
@@ -151,7 +176,7 @@ async function resolveArtifactDynamic(
       '-ntp',
       'dependency:get',
       `-Dartifact=${groupId}:${artifactId}:${versionSpec}:jar`,
-      `-DremoteRepositories=repsy::default::${repoUrl(repoName)}`,
+      ...remoteRepositoriesArgs,
       '-s',
       'settings.xml',
       `-Dmaven.repo.local=${localRepo}`,
@@ -277,45 +302,56 @@ test.describe('maven dynamic versions, concurrent deploy, and checksums (RPS-171
   );
 
   test(
-    'concurrent deploy: two parallel mvn deploy:deploy-file to same coordinates produces valid metadata',
+    'concurrent deploy: two parallel mvn deploy:deploy-file to same coordinates' +
+      ' - first succeeds, second fails with 403 allowOverride',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+      // A newly created repo always starts with allowOverride=true (RepoTxService.createRepo
+      // hardcodes it), so the redeploy-refusal race this test exercises needs it turned off first.
+      await seeder.setSettings(repo.name, { allowOverride: false });
       const groupId = `io.repsy.e2e.${seeder.runId}`;
       const artifactId = 'concurrent-test';
       const version = '1.0';
 
-      // Deploy twice in parallel to the same coordinates
+      // Deploy twice in parallel to the same coordinates. With allowOverride=false, one should win
+      // and the other should fail with 403 when re-uploading the same files.
       const [deploy1, deploy2] = await Promise.all([
         deployArtifact(repo.name, groupId, artifactId, version),
         deployArtifact(repo.name, groupId, artifactId, version),
       ]);
 
-      // At least one should succeed
+      // One should succeed (the first to write), the other should fail with 403
       expect(
-        deploy1.exitCode === 0 || deploy2.exitCode === 0,
-        'at least one concurrent deploy should succeed',
+        (deploy1.exitCode === 0 && deploy2.exitCode !== 0) ||
+          (deploy1.exitCode !== 0 && deploy2.exitCode === 0),
+        'exactly one of the concurrent deploys should succeed (the other loses the race)',
       ).toBe(true);
 
-      // Verify the metadata is valid and not corrupted
+      // Verify the metadata is valid and NOT corrupted (no duplicate version entries from race)
       const metadataPath = `${groupId.replace(/\./g, '/')}/${artifactId}/maven-metadata.xml`;
       const metadata = await rawGet(repo.name, adminCredential(), metadataPath);
-      expect(metadata.status, 'metadata should exist').toBe(200);
+      expect(metadata.status, 'metadata should exist after concurrent race').toBe(200);
 
       const metadataXml = metadata.body.toString('utf8');
       expect(metadataXml).toContain('<metadata');
       expect(metadataXml).toContain('</metadata>');
-      const listedVersions = parseArtifactVersions(metadataXml);
-      expect(listedVersions, 'version should be listed in metadata').toContain(version);
 
-      // Check that the jar file exists and is readable
+      // Parse and verify version list has exactly ONE entry (no duplicates from concurrent race)
+      const listedVersions = parseArtifactVersions(metadataXml);
+      expect(
+        listedVersions,
+        'metadata should list the version exactly once (no duplicates from concurrent race)',
+      ).toEqual([version]);
+
+      // Verify the jar was stored by the winning deploy
       const jarPath = versionDir(groupId, artifactId, version);
       const jar = await rawGet(
         repo.name,
         adminCredential(),
         `${jarPath}/${artifactId}-${version}.jar`,
       );
-      expect(jar.status, 'jar should be stored').toBe(200);
+      expect(jar.status, 'jar should be stored by the winning deploy').toBe(200);
     },
   );
 
@@ -388,39 +424,53 @@ test.describe('maven dynamic versions, concurrent deploy, and checksums (RPS-171
   );
 
   test(
-    'strict checksums: sidecar files can be managed independently (SHA1/MD5 updates)',
+    'strict checksums: mvn resolve FAILS when server checksum is deliberately corrupted',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
       const groupId = `io.repsy.e2e.${seeder.runId}`;
-      const artifactId = 'checksum-update-test';
+      const artifactId = 'checksum-corrupt-test';
       const version = '1.0';
 
       // Deploy an artifact
       const deployment = await deployArtifact(repo.name, groupId, artifactId, version);
       expect(deployment.exitCode).toBe(0);
 
-      // Verify SHA1 sidecar exists
+      // Verify checksum sidecars exist
       const jarPath = versionDir(groupId, artifactId, version);
       const sha1Path = `${jarPath}/${artifactId}-${version}.jar.sha1`;
       const sha1Before = await rawGet(repo.name, adminCredential(), sha1Path);
-      expect(sha1Before.status, 'sha1 should exist').toBe(200);
-      const originalHash = sha1Before.body.toString('utf8').trim();
+      expect(sha1Before.status, 'sha1 should exist before corruption').toBe(200);
 
-      // Update the SHA1 sidecar (simulating a corrected checksum)
-      const newHash = 'cafebabecafebabecafebabecafebabecafebabe';
-      const updated = await rawPut(repo.name, adminCredential(), sha1Path, newHash, 'text/plain');
-      expect(updated.status, 'sidecar update should succeed').toBe(200);
+      // Corrupt the SHA1 sidecar by uploading wrong hash
+      const wrongHash = 'cafebabecafebabecafebabecafebabecafebabe';
+      const corrupted = await rawPut(
+        repo.name,
+        adminCredential(),
+        sha1Path,
+        wrongHash,
+        'text/plain',
+      );
+      expect(corrupted.status, 'corruption PUT should succeed').toBe(200);
 
-      // Verify the sidecar was updated
-      const sha1After = await rawGet(repo.name, adminCredential(), sha1Path);
-      expect(sha1After.status, 'updated sha1 should be readable').toBe(200);
-      expect(sha1After.body.toString('utf8').trim(), 'sha1 content should be updated').toBe(
-        newHash,
+      // Now resolve with the repository's checksumPolicy explicitly set to "fail" (Maven's own
+      // default is "warn", which only prints a warning and still succeeds -- live-confirmed) -
+      // should FAIL because the local jar won't match the corrupted sidecar.
+      const resolved = await resolveArtifactDynamic(
+        repo.name,
+        groupId,
+        artifactId,
+        version,
+        'fail',
       );
-      expect(sha1After.body.toString('utf8').trim(), 'sha1 should differ from original').not.toBe(
-        originalHash,
-      );
+      expect(
+        resolved.exitCode,
+        'resolve should FAIL (exit 1) when server checksum is wrong under checksumPolicy=fail',
+      ).not.toBe(0);
+      expect(
+        resolved.resolvedVersions.length,
+        'no version should be resolved due to checksum failure',
+      ).toBe(0);
     },
   );
 });
