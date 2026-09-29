@@ -214,6 +214,8 @@ export interface BuiltWheel {
   bytes: Buffer;
   sha256Hex: string;
   requiresPython: string;
+  classifiers?: string[];
+  projectUrls?: Record<string, string>;
 }
 
 export function buildWheel(opts: {
@@ -221,21 +223,51 @@ export function buildWheel(opts: {
   version: string;
   marker?: string;
   requiresPython?: string;
+  author?: string;
+  license?: string;
+  classifiers?: string[];
+  projectUrls?: Record<string, string>;
   /** Bytes of random padding stored in one extra file (`<dist>/e2e_padding.bin`), for the size-limit
    *  leg (RPS-1482, `padding.ts`); it is not listed in `RECORD`, which no consumer checks. */
   padBytes?: number;
+  /** Comma-separated Requires-Dist entries for transitive dependencies (e.g. "package-b>=1.0,package-c>=2.0") */
+  requiresDist?: string;
 }): BuiltWheel {
   const requiresPython = opts.requiresPython ?? '>=3.9';
   const marker = opts.marker ?? `e2e ${opts.name}@${opts.version}`;
   const dist = distName(opts.name);
   const distInfo = `${dist}-${opts.version}.dist-info`;
 
-  const metadataText =
+  let metadataText =
     'Metadata-Version: 2.1\n' +
     `Name: ${opts.name}\n` +
     `Version: ${opts.version}\n` +
     `Summary: e2e ${opts.name}@${opts.version}\n` +
     `Requires-Python: ${requiresPython}\n`;
+
+  if (opts.author) {
+    metadataText += `Author: ${opts.author}\n`;
+  }
+  if (opts.license) {
+    metadataText += `License: ${opts.license}\n`;
+  }
+  if (opts.classifiers) {
+    for (const classifier of opts.classifiers) {
+      metadataText += `Classifier: ${classifier}\n`;
+    }
+  }
+  if (opts.projectUrls) {
+    for (const [name, url] of Object.entries(opts.projectUrls)) {
+      metadataText += `Project-URL: ${name}, ${url}\n`;
+    }
+  }
+  if (opts.requiresDist) {
+    const deps = opts.requiresDist.split(',').map((s) => s.trim());
+    for (const dep of deps) {
+      metadataText += `Requires-Dist: ${dep}\n`;
+    }
+  }
+
   const wheelText =
     'Wheel-Version: 1.0\nGenerator: repsy-e2e\nRoot-Is-Purelib: true\nTag: py3-none-any\n';
 
@@ -270,6 +302,8 @@ export function buildWheel(opts: {
     bytes,
     sha256Hex: sha256Hex(bytes),
     requiresPython,
+    classifiers: opts.classifiers,
+    projectUrls: opts.projectUrls,
   };
 }
 
