@@ -2820,19 +2820,30 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
           Arguments.of(
               "{\"layers\":[{\"size\":10}]}",
               "manifestLayerInvalid",
-              "The first layer of the manifest needs a sha256 digest and a numeric size."),
+              "The chart layer of the manifest needs a sha256 digest and a numeric size."),
           Arguments.of(
               "{\"layers\":[{\"digest\":\"" + DIGEST + "\"}]}",
               "manifestLayerInvalid",
-              "The first layer of the manifest needs a sha256 digest and a numeric size."),
+              "The chart layer of the manifest needs a sha256 digest and a numeric size."),
           Arguments.of(
               layer("\"" + DIGEST + "\"", "\"10\""),
               "manifestLayerInvalid",
-              "The first layer of the manifest needs a sha256 digest and a numeric size."),
+              "The chart layer of the manifest needs a sha256 digest and a numeric size."),
           Arguments.of(
               layer("\"../../etc/passwd\"", "10"),
               "manifestLayerInvalid",
-              "The first layer of the manifest needs a sha256 digest and a numeric size."));
+              "The chart layer of the manifest needs a sha256 digest and a numeric size."),
+          Arguments.of(
+              "{\"layers\":["
+                  + "{\"mediaType\":\"application/vnd.cncf.helm.chart.provenance.v1.prov\","
+                  + "\"digest\":\""
+                  + DIGEST
+                  + "\",\"size\":10},"
+                  + "{\"mediaType\":\"application/octet-stream\",\"digest\":\""
+                  + DIGEST
+                  + "\",\"size\":10}]}",
+              "manifestChartLayerMissing",
+              "The manifest must have a layer whose media type is the Helm chart content type."));
     }
 
     @ParameterizedTest(name = "{0}")

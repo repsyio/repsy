@@ -73,6 +73,8 @@ class OciErrorsTest {
         Arguments.of("chartNameMismatch", 400, MANIFEST_PATH, OciErrorCode.NAME_INVALID),
         Arguments.of("manifestInvalidJson", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
         Arguments.of("manifestLayersMissing", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
+        Arguments.of(
+            "manifestChartLayerMissing", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
         Arguments.of("manifestLayerInvalid", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
         Arguments.of("chartYamlInvalid", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
         Arguments.of("digestMismatch", 400, MANIFEST_PATH, OciErrorCode.DIGEST_INVALID),

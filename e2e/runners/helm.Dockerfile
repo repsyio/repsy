@@ -104,6 +104,18 @@ ENV HELM_PLUGINS=/opt/helm/plugins
 COPY --from=helm-tools /usr/local/bin/helm /usr/local/bin/helm
 COPY --from=helm-tools /opt/helm/plugins /opt/helm/plugins
 
+# gpg + gpg-agent (Debian bookworm's GnuPG 2.2, same minimal install as maven.Dockerfile's, no
+# dirmngr/gpgsm/keyserver tooling), for tests/helm/provenance.spec.ts (RPS-1719): `helm package
+# --sign` reads its `--keyring`/`--passphrase-file` as plain files (confirmed live -- Helm's own
+# PGP implementation parses the armored keyring itself, it never shells out to `gpg` to sign), but
+# generating and exporting that keyring reuses `src/clients/gpg.ts`'s `generateGpgKey()`, the same
+# real `gpg --batch --gen-key`/`--export` helper the maven runner's signed-deploy specs use, which
+# needs the `gpg` binary on PATH.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gpg \
+    gpg-agent \
+    && rm -rf /var/lib/apt/lists/*
+
 # Readable/executable (not necessarily owned) by whatever uid the container runs as
 # (docker-compose.runners.yml's "user:", the host user) -- installed as root during the build, run
 # as that other user at runtime, same reasoning as /app itself above. The plugin directory is a

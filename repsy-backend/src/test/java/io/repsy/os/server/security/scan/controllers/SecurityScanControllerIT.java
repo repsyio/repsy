@@ -111,7 +111,7 @@ import org.springframework.transaction.annotation.Transactional;
  * VulnerabilityScannerRegistry}. {@code repsy.security.scanner} is unset, so the registry holds the
  * real {@code NoOpVulnerabilityScanner} (wildcard {@code *}, which the registry never reports),
  * plus {@link StubScannerConfig}, a scanner declaring the same repo types as the real Trivy scanner
- * (MAVEN, NPM, PYPI, DOCKER) without needing its HTTP client or configuration. The "scanner
+ * (MAVEN, NPM, PYPI, DOCKER, HELM) without needing its HTTP client or configuration. The "scanner
  * disabled" answer (an empty list) is covered by spying the registry for that one test.
  */
 @Import(SecurityScanControllerIT.StubScannerConfig.class)
@@ -129,7 +129,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
   private static final String FAILURE_MESSAGE = "Scanner timed out";
   private static final Instant BASE_TIME = Instant.parse("2026-03-01T10:00:00Z");
   private static final Set<String> STUB_SCANNER_REPO_TYPES =
-      Set.of("MAVEN", "NPM", "PYPI", "DOCKER");
+      Set.of("MAVEN", "NPM", "PYPI", "DOCKER", "HELM");
 
   private static final List<String> SCAN_INFO_KEYS =
       List.of(

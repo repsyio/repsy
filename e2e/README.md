@@ -3845,10 +3845,19 @@ login` used to succeed with a WRONG password. Docker's `/v2/token` answered the 
   re-verified with a dedicated Helm-side test here (no real client flow this step drives needs it),
   but the underlying mechanism is the same one `tests/docker/publish-consume.spec.ts`'s "D3" now
   confirms green.
-- **B-H6** — Not exercised: a repro needs a real `helm push` to emit a `.prov` layer BEFORE the
-  chart layer in one manifest, which was not confirmed to be producible with the harness's own
-  chart fixture (no `.prov` file is ever generated here) — left as an open question, not a
-  confirmed bug, per the plan's own "only write this test if you confirm..." guidance.
+- **B-H6 (closed by RPS-1719, `tests/helm/provenance.spec.ts`)** — Was: not exercised, a repro
+  needed a real `helm push` to emit a `.prov` layer, which the harness's own hand-built chart
+  fixture never produces. Now exercised with `helm package --sign` (a real GPG key,
+  `src/clients/gpg.ts`) + `helm push`: confirmed live, this is NOT a bug. The `.prov` lands as a
+  SECOND manifest layer (`application/vnd.cncf.helm.chart.provenance.v1.prov`), AFTER the chart
+  layer, never before; `AbstractHelmOciManifestPushProtocolMethodHandler.parseChartLayer` only
+  reads `layers[0]` for its own chart bookkeeping and neither rejects nor drops the extra layer;
+  the `.prov` blob is stored and served by the same generic by-digest blob routes every other layer
+  uses. A real `helm pull --verify` against the signer's public keyring succeeds end to end. One
+  client-side (not Repsy) finding: Helm v4.3.0's own `--help` says a `--verify` failure means "the
+  chart will not be saved locally" — confirmed live that Helm still writes the unverified files to
+  the destination directory despite the non-zero exit and a genuine `openpgp: signature made by
+  unknown entity` error.
 - **B-H7 (pre-existing story, [RPS-1110](https://zyfera.atlassian.net/browse/RPS-1110) — commented
   with this live evidence, not a new ticket)** — An OCI manifest push with NO `Content-Type` header
   at all answers a bodyless `400` — no OCI envelope despite RPS-1039 (`OciErrorBodyAdvice`); RPS-1110
@@ -6903,6 +6912,7 @@ opt-in, and `docker-compose.runners.yml` gives every runner the stub's control U
 | `tests/npm-clients/matrix/audit-lookup-scanner.spec.ts` | npm, pnpm                  | the audit of pairs the repository does NOT store, from the stub's scripted `POST /advisories` (RPS-1613, "Advisory lookup"): a pair stored nowhere is reported (severity, title, url, vulnerable version) and another version of the name is not; a finding the stored scan and the lookup both report is listed once, beside one only the lookup knows; with the lookup down (503, 504, a body that is not JSON) the audit is answered from the stored findings alone with the same exit code and no error, and a lookup-only pair audits clean with exit 0; with the repository's scan setting off nothing is reported and the stub records no lookup, on again it is asked and reports |
 | `tests/maven/scanner.spec.ts`                           | `mvn deploy`               | one scan per deploy, of `groupId:artifactId` and the version, with the jar as the file; the panel API holds the COMPLETED scan and its findings                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `tests/pypi/scanner.spec.ts`                            | `twine upload`             | one scan of the name and version, with the wheel as the file; the panel API holds the scan and its findings                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `tests/helm/scanner.spec.ts` (RPS-1719)                 | `helm push`                | one scan of the chart name and version, with the chart `.tgz` as the file; the panel API holds the scan and its findings                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `tests/docker/scanner.spec.ts`                          | `crane push`               | the scanner gets no file but the image reference `<registry>/<repo>/<image>:<tag>` and a registry token; the panel API holds the scan and its findings                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 The audit needs the stub to name the published package: Repsy matches an advisory on the finding's package
@@ -6935,8 +6945,10 @@ stay with the stored-findings spec. Not covered: the lookup of more than 20,000 
 unit test), a lookup that takes longer than `TRIVY_REQUEST_TIMEOUT_SECONDS`, and the scanner being unreachable
 (the stub always answers).
 
-The Docker, Maven and PyPI specs script a finding list by name (`SCRIPTED_SEVERITIES`) because the catalog's
-names carry no directive. The scanner leg of the nightly runs `ui`, `npm-clients`, `docker`, `maven` and `pypi`;
+The Docker, Maven, PyPI and Helm specs script a finding list by name (`SCRIPTED_SEVERITIES`) because the
+catalog's names carry no directive. The scanner leg of the nightly runs `ui`, `npm-clients`, `docker`, `maven`
+and `pypi` (RPS-1719's `tests/helm/scanner.spec.ts` is not in that workflow list yet — CI wiring is out of
+scope for that story, see its ticket);
 its step "Check the opt-in specs ran" fails a runner that skipped or ran nothing.
 
 ### Real scanner stack (RPS-1484): `repsy-scanner-trivy` itself, once

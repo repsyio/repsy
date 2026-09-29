@@ -32,6 +32,17 @@ public final class HelmConstants {
   public static final String SHA256_PREFIX = "sha256:";
 
   /**
+   * The OCI media type of the Helm chart-content layer (the {@code .tgz}), as opposed to the
+   * optional {@code .prov} provenance layer ({@code
+   * application/vnd.cncf.helm.chart.provenance.v1.prov}) a signed push adds alongside it. Used to
+   * pick the chart layer OUT of a multi-layer manifest by media type rather than by array position
+   * (RPS-1719): a real Helm client does not guarantee the chart stays {@code layers[0]} once a
+   * {@code .prov} layer is present.
+   */
+  public static final String CHART_CONTENT_MEDIA_TYPE =
+      "application/vnd.cncf.helm.chart.content.v1.tar+gzip";
+
+  /**
    * The most bytes of Chart.yaml the server reads out of an uploaded archive. The archive size is
    * bounded by the upload limit, but a tiny archive can inflate to gigabytes, so the inflated entry
    * is capped as well. Real Chart.yaml files are a few kilobytes.
