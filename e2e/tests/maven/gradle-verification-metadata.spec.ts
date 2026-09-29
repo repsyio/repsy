@@ -33,11 +33,7 @@ import { RepoType } from '../../src/api/panel-api.js';
 import { run, isolatedWorkDir } from '../../src/clients/exec.js';
 import { gradleEnv } from '../../src/clients/gradle.js';
 import { mavenEnv } from '../../src/clients/maven.js';
-import {
-  adminCredential,
-  buildJar,
-  minimalPom,
-} from '../../src/clients/maven-raw.js';
+import { buildJar, minimalPom } from '../../src/clients/maven-raw.js';
 import { env } from '../../src/env.js';
 import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
@@ -55,9 +51,6 @@ test.describe('Gradle verification-metadata', () => {
       const version = '1.0.0';
 
       // Deploy a test artifact to Repsy
-      const deployHome = isolatedWorkDir('gradle-verify-deploy').then((w) => w.home);
-      const deployWork = isolatedWorkDir('gradle-verify-deploy').then((w) => w.work);
-
       const { home: home1, work: work1 } = await isolatedWorkDir('gradle-verify-deploy');
       const base = `${artifactId}-${version}`;
       const pomContent = minimalPom(groupId, artifactId, version);
@@ -100,7 +93,8 @@ test.describe('Gradle verification-metadata', () => {
       expect(deployResult.exitCode, `deploy exit code: ${deployResult.stdout}`).toBe(0);
 
       // Create a Gradle project that will generate verification-metadata
-      const { home: gradleHome, work: gradleWork } = await isolatedWorkDir('gradle-verify-consumer');
+      const { home: gradleHome, work: gradleWork } =
+        await isolatedWorkDir('gradle-verify-consumer');
 
       const buildGradleKt = `plugins {
   java
@@ -112,6 +106,7 @@ version = "1.0.0"
 repositories {
   maven {
     url = uri("${repoUrl(repo.name)}")
+    isAllowInsecureProtocol = true
     credentials {
       username = "${env.adminUsername}"
       password = "${env.adminPassword}"
@@ -131,17 +126,19 @@ org.gradle.parallel=false
       await fs.writeFile(path.join(gradleWork, 'build.gradle.kts'), buildGradleKt);
       await fs.writeFile(path.join(gradleWork, 'gradle.properties'), gradleProperties);
       await fs.mkdir(path.join(gradleWork, 'gradle'), { recursive: true });
+      // A source file so `compileJava` is not NO-SOURCE: without one Gradle skips the task
+      // (and the implementation dependency's classpath resolution with it) before ever touching
+      // the Repsy-hosted artifact, and `build` finishes without writing any <component> entries.
+      await fs.mkdir(path.join(gradleWork, 'src', 'main', 'java'), { recursive: true });
+      await fs.writeFile(
+        path.join(gradleWork, 'src', 'main', 'java', 'App.java'),
+        'public class App {}\n',
+      );
 
       // Generate verification-metadata with Gradle
       const genMetadataResult = await run(
         'gradle',
-        [
-          '--no-daemon',
-          'build',
-          '--write-verification-metadata',
-          'sha256',
-          '--export-keys',
-        ],
+        ['--no-daemon', 'build', '--write-verification-metadata', 'sha256', '--export-keys'],
         {
           cwd: gradleWork,
           env: gradleEnv(gradleHome, path.join(gradleHome, '.gradle')),
@@ -151,9 +148,10 @@ org.gradle.parallel=false
         },
       );
 
-      expect(genMetadataResult.exitCode, `gradle metadata generation exit code: ${genMetadataResult.stdout}`).toBe(
-        0,
-      );
+      expect(
+        genMetadataResult.exitCode,
+        `gradle metadata generation exit code: ${genMetadataResult.stdout}`,
+      ).toBe(0);
 
       // Verify the verification-metadata.xml was created
       const verificationMetadataPath = path.join(gradleWork, 'gradle', 'verification-metadata.xml');
@@ -164,9 +162,14 @@ org.gradle.parallel=false
 
       // Extract the SHA256 from the metadata file for the jar
       const sha256Match = metadataContent.match(
-        new RegExp(`<component name="${groupId}:${artifactId}:${version}[^"]*"[^>]*>([\\s\\S]*?)</component>`),
+        new RegExp(
+          `<component name="${groupId}:${artifactId}:${version}[^"]*"[^>]*>([\\s\\S]*?)</component>`,
+        ),
       );
-      expect(sha256Match, 'verification-metadata contains component for our artifact').toBeDefined();
+      expect(
+        sha256Match,
+        'verification-metadata contains component for our artifact',
+      ).toBeDefined();
 
       if (sha256Match) {
         const componentContent = sha256Match[1];
@@ -234,7 +237,8 @@ org.gradle.parallel=false
       expect(deployResult.exitCode, `deploy exit code: ${deployResult.stdout}`).toBe(0);
 
       // Create Gradle project
-      const { home: gradleHome, work: gradleWork } = await isolatedWorkDir('gradle-tamper-consumer');
+      const { home: gradleHome, work: gradleWork } =
+        await isolatedWorkDir('gradle-tamper-consumer');
 
       const buildGradleKt = `plugins {
   java
@@ -246,6 +250,7 @@ version = "1.0.0"
 repositories {
   maven {
     url = uri("${repoUrl(repo.name)}")
+    isAllowInsecureProtocol = true
     credentials {
       username = "${env.adminUsername}"
       password = "${env.adminPassword}"
@@ -265,17 +270,19 @@ org.gradle.parallel=false
       await fs.writeFile(path.join(gradleWork, 'build.gradle.kts'), buildGradleKt);
       await fs.writeFile(path.join(gradleWork, 'gradle.properties'), gradleProperties);
       await fs.mkdir(path.join(gradleWork, 'gradle'), { recursive: true });
+      // A source file so `compileJava` is not NO-SOURCE: without one Gradle skips the task
+      // (and the implementation dependency's classpath resolution with it) both here and on the
+      // tampered rebuild below, so the tampered checksum would never actually be checked.
+      await fs.mkdir(path.join(gradleWork, 'src', 'main', 'java'), { recursive: true });
+      await fs.writeFile(
+        path.join(gradleWork, 'src', 'main', 'java', 'App.java'),
+        'public class App {}\n',
+      );
 
       // Generate verification-metadata first
       const genMetadataResult = await run(
         'gradle',
-        [
-          '--no-daemon',
-          'build',
-          '--write-verification-metadata',
-          'sha256',
-          '--export-keys',
-        ],
+        ['--no-daemon', 'build', '--write-verification-metadata', 'sha256', '--export-keys'],
         {
           cwd: gradleWork,
           env: gradleEnv(gradleHome, path.join(gradleHome, '.gradle')),
@@ -285,16 +292,22 @@ org.gradle.parallel=false
         },
       );
 
-      expect(genMetadataResult.exitCode, `gradle metadata generation exit code: ${genMetadataResult.stdout}`).toBe(0);
+      expect(
+        genMetadataResult.exitCode,
+        `gradle metadata generation exit code: ${genMetadataResult.stdout}`,
+      ).toBe(0);
 
-      // Tamper with the verification-metadata.xml
+      // Tamper with the verification-metadata.xml. Gradle's real format nests the checksum as
+      // `<sha256 value="<hex>" origin="Generated by Gradle"/>` (live-confirmed against a real
+      // generated file) -- not a literal `sha256="..."` attribute -- so the replacement has to
+      // match the `value` attribute of the `<sha256>` element.
       const verificationMetadataPath = path.join(gradleWork, 'gradle', 'verification-metadata.xml');
       let metadataContent = await fs.readFile(verificationMetadataPath, 'utf-8');
 
       // Replace a valid SHA256 with an incorrect one (change first 2 chars)
       metadataContent = metadataContent.replace(
-        /sha256="([a-f0-9]{64})"/,
-        (match, hash) => `sha256="${hash.substring(2)}00"`,
+        /<sha256 value="([a-f0-9]{64})"/,
+        (match, hash) => `<sha256 value="${hash.substring(2)}00"`,
       );
 
       await fs.writeFile(verificationMetadataPath, metadataContent);
@@ -311,26 +324,24 @@ org.gradle.parallel=false
       }
 
       // Try to build with tampered metadata - should fail
-      const buildResult = await run(
-        'gradle',
-        ['--no-daemon', 'build'],
-        {
-          cwd: gradleWork,
-          env: gradleEnv(gradleHome, path.join(gradleHome, '.gradle')),
-          timeoutMs: GRADLE_TIMEOUT_MS,
-          redact: [env.adminPassword],
-          label: 'gradle-tamper-build',
-        },
-      );
+      const buildResult = await run('gradle', ['--no-daemon', 'build'], {
+        cwd: gradleWork,
+        env: gradleEnv(gradleHome, path.join(gradleHome, '.gradle')),
+        timeoutMs: GRADLE_TIMEOUT_MS,
+        redact: [env.adminPassword],
+        label: 'gradle-tamper-build',
+      });
 
       // Build should fail due to checksum mismatch
       expect(
         buildResult.exitCode,
-        `build should fail with tampered checksum: ${buildResult.stdout}`,
+        `build should fail with tampered checksum: ${buildResult.stdout}\n${buildResult.stderr}`,
       ).not.toBe(0);
 
+      // Gradle writes the "* What went wrong" failure detail (including the dependency
+      // verification failure) to stderr, not stdout.
       expect(
-        buildResult.stdout,
+        buildResult.stderr,
         'error output should mention checksum verification failure',
       ).toMatch(/verification.*fail|checksum|integrity|tamper/i);
 

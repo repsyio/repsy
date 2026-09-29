@@ -124,7 +124,8 @@ test.describe('Maven classifier artifacts', () => {
       expect(javadocResp.body.toString('utf-8')).toContain('javadoc for');
 
       // Resolve: dependency:get with each classifier
-      const { home: resolveHome, work: resolveWork } = await isolatedWorkDir('mvn-classifier-resolve');
+      const { home: resolveHome, work: resolveWork } =
+        await isolatedWorkDir('mvn-classifier-resolve');
 
       await fs.writeFile(
         path.join(resolveWork, 'settings.xml'),
@@ -143,7 +144,7 @@ test.describe('Maven classifier artifacts', () => {
           '-s',
           'settings.xml',
           `-Dmaven.repo.local=${path.join(resolveHome, 'repo-local')}`,
-          `-DremoteRepositories=${repoUrl(repo.name)}::default::${repoUrl(repo.name)}`,
+          `-DremoteRepositories=repsy::default::${repoUrl(repo.name)}`,
           `-Dartifact=${groupId}:${artifactId}:${version}:jar`,
         ],
         {
@@ -155,9 +156,10 @@ test.describe('Maven classifier artifacts', () => {
         },
       );
 
-      expect(resolveMainResult.exitCode, `resolve main exit code: ${resolveMainResult.stdout}`).toBe(
-        0,
-      );
+      expect(
+        resolveMainResult.exitCode,
+        `resolve main exit code: ${resolveMainResult.stdout}`,
+      ).toBe(0);
 
       // Resolve sources classifier
       const resolveSourcesResult = await run(
@@ -169,7 +171,7 @@ test.describe('Maven classifier artifacts', () => {
           '-s',
           'settings.xml',
           `-Dmaven.repo.local=${path.join(resolveHome, 'repo-local')}`,
-          `-DremoteRepositories=${repoUrl(repo.name)}::default::${repoUrl(repo.name)}`,
+          `-DremoteRepositories=repsy::default::${repoUrl(repo.name)}`,
           `-Dartifact=${groupId}:${artifactId}:${version}:jar:sources`,
         ],
         {
@@ -181,9 +183,10 @@ test.describe('Maven classifier artifacts', () => {
         },
       );
 
-      expect(resolveSourcesResult.exitCode, `resolve sources exit code: ${resolveSourcesResult.stdout}`).toBe(
-        0,
-      );
+      expect(
+        resolveSourcesResult.exitCode,
+        `resolve sources exit code: ${resolveSourcesResult.stdout}`,
+      ).toBe(0);
 
       // Verify resolved files are distinct
       const localRepoPath = path.join(resolveHome, 'repo-local', ...gId.split('.'), aId, version);
@@ -234,7 +237,7 @@ test.describe('Maven BOM handling', () => {
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
-        <version>2.1.0</version>
+        <version>2.0.20</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -292,6 +295,17 @@ test.describe('Maven BOM handling', () => {
   <artifactId>${consumerArtifactId}</artifactId>
   <version>${consumerVersion}</version>
 
+  <!-- BOM import is resolved while Maven builds the effective model, before the dependency:resolve
+       mojo runs, so -DremoteRepositories (which only affects the mojo's own resolution) cannot
+       reach it: the importing POM needs its own <repositories> entry, with an id matching
+       settings.xml's <server> so the credentials for this private repo are found. -->
+  <repositories>
+    <repository>
+      <id>repsy</id>
+      <url>${repoUrl(repo.name)}</url>
+    </repository>
+  </repositories>
+
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -319,9 +333,8 @@ test.describe('Maven BOM handling', () => {
 </project>`;
 
       const { home: consumerHome, work: consumerWork } = await isolatedWorkDir('mvn-bom-consume');
-      const consumerBase = `${consumerArtifactId}-${consumerVersion}`;
 
-      await fs.writeFile(path.join(consumerWork, `${consumerBase}.pom`), consumerPomContent);
+      await fs.writeFile(path.join(consumerWork, 'pom.xml'), consumerPomContent);
 
       await fs.writeFile(
         path.join(consumerWork, 'settings.xml'),
@@ -340,8 +353,7 @@ test.describe('Maven BOM handling', () => {
           '-s',
           'settings.xml',
           `-Dmaven.repo.local=${path.join(consumerHome, 'repo-local')}`,
-          `-Dfile=${consumerBase}.pom`,
-          `-DremoteRepositories=${repoUrl(repo.name)}::default::${repoUrl(repo.name)}`,
+          `-DremoteRepositories=repsy::default::${repoUrl(repo.name)}`,
         ],
         {
           cwd: consumerWork,
@@ -358,7 +370,7 @@ test.describe('Maven BOM handling', () => {
       expect(resolveResult.stdout, 'resolve output contains junit 5.10.0').toContain(
         'junit-jupiter-api',
       );
-      expect(resolveResult.stdout, 'resolve output contains slf4j 2.1.0').toContain('slf4j-api');
+      expect(resolveResult.stdout, 'resolve output contains slf4j 2.0.20').toContain('slf4j-api');
     },
   );
 });
