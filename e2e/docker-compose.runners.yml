@@ -372,6 +372,15 @@ services:
         MAVEN_SHA512: 'a555254d6b53d267965a3404ecb14e53c3827c09c3b94b5678835887ab404556bfaf78dcfe03ba76fa2508649dca8531c74bca4d5846513522404d48e8c4ac8b'
         CRANE_VERSION: 'v0.22.1'
         CRANE_IMAGE_DIGEST: 'sha256:1f968817b95790bed063f71175aa6b8ff879fa17064020415f3e18bb6e6a36e1'
+        # The upgrade-path and persistence legs (RPS-1719/RPS-1720) also publish a Helm chart and a Go
+        # module with the real clients: the same helm binary as the helm service's and the same Go
+        # toolchain as the golang service's. Keep these equal to theirs (runners/bump-pins.sh fails when
+        # a value differs between the services that repeat it).
+        HELM_VERSION: 'v4.3.0'
+        HELM_SHA256_AMD64: '86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb'
+        HELM_SHA256_ARM64: '31c5794dd55c66a51e6b7d2e2ac7a114ae8b1de41ff1d9ba51748ac973b06a08'
+        GO_VERSION: '1.27.1'
+        GO_IMAGE_DIGEST: 'sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195'
     group_add:
       - '${DOCKER_GID:-999}'
     environment:

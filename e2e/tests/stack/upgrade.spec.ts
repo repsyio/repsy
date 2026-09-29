@@ -32,6 +32,12 @@
  * with the reason. The nightly leg (`upgrade`, `upgrade-h2`) fails on a skip, so a broken leg cannot
  * pass by doing nothing.
  *
+ * Maven, npm and Docker are the original three (RPS-1487); Helm and Go (RPS-1719/RPS-1720) were added the
+ * same way, both published well before `PREVIOUS_RELEASE` (Helm since RPS-777, 2026-06-10; Go since
+ * RPS-746, 2026-04-13): a chart and a module are published on the previous release through
+ * `legacy-panel.ts` and the real `helm`/`go` clients (`clients/stack-packages.ts`), then pulled again
+ * after the recreate, exactly like every other package in the `packages` array.
+ *
  * Serial, one worker: the container is recreated under the spec. It runs on whichever database the stack
  * has, PostgreSQL (the postgres volume outlives the recreate, `--no-deps`) or embedded H2 (the file is in
  * the `/app/data` volume): the assertions are the same. No password changes, so every other runner of
@@ -49,6 +55,8 @@ import { buildImage } from '../../src/clients/docker-image.js';
 import { dockerAdapter } from '../../src/clients/docker.js';
 import { imageRef, sha256Hex } from '../../src/clients/docker-raw.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
+import { golangAdapter } from '../../src/clients/golang.js';
+import { helmAdapter } from '../../src/clients/helm.js';
 import { mavenAdapter } from '../../src/clients/maven-adapter.js';
 import { npmAdapter } from '../../src/clients/npm.js';
 import {
@@ -290,6 +298,8 @@ test.describe.serial(
         [mavenAdapter, RepoType.MAVEN],
         [npmAdapter, RepoType.NPM],
         [dockerAdapter, RepoType.DOCKER],
+        [helmAdapter, RepoType.HELM],
+        [golangAdapter, RepoType.GOLANG],
       ] as const) {
         const name = seeder.reserveRepoName(repoType);
         await legacy.createRepo(repoType, name);
@@ -484,7 +494,7 @@ test.describe.serial(
       const repos = await panelApi.listAllRepos({ q: `e2e-${seeder.runId}` });
       expect(
         repos.map((repo) => `${repo.type}:${repo.name}`).sort(),
-        'the panel lists the three repositories with their types',
+        'the panel lists every repository with its type',
       ).toEqual(
         packages.map((pkg) => `${pkg.world.protocol.toUpperCase()}:${pkg.world.repoName}`).sort(),
       );

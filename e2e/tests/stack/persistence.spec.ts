@@ -23,7 +23,8 @@
  *
  * Serial, one worker (docker-compose.runners.yml sets REPSY_E2E_WORKERS=1 for the stack runner): the
  * container is restarted under the spec, so nothing else may talk to this stack at the same time, and
- * never against a shared stack. It packs three protocols into one repo each, then:
+ * never against a shared stack. It packs five protocols (Maven, npm, Docker, Helm and Go, RPS-1719/
+ * RPS-1720) into one repo each, then:
  *
  *  1. control: everything is consumable and listed in the panel before anything happens;
  *  2. `docker restart`: consumed again with the admin password and with a deploy token, listed in the
@@ -59,6 +60,8 @@ import {
   type ComposeFiles,
 } from '../../src/clients/stack.js';
 import { dockerAdapter } from '../../src/clients/docker.js';
+import { golangAdapter } from '../../src/clients/golang.js';
+import { helmAdapter } from '../../src/clients/helm.js';
 import {
   ADMIN,
   consume,
@@ -203,6 +206,8 @@ test.describe.serial(
         await publish(mavenAdapter, RepoType.MAVEN),
         await publish(npmAdapter, RepoType.NPM),
         await publish(dockerAdapter, RepoType.DOCKER),
+        await publish(helmAdapter, RepoType.HELM),
+        await publish(golangAdapter, RepoType.GOLANG),
       ];
     });
 
