@@ -66,9 +66,9 @@
           />
           <div class="text-body2 text-error min-h-7 pt-1">
             @if (form.get('name').errors?.['required'] && form.get('name').touched) {
-              <p data-testid="token-create-name-error-required" animate.enter="fade-in-up">• Should not be empty</p>
+              <p data-testid="token-create-name-error-required">• Should not be empty</p>
             } @else if (form.get('name').errors?.['maxlength'] && form.get('name').touched) {
-              <p data-testid="token-create-name-error-maxlength" animate.enter="fade-in-up">
+              <p data-testid="token-create-name-error-maxlength">
                 • Should be maximum 80 characters
               </p>
             }
@@ -88,15 +88,15 @@
           />
           <div class="text-body2 text-error min-h-7 pt-1">
             @if (form.get('username').errors?.['minlength'] && form.get('username').touched) {
-              <p data-testid="token-create-username-error-minlength" class="text-error" animate.enter="fade-in-up">
+              <p data-testid="token-create-username-error-minlength" class="text-error">
                 • {{ usernameMessages.minlength }}
               </p>
             } @else if (form.get('username').errors?.['maxlength'] && form.get('username').touched) {
-              <p data-testid="token-create-username-error-maxlength" class="text-error" animate.enter="fade-in-up">
+              <p data-testid="token-create-username-error-maxlength" class="text-error">
                 • {{ usernameMessages.maxlength }}
               </p>
             } @else if (form.get('username').errors?.['pattern'] && form.get('username').touched) {
-              <p data-testid="token-create-username-error-pattern" class="text-error" animate.enter="fade-in-up">
+              <p data-testid="token-create-username-error-pattern" class="text-error">
                 • {{ usernameMessages.pattern }}
               </p>
             }
@@ -117,7 +117,7 @@
           <div class="text-body2 flex min-h-7 items-start justify-between gap-2 pt-1">
             <div class="text-error">
               @if (form.get('description').errors?.['maxlength'] && form.get('description').touched) {
-                <p data-testid="token-create-description-error-maxlength" animate.enter="fade-in-up">
+                <p data-testid="token-create-description-error-maxlength">
                   • {{ descriptionMaxMessage }}
                 </p>
               }
@@ -161,11 +161,11 @@
             />
             <div class="text-body2 text-error min-h-7 pt-1">
               @if (form.get('expirationDate').errors?.['dateOutOfRange'] && form.get('expirationDate').touched) {
-                <p data-testid="token-create-expiration-error-range" animate.enter="fade-in-up">
+                <p data-testid="token-create-expiration-error-range">
                   • Must be between tomorrow and one year from today
                 </p>
               } @else if (form.get('expirationDate').errors?.['dateInvalid'] && form.get('expirationDate').touched) {
-                <p data-testid="token-create-expiration-error-invalid" animate.enter="fade-in-up">
+                <p data-testid="token-create-expiration-error-invalid">
                   • Enter a valid date
                 </p>
               }

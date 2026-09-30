@@ -48,23 +48,23 @@
         </div>
         <div class="text-body2 text-error min-h-7 pt-1">
           @if (passwordForm.get('newPassword').errors?.['required'] && passwordForm.get('newPassword').touched) {
-            <p data-testid="profile-new-password-error-required" class="text-error" animate.enter="fade-in-up">
+            <p data-testid="profile-new-password-error-required" class="text-error">
               • {{ passwordMessages.required }}
             </p>
           } @else if (
             passwordForm.get('newPassword').errors?.['minlength'] && passwordForm.get('newPassword').touched
           ) {
-            <p data-testid="profile-new-password-error-minlength" class="text-error" animate.enter="fade-in-up">
+            <p data-testid="profile-new-password-error-minlength" class="text-error">
               • {{ passwordMessages.minlength }}
             </p>
           } @else if (
             passwordForm.get('newPassword').errors?.['maxlength'] && passwordForm.get('newPassword').touched
           ) {
-            <p data-testid="profile-new-password-error-maxlength" class="text-error" animate.enter="fade-in-up">
+            <p data-testid="profile-new-password-error-maxlength" class="text-error">
               • {{ passwordMessages.maxlength }}
             </p>
           } @else if (passwordForm.get('newPassword').errors?.['pattern'] && passwordForm.get('newPassword').touched) {
-            <p data-testid="profile-new-password-error-pattern" class="text-error" animate.enter="fade-in-up">
+            <p data-testid="profile-new-password-error-pattern" class="text-error">
               • {{ passwordMessages.pattern }}
             </p>
           }
@@ -111,11 +111,11 @@
             passwordForm.get('passwordConfirmation').errors?.['required'] &&
             passwordForm.get('passwordConfirmation').touched
           ) {
-            <p data-testid="profile-password-confirmation-error-required" class="text-error" animate.enter="fade-in-up">
+            <p data-testid="profile-password-confirmation-error-required" class="text-error">
               • {{ passwordMessages.required }}
             </p>
           } @else if (passwordForm.hasError('notSame') && passwordForm.get('passwordConfirmation').touched) {
-            <p data-testid="profile-password-confirmation-error-mismatch" class="text-error" animate.enter="fade-in-up">
+            <p data-testid="profile-password-confirmation-error-mismatch" class="text-error">
               • {{ mismatchMessage }}
             </p>
           }
@@ -157,19 +157,19 @@
 
       <div class="text-body2 min-h-7 pt-1">
         @if (usernameForm.get('username').errors?.['required'] && usernameForm.get('username').touched) {
-          <p data-testid="profile-username-error-required" class="text-error" animate.enter="fade-in-up">
+          <p data-testid="profile-username-error-required" class="text-error">
             • {{ usernameMessages.required }}
           </p>
         } @else if (usernameForm.get('username').errors?.['minlength'] && usernameForm.get('username').touched) {
-          <p data-testid="profile-username-error-minlength" class="text-error" animate.enter="fade-in-up">
+          <p data-testid="profile-username-error-minlength" class="text-error">
             • {{ usernameMessages.minlength }}
           </p>
         } @else if (usernameForm.get('username').errors?.['maxlength'] && usernameForm.get('username').touched) {
-          <p data-testid="profile-username-error-maxlength" class="text-error" animate.enter="fade-in-up">
+          <p data-testid="profile-username-error-maxlength" class="text-error">
             • {{ usernameMessages.maxlength }}
           </p>
         } @else if (usernameForm.get('username').errors?.['pattern'] && usernameForm.get('username').touched) {
-          <p data-testid="profile-username-error-pattern" class="text-error" animate.enter="fade-in-up">
+          <p data-testid="profile-username-error-pattern" class="text-error">
             • {{ usernameMessages.pattern }}
           </p>
         }
@@ -186,7 +186,7 @@
 
       <div class="text-body2 min-h-7 pt-5">
         @if (usernameForm.get('username')?.value !== username) {
-          <p data-testid="profile-username-warning" class="text-warning-500" animate.enter="fade-in-up">
+          <p data-testid="profile-username-warning" class="text-warning-500">
             Repository URLs do not contain your username, so they stay the same. Clients that sign in with your username
             (for example a Maven settings.xml or an npm .npmrc) must be updated to the new username after you change it.
           </p>

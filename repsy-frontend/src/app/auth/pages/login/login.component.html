@@ -29,19 +29,19 @@
 
           <div class="text-body2 text-error min-h-7 pt-1">
             @if (form.get('username').errors?.['required'] && form.get('username').touched) {
-              <p data-testid="login-username-error-required" animate.enter="fade-in-up">
+              <p data-testid="login-username-error-required">
                 • {{ usernameMessages.required }}
               </p>
             } @else if (form.get('username').errors?.['pattern'] && form.get('username').touched) {
-              <p data-testid="login-username-error-pattern" animate.enter="fade-in-up">
+              <p data-testid="login-username-error-pattern">
                 • {{ usernameMessages.pattern }}
               </p>
             } @else if (form.get('username').errors?.['minlength'] && form.get('username').touched) {
-              <p data-testid="login-username-error-minlength" animate.enter="fade-in-up">
+              <p data-testid="login-username-error-minlength">
                 • {{ usernameMessages.minlength }}
               </p>
             } @else if (form.get('username').errors?.['maxlength'] && form.get('username').touched) {
-              <p data-testid="login-username-error-maxlength" animate.enter="fade-in-up">
+              <p data-testid="login-username-error-maxlength">
                 • {{ usernameMessages.maxlength }}
               </p>
             }
@@ -80,11 +80,11 @@
           </div>
           <div class="text-body2 text-error min-h-7 pt-1">
             @if (form.get('password').errors?.['required'] && form.get('password').touched) {
-              <p data-testid="login-password-error-required" animate.enter="fade-in-up">
+              <p data-testid="login-password-error-required">
                 • {{ passwordMessages.required }}
               </p>
             } @else if (form.get('password').errors?.['maxlength'] && form.get('password').touched) {
-              <p data-testid="login-password-error-maxlength" animate.enter="fade-in-up">
+              <p data-testid="login-password-error-maxlength">
                 • {{ passwordMessages.maxlength }}
               </p>
             }
