@@ -229,6 +229,8 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final String versionName)
       throws IOException {
 
+    NpmPublishLimits.checkDistTagName(tagName);
+
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
     final var version = versionName.replace("\"", "");
@@ -424,6 +426,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             packageBasePath,
             this.snapshotOf(repoInfo, scopeName, packageName));
     final var deprecations = PackageUtils.findDeprecatedVersions(metadata, payload);
+    deprecations.forEach(entry -> NpmPublishLimits.checkDeprecationMessage(entry.getSecond()));
 
     // The deprecation rows are written first and the package metadata second, in one transaction
     // that holds the package row locked (RPS-1280): see NpmPackageService#handleDeprecations.
