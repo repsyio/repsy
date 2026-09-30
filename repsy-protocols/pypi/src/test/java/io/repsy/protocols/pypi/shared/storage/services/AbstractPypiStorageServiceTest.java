@@ -197,6 +197,84 @@ class AbstractPypiStorageServiceTest {
       verify(storageStrategy, never())
           .delete(path(REPO_ID + "/" + NORMALIZED_NAME + "/my_package-2.0.0-py3-none-any.whl"));
     }
+
+    @Test
+    @DisplayName("never deletes the files of a local build when its public release is deleted")
+    void deleteOfAReleaseLeavesItsLocalBuildsAlone() {
+      final var names =
+          java.util.List.of(
+              "my_package-1.0-py3-none-any.whl",
+              "my_package-1.0-py3-none-any.whl.sha256",
+              "my_package-1.0.tar.gz",
+              "my_package-1.0+cu118-py3-none-any.whl",
+              "my_package-1.0+cu118-py3-none-any.whl.sha256",
+              "my_package-1.0+cu118.tar.gz",
+              "my_package-1.0+cu121.tar.gz");
+      when(storageStrategy.listDirectoryContents(any(StoragePath.class)))
+          .thenReturn(
+              names.stream()
+                  .map(
+                      name ->
+                          io.repsy.libs.storage.core.dtos.StorageItemInfo.builder()
+                              .name(name)
+                              .directory(false)
+                              .size(1L)
+                              .build())
+                  .toList());
+
+      final var usage = service.deleteRelease(REPO_ID, NORMALIZED_NAME, "1.0");
+
+      assertThat(usage).isEqualTo(3L);
+      for (final var name : names) {
+        final var expected =
+            name.startsWith("my_package-1.0-") || name.equals("my_package-1.0.tar.gz");
+        if (expected) {
+          verify(storageStrategy).delete(path(REPO_ID + "/" + NORMALIZED_NAME + "/" + name));
+        } else {
+          verify(storageStrategy, never())
+              .delete(path(REPO_ID + "/" + NORMALIZED_NAME + "/" + name));
+        }
+      }
+    }
+
+    @Test
+    @DisplayName("deletes a local build with its sidecar, and only that build")
+    void deleteOfALocalBuildLeavesThePublicReleaseAlone() {
+      final var names =
+          java.util.List.of(
+              "my_package-1.0-py3-none-any.whl",
+              "my_package-1.0+cu118-py3-none-any.whl",
+              "my_package-1.0+cu118-py3-none-any.whl.sha256",
+              "my_package-1.0+cu121-py3-none-any.whl");
+      when(storageStrategy.listDirectoryContents(any(StoragePath.class)))
+          .thenReturn(
+              names.stream()
+                  .map(
+                      name ->
+                          io.repsy.libs.storage.core.dtos.StorageItemInfo.builder()
+                              .name(name)
+                              .directory(false)
+                              .size(1L)
+                              .build())
+                  .toList());
+
+      final var usage = service.deleteRelease(REPO_ID, NORMALIZED_NAME, "1.0+cu118");
+
+      assertThat(usage).isEqualTo(2L);
+      verify(storageStrategy)
+          .delete(path(REPO_ID + "/" + NORMALIZED_NAME + "/my_package-1.0+cu118-py3-none-any.whl"));
+      verify(storageStrategy)
+          .delete(
+              path(
+                  REPO_ID
+                      + "/"
+                      + NORMALIZED_NAME
+                      + "/my_package-1.0+cu118-py3-none-any.whl.sha256"));
+      verify(storageStrategy, never())
+          .delete(path(REPO_ID + "/" + NORMALIZED_NAME + "/my_package-1.0-py3-none-any.whl"));
+      verify(storageStrategy, never())
+          .delete(path(REPO_ID + "/" + NORMALIZED_NAME + "/my_package-1.0+cu121-py3-none-any.whl"));
+    }
   }
 
   @Nested

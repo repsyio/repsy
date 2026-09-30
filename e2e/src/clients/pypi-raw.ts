@@ -37,13 +37,16 @@
  *      1. `normalizePackageName` (PEP 503: `[-_.]+` -> `-`, lower-cased).
  *      2. `PackageStorageUtils.checkArchiveFilename`: the filename must fully match
  *         `NAME-VERSION(-tag)*.(tar.gz|whl|zip)` with VERSION the PEP 440 **canonical** grammar
- *         (`ReleaseVersion`'s own `NORMALIZED_VERSION_PATTERN`) -- else `400 archiveFileNameInvalid`.
+ *         (`ReleaseVersion`'s own `NORMALIZED_VERSION_PATTERN`), a lower-cased `.`-separated local
+ *         segment (`1.0+cu118`) included (RPS-1662) -- else `400 archiveFileNameInvalid`.
+ *      2b. (RPS-1662) `PackageStorageUtils.checkArchiveVersion`: the version of the form, normalised,
+ *         must equal the version of the filename -- else `400 archiveVersionMismatch` (a malformed
+ *         form version is `400 badVersionString` first).
  *      3. `checkOverridePermission` (skipped when `allowOverride: true`): refuses with
- *         `403 fileAlreadyExists` only when `isPackageFileExist` is true, which itself is true only
- *         when `isFileBelongsRelease(filename, version)` (the RAW FORM `version`, compared against
- *         the version RE-EXTRACTED from the filename via `ReleaseVersion.of`) AND the storage path
- *         already exists -- so a form `version` that does not match the filename's own version makes
- *         an existing file overwritable even with `allowOverride: false` (P3, confirmed live).
+ *         `403 fileAlreadyExists` only when `isPackageFileExist` is true, i.e. the storage path of the
+ *         file already exists. `isFileBelongsRelease` compares the versions WHOLE, so release `1.0`
+ *         never owns the files of `1.0+cu118`. (A form `version` that differed from the filename's
+ *         used to make an existing file overwritable, P3/RPS-1223; it is now refused in step 2b.)
  *      4. (RPS-1124/#508, fixed) the release rows are written FIRST, in one transaction, where
  *         `ReleaseVersion.of(form.version)` can still throw `400 badVersionString`; only then does
  *         `writePackageArchive` store the file and a `.sha256` sidecar. A refused upload therefore

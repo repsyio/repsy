@@ -34,15 +34,13 @@ import org.jspecify.annotations.Nullable;
  * normalized string does not sort correctly as plain text either: a release segment sorts as a
  * string there ({@code "10.0"} would sit above {@code "9.0"}), and a pre-release like {@code
  * "2.0.0a1"} sorts after the final release {@code "2.0.0"} it precedes because it is the longer
- * string. This class parses the same grammar (a superset of what {@link ReleaseVersion} ever
- * normalizes a stored version to) into comparable fields instead.
+ * string. This class parses the same grammar, local segment included, into comparable fields
+ * instead.
  *
- * <p>{@link ReleaseVersion#normalize} never carries a local version (the optional {@code +...}
- * suffix) into the string it stores, so a stored release version never has one; the {@code local}
- * field and its ordering are still implemented, for a version string from anywhere else that does
- * carry one, following PEP 440: a version with a local segment sorts after the same version without
- * one, and same-position segments compare numeric-to-numeric and string-to-string, with a numeric
- * segment always outranking a string one.
+ * <p>A stored release version may carry a normalized local segment (the optional {@code +...}
+ * suffix, RPS-1662), and the comparator orders it following PEP 440: a version with a local segment
+ * sorts after the same version without one, and same-position segments compare numeric-to-numeric
+ * and string-to-string, with a numeric segment always outranking a string one.
  */
 @NullMarked
 public final class Pep440Version implements Comparable<Pep440Version> {

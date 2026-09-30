@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.AbstractIntegrationTest;
@@ -109,7 +110,7 @@ class PypiUploadOverrideIT extends AbstractIntegrationTest {
   @Test
   @DisplayName(
       "refuses an override whose form version does not match the filename's own version (the exact"
-          + " RPS-1223 bypass)")
+          + " RPS-1223 bypass): since RPS-1662 it is a 400, before the override rule is reached")
   void refusesOverrideWhenFormVersionDoesNotMatchTheFilename() throws Exception {
     final var repo = this.createRepo();
     repo.setAllowOverride(false);
@@ -121,8 +122,8 @@ class PypiUploadOverrideIT extends AbstractIntegrationTest {
             () ->
                 this.upload(
                     repo, "my-package", "1.0.0.post9", filename, wheelContent("bypass attempt")))
-        .isInstanceOf(AccessNotAllowedException.class)
-        .hasMessage("fileAlreadyExists");
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("archiveVersionMismatch");
   }
 
   @Test

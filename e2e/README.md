@@ -4091,12 +4091,23 @@ install`/`download` never fetch the root page, only `/simple/<project>/` — but
   repo ROOT (`POST /<repo>/` or `/<repo>`) — a `twine upload -r <that source>` built from the panel's
   OWN instructions 404s with `unknownPath`. Confirmed live: `registry-rules.spec.ts`'s
   no-trailing-slash/`P2` test.
+- **RPS-1662** (fixed) — PEP 440 local versions (`1.0.0+local.1`, `2.1.0+cu118`) were refused with
+  `archiveFileNameInvalid`, and once accepted a file would have been read as the release before the `+`. Repsy OS now
+  keeps the segment: each `1.0.0+<label>` is its own release, a file belongs to exactly one release (deleting `1.0.0`
+  leaves `1.0.0+local.1`, and the other way round), and the upload is refused with `400 archiveVersionMismatch` when
+  the form `version` differs from the version in the file name. `local-version.spec.ts`: twine and `uv publish`
+  upload a local build, pip and `uv pip` install it by `==1.0.0+local.1` (the project page prints a literal `+`, which
+  both clients request as is), `==1.0.0` is PEP 440's to answer (a public pin ignores a candidate's local label, so pip
+  may well pick the local build), and the panel lists, describes and deletes a `+` version. The repsy-docs page
+  describes the behaviour.
 - **RPS-1223** — `checkOverridePermission`/`isPackageFileExist` compares the FORM `version`
   field against the version RE-EXTRACTED from the archive FILENAME (`isFileBelongsRelease`), not the
   filename directly — a form `version` that does not match the filename's own encoded version makes
   an existing file overwritable even under `allowOverride: false`, bypassing the rule entirely.
   Confirmed live: `registry-rules.spec.ts`'s override test (same filename, mismatched declared
   version, `allowOverride: false`, `200` instead of the expected `403`).
+  Since RPS-1662 a declared version that differs from the file name's is refused outright, `400
+  archiveVersionMismatch`, so the same test now pins that answer.
 - **P4** (fixed, RPS-1124/#508): `AbstractPypiStorageService.writePackageArchive` (the archive file
   AND its `.sha256` sidecar) used to run BEFORE `PypiPackageServiceImpl.addOrUpdateRelease`, where
   `ReleaseVersion.of(form.version)` can still throw `badVersionString`, so a validation failure
@@ -6581,9 +6592,9 @@ assertions are in `src/ui/hostile-checks.ts`. Repsy Cloud's suite (RPS-1624) reu
   install snippet, a reload, and a direct visit to the route. `SHOWN` differences are data: the panel shows a NuGet
   id lower-cased (`E2e.PascalCase.Pkg` is `e2e.pascalcase.pkg`, as the registry keys it) and drops NuGet build metadata
   (`1.0.0+meta.1` is `1.0.0`); PyPI keeps the name as published and also serves the normalised spelling
-  (`alias: 'my-package-name'`). Not covered: PyPI local versions (`1.0.0+local.1`): the upload grammar
-  (`PackageStorageUtils`) refuses them with `archiveFileNameInvalid`, which is a wire-protocol decision for the
-  PyPI suite, not the panel.
+  (`alias: 'my-package-name'`). PyPI local versions (`1.0.0+local.1`) are not a panel case: Repsy OS accepts
+  and keeps them since RPS-1662, and `tests/pypi/local-version.spec.ts` covers them (next to the panel calls: list
+  order, detail and delete of a `+` version, whose path carries the `+` as `%2B`).
 - **PKG-npm-10** (`npm.spec.ts`): the versions page shows every dist-tag (`latest`, one published with `--tag next`,
   one added with `npm dist-tag add`, `lts-1.x`) and follows a tag removed elsewhere after a refresh and a reload; the
   list row of a package whose newest version is tagged `next` shows the `latest` one in its Latest column (and links to

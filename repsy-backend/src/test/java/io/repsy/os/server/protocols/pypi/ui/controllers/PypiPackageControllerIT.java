@@ -44,6 +44,7 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
@@ -442,6 +443,49 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
             .getResponse()
             .getContentAsString();
     assertErrorEnvelope(missingResponse, "packageNotFound", "packageNotFound");
+  }
+
+  @Test
+  @DisplayName(
+      "lists local versions after their public release, describes a + version under either"
+          + " spelling of the +, and deletes one without touching its siblings (RPS-1662)")
+  void handlesLocalVersionReleases() throws Exception {
+    final var repo = this.createRepo(true);
+    final var token = this.bearerToken(this.createUser(UserRole.ADMIN));
+    this.upload(repo, "local-pkg", "1.0.0", "local_pkg-1.0.0-py3-none-any.whl");
+    this.upload(repo, "local-pkg", "1.0.0+local.1", "local_pkg-1.0.0+local.1-py3-none-any.whl");
+    this.upload(repo, "local-pkg", "1.0.0+local.2", "local-pkg-1.0.0+local.2.tar.gz");
+    final var base = "/api/pypi/packages/" + repo.getName() + "/local-pkg/releases";
+
+    final var listed =
+        body(this.perform(get(base).header(AUTHORIZATION, token)).andExpect(status().isOk()));
+    assertThat((List<Map<String, Object>>) JsonPath.read(listed, "$.data.content"))
+        .extracting(item -> item.get("version"))
+        .containsExactly("1.0.0+local.2", "1.0.0+local.1", "1.0.0");
+
+    for (final var spelling : List.of("1.0.0+local.1", "1.0.0%2Blocal.1")) {
+      final var detail =
+          body(
+              this.perform(get(URI.create(base + "/" + spelling)).header(AUTHORIZATION, token))
+                  .andExpect(status().isOk()));
+      assertThat((String) JsonPath.read(detail, "$.data.version")).isEqualTo("1.0.0+local.1");
+    }
+
+    this.perform(delete(URI.create(base + "/1.0.0")).header(AUTHORIZATION, token))
+        .andExpect(status().isOk());
+    final var afterPublicDelete =
+        body(this.perform(get(base).header(AUTHORIZATION, token)).andExpect(status().isOk()));
+    assertThat((List<Map<String, Object>>) JsonPath.read(afterPublicDelete, "$.data.content"))
+        .extracting(item -> item.get("version"))
+        .containsExactly("1.0.0+local.2", "1.0.0+local.1");
+
+    this.perform(delete(URI.create(base + "/1.0.0%2Blocal.2")).header(AUTHORIZATION, token))
+        .andExpect(status().isOk());
+    final var afterLocalDelete =
+        body(this.perform(get(base).header(AUTHORIZATION, token)).andExpect(status().isOk()));
+    assertThat((List<Map<String, Object>>) JsonPath.read(afterLocalDelete, "$.data.content"))
+        .extracting(item -> item.get("version"))
+        .containsExactly("1.0.0+local.1");
   }
 
   @Test

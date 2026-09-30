@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -221,9 +222,9 @@ class AbstractPypiProtocolFacadeTest {
 
     @Test
     @DisplayName(
-        "checks existence keyed only on repoId/normalizedName/filename -- a form version that"
-            + " does not match the filename's own version no longer bypasses the check")
-    void checksExistenceByFilenameOnlyRegardlessOfFormVersion() throws Exception {
+        "a form version that does not match the filename's own version is refused before the"
+            + " override check, so it cannot bypass it (RPS-1223, RPS-1662)")
+    void refusesAFormVersionThatDoesNotMatchTheFilename() throws Exception {
       repoInfo.setAllowOverride(false);
       final var bytes = "content".getBytes();
       final var digest = sha256Hex(bytes);
@@ -231,13 +232,48 @@ class AbstractPypiProtocolFacadeTest {
       // Form version deliberately does NOT match the filename's own version ("1.0.0").
       final var params = form("pkg", "1.0.0.post9", digest);
 
-      when(storageService.isPackageFileExist(REPO_ID, "pkg", "pkg-1.0.0.tar.gz")).thenReturn(true);
-
       assertThatThrownBy(() -> facade.uploadPackage(context(), params, file))
-          .isInstanceOf(AccessNotAllowedException.class)
-          .hasMessage("fileAlreadyExists");
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("archiveVersionMismatch");
 
       verify(storageService, never()).writePackageArchive(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("a local version in the form is not dropped: it must match the filename's")
+    void refusesAFormVersionWithoutTheLocalSegmentOfTheFilename() throws Exception {
+      final var bytes = "content".getBytes();
+      final var digest = sha256Hex(bytes);
+      final var file = file("pkg-1.0.0+cu118.tar.gz", bytes);
+
+      assertThatThrownBy(() -> facade.uploadPackage(context(), form("pkg", "1.0.0", digest), file))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("archiveVersionMismatch");
+      assertThatThrownBy(
+              () -> facade.uploadPackage(context(), form("pkg", "1.0.0+cu121", digest), file))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("archiveVersionMismatch");
+
+      verify(storageService, never()).writePackageArchive(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("a wheel with a local version is stored under its exact filename")
+    void storesALocalVersionWheel() throws Exception {
+      repoInfo.setAllowOverride(false);
+      final var bytes = "content".getBytes();
+      final var digest = sha256Hex(bytes);
+      final var file = file("pkg-1.0.0+cu118-py3-none-any.whl", bytes);
+
+      when(storageService.isPackageFileExist(any(), any(), any())).thenReturn(false);
+      publishRunsFileWriter();
+      when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
+
+      facade.uploadPackage(context(), form("pkg", "1.0.0+CU118", digest), file);
+
+      verify(storageService).writePackageArchive(any(), any(), any(), any());
+      verify(storageService, atLeastOnce())
+          .isPackageFileExist(REPO_ID, "pkg", "pkg-1.0.0+cu118-py3-none-any.whl");
     }
 
     @Test

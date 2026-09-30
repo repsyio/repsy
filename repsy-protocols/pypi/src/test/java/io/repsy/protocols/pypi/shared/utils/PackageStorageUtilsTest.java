@@ -241,4 +241,147 @@ class PackageStorageUtilsTest {
       assertThat(first).isEqualTo(second);
     }
   }
+
+  @Nested
+  @DisplayName("PEP 440 local versions (RPS-1662)")
+  class LocalVersionTests {
+
+    @Test
+    @DisplayName("a wheel with a +local segment belongs to its own release and to no other")
+    void wheelBelongsOnlyToItsOwnRelease() {
+      final var wheel = "torch-2.1.0+cu118-cp311-cp311-linux_x86_64.whl";
+
+      assertThat(PackageStorageUtils.isFileBelongsRelease(wheel, "2.1.0+cu118")).isTrue();
+      assertThat(PackageStorageUtils.isFileBelongsRelease(wheel, "2.1.0")).isFalse();
+      assertThat(PackageStorageUtils.isFileBelongsRelease(wheel, "2.1.0+cu121")).isFalse();
+    }
+
+    @Test
+    @DisplayName("a release without a local segment never claims the files of a local build")
+    void plainReleaseDoesNotClaimLocalFiles() {
+      assertThat(PackageStorageUtils.isFileBelongsRelease("pkg-1.0.tar.gz", "1.0+cu118")).isFalse();
+      assertThat(PackageStorageUtils.isFileBelongsRelease("pkg-1.0+cu118.tar.gz", "1.0")).isFalse();
+      assertThat(PackageStorageUtils.isFileBelongsRelease("pkg-1.0+cu118.tar.gz", "1.0+cu118"))
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("the .sha256 sidecar of a file belongs to the release of that file")
+    void sidecarBelongsToTheReleaseOfItsFile() {
+      assertThat(PackageStorageUtils.isFileBelongsRelease("pkg-1.0+cu118.whl.sha256", "1.0+cu118"))
+          .isTrue();
+      assertThat(PackageStorageUtils.isFileBelongsRelease("pkg-1.0+cu118.whl.sha256", "1.0"))
+          .isFalse();
+      assertThat(PackageStorageUtils.isFileBelongsRelease("pkg-1.0.whl.sha256", "1.0")).isTrue();
+    }
+
+    @Test
+    @DisplayName("extracts a dotted local segment out of an sdist, keeping it out of the extension")
+    void extractsDottedLocalFromSdist() {
+      assertThat(PackageStorageUtils.extractVersionFromArchiveFilename("pkg-1.0+local.1.tar.gz"))
+          .isEqualTo("1.0+local.1");
+      assertThat(PackageStorageUtils.extractVersionFromArchiveFilename("pkg-1.0+local.1.zip"))
+          .isEqualTo("1.0+local.1");
+    }
+
+    @Test
+    @DisplayName("extracts the local segment out of a wheel, with and without a build tag")
+    void extractsLocalFromWheel() {
+      assertThat(
+              PackageStorageUtils.extractVersionFromArchiveFilename(
+                  "pkg-1.0+local.1-py3-none-any.whl"))
+          .isEqualTo("1.0+local.1");
+      assertThat(
+              PackageStorageUtils.extractVersionFromArchiveFilename(
+                  "pkg-1.0.post1+cu118-2-py3-none-any.whl"))
+          .isEqualTo("1.0.post1+cu118");
+    }
+
+    @Test
+    @DisplayName("a wheel build tag is not taken for the version")
+    void buildTagIsNotTheVersion() {
+      assertThat(
+              PackageStorageUtils.extractVersionFromArchiveFilename("pkg-1.0-1-py3-none-any.whl"))
+          .isEqualTo("1.0");
+      assertThat(PackageStorageUtils.isFileBelongsRelease("pkg-1.0-1-py3-none-any.whl", "1"))
+          .isFalse();
+    }
+
+    @Test
+    @DisplayName("a hyphenated project name does not hide the version")
+    void hyphenatedNameKeepsVersion() {
+      assertThat(PackageStorageUtils.extractVersionFromArchiveFilename("my-pkg-1.0+abc.tar.gz"))
+          .isEqualTo("1.0+abc");
+      assertThat(
+              PackageStorageUtils.extractVersionFromArchiveFilename(
+                  "my-pkg-1.0+abc-py3-none-any.whl"))
+          .isEqualTo("1.0+abc");
+    }
+
+    @Test
+    @DisplayName("checkArchiveFilename() accepts a lower-cased local version, wheel and sdist")
+    void uploadGrammarAcceptsLocalVersions() {
+      for (final var name :
+          new String[] {
+            "torch-2.1.0+cu118-cp311-cp311-linux_x86_64.whl",
+            "pkg-1.0+local.1.tar.gz",
+            "pkg-1.0+local.1.zip",
+            "pkg-1.0+local.1-py3-none-any.whl",
+            "pkg-1!2.0rc1.post3.dev4+a.b.7-py3-none-any.whl"
+          }) {
+        final var file = new MockMultipartFile("content", name, null, new byte[] {1});
+
+        assertThatCode(() -> PackageStorageUtils.checkArchiveFilename(file))
+            .as(name)
+            .doesNotThrowAnyException();
+      }
+    }
+
+    @Test
+    @DisplayName("checkArchiveFilename() refuses a malformed local segment")
+    void uploadGrammarRefusesMalformedLocal() {
+      for (final var name :
+          new String[] {
+            "pkg-1.0+CU118.tar.gz",
+            "pkg-1.0+.tar.gz",
+            "pkg-1.0+a..b.tar.gz",
+            "pkg-1.0+a_b.tar.gz",
+            "pkg-1.0+a-b.tar.gz",
+            "pkg-1.0+a+b.tar.gz",
+            "pkg-1.0+a.tar.gz.exe"
+          }) {
+        final var file = new MockMultipartFile("content", name, null, new byte[] {1});
+
+        assertThatThrownBy(() -> PackageStorageUtils.checkArchiveFilename(file))
+            .as(name)
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("archiveFileNameInvalid");
+      }
+    }
+
+    @Test
+    @DisplayName("checkArchiveVersion() accepts the same version, however the form spells it")
+    void archiveVersionMatchesTheMetadataVersion() {
+      final var file =
+          new MockMultipartFile("content", "pkg-1.0rc1+cu118.tar.gz", null, new byte[1]);
+
+      assertThatCode(() -> PackageStorageUtils.checkArchiveVersion(file, "1.0.RC1+CU118"))
+          .doesNotThrowAnyException();
+      assertThatCode(() -> PackageStorageUtils.checkArchiveVersion(file, "1.0rc1+cu118"))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("checkArchiveVersion() refuses a filename and a form that name different versions")
+    void archiveVersionMismatchIsRefused() {
+      final var file = new MockMultipartFile("content", "pkg-1.0+cu118.tar.gz", null, new byte[1]);
+
+      for (final var metadataVersion : new String[] {"1.0", "1.0+cu121", "1.0+cu118.1"}) {
+        assertThatThrownBy(() -> PackageStorageUtils.checkArchiveVersion(file, metadataVersion))
+            .as(metadataVersion)
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("archiveVersionMismatch");
+      }
+    }
+  }
 }
