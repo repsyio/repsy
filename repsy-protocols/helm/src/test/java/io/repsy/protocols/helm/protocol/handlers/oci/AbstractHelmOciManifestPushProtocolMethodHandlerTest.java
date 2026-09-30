@@ -178,6 +178,21 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
   }
 
   @Test
+  @DisplayName(
+      "names the chart layer blob as the pushed file so a scan reads it, and only for a tag"
+          + " (RPS-1736)")
+  void namesTheChartLayerBlobAsTheStoragePath() throws Exception {
+    final var context = context("/payments/manifests/1.0.0");
+    this.stubChartLayer("payments", "1.0.0");
+    this.stubPush();
+
+    this.push(context);
+
+    assertThat(context.<String>getProperty("storagePath")).isEqualTo("oci/blobs/" + LAYER_DIGEST);
+    assertThat(context.<String>getProperty("artifactVersion")).isEqualTo("1.0.0");
+  }
+
+  @Test
   @DisplayName("reports the manifest file's usage once, after the push has succeeded")
   void reportsUsagesOnce() throws Exception {
     final var context = context("/payments/manifests/1.0.0");

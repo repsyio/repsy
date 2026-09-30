@@ -32,6 +32,7 @@ import io.repsy.os.server.security.scanner.trivy.TrivyScannerProperties;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.time.Instant;
 import java.util.Map;
@@ -56,6 +57,7 @@ import org.springframework.web.reactive.function.client.WebClientRequestExceptio
 public class ArtifactScanListener {
 
   private static final String DOCKER_REPO_TYPE = "DOCKER";
+  private static final String HELM_REPO_TYPE = "HELM";
   private static final String NO_SCANNER_NAME = "none";
   private static final String SCAN_NOT_FOUND_MSG_ID = "vulnerabilityScanNotFound";
 
@@ -424,7 +426,7 @@ public class ArtifactScanListener {
       return null;
     }
 
-    return new ResourceArtifactContent(resource.get(), extractFileName(event.storagePath()));
+    return new ResourceArtifactContent(resource.get(), scanFileName(event));
   }
 
   private @Nullable UUID createPendingScanOrNull(final @NonNull ArtifactPushedEvent event) {
@@ -486,6 +488,22 @@ public class ArtifactScanListener {
     return exception.getMessage() != null
         ? exception.getMessage()
         : exception.getClass().getSimpleName();
+  }
+
+  /**
+   * The name the scanner is sent the file under. It picks the extractor by extension, and a Helm
+   * chart published through OCI is stored as a bare digest ({@code oci/blobs/sha256:...}), so that
+   * one is named like the classic archive, {@code <name>-<version>.tgz} (RPS-1736).
+   */
+  private static @NonNull String scanFileName(final @NonNull ArtifactPushedEvent event) {
+    if (HELM_REPO_TYPE.equals(event.repoType())
+        && event.storagePath().startsWith(HelmConstants.OCI_BLOBS_PATH + "/")
+        && event.artifactName() != null
+        && event.artifactVersion() != null) {
+      return event.artifactName() + "-" + event.artifactVersion() + HelmConstants.TGZ_EXTENSION;
+    }
+
+    return extractFileName(event.storagePath());
   }
 
   private static @NonNull String extractFileName(final @NonNull String storagePath) {

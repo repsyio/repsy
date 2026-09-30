@@ -23,19 +23,11 @@
  * `tests/pypi/scanner.spec.ts` (a real client publishes a file, no image reference the way Docker's
  * spec has). The panel API then holds the scan the scanner reported and its findings.
  *
- * Published through the CLASSIC protocol (`helmClassicAdapter`, `cm-push`), not OCI
- * (`helmAdapter`, `helm push`): confirmed live that `HelmArtifactStorageResolver` (the class this
- * spec was added to finally exercise) resolves a scanned chart's bytes only through
- * `HelmStorageService.getChartRelativePath`/`getResource`, the CLASSIC storage path -- the same
- * one the README's "B-H1"/RPS-1217 finding already documents an OCI-only push never writes to
- * (`AbstractHelmOciManifestPushProtocolMethodHandler` writes chart bytes keyed by OCI digest under
- * `oci/blobs/`, never the classic `charts/<name>-<version>.tgz` layout). A chart published purely
- * via OCI therefore has nothing for the resolver to find: the scan is silently never submitted (no
- * error, no findings, no failed status -- `ArtifactPushedEventPostProcessor` fires the event fine,
- * but `ArtifactScanListener`'s resolve step comes back empty and skips the submit). That gap is the
- * same storage-path unification RPS-1217 already tracks, not something to fix in this batch --
- * publishing through the classic protocol here exercises the resolver on the storage layout it
- * actually reads today, which is a genuine, currently-working scan path.
+ * Both publish routes are covered. The classic one (`helmClassicAdapter`, `cm-push`) stores
+ * `charts/<name>-<version>.tgz`. The OCI one (`helmAdapter`, `helm push`) stores the archive as the
+ * chart layer blob under `oci/blobs/<digest>`, which used to leave the scan silently never
+ * submitted (RPS-1736, the same classic-then-OCI order RPS-1217 gave the download): the push event
+ * now names the blob and the scanner is sent it as `<name>-<version>.tgz`.
  */
 import {
   SCANNER_TAG,
@@ -47,6 +39,7 @@ import {
   test,
 } from '../../src/scenarios/scanner-fixtures.js';
 import { helmClassicAdapter } from '../../src/clients/helm-classic.js';
+import { helmAdapter } from '../../src/clients/helm.js';
 
 test.describe('a helm cm-push is scanned (stub scanner)', { tag: [SCANNER_TAG] }, () => {
   skipUnlessScannerOptedIn();
@@ -76,6 +69,32 @@ test.describe('a helm cm-push is scanned (stub scanner)', { tag: [SCANNER_TAG] }
         dockerImageReference: null,
       });
       expect(call.fileName, 'the scanner got the chart .tgz').toMatch(/\.tgz$/);
+      expect(call.fileSize).toBeGreaterThan(0);
+    },
+  );
+
+  test(
+    'a chart pushed ONLY through OCI (helm push) is submitted to the scanner as <name>-<version>.tgz (RPS-1736)',
+    { tag: ['@helm'] },
+    async ({ world, scanner, panelApi }) => {
+      const w = await world(WIRE_SCENARIO, helmAdapter);
+      const { packageName: name, version } = w.publishTarget;
+      await scanner.script(name, { findings: [...SCRIPTED_SEVERITIES] });
+
+      await helmAdapter.seedPublish(w);
+
+      const call = await expectScanReported(panelApi, scanner, {
+        repoName: w.repoName,
+        name,
+        version,
+      });
+      expect(call).toMatchObject({
+        repoType: 'HELM',
+        artifactName: name,
+        artifactVersion: version,
+        dockerImageReference: null,
+      });
+      expect(call.fileName).toBe(`${name}-${version}.tgz`);
       expect(call.fileSize).toBeGreaterThan(0);
     },
   );
