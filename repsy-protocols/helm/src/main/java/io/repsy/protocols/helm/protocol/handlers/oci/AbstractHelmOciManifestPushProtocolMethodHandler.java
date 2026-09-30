@@ -70,6 +70,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
   private static final long WAIT_RETRY = 100;
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
+  private static final String STORAGE_PATH = "storagePath";
   private static final Pattern SHA256_DIGEST_PATTERN = Pattern.compile("^sha256:[0-9a-fA-F]{64}$");
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -197,6 +198,9 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     if (!reference.startsWith(HelmConstants.SHA256_PREFIX)) {
       context.addProperty(ARTIFACT_NAME, metadata.getName());
       context.addProperty(ARTIFACT_VERSION, metadata.getVersion());
+      // The chart archive of an OCI push is its chart layer blob, so that is what a scan reads
+      // (RPS-1736); without it the event would name the manifest request path, which holds no file.
+      context.addProperty(STORAGE_PATH, HelmConstants.OCI_BLOBS_PATH + "/" + layerDigest);
     }
 
     final var requestPath = request.getRequestURI();

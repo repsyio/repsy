@@ -24,6 +24,13 @@ public final class HelmConstants {
 
   public static final String API_VERSION = "v1";
   public static final String CHARTS_PATH = "charts";
+
+  /**
+   * Where the OCI route stores blobs, keyed by digest. A chart published only through OCI keeps its
+   * archive here, under {@code oci/blobs/<digest>}, never under {@link #CHARTS_PATH} (RPS-1217).
+   */
+  public static final String OCI_BLOBS_PATH = "oci/blobs";
+
   public static final String INDEX_YAML = "index.yaml";
   public static final String CHART_YAML = "Chart.yaml";
   public static final String TGZ_EXTENSION = ".tgz";
