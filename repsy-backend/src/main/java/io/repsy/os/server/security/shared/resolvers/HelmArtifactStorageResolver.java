@@ -16,8 +16,10 @@
 package io.repsy.os.server.security.shared.resolvers;
 
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
 import io.repsy.os.server.security.shared.ArtifactStorageResolver;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
+import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.Set;
@@ -37,6 +39,7 @@ public class HelmArtifactStorageResolver implements ArtifactStorageResolver {
   private static final Set<String> SUPPORTED_REPO_TYPES = Set.of("HELM");
 
   private final @NonNull HelmStorageService<?> helmStorageService;
+  private final @NonNull HelmChartService helmChartService;
 
   @Override
   public @NonNull Optional<String> resolve(
@@ -59,7 +62,13 @@ public class HelmArtifactStorageResolver implements ArtifactStorageResolver {
       log.debug("Failed to check classic chart existence at {}", relativePath, exception);
     }
 
-    return Optional.empty();
+    // A chart published only through OCI keeps its archive as the chart layer blob, never under
+    // charts/ (RPS-1217, RPS-1736): the same classic-then-OCI order getChart and deleteChartFile
+    // use.
+    return this.helmChartService
+        .findOptionalByNameAndVersion(repoId, artifactName, artifactVersion)
+        .filter(chart -> this.helmStorageService.blobExists(repoId, chart.digest(), repoName))
+        .map(chart -> HelmConstants.OCI_BLOBS_PATH + "/" + chart.digest());
   }
 
   @Override

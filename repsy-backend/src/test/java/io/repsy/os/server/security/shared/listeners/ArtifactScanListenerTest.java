@@ -73,6 +73,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -566,6 +567,43 @@ class ArtifactScanListenerTest {
   private static DataIntegrityViolationException integrityViolation(final String sqlState) {
     return new DataIntegrityViolationException(
         "violation", new SQLException("violation", sqlState));
+  }
+
+  @Test
+  @DisplayName(
+      "sends an OCI-only Helm chart's blob to the scanner as <name>-<version>.tgz (RPS-1736)")
+  void namesAnOciHelmBlobLikeAClassicArchive() {
+    final var storage = mock(StorageStrategy.class);
+    final var blob = new ByteArrayResource(new byte[] {1, 2, 3});
+    when(storage.get(any(), eq("repo"))).thenReturn(Optional.of(blob));
+    final var helmListener =
+        new ArtifactScanListener(
+            this.scannerRegistry,
+            this.scanTxService,
+            this.repoTxService,
+            this.dockerScanTokenIssuer,
+            this.taskScheduler,
+            PROPERTIES,
+            this.scanTaskExecutor,
+            Map.of("HELM", storage));
+    when(this.scanner.getName()).thenReturn("trivy");
+    when(this.scannerRegistry.findScanner("HELM")).thenReturn(Optional.of(this.scanner));
+    when(this.scanTxService.createPendingScan(REPO_ID, "payments", "1.0.0", "trivy"))
+        .thenReturn(SCAN_ID);
+    doAnswer(
+            invocation -> {
+              invocation.<Runnable>getArgument(0).run();
+              return null;
+            })
+        .when(this.scanTaskExecutor)
+        .execute(any());
+
+    helmListener.handleArtifactPushed(
+        new ArtifactPushedEvent(
+            REPO_ID, "HELM", "repo", "oci/blobs/sha256:abc", "payments", "1.0.0", true, false));
+
+    final var content = this.capturedScanRequest().artifactContent();
+    assertThat(content.fileName()).isEqualTo("payments-1.0.0.tgz");
   }
 
   private void givenDockerScanIsQueued() {
