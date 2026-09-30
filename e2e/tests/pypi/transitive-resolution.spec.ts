@@ -36,11 +36,7 @@ import { callOperation, expectContract } from '../../src/api/contract-checks.js'
 import { RepoType } from '../../src/api/panel-api.js';
 import * as pypi from '../../src/clients/pypi.js';
 import { pipEnv } from '../../src/clients/pypi.js';
-import {
-  adminCredential,
-  buildWheel,
-  uploadUrl,
-} from '../../src/clients/pypi-raw.js';
+import { adminCredential, buildWheel, uploadUrl } from '../../src/clients/pypi-raw.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 
@@ -63,16 +59,35 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
         version,
         marker: `transitive-b ${randomUUID()}`,
       });
-      const distDirB = path.join((await isolatedWorkDir(`pypi-build-b-${seeder.runId}`)).work, 'dist');
+      const distDirB = path.join(
+        (await isolatedWorkDir(`pypi-build-b-${seeder.runId}`)).work,
+        'dist',
+      );
       await fs.mkdir(distDirB, { recursive: true });
       await fs.writeFile(path.join(distDirB, builtB.filename), builtB.bytes);
 
-      const uploadB = await run('python3', ['-m', 'twine', 'upload', '--non-interactive', '--disable-progress-bar', '--repository-url', uploadUrl(repo.name), path.join(distDirB, builtB.filename)], {
-        cwd: distDirB,
-        env: pypi.twineEnv((await isolatedWorkDir(`pypi-build-b-${seeder.runId}`)).home, credential),
-        timeoutMs: 120_000,
-        label: `pypi-transitive-b-${seeder.runId}`,
-      });
+      const uploadB = await run(
+        'python3',
+        [
+          '-m',
+          'twine',
+          'upload',
+          '--non-interactive',
+          '--disable-progress-bar',
+          '--repository-url',
+          uploadUrl(repo.name),
+          path.join(distDirB, builtB.filename),
+        ],
+        {
+          cwd: distDirB,
+          env: pypi.twineEnv(
+            (await isolatedWorkDir(`pypi-build-b-${seeder.runId}`)).home,
+            credential,
+          ),
+          timeoutMs: 120_000,
+          label: `pypi-transitive-b-${seeder.runId}`,
+        },
+      );
       expect(uploadB.exitCode, `twine upload B: ${uploadB.command}`).toBe(0);
 
       // 2. Publish package A (depends on B with version spec)
@@ -82,16 +97,35 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
         marker: `transitive-a ${randomUUID()}`,
         requiresDist: `${packageB}>=1.0`,
       });
-      const distDirA = path.join((await isolatedWorkDir(`pypi-build-a-${seeder.runId}`)).work, 'dist');
+      const distDirA = path.join(
+        (await isolatedWorkDir(`pypi-build-a-${seeder.runId}`)).work,
+        'dist',
+      );
       await fs.mkdir(distDirA, { recursive: true });
       await fs.writeFile(path.join(distDirA, builtA.filename), builtA.bytes);
 
-      const uploadA = await run('python3', ['-m', 'twine', 'upload', '--non-interactive', '--disable-progress-bar', '--repository-url', uploadUrl(repo.name), path.join(distDirA, builtA.filename)], {
-        cwd: distDirA,
-        env: pypi.twineEnv((await isolatedWorkDir(`pypi-build-a-${seeder.runId}`)).home, credential),
-        timeoutMs: 120_000,
-        label: `pypi-transitive-a-${seeder.runId}`,
-      });
+      const uploadA = await run(
+        'python3',
+        [
+          '-m',
+          'twine',
+          'upload',
+          '--non-interactive',
+          '--disable-progress-bar',
+          '--repository-url',
+          uploadUrl(repo.name),
+          path.join(distDirA, builtA.filename),
+        ],
+        {
+          cwd: distDirA,
+          env: pypi.twineEnv(
+            (await isolatedWorkDir(`pypi-build-a-${seeder.runId}`)).home,
+            credential,
+          ),
+          timeoutMs: 120_000,
+          label: `pypi-transitive-a-${seeder.runId}`,
+        },
+      );
       expect(uploadA.exitCode, `twine upload A: ${uploadA.command}`).toBe(0);
 
       // 3. Real pip install of A (without --no-deps) - should resolve both A and B
@@ -101,15 +135,7 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
 
       const installResult = await run(
         'python3',
-        [
-          '-m',
-          'pip',
-          'install',
-          '--no-cache-dir',
-          '--target',
-          installDir,
-          `${packageA}`,
-        ],
+        ['-m', 'pip', 'install', '--no-cache-dir', '--target', installDir, `${packageA}`],
         {
           cwd: work,
           env: pipEnv(home, credential, repo.name),
@@ -117,14 +143,23 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
           label: `pypi-transitive-install-${seeder.runId}`,
         },
       );
-      expect(installResult.exitCode, `pip install A (with transitive deps): ${installResult.command}`).toBe(0);
+      expect(
+        installResult.exitCode,
+        `pip install A (with transitive deps): ${installResult.command}`,
+      ).toBe(0);
 
       // Verify both packages are installed
       const distBName = packageB.replace(/-/g, '_');
       const distAName = packageA.replace(/-/g, '_');
       const dirContents = await fs.readdir(installDir);
-      expect(dirContents.some((d) => d.startsWith(distAName)), `package A installed: ${dirContents.join(', ')}`).toBe(true);
-      expect(dirContents.some((d) => d.startsWith(distBName)), `package B (transitive) installed: ${dirContents.join(', ')}`).toBe(true);
+      expect(
+        dirContents.some((d) => d.startsWith(distAName)),
+        `package A installed: ${dirContents.join(', ')}`,
+      ).toBe(true);
+      expect(
+        dirContents.some((d) => d.startsWith(distBName)),
+        `package B (transitive) installed: ${dirContents.join(', ')}`,
+      ).toBe(true);
     },
   );
 
@@ -144,16 +179,35 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
           version,
           marker: `unpinned ${version} ${randomUUID()}`,
         });
-        const distDir = path.join((await isolatedWorkDir(`pypi-build-unpinned-${version}-${seeder.runId}`)).work, 'dist');
+        const distDir = path.join(
+          (await isolatedWorkDir(`pypi-build-unpinned-${version}-${seeder.runId}`)).work,
+          'dist',
+        );
         await fs.mkdir(distDir, { recursive: true });
         await fs.writeFile(path.join(distDir, built.filename), built.bytes);
 
-        const uploadResult = await run('python3', ['-m', 'twine', 'upload', '--non-interactive', '--disable-progress-bar', '--repository-url', uploadUrl(repo.name), path.join(distDir, built.filename)], {
-          cwd: distDir,
-          env: pypi.twineEnv((await isolatedWorkDir(`pypi-build-unpinned-${version}-${seeder.runId}`)).home, credential),
-          timeoutMs: 120_000,
-          label: `pypi-unpinned-${version}-${seeder.runId}`,
-        });
+        const uploadResult = await run(
+          'python3',
+          [
+            '-m',
+            'twine',
+            'upload',
+            '--non-interactive',
+            '--disable-progress-bar',
+            '--repository-url',
+            uploadUrl(repo.name),
+            path.join(distDir, built.filename),
+          ],
+          {
+            cwd: distDir,
+            env: pypi.twineEnv(
+              (await isolatedWorkDir(`pypi-build-unpinned-${version}-${seeder.runId}`)).home,
+              credential,
+            ),
+            timeoutMs: 120_000,
+            label: `pypi-unpinned-${version}-${seeder.runId}`,
+          },
+        );
         expect(uploadResult.exitCode, `twine upload ${version}: ${uploadResult.command}`).toBe(0);
       }
 
@@ -188,7 +242,10 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
       const distName = packageName.replace(/-/g, '_');
       const expectedFile = `${distName}-1.1.0-py3-none-any.whl`;
       const files = await fs.readdir(destDir);
-      expect(files.some((f) => f === expectedFile), `1.1.0 was downloaded: ${files.join(', ')}`).toBe(true);
+      expect(
+        files.some((f) => f === expectedFile),
+        `1.1.0 was downloaded: ${files.join(', ')}`,
+      ).toBe(true);
     },
   );
 
@@ -211,16 +268,38 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
         requiresPython: '>=4.0',
         marker: `incompatible ${randomUUID()}`,
       });
-      const distDirIncompatible = path.join((await isolatedWorkDir(`pypi-build-incompat-${seeder.runId}`)).work, 'dist');
+      const distDirIncompatible = path.join(
+        (await isolatedWorkDir(`pypi-build-incompat-${seeder.runId}`)).work,
+        'dist',
+      );
       await fs.mkdir(distDirIncompatible, { recursive: true });
-      await fs.writeFile(path.join(distDirIncompatible, builtIncompatible.filename), builtIncompatible.bytes);
+      await fs.writeFile(
+        path.join(distDirIncompatible, builtIncompatible.filename),
+        builtIncompatible.bytes,
+      );
 
-      let uploadResult = await run('python3', ['-m', 'twine', 'upload', '--non-interactive', '--disable-progress-bar', '--repository-url', uploadUrl(repo.name), path.join(distDirIncompatible, builtIncompatible.filename)], {
-        cwd: distDirIncompatible,
-        env: pypi.twineEnv((await isolatedWorkDir(`pypi-build-incompat-${seeder.runId}`)).home, credential),
-        timeoutMs: 120_000,
-        label: `pypi-requires-py-incompat-${seeder.runId}`,
-      });
+      let uploadResult = await run(
+        'python3',
+        [
+          '-m',
+          'twine',
+          'upload',
+          '--non-interactive',
+          '--disable-progress-bar',
+          '--repository-url',
+          uploadUrl(repo.name),
+          path.join(distDirIncompatible, builtIncompatible.filename),
+        ],
+        {
+          cwd: distDirIncompatible,
+          env: pypi.twineEnv(
+            (await isolatedWorkDir(`pypi-build-incompat-${seeder.runId}`)).home,
+            credential,
+          ),
+          timeoutMs: 120_000,
+          label: `pypi-requires-py-incompat-${seeder.runId}`,
+        },
+      );
       expect(uploadResult.exitCode, `twine upload incompatible: ${uploadResult.command}`).toBe(0);
 
       // Compatible version (Requires-Python: >=3.9)
@@ -230,16 +309,38 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
         requiresPython: '>=3.9',
         marker: `compatible ${randomUUID()}`,
       });
-      const distDirCompatible = path.join((await isolatedWorkDir(`pypi-build-compat-${seeder.runId}`)).work, 'dist');
+      const distDirCompatible = path.join(
+        (await isolatedWorkDir(`pypi-build-compat-${seeder.runId}`)).work,
+        'dist',
+      );
       await fs.mkdir(distDirCompatible, { recursive: true });
-      await fs.writeFile(path.join(distDirCompatible, builtCompatible.filename), builtCompatible.bytes);
+      await fs.writeFile(
+        path.join(distDirCompatible, builtCompatible.filename),
+        builtCompatible.bytes,
+      );
 
-      uploadResult = await run('python3', ['-m', 'twine', 'upload', '--non-interactive', '--disable-progress-bar', '--repository-url', uploadUrl(repo.name), path.join(distDirCompatible, builtCompatible.filename)], {
-        cwd: distDirCompatible,
-        env: pypi.twineEnv((await isolatedWorkDir(`pypi-build-compat-${seeder.runId}`)).home, credential),
-        timeoutMs: 120_000,
-        label: `pypi-requires-py-compat-${seeder.runId}`,
-      });
+      uploadResult = await run(
+        'python3',
+        [
+          '-m',
+          'twine',
+          'upload',
+          '--non-interactive',
+          '--disable-progress-bar',
+          '--repository-url',
+          uploadUrl(repo.name),
+          path.join(distDirCompatible, builtCompatible.filename),
+        ],
+        {
+          cwd: distDirCompatible,
+          env: pypi.twineEnv(
+            (await isolatedWorkDir(`pypi-build-compat-${seeder.runId}`)).home,
+            credential,
+          ),
+          timeoutMs: 120_000,
+          label: `pypi-requires-py-compat-${seeder.runId}`,
+        },
+      );
       expect(uploadResult.exitCode, `twine upload compatible: ${uploadResult.command}`).toBe(0);
 
       // pip download without version spec should skip 2.0.0 and download 1.0.0 (compatible)
@@ -267,14 +368,23 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
           label: `pypi-requires-py-download-${seeder.runId}`,
         },
       );
-      expect(downloadResult.exitCode, `pip download (with Requires-Python fallback): ${downloadResult.command}`).toBe(0);
+      expect(
+        downloadResult.exitCode,
+        `pip download (with Requires-Python fallback): ${downloadResult.command}`,
+      ).toBe(0);
 
       // Check that 1.0.0 was downloaded (compatible), not 2.0.0 (incompatible)
       const distName = packageName.replace(/-/g, '_');
       const expectedFile = `${distName}-1.0.0-py3-none-any.whl`;
       const files = await fs.readdir(destDir);
-      expect(files.some((f) => f === expectedFile), `1.0.0 (compatible) was downloaded: ${files.join(', ')}`).toBe(true);
-      expect(files.some((f) => f.includes('2.0.0')), `2.0.0 (incompatible) was NOT downloaded: ${files.join(', ')}`).toBe(false);
+      expect(
+        files.some((f) => f === expectedFile),
+        `1.0.0 (compatible) was downloaded: ${files.join(', ')}`,
+      ).toBe(true);
+      expect(
+        files.some((f) => f.includes('2.0.0')),
+        `2.0.0 (incompatible) was NOT downloaded: ${files.join(', ')}`,
+      ).toBe(false);
     },
   );
 
@@ -298,7 +408,7 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
 
       const projectUrls = {
         'Bug Tracker': 'https://github.com/example/example/issues',
-        'Documentation': 'https://example.readthedocs.io',
+        Documentation: 'https://example.readthedocs.io',
         'Source Code': 'https://github.com/example/example',
       };
 
@@ -313,17 +423,38 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
         projectUrls,
       });
 
-      const distDir = path.join((await isolatedWorkDir(`pypi-metadata-build-${seeder.runId}`)).work, 'dist');
+      const distDir = path.join(
+        (await isolatedWorkDir(`pypi-metadata-build-${seeder.runId}`)).work,
+        'dist',
+      );
       await fs.mkdir(distDir, { recursive: true });
       await fs.writeFile(path.join(distDir, built.filename), built.bytes);
 
-      const uploadResult = await run('python3', ['-m', 'twine', 'upload', '--non-interactive', '--disable-progress-bar', '--repository-url', uploadUrl(repo.name), path.join(distDir, built.filename)], {
-        cwd: distDir,
-        env: pypi.twineEnv((await isolatedWorkDir(`pypi-metadata-build-${seeder.runId}`)).home, credential),
-        timeoutMs: 120_000,
-        label: `pypi-metadata-upload-${seeder.runId}`,
-      });
-      expect(uploadResult.exitCode, `twine upload (with metadata): ${uploadResult.command}`).toBe(0);
+      const uploadResult = await run(
+        'python3',
+        [
+          '-m',
+          'twine',
+          'upload',
+          '--non-interactive',
+          '--disable-progress-bar',
+          '--repository-url',
+          uploadUrl(repo.name),
+          path.join(distDir, built.filename),
+        ],
+        {
+          cwd: distDir,
+          env: pypi.twineEnv(
+            (await isolatedWorkDir(`pypi-metadata-build-${seeder.runId}`)).home,
+            credential,
+          ),
+          timeoutMs: 120_000,
+          label: `pypi-metadata-upload-${seeder.runId}`,
+        },
+      );
+      expect(uploadResult.exitCode, `twine upload (with metadata): ${uploadResult.command}`).toBe(
+        0,
+      );
 
       // Query the panel API to verify metadata was stored
       const release = expectContract(
@@ -339,7 +470,10 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
       expect(release.packageName).toBe(packageName);
       expect(release.version).toBe(version);
       expect(release.requiresPython).toBe('>=3.9');
-      expect((release.summary as string | undefined)?.includes(packageName), 'should contain package name in summary').toBe(true);
+      expect(
+        (release.summary as string | undefined)?.includes(packageName),
+        'should contain package name in summary',
+      ).toBe(true);
 
       // Verify classifiers were stored (may be empty array if not yet implemented, but we're probing for it)
       expect(Array.isArray(release.classifiers), 'classifiers should be an array').toBe(true);
