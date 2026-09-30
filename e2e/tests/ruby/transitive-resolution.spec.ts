@@ -956,9 +956,10 @@ test.describe('ruby > pre-release versions and real-client flows (RPS-1724)', ()
       repo.name,
       name,
     );
-    expect(installLatestRelease.exitCode, `gem install ${name}: ${installLatestRelease.stderr}`).toBe(
-      0,
-    );
+    expect(
+      installLatestRelease.exitCode,
+      `gem install ${name}: ${installLatestRelease.stderr}`,
+    ).toBe(0);
     expect(installLatestRelease.installed).toEqual([`${name}-1.0.0`]);
 
     // `gem install <name> --pre` (with `--pre`, no explicit version) selects latest including pre-releases.
@@ -968,7 +969,10 @@ test.describe('ruby > pre-release versions and real-client flows (RPS-1724)', ()
       name,
       ['--pre'],
     );
-    expect(installLatestWithPre.exitCode, `gem install ${name} --pre: ${installLatestWithPre.stderr}`).toBe(0);
+    expect(
+      installLatestWithPre.exitCode,
+      `gem install ${name} --pre: ${installLatestWithPre.stderr}`,
+    ).toBe(0);
     expect(installLatestWithPre.installed).toEqual([`${name}-1.1.0.pre`]);
   });
 

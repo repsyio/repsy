@@ -551,11 +551,7 @@ test.describe('nuget registry rules (raw HTTP)', () => {
         marker: 'symbol-only',
         metadata: { packageType: 'SymbolsPackage' },
       });
-      expectPublish(
-        await rawPublish(layout.repoName, admin, snupkgNoNupkg),
-        400,
-        'symbol package',
-      );
+      expectPublish(await rawPublish(layout.repoName, admin, snupkgNoNupkg), 400, 'symbol package');
 
       // Verify nothing was stored for this version
       const dlAfterSnupkg = await rawDownloadNupkg(layout.repoName, admin, idLower, verLower1);
@@ -585,11 +581,7 @@ test.describe('nuget registry rules (raw HTTP)', () => {
         marker: 'symbol-package',
         metadata: { packageType: 'SymbolsPackage' },
       });
-      expectPublish(
-        await rawPublish(layout.repoName, admin, snupkgBytes),
-        400,
-        'symbol package',
-      );
+      expectPublish(await rawPublish(layout.repoName, admin, snupkgBytes), 400, 'symbol package');
 
       // Verify the .nupkg is still intact and unchanged
       const nupkgAfter = await rawDownloadNupkg(layout.repoName, admin, idLower, verLower2);
@@ -628,7 +620,10 @@ test.describe('nuget registry rules (raw HTTP)', () => {
       expect(regIndex.status, 'registration index is served').toBe(200);
       const indexLeaves = parseRegistrationIndex(regIndex.body);
       expect(indexLeaves.map((l) => l.version).sort()).toEqual(versions.sort());
-      expect(indexLeaves.every((l) => l.listed === true), 'all versions are listed').toBe(true);
+      expect(
+        indexLeaves.every((l) => l.listed === true),
+        'all versions are listed',
+      ).toBe(true);
 
       // Each version should be downloadable and have a valid packageContent URL
       for (const version of versions) {

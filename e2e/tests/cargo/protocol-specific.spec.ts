@@ -1125,10 +1125,7 @@ test(
 
     // Both spellings should return 200
     expect(byHyphen.status, `query by hyphenated spelling "${hyphenName}"`).toBe(200);
-    expect(
-      byUnderscore.status,
-      `query by normalized spelling "${underscoreName}"`,
-    ).toBe(200);
+    expect(byUnderscore.status, `query by normalized spelling "${underscoreName}"`).toBe(200);
 
     // Both queries should return the same entry
     const entryByHyphen = parseIndex(byHyphen.body)[0];

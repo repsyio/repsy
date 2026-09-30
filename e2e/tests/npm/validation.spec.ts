@@ -95,32 +95,36 @@ test.describe('npm validation edge cases (RPS-1717)', () => {
     expect(packument.status, `packument of max-length name ${maxName}`).toBe(200);
   });
 
-  test('package name at 215 chars (over max) is refused', { tag: ['@negative'] }, async ({
-    seeder,
-  }) => {
-    const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
+  test(
+    'package name at 215 chars (over max) is refused',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
 
-    // NpmPublishLimits.MAX_NAME_LENGTH = 214. Test one over.
-    const tooLongName = 'a'.repeat(215);
-    const version = npmAdapter.version('release');
+      // NpmPublishLimits.MAX_NAME_LENGTH = 214. Test one over.
+      const tooLongName = 'a'.repeat(215);
+      const version = npmAdapter.version('release');
 
-    const tarball = buildTarball({ packageName: tooLongName, version });
-    const publishDoc = buildPublishDocument({
-      repoName: repo.name,
-      packageName: tooLongName,
-      version,
-      tarballBytes: tarball,
-    });
+      const tarball = buildTarball({ packageName: tooLongName, version });
+      const publishDoc = buildPublishDocument({
+        repoName: repo.name,
+        packageName: tooLongName,
+        version,
+        tarballBytes: tarball,
+      });
 
-    const result = await rawPublish(repo.name, adminCredential(), tooLongName, publishDoc);
+      const result = await rawPublish(repo.name, adminCredential(), tooLongName, publishDoc);
 
-    expect(result.status, `raw publish over max name length (215 chars) should fail`).not.toBe(200);
-    expect(result.status, `should be 400`).toBe(400);
+      expect(result.status, `raw publish over max name length (215 chars) should fail`).not.toBe(
+        200,
+      );
+      expect(result.status, `should be 400`).toBe(400);
 
-    // Verify it was not stored
-    const packument = await rawGetPackument(repo.name, adminCredential(), tooLongName);
-    expect(packument.status, `packument of too-long name should not exist`).toBe(404);
-  });
+      // Verify it was not stored
+      const packument = await rawGetPackument(repo.name, adminCredential(), tooLongName);
+      expect(packument.status, `packument of too-long name should not exist`).toBe(404);
+    },
+  );
 
   test('version at 128 chars (max) succeeds', { tag: ['@negative'] }, async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
@@ -204,33 +208,35 @@ test.describe('npm validation edge cases (RPS-1717)', () => {
     expect(packument2.status, `no packument under JSON name`).toBe(404);
   });
 
-  test('unpublish: once removed, package stays gone (invariant check)', { tag: ['@negative'] }, async ({
-    seeder,
-  }) => {
-    const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
-    const packageName = `e2e-${seeder.runId}-unpublish-check`;
-    const version = npmAdapter.version('release');
+  test(
+    'unpublish: once removed, package stays gone (invariant check)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
+      const packageName = `e2e-${seeder.runId}-unpublish-check`;
+      const version = npmAdapter.version('release');
 
-    // Publish a version
-    const world = worldFor(repo.name, packageName, version);
-    await npm.seedPublish(world);
+      // Publish a version
+      const world = worldFor(repo.name, packageName, version);
+      await npm.seedPublish(world);
 
-    // Verify it's published
-    const packument1 = await rawGetPackument(repo.name, adminCredential(), packageName);
-    expect(packument1.status, `packument before unpublish`).toBe(200);
+      // Verify it's published
+      const packument1 = await rawGetPackument(repo.name, adminCredential(), packageName);
+      expect(packument1.status, `packument before unpublish`).toBe(200);
 
-    // Unpublish it
-    const unpubResult = await npm.unpublish(world, `${packageName}@${version}`, { force: true });
-    expect(unpubResult.exitCode, `npm unpublish should succeed: ${unpubResult.command}`).toBe(0);
+      // Unpublish it
+      const unpubResult = await npm.unpublish(world, `${packageName}@${version}`, { force: true });
+      expect(unpubResult.exitCode, `npm unpublish should succeed: ${unpubResult.command}`).toBe(0);
 
-    // Invariant: once unpublished, the package is gone and stays gone
-    const packument2 = await rawGetPackument(repo.name, adminCredential(), packageName);
-    expect(packument2.status, `packument after unpublish should be gone`).toBe(404);
+      // Invariant: once unpublished, the package is gone and stays gone
+      const packument2 = await rawGetPackument(repo.name, adminCredential(), packageName);
+      expect(packument2.status, `packument after unpublish should be gone`).toBe(404);
 
-    // Check again to verify it stays gone (not a race condition where it reappears)
-    const packument3 = await rawGetPackument(repo.name, adminCredential(), packageName);
-    expect(packument3.status, `repeated GET after unpublish stays 404`).toBe(404);
-  });
+      // Check again to verify it stays gone (not a race condition where it reappears)
+      const packument3 = await rawGetPackument(repo.name, adminCredential(), packageName);
+      expect(packument3.status, `repeated GET after unpublish stays 404`).toBe(404);
+    },
+  );
 
   test(
     'unpublish race: concurrent unpublish of same version (at least one succeeds)',

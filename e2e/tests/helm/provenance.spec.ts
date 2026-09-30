@@ -199,7 +199,12 @@ test.describe('helm > OCI provenance (.prov signing, RPS-1719)', () => {
         // The prov blob is retrievable directly by digest -- the same generic by-digest blob GET
         // every other layer uses -- and byte-identical to what was pushed, not merely "helm says
         // pull succeeded".
-        const blobRes = await rawGetBlob(published.repoName, credential, published.chart, provDigest);
+        const blobRes = await rawGetBlob(
+          published.repoName,
+          credential,
+          published.chart,
+          provDigest,
+        );
         expect(blobRes.status, 'GET the prov blob by digest').toBe(200);
         expect(sha256Hex(blobRes.body), 'the prov blob round-trips byte for byte').toBe(
           sha256Hex(provBytes),
@@ -231,10 +236,19 @@ test.describe('helm > OCI provenance (.prov signing, RPS-1719)', () => {
             pulledDir,
             ...plainHttpFlag(),
           ],
-          { cwd: conWork, env: helmEnv(conHome), timeoutMs: 60_000, label: 'helm-prov1-pull-verify' },
+          {
+            cwd: conWork,
+            env: helmEnv(conHome),
+            timeoutMs: 60_000,
+            label: 'helm-prov1-pull-verify',
+          },
         );
-        expect(pullVerifyResult.exitCode, `helm pull --verify: ${pullVerifyResult.command}`).toBe(0);
-        expect(pullVerifyResult.stdout, 'pull --verify reports who signed it').toMatch(/Signed by/i);
+        expect(pullVerifyResult.exitCode, `helm pull --verify: ${pullVerifyResult.command}`).toBe(
+          0,
+        );
+        expect(pullVerifyResult.stdout, 'pull --verify reports who signed it').toMatch(
+          /Signed by/i,
+        );
 
         const pulledChart = path.join(pulledDir, chartFileName(published.chart, published.version));
         const pulledProv = `${pulledChart}.prov`;
@@ -290,22 +304,32 @@ test.describe('helm > OCI provenance (.prov signing, RPS-1719)', () => {
 
         // Control: the untampered, round-tripped pair verifies -- proves the two failures below
         // are real, not an environment that always rejects "verify".
-        const controlVerify = await run('helm', ['verify', pulledChart, '--keyring', pubKeyringPath], {
-          cwd: conWork,
-          env: helmEnv(conHome),
-          timeoutMs: 30_000,
-          label: 'helm-prov2-verify-control',
-        });
-        expect(controlVerify.exitCode, `helm verify (untampered control): ${controlVerify.command}`).toBe(
-          0,
+        const controlVerify = await run(
+          'helm',
+          ['verify', pulledChart, '--keyring', pubKeyringPath],
+          {
+            cwd: conWork,
+            env: helmEnv(conHome),
+            timeoutMs: 30_000,
+            label: 'helm-prov2-verify-control',
+          },
         );
+        expect(
+          controlVerify.exitCode,
+          `helm verify (untampered control): ${controlVerify.command}`,
+        ).toBe(0);
 
         // Tamper the CHART bytes alone: the .prov's own recorded sha256 no longer matches.
         await fs.writeFile(pulledChart, Buffer.concat([originalChartBytes, Buffer.from([0x58])]));
         const chartTamperVerify = await run(
           'helm',
           ['verify', pulledChart, '--keyring', pubKeyringPath],
-          { cwd: conWork, env: helmEnv(conHome), timeoutMs: 30_000, label: 'helm-prov2-verify-chart' },
+          {
+            cwd: conWork,
+            env: helmEnv(conHome),
+            timeoutMs: 30_000,
+            label: 'helm-prov2-verify-chart',
+          },
         );
         expect(chartTamperVerify.exitCode, 'verify must FAIL on a tampered chart').not.toBe(0);
         expect(chartTamperVerify.stderr + chartTamperVerify.stdout).toMatch(
@@ -320,12 +344,18 @@ test.describe('helm > OCI provenance (.prov signing, RPS-1719)', () => {
         const provTamperVerify = await run(
           'helm',
           ['verify', pulledChart, '--keyring', pubKeyringPath],
-          { cwd: conWork, env: helmEnv(conHome), timeoutMs: 30_000, label: 'helm-prov2-verify-prov' },
+          {
+            cwd: conWork,
+            env: helmEnv(conHome),
+            timeoutMs: 30_000,
+            label: 'helm-prov2-verify-prov',
+          },
         );
         expect(provTamperVerify.exitCode, 'verify must FAIL on a tampered signature').not.toBe(0);
-        expect(provTamperVerify.stderr + provTamperVerify.stdout, 'a real error is reported').toMatch(
-          /error/i,
-        );
+        expect(
+          provTamperVerify.stderr + provTamperVerify.stdout,
+          'a real error is reported',
+        ).toMatch(/error/i);
       } finally {
         await published.key.dispose();
       }

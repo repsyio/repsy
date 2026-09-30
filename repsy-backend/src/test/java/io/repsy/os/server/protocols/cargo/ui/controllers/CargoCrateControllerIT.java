@@ -241,7 +241,7 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
     void searchesCratesWithFullPagingEnvelopeAndQuery() throws Exception {
       final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, false);
       CargoCrateControllerIT.this.publish(repo, "hello_world", "1.0.0");
-      CargoCrateControllerIT.this.publish(repo, "hello-world", "1.1.0");
+      CargoCrateControllerIT.this.publish(repo, "hello_world", "1.1.0");
       CargoCrateControllerIT.this.publish(repo, "other", "1.0.0");
 
       final var response =

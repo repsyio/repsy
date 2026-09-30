@@ -21,7 +21,12 @@
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import { nugetAdapter } from '../../src/clients/nuget.js';
-import { adminCredential, normalizeVersion, parseVersions, rawGetVersions } from '../../src/clients/nuget-raw.js';
+import {
+  adminCredential,
+  normalizeVersion,
+  parseVersions,
+  rawGetVersions,
+} from '../../src/clients/nuget-raw.js';
 import { registerCredentialInvalidation } from '../../src/scenarios/credential-invalidation.js';
 
 registerCredentialInvalidation({
