@@ -35,9 +35,7 @@
           @if (renameForm.get('name').errors?.['required'] && renameForm.get('name').touched) {
             <p data-testid="settings-rename-error-required">• Should not be empty</p>
           } @else if (renameForm.get('name').errors?.['maxlength'] && renameForm.get('name').touched) {
-            <p data-testid="settings-rename-error-maxlength">
-              • Should be maximum 25 characters
-            </p>
+            <p data-testid="settings-rename-error-maxlength">• Should be maximum 25 characters</p>
           } @else if (renameForm.get('name').errors?.['pattern'] && renameForm.get('name').touched) {
             <p data-testid="settings-rename-error-pattern">
               • Should contain only letters, numbers, - and _, and not start with -
@@ -68,9 +66,7 @@
             @if (
               descriptionForm.get('description').errors?.['maxlength'] && descriptionForm.get('description').touched
             ) {
-              <p data-testid="settings-description-error-maxlength">
-                • {{ descriptionMaxMessage }}
-              </p>
+              <p data-testid="settings-description-error-maxlength">• {{ descriptionMaxMessage }}</p>
             }
           </div>
           <p

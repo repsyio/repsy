@@ -71,7 +71,14 @@ test.describe('docker > abandoned upload cleanup', () => {
 
       // Send at least one byte to ensure the upload session is persisted
       const testChunk = Buffer.from('test', 'utf8');
-      const chunkRes = await rawUploadChunk(repo.name, credential, image, uploadLocation, testChunk, '0-3');
+      const chunkRes = await rawUploadChunk(
+        repo.name,
+        credential,
+        image,
+        uploadLocation,
+        testChunk,
+        '0-3',
+      );
       expect(chunkRes.status, 'First chunk should succeed').toBe(202);
 
       // Verify the upload session exists by checking its status immediately
@@ -112,7 +119,14 @@ test.describe('docker > abandoned upload cleanup', () => {
 
         // Send at least one byte to ensure the upload session is persisted
         const testChunk = Buffer.from('test', 'utf8');
-        const chunkRes = await rawUploadChunk(repo.name, credential, image, startRes.location!, testChunk, '0-3');
+        const chunkRes = await rawUploadChunk(
+          repo.name,
+          credential,
+          image,
+          startRes.location!,
+          testChunk,
+          '0-3',
+        );
         expect(chunkRes.status, `first chunk for ${image}`).toBe(202);
 
         uploads.push({
