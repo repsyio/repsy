@@ -285,8 +285,9 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       ).toBe(builtA.sha256Hex);
 
       // RPS-1223 (fixed): the SAME filename, but a form `version` that does not match the
-      // version encoded in that filename. `isPackageFileExist` is now decided by the filename
-      // alone, so this no longer bypasses the "already exists" check.
+      // version encoded in that filename. `isPackageFileExist` is decided by the filename alone,
+      // and since RPS-1662 the upload is refused outright when the two versions differ, so this
+      // can never bypass the "already exists" check.
       const builtBypass = buildWheel({
         name: layout.packageName,
         version: `${version}.post9`,
@@ -307,7 +308,7 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       });
       const bypassBytes = Buffer.from(await bypassRes.arrayBuffer());
 
-      expectMsgId({ status: bypassRes.status, body: bypassBytes }, 403, 'fileAlreadyExists');
+      expectMsgId({ status: bypassRes.status, body: bypassBytes }, 400, 'archiveVersionMismatch');
     },
   );
 

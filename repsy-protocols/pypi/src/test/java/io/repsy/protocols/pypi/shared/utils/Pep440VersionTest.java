@@ -91,4 +91,58 @@ class Pep440VersionTest {
   void equalVersionsCompareEqual() {
     assertThat(compare("1.2.3", "1.2.3")).isZero();
   }
+
+  @Test
+  @DisplayName("a version with a local segment sorts after the same version without one (RPS-1662)")
+  void localVersionSortsAfterThePublicVersion() {
+    assertThat(compare("1.0+cu118", "1.0")).isPositive();
+    assertThat(compare("1.0", "1.0+cu118")).isNegative();
+    assertThat(compare("1.0+cu118", "1.0+cu118")).isZero();
+  }
+
+  @Test
+  @DisplayName("the local segment never outranks a newer public version")
+  void localSegmentDoesNotOutrankANewerVersion() {
+    assertThat(compare("1.0+zzz.99", "1.0.post1")).isNegative();
+    assertThat(compare("1.0+zzz.99", "1.0.1")).isNegative();
+    assertThat(compare("1.0rc1+cu118", "1.0")).isNegative();
+    assertThat(compare("1.0.dev1+local", "1.0a1")).isNegative();
+  }
+
+  @Test
+  @DisplayName("local segments compare position by position: numbers numerically, text lexically")
+  void localSegmentsCompareByPosition() {
+    assertThat(compare("1.0+cu121", "1.0+cu118")).isPositive();
+    assertThat(compare("1.0+abc", "1.0+abd")).isNegative();
+    assertThat(compare("1.0+local.10", "1.0+local.9")).isPositive();
+    assertThat(compare("1.0+local.1.1", "1.0+local.1")).isPositive();
+    assertThat(compare("1.0+local.1", "1.0+local.1.0")).isNegative();
+  }
+
+  @Test
+  @DisplayName("a numeric local segment outranks an alphanumeric one, as PEP 440 says")
+  void numericLocalSegmentOutranksText() {
+    assertThat(compare("1.0+1", "1.0+abc")).isPositive();
+    assertThat(compare("1.0+abc", "1.0+1")).isNegative();
+    assertThat(compare("1.0+local.1", "1.0+local.zzz")).isPositive();
+  }
+
+  @Test
+  @DisplayName("local separators are interchangeable and the case does not matter")
+  void localSeparatorsAndCaseAreNormalized() {
+    assertThat(compare("1.0+Ubuntu-1_2", "1.0+ubuntu.1.2")).isZero();
+  }
+
+  @Test
+  @DisplayName("a mixed list of public and local versions sorts in PEP 440 order")
+  void mixedListSortsInPep440Order() {
+    final var chain =
+        List.of("1.0rc1", "1.0", "1.0+cu118", "1.0+cu121", "1.0+cu121.1", "1.0.post1", "1.1");
+
+    final var shuffled = new ArrayList<>(chain);
+    Collections.shuffle(shuffled, new Random(7));
+
+    assertThat(shuffled.stream().sorted(Comparator.comparing(Pep440Version::parse)).toList())
+        .containsExactlyElementsOf(chain);
+  }
 }

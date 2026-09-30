@@ -19,6 +19,7 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -32,12 +33,13 @@ public class ReleaseVersion {
               + "(?<release>[0-9]+(?:\\.[0-9]+)*)"
               + "(?<pre>[-_.]?(?<preSignifier>(?:alpha|a|beta|b|rc|c|preview|pre))[-_.]?(?<preNumeral>[0-9]+)?)?"
               + "(?<post>(?:-(?<postNumeral1>[0-9]+))|(?:[-_.]?(post|rev|r)[-_.]?(?<postNumeral2>[0-9]+)?))?"
-              + "(?<dev>[-_.]?(dev)[-_.]?(?<devNumeral>[0-9]+)?)?)(?:\\+([a-z0-9]+(?:[-_.][a-z0-9]+)*))?$");
+              + "(?<dev>[-_.]?(dev)[-_.]?(?<devNumeral>[0-9]+)?)?)(?:\\+(?<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?$");
   private static final @NonNull Pattern NORMALIZED_VERSION_PATTERN =
       Pattern.compile(
           "^([1-9][0-9]*!)?(0|[1-9][0-9]*)"
               + "(\\.(0|[1-9][0-9]*))*(?<pre>(a|b|rc)(0|[1-9][0-9]*))?(?<post>\\.post(0|[1-9][0-9]*))?"
-              + "(?<dev>\\.dev(0|[1-9][0-9]*))?$");
+              + "(?<dev>\\.dev(0|[1-9][0-9]*))?(?:\\+(?<local>[a-z0-9]+(?:\\.[a-z0-9]+)*))?$");
+  private static final @NonNull Pattern LOCAL_SEPARATOR = Pattern.compile("[-_.]");
 
   private boolean isPreRelease;
   private boolean isPostRelease;
@@ -54,7 +56,9 @@ public class ReleaseVersion {
     final var trimmedVersion = releaseVersion.trim().toLowerCase(Locale.getDefault());
     final var normalizedVersionMatcher = NORMALIZED_VERSION_PATTERN.matcher(trimmedVersion);
 
-    if (normalizedVersionMatcher.matches()) {
+    // A local segment with a number that has a leading zero is not normalized yet (+007 is +7).
+    if (normalizedVersionMatcher.matches()
+        && isNormalizedLocal(normalizedVersionMatcher.group("local"))) {
       final ReleaseVersion rv = new ReleaseVersion();
 
       rv.isPreRelease = normalizedVersionMatcher.group("pre") != null;
@@ -85,9 +89,39 @@ public class ReleaseVersion {
         versionMatcher.group("preNumeral"),
         versionMatcher.group("postNumeral1"),
         versionMatcher.group("postNumeral2"),
-        versionMatcher.group("devNumeral"));
+        versionMatcher.group("devNumeral"),
+        versionMatcher.group("local"));
 
     return rv;
+  }
+
+  private static boolean isNormalizedLocal(final @Nullable String local) {
+    return local == null || normalizeLocal(local).equals(local);
+  }
+
+  /**
+   * The PEP 440 normal form of a local version: {@code -} and {@code _} become {@code .}, and a
+   * segment that is only digits loses its leading zeros. The text was lower-cased before.
+   */
+  private static @NonNull String localSuffix(final @Nullable String local) {
+    return local == null ? "" : "+" + normalizeLocal(local);
+  }
+
+  private static @NonNull String normalizeLocal(final @NonNull String local) {
+
+    return LOCAL_SEPARATOR
+        .splitAsStream(local)
+        .map(
+            segment ->
+                segment.chars().allMatch(Character::isDigit) ? stripLeadingZeros(segment) : segment)
+        .collect(Collectors.joining("."));
+  }
+
+  private static @NonNull String stripLeadingZeros(final @NonNull String digits) {
+
+    final var stripped = digits.replaceFirst("^0+", "");
+
+    return stripped.isEmpty() ? "0" : stripped;
   }
 
   public boolean isFinalRelease() {
@@ -101,7 +135,8 @@ public class ReleaseVersion {
       final @Nullable String preNumeral,
       final @Nullable String postNumeral1,
       final @Nullable String postNumeral2,
-      final @Nullable String devNumeral) {
+      final @Nullable String devNumeral,
+      final @Nullable String local) {
 
     final var normalizedVersionBuilder = new StringBuilder();
 
@@ -127,6 +162,8 @@ public class ReleaseVersion {
       normalizedVersionBuilder.append(".dev");
       normalizedVersionBuilder.append(Objects.requireNonNullElse(devNumeral, "0"));
     }
+
+    normalizedVersionBuilder.append(localSuffix(local));
 
     this.version = normalizedVersionBuilder.toString();
   }

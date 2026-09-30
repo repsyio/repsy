@@ -29,6 +29,7 @@ import io.repsy.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.protocols.pypi.shared.utils.PackageStorageUtils;
 import io.repsy.protocols.pypi.shared.utils.PackageUtils;
 import io.repsy.protocols.pypi.shared.utils.PypiPublishLimits;
+import io.repsy.protocols.pypi.shared.utils.ReleaseVersion;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
@@ -82,6 +83,9 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
     PypiPublishLimits.dropOverLongFields(uploadForm);
 
     PackageStorageUtils.checkArchiveFilename(file);
+    // The file must belong to the release it is published under: the local segment of a version
+    // (1.0+cu118) is part of the release, so it cannot differ between the two (RPS-1662).
+    PackageStorageUtils.checkArchiveVersion(file, uploadForm.getVersion());
     PackageStorageUtils.checkSha256Digest(uploadForm);
 
     final var actualDigest = PackageStorageUtils.computeSha256(file);
@@ -95,7 +99,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
     final var packageUsage = this.savePackage(repoInfo, uploadForm, file);
 
     context.addProperty(ARTIFACT_NAME, uploadForm.getNormalizedName());
-    context.addProperty(ARTIFACT_VERSION, uploadForm.getVersion());
+    context.addProperty(ARTIFACT_VERSION, ReleaseVersion.of(uploadForm.getVersion()).getVersion());
     context.addProperty(
         STORAGE_PATH,
         Paths.get(uploadForm.getNormalizedName(), file.getOriginalFilename()).toString());
