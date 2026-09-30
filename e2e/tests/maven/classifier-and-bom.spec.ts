@@ -219,8 +219,8 @@ test.describe('Maven BOM handling', () => {
       // Create a simple BOM POM with managed dependencies
       const bomPomContent = `<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>${groupId}</groupId>
   <artifactId>${bomArtifactId}</artifactId>
@@ -288,17 +288,17 @@ test.describe('Maven BOM handling', () => {
 
       const consumerPomContent = `<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>${groupId}</groupId>
   <artifactId>${consumerArtifactId}</artifactId>
   <version>${consumerVersion}</version>
 
   <!-- BOM import is resolved while Maven builds the effective model, before the dependency:resolve
-       mojo runs, so -DremoteRepositories (which only affects the mojo's own resolution) cannot
-       reach it: the importing POM needs its own <repositories> entry, with an id matching
-       settings.xml's <server> so the credentials for this private repo are found. -->
+      mojo runs, so -DremoteRepositories (which only affects the mojo's own resolution) cannot
+      reach it: the importing POM needs its own <repositories> entry, with an id matching
+      settings.xml's <server> so the credentials for this private repo are found. -->
   <repositories>
     <repository>
       <id>repsy</id>
