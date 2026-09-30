@@ -68,9 +68,7 @@
             @if (form.get('name').errors?.['required'] && form.get('name').touched) {
               <p data-testid="token-create-name-error-required">• Should not be empty</p>
             } @else if (form.get('name').errors?.['maxlength'] && form.get('name').touched) {
-              <p data-testid="token-create-name-error-maxlength">
-                • Should be maximum 80 characters
-              </p>
+              <p data-testid="token-create-name-error-maxlength">• Should be maximum 80 characters</p>
             }
           </div>
         </div>
@@ -117,9 +115,7 @@
           <div class="text-body2 flex min-h-7 items-start justify-between gap-2 pt-1">
             <div class="text-error">
               @if (form.get('description').errors?.['maxlength'] && form.get('description').touched) {
-                <p data-testid="token-create-description-error-maxlength">
-                  • {{ descriptionMaxMessage }}
-                </p>
+                <p data-testid="token-create-description-error-maxlength">• {{ descriptionMaxMessage }}</p>
               }
             </div>
             <p
@@ -165,9 +161,7 @@
                   • Must be between tomorrow and one year from today
                 </p>
               } @else if (form.get('expirationDate').errors?.['dateInvalid'] && form.get('expirationDate').touched) {
-                <p data-testid="token-create-expiration-error-invalid">
-                  • Enter a valid date
-                </p>
+                <p data-testid="token-create-expiration-error-invalid">• Enter a valid date</p>
               }
             </div>
           </div>
