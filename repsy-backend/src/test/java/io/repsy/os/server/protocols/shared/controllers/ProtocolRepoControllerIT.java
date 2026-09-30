@@ -807,7 +807,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               "repoPermissionsFetched",
               "Repo permissions of the user have fetched.");
 
-      assertPermissions(dataObject(body), name, null, true, true, true, false);
+      assertPermissions(dataObject(body), name, null, true, true, true, true);
     }
 
     @Test

@@ -38,4 +38,4 @@ services:
       # Cleanup every 2 seconds to find abandoned uploads quickly
       ABANDONED_UPLOAD_CLEANUP_INTERVAL: PT2S
       # Ensure cleanup is enabled (it is by default, but make it explicit for the test)
-      ABANDONED_UPLOAD_CLEANUP_ENABLED: "true"
+      ABANDONED_UPLOAD_CLEANUP_ENABLED: 'true'

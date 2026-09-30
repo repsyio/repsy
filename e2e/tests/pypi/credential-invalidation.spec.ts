@@ -36,6 +36,8 @@ registerCredentialInvalidation({
       throw new Error(`GET simple page of ${packageName} as admin answered ${res.status}`);
     }
     const files = parseSimplePage(res.body);
-    return files.some((f) => f.filename.includes(`-${version}-`) || f.filename.includes(`-${version}.`));
+    return files.some(
+      (f) => f.filename.includes(`-${version}-`) || f.filename.includes(`-${version}.`),
+    );
   },
 });
