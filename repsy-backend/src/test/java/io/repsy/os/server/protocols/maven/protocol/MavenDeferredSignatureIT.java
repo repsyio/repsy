@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.maven.protocol;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -27,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.PendingSignatureService;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
@@ -59,8 +61,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -109,6 +113,10 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
   @MockitoSpyBean private PendingSignatureService pendingSignatureService;
   @Autowired private ObjectMapper objectMapper;
 
+  @Qualifier(SignedRecomputeExecutorConfig.BEAN_NAME)
+  @Autowired
+  private ThreadPoolTaskExecutor signedRecomputeExecutor;
+
   private final List<UUID> createdRepoIds = new ArrayList<>();
   private final List<UUID> createdUserIds = new ArrayList<>();
 
@@ -132,6 +140,16 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
 
   @AfterEach
   void deleteCommittedData() {
+    // Registering a key starts an async recompute that locks version rows; deleting the repo
+    // meanwhile can deadlock with it (see MavenSignedRecomputeIT, RPS-1655).
+    await()
+        .atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(20))
+        .untilAsserted(
+            () -> {
+              final var pool = this.signedRecomputeExecutor.getThreadPoolExecutor();
+              assertThat(pool.getActiveCount() + pool.getQueue().size()).isZero();
+            });
     this.createdRepoIds.forEach(
         id -> this.jdbcTemplate.update("delete from repo where id = ?", id));
     this.createdRepoIds.clear();
