@@ -61,7 +61,7 @@
     "@types/jasmine": "~6.0.0",
     "@types/node": "^26.6.3",
     "@typescript-eslint/eslint-plugin": "^8.70.0",
-    "@typescript-eslint/parser": "^8.70.0",
+    "@typescript-eslint/parser": "^8.70.1",
     "angular-eslint": "^22.5.0",
     "autoprefixer": "^10.6.1",
     "daisyui": "^5.7.46",
