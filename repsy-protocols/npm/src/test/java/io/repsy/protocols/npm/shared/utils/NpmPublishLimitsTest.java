@@ -102,6 +102,27 @@ class NpmPublishLimitsTest {
       NpmPublishLimits.checkDistTags(Map.of("dist-tags", Map.of("latest", "1.0.0")));
       NpmPublishLimits.checkDistTags(Map.of());
     }
+
+    @Test
+    @DisplayName("refuses a lone dist-tag name over 255 characters, accepts one at the limit")
+    void checksLoneDistTagName() {
+      NpmPublishLimits.checkDistTagName(repeat('t', 255));
+
+      assertThatThrownBy(() -> NpmPublishLimits.checkDistTagName(repeat('t', 256)))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("distTagNameTooLong");
+    }
+
+    @Test
+    @DisplayName("refuses a deprecation message over 4096 characters, accepts one at the limit")
+    void checksDeprecationMessage() {
+      NpmPublishLimits.checkDeprecationMessage(repeat('m', 4096));
+      NpmPublishLimits.checkDeprecationMessage("");
+
+      assertThatThrownBy(() -> NpmPublishLimits.checkDeprecationMessage(repeat('m', 4097)))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("deprecationMessageTooLong");
+    }
   }
 
   @Nested

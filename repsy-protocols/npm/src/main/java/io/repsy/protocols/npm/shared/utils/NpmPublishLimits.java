@@ -64,6 +64,9 @@ public final class NpmPublishLimits {
   public static final int MAX_NAME_LENGTH = 214;
   public static final int MAX_VERSION_LENGTH = 128;
   public static final int MAX_DIST_TAG_LENGTH = 255;
+  // A deprecation message is stored whole (a text column) and a client can send one per version,
+  // so it is bounded here (RPS-1747).
+  public static final int MAX_DEPRECATION_MESSAGE_LENGTH = 4096;
 
   // Drop (null): descriptive fields of npm_package_version.
   public static final int MAX_AUTHOR_NAME_LENGTH = 255;
@@ -109,6 +112,28 @@ public final class NpmPublishLimits {
   public static void checkVersion(final String versionName) {
     if (versionName.length() > MAX_VERSION_LENGTH) {
       throw new BadRequestException("packageVersionTooLong");
+    }
+  }
+
+  /**
+   * Refuses an over-long dist-tag name given on its own, as {@code npm dist-tag add} sends it.
+   *
+   * @throws BadRequestException With {@code distTagNameTooLong}.
+   */
+  public static void checkDistTagName(final String tagName) {
+    if (tagName.length() > MAX_DIST_TAG_LENGTH) {
+      throw new BadRequestException("distTagNameTooLong");
+    }
+  }
+
+  /**
+   * Refuses an over-long deprecation message.
+   *
+   * @throws BadRequestException With {@code deprecationMessageTooLong}.
+   */
+  public static void checkDeprecationMessage(final String message) {
+    if (message.length() > MAX_DEPRECATION_MESSAGE_LENGTH) {
+      throw new BadRequestException("deprecationMessageTooLong");
     }
   }
 
