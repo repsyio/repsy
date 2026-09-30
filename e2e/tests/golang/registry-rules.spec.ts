@@ -460,7 +460,11 @@ test.describe('golang registry rules (raw HTTP)', () => {
       });
       expectMsgId(await rawUpload(pseudoOnly.repoName, admin, pseudoBuilt), 200, undefined);
 
-      const pseudoRes = await rawGet(pseudoOnly.repoName, admin, latestRelPath(pseudoOnly.modulePath));
+      const pseudoRes = await rawGet(
+        pseudoOnly.repoName,
+        admin,
+        latestRelPath(pseudoOnly.modulePath),
+      );
       expect(
         parseInfo(pseudoRes.body).Version,
         'a pseudo-version still answers @latest rather than 404ing, when it is the only version',

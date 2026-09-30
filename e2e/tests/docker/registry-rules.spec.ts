@@ -1497,7 +1497,12 @@ test.describe('docker registry rules (raw HTTP)', () => {
       expect(indexDigest, 'index digest in response header').toBeDefined();
 
       // Verify both index and child are pullable before deletion
-      const getIndexBefore = await rawGetManifest(layout.repoName, admin, layout.image, 'multiarch-tag');
+      const getIndexBefore = await rawGetManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        'multiarch-tag',
+      );
       expect(getIndexBefore.status, 'index is pullable by tag before deletion').toBe(200);
 
       const getChildBeforeDel = await rawGetManifest(
@@ -1506,7 +1511,9 @@ test.describe('docker registry rules (raw HTTP)', () => {
         layout.image,
         childDigest,
       );
-      expect(getChildBeforeDel.status, 'child is pullable by digest before index deletion').toBe(200);
+      expect(getChildBeforeDel.status, 'child is pullable by digest before index deletion').toBe(
+        200,
+      );
 
       // Delete the index by digest
       const deleteIndex = await rawDeleteManifest(
@@ -1539,12 +1546,7 @@ test.describe('docker registry rules (raw HTTP)', () => {
 
       // Check if child is still pullable: per AGENTS.md's Docker manifest section, the child
       // becomes orphaned (not reachable via index edges) after the index is deleted
-      const getChildAfter = await rawGetManifest(
-        layout.repoName,
-        admin,
-        layout.image,
-        childDigest,
-      );
+      const getChildAfter = await rawGetManifest(layout.repoName, admin, layout.image, childDigest);
       // After the index is deleted, the child becomes orphaned but remains stored and accessible (200).
       // Per UntaggedManifestFinder: children not reachable via index edges remain in storage.
       // This is the correct behavior — deletion of the index does not cascade-delete orphaned children.
