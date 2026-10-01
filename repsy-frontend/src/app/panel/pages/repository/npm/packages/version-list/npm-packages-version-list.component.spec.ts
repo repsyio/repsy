@@ -151,6 +151,17 @@ describe('NpmPackagesVersionListComponent', () => {
       );
     }));
 
+    it('offers a Version sort that asks the backend for version precedence (RPS-1765)', fakeAsync(() => {
+      build('acme', { sort: 'Version' }).respond([VERSION], 1);
+
+      repoChanges.next(permission(REPO_NAME));
+      flushMicrotasks();
+
+      expect(component.sortOptions.map((o) => o.name)).toEqual(['Newest', 'Oldest', 'Version']);
+      expect(component.sortOption).toEqual({ name: 'Version', column: 'version', type: 'DESC' });
+      expect(npmService.searchPackageVersions).toHaveBeenCalledOnceWith('ui', 'acme', '', component.sortOption, 0, 10);
+    }));
+
     it('falls back to the default sort for a URL sort that names no option', fakeAsync(() => {
       build('acme', { sort: 'bogus' }).respond([VERSION], 1);
 

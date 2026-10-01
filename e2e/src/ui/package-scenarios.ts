@@ -76,6 +76,7 @@ export type PackageScenarioKey =
   | '01'
   | '02-search'
   | '02-versions-search'
+  | '02-versions-sort'
   | '02-sort'
   | '02-pagination'
   | '03'
@@ -418,6 +419,34 @@ export function registerPackageScenarios(
           const versions = protocolPages(adminPage, descriptor, repo.name).versions(pkg);
           await versions.goto();
           await expect(versions.searchBox).toHaveCount(0);
+        },
+      );
+    }
+
+    const precedenceSample = descriptor.versionPrecedenceSample;
+    if (precedenceSample) {
+      test(
+        title(
+          '02',
+          'the versions page sorts by version precedence, not by text or upload time',
+          '02-versions-sort',
+        ),
+        async ({ adminPage, seeder, seedVersions }) => {
+          pin('02-versions-sort');
+          const repo = await seeder.createRepo(type);
+          // Published one after the other, so Newest/Oldest follow the upload order; precedence does not.
+          const seeded = await seedVersions(repo, precedenceSample);
+          const versions = protocolPages(adminPage, descriptor, repo.name).versions(seeded[0]);
+          await versions.goto();
+          const keys = seeded.map((pkg) => versions.keyOf(pkg));
+          // [1.9.0, 1.10.0, pre-release, 2.0.0], highest precedence first: 2.0.0, 1.10.0, 1.9.0, pre-release.
+          const byPrecedence = [keys[3], keys[1], keys[0], keys[2]];
+
+          await expect.poll(() => rowKeys(versions)).toEqual([...keys].reverse());
+          await versions.sortBy('Oldest');
+          await expect.poll(() => rowKeys(versions)).toEqual(keys);
+          await versions.sortBy('Version');
+          await expect.poll(() => rowKeys(versions)).toEqual(byPrecedence);
         },
       );
     }

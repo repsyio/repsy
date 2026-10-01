@@ -13,7 +13,12 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-import { NEWEST_OLDEST, NEWEST_OLDEST_NAME, need, type ProtocolDescriptor } from './types.js';
+import {
+  NEWEST_OLDEST_VERSION,
+  NEWEST_OLDEST_NAME,
+  need,
+  type ProtocolDescriptor,
+} from './types.js';
 import { repoRoute } from '../../routes.js';
 
 /**
@@ -27,6 +32,7 @@ import { repoRoute } from '../../routes.js';
 export const rubyDescriptor: ProtocolDescriptor = {
   protocol: 'ruby',
   label: 'Ruby',
+  versionPrecedenceSample: ['1.9.0', '1.10.0', '1.0.0.pre', '2.0.0'],
   levels: {
     list: {
       path: (repo) => repoRoute(repo),
@@ -44,7 +50,7 @@ export const rubyDescriptor: ProtocolDescriptor = {
       path: (repo, t) => repoRoute(repo, need(t, 'ruby').name),
       rowKey: (t) => need(t, 'ruby').version,
       search: { placeholder: 'version', term: (t) => t.version },
-      sort: NEWEST_OLDEST,
+      sort: NEWEST_OLDEST_VERSION,
       pagination: true,
       mobileCards: true,
       rowDelete: { dialogTitle: 'Delete Version', successToast: 'Version deleted successfully' },

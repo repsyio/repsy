@@ -15,7 +15,7 @@
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { Sort } from '../../dto/sort';
+import { Sort, VERSION_PRECEDENCE_SORT } from '../../dto/sort';
 import { SortSelectorComponent } from './sort-selector.component';
 
 const NEWEST: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
@@ -127,6 +127,21 @@ describe('SortSelectorComponent', () => {
       click(toggle());
 
       expect(menu()).not.toBeNull();
+    });
+  });
+
+  describe('version precedence option (RPS-1765)', () => {
+    it('offers a testid-addressable Version option that emits the version column', () => {
+      component.options = [NEWEST, OLDEST, VERSION_PRECEDENCE_SORT];
+      const chosen: Sort[] = [];
+      component.choose.subscribe((picked) => chosen.push(picked));
+      click(toggle());
+
+      expect(option('Version')).not.toBeNull();
+      click(option('Version'));
+
+      expect(chosen).toEqual([{ name: 'Version', column: 'version', type: 'DESC' }]);
+      expect(toggle().textContent).toContain('Version');
     });
   });
 

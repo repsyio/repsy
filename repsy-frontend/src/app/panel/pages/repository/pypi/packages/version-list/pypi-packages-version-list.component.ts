@@ -35,7 +35,7 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort } from '../../../../../shared/dto/sort';
+import { Sort, VERSION_PRECEDENCE_SORT } from '../../../../../shared/dto/sort';
 import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
 import { SecurityService } from '../../../../security/service/security.service';
 import { PypiConfigComponent } from '../../config/pypi-config.component';
@@ -79,6 +79,7 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
   public sortOptions: Sort[] = [
     { name: 'Newest', column: 'createdAt', type: 'DESC' },
     { name: 'Oldest', column: 'createdAt', type: 'ASC' },
+    VERSION_PRECEDENCE_SORT,
   ];
 
   public readonly baseUrl: string;
