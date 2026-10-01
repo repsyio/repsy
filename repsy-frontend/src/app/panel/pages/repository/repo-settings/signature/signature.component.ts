@@ -35,6 +35,8 @@ import { SelectorComponent } from '../../../../shared/components/selector/select
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 import { saveRepoSetting } from '../save-repo-setting';
+import { PgpPublicKeyItem } from './dto/pgp-public-key-item';
+import { CreateMavenPgpPublicKeyRequest } from './dto/pgp-public-key-form';
 
 @Component({
   selector: 'app-signature',
@@ -58,6 +60,9 @@ export class SignatureComponent implements OnInit {
   /** A settings save is on its way: both toggles are locked, so a double click sends one request (RPS-1618). */
   public saving = false;
   public docsBaseUrl: string;
+  public publicKeys: PgpPublicKeyItem[] = [];
+  public publicKeyPageNum = 1;
+  public publicKeyPageSize = 5;
 
   public readonly wellKnownServers = [
     { host: 'keyserver.ubuntu.com', displayName: 'Ubuntu Keyserver' },
@@ -80,6 +85,7 @@ export class SignatureComponent implements OnInit {
     this.keyServerLookupEnabled = this.parentForm?.get('pgpKeyServerLookupEnabled')?.value ?? true;
     this.fetchKeyStores();
     this.fetchAllowedKeyservers();
+    this.fetchPublicKeys();
   }
 
   /** Each toggle sends only its own field, so it cannot change any other setting of the repository. */
@@ -205,6 +211,84 @@ export class SignatureComponent implements OnInit {
           this.pageNum = 1;
           this.fetchKeyStores();
           this.toastService.show('Key Store deleted', 'success');
+        },
+        error: () => {},
+      });
+    });
+  }
+
+  public addPublicKey(armoredKey: string): void {
+    if (this.isSubmitting) {
+      return;
+    }
+
+    const trimmed = armoredKey.trim();
+    if (!trimmed) {
+      this.toastService.show('Please paste an armored PGP public key', 'error');
+      return;
+    }
+
+    this.isSubmitting = true;
+
+    const request: CreateMavenPgpPublicKeyRequest = { armoredKey: trimmed };
+
+    this.keyStoreControllerService
+      .createMavenPgpPublicKey(this.activeRepository.repoName, request)
+      .pipe(
+        finalize(() => {
+          this.isSubmitting = false;
+        }),
+      )
+      .subscribe({
+        next: () => {
+          this.publicKeyPageNum = 1;
+          this.fetchPublicKeys();
+          this.toastService.show('Public key added', 'success');
+        },
+        error: () => {},
+      });
+  }
+
+  public fetchPublicKeys(): void {
+    this.publicKeyPageNum = 1;
+    this.keyStoreControllerService
+      .listMavenPgpPublicKeys(this.activeRepository.repoName, 0, this.publicKeyPageSize)
+      .subscribe({
+        next: (r) => {
+          this.publicKeys = r.data?.content ?? [];
+        },
+        error: () => {},
+      });
+  }
+
+  public loadMorePublicKeys(): void {
+    this.keyStoreControllerService
+      .listMavenPgpPublicKeys(this.activeRepository.repoName, this.publicKeyPageNum, this.publicKeyPageSize)
+      .subscribe({
+        next: (r) => {
+          const newItems = r.data?.content ?? [];
+          this.publicKeys = [...this.publicKeys, ...newItems];
+          this.publicKeyPageNum++;
+        },
+        error: () => {},
+      });
+  }
+
+  public onScrollPublicKeys(event: Event): void {
+    const target = event.target as HTMLElement;
+    const bottom = target.scrollHeight === target.scrollTop + target.clientHeight;
+    if (bottom) {
+      this.loadMorePublicKeys();
+    }
+  }
+
+  public deletePublicKey(uuid: string): void {
+    this.dangerModalService.show('Delete Public Key', 'Delete', () => {
+      this.keyStoreControllerService.deleteMavenPgpPublicKey(uuid, this.activeRepository.repoName).subscribe({
+        next: () => {
+          this.publicKeyPageNum = 1;
+          this.fetchPublicKeys();
+          this.toastService.show('Public key deleted', 'success');
         },
         error: () => {},
       });

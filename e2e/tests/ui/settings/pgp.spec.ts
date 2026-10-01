@@ -247,4 +247,70 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     await settings.goto();
     await expect(settings.pgp.root).toHaveCount(0);
   });
+
+  test('SET-08e add a registered public key, see it listed, delete it (RPS-1803)', async ({
+    adminPage,
+    seeder,
+    adminSession,
+  }) => {
+    const readback = new RepoSettingsReadback(adminSession.token);
+    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    await settings.goto();
+    const { pgp } = settings;
+
+    // No public keys are registered yet.
+    await expect(pgp.publicKeys).toContainText('No public keys registered yet.');
+    expect(await pgp.publicKeyCount()).toBe(0);
+
+    // Add a public key. Test with a minimal but valid armored public key block.
+    const armoredKey = `-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mI0EZvEb6wEEAIJ7c2qpSUzMrlJwRl1L/Q5A6wQfbq/V8VqwCLqEpUfKCZhK
+CrAHBdCa/pGKbG6LPQDA0gFi0rX3LjVEBsZ4xvP7PAQG6gvXhkFGRZVGqo8t
+bG7L6P9xJvIZuR5Rqw==
+=AbC0
+-----END PGP PUBLIC KEY BLOCK-----`;
+
+    await pgp.addPublicKey(armoredKey);
+    await settings.shell.toasts.expectSuccess('Public key added');
+
+    // The key is now visible in the list.
+    await expect(pgp.publicKeys).not.toContainText('No public keys registered yet.');
+    expect(await pgp.publicKeyCount()).toBe(1);
+
+    // It is still there after a reload.
+    await settings.reload();
+    expect(await pgp.publicKeyCount()).toBe(1);
+
+    // Add another public key.
+    const secondArmoredKey = `-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mI0EZvEb6wEEAJJ7c2qpSUzMrlJwRl1L/Q5A6wQfbq/V8VqwCLqEpUfKCZhL
+CrAHBdCa/pGKbG6LPQDA0gFi0rX3LjVEBsZ4xvP7PAQG6gvXhkFGRZVGqo8t
+bG7L6P9xJvIZuR5Rqx==
+=CdE1
+-----END PGP PUBLIC KEY BLOCK-----`;
+
+    await pgp.addPublicKey(secondArmoredKey);
+    await settings.shell.toasts.expectSuccess('Public key added');
+    expect(await pgp.publicKeyCount()).toBe(2);
+
+    // Delete the first one; the second remains.
+    const uuids = await pgp.publicKeyUuids();
+    expect(uuids.length).toBeGreaterThanOrEqual(1);
+    const firstUuid = uuids[0];
+
+    await pgp.deletePublicKey(firstUuid);
+    await settings.shell.dangerModal.expectOpen('Delete Public Key');
+    await settings.shell.dangerModal.cancel();
+    await settings.shell.dangerModal.expectClosed();
+    expect(await pgp.publicKeyCount()).toBe(2);
+
+    await pgp.deletePublicKey(firstUuid);
+    await settings.shell.dangerModal.expectOpen('Delete Public Key');
+    await settings.shell.dangerModal.confirm();
+    await settings.shell.toasts.expectSuccess('Public key deleted');
+    expect(await pgp.publicKeyCount()).toBe(1);
+  });
 });

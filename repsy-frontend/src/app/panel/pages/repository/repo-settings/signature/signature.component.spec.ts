@@ -27,6 +27,7 @@ import { ToastService } from '../../../../shared/components/toast/toast.service'
 import { permission } from '../../testing/protocol-service-spec-helpers';
 import { releaseAwareParentForm } from '../testing/repo-settings-spec-helpers';
 import { SignatureComponent } from './signature.component';
+import { PgpPublicKeyItem } from './dto/pgp-public-key-item';
 
 const REPO = 'maven-repo';
 const UBUNTU: AllowedKeyserverItem = { id: 'ks-1', host: 'keyserver.ubuntu.com', displayName: 'Ubuntu Keyserver' };
@@ -36,6 +37,16 @@ const OPENPGP_LABEL = 'OpenPGP Keyserver (keys.openpgp.org)';
 
 function keyStore(id: string): KeyStoreItem {
   return { id, allowedKeyserverId: 'ks-1', host: 'keyserver.ubuntu.com', displayName: 'Ubuntu Keyserver' };
+}
+
+function publicKey(uuid: string): PgpPublicKeyItem {
+  return {
+    uuid,
+    keyId: 'ABCD1234',
+    fingerprint: '1234567890ABCDEF1234567890ABCDEF12345678',
+    userId: 'Test User <test@example.com>',
+    createdAt: '2026-10-01T00:00:00Z',
+  };
 }
 
 describe('SignatureComponent', () => {
@@ -51,11 +62,17 @@ describe('SignatureComponent', () => {
       'listMavenKeyStores',
       'createMavenKeyStore',
       'deleteMavenKeyStore',
+      'listMavenPgpPublicKeys',
+      'createMavenPgpPublicKey',
+      'deleteMavenPgpPublicKey',
     ]);
     keyStoreService.listMavenAllowedKeyServers.and.returnValue(of({ data: [UBUNTU, OPENPGP] }) as never);
     keyStoreService.listMavenKeyStores.and.returnValue(of({ data: { content: [keyStore('k1')] } }) as never);
     keyStoreService.createMavenKeyStore.and.returnValue(of({}) as never);
     keyStoreService.deleteMavenKeyStore.and.returnValue(of({}) as never);
+    keyStoreService.listMavenPgpPublicKeys.and.returnValue(of({ data: { content: [publicKey('pk1')] } }) as never);
+    keyStoreService.createMavenPgpPublicKey.and.returnValue(of({ data: publicKey('pk2') }) as never);
+    keyStoreService.deleteMavenPgpPublicKey.and.returnValue(of({}) as never);
     repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
       'updateRepoSettings',
     ]);
@@ -158,12 +175,15 @@ describe('SignatureComponent', () => {
   });
 
   describe('ngOnInit', () => {
-    it('loads the first page of key stores and the allowed keyservers', () => {
+    it('loads the first page of key stores, public keys and the allowed keyservers', () => {
       component.ngOnInit();
 
       expect(keyStoreService.listMavenKeyStores).toHaveBeenCalledOnceWith(REPO, 0, 5);
       expect(component.keyStores.map((k) => k.id)).toEqual(['k1']);
       expect(component.pageNum).toBe(1);
+      expect(keyStoreService.listMavenPgpPublicKeys).toHaveBeenCalledOnceWith(REPO, 0, 5);
+      expect(component.publicKeys.map((k) => k.uuid)).toEqual(['pk1']);
+      expect(component.publicKeyPageNum).toBe(1);
     });
 
     it('offers the allowed keyservers as "name (host)" and selects the first', () => {
@@ -315,6 +335,140 @@ describe('SignatureComponent', () => {
       dangerModalService.call();
 
       expect(keyStoreService.listMavenKeyStores).not.toHaveBeenCalled();
+      expect(toastService.show).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addPublicKey (RPS-1803)', () => {
+    beforeEach(() => {
+      component.ngOnInit();
+      keyStoreService.listMavenPgpPublicKeys.calls.reset();
+    });
+
+    it('adds a public key from an armored key string, then reloads and toasts', () => {
+      const armoredKey = '-----BEGIN PGP PUBLIC KEY BLOCK-----\n...key...\n-----END PGP PUBLIC KEY BLOCK-----';
+
+      component.addPublicKey(armoredKey);
+
+      expect(keyStoreService.createMavenPgpPublicKey).toHaveBeenCalledOnceWith(REPO, { armoredKey });
+      expect(keyStoreService.listMavenPgpPublicKeys).toHaveBeenCalledOnceWith(REPO, 0, 5);
+      expect(toastService.show).toHaveBeenCalledOnceWith('Public key added', 'success');
+      expect(component.isSubmitting).toBeFalse();
+    });
+
+    it('trims whitespace from the armored key before submitting', () => {
+      const armoredKey = '  -----BEGIN PGP PUBLIC KEY BLOCK-----\n...key...\n-----END PGP PUBLIC KEY BLOCK-----  \n';
+
+      component.addPublicKey(armoredKey);
+
+      expect(keyStoreService.createMavenPgpPublicKey).toHaveBeenCalledOnceWith(REPO, {
+        armoredKey: '-----BEGIN PGP PUBLIC KEY BLOCK-----\n...key...\n-----END PGP PUBLIC KEY BLOCK-----',
+      });
+    });
+
+    it('shows an error and does not submit when the key is empty or whitespace', () => {
+      component.addPublicKey('  \n  ');
+
+      expect(toastService.show).toHaveBeenCalledOnceWith('Please paste an armored PGP public key', 'error');
+      expect(keyStoreService.createMavenPgpPublicKey).not.toHaveBeenCalled();
+      expect(component.isSubmitting).toBeFalse();
+    });
+
+    it('ignores a second click while the first is still being submitted', () => {
+      const answer = new Subject<unknown>();
+      keyStoreService.createMavenPgpPublicKey.and.returnValue(answer as never);
+
+      component.addPublicKey('key1');
+      expect(component.isSubmitting).toBeTrue();
+      component.addPublicKey('key2');
+
+      expect(keyStoreService.createMavenPgpPublicKey).toHaveBeenCalledTimes(1);
+
+      answer.next({});
+      answer.complete();
+      expect(component.isSubmitting).toBeFalse();
+    });
+
+    it('does not reload or toast, and can submit again, when adding fails', () => {
+      keyStoreService.createMavenPgpPublicKey.and.returnValue(throwError(() => new Error('boom')));
+
+      component.addPublicKey('-----BEGIN PGP PUBLIC KEY BLOCK-----\n...key...\n-----END PGP PUBLIC KEY BLOCK-----');
+
+      expect(toastService.show).not.toHaveBeenCalledWith('Public key added', 'success');
+      expect(keyStoreService.listMavenPgpPublicKeys).not.toHaveBeenCalled();
+      expect(component.isSubmitting).toBeFalse();
+    });
+  });
+
+  describe('paging public keys by scrolling', () => {
+    beforeEach(() => component.ngOnInit());
+
+    it('loadMorePublicKeys appends the next page and moves on', () => {
+      keyStoreService.listMavenPgpPublicKeys.and.returnValue(of({ data: { content: [publicKey('pk2')] } }) as never);
+
+      component.loadMorePublicKeys();
+
+      expect(keyStoreService.listMavenPgpPublicKeys).toHaveBeenCalledWith(REPO, 1, 5);
+      expect(component.publicKeys.map((k) => k.uuid)).toEqual(['pk1', 'pk2']);
+      expect(component.publicKeyPageNum).toBe(2);
+    });
+
+    it('loadMorePublicKeys keeps the list when the page cannot be loaded', () => {
+      keyStoreService.listMavenPgpPublicKeys.and.returnValue(throwError(() => new Error('boom')));
+
+      component.loadMorePublicKeys();
+
+      expect(component.publicKeys.map((k) => k.uuid)).toEqual(['pk1']);
+      expect(component.publicKeyPageNum).toBe(1);
+    });
+
+    function scrolled(scrollHeight: number, scrollTop: number, clientHeight: number): Event {
+      return { target: { scrollHeight, scrollTop, clientHeight } } as unknown as Event;
+    }
+
+    it('loads more public keys only once the list is scrolled to the bottom', () => {
+      keyStoreService.listMavenPgpPublicKeys.calls.reset();
+
+      component.onScrollPublicKeys(scrolled(500, 100, 200));
+      expect(keyStoreService.listMavenPgpPublicKeys).not.toHaveBeenCalled();
+
+      component.onScrollPublicKeys(scrolled(500, 300, 200));
+      expect(keyStoreService.listMavenPgpPublicKeys).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('deletePublicKey (RPS-1803)', () => {
+    beforeEach(() => {
+      component.ngOnInit();
+      keyStoreService.listMavenPgpPublicKeys.calls.reset();
+    });
+
+    it('asks for confirmation before deleting anything', () => {
+      component.deletePublicKey('pk1');
+
+      expect(dangerModalService.modal).toEqual({ title: 'Delete Public Key', action: 'Delete', message: null });
+      expect(keyStoreService.deleteMavenPgpPublicKey).not.toHaveBeenCalled();
+    });
+
+    it('deletes once confirmed, then reloads from the first page and toasts', () => {
+      component.publicKeyPageNum = 4;
+      component.deletePublicKey('pk1');
+
+      dangerModalService.call();
+
+      expect(keyStoreService.deleteMavenPgpPublicKey).toHaveBeenCalledOnceWith('pk1', REPO);
+      expect(keyStoreService.listMavenPgpPublicKeys).toHaveBeenCalledOnceWith(REPO, 0, 5);
+      expect(component.publicKeyPageNum).toBe(1);
+      expect(toastService.show).toHaveBeenCalledOnceWith('Public key deleted', 'success');
+    });
+
+    it('neither reloads nor toasts when the delete fails', () => {
+      keyStoreService.deleteMavenPgpPublicKey.and.returnValue(throwError(() => new Error('boom')));
+      component.deletePublicKey('pk1');
+
+      dangerModalService.call();
+
+      expect(keyStoreService.listMavenPgpPublicKeys).not.toHaveBeenCalled();
       expect(toastService.show).not.toHaveBeenCalled();
     });
   });
