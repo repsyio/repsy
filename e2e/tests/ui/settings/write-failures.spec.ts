@@ -33,6 +33,7 @@ import {
   SETTING_TOGGLES,
   togglesFor,
 } from '../../../src/ui/pages/repo-settings/setting-toggles.js';
+import { escapeRegExp, repoApiPath } from '../../../src/ui/routes.js';
 import { errorBody, fulfillJson, type ErrorResponse } from '../../../src/ui/stub-responses.js';
 
 const SETTINGS = '@settings';
@@ -55,7 +56,7 @@ const FAILURES = [
 ] as const;
 
 const settingsUrl = (repoName: string): RegExp =>
-  new RegExp(`/api/repos/${repoName}/settings(\\?|$)`);
+  new RegExp(`${escapeRegExp(repoApiPath(repoName, 'settings'))}(\\?|$)`);
 
 test.describe('Repository settings: a failed save', { tag: SETTINGS }, () => {
   test.use({

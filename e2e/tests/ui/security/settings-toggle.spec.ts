@@ -26,6 +26,7 @@ import { UI_REPO_TYPES } from '../../../src/ui/repo-types.js';
 import { VulnerabilityScanningSection } from '../../../src/ui/pages/security.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
 import { expect, test } from '../../../src/ui/security-fixtures.js';
+import { repoApiPath } from '../../../src/ui/routes.js';
 import { stubSupportedRepoTypes } from '../../../src/ui/security-stubs.js';
 
 const MOCKED = '@mocked';
@@ -84,7 +85,7 @@ test.describe('SEC-02c Vulnerability Scanning setting', { tag: MOCKED }, () => {
 
     const put = adminPage.waitForRequest(
       (request) =>
-        request.method() === 'PUT' && request.url().endsWith(`/api/repos/${repo.name}/settings`),
+        request.method() === 'PUT' && request.url().endsWith(repoApiPath(repo.name, 'settings')),
     );
     await scanning.flip();
 
@@ -104,7 +105,7 @@ test.describe('SEC-02c Vulnerability Scanning setting', { tag: MOCKED }, () => {
 
     const putOn = adminPage.waitForRequest(
       (request) =>
-        request.method() === 'PUT' && request.url().endsWith(`/api/repos/${repo.name}/settings`),
+        request.method() === 'PUT' && request.url().endsWith(repoApiPath(repo.name, 'settings')),
     );
     await scanning.flip();
     expect((await putOn).postDataJSON()).toMatchObject({ securityScanEnabled: true });
@@ -144,7 +145,7 @@ test.describe('SEC-02c Vulnerability Scanning setting', { tag: MOCKED }, () => {
       await scanning.expectChecked(true);
       const put = adminPage.waitForRequest(
         (request) =>
-          request.method() === 'PUT' && request.url().endsWith(`/api/repos/${repo.name}/settings`),
+          request.method() === 'PUT' && request.url().endsWith(repoApiPath(repo.name, 'settings')),
       );
 
       await scanning.flip();

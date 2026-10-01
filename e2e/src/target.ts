@@ -69,6 +69,15 @@ export interface UiCapabilities {
    * and throws on Repsy Cloud when `REPSY_REPO_OWNER` is unset.
    */
   repoRoute(repo: string, ...segments: string[]): string;
+  /**
+   * The panel REST API path of a repository, or of a call inside it: `repoApiPath('r')` is `/api/repos/r`
+   * on Repsy OS and `/api/repos/<owner>/r` on Repsy Cloud, `repoApiPath('r', 'settings')` is
+   * `/api/repos/r/settings` and `/api/repos/<owner>/r/settings`. Like `repoRoute`, the segments are
+   * joined as they are (a caller that needs `encodeURIComponent` applies it), it reads `env.repoOwner`
+   * when it is called, and it throws on Repsy Cloud when `REPSY_REPO_OWNER` is unset. Paths that name no
+   * repository (`/api/repos/counts`, `/api/repos/security-summary`) stay literals.
+   */
+  repoApiPath(repo: string, ...segments: string[]): string;
   /** The route of the signed-in account's own page: `/profile` (OS) or `/account` (Cloud). */
   profilePath: string;
   /** The panel has an admin-only Users page (`/users`, the sidebar's Users entry): Repsy OS only. */
@@ -125,6 +134,7 @@ const supportsVersionAllowanceSettings = (repoType: RepoType): boolean =>
 
 const OS_UI: UiCapabilities = {
   repoRoute: (repo, ...segments) => ['', repo, ...segments].join('/'),
+  repoApiPath: (repo, ...segments) => ['', 'api', 'repos', repo, ...segments].join('/'),
   profilePath: '/profile',
   hasUsersPage: true,
   loginField: 'username',
@@ -146,6 +156,14 @@ const CLOUD_UI: UiCapabilities = {
       );
     }
     return ['', env.repoOwner, repo, ...segments].join('/');
+  },
+  repoApiPath: (repo, ...segments) => {
+    if (!env.repoOwner) {
+      throw new Error(
+        'The panel API of Repsy Cloud addresses a repository as /api/repos/<owner>/<repo>, but REPSY_REPO_OWNER is not set.',
+      );
+    }
+    return ['', 'api', 'repos', env.repoOwner, repo, ...segments].join('/');
   },
   profilePath: '/account',
   hasUsersPage: false,

@@ -50,9 +50,20 @@ import { errorToasts } from '../../../src/ui/page-errors.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { expectVersionNotFound } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages, type VersionsPage } from '../../../src/ui/pages/protocol.js';
+import { repoApiPath } from '../../../src/ui/routes.js';
 import { errorBody, fulfillJson, type ErrorResponse } from '../../../src/ui/stub-responses.js';
 
 const maven = DESCRIPTORS.maven;
+
+/**
+ * The directory listing the browser reads (`GET <repo API path>/contents?...`). A Playwright glob's `*`
+ * does not cross a `/`, and the path differs between Repsy OS and Cloud (an owner), so this matches the
+ * pathname built by `repoApiPath` and requires a query string, as the old `**\/api/repos/*\/contents?*` did.
+ */
+const contentsListing =
+  (repoName: string) =>
+  (url: URL): boolean =>
+    url.pathname === repoApiPath(repoName, 'contents') && url.search !== '';
 
 let sharedKey: Promise<PgpKeyPair> | undefined;
 /** One RSA key per worker: generating one takes about a second, and each repo only needs to register it. */
@@ -521,7 +532,7 @@ test.describe('Maven file browser states', { tag: '@packages' }, () => {
     const repo = await seeder.createRepo(RepoType.MAVEN);
     const pkg = await seedPackage(repo);
     // The root listing answers late: the click cannot land before the grid exists, and the path is never lost.
-    await adminPage.route('**/api/repos/*/contents?*', async (route) => {
+    await adminPage.route(contentsListing(repo.name), async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 800));
       await route.continue();
     });
@@ -632,7 +643,7 @@ test.describe('Maven file browser states', { tag: '@packages' }, () => {
         seeder,
       }) => {
         const repo = await seeder.createRepo(RepoType.MAVEN);
-        await adminPage.route('**/api/repos/*/contents?*', (route) =>
+        await adminPage.route(contentsListing(repo.name), (route) =>
           fulfillJson<ErrorResponse>(
             route,
             status,

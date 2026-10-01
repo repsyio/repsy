@@ -31,6 +31,7 @@ import type { Page, Route } from '@playwright/test';
 import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
+import { repoApiPath } from '../../../src/ui/routes.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
@@ -315,7 +316,7 @@ test.describe('AUTH-12 permission failure is not a lost session', { tag: ['@clou
     const before = await storedSession(userPage);
     expect(before.token).toMatch(JWT_SHAPE);
     const authorization = { Authorization: `Bearer ${before.token}` };
-    const repoUrl = `${env.apiBaseUrl}/api/repos/${encodeURIComponent(repo.name)}`;
+    const repoUrl = `${env.apiBaseUrl}${repoApiPath(encodeURIComponent(repo.name))}`;
 
     // The route families that need MANAGE: usage, settings (read/write), deploy tokens, description,
     // rename and delete. The stack's default USER may read the repo (`/permissions`), not manage it.
@@ -355,7 +356,7 @@ test.describe('AUTH-12 permission failure is not a lost session', { tag: ['@clou
     const tampered = `${before.token}x`;
 
     const response = await userPage.request.get(
-      `${env.apiBaseUrl}/api/repos/${encodeURIComponent(repo.name)}/usage`,
+      `${env.apiBaseUrl}${repoApiPath(encodeURIComponent(repo.name), 'usage')}`,
       { headers: { Authorization: `Bearer ${tampered}` } },
     );
     expect(response.status()).toBe(401);

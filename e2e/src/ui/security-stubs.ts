@@ -74,6 +74,7 @@ import {
   type VulnerabilityScanDetail,
   type VulnerabilityScanInfo,
 } from './stub-models.js';
+import { escapeRegExp, repoApiPath } from './routes.js';
 import { fulfillJson } from './stub-responses.js';
 
 export { FixStatus, RepoType, ScanStatus, Severity };
@@ -157,6 +158,18 @@ async function stub(
 }
 
 const SEG = '([^/]+)';
+const SEG_MARK = '\u0001';
+
+/**
+ * `^<repoApiPath(repo, ...segments)>$` with a `SEG` capture group for the repo and for each `:param`
+ * in `segments`. Built from `repoApiPath`, so Repsy Cloud's owner is part of the pattern (`/api/repos/
+ * <owner>/<repo>/...`); the owner and the literal segments are escaped. Read when the pattern is used,
+ * never at import ("Import time is not run time", README): Cloud's `repoApiPath` needs `REPSY_REPO_OWNER`.
+ */
+function repoApiPattern(...segments: string[]): RegExp {
+  const path = repoApiPath(SEG_MARK, ...segments.map((s) => (s === ':' ? SEG_MARK : s)));
+  return new RegExp(`^${escapeRegExp(path).replaceAll(SEG_MARK, SEG)}$`);
+}
 
 /** Path patterns of every security call, straight from `openapi-spec.yaml`. */
 export const SECURITY_PATHS = {
@@ -164,16 +177,35 @@ export const SECURITY_PATHS = {
   scans: /^\/api\/security\/scans$/,
   scansSummary: /^\/api\/security\/scans\/summary$/,
   repoSummary: /^\/api\/repos\/security-summary$/,
-  artifactsSummary: new RegExp(`^/api/repos/${SEG}/artifacts/security-summary$`),
-  versionsSummary: new RegExp(`^/api/repos/${SEG}/artifacts/${SEG}/security-summary$`),
-  repoDetail: new RegExp(`^/api/repos/${SEG}/security-detail$`),
-  artifactDetail: new RegExp(`^/api/repos/${SEG}/artifacts/${SEG}/security-detail$`),
-  versionScans: new RegExp(`^/api/repos/${SEG}/artifacts/${SEG}/versions/${SEG}/scans$`),
-  scanOverview: new RegExp(`^/api/repos/${SEG}/artifacts/${SEG}/versions/${SEG}/scan-overview$`),
-  triggerScan: new RegExp(`^/api/repos/${SEG}/artifacts/${SEG}/versions/${SEG}/scan$`),
-  scanDetail: new RegExp(`^/api/repos/${SEG}/scans/${SEG}$`),
-  scanFindings: new RegExp(`^/api/repos/${SEG}/scans/${SEG}/findings$`),
-} as const;
+  // The repo-scoped ones are getters: see `repoApiPattern` (the owner is read at call time).
+  get artifactsSummary() {
+    return repoApiPattern('artifacts', 'security-summary');
+  },
+  get versionsSummary() {
+    return repoApiPattern('artifacts', ':', 'security-summary');
+  },
+  get repoDetail() {
+    return repoApiPattern('security-detail');
+  },
+  get artifactDetail() {
+    return repoApiPattern('artifacts', ':', 'security-detail');
+  },
+  get versionScans() {
+    return repoApiPattern('artifacts', ':', 'versions', ':', 'scans');
+  },
+  get scanOverview() {
+    return repoApiPattern('artifacts', ':', 'versions', ':', 'scan-overview');
+  },
+  get triggerScan() {
+    return repoApiPattern('artifacts', ':', 'versions', ':', 'scan');
+  },
+  get scanDetail() {
+    return repoApiPattern('scans', ':');
+  },
+  get scanFindings() {
+    return repoApiPattern('scans', ':', 'findings');
+  },
+};
 
 // ---------------------------------------------------------------------------------------------
 // Builders (models with sensible defaults, so a test states only what it asserts on)

@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import type { Page } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
-import { repoUrl } from '../../../src/repo-url.js';
+import { repoPath, repoUrl } from '../../../src/repo-url.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import {
   artifactDir,
@@ -41,6 +41,7 @@ import {
 } from '../../../src/clients/maven-raw.js';
 import { defaultPackageName } from '../../../src/seed/packages/shared.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
+import { repoApiPath } from '../../../src/ui/routes.js';
 import { registerPackageScenarios, rowKeys } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 
@@ -167,12 +168,13 @@ test.describe('Maven file browser', { tag: '@packages' }, () => {
     // token that opens only this path, then navigates to the file with it in the query string.
     const tokenResponse = adminPage.waitForResponse(
       (res) =>
-        res.url().includes(`/api/repos/${repo.name}/download-token`) &&
+        new URL(res.url()).pathname === repoApiPath(repo.name, 'download-token') &&
         res.request().method() === 'POST',
     );
     const fileRequest = adminPage.waitForRequest(
       (req) =>
-        req.url().includes(`/${repo.name}${remotePath}`) && req.url().includes('downloadToken='),
+        req.url().includes(`/${repoPath(repo.name)}${remotePath}`) &&
+        req.url().includes('downloadToken='),
     );
     const download = adminPage.waitForEvent('download');
     await adminPage.getByTestId(browserItem(jar)).getByTestId('row-open').click();
