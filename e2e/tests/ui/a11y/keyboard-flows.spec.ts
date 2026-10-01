@@ -32,6 +32,7 @@ import type { Locator, Page } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
+import { target } from '../../../src/target.js';
 import { obscuredFocus } from '../../../src/ui/layout.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
@@ -89,7 +90,12 @@ test.describe('Keyboard: login and landmarks', { tag: A11Y }, () => {
 
     // The header's logo comes first; the form's controls follow it in reading order.
     const order = await tabOrder(page, 6);
-    const form = ['login-username', 'login-password', 'login-password-toggle', 'login-submit'];
+    const form = [
+      `login-${target.ui.loginField}`,
+      'login-password',
+      'login-password-toggle',
+      'login-submit',
+    ];
     const at = form.map((id) => order.indexOf(id));
     expect(at, `the form's controls are all tab stops in ${JSON.stringify(order)}`).not.toContain(
       -1,

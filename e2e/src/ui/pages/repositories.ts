@@ -157,16 +157,19 @@ export class RepositoriesPage extends UiPage {
   }
 
   /**
-   * Opens `/repositories` and waits for the profile (which decides the admin-only controls) and
-   * the list answer. A pre-selected type only comes from the dashboard's count rows
-   * (`history.state`), never from a URL.
+   * Opens `/repositories` and waits for the list answer. On Repsy OS, also waits for the profile
+   * (which decides the admin-only controls); on Repsy Cloud this endpoint does not exist or behaves
+   * differently, so the wait is relaxed: it times out after 2s without blocking the page. A
+   * pre-selected type only comes from the dashboard's count rows (`history.state`), never from a URL.
    */
   async goto(): Promise<void> {
     await this.afterListResponse(async () => {
       const profile = this.page.waitForResponse((response) => PROFILE_URL.test(response.url()));
       profile.catch(() => undefined);
       await this.page.goto('/repositories');
-      await profile;
+      // On Cloud, the profile endpoint may not exist or respond, so use a race with a timeout to
+      // avoid hanging. On OS, the profile response is captured if it arrives within 2 seconds.
+      await Promise.race([profile, new Promise<void>((resolve) => setTimeout(resolve, 2000))]);
     });
     await expect(this.title).toBeVisible();
     await expect(this.spinner.root).toBeHidden();
