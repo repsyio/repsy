@@ -44,7 +44,6 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-compress</artifactId>
-      <version>1.28.0</version>
     </dependency>
 
     <dependency>
@@ -55,7 +54,6 @@
     <dependency>
       <groupId>org.semver4j</groupId>
       <artifactId>semver4j</artifactId>
-      <version>6.0.0</version>
     </dependency>
 
     <dependency>

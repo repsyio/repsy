@@ -58,6 +58,44 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+
+      <!--
+        RPS-1810: versions that more than one module repeated, kept in one place. core-bom does not
+        manage them. Do not turn the semver4j version into a property named semver4j.version:
+        core-parent already defines that property (3.1.0) for its own purposes.
+        repsy-scanner-trivy has its own Spring Boot parent and is outside this reactor, so it keeps
+        its own commons-compress version (keep it in sync with the one here).
+      -->
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-compress</artifactId>
+        <version>1.28.0</version>
+      </dependency>
+      <dependency>
+        <groupId>org.json</groupId>
+        <artifactId>json</artifactId>
+        <version>20260814</version>
+      </dependency>
+      <dependency>
+        <groupId>org.semver4j</groupId>
+        <artifactId>semver4j</artifactId>
+        <version>6.0.0</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>3.1.1</version>
+      </dependency>
+      <dependency>
+        <groupId>org.passay</groupId>
+        <artifactId>passay</artifactId>
+        <version>2.0.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.tngtech.archunit</groupId>
+        <artifactId>archunit-junit5</artifactId>
+        <version>1.5.1</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -69,6 +107,16 @@
   </modules>
 
   <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.openapitools</groupId>
+          <artifactId>openapi-generator-maven-plugin</artifactId>
+          <version>7.25.0</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
     <plugins>
       <!--
         RPS-964: promote the Error Prone checks this repo has cleaned to errors so they stay at zero.
