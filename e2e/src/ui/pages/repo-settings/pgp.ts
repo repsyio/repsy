@@ -18,6 +18,7 @@
  * The PGP Signature Key Stores section (Maven repos only): a selector of the key servers the
  * instance allows plus an add button, the list of servers registered on this repo (each with a
  * delete button, confirmed through the danger modal) and the built-in servers, which are read-only.
+ * Also includes the PGP Public Keys section (RPS-1803) with add/list/delete functionality.
  */
 import { expect, type Locator, type Page } from '@playwright/test';
 
@@ -37,6 +38,12 @@ export class PgpSection {
   readonly keyServerLookupToggle: Locator;
   readonly keyServerLookupInput: Locator;
   readonly keyServerLookupLabel: Locator;
+  /** `settings-pgp-public-key-input`: textarea for adding armored public keys (RPS-1803). */
+  readonly publicKeyInput: Locator;
+  /** `settings-pgp-public-key-add`: button to add a public key (RPS-1803). */
+  readonly publicKeyAddButton: Locator;
+  /** `settings-pgp-public-keys`: container for the list of registered public keys (RPS-1803). */
+  readonly publicKeys: Locator;
 
   constructor(page: Page) {
     this.root = page.getByTestId('settings-pgp');
@@ -52,6 +59,9 @@ export class PgpSection {
     this.keyServerLookupToggle = this.root.getByTestId('settings-pgp-keyserver-lookup-toggle');
     this.keyServerLookupInput = this.keyServerLookupToggle.getByTestId('toggle-input');
     this.keyServerLookupLabel = this.keyServerLookupToggle.getByTestId('toggle-label');
+    this.publicKeyInput = this.root.getByTestId('settings-pgp-public-key-input');
+    this.publicKeyAddButton = this.root.getByTestId('settings-pgp-public-key-add');
+    this.publicKeys = this.root.getByTestId('settings-pgp-public-keys');
   }
 
   /** Flips the switch, the same way `ToggleSection.flip()` does for the other settings toggles. */
@@ -110,5 +120,45 @@ export class PgpSection {
     await expect(this.selectorMenu).toBeVisible();
     await this.selectorMenu.getByTestId(`selector-option-${label}`).click();
     await expect(this.selectorMenu).toBeHidden();
+  }
+
+  /**
+   * Adds a public key by filling the textarea with the armored key and clicking the add button (RPS-1803).
+   * Does NOT wait for the toast or the list to update; use `expectPublicKeyCount` after calling this.
+   */
+  async addPublicKey(armoredKey: string): Promise<void> {
+    await this.publicKeyInput.fill(armoredKey);
+    await this.publicKeyAddButton.click();
+  }
+
+  /** The number of registered public keys visible in the list. */
+  async publicKeyCount(): Promise<number> {
+    return this.publicKeys.locator('[data-testid^="settings-pgp-public-key-delete-"]').count();
+  }
+
+  /** Expects the public key count to match (RPS-1803). */
+  async expectPublicKeyCount(count: number): Promise<void> {
+    await expect(this.publicKeys).toContainText(count === 0 ? 'No public keys registered yet.' : '');
+    if (count > 0) {
+      await expect(this.publicKeys.locator('[data-testid^="settings-pgp-public-key-delete-"]')).toHaveCount(count);
+    }
+  }
+
+  /** Deletes the public key at the given UUID (RPS-1803). */
+  async deletePublicKey(uuid: string): Promise<void> {
+    await this.publicKeys.getByTestId(`settings-pgp-public-key-delete-${uuid}`).click();
+  }
+
+  /** Returns the UUIDs of all visible public keys (RPS-1803). */
+  async publicKeyUuids(): Promise<string[]> {
+    const buttons = await this.publicKeys.locator('[data-testid^="settings-pgp-public-key-delete-"]').all();
+    const uuids = [];
+    for (const button of buttons) {
+      const testId = await button.getAttribute('data-testid');
+      if (testId) {
+        uuids.push(testId.replace('settings-pgp-public-key-delete-', ''));
+      }
+    }
+    return uuids;
   }
 }
