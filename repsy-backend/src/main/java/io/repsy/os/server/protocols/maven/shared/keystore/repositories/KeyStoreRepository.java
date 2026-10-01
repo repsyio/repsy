@@ -44,9 +44,15 @@ public interface KeyStoreRepository extends JpaRepository<KeyStore, UUID> {
       FROM KeyStore ks
       JOIN ks.allowedKeyserver ak
       WHERE ks.repo.id = :repoId
+        AND ak.active = true
       """)
   @NonNull Page<KeyStoreItem> findAllByRepoId(@NonNull UUID repoId, @NonNull Pageable pageable);
 
+  /**
+   * The key-server hosts a Maven signature of the repo is looked up on: only the active ones, so a
+   * keyserver an admin deactivated is never contacted, in a fixed order (host, then row id) so the
+   * key that is tried first, and the error that is reported, do not depend on the plan (RPS-1791).
+   */
   @Query(
       """
       SELECT ks.id                     AS id,
@@ -56,7 +62,8 @@ public interface KeyStoreRepository extends JpaRepository<KeyStore, UUID> {
       FROM KeyStore ks
       JOIN ks.allowedKeyserver ak
       WHERE ks.repo.id = :repoId
-      ORDER BY ks.createdAt, ks.id
+        AND ak.active = true
+      ORDER BY ak.host, ks.id
       """)
   @NonNull List<KeyStoreItem> findAllByRepoId(@NonNull UUID repoId);
 }

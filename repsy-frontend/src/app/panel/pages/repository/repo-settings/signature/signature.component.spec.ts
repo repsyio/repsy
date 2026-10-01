@@ -206,7 +206,7 @@ describe('SignatureComponent', () => {
 
       expect(keyStoreService.createMavenKeyStore).toHaveBeenCalledOnceWith(REPO, { allowedKeyserverId: 'ks-2' });
       expect(keyStoreService.listMavenKeyStores).toHaveBeenCalledOnceWith(REPO, 0, 5);
-      expect(toastService.show).toHaveBeenCalledOnceWith('Key Store added', 'success');
+      expect(toastService.show).toHaveBeenCalledOnceWith('Key store added', 'success');
       expect(component.isSubmitting).toBeFalse();
     });
 
@@ -292,7 +292,7 @@ describe('SignatureComponent', () => {
     it('asks for confirmation before deleting anything', () => {
       component.deleteKeyStore('k1');
 
-      expect(dangerModalService.modal).toEqual({ title: 'Delete Key Store', action: 'Delete', message: null });
+      expect(dangerModalService.modal).toEqual({ title: 'Delete key store', action: 'Delete', message: null });
       expect(keyStoreService.deleteMavenKeyStore).not.toHaveBeenCalled();
     });
 
@@ -305,7 +305,7 @@ describe('SignatureComponent', () => {
       expect(keyStoreService.deleteMavenKeyStore).toHaveBeenCalledOnceWith('k1', REPO);
       expect(keyStoreService.listMavenKeyStores).toHaveBeenCalledOnceWith(REPO, 0, 5);
       expect(component.pageNum).toBe(1);
-      expect(toastService.show).toHaveBeenCalledOnceWith('Key Store deleted', 'success');
+      expect(toastService.show).toHaveBeenCalledOnceWith('Key store deleted', 'success');
     });
 
     it('neither reloads nor toasts when the delete fails', () => {

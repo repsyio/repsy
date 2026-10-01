@@ -161,7 +161,7 @@ export class SignatureComponent implements OnInit {
         next: () => {
           this.pageNum = 1;
           this.fetchKeyStores();
-          this.toastService.show('Key Store added', 'success');
+          this.toastService.show('Key store added', 'success');
         },
         error: () => {},
       });
@@ -199,12 +199,12 @@ export class SignatureComponent implements OnInit {
   }
 
   public deleteKeyStore(id: string): void {
-    this.dangerModalService.show('Delete Key Store', 'Delete', () => {
+    this.dangerModalService.show('Delete key store', 'Delete', () => {
       this.keyStoreControllerService.deleteMavenKeyStore(id, this.activeRepository.repoName).subscribe({
         next: () => {
           this.pageNum = 1;
           this.fetchKeyStores();
-          this.toastService.show('Key Store deleted', 'success');
+          this.toastService.show('Key store deleted', 'success');
         },
         error: () => {},
       });
