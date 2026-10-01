@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, Subject, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
@@ -470,6 +471,39 @@ describe('SignatureComponent', () => {
 
       expect(keyStoreService.listMavenPgpPublicKeys).not.toHaveBeenCalled();
       expect(toastService.show).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('signature settings hints (RPS-1798)', () => {
+    let fixture: ComponentFixture<SignatureComponent>;
+
+    beforeEach(async () => {
+      await TestBed.configureTestingModule({
+        imports: [SignatureComponent],
+        providers: [
+          { provide: ToastService, useValue: toastService },
+          { provide: DangerModalService, useValue: dangerModalService },
+          { provide: KeyStoreControllerService, useValue: keyStoreService },
+          { provide: ProtocolRepoControllerService, useValue: repoApi },
+        ],
+      }).compileComponents();
+
+      fixture = TestBed.createComponent(SignatureComponent);
+      component = fixture.componentInstance;
+      component.activeRepository = permission(REPO, { canManage: true });
+      component.repoType = 'MAVEN';
+      component.parentForm = releaseAwareParentForm();
+      fixture.detectChanges();
+    });
+
+    it('renders the keyserver-lookup hint with correct data-testid and text (RPS-1798)', () => {
+      const hintElement = fixture.debugElement.query((el) =>
+        el.nativeElement.hasAttribute?.('data-testid') &&
+        el.nativeElement.getAttribute('data-testid') === 'settings-pgp-keyserver-lookup-hint'
+      );
+
+      expect(hintElement).toBeTruthy('Hint element should be present');
+      expect(hintElement.nativeElement.textContent).toContain('does not prove who deployed');
     });
   });
 });
