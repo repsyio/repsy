@@ -114,6 +114,10 @@ services:
         ANT_LAUNCHER_SHA512: '6fc2b33cde07493704c201b759e6813ba5f60ffd3925a52bb097a7fffedbc950bcc4fbc93fe0a86ec2a41872b16b92868b6be87632d3e8e0dc89a5b4143ccb9e'
         IVY_VERSION: '2.5.3'
         IVY_SHA512: 'be291ddf612703fd3657a72820199430d053a8e06f7631e78477b428ba343631bc36b16bde8c25df544b64b420be84568d3898921f8db63fe676fb590586355b'
+        SBT_VERSION: '1.13.0'
+        SBT_SHA256: '06806805ffd26232727326216766ed4793b549f8c1e6ffeef2e610db7245b698'
+        SBT_VERSION_2: '2.1.0'
+        SBT_VERSION_2_SHA256: 'c26da34433ffa8a503682cc9b7d3789ed84305070b9f187948f0a41b82d76f10'
     environment:
       <<: *runner-environment
       # Read by clients/maven.ts: Maven's shared, third-party-only "local repository tail" (see that
