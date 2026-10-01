@@ -102,7 +102,7 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     // Add the SECOND one (not the selector's default), so a default-only pass would be caught.
     await pgp.select(label(second));
     await pgp.addButton.click();
-    await settings.shell.toasts.expectSuccess('Key Store added');
+    await settings.shell.toasts.expectSuccess('Key store added');
     await expect(pgp.keyStore(second.host)).toBeVisible();
     await expect(pgp.keyStore(second.host)).toContainText(second.displayName);
     await expect(pgp.keyStore(first.host)).toHaveCount(0);
@@ -115,19 +115,19 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     // Add the first as well, then delete the second; only the first remains.
     await pgp.select(label(first));
     await pgp.addButton.click();
-    await settings.shell.toasts.expectSuccess('Key Store added');
+    await settings.shell.toasts.expectSuccess('Key store added');
     await expect(pgp.keyStore(first.host)).toBeVisible();
 
     await pgp.deleteButton(second.host).click();
-    await settings.shell.dangerModal.expectOpen('Delete Key Store');
+    await settings.shell.dangerModal.expectOpen('Delete key store');
     await settings.shell.dangerModal.cancel();
     await settings.shell.dangerModal.expectClosed();
     await expect(pgp.keyStore(second.host)).toBeVisible();
 
     await pgp.deleteButton(second.host).click();
-    await settings.shell.dangerModal.expectOpen('Delete Key Store');
+    await settings.shell.dangerModal.expectOpen('Delete key store');
     await settings.shell.dangerModal.confirm();
-    await settings.shell.toasts.expectSuccess('Key Store deleted');
+    await settings.shell.toasts.expectSuccess('Key store deleted');
     await expect(pgp.keyStore(second.host)).toHaveCount(0);
     await expect(pgp.keyStore(first.host)).toBeVisible();
     await expect

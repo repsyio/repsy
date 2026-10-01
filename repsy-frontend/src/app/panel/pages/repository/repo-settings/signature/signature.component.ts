@@ -35,8 +35,8 @@ import { SelectorComponent } from '../../../../shared/components/selector/select
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 import { saveRepoSetting } from '../save-repo-setting';
-import { PgpPublicKeyItem } from './dto/pgp-public-key-item';
 import { CreateMavenPgpPublicKeyRequest } from './dto/pgp-public-key-form';
+import { PgpPublicKeyItem } from './dto/pgp-public-key-item';
 
 @Component({
   selector: 'app-signature',
@@ -167,7 +167,7 @@ export class SignatureComponent implements OnInit {
         next: () => {
           this.pageNum = 1;
           this.fetchKeyStores();
-          this.toastService.show('Key Store added', 'success');
+          this.toastService.show('Key store added', 'success');
         },
         error: () => {},
       });
@@ -205,12 +205,12 @@ export class SignatureComponent implements OnInit {
   }
 
   public deleteKeyStore(id: string): void {
-    this.dangerModalService.show('Delete Key Store', 'Delete', () => {
+    this.dangerModalService.show('Delete key store', 'Delete', () => {
       this.keyStoreControllerService.deleteMavenKeyStore(id, this.activeRepository.repoName).subscribe({
         next: () => {
           this.pageNum = 1;
           this.fetchKeyStores();
-          this.toastService.show('Key Store deleted', 'success');
+          this.toastService.show('Key store deleted', 'success');
         },
         error: () => {},
       });

@@ -20,7 +20,7 @@
  * is returned, only the fingerprint/keyId identifying it.
  */
 export interface PgpPublicKeyItem {
-  uuid: string;
+  id: string;
   keyId: string;
   fingerprint: string;
   userId?: string;

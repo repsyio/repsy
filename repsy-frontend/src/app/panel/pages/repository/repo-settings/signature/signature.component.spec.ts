@@ -26,8 +26,8 @@ import { DangerModalService } from '../../../../shared/components/modals/danger-
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { permission } from '../../testing/protocol-service-spec-helpers';
 import { releaseAwareParentForm } from '../testing/repo-settings-spec-helpers';
-import { SignatureComponent } from './signature.component';
 import { PgpPublicKeyItem } from './dto/pgp-public-key-item';
+import { SignatureComponent } from './signature.component';
 
 const REPO = 'maven-repo';
 const UBUNTU: AllowedKeyserverItem = { id: 'ks-1', host: 'keyserver.ubuntu.com', displayName: 'Ubuntu Keyserver' };
@@ -39,9 +39,9 @@ function keyStore(id: string): KeyStoreItem {
   return { id, allowedKeyserverId: 'ks-1', host: 'keyserver.ubuntu.com', displayName: 'Ubuntu Keyserver' };
 }
 
-function publicKey(uuid: string): PgpPublicKeyItem {
+function publicKey(id: string): PgpPublicKeyItem {
   return {
-    uuid,
+    id,
     keyId: 'ABCD1234',
     fingerprint: '1234567890ABCDEF1234567890ABCDEF12345678',
     userId: 'Test User <test@example.com>',
@@ -182,7 +182,7 @@ describe('SignatureComponent', () => {
       expect(component.keyStores.map((k) => k.id)).toEqual(['k1']);
       expect(component.pageNum).toBe(1);
       expect(keyStoreService.listMavenPgpPublicKeys).toHaveBeenCalledOnceWith(REPO, 0, 5);
-      expect(component.publicKeys.map((k) => k.uuid)).toEqual(['pk1']);
+      expect(component.publicKeys.map((k) => k.id)).toEqual(['pk1']);
       expect(component.publicKeyPageNum).toBe(1);
     });
 
@@ -226,7 +226,7 @@ describe('SignatureComponent', () => {
 
       expect(keyStoreService.createMavenKeyStore).toHaveBeenCalledOnceWith(REPO, { allowedKeyserverId: 'ks-2' });
       expect(keyStoreService.listMavenKeyStores).toHaveBeenCalledOnceWith(REPO, 0, 5);
-      expect(toastService.show).toHaveBeenCalledOnceWith('Key Store added', 'success');
+      expect(toastService.show).toHaveBeenCalledOnceWith('Key store added', 'success');
       expect(component.isSubmitting).toBeFalse();
     });
 
@@ -312,7 +312,7 @@ describe('SignatureComponent', () => {
     it('asks for confirmation before deleting anything', () => {
       component.deleteKeyStore('k1');
 
-      expect(dangerModalService.modal).toEqual({ title: 'Delete Key Store', action: 'Delete', message: null });
+      expect(dangerModalService.modal).toEqual({ title: 'Delete key store', action: 'Delete', message: null });
       expect(keyStoreService.deleteMavenKeyStore).not.toHaveBeenCalled();
     });
 
@@ -325,7 +325,7 @@ describe('SignatureComponent', () => {
       expect(keyStoreService.deleteMavenKeyStore).toHaveBeenCalledOnceWith('k1', REPO);
       expect(keyStoreService.listMavenKeyStores).toHaveBeenCalledOnceWith(REPO, 0, 5);
       expect(component.pageNum).toBe(1);
-      expect(toastService.show).toHaveBeenCalledOnceWith('Key Store deleted', 'success');
+      expect(toastService.show).toHaveBeenCalledOnceWith('Key store deleted', 'success');
     });
 
     it('neither reloads nor toasts when the delete fails', () => {
@@ -409,7 +409,7 @@ describe('SignatureComponent', () => {
       component.loadMorePublicKeys();
 
       expect(keyStoreService.listMavenPgpPublicKeys).toHaveBeenCalledWith(REPO, 1, 5);
-      expect(component.publicKeys.map((k) => k.uuid)).toEqual(['pk1', 'pk2']);
+      expect(component.publicKeys.map((k) => k.id)).toEqual(['pk1', 'pk2']);
       expect(component.publicKeyPageNum).toBe(2);
     });
 
@@ -418,7 +418,7 @@ describe('SignatureComponent', () => {
 
       component.loadMorePublicKeys();
 
-      expect(component.publicKeys.map((k) => k.uuid)).toEqual(['pk1']);
+      expect(component.publicKeys.map((k) => k.id)).toEqual(['pk1']);
       expect(component.publicKeyPageNum).toBe(1);
     });
 
