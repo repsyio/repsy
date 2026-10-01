@@ -15,6 +15,7 @@
 ///
 
 import { isPlatformBrowser } from '@angular/common';
+import { HttpContext } from '@angular/common/http';
 import { DestroyRef, Inject, inject, Injectable, PLATFORM_ID } from '@angular/core';
 import {
   BehaviorSubject,
@@ -33,6 +34,7 @@ import {
 
 import { LoginForm, LoginInfo } from '../../../../generated/api';
 import { AuthControllerService } from '../../../../generated/api/api/auth-controller.service';
+import { SILENT_ERROR } from '../../../shared/interceptor/error-handler.interceptor';
 
 const USERNAME_KEY = 'username';
 const TOKEN_KEY = 'token';
@@ -340,12 +342,18 @@ export class AuthService {
     // The refresh call completes without an answer when `RefreshTokenInterceptor` logged the session out
     // for a refused refresh token: no token, like the session that ended in another tab.
     return firstValueFrom(
-      this.authControllerService.refreshToken({ refreshToken: this._refreshToken }).pipe(
-        map((r) => {
-          this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
-          return r.data!.token!;
-        }),
-      ),
+      this.authControllerService
+        .refreshToken({ refreshToken: this._refreshToken }, 'body', false, {
+          // Not toasted by `errorHandlerInterceptor` (RPS-1754): a failed refresh ends the session, and
+          // `RefreshTokenInterceptor` shows the one "Session expired" toast for it.
+          context: new HttpContext().set(SILENT_ERROR, true),
+        })
+        .pipe(
+          map((r) => {
+            this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
+            return r.data!.token!;
+          }),
+        ),
       { defaultValue: null },
     );
   }
