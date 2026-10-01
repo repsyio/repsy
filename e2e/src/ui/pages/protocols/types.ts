@@ -176,6 +176,13 @@ export interface ProtocolDescriptor {
   configure?: ConfigureModal;
   /** `SeedPackageOptions.variant` values the seeder accepts (helm: two backend modules); absent = one way. */
   seedVariants?: readonly string[];
+  /**
+   * Four versions, in the order to publish them, for the versions page's `Version` sort (RPS-1765): the
+   * third is a pre-release, and publish order differs from precedence (1.9.0 is older than 1.10.0 but
+   * sorts below it as text). Precedence, highest first, is the 4th, 2nd, 1st, 3rd. Absent = the versions
+   * level has no `Version` sort.
+   */
+  versionPrecedenceSample?: readonly [string, string, string, string];
 }
 
 /** Throws unless a route that needs a package was given one. */
@@ -190,6 +197,8 @@ export function need(target: PackageRef | undefined, what: string): PackageRef {
 
 /** The sort most lists offer: Newest (the default) and Oldest. */
 export const NEWEST_OLDEST: readonly string[] = ['Newest', 'Oldest'];
+/** The version lists that can also sort by version precedence (RPS-1765): Newest, Oldest, Version. */
+export const NEWEST_OLDEST_VERSION: readonly string[] = ['Newest', 'Oldest', 'Version'];
 /** Cargo, Helm and Ruby lists add Name sorts to Newest/Oldest. */
 export const NEWEST_OLDEST_NAME: readonly string[] = [
   'Newest',

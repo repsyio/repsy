@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
+import { NEWEST_OLDEST_VERSION, need, type ProtocolDescriptor } from './types.js';
 import { repoRoute } from '../../routes.js';
 
 /**
@@ -30,6 +30,7 @@ import { repoRoute } from '../../routes.js';
 export const nugetDescriptor: ProtocolDescriptor = {
   protocol: 'nuget',
   label: 'NuGet',
+  versionPrecedenceSample: ['1.9.0', '1.10.0', '1.0.0-beta', '2.0.0'],
   levels: {
     list: {
       path: (repo) => repoRoute(repo),
@@ -47,7 +48,7 @@ export const nugetDescriptor: ProtocolDescriptor = {
       path: (repo, t) => repoRoute(repo, need(t, 'nuget').name),
       rowKey: (t) => need(t, 'nuget').version,
       search: { placeholder: 'version', term: (t) => t.version },
-      sort: NEWEST_OLDEST,
+      sort: NEWEST_OLDEST_VERSION,
       pagination: true,
       mobileCards: true,
       rowDelete: { dialogTitle: 'Delete Version', successToast: 'Version deleted successfully' },

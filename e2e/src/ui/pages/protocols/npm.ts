@@ -15,7 +15,7 @@
 ///
 
 import type { PackageRef } from '../../../seed/packages.js';
-import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
+import { NEWEST_OLDEST, NEWEST_OLDEST_VERSION, need, type ProtocolDescriptor } from './types.js';
 import { repoPath } from '../../../repo-url.js';
 import { repoRoute } from '../../routes.js';
 
@@ -60,6 +60,7 @@ function packageBase(repo: string, target: PackageRef | undefined): string {
 export const npmDescriptor: ProtocolDescriptor = {
   protocol: 'npm',
   label: 'npm',
+  versionPrecedenceSample: ['1.9.0', '1.10.0', '1.0.0-beta', '2.0.0'],
   levels: {
     list: {
       path: (repo) => repoRoute(repo),
@@ -97,7 +98,7 @@ export const npmDescriptor: ProtocolDescriptor = {
       path: (repo, t) => packageBase(repo, t),
       rowKey: (t) => split(t).version,
       search: { placeholder: 'version', term: (t) => t.version },
-      sort: NEWEST_OLDEST,
+      sort: NEWEST_OLDEST_VERSION,
       pagination: true,
       mobileCards: true,
       rowDelete: { dialogTitle: 'Delete Version', successToast: 'Version deleted successfully' },

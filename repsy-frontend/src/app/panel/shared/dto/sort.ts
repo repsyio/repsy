@@ -19,3 +19,9 @@ export interface Sort {
   column: string;
   type: 'ASC' | 'DESC';
 }
+
+/**
+ * Sorts a package version list by version precedence (semver, NuGet, PEP 440, RubyGems) instead of
+ * upload time. The backend orders `version` with a real version comparator (RPS-1688).
+ */
+export const VERSION_PRECEDENCE_SORT: Sort = { name: 'Version', column: 'version', type: 'DESC' };
