@@ -15,9 +15,6 @@
  */
 package io.repsy.protocols.golang.protocol.facades;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -49,6 +46,10 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 @NullMarked
 public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I> {
@@ -63,10 +64,13 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
 
+  // The Go proxy .info file keeps the declared property order (Version, Time); Jackson 3 would sort
+  // them alphabetically by default.
   private static final ObjectMapper OBJECT_MAPPER =
-      new ObjectMapper()
-          .registerModule(new JavaTimeModule())
-          .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+      JsonMapper.builder()
+          .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
+          .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+          .build();
 
   private final GoStorageService<I> goStorageService;
   private final GoModuleService<I> goModuleService;
