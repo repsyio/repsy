@@ -62,6 +62,14 @@ improvement made on either side belongs on the other too.
 - **Say so when a difference is deliberate.** Cloud-only concerns (hosted storage, tenancy) are not
   ported here, and OS-only ones (embedded H2, single-node install) are not forced onto Cloud. Note
   the reason in the code or the PR so a deliberate difference does not read as drift.
+- **The e2e UI suite is shared: write specs for both targets.** Cloud runs `e2e/tests/ui` verbatim
+  against a multi-tenant stack, where panel API and file URLs carry the owner
+  (`/api/repos/<owner>/<repo>/...`, `/<owner>/<repo>/<path>`) while OS has a single owner and omits it.
+  A spec or page object must never hard-code either shape: build URLs through the target helpers
+  (`repoRoute`, `repoPath`/`repoUrl`, `target.urlScheme`), whose OS implementation returns today's
+  owner-less strings. Do not widen a matcher into an owner-tolerant regex to make a test pass on
+  Cloud; that hides a wrong or missing owner. If no helper exists for the URL you need (the panel
+  API path is the known gap), add one to the target layer instead of inlining the path.
 - **The repositories stay separate.** A change lands through the pull request flow of the repository
   it belongs to, under that repository's review and merge rules. Do not merge in the other repository
   without the owner's go-ahead.
