@@ -63,6 +63,7 @@ class KeyStoreServiceTest {
   @Mock PgpPublicKeyRepository pgpPublicKeyRepository;
   @Mock ArtifactConverter artifactConverter;
   @Mock ApplicationEventPublisher eventPublisher;
+  @Mock MavenPgpCaps caps;
 
   private KeyStoreService service;
   private final UUID repoId = UUID.randomUUID();
@@ -71,6 +72,7 @@ class KeyStoreServiceTest {
 
   @BeforeEach
   void setUp() {
+    org.mockito.Mockito.lenient().when(this.caps.getMaxPublicKeysPerRepo()).thenReturn(20);
     this.service =
         new KeyStoreService(
             this.allowedKeyserverRepository,
@@ -78,7 +80,8 @@ class KeyStoreServiceTest {
             this.repoRepository,
             this.pgpPublicKeyRepository,
             this.artifactConverter,
-            this.eventPublisher);
+            this.eventPublisher,
+            this.caps);
   }
 
   private PgpPublicKeyForm keyForm() {

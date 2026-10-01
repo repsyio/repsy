@@ -41,6 +41,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactV
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSignatureRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.MavenPgpCaps;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
@@ -87,6 +88,7 @@ class PendingSignatureServiceTest {
   @Mock UsageUpdateService usageUpdateService;
   @Mock StorageStrategy storageStrategy;
   @Mock PlatformTransactionManager transactionManager;
+  @Mock MavenPgpCaps caps;
 
   private PendingSignatureService service;
   private final UUID repoId = UUID.randomUUID();
@@ -100,6 +102,7 @@ class PendingSignatureServiceTest {
     lenient()
         .when(this.transactionManager.getTransaction(any()))
         .thenReturn(new SimpleTransactionStatus());
+    lenient().when(this.caps.getMaxPendingSignaturesPerRepo()).thenReturn(500);
     this.service =
         new PendingSignatureService(
             this.pendingSignatureRepository,
@@ -111,7 +114,8 @@ class PendingSignatureServiceTest {
             this.keyStoreService,
             this.usageUpdateService,
             this.storageStrategy,
-            this.transactionManager);
+            this.transactionManager,
+            this.caps);
     this.version.setId(UUID.randomUUID());
   }
 

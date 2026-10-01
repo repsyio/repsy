@@ -41,6 +41,8 @@ public interface PendingSignatureRepository extends JpaRepository<PendingSignatu
   List<PendingSignature> findByRepoIdAndSignedFilePathStartingWithOrderBySignedFilePath(
       UUID repoId, String prefix);
 
+  long countByRepoId(UUID repoId);
+
   long deleteByRepoIdAndSignedFilePathStartingWith(UUID repoId, String prefix);
 
   List<PendingSignature> findByCreatedAtBefore(Instant cutoff);

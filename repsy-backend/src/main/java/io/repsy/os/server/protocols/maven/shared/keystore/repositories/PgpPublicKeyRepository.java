@@ -32,6 +32,9 @@ public interface PgpPublicKeyRepository extends JpaRepository<PgpPublicKey, UUID
 
   boolean existsByRepoIdAndFingerprint(@NonNull UUID repoId, @NonNull String fingerprint);
 
+  @Query("select count(k) from PgpPublicKey k where k.repo.id = :repoId")
+  long countByRepoId(@Param("repoId") @NonNull UUID repoId);
+
   @NonNull Optional<PgpPublicKey> findByIdAndRepoId(@NonNull UUID id, @NonNull UUID repoId);
 
   @NonNull Page<PgpPublicKey> findAllByRepoId(@NonNull UUID repoId, @NonNull Pageable pageable);

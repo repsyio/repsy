@@ -64,6 +64,7 @@ public class KeyStoreService {
   private final PgpPublicKeyRepository pgpPublicKeyRepository;
   private final ArtifactConverter artifactConverter;
   private final ApplicationEventPublisher eventPublisher;
+  private final MavenPgpCaps caps;
 
   @Transactional
   public void create(final RepoInfo repoInfo, final KeyStoreForm form) {
@@ -129,6 +130,9 @@ public class KeyStoreService {
    *
    * @throws io.repsy.core.error_handling.exceptions.BadRequestException {@code pgpPublicKeyInvalid}
    *     when the form's key is too long, or is not exactly one armored OpenPGP public key
+   * @throws io.repsy.core.error_handling.exceptions.BadRequestException {@code
+   *     pgpPublicKeyLimitReached} when the repo already has {@code
+   *     repsy.maven.pgp.max-public-keys-per-repo} keys (RPS-1796)
    * @throws ItemAlreadyExistException {@code pgpPublicKeyAlreadyExists} when the repo already has a
    *     key with the same fingerprint
    * @throws ItemNotFoundException {@code repoNotFound} when the repo has vanished
@@ -142,9 +146,18 @@ public class KeyStoreService {
 
     final var parsed = PGPVerifierService.parseArmoredPublicKey(form.getArmoredKey());
 
+    // RPS-1796: the count and the insert are one step per repo, or concurrent registrations
+    // would each see room for one more.
+    this.caps.lockPublicKeys(repoInfo.getStorageKey());
+
     if (this.pgpPublicKeyRepository.existsByRepoIdAndFingerprint(
         repoInfo.getStorageKey(), parsed.fingerprintHex())) {
       throw new ItemAlreadyExistException("pgpPublicKeyAlreadyExists");
+    }
+
+    if (this.pgpPublicKeyRepository.countByRepoId(repoInfo.getStorageKey())
+        >= this.caps.getMaxPublicKeysPerRepo()) {
+      throw new BadRequestException("pgpPublicKeyLimitReached");
     }
 
     final var repo =
