@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.maven.shared.artifact.services;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -27,6 +28,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactR
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSignatureRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.MavenPgpCaps;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -141,8 +143,9 @@ public class PendingSignatureService {
   private final UsageUpdateService usageUpdateService;
   private final StorageStrategy storageStrategy;
   private final TransactionTemplate newTransaction;
+  private final MavenPgpCaps caps;
 
-  @SuppressWarnings("java:S107")
+  @SuppressWarnings({"java:S107", "checkstyle:ParameterNumber"})
   public PendingSignatureService(
       final PendingSignatureRepository pendingSignatureRepository,
       final ArtifactRepository artifactRepository,
@@ -153,7 +156,8 @@ public class PendingSignatureService {
       final KeyStoreService keyStoreService,
       final UsageUpdateService usageUpdateService,
       @Qualifier("osStorageStrategyMaven") final StorageStrategy storageStrategy,
-      final PlatformTransactionManager transactionManager) {
+      final PlatformTransactionManager transactionManager,
+      final MavenPgpCaps caps) {
 
     this.pendingSignatureRepository = pendingSignatureRepository;
     this.artifactRepository = artifactRepository;
@@ -164,6 +168,7 @@ public class PendingSignatureService {
     this.keyStoreService = keyStoreService;
     this.usageUpdateService = usageUpdateService;
     this.storageStrategy = storageStrategy;
+    this.caps = caps;
     this.newTransaction = new TransactionTemplate(transactionManager);
     this.newTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -186,6 +191,8 @@ public class PendingSignatureService {
    * Parks the signature of the file {@code signedFilePath}, in a transaction that commits before
    * this returns. The signature of the same file that was already parked is replaced.
    *
+   * @throws BadRequestException {@code pendingSignatureLimitReached} when the repo already has
+   *     {@code repsy.maven.pending-signature.max-per-repo} signatures parked (RPS-1796)
    * @throws SignatureNotVerifiedException {@code artifactSignatureNotVerified} when the bytes are
    *     not an OpenPGP signature (or not text: a parked signature is armored)
    */
@@ -214,10 +221,20 @@ public class PendingSignatureService {
 
     this.newTransaction.executeWithoutResult(
         status -> {
+          // RPS-1796: count and insert are one step per repo (see MavenPgpCaps). Replacing the
+          // signature already parked for a file is never refused, only a new row is.
+          this.caps.lockPendingSignatures(repoId);
+
           final var row =
               this.pendingSignatureRepository
                   .lockByRepoIdAndSignedFilePath(repoId, signedFilePath)
                   .orElseGet(PendingSignature::new);
+
+          if (row.getId() == null
+              && this.pendingSignatureRepository.countByRepoId(repoId)
+                  >= this.caps.getMaxPendingSignaturesPerRepo()) {
+            throw new BadRequestException("pendingSignatureLimitReached");
+          }
 
           row.setRepoId(repoId);
           row.setSignedFilePath(signedFilePath);

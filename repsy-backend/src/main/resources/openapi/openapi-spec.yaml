@@ -75,7 +75,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -124,7 +124,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -163,7 +163,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -663,7 +663,13 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponsePgpPublicKeyItem"
         '400':
-          "$ref": "#/components/responses/BadRequest"
+          description: >-
+            The key is not one armored OpenPGP public key (pgpPublicKeyInvalid), or the repository
+            already has the maximum of 20 registered keys (pgpPublicKeyLimitReached, RPS-1796).
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -703,7 +709,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -789,7 +795,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -812,7 +818,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -851,7 +857,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1185,7 +1191,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1247,7 +1253,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1290,7 +1296,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Delete the current user's account
@@ -1390,7 +1396,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1472,7 +1478,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1534,7 +1540,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1606,7 +1612,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -2524,7 +2530,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2607,7 +2613,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2779,7 +2785,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3061,7 +3067,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3133,7 +3139,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3278,7 +3284,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3348,7 +3354,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3472,7 +3478,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3602,7 +3608,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3696,7 +3702,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3787,7 +3793,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3826,7 +3832,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/ErrorResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':

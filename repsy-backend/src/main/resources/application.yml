@@ -133,10 +133,18 @@ repsy:
     # libraries, generated bindings) can raise this without a rebuild (RPS-1119).
     max-crate-size: ${CARGO_MAX_CRATE_SIZE:100MB}
   maven:
+    # RPS-1796: abuse cap (not a quota) on the armored public keys one repo can register; every
+    # deploy parses them. Over it: 400 pgpPublicKeyLimitReached.
+    pgp:
+      max-public-keys-per-repo: ${MAVEN_PGP_MAX_PUBLIC_KEYS_PER_REPO:20}
     # A Maven repo that verifies every signature accepts a signature before the file it signs (Maven
     # uploads in parallel) and holds it, unverified and not served, until that file arrives. What is
     # older than `ttl` is deleted every `purge-interval`. Durations are ISO-8601 (PT24H = 24 hours).
     pending-signature:
+      # RPS-1796: abuse cap on the signatures one repo can have parked at a time (each up to 64
+      # KiB). Over it: 400 pendingSignatureLimitReached. A signature of a file whose signature is
+      # already parked replaces it and is never refused.
+      max-per-repo: ${PENDING_SIGNATURE_MAX_PER_REPO:500}
       enabled: ${PENDING_SIGNATURE_PURGE_ENABLED:true}
       ttl: ${PENDING_SIGNATURE_TTL:PT24H}
       purge-interval: ${PENDING_SIGNATURE_PURGE_INTERVAL:PT15M}
