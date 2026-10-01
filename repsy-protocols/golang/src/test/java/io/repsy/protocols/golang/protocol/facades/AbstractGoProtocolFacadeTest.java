@@ -152,6 +152,32 @@ class AbstractGoProtocolFacadeTest {
   }
 
   @Test
+  @DisplayName("writes the .info file as the Go proxy JSON: Version first, ISO-8601 Time")
+  void writesInfoFileWireFormat() throws IOException {
+    publishRunsFilesWriter();
+    when(this.storageService.getModuleZipRelativePath(MODULE, VERSION))
+        .thenReturn("/" + MODULE + "/@v/" + VERSION + ".zip");
+    final var written = new java.util.LinkedHashMap<String, String>();
+    when(this.storageService.writeInputStreamToPath(any(), any(InputStream.class), any()))
+        .thenAnswer(
+            invocation -> {
+              final StoragePath path = invocation.getArgument(0);
+              final InputStream in = invocation.getArgument(1);
+              written.put(
+                  path.getRelativePath().getPath(),
+                  new String(in.readAllBytes(), StandardCharsets.UTF_8));
+
+              return BaseUsages.ofDisk(10);
+            });
+    final var zip = moduleZip(MODULE, VERSION);
+
+    this.facade.upload(this.context(MODULE, VERSION), new ByteArrayInputStream(zip), zip.length);
+
+    assertThat(written.get("/" + MODULE + "/@v/" + VERSION + ".info"))
+        .matches("\\{\"Version\":\"v1\\.0\\.0\",\"Time\":\"\\d{4}-\\d{2}-\\d{2}T[\\d:.]+Z\"\\}");
+  }
+
+  @Test
   @DisplayName("does not touch storage when the version row cannot be written")
   void leavesStorageAloneWhenRowFails() throws IOException {
     when(this.moduleService.publishModule(any(), any(), any(), any(), any(), any(), any()))
