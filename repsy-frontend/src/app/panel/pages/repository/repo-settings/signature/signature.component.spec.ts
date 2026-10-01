@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { RouterTestingModule } from '@angular/router/testing';
 import { of, Subject, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
@@ -479,7 +480,7 @@ describe('SignatureComponent', () => {
 
     beforeEach(async () => {
       await TestBed.configureTestingModule({
-        imports: [SignatureComponent],
+        imports: [SignatureComponent, RouterTestingModule],
         providers: [
           { provide: ToastService, useValue: toastService },
           { provide: DangerModalService, useValue: dangerModalService },
