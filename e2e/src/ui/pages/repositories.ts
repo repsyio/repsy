@@ -16,6 +16,7 @@
 
 import { expect, type Locator, type Page, type Response } from '@playwright/test';
 
+import { target } from '../../target.js';
 import type { UiRepoType } from '../repo-types.js';
 import { UiPage } from './base.js';
 import { DangerModal, DesktopList, EmptyList, Pagination, Spinner, Toasts } from './components.js';
@@ -24,7 +25,6 @@ import { RepoCreateModal } from './repo-create-modal.js';
 /** `GET /api/repos` (the list); `/api/repos/counts` and `/api/repos/security-summary` do not match. */
 export const LIST_URL = /\/api\/repos(\?|$)/;
 export const SECURITY_SUMMARY_URL = /\/api\/repos\/security-summary(\?|$)/;
-const PROFILE_URL = /\/api\/profile(\?|$)/;
 
 /** Rows per page of the list: the page size the SPA asks the server for (`RepositoryComponent.pageSize`). */
 export const REPO_PAGE_SIZE = 10;
@@ -157,14 +157,21 @@ export class RepositoriesPage extends UiPage {
   }
 
   /**
-   * Opens `/repositories` and waits for the profile (which decides the admin-only controls) and
-   * the list answer. A pre-selected type only comes from the dashboard's count rows
-   * (`history.state`), never from a URL.
+   * Opens `/repositories` and waits for the list answer. On Repsy OS, the panel component also
+   * requests the profile (which decides admin-only controls), so this wait captures it; on Repsy
+   * Cloud the profile endpoint is not requested, so there is nothing to wait for. A pre-selected
+   * type only comes from the dashboard's count rows (`history.state`), never from a URL.
    */
   async goto(): Promise<void> {
     await this.afterListResponse(async () => {
-      const profile = this.page.waitForResponse((response) => PROFILE_URL.test(response.url()));
-      profile.catch(() => undefined);
+      // On OS, wait for the profile request; on Cloud, target.ui.profileApiUrl is null so skip it.
+      let profile: Promise<Response | null> = Promise.resolve(null);
+      if (target.ui.profileApiUrl) {
+        profile = this.page.waitForResponse((response) =>
+          target.ui.profileApiUrl!.test(response.url()),
+        );
+        profile.catch(() => undefined);
+      }
       await this.page.goto('/repositories');
       await profile;
     });

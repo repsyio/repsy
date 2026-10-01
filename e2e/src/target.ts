@@ -80,6 +80,11 @@ export interface UiCapabilities {
   repoApiPath(repo: string, ...segments: string[]): string;
   /** The route of the signed-in account's own page: `/profile` (OS) or `/account` (Cloud). */
   profilePath: string;
+  /**
+   * The regex pattern for the profile API endpoint (e.g., `/\/api\/profile(\?|$)/` on Repsy OS).
+   * `null` means the panel does not request this endpoint (Repsy Cloud).
+   */
+  profileApiUrl: RegExp | null;
   /** The panel has an admin-only Users page (`/users`, the sidebar's Users entry): Repsy OS only. */
   hasUsersPage: boolean;
   /** The login form's identifier field: see `UiLoginField`. */
@@ -136,6 +141,7 @@ const OS_UI: UiCapabilities = {
   repoRoute: (repo, ...segments) => ['', repo, ...segments].join('/'),
   repoApiPath: (repo, ...segments) => ['', 'api', 'repos', repo, ...segments].join('/'),
   profilePath: '/profile',
+  profileApiUrl: /\/api\/profile(\?|$)/,
   hasUsersPage: true,
   loginField: 'username',
   sessionStorageKeys: { username: 'username', token: 'token', refreshToken: 'refresh-token' },
@@ -166,6 +172,7 @@ const CLOUD_UI: UiCapabilities = {
     return ['', 'api', 'repos', env.repoOwner, repo, ...segments].join('/');
   },
   profilePath: '/account',
+  profileApiUrl: null,
   hasUsersPage: false,
   loginField: 'usernameOrEmail',
   sessionStorageKeys: {
