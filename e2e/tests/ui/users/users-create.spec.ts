@@ -323,6 +323,11 @@ test.describe('USR-02 create validation', { tag: ['@cloud-skip'] }, () => {
   test('the create-user modal and the profile show the same message for the same bad input', async ({
     usersPage,
   }) => {
+    // Normalize whitespace in validation messages: multi-line templates may have leading/trailing
+    // spaces that are not visible to the user. RPS-1763: some templates wrap lines at 120 chars,
+    // so we normalize to compare visible text only.
+    const normalizeText = (s: string): string => s.replace(/\s+/g, ' ').trim();
+
     const badUsernames = {
       minlength: 'ab',
       maxlength: 'a'.repeat(26),
@@ -341,18 +346,22 @@ test.describe('USR-02 create validation', { tag: ['@cloud-skip'] }, () => {
     for (const [validator, value] of Object.entries(badUsernames)) {
       await modal.username.fill(value);
       await modal.username.blur();
-      fromModal[`username-${validator}`] =
-        (await modal.error('username', validator as UsernameValidator).textContent()) ?? '';
+      fromModal[`username-${validator}`] = normalizeText(
+        (await modal.error('username', validator as UsernameValidator).textContent()) ?? '',
+      );
     }
     for (const [validator, value] of Object.entries(badPasswords)) {
       await modal.password.fill(value);
       await modal.password.blur();
-      fromModal[`password-${validator}`] =
-        (await modal.error('password', validator as PasswordValidator).textContent()) ?? '';
+      fromModal[`password-${validator}`] = normalizeText(
+        (await modal.error('password', validator as PasswordValidator).textContent()) ?? '',
+      );
     }
     await modal.confirmPassword.fill('different');
     await modal.confirmPassword.blur();
-    fromModal['mismatch'] = (await modal.error('confirm-password', 'mismatch').textContent()) ?? '';
+    fromModal['mismatch'] = normalizeText(
+      (await modal.error('confirm-password', 'mismatch').textContent()) ?? '',
+    );
 
     // The harness admin only types into the profile fields here; nothing is submitted.
     const profile = new ProfilePage(usersPage.page);
@@ -361,26 +370,29 @@ test.describe('USR-02 create validation', { tag: ['@cloud-skip'] }, () => {
     for (const [validator, value] of Object.entries(badUsernames)) {
       await profile.username.fill(value);
       await profile.username.blur();
-      fromProfile[`username-${validator}`] =
-        (await profile.usernameError(validator as ProfileUsernameValidator).textContent()) ?? '';
+      fromProfile[`username-${validator}`] = normalizeText(
+        (await profile.usernameError(validator as ProfileUsernameValidator).textContent()) ?? '',
+      );
     }
     for (const [validator, value] of Object.entries(badPasswords)) {
       await profile.newPassword.fill(value);
       await profile.newPassword.blur();
-      fromProfile[`password-${validator}`] =
+      fromProfile[`password-${validator}`] = normalizeText(
         (await profile
           .passwordError('new-password', validator as PasswordValidator)
-          .textContent()) ?? '';
+          .textContent()) ?? '',
+      );
     }
     await profile.newPassword.fill('Passw0rd');
     await profile.passwordConfirmation.fill('different');
     await profile.passwordConfirmation.blur();
-    fromProfile['mismatch'] =
-      (await profile.passwordError('password-confirmation', 'mismatch').textContent()) ?? '';
+    fromProfile['mismatch'] = normalizeText(
+      (await profile.passwordError('password-confirmation', 'mismatch').textContent()) ?? '',
+    );
 
     expect(fromProfile).toEqual(fromModal);
-    expect(fromProfile['username-pattern']?.trim()).toBe(bulleted(USERNAME_TEXT.pattern));
-    expect(fromProfile['password-pattern']?.trim()).toBe(bulleted(PASSWORD_TEXT.pattern));
+    expect(fromProfile['username-pattern']).toBe(bulleted(USERNAME_TEXT.pattern));
+    expect(fromProfile['password-pattern']).toBe(bulleted(PASSWORD_TEXT.pattern));
   });
 
   test('a valid form enables the submit button', async ({ usersPage, seeder }) => {
