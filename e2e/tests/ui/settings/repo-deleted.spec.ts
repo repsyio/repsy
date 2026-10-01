@@ -27,6 +27,7 @@
 import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
+import { repoApiPath } from '../../../src/ui/routes.js';
 import { errorToasts } from '../../../src/ui/page-errors.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
 import {
@@ -87,14 +88,17 @@ test.describe('Repository settings: the repo is gone under an open page', { tag:
     // Another admin renames it; the page still holds the old name. Tracked, so cleanup deletes it.
     const newName = seeder.reserveRepoName(type);
     seeder.adoptRepo(newName);
-    const res = await fetch(`${env.apiBaseUrl}/api/repos/${encodeURIComponent(repo.name)}/name`, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${adminSession.token}`,
-        'Content-Type': 'application/json',
+    const res = await fetch(
+      `${env.apiBaseUrl}${repoApiPath(encodeURIComponent(repo.name), 'name')}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${adminSession.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: newName }),
       },
-      body: JSON.stringify({ name: newName }),
-    });
+    );
     expect(res.status).toBe(200);
     const before = comparable(await panelApi.getSettings(newName));
 

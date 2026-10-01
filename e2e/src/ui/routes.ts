@@ -30,14 +30,28 @@ export function repoRoute(repo: string, ...segments: string[]): string {
   return target.ui.repoRoute(repo, ...segments);
 }
 
+/**
+ * `/api/repos/<repo>` (Repsy OS) or `/api/repos/<owner>/<repo>` (Repsy Cloud), then `segments`:
+ * `target.ui.repoApiPath`. Never write `/api/repos/${repo}` in a spec or page object (the `no-restricted-syntax`
+ * rule in `eslint.config.js` fails it): Cloud runs this suite verbatim and its panel API carries the owner.
+ */
+export function repoApiPath(repo: string, ...segments: string[]): string {
+  return target.ui.repoApiPath(repo, ...segments);
+}
+
 /** The signed-in account's own page: `/profile` (Repsy OS) or `/account` (Repsy Cloud). */
 export function profileRoute(): string {
   return target.ui.profilePath;
 }
 
+/** `text` as a regular-expression fragment that matches it literally. */
+export function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /** A URL whose path (and query) ends in `path`, whatever the base URL is: for `expect(page).toHaveURL(...)`. */
 export function urlEndsWith(path: string): RegExp {
-  return new RegExp(`${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
+  return new RegExp(`${escapeRegExp(path)}$`);
 }
 
 /**

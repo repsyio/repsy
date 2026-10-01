@@ -23,6 +23,7 @@
  */
 import { env } from '../../../env.js';
 import { repoUrl } from '../../../repo-url.js';
+import { repoApiPath } from '../../routes.js';
 
 /** The `{ data: ... }` envelope of a panel REST response. */
 interface Envelope<T> {
@@ -70,13 +71,13 @@ export class RepoSettingsReadback {
 
   /** The repo's description, privacy and what the caller may do with it. */
   permissions(repoName: string): Promise<RepoPermissions> {
-    return this.get<RepoPermissions>(`/api/repos/${encodeURIComponent(repoName)}/permissions`);
+    return this.get<RepoPermissions>(repoApiPath(encodeURIComponent(repoName), 'permissions'));
   }
 
   /** Bytes the repo occupies, as the Storage section's source (`diskUsed.value`). */
   async diskUsedBytes(repoName: string): Promise<number> {
     const usage = await this.get<{ diskUsed?: { value?: number } }>(
-      `/api/repos/${encodeURIComponent(repoName)}/usage`,
+      repoApiPath(encodeURIComponent(repoName), 'usage'),
     );
     return usage.diskUsed?.value ?? 0;
   }

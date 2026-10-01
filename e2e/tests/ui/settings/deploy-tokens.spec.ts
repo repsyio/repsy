@@ -33,6 +33,7 @@ import {
 import type { SeededToken } from '../../../src/seed/seeder.js';
 import { allowClipboard, copiedText } from '../../../src/ui/clipboard.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
+import { repoApiPath } from '../../../src/ui/routes.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
 import { repoRootStatus } from '../../../src/ui/pages/repo-settings/readback.js';
 import {
@@ -60,7 +61,7 @@ function seededByName(seeded: SeededToken[], name: string): SeededToken {
 /** `GET /api/repos/<repo>/deploy-tokens?page=<n>` (zero-based `n`), the list the section reads. */
 function isTokenListRequest(url: URL, repoName: string, pageIndex: number): boolean {
   return (
-    url.pathname.endsWith(`/api/repos/${repoName}/deploy-tokens`) &&
+    url.pathname.endsWith(repoApiPath(repoName, 'deploy-tokens')) &&
     url.searchParams.get('page') === String(pageIndex)
   );
 }

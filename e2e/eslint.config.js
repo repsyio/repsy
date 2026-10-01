@@ -58,6 +58,21 @@ const UNTYPED_STUB_BODY = {
     'generated OpenAPI models, or fulfillText() for a body that is not JSON on purpose (RPS-1652).',
 };
 
+// RPS-1770: Repsy Cloud runs this UI suite verbatim, and its panel API carries the owner
+// (`/api/repos/<owner>/<repo>/...`) where Repsy OS's does not. A repo-scoped panel API path is built with
+// repoApiPath() (src/ui/routes.ts), never by interpolating into a literal. `/api/repos/counts` and
+// `/api/repos/security-summary` name no repository and stay literals; so does a glob such as
+// `** /api/repos/*` (use a matcher built from repoApiPath()).
+const HARDCODED_REPO_API_MESSAGE =
+  'Build a repo-scoped panel API path with repoApiPath() (src/ui/routes.ts): Repsy Cloud puts the owner in ' +
+  'it (/api/repos/<owner>/<repo>/...) and runs this suite verbatim (RPS-1770).';
+const HARDCODED_REPO_API = [
+  // `/api/repos/${repo}/...`: a template chunk that ends in /api/repos/ before an expression
+  'TemplateLiteral > TemplateElement[value.raw=/\\/api\\/repos\\/$/]',
+  // '**/api/repos/*/contents' and '/api/repos/{repo}...' written as plain strings
+  'Literal[value=/\\/api\\/repos\\/(\\*|\\{)/]',
+].map((selector) => ({ selector, message: HARDCODED_REPO_API_MESSAGE }));
+
 export default tseslint.config(
   { ignores: IGNORES },
   pluginJs.configs.recommended,
@@ -87,7 +102,12 @@ export default tseslint.config(
     files: ['src/ui/**/*.ts', 'tests/ui/**/*.ts'],
     ignores: ['src/ui/stub-responses.ts'],
     rules: {
-      'no-restricted-syntax': ['error', ...PROCESS_ENV_COPIES, UNTYPED_STUB_BODY],
+      'no-restricted-syntax': [
+        'error',
+        ...PROCESS_ENV_COPIES,
+        UNTYPED_STUB_BODY,
+        ...HARDCODED_REPO_API,
+      ],
     },
   },
   {

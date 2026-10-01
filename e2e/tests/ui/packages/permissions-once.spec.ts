@@ -23,6 +23,7 @@ import type { Request } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
+import { repoApiPath } from '../../../src/ui/routes.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 
 test.describe('Repository permissions', { tag: '@packages' }, () => {
@@ -38,7 +39,7 @@ test.describe('Repository permissions', { tag: '@packages' }, () => {
         RepoType[protocol.toUpperCase() as keyof typeof RepoType],
       );
       const pkg = await seedPackage(repo);
-      const permissions = `/api/repos/${repo.name}/permissions`;
+      const permissions = repoApiPath(repo.name, 'permissions');
       const requests: string[] = [];
       adminPage.on('request', (request: Request) => {
         if (new URL(request.url()).pathname === permissions) {
