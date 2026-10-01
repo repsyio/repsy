@@ -26,8 +26,8 @@ import { DangerModalService } from '../../../../shared/components/modals/danger-
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { permission } from '../../testing/protocol-service-spec-helpers';
 import { releaseAwareParentForm } from '../testing/repo-settings-spec-helpers';
-import { SignatureComponent } from './signature.component';
 import { PgpPublicKeyItem } from './dto/pgp-public-key-item';
+import { SignatureComponent } from './signature.component';
 
 const REPO = 'maven-repo';
 const UBUNTU: AllowedKeyserverItem = { id: 'ks-1', host: 'keyserver.ubuntu.com', displayName: 'Ubuntu Keyserver' };

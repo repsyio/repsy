@@ -35,8 +35,8 @@ import { SelectorComponent } from '../../../../shared/components/selector/select
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 import { saveRepoSetting } from '../save-repo-setting';
-import { PgpPublicKeyItem } from './dto/pgp-public-key-item';
 import { CreateMavenPgpPublicKeyRequest } from './dto/pgp-public-key-form';
+import { PgpPublicKeyItem } from './dto/pgp-public-key-item';
 
 @Component({
   selector: 'app-signature',
