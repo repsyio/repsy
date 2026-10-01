@@ -60,11 +60,14 @@ ARG MAVEN_SHA512
 ARG GRADLE_VERSION=8.14.3
 ARG GRADLE_SHA256=bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531
 
-# The published checksum of sbt-${SBT_VERSION}.tgz (its GitHub release page lists a .sha256 next to it);
-# change both together. The build fails on a mismatch. Scala versions are not installed: the sbt
-# projects of clients/sbt.ts name them and sbt downloads them, once, into the primed cache below.
+# The published checksum of sbt-${SBT_VERSION}.tgz and sbt-${SBT_VERSION_2}.tgz (their GitHub release
+# pages list .sha256 next to each); change each version and its checksum together. The build fails on a mismatch.
+# Scala versions are not installed: the sbt projects of clients/sbt.ts name them and sbt downloads them, once,
+# into the primed caches below.
 ARG SBT_VERSION=1.13.0
 ARG SBT_SHA256=06806805ffd26232727326216766ed4793b549f8c1e6ffeef2e610db7245b698
+ARG SBT_VERSION_2=2.1.0
+ARG SBT_VERSION_2_SHA256=55de50e2ef0cf40c4bd81df1fc06197c4a8c3903df25a69dbcc81e8e18e52ffc
 
 # The published SHA-512 of apache-ant-${ANT_VERSION}-bin.tar.gz and apache-ivy-${IVY_VERSION}-bin.tar.gz
 # (the .sha512 files next to them on archive.apache.org); change each version and its checksum together.
@@ -80,6 +83,7 @@ ENV JAVA_HOME="/opt/java/temurin"
 ENV MAVEN_HOME="/opt/maven"
 ENV GRADLE_HOME="/opt/gradle"
 ENV SBT_HOME="/opt/sbt"
+ENV SBT_HOME_2="/opt/sbt-2"
 ENV ANT_HOME="/opt/ant"
 ENV IVY_JAR="/opt/ivy/ivy.jar"
 ENV PATH="${JAVA_HOME}/bin:${MAVEN_HOME}/bin:${GRADLE_HOME}/bin:${SBT_HOME}/bin:${ANT_HOME}/bin:${PATH}"
@@ -120,6 +124,14 @@ RUN curl -fsSL -o /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v${
     && tar -xzf /tmp/sbt.tgz -C /opt \
     && rm /tmp/sbt.tgz \
     && chmod -R a+rX "${SBT_HOME}"
+
+RUN mkdir -p /tmp/sbt-2-extract \
+    && curl -fsSL -o /tmp/sbt-2.tgz "https://github.com/sbt/sbt/releases/download/v${SBT_VERSION_2}/sbt-${SBT_VERSION_2}.tgz" \
+    && echo "${SBT_VERSION_2_SHA256}  /tmp/sbt-2.tgz" | sha256sum -c - \
+    && tar -xzf /tmp/sbt-2.tgz -C /tmp/sbt-2-extract \
+    && mv /tmp/sbt-2-extract/sbt "${SBT_HOME_2}" \
+    && rm -rf /tmp/sbt-2.tgz /tmp/sbt-2-extract \
+    && chmod -R a+rX "${SBT_HOME_2}"
 
 RUN curl -fsSL -o /tmp/ant.tgz "https://archive.apache.org/dist/ant/binaries/apache-ant-${ANT_VERSION}-bin.tar.gz" \
     && echo "${ANT_SHA512}  /tmp/ant.tgz" | sha512sum -c - \
@@ -166,6 +178,15 @@ RUN mkdir -p /opt/sbt-cache/boot /opt/sbt-cache/coursier /opt/sbt-cache/ivy /opt
         -Dsbt.global.base=/opt/sbt-cache/global -Dsbt.server.autostart=false \
         +update +compile +package +makePom \
     && rm -rf /tmp/sbt-warmup /tmp/.sbt /opt/sbt-cache/home /opt/sbt-cache/global \
+    && mkdir -p /opt/sbt-cache/global && chmod -R a+rwX /opt/sbt-cache
+
+COPY ${HARNESS_DIR}/runners/sbt2-warmup /tmp/sbt2-warmup
+RUN cd /tmp/sbt2-warmup \
+    && PATH="${SBT_HOME_2}/bin:${PATH}" HOME=/opt/sbt-cache/home COURSIER_CACHE=/opt/sbt-cache/coursier sbt -batch -no-colors \
+        -Dsbt.boot.directory=/opt/sbt-cache/boot -Dsbt.ivy.home=/opt/sbt-cache/ivy \
+        -Dsbt.global.base=/opt/sbt-cache/global -Dsbt.server.autostart=false \
+        +update +compile +package +makePom \
+    && rm -rf /tmp/sbt2-warmup /tmp/.sbt /opt/sbt-cache/home /opt/sbt-cache/global \
     && mkdir -p /opt/sbt-cache/global && chmod -R a+rwX /opt/sbt-cache
 
 RUN java --version && mvn --version && GRADLE_USER_HOME=/tmp/gradle-check gradle --version && rm -rf /tmp/gradle-check && gpg --version | head -1 && ant -version && java -cp "${IVY_JAR}" org.apache.ivy.Main -version

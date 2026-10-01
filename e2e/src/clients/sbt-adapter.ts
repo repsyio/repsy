@@ -15,16 +15,17 @@
 ///
 
 /**
- * `sbtAdapter`: the sbt client's `ProtocolAdapter` (`scenarios/adapter.ts`, RPS-134).
- * `tests/maven/sbt.spec.ts` hands it to `scenarios/loop.ts`'s `registerPublishConsumeLoop`, so the whole
- * shared catalog runs against an ordinary Maven repository with a real `sbt publish` and a real sbt
- * dependency resolution. `publish`/`resolve`/`seedPublish` are `clients/sbt.ts`'s real-client
- * functions; the repo-tree fingerprint and the "nothing stored" check are Maven's own, since the
- * repository is the same.
+ * `sbtAdapter`: the sbt client's `ProtocolAdapter` factory (`scenarios/adapter.ts`, RPS-134, RPS-1327).
+ * `tests/maven/sbt.spec.ts` and `tests/maven/sbt-2.spec.ts` hand `sbtAdapter(version)` to `scenarios/loop.ts`'s
+ * `registerPublishConsumeLoop`, so the whole shared catalog runs against an ordinary Maven repository
+ * with a real `sbt publish` and a real sbt dependency resolution for each sbt version. `publish`/`resolve`/`seedPublish`
+ * are `clients/sbt.ts`'s real-client functions; the repo-tree fingerprint and the "nothing stored"
+ * check are Maven's own, since the repository is the same.
  *
- * `packageName` is the artifactId sbt PUBLISHES (`sbt-<scenario>_2.13`, the cross-version suffix
- * included), not the `name` in the build: that keeps every raw helper that builds a path from the
- * world's coordinates (`repoTree`, `expectNothingStored`, the probes) pointing at the real files.
+ * `packageName` is the artifactId sbt PUBLISHES (`sbt-1-x-<scenario>_2.13` for sbt 1.x,
+ * `sbt-2-x-<scenario>_3` for sbt 2.x, the cross-version suffix included), not the `name` in the build:
+ * that keeps every raw helper that builds a path from the world's coordinates (`repoTree`,
+ * `expectNothingStored`, the probes) pointing at the real files.
  */
 import { slugify } from '../scenarios/coordinates.js';
 import type { ProtocolAdapter } from '../scenarios/adapter.js';
@@ -33,26 +34,48 @@ import { uniqueVersion } from './maven-adapter.js';
 import { expectNothingStored } from './maven-checks.js';
 import { repoTree, type RepoTree } from './maven-raw.js';
 import { expectLiteralSnapshotStored } from './sbt-checks.js';
-import { crossSuffix, publish, resolve, SCALA_213, seedPublish } from './sbt.js';
+import {
+  crossSuffix,
+  publish,
+  resolve,
+  SCALA_213,
+  SCALA_3,
+  SBT_VERSION,
+  SBT_VERSION_2,
+  seedPublish,
+} from './sbt.js';
 
-export const sbtAdapter: ProtocolAdapter<RepoTree> = {
-  protocol: 'sbt',
-  client: { name: 'sbt', publishVerb: 'publish', consumeVerb: 'fetchDependencies' },
+/** The protocol key of a sbt version's adapter: `sbt-1.x` | `sbt-2.x`. */
+export function sbtProtocol(version: string): `sbt-${string}` {
+  return `sbt-${version.split('.').slice(0, 2).join('.')}`;
+}
 
-  packageName: (runId: string, scenario: Scenario) =>
-    `io.repsy.e2e.${runId}:sbt-${slugify(scenario.id)}${crossSuffix(SCALA_213)}`,
-  version: uniqueVersion,
+/** The default Scala version for a given sbt version: 2.13 for sbt 1.x, 3 for sbt 2.x. */
+export function defaultScalaForSbt(version: string): string {
+  return version.startsWith('2.') ? SCALA_3 : SCALA_213;
+}
 
-  publish: (world) => publish(world),
-  resolve: (world) => resolve(world),
-  seedPublish: (world) => seedPublish(world),
+export function sbtAdapter(version: string = SBT_VERSION): ProtocolAdapter<RepoTree> {
+  const scalaVersion = defaultScalaForSbt(version);
+  return {
+    protocol: sbtProtocol(version),
+    client: { name: 'sbt', publishVerb: 'publish', consumeVerb: 'fetchDependencies' },
 
-  fingerprint: (world) => repoTree(world.repoName),
-  expectNothingStored,
+    packageName: (runId: string, scenario: Scenario) =>
+      `io.repsy.e2e.${runId}:sbt-${version.split('.').slice(0, 1).join('.')}-x-${slugify(scenario.id)}${crossSuffix(scalaVersion)}`,
+    version: uniqueVersion,
 
-  afterSuccessfulRoundTrip: async (world, _published, resolved) => {
-    if (world.scenario.versionType === 'snapshot') {
-      await expectLiteralSnapshotStored(world, resolved);
-    }
-  },
-};
+    publish: (world) => publish(world, { sbtVersion: version, scalaVersion }),
+    resolve: (world) => resolve(world, { sbtVersion: version, scalaVersion }),
+    seedPublish: (world) => seedPublish(world, { sbtVersion: version, scalaVersion }),
+
+    fingerprint: (world) => repoTree(world.repoName),
+    expectNothingStored,
+
+    afterSuccessfulRoundTrip: async (world, _published, resolved) => {
+      if (world.scenario.versionType === 'snapshot') {
+        await expectLiteralSnapshotStored(world, resolved);
+      }
+    },
+  };
+}

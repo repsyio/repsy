@@ -15,9 +15,10 @@
 ///
 
 /**
- * The scenario-driven sbt 1.x suite: the whole shared catalog (`scenarios/catalog.ts`) run through the
- * real `sbt 1.13` publish and a real sbt dependency resolution (`clients/sbt-adapter.ts`), against an
- * ordinary Repsy Maven repository (RPS-134).
+ * The scenario-driven sbt 2.x suite: the whole shared catalog (`scenarios/catalog.ts`) run through the
+ * real `sbt 2.1` publish and a real sbt dependency resolution (`clients/sbt-adapter.ts`), against an
+ * ordinary Repsy Maven repository (RPS-1327). sbt 2.x differs from 1.x in SNAPSHOT publishing:
+ * it generates maven-metadata.xml with timestamped SNAPSHOTs instead of non-unique versions.
  */
 import { sbtAdapter } from '../../src/clients/sbt-adapter.js';
 import { test } from '../../src/scenarios/fixtures.js';
@@ -27,5 +28,5 @@ import { registerSbtExtras } from '../../src/scenarios/sbt-extras.js';
 // A cold sbt (JVM start, build load, a Scala compile) per publish and resolve.
 test.describe.configure({ timeout: 360_000 });
 
-registerPublishConsumeLoop(sbtAdapter('1.13.0'));
+registerPublishConsumeLoop(sbtAdapter('2.1.0'));
 registerSbtExtras();
