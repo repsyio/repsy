@@ -39,9 +39,9 @@ function keyStore(id: string): KeyStoreItem {
   return { id, allowedKeyserverId: 'ks-1', host: 'keyserver.ubuntu.com', displayName: 'Ubuntu Keyserver' };
 }
 
-function publicKey(uuid: string): PgpPublicKeyItem {
+function publicKey(id: string): PgpPublicKeyItem {
   return {
-    uuid,
+    id,
     keyId: 'ABCD1234',
     fingerprint: '1234567890ABCDEF1234567890ABCDEF12345678',
     userId: 'Test User <test@example.com>',
@@ -182,7 +182,7 @@ describe('SignatureComponent', () => {
       expect(component.keyStores.map((k) => k.id)).toEqual(['k1']);
       expect(component.pageNum).toBe(1);
       expect(keyStoreService.listMavenPgpPublicKeys).toHaveBeenCalledOnceWith(REPO, 0, 5);
-      expect(component.publicKeys.map((k) => k.uuid)).toEqual(['pk1']);
+      expect(component.publicKeys.map((k) => k.id)).toEqual(['pk1']);
       expect(component.publicKeyPageNum).toBe(1);
     });
 
@@ -409,7 +409,7 @@ describe('SignatureComponent', () => {
       component.loadMorePublicKeys();
 
       expect(keyStoreService.listMavenPgpPublicKeys).toHaveBeenCalledWith(REPO, 1, 5);
-      expect(component.publicKeys.map((k) => k.uuid)).toEqual(['pk1', 'pk2']);
+      expect(component.publicKeys.map((k) => k.id)).toEqual(['pk1', 'pk2']);
       expect(component.publicKeyPageNum).toBe(2);
     });
 
@@ -418,7 +418,7 @@ describe('SignatureComponent', () => {
 
       component.loadMorePublicKeys();
 
-      expect(component.publicKeys.map((k) => k.uuid)).toEqual(['pk1']);
+      expect(component.publicKeys.map((k) => k.id)).toEqual(['pk1']);
       expect(component.publicKeyPageNum).toBe(1);
     });
 
