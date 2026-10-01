@@ -4107,7 +4107,7 @@ install`/`download` never fetch the root page, only `/simple/<project>/` — but
   Confirmed live: `registry-rules.spec.ts`'s override test (same filename, mismatched declared
   version, `allowOverride: false`, `200` instead of the expected `403`).
   Since RPS-1662 a declared version that differs from the file name's is refused outright, `400
-  archiveVersionMismatch`, so the same test now pins that answer.
+archiveVersionMismatch`, so the same test now pins that answer.
 - **P4** (fixed, RPS-1124/#508): `AbstractPypiStorageService.writePackageArchive` (the archive file
   AND its `.sha256` sidecar) used to run BEFORE `PypiPackageServiceImpl.addOrUpdateRelease`, where
   `ReleaseVersion.of(form.version)` can still throw `badVersionString`, so a validation failure

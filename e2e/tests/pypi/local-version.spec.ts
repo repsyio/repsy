@@ -25,11 +25,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import {
-  callOperation,
-  expectContract,
-  expectFailure,
-} from '../../src/api/contract-checks.js';
+import { callOperation, expectContract, expectFailure } from '../../src/api/contract-checks.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import * as pypi from '../../src/clients/pypi.js';
 import { pipEnv } from '../../src/clients/pypi.js';
@@ -137,7 +133,10 @@ test.describe('pypi local versions (PEP 440 +local)', () => {
 
       const files = await projectFiles(layout);
       expect(files, 'the page lists both builds').toEqual(
-        [wheelFilename(layout.packageName, PUBLIC), wheelFilename(layout.packageName, LOCAL_1)].sort(),
+        [
+          wheelFilename(layout.packageName, PUBLIC),
+          wheelFilename(layout.packageName, LOCAL_1),
+        ].sort(),
       );
 
       const local = await pipDownload(layout, `${layout.packageName}==${LOCAL_1}`, 'exact');
@@ -205,7 +204,16 @@ test.describe('pypi local versions (PEP 440 +local)', () => {
       );
       expect(published.exitCode, published.command).toBe(0);
 
-      expect((await runUv('pypi-lv-uv-venv', ['venv', 'venv'], { home, cwd: work, credential, mode: 'none' })).exitCode).toBe(0);
+      expect(
+        (
+          await runUv('pypi-lv-uv-venv', ['venv', 'venv'], {
+            home,
+            cwd: work,
+            credential,
+            mode: 'none',
+          })
+        ).exitCode,
+      ).toBe(0);
       const install = await runUv(
         'pypi-lv-uv-install',
         [
@@ -262,7 +270,10 @@ test.describe('pypi local versions (PEP 440 +local)', () => {
 
       expect(await versions()).toEqual([LOCAL_2, LOCAL_1]);
       expect(await projectFiles(layout), 'only the public file went').toEqual(
-        [wheelFilename(layout.packageName, LOCAL_1), wheelFilename(layout.packageName, LOCAL_2)].sort(),
+        [
+          wheelFilename(layout.packageName, LOCAL_1),
+          wheelFilename(layout.packageName, LOCAL_2),
+        ].sort(),
       );
       for (const version of [LOCAL_1, LOCAL_2]) {
         const dl = await rawDownload(
@@ -275,7 +286,10 @@ test.describe('pypi local versions (PEP 440 +local)', () => {
       }
 
       // And the other way round: deleting a local build leaves the next one.
-      expectContract('deletePypiRelease', await callOperation('deletePypiRelease', values(LOCAL_2)));
+      expectContract(
+        'deletePypiRelease',
+        await callOperation('deletePypiRelease', values(LOCAL_2)),
+      );
       expect(await versions()).toEqual([LOCAL_1]);
       expectFailure(
         'getPypiRelease',
