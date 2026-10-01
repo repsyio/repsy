@@ -42,9 +42,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 /**
- * RPS-1791 (OS half): the key-server hosts a repo's signatures are looked up on are the active
- * ones only, in a fixed order. A keyserver an admin deactivated must not be contacted, and the
- * host that is tried first must not depend on the query plan.
+ * RPS-1791 (OS half): the key-server hosts a repo's signatures are looked up on are the active ones
+ * only, in a fixed order. A keyserver an admin deactivated must not be contacted, and the host that
+ * is tried first must not depend on the query plan.
  */
 class KeyStoreHostsIT extends AbstractIntegrationTest {
 
