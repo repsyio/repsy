@@ -86,6 +86,9 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
     { name: 'Oldest', column: 'versionName', type: 'ASC' },
   ];
 
+  public readonly signedColumnHint =
+    'Signed means a key matching the signature\'s key id is registered on this repo or, with keyserver lookup on, published on a public keyserver. It does not prove who deployed the artifact.';
+
   private readonly repositoryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
 

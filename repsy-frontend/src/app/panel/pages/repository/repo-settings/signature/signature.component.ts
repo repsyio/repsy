@@ -69,6 +69,9 @@ export class SignatureComponent implements OnInit {
     { host: 'keys.openpgp.org', displayName: 'OpenPGP Keyserver' },
   ];
 
+  public readonly signedColumnHint =
+    'Signed means a key matching the signature\'s key id is registered on this repo or, with keyserver lookup on, published on a public keyserver. It does not prove who deployed the artifact.';
+
   private allowedKeyservers: AllowedKeyserverItem[] = [];
 
   constructor(
