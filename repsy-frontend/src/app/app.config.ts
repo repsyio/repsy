@@ -14,13 +14,7 @@
 /// limitations under the License.
 ///
 
-import {
-  HTTP_INTERCEPTORS,
-  HttpClient,
-  provideHttpClient,
-  withInterceptors,
-  withInterceptorsFromDi,
-} from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { ApplicationConfig, ErrorHandler, importProvidersFrom } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { PreloadAllModules, PreloadingStrategy, provideRouter, withInMemoryScrolling } from '@angular/router';
@@ -31,9 +25,7 @@ import { environment } from '../environments/environment';
 import { BASE_PATH } from '../generated/api';
 import { routes } from './app.routes';
 import { AppGlobalErrorHandler } from './shared/error-handler/app-global-error-handler';
-import { errorHandlerInterceptor } from './shared/interceptor/error-handler.interceptor';
-import { HttpHeadersInterceptor } from './shared/interceptor/http-headers.interceptor';
-import { RefreshTokenInterceptor } from './shared/interceptor/refresh-token.interceptor';
+import { provideAppHttpClient } from './shared/interceptor/app-http.providers';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -46,17 +38,7 @@ export const appConfig: ApplicationConfig = {
       }),
     ),
     provideMarkdown({ loader: HttpClient }),
-    provideHttpClient(withInterceptors([errorHandlerInterceptor]), withInterceptorsFromDi()),
-    {
-      provide: HTTP_INTERCEPTORS,
-      useClass: HttpHeadersInterceptor,
-      multi: true,
-    },
-    {
-      provide: HTTP_INTERCEPTORS,
-      useClass: RefreshTokenInterceptor,
-      multi: true,
-    },
+    ...provideAppHttpClient(),
     {
       provide: ErrorHandler,
       useClass: AppGlobalErrorHandler,

@@ -14,13 +14,20 @@
 /// limitations under the License.
 ///
 
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { PLATFORM_ID } from '@angular/core';
 import { fakeAsync, flushMicrotasks, TestBed, tick } from '@angular/core/testing';
 import { EMPTY, firstValueFrom, from, of, throwError } from 'rxjs';
 
 import { AuthControllerService, LoginInfo, RestResponseLoginInfo } from '../../../../generated/api';
+import { SILENT_ERROR } from '../../../shared/interceptor/error-handler.interceptor';
 import { AuthService } from './auth.service';
+
+/** The refresh call must carry SILENT_ERROR, so `errorHandlerInterceptor` never toasts it (RPS-1754). */
+const SILENT_REFRESH_OPTIONS = {
+  asymmetricMatch: (options: { context?: HttpContext } | undefined) => options?.context?.get(SILENT_ERROR) === true,
+  jasmineToString: () => '<request options with SILENT_ERROR set>',
+};
 
 const STORAGE_KEYS = ['username', 'token', 'refresh-token'];
 
@@ -190,7 +197,12 @@ describe('AuthService', () => {
 
       const accessToken = await firstValueFrom(service.refreshToken());
 
-      expect(refreshToken).toHaveBeenCalledOnceWith({ refreshToken: 'refresh-1' });
+      expect(refreshToken).toHaveBeenCalledOnceWith(
+        { refreshToken: 'refresh-1' },
+        'body',
+        false,
+        SILENT_REFRESH_OPTIONS,
+      );
       expect(accessToken).toBe('access-2');
       expect(service.accessToken).toBe('access-2');
       expect(localStorage.getItem('token')).toBe('access-2');
@@ -457,7 +469,12 @@ describe('AuthService', () => {
 
         expect(await firstValueFrom(service.refreshToken())).toBe('access-2');
 
-        expect(refreshToken).toHaveBeenCalledOnceWith({ refreshToken: 'refresh-1' });
+        expect(refreshToken).toHaveBeenCalledOnceWith(
+          { refreshToken: 'refresh-1' },
+          'body',
+          false,
+          SILENT_REFRESH_OPTIONS,
+        );
       });
 
       it('adopts the pair another tab rotated meanwhile instead of spending the spent token again', async () => {
@@ -482,7 +499,12 @@ describe('AuthService', () => {
 
         expect(await firstValueFrom(service.refreshToken())).toBe('access-3');
 
-        expect(refreshToken).toHaveBeenCalledOnceWith({ refreshToken: 'refresh-2' });
+        expect(refreshToken).toHaveBeenCalledOnceWith(
+          { refreshToken: 'refresh-2' },
+          'body',
+          false,
+          SILENT_REFRESH_OPTIONS,
+        );
       });
 
       it('makes one call when two tabs find their access token expired together', async () => {
@@ -493,7 +515,12 @@ describe('AuthService', () => {
 
         const [a, b] = await Promise.all([firstValueFrom(tabA.refreshToken()), firstValueFrom(tabB.refreshToken())]);
 
-        expect(refreshToken).toHaveBeenCalledOnceWith({ refreshToken: 'refresh-1' });
+        expect(refreshToken).toHaveBeenCalledOnceWith(
+          { refreshToken: 'refresh-1' },
+          'body',
+          false,
+          SILENT_REFRESH_OPTIONS,
+        );
         expect([a, b]).toEqual(['access-2', 'access-2']);
         expect(tabA.accessToken).toBe('access-2');
         expect(tabB.accessToken).toBe('access-2');
@@ -526,7 +553,12 @@ describe('AuthService', () => {
           const b = start(tabB);
           tick(1000);
 
-          expect(refreshToken).toHaveBeenCalledOnceWith({ refreshToken: 'refresh-1' });
+          expect(refreshToken).toHaveBeenCalledOnceWith(
+            { refreshToken: 'refresh-1' },
+            'body',
+            false,
+            SILENT_REFRESH_OPTIONS,
+          );
           expect(a.tokens).toEqual(['access-2']);
           expect(b.tokens).toEqual(['access-2']);
           expect(tabB.accessToken).toBe('access-2');
@@ -720,7 +752,12 @@ describe('AuthService', () => {
 
         expect(await firstValueFrom(service.refreshToken())).toBe('access-2');
 
-        expect(refreshToken).toHaveBeenCalledOnceWith({ refreshToken: 'refresh-1' });
+        expect(refreshToken).toHaveBeenCalledOnceWith(
+          { refreshToken: 'refresh-1' },
+          'body',
+          false,
+          SILENT_REFRESH_OPTIONS,
+        );
       });
 
       it('ignores an announcement of a different shape', async () => {
@@ -732,7 +769,12 @@ describe('AuthService', () => {
         announcer.postMessage(null);
 
         expect(await firstValueFrom(service.refreshToken())).toBe('access-2');
-        expect(refreshToken).toHaveBeenCalledOnceWith({ refreshToken: 'refresh-1' });
+        expect(refreshToken).toHaveBeenCalledOnceWith(
+          { refreshToken: 'refresh-1' },
+          'body',
+          false,
+          SILENT_REFRESH_OPTIONS,
+        );
       });
 
       it('does not react to an announcement once the service is destroyed', async () => {

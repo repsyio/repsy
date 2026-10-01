@@ -26,7 +26,7 @@
  * its own page's `localStorage`. The SPA reads `localStorage` once at boot (`AuthService`), so a
  * change takes effect on the next load: `seedSession()` writes once per tab, so a reload keeps it.
  */
-import type { Page } from '@playwright/test';
+import type { Page, Route } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
@@ -41,9 +41,11 @@ import {
   loginSession,
   setStoredSessionValue,
   answerRefreshTokenExpired,
+  countRefreshCalls,
 } from '../../../src/ui/session.js';
 import { JWT_SHAPE, NO_SESSION, storedSession } from './stored-session.js';
 import { allowLists, errorToasts } from '../../../src/ui/page-errors.js';
+import { errorBody, fulfillJson, type ErrorResponse } from '../../../src/ui/stub-responses.js';
 
 test.describe('AUTH-08 expired access token (stubbed 401)', () => {
   test('is swapped through the refresh token without the user noticing', async ({ adminPage }) => {
@@ -199,6 +201,82 @@ test.describe('AUTH-09 refused refresh token', { tag: ['@cloud-skip'] }, () => {
     await expectLoggedOut(userPage);
     await new Shell(userPage).toasts.expectError('Session expired, please log in again.');
   });
+});
+
+/**
+ * AUTH-09 (RPS-1754): a refresh call that FAILS, rather than being refused with a 401, still ends the session with
+ * exactly ONE toast, "Session expired". The dashboard sends several GETs at once, all answered `sessionExpired`
+ * (stubbed, `expireAccessToken`), so they share one refresh; that refresh is answered with a 503 or is cut off (the
+ * connection drops: status 0). The central error interceptor (`errorHandlerInterceptor`) must not toast each of
+ * these failures on its own (the refresh call, then every request that was waiting for it): the user sees only
+ * `RefreshTokenInterceptor`'s "Session expired". All of those toasts are raised in the one failure cascade that precedes
+ * the redirect to /login, so they are on screen by the time the login form is; the toast stack keeps at most 3, so
+ * the assertion compares the toasts' texts, not just their number.
+ *
+ * Runs on adminPage and stubs only the refresh call, so Repsy Cloud's panel (which registers the error interceptor
+ * innermost, repsy-mono RPS-1742) runs it too.
+ */
+test.describe('AUTH-09 refresh call that fails without a 401 (RPS-1754)', () => {
+  const SESSION_EXPIRED = 'Session expired, please log in again.';
+  test.use({
+    allowedPageErrors: allowLists(
+      errorToasts(
+        'by design: the refresh fails and the session ends; the other texts are what the bug showed',
+        SESSION_EXPIRED,
+        'Server error',
+        'Connection error',
+      ),
+      {
+        entries: [
+          {
+            pattern: /^Failed to load user role:/,
+            reason:
+              'by design: the sidebar asks for the profile with the refused token, right before the session ends',
+          },
+        ],
+      },
+    ),
+  });
+
+  const failures = [
+    {
+      name: 'a 503',
+      fail: (route: Route) =>
+        fulfillJson<ErrorResponse>(
+          route,
+          503,
+          errorBody({ msgId: 'resourceBusy', data: 'resourceBusy' }),
+        ),
+    },
+    { name: 'a dropped connection', fail: (route: Route) => route.abort('connectionreset') },
+  ];
+
+  for (const { name, fail } of failures) {
+    test(`a refresh answered with ${name} logs the user out with one "Session expired" toast`, async ({
+      adminPage,
+    }) => {
+      await new DashboardPage(adminPage).goto();
+      const session = await storedSession(adminPage);
+      await expireAccessToken(adminPage, session.token!);
+      await adminPage.route(`**${REFRESH_PATH}`, fail);
+      const refreshCalls = countRefreshCalls(adminPage);
+
+      await adminPage.reload();
+
+      await expectLoggedOut(adminPage);
+      const toasts = new Shell(adminPage).toasts;
+      // Short timeout: the toasts of the failure cascade are all there by now, and they expire after 7 s, so a
+      // longer wait would only report the empty stack that is left. Not `expectError(SESSION_EXPIRED)` first: with
+      // the bug the stack (3 at most) can be full of "Server error" toasts without it, and the text list says so.
+      await expect(toasts.toast('error').getByTestId('toast-message')).toHaveText(
+        [SESSION_EXPIRED],
+        {
+          timeout: 2_000,
+        },
+      );
+      expect(refreshCalls.count).toBe(1);
+    });
+  }
 });
 
 /**
