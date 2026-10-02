@@ -109,7 +109,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
-          git commit -q -a -m "ci: Bump the pinned pnpm from $current to $latest" \
+          git commit -q -a -m "RPS-1167: Bump the pinned pnpm from $current to $latest" \
             -m "Opened by .github/workflows/pnpm-bump.yml (RPS-1167)."
           git push -q origin "$branch"
 
@@ -120,7 +120,7 @@ jobs:
           done
 
           url=$(gh pr create --base main --head "$branch" \
-            --title "ci: Bump the pinned pnpm from $current to $latest" \
+            --title "RPS-1167: Bump the pinned pnpm from $current to $latest" \
             --body "Bumps the pnpm pin from $current to $latest in the frontend CI setup action, the Dockerfile and the e2e runner images, which \`DockerfileTest\` keeps in sync. Opened by \`.github/workflows/pnpm-bump.yml\` (RPS-1167); it is queued to merge once the required checks pass.")
           gh pr merge "$url" --auto --squash
           echo "Opened $url" >> "$GITHUB_STEP_SUMMARY"

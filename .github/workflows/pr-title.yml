@@ -1,0 +1,46 @@
+name: PR Title
+
+permissions: {}
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, edited, reopened, synchronize]
+  # The title was already checked on the pull request. The merge queue only needs this required
+  # check to report, otherwise queued entries never get a result and time out.
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-title:
+    name: PR title
+    runs-on: hetzner
+    timeout-minutes: 5
+    steps:
+      - name: Check the PR title
+        shell: bash
+        env:
+          # Passed through env, never interpolated into the script: the title is user input.
+          TITLE: ${{ github.event.pull_request.title }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT" == "merge_group" ]]; then
+            echo "Merge queue entry: the title was checked on the pull request."
+            exit 0
+          fi
+          if [[ "$AUTHOR" == "dependabot[bot]" ]]; then
+            echo "Dependabot pull request, title check skipped."
+            exit 0
+          fi
+          pattern='^RPS-[0-9]+(, RPS-[0-9]+)*: [^[:space:]].*$'
+          if [[ "$TITLE" =~ $pattern && ! "$TITLE" =~ [[:space:]]$ && ! "$TITLE" =~ [[:cntrl:]] ]]; then
+            echo "OK: $TITLE"
+            exit 0
+          fi
+          echo "::error title=PR title::\"$TITLE\" must read \"RPS-1234: Description\" (several tickets: \"RPS-1, RPS-2: Description\"), one space after the colon and no trailing whitespace."
+          exit 1
