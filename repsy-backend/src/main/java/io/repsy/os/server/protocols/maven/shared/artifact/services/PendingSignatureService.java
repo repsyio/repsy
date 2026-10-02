@@ -192,11 +192,10 @@ public class PendingSignatureService {
    * this returns. The signature of the same file that was already parked is replaced.
    *
    * @throws BadRequestException {@code pendingSignatureLimitReached} when the repo already has
-   *     {@code repsy.maven.pending-signature.max-per-repo} signatures parked (RPS-1796), or
-   *     {@code pendingSignatureBytesLimitReached} when the repo's total bytes would exceed
-   *     {@code repsy.maven.pending-signature.max-bytes-per-repo} after adding this signature
-   *     (RPS-1817). Replacing an already parked signature is never refused, only judged by net
-   *     growth.
+   *     {@code repsy.maven.pending-signature.max-per-repo} signatures parked (RPS-1796), or {@code
+   *     pendingSignatureBytesLimitReached} when the repo's total bytes would exceed {@code
+   *     repsy.maven.pending-signature.max-bytes-per-repo} after adding this signature (RPS-1817).
+   *     Replacing an already parked signature is never refused, only judged by net growth.
    * @throws SignatureNotVerifiedException {@code artifactSignatureNotVerified} when the bytes are
    *     not an OpenPGP signature (or not text: a parked signature is armored)
    */
@@ -248,10 +247,10 @@ public class PendingSignatureService {
           // RPS-1817: check total bytes cap. For an update, judge by net growth: the new signature
           // smaller or equal to the old one is never refused, only growth beyond the cap is.
           final var newBytes = armored.getBytes(UTF_8).length;
-          final var oldBytes = row.getArmoredSignature() == null ? 0 : row
-              .getArmoredSignature()
-              .getBytes(UTF_8)
-              .length;
+          final var oldBytes =
+              row.getArmoredSignature() == null
+                  ? 0
+                  : row.getArmoredSignature().getBytes(UTF_8).length;
           final var currentBytes =
               this.pendingSignatureRepository.sumBytesArmoredSignatureByRepoId(repoId)
                   - oldBytes; // Exclude the old signature if replacing

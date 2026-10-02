@@ -26,9 +26,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * RPS-1796, RPS-1817: the abuse caps of a Maven repo's PGP data, and the lock that makes them
- * hold under concurrent requests. They are abuse caps, not quotas: Repsy OS has no tenants or
- * plans.
+ * RPS-1796, RPS-1817: the abuse caps of a Maven repo's PGP data, and the lock that makes them hold
+ * under concurrent requests. They are abuse caps, not quotas: Repsy OS has no tenants or plans.
  *
  * <ul>
  *   <li>registered public keys per repo ({@code repsy.maven.pgp.max-public-keys-per-repo}, 20);
