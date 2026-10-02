@@ -38,7 +38,6 @@ import {
 } from '../../src/clients/docker-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import { optedIn } from '../../src/stack-overlays.js';
-import type { Seeder } from '../../src/seed/seeder.js';
 
 /** Helper to wait for a duration (in milliseconds) with a delay. */
 async function waitMs(ms: number): Promise<void> {

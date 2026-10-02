@@ -1537,7 +1537,7 @@ test.describe('docker registry rules (raw HTTP)', () => {
         layout.repoName,
         admin,
         layout.image,
-        indexDigest,
+        indexDigest!,
       );
       expect(
         getIndexByDigestAfter.status,

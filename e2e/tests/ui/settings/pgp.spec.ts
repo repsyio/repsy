@@ -251,9 +251,7 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
   test('SET-08e add a registered public key, see it listed, delete it (RPS-1803)', async ({
     adminPage,
     seeder,
-    adminSession,
   }) => {
-    const readback = new RepoSettingsReadback(adminSession.token);
     const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
     const settings = new RepoSettingsPage(adminPage, repo.name);
     await settings.goto();
