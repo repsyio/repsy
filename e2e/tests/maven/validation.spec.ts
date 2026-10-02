@@ -36,6 +36,7 @@ import {
 } from '../../src/clients/maven-raw.js';
 import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
+import type { Seeder } from '../../src/seed/seeder.js';
 
 const OCTET = 'application/octet-stream';
 
@@ -47,7 +48,7 @@ interface Layout {
 }
 
 /** A fresh maven repo (permissive defaults) and an admin-credentialed PUT into it. */
-async function newRepo(seeder: any, groupId?: string, artifactId?: string): Promise<Layout> {
+async function newRepo(seeder: Seeder, groupId?: string, artifactId?: string): Promise<Layout> {
   const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
   const admin = adminCredential();
   return {
