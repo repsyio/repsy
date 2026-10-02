@@ -12,6 +12,7 @@ permissions:
 jobs:
   build-and-push:
     runs-on: hetzner
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -72,6 +73,11 @@ jobs:
           tags: |
             repo.repsy.io/repsy/os/repsy:${{ env.DOCKER_IMAGE_TAG }}
             repo.repsy.io/repsy/os/repsy:latest
+          # Build cache in the registry, not the 10 GB GitHub cache. mode=max keeps the Maven and
+          # frontend build stages, which are the expensive ones. This workflow only runs on tags and
+          # manual dispatch, never on pull requests, so only trusted refs write the cache.
+          cache-from: type=registry,ref=repo.repsy.io/repsy/os/repsy:buildcache
+          cache-to: type=registry,ref=repo.repsy.io/repsy/os/repsy:buildcache,mode=max,image-manifest=true,oci-mediatypes=true
 
   # The vulnerability scanner (repsy-scanner-trivy, RPS-1400) is published with every release, under
   # the same tags as the application image, so that an operator enabling SECURITY_SCANNER runs the
@@ -82,6 +88,7 @@ jobs:
   # nor the OpenAPI generator cache.
   build-and-push-scanner:
     runs-on: hetzner
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -113,10 +120,13 @@ jobs:
           tags: |
             repo.repsy.io/repsy/os/repsy-scanner-trivy:${{ env.DOCKER_IMAGE_TAG }}
             repo.repsy.io/repsy/os/repsy-scanner-trivy:latest
+          cache-from: type=registry,ref=repo.repsy.io/repsy/os/repsy-scanner-trivy:buildcache
+          cache-to: type=registry,ref=repo.repsy.io/repsy/os/repsy-scanner-trivy:buildcache,mode=max,image-manifest=true,oci-mediatypes=true
 
   helm-update:
     needs: build-and-push
     runs-on: hetzner
+    timeout-minutes: 10
     steps:
       - name: Detect Image Tag
         run: |
@@ -128,8 +138,9 @@ jobs:
 
       - name: Install yq
         run: |
-          sudo curl -sL https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64 -o /usr/local/bin/yq
-          sudo chmod +x /usr/local/bin/yq
+          curl -fsSL https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64 -o /tmp/yq
+          echo "a2c097180dd884a8d50c956ee16a9cec070f30a7947cf4ebf87d5f36213e9ed7  /tmp/yq" | sha256sum -c -
+          sudo install -m 0755 /tmp/yq /usr/local/bin/yq
 
       - name: Update image tag in repsy-os-helm
         run: |
@@ -157,6 +168,7 @@ jobs:
     if: github.ref_type == 'tag'
     needs: [helm-update, build-and-push-scanner]
     runs-on: hetzner
+    timeout-minutes: 10
     steps:
       - name: Tag repsy-os-helm with the release tag
         run: |

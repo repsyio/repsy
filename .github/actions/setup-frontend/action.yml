@@ -46,6 +46,21 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       run: npm install -g --ignore-scripts pnpm@12.5.1
 
+    # pnpm's content-addressed store, so a lockfile change only downloads the packages that changed.
+    # The key hashes the lockfile of the frontend only; the prefix restore picks the newest entry.
+    - name: Locate pnpm store
+      id: pnpm-store
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    - name: Cache pnpm store
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: ${{ steps.pnpm-store.outputs.path }}
+        key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(format('{0}/pnpm-lock.yaml', inputs.working-directory)) }}
+        restore-keys: pnpm-store-${{ runner.os }}-${{ runner.arch }}-
+
     # --frozen-lockfile fails instead of rewriting pnpm-lock.yaml (githubactions:S8543) and
     # --ignore-scripts skips dependency lifecycle scripts (githubactions:S6505). None of the
     # dependencies that have one (esbuild, @parcel/watcher, lmdb, ...) needs it to lint, test or

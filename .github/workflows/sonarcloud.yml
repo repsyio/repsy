@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # The scan runs in the "analyze" job and reads this report; a project has one analysis per
   # branch, so the frontend cannot be scanned on its own. Same steps as the "Repsy frontend" job
@@ -15,6 +19,7 @@ jobs:
   frontend-coverage:
     name: Frontend coverage
     runs-on: hetzner
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: ./repsy-frontend
@@ -54,6 +59,7 @@ jobs:
     name: Analyze main branch
     needs: frontend-coverage
     runs-on: hetzner
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -67,6 +73,10 @@ jobs:
           # Checkout already ran above with fetch-depth: 0 for SonarCloud blame data;
           # setup-maven-action's own default checkout would re-shallow the repo.
           checkout-enabled: false
+          # The JDK step below owns the Temurin JDK and the Maven cache; without these two the
+          # action installs Zulu and keeps a second ~/.m2 cache.
+          cache-enabled: false
+          java-distribution: temurin
 
       - name: Set up JDK
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
