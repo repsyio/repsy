@@ -23,6 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
+import io.repsy.os.server.protocols.maven.shared.keystore.support.StubKeyServers;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -43,16 +44,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -62,7 +60,7 @@ import tools.jackson.databind.ObjectMapper;
  * verified signature. A repo without the setting keeps today's behaviour: only the {@code .pom.asc}
  * is verified and the other signatures are stored as sent.
  *
- * <p>The key server is an in-memory {@link WebClient} that serves the public key of every key in
+ * <p>The key server is an in-memory {@link RestClient} that serves the public key of every key in
  * {@link #SERVED_KEYS}, so the signatures are checked for real and nothing leaves the machine. Most
  * tests register the key on the repo instead and need no server at all.
  *
@@ -96,8 +94,8 @@ class MavenArtifactSignatureIT extends AbstractIntegrationTest {
       <version>1.0</version></versions><lastUpdated>20260921101010</lastUpdated></versioning>\
       </metadata>""";
 
-  @TestBean(name = "pgpVerifierWebClient", methodName = "keyServer")
-  private WebClient keyServer;
+  @TestBean(name = "pgpVerifierRestClient", methodName = "keyServer")
+  private RestClient keyServer;
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private MavenStorageService mavenStorageService;
@@ -108,27 +106,20 @@ class MavenArtifactSignatureIT extends AbstractIntegrationTest {
 
   /** A key server that has the public key of every key in {@link #SERVED_KEYS}. */
   @SuppressWarnings("unused")
-  static WebClient keyServer() {
-    return WebClient.builder()
-        .exchangeFunction(
-            request -> {
-              KEY_SERVER_REQUESTS.incrementAndGet();
+  static RestClient keyServer() {
+    return StubKeyServers.answering(
+        uri -> {
+          KEY_SERVER_REQUESTS.incrementAndGet();
 
-              final var matcher = SEARCH.matcher(request.url().toString());
-              final var keys =
-                  matcher.find() ? SERVED_KEYS.get(matcher.group(1).toUpperCase()) : null;
+          final var matcher = SEARCH.matcher(uri.toString());
+          final var keys = matcher.find() ? SERVED_KEYS.get(matcher.group(1).toUpperCase()) : null;
 
-              if (keys == null) {
-                return Mono.just(ClientResponse.create(HttpStatus.NOT_FOUND).build());
-              }
+          if (keys == null) {
+            return StubKeyServers.notFound();
+          }
 
-              return Mono.just(
-                  ClientResponse.create(HttpStatus.OK)
-                      .header(HttpHeaders.CONTENT_TYPE, "text/plain")
-                      .body(keys.armoredPublicKey())
-                      .build());
-            })
-        .build();
+          return StubKeyServers.ok(keys.armoredPublicKey());
+        });
   }
 
   @BeforeEach

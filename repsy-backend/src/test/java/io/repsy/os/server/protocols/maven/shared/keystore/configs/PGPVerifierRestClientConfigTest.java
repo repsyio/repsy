@@ -31,21 +31,21 @@ import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.client.ResourceAccessException;
 
 /**
  * RPS-1469: a key-server lookup ({@link
  * io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService}) runs for a key
  * that is not registered, so a slow or unreachable key server must not be able to hang a lookup
  * forever. A real, local HTTP server plays a slow or unreachable key server; the timeouts are the
- * ones {@link PGPVerifierWebClientConfig} actually configures, not a copy of them, so a change of
+ * ones {@link PGPVerifierRestClientConfig} actually configures, not a copy of them, so a change of
  * the configured values is caught here too.
  */
-@DisplayName("PGPVerifierWebClientConfig timeouts (RPS-1469)")
-class PGPVerifierWebClientConfigTest {
+@DisplayName("PGPVerifierRestClientConfig timeouts (RPS-1469)")
+class PGPVerifierRestClientConfigTest {
 
-  // Mirrors PGPVerifierWebClientConfig's own constants: kept a little above them so a bound that is
+  // Mirrors PGPVerifierRestClientConfig's own constants: kept a little above them so a bound that
+  // is
   // exactly right does not make the test flaky, and well below what an unbounded wait would take.
   private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
   private static final Duration GENEROUS_UPPER_BOUND = Duration.ofSeconds(9);
@@ -79,13 +79,12 @@ class PGPVerifierWebClientConfigTest {
         });
 
     final var answer =
-        new PGPVerifierWebClientConfig()
-            .pgpVerifierWebClient()
+        new PGPVerifierRestClientConfig()
+            .pgpVerifierRestClient()
             .get()
             .uri(this.baseUrl() + "/pks/lookup")
             .retrieve()
-            .bodyToMono(String.class)
-            .block();
+            .body(String.class);
 
     assertThat(answer).contains("BEGIN PGP PUBLIC KEY BLOCK");
   }
@@ -106,20 +105,71 @@ class PGPVerifierWebClientConfigTest {
 
     assertThatThrownBy(
             () ->
-                new PGPVerifierWebClientConfig()
-                    .pgpVerifierWebClient()
+                new PGPVerifierRestClientConfig()
+                    .pgpVerifierRestClient()
                     .get()
                     .uri(this.baseUrl() + "/pks/lookup")
                     .retrieve()
-                    .bodyToMono(String.class)
-                    .block())
-        .isInstanceOfAny(WebClientResponseException.class, WebClientRequestException.class);
+                    .body(String.class))
+        .isInstanceOf(ResourceAccessException.class);
 
     final var elapsed = Duration.ofNanos(System.nanoTime() - start);
     assertThat(elapsed)
         .as("bounded by the response timeout, not left to hang")
         .isGreaterThanOrEqualTo(RESPONSE_TIMEOUT.minusSeconds(1))
         .isLessThan(GENEROUS_UPPER_BOUND);
+  }
+
+  @Test
+  @DisplayName("a redirect is not followed")
+  void redirectIsNotFollowed() {
+    final var followed = new java.util.concurrent.atomic.AtomicBoolean();
+
+    this.startServer(
+        exchange -> {
+          exchange.getResponseHeaders().add("Location", this.baseUrl() + "/pks/other");
+          exchange.sendResponseHeaders(302, -1);
+          exchange.close();
+        });
+    this.server.createContext(
+        "/pks/other",
+        exchange -> {
+          followed.set(true);
+          exchange.sendResponseHeaders(200, -1);
+          exchange.close();
+        });
+
+    new PGPVerifierRestClientConfig()
+        .pgpVerifierRestClient()
+        .get()
+        .uri(this.baseUrl() + "/pks/lookup")
+        .retrieve()
+        .body(String.class);
+
+    assertThat(followed).isFalse();
+  }
+
+  @Test
+  @DisplayName("an answer above the 512 KiB limit is refused, not buffered")
+  void oversizedAnswerIsRefused() {
+    this.startServer(
+        exchange -> {
+          final var body = new byte[600 * 1024];
+          exchange.sendResponseHeaders(200, body.length);
+          try (var out = exchange.getResponseBody()) {
+            out.write(body);
+          }
+        });
+
+    assertThatThrownBy(
+            () ->
+                new PGPVerifierRestClientConfig()
+                    .pgpVerifierRestClient()
+                    .get()
+                    .uri(this.baseUrl() + "/pks/lookup")
+                    .retrieve()
+                    .body(String.class))
+        .isInstanceOf(org.springframework.web.client.RestClientException.class);
   }
 
   @Test
@@ -135,14 +185,13 @@ class PGPVerifierWebClientConfigTest {
 
     assertThatThrownBy(
             () ->
-                new PGPVerifierWebClientConfig()
-                    .pgpVerifierWebClient()
+                new PGPVerifierRestClientConfig()
+                    .pgpVerifierRestClient()
                     .get()
                     .uri("http://127.0.0.1:" + closedPort + "/pks/lookup")
                     .retrieve()
-                    .bodyToMono(String.class)
-                    .block())
-        .isInstanceOf(WebClientRequestException.class);
+                    .body(String.class))
+        .isInstanceOf(ResourceAccessException.class);
 
     assertThat(Duration.ofNanos(System.nanoTime() - start))
         .as("a refused connection must not wait for the response timeout")

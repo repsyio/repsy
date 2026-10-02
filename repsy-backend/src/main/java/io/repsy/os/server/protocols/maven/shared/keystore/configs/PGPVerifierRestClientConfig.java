@@ -15,34 +15,40 @@
  */
 package io.repsy.os.server.protocols.maven.shared.keystore.configs;
 
-import io.netty.channel.ChannelOption;
+import io.repsy.os.shared.http.ResponseSizeLimitInterceptor;
+import java.net.http.HttpClient;
 import java.time.Duration;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.netty.http.client.HttpClient;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
 
 @Configuration
-public class PGPVerifierWebClientConfig {
+public class PGPVerifierRestClientConfig {
 
-  private static final int CONNECT_TIMEOUT_MS = 3_000;
+  private static final @NonNull Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
   private static final @NonNull Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
   private static final int MAX_RESPONSE_BYTES = 512 * 1024;
 
   @Bean
-  public @NonNull WebClient pgpVerifierWebClient() {
+  public @NonNull RestClient pgpVerifierRestClient() {
 
+    // HTTP/1.1 and no redirects, as the Reactor Netty client this replaced: the JDK client would
+    // otherwise offer an h2c upgrade.
     final var httpClient =
-        HttpClient.create()
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MS)
-            .responseTimeout(RESPONSE_TIMEOUT)
-            .followRedirect(false);
+        HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(CONNECT_TIMEOUT)
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build();
 
-    return WebClient.builder()
-        .clientConnector(new ReactorClientHttpConnector(httpClient))
-        .codecs(config -> config.defaultCodecs().maxInMemorySize(MAX_RESPONSE_BYTES))
+    final var requestFactory = new JdkClientHttpRequestFactory(httpClient);
+    requestFactory.setReadTimeout(RESPONSE_TIMEOUT);
+
+    return RestClient.builder()
+        .requestFactory(requestFactory)
+        .requestInterceptor(new ResponseSizeLimitInterceptor(MAX_RESPONSE_BYTES))
         .build();
   }
 }

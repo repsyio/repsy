@@ -26,6 +26,7 @@ import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
+import io.repsy.os.server.protocols.maven.shared.keystore.support.StubKeyServers;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -48,16 +49,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.web.client.RestClient;
 
 /**
  * RPS-1469: the toggle-on recompute ({@code SignedRecomputeService}) verifies a signature that is
@@ -66,7 +64,7 @@ import reactor.core.publisher.Mono;
  * turn a lock normally held for a few milliseconds into one held for as long as the lookup takes,
  * blocking a concurrent upload to the same version for that long.
  *
- * <p>The key server is a stub {@link WebClient} (no real network) that answers "not found" after a
+ * <p>The key server is a stub {@link RestClient} (no real network) that answers "not found" after a
  * configurable delay, standing in for the "1-5 s latency" slow-server simulation the ticket asks
  * for. The version's row lock is probed directly, with the same statement {@code
  * ArtifactVersionRepository#lockForSignedUpdate} uses, from a JDBC connection of its own: that wait
@@ -92,8 +90,8 @@ class MavenSignedRecomputeKeyServerLockIT extends AbstractIntegrationTest {
   /** How many lookups the stub key server has received, reset before each test. */
   private static final AtomicInteger KEY_SERVER_REQUESTS = new AtomicInteger();
 
-  @TestBean(name = "pgpVerifierWebClient", methodName = "slowKeyServer")
-  private WebClient keyServer;
+  @TestBean(name = "pgpVerifierRestClient", methodName = "slowKeyServer")
+  private RestClient keyServer;
 
   @MockitoBean private UsageUpdateService usageUpdateService;
 
@@ -113,16 +111,19 @@ class MavenSignedRecomputeKeyServerLockIT extends AbstractIntegrationTest {
 
   /** Answers every lookup "not found", after {@link #DELAY_MILLIS}: no real network is used. */
   @SuppressWarnings("unused")
-  static WebClient slowKeyServer() {
-    return WebClient.builder()
-        .exchangeFunction(
-            request -> {
-              KEY_SERVER_REQUESTS.incrementAndGet();
+  static RestClient slowKeyServer() {
+    return StubKeyServers.answering(
+        uri -> {
+          KEY_SERVER_REQUESTS.incrementAndGet();
 
-              return Mono.delay(Duration.ofMillis(DELAY_MILLIS.get()))
-                  .then(Mono.just(ClientResponse.create(HttpStatus.NOT_FOUND).build()));
-            })
-        .build();
+          try {
+            Thread.sleep(DELAY_MILLIS.get());
+          } catch (final InterruptedException _) {
+            Thread.currentThread().interrupt();
+          }
+
+          return StubKeyServers.notFound();
+        });
   }
 
   @BeforeEach

@@ -32,6 +32,7 @@ import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.PendingSignatureService;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
+import io.repsy.os.server.protocols.maven.shared.keystore.support.StubKeyServers;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -71,9 +72,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -85,7 +84,7 @@ import tools.jackson.databind.ObjectMapper;
  * byte-equal, three are recorded, none is left parked and the version is signed.
  *
  * <p>The signer's key is registered on the repo, so nothing asks a key server ({@code
- * pgpVerifierWebClient} answers 404 to anything and counts). Runs without a test transaction, like
+ * pgpVerifierRestClient} answers 404 to anything and counts). Runs without a test transaction, like
  * {@link MavenArtifactSignatureIT}.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -102,8 +101,8 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
   private static final List<String> SIX =
       List.of(POM, JAR, SOURCES, POM + ".asc", JAR + ".asc", SOURCES + ".asc");
 
-  @TestBean(name = "pgpVerifierWebClient", methodName = "keyServer")
-  private WebClient keyServer;
+  @TestBean(name = "pgpVerifierRestClient", methodName = "keyServer")
+  private RestClient keyServer;
 
   @MockitoBean private UsageUpdateService usageUpdateService;
   @MockitoSpyBean private PGPVerifierService pgpVerifierService;
@@ -122,15 +121,13 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
 
   /** A key server that has no key at all, and counts what it is asked. */
   @SuppressWarnings("unused")
-  static WebClient keyServer() {
-    return WebClient.builder()
-        .exchangeFunction(
-            request -> {
-              KEY_SERVER_REQUESTS.incrementAndGet();
+  static RestClient keyServer() {
+    return StubKeyServers.answering(
+        uri -> {
+          KEY_SERVER_REQUESTS.incrementAndGet();
 
-              return Mono.just(ClientResponse.create(HttpStatus.NOT_FOUND).build());
-            })
-        .build();
+          return StubKeyServers.notFound();
+        });
   }
 
   @BeforeEach

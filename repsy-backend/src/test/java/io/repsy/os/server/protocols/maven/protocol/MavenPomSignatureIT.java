@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
+import io.repsy.os.server.protocols.maven.shared.keystore.support.StubKeyServers;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -45,7 +46,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.convention.TestBean;
@@ -53,9 +53,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -73,8 +71,8 @@ import tools.jackson.databind.ObjectMapper;
  * timestamped snapshot with other versions in the repo the rollback even looked up the wrong name
  * and ended in a 500.
  *
- * <p>The key server is an in-memory {@link WebClient} that answers every lookup with the public key
- * of {@link #KEYS}, so the signatures are checked for real and nothing leaves the machine.
+ * <p>The key server is an in-memory {@link RestClient} that answers every lookup with the public
+ * key of {@link #KEYS}, so the signatures are checked for real and nothing leaves the machine.
  *
  * <p>Runs without a test transaction, like {@link MavenPomStorageConsistencyIT}: an accepted POM
  * inserts its artifact row in its own transaction, which cannot see an uncommitted repo row. It
@@ -113,10 +111,10 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
   private static final AtomicInteger KEY_SERVER_REQUESTS = new AtomicInteger();
 
   /**
-   * Replaces the key-server client of {@code PGPVerifierWebClientConfig}, see {@link #keyServer}.
+   * Replaces the key-server client of {@code PGPVerifierRestClientConfig}, see {@link #keyServer}.
    */
-  @TestBean(name = "pgpVerifierWebClient", methodName = "keyServer")
-  private WebClient keyServer;
+  @TestBean(name = "pgpVerifierRestClient", methodName = "keyServer")
+  private RestClient keyServer;
 
   @MockitoBean private UsageUpdateService usageUpdateService;
 
@@ -129,19 +127,13 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
 
   /** A key server that has the public key of {@link #KEYS}, and no other, on every host. */
   @SuppressWarnings("unused")
-  static WebClient keyServer() {
-    return WebClient.builder()
-        .exchangeFunction(
-            request -> {
-              KEY_SERVER_REQUESTS.incrementAndGet();
+  static RestClient keyServer() {
+    return StubKeyServers.answering(
+        uri -> {
+          KEY_SERVER_REQUESTS.incrementAndGet();
 
-              return Mono.just(
-                  ClientResponse.create(HttpStatus.OK)
-                      .header(HttpHeaders.CONTENT_TYPE, "text/plain")
-                      .body(KEYS.armoredPublicKey())
-                      .build());
-            })
-        .build();
+          return StubKeyServers.ok(KEYS.armoredPublicKey());
+        });
   }
 
   @BeforeEach

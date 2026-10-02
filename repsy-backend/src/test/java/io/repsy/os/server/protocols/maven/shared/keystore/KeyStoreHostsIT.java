@@ -28,6 +28,7 @@ import io.repsy.os.server.protocols.maven.shared.keystore.repositories.AllowedKe
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.KeyStoreRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
+import io.repsy.os.server.protocols.maven.shared.keystore.support.StubKeyServers;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.List;
@@ -36,10 +37,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
 /**
  * RPS-1791 (OS half): the key-server hosts a repo's signatures are looked up on are the active ones
@@ -92,14 +89,12 @@ class KeyStoreHostsIT extends AbstractIntegrationTest {
     final var requested = new CopyOnWriteArrayList<String>();
     final var verifier =
         new PGPVerifierService(
-            WebClient.builder()
-                .exchangeFunction(
-                    request -> {
-                      requested.add(request.url().toString());
+            StubKeyServers.answering(
+                uri -> {
+                  requested.add(uri.toString());
 
-                      return Mono.just(ClientResponse.create(HttpStatus.NOT_FOUND).build());
-                    })
-                .build());
+                  return StubKeyServers.notFound();
+                }));
     final var file = "content".getBytes(UTF_8);
     final var sources = this.keyStoreService.findPublicKeySources(repo.getId(), true);
 

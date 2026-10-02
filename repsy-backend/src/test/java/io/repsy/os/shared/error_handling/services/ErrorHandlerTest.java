@@ -85,9 +85,9 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -278,11 +278,11 @@ class ErrorHandlerTest {
   }
 
   @Test
-  @DisplayName("answers 500 errorOccurred for a WebClient failure instead of relaying its status")
-  void webClientResponseException() throws Exception {
-    // The former handler returned a Mono, which a servlet advice turns into an empty 200.
+  @DisplayName("answers 500 errorOccurred for a RestClient failure instead of relaying its status")
+  void restClientResponseException() throws Exception {
+    // A relayed upstream status would leak the upstream's answer as our own.
     this.mockMvc
-        .perform(get("/web-client"))
+        .perform(get("/rest-client"))
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.msgId").value("errorOccurred"));
   }
@@ -766,10 +766,10 @@ class ErrorHandlerTest {
   @RestController
   static class ThrowingController {
 
-    @GetMapping("/web-client")
-    String webClient() {
-      throw WebClientResponseException.create(
-          404, "upstream", HttpHeaders.EMPTY, "upstream body".getBytes(UTF_8), UTF_8);
+    @GetMapping("/rest-client")
+    String restClient() {
+      throw new RestClientResponseException(
+          "upstream", 404, "Not Found", HttpHeaders.EMPTY, "upstream body".getBytes(UTF_8), UTF_8);
     }
 
     @GetMapping("/header/authorization")

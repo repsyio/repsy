@@ -58,7 +58,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 @Slf4j
 @Service
@@ -88,21 +89,22 @@ public class PGPVerifierService {
   // parsed, and logged, again). KeyStoreService evicts a key's entry when the key is deleted.
   private static final long PARSED_KEY_CACHE_SIZE = 500;
 
-  private final @NonNull WebClient webClient;
+  private final @NonNull RestClient restClient;
   private final Cache<String, String> keyBlocksByUrl;
   private final Cache<String, PGPPublicKeyRingCollection> parsedRegisteredKeys =
       CacheBuilder.newBuilder().maximumSize(PARSED_KEY_CACHE_SIZE).recordStats().build();
 
   @Autowired
-  public PGPVerifierService(final @Qualifier("pgpVerifierWebClient") @NonNull WebClient webClient) {
+  public PGPVerifierService(
+      final @Qualifier("pgpVerifierRestClient") @NonNull RestClient restClient) {
 
-    this(webClient, Ticker.systemTicker());
+    this(restClient, Ticker.systemTicker());
   }
 
   @VisibleForTesting
-  PGPVerifierService(final @NonNull WebClient webClient, final @NonNull Ticker ticker) {
+  PGPVerifierService(final @NonNull RestClient restClient, final @NonNull Ticker ticker) {
 
-    this.webClient = webClient;
+    this.restClient = restClient;
     this.keyBlocksByUrl =
         CacheBuilder.newBuilder()
             .expireAfterWrite(KEY_BLOCK_TTL)
@@ -417,16 +419,13 @@ public class PGPVerifierService {
 
   private @Nullable String downloadKeyData(final @NonNull String serverUrl) {
 
-    return this.webClient
-        .get()
-        .uri(serverUrl)
-        .retrieve()
-        .bodyToMono(String.class)
-        .doOnError(
-            error ->
-                log.debug("Failed to fetch key from server {}: {}", serverUrl, error.getMessage()))
-        .onErrorReturn("")
-        .block();
+    try {
+      return this.restClient.get().uri(serverUrl).retrieve().body(String.class);
+    } catch (final RestClientException exception) {
+      log.debug("Failed to fetch key from server {}: {}", serverUrl, exception.getMessage());
+
+      return "";
+    }
   }
 
   private @NonNull Optional<MatchedKey> parsePublicKey(
