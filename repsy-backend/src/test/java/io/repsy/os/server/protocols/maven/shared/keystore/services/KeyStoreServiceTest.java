@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.maven.shared.keystore.services;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -37,6 +38,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +48,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Every change of where a repo looks for the keys of its signers publishes the event that
@@ -65,6 +69,7 @@ class KeyStoreServiceTest {
   @Mock ApplicationEventPublisher eventPublisher;
   @Mock MavenPgpCaps caps;
 
+  private final PGPVerifierService verifier = new PGPVerifierService(WebClient.create());
   private KeyStoreService service;
   private final UUID repoId = UUID.randomUUID();
   private final RepoInfo repoInfo = RepoInfo.builder().storageKey(this.repoId).name("repo").build();
@@ -81,6 +86,7 @@ class KeyStoreServiceTest {
             this.pgpPublicKeyRepository,
             this.artifactConverter,
             this.eventPublisher,
+            this.verifier,
             this.caps);
   }
 
@@ -115,12 +121,38 @@ class KeyStoreServiceTest {
   @DisplayName("deleting a public key publishes the event for its repo")
   void deletingAKeyPublishes() {
     final var id = UUID.randomUUID();
+    final var stored = new PgpPublicKey();
+    stored.setArmoredKey(KEYS.armoredPublicKey());
     when(this.pgpPublicKeyRepository.findByIdAndRepoId(id, this.repoId))
-        .thenReturn(Optional.of(new PgpPublicKey()));
+        .thenReturn(Optional.of(stored));
 
     this.service.deletePublicKey(this.repoInfo, id);
 
     verify(this.eventPublisher).publishEvent(this.event);
+  }
+
+  @Test
+  @DisplayName("deleting a public key drops its parsed form from the verifier cache (RPS-1814)")
+  void deletingAKeyEvictsItsParsedForm() {
+    final var armored = KEYS.armoredPublicKey();
+    final var pom = "<project/>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    this.verifier.verify(
+        new ByteArrayResource(pom),
+        new ByteArrayResource(
+            KEYS.detachedSignature(pom).getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+        new io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources(
+            List.of(armored), List.of(), false));
+    assertThat(this.verifier.parsedRegisteredKeyCount()).isEqualTo(1);
+
+    final var id = UUID.randomUUID();
+    final var stored = new PgpPublicKey();
+    stored.setArmoredKey(armored);
+    when(this.pgpPublicKeyRepository.findByIdAndRepoId(id, this.repoId))
+        .thenReturn(Optional.of(stored));
+
+    this.service.deletePublicKey(this.repoInfo, id);
+
+    assertThat(this.verifier.parsedRegisteredKeyCount()).isZero();
   }
 
   @Test

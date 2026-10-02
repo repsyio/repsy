@@ -64,6 +64,7 @@ public class KeyStoreService {
   private final PgpPublicKeyRepository pgpPublicKeyRepository;
   private final ArtifactConverter artifactConverter;
   private final ApplicationEventPublisher eventPublisher;
+  private final PGPVerifierService pgpVerifierService;
   private final MavenPgpCaps caps;
 
   @Transactional
@@ -187,6 +188,7 @@ public class KeyStoreService {
             .orElseThrow(() -> new ItemNotFoundException("pgpPublicKeyNotFound"));
 
     this.pgpPublicKeyRepository.delete(pgpPublicKey);
+    this.pgpVerifierService.evictRegisteredKey(pgpPublicKey.getArmoredKey());
     this.publishKeySourcesChanged(repoInfo);
   }
 
