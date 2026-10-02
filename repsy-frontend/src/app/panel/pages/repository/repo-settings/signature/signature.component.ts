@@ -70,7 +70,7 @@ export class SignatureComponent implements OnInit {
   ];
 
   public readonly signedColumnHint =
-    'Signed means a key matching the signature\'s key id is registered on this repo or, with keyserver lookup on, published on a public keyserver. It does not prove who deployed the artifact.';
+    "Signed means a key matching the signature's key id is registered on this repo or, with keyserver lookup on, published on a public keyserver. It does not prove who deployed the artifact.";
 
   private allowedKeyservers: AllowedKeyserverItem[] = [];
 
