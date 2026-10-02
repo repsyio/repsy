@@ -51,6 +51,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -357,6 +358,104 @@ class MavenPgpCapsIT extends AbstractIntegrationTest {
             this.uploadOutcome(
                 repo, admin, DIR + "caps-1.0-sized.jar.asc", padded(base, limit + 1)))
         .isEqualTo("400 mavenSignatureTooLarge");
+  }
+
+  // ---- total bytes of pending signatures ----
+
+  private long pendingBytes(final Repo repo) {
+    return this.jdbcTemplate.queryForObject(
+        "select coalesce(sum(length(armored_signature)), 0) from maven_pending_signature where repo_id = ?",
+        Long.class,
+        repo.getId());
+  }
+
+  /** A small cap so the tests need a few uploads, not thousands of rows. */
+  private static final long TEST_BYTES_CAP = 3_000;
+
+  private static final int SLOT = 1_000;
+
+  private Long originalBytesCap;
+
+  private void lowerBytesCap() {
+    this.originalBytesCap = this.caps.getMaxBytesPerRepo();
+    ReflectionTestUtils.setField(this.caps, "maxBytesPerRepo", TEST_BYTES_CAP);
+  }
+
+  @AfterEach
+  void restoreBytesCap() {
+    if (this.originalBytesCap != null) {
+      ReflectionTestUtils.setField(this.caps, "maxBytesPerRepo", this.originalBytesCap);
+      this.originalBytesCap = null;
+    }
+  }
+
+  @Test
+  @DisplayName("the cap-th byte of total pending is accepted, one byte more is refused with 400")
+  void bytesCapIsExactlyTheLimit() throws Exception {
+    this.lowerBytesCap();
+    final var admin = this.admin();
+    final var repo = this.verifyAllRepo();
+    final var base = signatureOf("seed");
+
+    assertThat(this.uploadOutcome(repo, admin, DIR + "caps-1.0-a.jar.asc", padded(base, SLOT)))
+        .isEqualTo("200");
+    assertThat(this.uploadOutcome(repo, admin, DIR + "caps-1.0-b.jar.asc", padded(base, SLOT)))
+        .isEqualTo("200");
+
+    final var remaining = (int) (TEST_BYTES_CAP - this.pendingBytes(repo));
+
+    assertThat(remaining).isGreaterThan(base.length);
+
+    // Exactly at the limit is accepted.
+    assertThat(
+            this.uploadOutcome(repo, admin, DIR + "caps-1.0-fill.jar.asc", padded(base, remaining)))
+        .isEqualTo("200");
+    assertThat(this.pendingBytes(repo)).isEqualTo(TEST_BYTES_CAP);
+
+    // One byte more, as a new file, is refused.
+    assertThat(this.uploadOutcome(repo, admin, DIR + "caps-1.0-over.jar.asc", base))
+        .isEqualTo("400 pendingSignatureBytesLimitReached");
+    assertThat(this.pendingBytes(repo)).isEqualTo(TEST_BYTES_CAP);
+
+    // Growing an existing one by a byte is refused too.
+    assertThat(
+            this.uploadOutcome(
+                repo, admin, DIR + "caps-1.0-fill.jar.asc", padded(base, remaining + 1)))
+        .isEqualTo("400 pendingSignatureBytesLimitReached");
+    assertThat(this.pendingBytes(repo)).isEqualTo(TEST_BYTES_CAP);
+
+    // Replacing one with a smaller signature is allowed, even at the cap.
+    assertThat(this.uploadOutcome(repo, admin, DIR + "caps-1.0-fill.jar.asc", base))
+        .isEqualTo("200");
+    assertThat(this.pendingBytes(repo)).isLessThan(TEST_BYTES_CAP);
+  }
+
+  @Test
+  @DisplayName("signatures sent at the same time never make total bytes go over the cap")
+  void concurrentBytesCapHolds() throws Exception {
+    this.lowerBytesCap();
+    final var admin = this.admin();
+    final var repo = this.verifyAllRepo();
+    final var base = signatureOf("seed");
+
+    assertThat(this.uploadOutcome(repo, admin, DIR + "caps-1.0-first.jar.asc", padded(base, SLOT)))
+        .isEqualTo("200");
+
+    final var room = (int) ((TEST_BYTES_CAP - this.pendingBytes(repo)) / SLOT);
+    final var names = IntStream.range(0, 6).mapToObj(i -> "byte-" + i).toList();
+    final var outcomes =
+        this.concurrently(
+            names,
+            name ->
+                this.uploadOutcome(
+                    repo, admin, DIR + "caps-1.0-" + name + ".jar.asc", padded(base, SLOT)));
+
+    assertThat(room).isEqualTo(2);
+    assertThat(outcomes).filteredOn("200"::equals).hasSize(room);
+    assertThat(outcomes)
+        .filteredOn("400 pendingSignatureBytesLimitReached"::equals)
+        .hasSize(names.size() - room);
+    assertThat(this.pendingBytes(repo)).isLessThanOrEqualTo(TEST_BYTES_CAP);
   }
 
   // ---- helpers ----

@@ -145,6 +145,10 @@ repsy:
       # KiB). Over it: 400 pendingSignatureLimitReached. A signature of a file whose signature is
       # already parked replaces it and is never refused.
       max-per-repo: ${PENDING_SIGNATURE_MAX_PER_REPO:500}
+      # RPS-1817: abuse cap on the total bytes of signatures one repo can have parked at a time
+      # (uncharged). Over it: 400 pendingSignatureBytesLimitReached. Replacing a signature is
+      # never refused, only judged by net growth.
+      max-bytes-per-repo: ${PENDING_SIGNATURE_MAX_BYTES_PER_REPO:8388608}
       enabled: ${PENDING_SIGNATURE_PURGE_ENABLED:true}
       ttl: ${PENDING_SIGNATURE_TTL:PT24H}
       purge-interval: ${PENDING_SIGNATURE_PURGE_INTERVAL:PT15M}

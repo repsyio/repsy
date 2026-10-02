@@ -192,7 +192,10 @@ public class PendingSignatureService {
    * this returns. The signature of the same file that was already parked is replaced.
    *
    * @throws BadRequestException {@code pendingSignatureLimitReached} when the repo already has
-   *     {@code repsy.maven.pending-signature.max-per-repo} signatures parked (RPS-1796)
+   *     {@code repsy.maven.pending-signature.max-per-repo} signatures parked (RPS-1796), or {@code
+   *     pendingSignatureBytesLimitReached} when the repo's total bytes would exceed {@code
+   *     repsy.maven.pending-signature.max-bytes-per-repo} after adding this signature (RPS-1817).
+   *     Replacing an already parked signature is never refused, only judged by net growth.
    * @throws SignatureNotVerifiedException {@code artifactSignatureNotVerified} when the bytes are
    *     not an OpenPGP signature (or not text: a parked signature is armored)
    */
@@ -221,8 +224,11 @@ public class PendingSignatureService {
 
     this.newTransaction.executeWithoutResult(
         status -> {
-          // RPS-1796: count and insert are one step per repo (see MavenPgpCaps). Replacing the
-          // signature already parked for a file is never refused, only a new row is.
+          // RPS-1796, RPS-1817: count and insert are one step per repo (see MavenPgpCaps).
+          // Replacing the signature already parked for a file is never refused, only a new row is
+          // (count cap). For the bytes cap, replacing is judged by net growth: if the new signature
+          // is smaller or equal to the old one, it is never refused; if larger, only refused if
+          // total growth exceeds the cap.
           this.caps.lockPendingSignatures(repoId);
 
           final var row =
@@ -230,10 +236,28 @@ public class PendingSignatureService {
                   .lockByRepoIdAndSignedFilePath(repoId, signedFilePath)
                   .orElseGet(PendingSignature::new);
 
-          if (row.getId() == null
+          final var isNewRow = row.getId() == null;
+
+          if (isNewRow
               && this.pendingSignatureRepository.countByRepoId(repoId)
                   >= this.caps.getMaxPendingSignaturesPerRepo()) {
             throw new BadRequestException("pendingSignatureLimitReached");
+          }
+
+          // RPS-1817: check total bytes cap. For an update, judge by net growth: the new signature
+          // smaller or equal to the old one is never refused, only growth beyond the cap is.
+          final var newBytes = armored.getBytes(UTF_8).length;
+          final var oldBytes =
+              row.getArmoredSignature() == null
+                  ? 0
+                  : row.getArmoredSignature().getBytes(UTF_8).length;
+          final var currentBytes =
+              this.pendingSignatureRepository.sumBytesArmoredSignatureByRepoId(repoId)
+                  - oldBytes; // Exclude the old signature if replacing
+          final var totalBytes = currentBytes + newBytes;
+
+          if (totalBytes > this.caps.getMaxBytesPerRepo()) {
+            throw new BadRequestException("pendingSignatureBytesLimitReached");
           }
 
           row.setRepoId(repoId);
