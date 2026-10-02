@@ -49,7 +49,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.client.ResourceAccessException;
 
 @Slf4j
 @Service
@@ -172,7 +172,7 @@ public class ArtifactScanListener {
     } catch (final ObjectOptimisticLockingFailureException
         | DataIntegrityViolationException exception) {
       this.handleScanWriteConflict(event, scanId, exception);
-    } catch (final WebClientRequestException exception) {
+    } catch (final ResourceAccessException exception) {
       this.handleScannerUnreachable(event, scanId, scanner, attempt, exception);
     } catch (final Exception exception) {
       this.handleScanFailure(event, scanId, exception);
@@ -239,14 +239,14 @@ public class ArtifactScanListener {
   }
 
   /**
-   * The scanner could not be reached ({@link WebClientRequestException}: connection refused, DNS
+   * The scanner could not be reached ({@link ResourceAccessException}: connection refused, DNS
    * failure, connection reset), which is what a scanner that is restarting, cold-starting or being
    * upgraded looks like. The submit is tried again a bounded number of times, {@code
    * repsy.security.trivy.submit-max-attempts} in all, after a growing delay.
    *
    * <p>Only this failure is retried. A 5xx answer, a scanner that did not answer or stopped reading
-   * the upload in time (a {@code TrivyScanException}, so not a {@link WebClientRequestException})
-   * and an unreadable artifact mean the scanner was reached, or the upload was under way, and
+   * the upload in time (a {@code TrivyScanException}, so not a {@link ResourceAccessException}) and
+   * an unreadable artifact mean the scanner was reached, or the upload was under way, and
    * re-sending an artifact of up to hundreds of megabytes to a slow scanner would only make it
    * slower. Those stay a recorded failure that can be re-run by hand.
    *
@@ -267,7 +267,7 @@ public class ArtifactScanListener {
       final @NonNull UUID scanId,
       final @NonNull VulnerabilityScanner scanner,
       final int attempt,
-      final @NonNull WebClientRequestException exception) {
+      final @NonNull ResourceAccessException exception) {
 
     final var maxAttempts = this.scannerProperties.submitMaxAttempts();
 

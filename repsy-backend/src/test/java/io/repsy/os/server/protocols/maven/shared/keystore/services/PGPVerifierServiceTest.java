@@ -26,6 +26,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
+import io.repsy.os.server.protocols.maven.shared.keystore.support.StubKeyServers;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -51,11 +52,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.http.client.ClientHttpResponse;
 
 /**
  * The detached-signature check of a Maven upload, with real OpenPGP signatures and a key server
@@ -86,31 +83,26 @@ class PGPVerifierServiceTest {
     keys = PgpTestKeys.generate();
   }
 
-  private PGPVerifierService serviceAnswering(final Function<URI, ClientResponse> answers) {
+  private PGPVerifierService serviceAnswering(final Function<URI, ClientHttpResponse> answers) {
     return new PGPVerifierService(
-        WebClient.builder()
-            .exchangeFunction(
-                request -> {
-                  this.asked.add(request.url());
+        StubKeyServers.answering(
+            uri -> {
+              this.asked.add(uri);
 
-                  return Mono.just(answers.apply(request.url()));
-                })
-            .build());
+              return answers.apply(uri);
+            }));
   }
 
   private PGPVerifierService serviceWithTheKey() {
     return this.serviceAnswering(uri -> keyResponse());
   }
 
-  private static ClientResponse keyResponse() {
-    return ClientResponse.create(HttpStatus.OK)
-        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
-        .body(keys.armoredPublicKey())
-        .build();
+  private static ClientHttpResponse keyResponse() {
+    return StubKeyServers.ok(keys.armoredPublicKey());
   }
 
-  private static ClientResponse notFound() {
-    return ClientResponse.create(HttpStatus.NOT_FOUND).build();
+  private static ClientHttpResponse notFound() {
+    return StubKeyServers.notFound();
   }
 
   private static Resource resource(final String text) {
@@ -211,14 +203,12 @@ class PGPVerifierServiceTest {
     final var ticker = new ManualTicker();
     final var service =
         new PGPVerifierService(
-            WebClient.builder()
-                .exchangeFunction(
-                    request -> {
-                      this.asked.add(request.url());
+            StubKeyServers.answering(
+                uri -> {
+                  this.asked.add(uri);
 
-                      return Mono.just(keyResponse());
-                    })
-                .build(),
+                  return keyResponse();
+                }),
             ticker);
 
     service.verify(new ByteArrayResource(POM), signature, noRegisteredKeys());
@@ -511,12 +501,7 @@ class PGPVerifierServiceTest {
 
     assertThatThrownBy(
             () ->
-                this.serviceAnswering(
-                        uri ->
-                            ClientResponse.create(HttpStatus.OK)
-                                .header(HttpHeaders.CONTENT_TYPE, "text/plain")
-                                .body("<html>not a key</html>")
-                                .build())
+                this.serviceAnswering(uri -> StubKeyServers.ok("<html>not a key</html>"))
                     .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
         .isInstanceOf(ItemNotFoundException.class);
   }
@@ -529,11 +514,8 @@ class PGPVerifierServiceTest {
     return String.join("\n", lines) + "\n";
   }
 
-  private static ClientResponse keyBlockResponse(final String armoredKeyBlock) {
-    return ClientResponse.create(HttpStatus.OK)
-        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
-        .body(armoredKeyBlock)
-        .build();
+  private static ClientHttpResponse keyBlockResponse(final String armoredKeyBlock) {
+    return StubKeyServers.ok(armoredKeyBlock);
   }
 
   @Test
@@ -612,11 +594,8 @@ class PGPVerifierServiceTest {
     assertThat(this.asked).hasSize(1);
   }
 
-  private static ClientResponse keyResponse(final PgpTestKeys of) {
-    return ClientResponse.create(HttpStatus.OK)
-        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
-        .body(of.armoredPublicKey())
-        .build();
+  private static ClientHttpResponse keyResponse(final PgpTestKeys of) {
+    return StubKeyServers.ok(of.armoredPublicKey());
   }
 
   @Test

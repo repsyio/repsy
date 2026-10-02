@@ -49,7 +49,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestClient;
 
 /**
  * Every change of where a repo looks for the keys of its signers publishes the event that
@@ -69,7 +69,7 @@ class KeyStoreServiceTest {
   @Mock ApplicationEventPublisher eventPublisher;
   @Mock MavenPgpCaps caps;
 
-  private final PGPVerifierService verifier = new PGPVerifierService(WebClient.create());
+  private final PGPVerifierService verifier = new PGPVerifierService(RestClient.create());
   private KeyStoreService service;
   private final UUID repoId = UUID.randomUUID();
   private final RepoInfo repoInfo = RepoInfo.builder().storageKey(this.repoId).name("repo").build();

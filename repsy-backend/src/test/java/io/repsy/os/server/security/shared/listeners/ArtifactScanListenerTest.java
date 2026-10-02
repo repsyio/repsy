@@ -46,7 +46,6 @@ import io.repsy.os.server.security.scanner.trivy.TrivyScannerProperties;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import java.net.ConnectException;
-import java.net.URI;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
@@ -75,11 +74,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.scheduling.TaskScheduler;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.client.ResourceAccessException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ArtifactScanListener")
@@ -552,12 +549,10 @@ class ArtifactScanListenerTest {
 
   private record ScheduledRetries(List<Runnable> tasks, List<Instant> instants) {}
 
-  private static WebClientRequestException unreachable() {
-    return new WebClientRequestException(
-        new ConnectException("Connection refused: scanner/10.0.0.1:8090"),
-        HttpMethod.POST,
-        URI.create("http://scanner:8090/scan"),
-        HttpHeaders.EMPTY);
+  private static ResourceAccessException unreachable() {
+    return new ResourceAccessException(
+        "I/O error on POST request for \"http://scanner:8090/scan\": Connection refused",
+        new ConnectException("Connection refused: scanner/10.0.0.1:8090"));
   }
 
   private static ObjectOptimisticLockingFailureException optimisticLockFailure() {
