@@ -498,9 +498,10 @@ describe('SignatureComponent', () => {
     });
 
     it('renders the keyserver-lookup hint with correct data-testid and text (RPS-1798)', () => {
-      const hintElement = fixture.debugElement.query((el) =>
-        el.nativeElement.hasAttribute?.('data-testid') &&
-        el.nativeElement.getAttribute('data-testid') === 'settings-pgp-keyserver-lookup-hint'
+      const hintElement = fixture.debugElement.query(
+        (el) =>
+          el.nativeElement.hasAttribute?.('data-testid') &&
+          el.nativeElement.getAttribute('data-testid') === 'settings-pgp-keyserver-lookup-hint',
       );
 
       expect(hintElement).toBeTruthy('Hint element should be present');
