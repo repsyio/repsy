@@ -14,6 +14,11 @@
 
   <artifactId>maven</artifactId>
 
+  <properties>
+    <indexer-core.version>7.1.6</indexer-core.version>
+    <maven.version>3.9.12</maven.version>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>io.repsy.protocols</groupId>
