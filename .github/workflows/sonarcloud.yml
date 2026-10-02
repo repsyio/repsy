@@ -29,9 +29,18 @@ jobs:
         with:
           cache-generator-jar: "true"
 
+      - name: Set up Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
+        with:
+          install-dependencies: true
+          no-sudo: true
+
       - name: Unit tests
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: |
-          google-chrome --version
+          "$CHROME_BIN" --version
           pnpm test --watch=false --browsers=ChromeHeadlessCI --code-coverage
 
       - name: Upload frontend coverage

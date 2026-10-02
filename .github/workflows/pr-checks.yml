@@ -182,12 +182,22 @@ jobs:
         working-directory: e2e
         run: pnpm exec prettier --check .
 
-      # Karma needs a Chrome binary; the runner image ships google-chrome. The CI launcher in
+      # Karma needs a Chrome binary; the Hetzner runners ship none, so "Set up Chrome" installs it
+      # and Karma finds it through CHROME_BIN. The CI launcher in
       # karma.conf.cjs adds --no-sandbox. A failing spec makes ng test exit non-zero. The coverage
       # report (lcov.info) is what the SonarCloud scan in the "Repsy check" job reads.
+      - name: Set up Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
+        with:
+          install-dependencies: true
+          no-sudo: true
+
       - name: Unit tests
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: |
-          google-chrome --version
+          "$CHROME_BIN" --version
           pnpm test --watch=false --browsers=ChromeHeadlessCI --code-coverage
 
       - name: Upload frontend coverage
