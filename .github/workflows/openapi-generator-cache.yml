@@ -19,10 +19,15 @@ on:
     - cron: "17 3 * * 1"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   seed:
     name: Seed generator jar cache
     runs-on: hetzner
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: ./repsy-frontend

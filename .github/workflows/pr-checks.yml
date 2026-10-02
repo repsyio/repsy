@@ -19,6 +19,7 @@ jobs:
   pre-checks:
     name: Editorconfig check - All
     runs-on: hetzner
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -45,6 +46,7 @@ jobs:
     # the 4x runner: about the same vCPU-minutes per run as the 2x runner took for the 14 minutes
     # of the serial build, in a bit more than half the time.
     runs-on: hetzner
+    timeout-minutes: 45
     # The SonarCloud scan below reads the frontend coverage report the frontend job produces (there
     # is one analysis per project, so the scan cannot be split per language). The two jobs run in
     # parallel; the scan step waits for the report, which is long done by the time the Java build
@@ -64,6 +66,10 @@ jobs:
           # Checkout already ran above with fetch-depth: 0 for SonarCloud blame data;
           # setup-maven-action's own default checkout would re-shallow the repo.
           checkout-enabled: false
+          # The JDK step below owns the Temurin JDK and the Maven cache; without these two the
+          # action installs Zulu and keeps a second ~/.m2 cache.
+          cache-enabled: false
+          java-distribution: temurin
 
       - name: Set up JDK
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
@@ -151,6 +157,7 @@ jobs:
   repsy-frontend:
     name: Repsy frontend
     runs-on: hetzner
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: ./repsy-frontend
