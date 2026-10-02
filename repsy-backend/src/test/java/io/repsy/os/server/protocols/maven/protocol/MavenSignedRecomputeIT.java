@@ -660,6 +660,10 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
     final var flagOff = this.mavenRepo();
     final var admin = this.admin();
     this.putVerifyAll(flagOn, admin, true);
+    // The toggle's own run is queued on another thread: wait until it has started, or it is
+    // counted below as a second run of the repo.
+    verify(this.signedRecomputeService, timeout(RECOMPUTE_TIMEOUT.toMillis()))
+        .recomputeRepo(flagOn.getId());
     clearInvocations(this.signedRecomputeService);
 
     this.putKeyServerLookup(flagOn, admin, false);
