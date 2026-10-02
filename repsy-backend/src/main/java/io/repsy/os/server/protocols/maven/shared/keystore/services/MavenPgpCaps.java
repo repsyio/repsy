@@ -26,13 +26,16 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * RPS-1796: the abuse caps of a Maven repo's PGP data, and the lock that makes them hold under
- * concurrent requests. They are abuse caps, not quotas: Repsy OS has no tenants or plans.
+ * RPS-1796, RPS-1817: the abuse caps of a Maven repo's PGP data, and the lock that makes them
+ * hold under concurrent requests. They are abuse caps, not quotas: Repsy OS has no tenants or
+ * plans.
  *
  * <ul>
  *   <li>registered public keys per repo ({@code repsy.maven.pgp.max-public-keys-per-repo}, 20);
  *   <li>parked (pending) signatures per repo ({@code repsy.maven.pending-signature.max-per-repo},
  *       500);
+ *   <li>total bytes of parked signatures per repo ({@code
+ *       repsy.maven.pending-signature.max-bytes-per-repo}, 8 MiB; RPS-1817);
  *   <li>bytes of one signature file: {@link #MAX_SIGNATURE_BYTES}, enforced for every {@code .asc}
  *       upload by {@code AbstractMavenProtocolFacade} ({@code mavenSignatureTooLarge});
  *   <li>key-server links per repo: bounded by the size of the allow-list, so no check of its own.
@@ -59,6 +62,7 @@ public class MavenPgpCaps {
 
   @Getter private final int maxPublicKeysPerRepo;
   @Getter private final int maxPendingSignaturesPerRepo;
+  @Getter private final long maxBytesPerRepo;
   private final boolean postgres;
 
   @PersistenceContext private EntityManager entityManager;
@@ -67,10 +71,13 @@ public class MavenPgpCaps {
       @Value("${repsy.maven.pgp.max-public-keys-per-repo:20}") final int maxPublicKeysPerRepo,
       @Value("${repsy.maven.pending-signature.max-per-repo:500}")
           final int maxPendingSignaturesPerRepo,
+      @Value("${repsy.maven.pending-signature.max-bytes-per-repo:8388608}")
+          final long maxBytesPerRepo,
       @Value("${spring.datasource.url:}") final String datasourceUrl) {
 
     this.maxPublicKeysPerRepo = maxPublicKeysPerRepo;
     this.maxPendingSignaturesPerRepo = maxPendingSignaturesPerRepo;
+    this.maxBytesPerRepo = maxBytesPerRepo;
     this.postgres = datasourceUrl.startsWith("jdbc:postgresql:");
   }
 
