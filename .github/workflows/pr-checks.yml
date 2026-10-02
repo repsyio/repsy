@@ -18,7 +18,7 @@ concurrency:
 jobs:
   pre-checks:
     name: Editorconfig check - All
-    runs-on: warp-ubuntu-latest-x64-2x
+    runs-on: hetzner
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -44,7 +44,7 @@ jobs:
     # several test JVMs at once (see "Build and Verify" below) and are CPU-bound, so this job uses
     # the 4x runner: about the same vCPU-minutes per run as the 2x runner took for the 14 minutes
     # of the serial build, in a bit more than half the time.
-    runs-on: warp-ubuntu-latest-x64-4x
+    runs-on: hetzner
     # The SonarCloud scan below reads the frontend coverage report the frontend job produces (there
     # is one analysis per project, so the scan cannot be split per language). The two jobs run in
     # parallel; the scan step waits for the report, which is long done by the time the Java build
@@ -150,7 +150,7 @@ jobs:
 
   repsy-frontend:
     name: Repsy frontend
-    runs-on: warp-ubuntu-latest-x64-2x
+    runs-on: hetzner
     defaults:
       run:
         working-directory: ./repsy-frontend
@@ -182,12 +182,22 @@ jobs:
         working-directory: e2e
         run: pnpm exec prettier --check .
 
-      # Karma needs a Chrome binary; the runner image ships google-chrome. The CI launcher in
+      # Karma needs a Chrome binary; the Hetzner runners ship none, so "Set up Chrome" installs it
+      # and Karma finds it through CHROME_BIN. The CI launcher in
       # karma.conf.cjs adds --no-sandbox. A failing spec makes ng test exit non-zero. The coverage
       # report (lcov.info) is what the SonarCloud scan in the "Repsy check" job reads.
+      - name: Set up Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
+        with:
+          install-dependencies: true
+          no-sudo: true
+
       - name: Unit tests
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: |
-          google-chrome --version
+          "$CHROME_BIN" --version
           pnpm test --watch=false --browsers=ChromeHeadlessCI --code-coverage
 
       - name: Upload frontend coverage

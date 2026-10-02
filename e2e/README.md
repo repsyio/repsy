@@ -7434,8 +7434,8 @@ no change in the workflow). To run against an image you already built, set `REPS
   `ubuntu-latest`, which moves to Ubuntu 26 on 2026-10-19 (RPS-1600): the Chromium sandbox probe, the Docker version
   and the docker socket's gid of the `stack` runner all change with the image, so the pin moves on purpose, in a PR of
   its own, after a manual `suite=all` run on the new one (`release.yml` still uses `ubuntu-latest`). Set the repository variable `E2E_RUNNER` (Settings, Secrets and variables,
-  Actions, Variables) to another label, for example a larger WarpBuild size than the `warp-ubuntu-latest-x64-2x` that
-  `pr-checks.yml` uses (2 vCPU is too small for the `ui` leg), without editing the workflow.
+  Actions, Variables) to another label, for example a larger Hetzner runner than the `hetzner` label that
+  `pr-checks.yml` uses (a small runner is too little for the `ui` leg), without editing the workflow.
 - Images come from Docker Hub (`postgres:18`, the `node`, `maven`, `rust`, ... bases of the runner
   images), the OpenAPI generator jar comes from the cache that `openapi-generator-cache.yml` seeds
   (else Maven Central), and the wire clients download their own toolchains at image-build time.

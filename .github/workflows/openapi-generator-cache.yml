@@ -22,7 +22,7 @@ on:
 jobs:
   seed:
     name: Seed generator jar cache
-    runs-on: warp-ubuntu-latest-x64-2x
+    runs-on: hetzner
     defaults:
       run:
         working-directory: ./repsy-frontend
