@@ -14,7 +14,7 @@ jobs:
   # in pr-checks.yml, minus lint.
   frontend-coverage:
     name: Frontend coverage
-    runs-on: warp-ubuntu-latest-x64-2x
+    runs-on: hetzner
     defaults:
       run:
         working-directory: ./repsy-frontend
@@ -44,7 +44,7 @@ jobs:
   analyze:
     name: Analyze main branch
     needs: frontend-coverage
-    runs-on: warp-ubuntu-latest-x64-2x
+    runs-on: hetzner
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

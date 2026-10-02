@@ -18,7 +18,7 @@ concurrency:
 jobs:
   pre-checks:
     name: Editorconfig check - All
-    runs-on: warp-ubuntu-latest-x64-2x
+    runs-on: hetzner
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -44,7 +44,7 @@ jobs:
     # several test JVMs at once (see "Build and Verify" below) and are CPU-bound, so this job uses
     # the 4x runner: about the same vCPU-minutes per run as the 2x runner took for the 14 minutes
     # of the serial build, in a bit more than half the time.
-    runs-on: warp-ubuntu-latest-x64-4x
+    runs-on: hetzner
     # The SonarCloud scan below reads the frontend coverage report the frontend job produces (there
     # is one analysis per project, so the scan cannot be split per language). The two jobs run in
     # parallel; the scan step waits for the report, which is long done by the time the Java build
@@ -150,7 +150,7 @@ jobs:
 
   repsy-frontend:
     name: Repsy frontend
-    runs-on: warp-ubuntu-latest-x64-2x
+    runs-on: hetzner
     defaults:
       run:
         working-directory: ./repsy-frontend
