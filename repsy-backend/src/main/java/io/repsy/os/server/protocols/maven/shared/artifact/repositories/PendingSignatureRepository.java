@@ -49,7 +49,7 @@ public interface PendingSignatureRepository extends JpaRepository<PendingSignatu
 
   /**
    * The total byte length of the armored signatures of a repo. RPS-1817: used to enforce the
-   * total-bytes cap.
+   * total-bytes cap. HQL length() counts characters; armored text is ASCII so this equals bytes.
    */
   @Query(
       "select coalesce(sum(length(p.armoredSignature)), 0) from PendingSignature p where p.repoId = :repoId")

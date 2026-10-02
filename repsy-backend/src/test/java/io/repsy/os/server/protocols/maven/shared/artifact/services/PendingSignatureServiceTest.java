@@ -103,6 +103,10 @@ class PendingSignatureServiceTest {
         .when(this.transactionManager.getTransaction(any()))
         .thenReturn(new SimpleTransactionStatus());
     lenient().when(this.caps.getMaxPendingSignaturesPerRepo()).thenReturn(500);
+    lenient().when(this.caps.getMaxBytesPerRepo()).thenReturn(8_388_608L); // RPS-1817
+    lenient()
+        .when(this.pendingSignatureRepository.sumBytesArmoredSignatureByRepoId(any()))
+        .thenReturn(0L); // RPS-1817: no existing signatures by default
     this.service =
         new PendingSignatureService(
             this.pendingSignatureRepository,
