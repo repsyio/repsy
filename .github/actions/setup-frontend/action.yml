@@ -41,10 +41,16 @@ runs:
     # (a leading env document that pins its own binary) and fails --frozen-lockfile without it.
     # Every run step sets shell and working-directory itself: a job's `defaults.run` does not
     # apply inside a composite action.
+    # The prefix is per runner, not the shared /opt/hostedtoolcache/node/... bin directory, where
+    # concurrent jobs on the Hetzner runners raced on the pnpm links (npm EEXIST).
     - name: Install pnpm
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: npm install -g --ignore-scripts pnpm@12.5.1
+      env:
+        NPM_CONFIG_PREFIX: ${{ runner.temp }}/npm-global
+      run: |
+        npm install -g --ignore-scripts pnpm@12.5.1
+        echo "$NPM_CONFIG_PREFIX/bin" >> "$GITHUB_PATH"
 
     # --frozen-lockfile fails instead of rewriting pnpm-lock.yaml (githubactions:S8543) and
     # --ignore-scripts skips dependency lifecycle scripts (githubactions:S6505). None of the
