@@ -288,7 +288,10 @@ builds each PR on top of the entries ahead of it and merges it only if that comb
   below reports on both. A workflow that a required check comes from must keep the `merge_group`
   trigger, or queued PRs never get a result and time out.
 - Required checks in the `protect default` ruleset: `Repsy check`, `Repsy frontend` and
-  `Editorconfig check - All`. Add a new job to that list when it should gate merges.
+  `Editorconfig check - All`. Add a new job to that list when it should gate merges. `PR title`
+  (`pr-title.yml`) is to be added once it has reported on a PR and on a queue entry.
+- Every PR title reads `RPS-1234: Description`, or `RPS-1, RPS-2: Description` for several
+  tickets. `pr-title.yml` checks it; Dependabot PRs are exempt. The squash commit takes the title.
 - Queue settings: squash merge, `ALLGREEN` grouping, up to 5 entries built at once, 60 minutes
   to report checks.
 - `gh pr merge --admin` skips the queue and the required checks. Org admins keep that bypass as a
