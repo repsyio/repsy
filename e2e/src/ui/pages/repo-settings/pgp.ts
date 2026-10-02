@@ -138,9 +138,13 @@ export class PgpSection {
 
   /** Expects the public key count to match (RPS-1803). */
   async expectPublicKeyCount(count: number): Promise<void> {
-    await expect(this.publicKeys).toContainText(count === 0 ? 'No public keys registered yet.' : '');
+    await expect(this.publicKeys).toContainText(
+      count === 0 ? 'No public keys registered yet.' : '',
+    );
     if (count > 0) {
-      await expect(this.publicKeys.locator('[data-testid^="settings-pgp-public-key-delete-"]')).toHaveCount(count);
+      await expect(
+        this.publicKeys.locator('[data-testid^="settings-pgp-public-key-delete-"]'),
+      ).toHaveCount(count);
     }
   }
 
@@ -151,7 +155,9 @@ export class PgpSection {
 
   /** Returns the UUIDs of all visible public keys (RPS-1803). */
   async publicKeyUuids(): Promise<string[]> {
-    const buttons = await this.publicKeys.locator('[data-testid^="settings-pgp-public-key-delete-"]').all();
+    const buttons = await this.publicKeys
+      .locator('[data-testid^="settings-pgp-public-key-delete-"]')
+      .all();
     const uuids = [];
     for (const button of buttons) {
       const testId = await button.getAttribute('data-testid');
