@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ticker;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheStats;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
@@ -30,12 +31,15 @@ import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.Security;
 import java.time.Duration;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -77,8 +81,17 @@ public class PGPVerifierService {
   private static final Duration KEY_BLOCK_TTL = Duration.ofMinutes(10);
   private static final long KEY_BLOCK_CACHE_SIZE = 1_000;
 
+  // RPS-1814: a registered armored key (up to 64 KB, up to 20 per repo) was parsed again by every
+  // verification. The parsed ring collection is kept instead, keyed by the SHA-256 of the armored
+  // text: an armoredKey that changes can never be answered by a stale ring, and the key is a
+  // fixed-size digest, not the 64 KB text. Only a successful parse is kept (a corrupt row is
+  // parsed, and logged, again). KeyStoreService evicts a key's entry when the key is deleted.
+  private static final long PARSED_KEY_CACHE_SIZE = 500;
+
   private final @NonNull WebClient webClient;
   private final Cache<String, String> keyBlocksByUrl;
+  private final Cache<String, PGPPublicKeyRingCollection> parsedRegisteredKeys =
+      CacheBuilder.newBuilder().maximumSize(PARSED_KEY_CACHE_SIZE).recordStats().build();
 
   @Autowired
   public PGPVerifierService(final @Qualifier("pgpVerifierWebClient") @NonNull WebClient webClient) {
@@ -250,7 +263,7 @@ public class PGPVerifierService {
 
     for (final var armoredKey : sources.registeredArmoredKeys()) {
       try {
-        final var key = this.parsePublicKey(armoredKey, keyId);
+        final var key = matchKey(this.parseRegisteredKey(armoredKey), keyId);
 
         if (key.isPresent()) {
           return key;
@@ -263,6 +276,52 @@ public class PGPVerifierService {
     }
 
     return Optional.empty();
+  }
+
+  /** The parsed form of a registered armored key: parsed once, then served from the cache. */
+  private @NonNull PGPPublicKeyRingCollection parseRegisteredKey(final @NonNull String armoredKey)
+      throws PGPException, IOException {
+
+    try {
+      return this.parsedRegisteredKeys.get(cacheKey(armoredKey), () -> parseCollection(armoredKey));
+    } catch (final ExecutionException exception) {
+      if (exception.getCause() instanceof final PGPException pgpException) {
+        throw pgpException;
+      }
+      if (exception.getCause() instanceof final IOException ioException) {
+        throw ioException;
+      }
+      throw new IllegalStateException(exception.getCause());
+    }
+  }
+
+  /**
+   * Forgets the parsed form of a registered armored key that was deleted (RPS-1814), so a deleted
+   * key does not sit in memory until it is evicted by size.
+   */
+  public void evictRegisteredKey(final @NonNull String armoredKey) {
+
+    this.parsedRegisteredKeys.invalidate(cacheKey(armoredKey));
+  }
+
+  @VisibleForTesting
+  CacheStats parsedRegisteredKeyStats() {
+    return this.parsedRegisteredKeys.stats();
+  }
+
+  @VisibleForTesting
+  long parsedRegisteredKeyCount() {
+    return this.parsedRegisteredKeys.size();
+  }
+
+  private static @NonNull String cacheKey(final @NonNull String armoredKey) {
+
+    try {
+      return Hex.toHexString(
+          MessageDigest.getInstance("SHA-256").digest(armoredKey.getBytes(UTF_8)));
+    } catch (final NoSuchAlgorithmException exception) {
+      throw new IllegalStateException(exception);
+    }
   }
 
   private @NonNull Optional<MatchedKey> findInCustomHosts(
@@ -373,19 +432,30 @@ public class PGPVerifierService {
   private @NonNull Optional<MatchedKey> parsePublicKey(
       final @NonNull String keyData, final long keyId) throws PGPException, IOException {
 
+    return matchKey(parseCollection(keyData), keyId);
+  }
+
+  private static @NonNull PGPPublicKeyRingCollection parseCollection(final @NonNull String keyData)
+      throws PGPException, IOException {
+
     try (final var ds = getDecoderStream(new ByteArrayInputStream(keyData.getBytes(UTF_8)))) {
-      final var collection = new PGPPublicKeyRingCollection(ds, new JcaKeyFingerprintCalculator());
-      final var key = collection.getPublicKey(keyId);
-
-      if (key == null) {
-        return Optional.empty();
-      }
-
-      final var ring = collection.getPublicKeyRing(keyId);
-      final var primary = ring != null ? ring.getPublicKey() : key;
-
-      return Optional.of(new MatchedKey(key, primary));
+      return new PGPPublicKeyRingCollection(ds, new JcaKeyFingerprintCalculator());
     }
+  }
+
+  private static @NonNull Optional<MatchedKey> matchKey(
+      final @NonNull PGPPublicKeyRingCollection collection, final long keyId) throws PGPException {
+
+    final var key = collection.getPublicKey(keyId);
+
+    if (key == null) {
+      return Optional.empty();
+    }
+
+    final var ring = collection.getPublicKeyRing(keyId);
+    final var primary = ring != null ? ring.getPublicKey() : key;
+
+    return Optional.of(new MatchedKey(key, primary));
   }
 
   /**

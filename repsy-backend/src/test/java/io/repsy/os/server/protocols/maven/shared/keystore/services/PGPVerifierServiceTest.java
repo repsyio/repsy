@@ -852,4 +852,74 @@ class PGPVerifierServiceTest {
       return collection.getKeyRings().next();
     }
   }
+
+  @Test
+  @DisplayName("a registered key is parsed once however many signatures are verified (RPS-1814)")
+  void aRegisteredKeyIsParsedOnce() {
+    final var service = this.serviceAnswering(uri -> notFound());
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    final var signature = resource(keys.detachedSignature(POM));
+
+    service.verify(new ByteArrayResource(POM), signature, sources);
+    service.verify(new ByteArrayResource(POM), signature, sources);
+    service.verify(new ByteArrayResource(POM), signature, sources);
+
+    assertThat(service.parsedRegisteredKeyStats().loadSuccessCount()).isEqualTo(1);
+    assertThat(service.parsedRegisteredKeyStats().hitCount()).isEqualTo(2);
+    assertThat(this.asked).isEmpty();
+  }
+
+  @Test
+  @DisplayName("evicting a deleted key makes the next lookup parse it again (RPS-1814)")
+  void evictingAKeyForgetsItsParsedForm() {
+    final var service = this.serviceAnswering(uri -> notFound());
+    final var armored = keys.armoredPublicKey();
+    final var signature = resource(keys.detachedSignature(POM));
+
+    service.verify(new ByteArrayResource(POM), signature, registeredKeys(armored));
+    assertThat(service.parsedRegisteredKeyCount()).isEqualTo(1);
+
+    service.evictRegisteredKey(armored);
+    assertThat(service.parsedRegisteredKeyCount()).isZero();
+
+    service.verify(new ByteArrayResource(POM), signature, registeredKeys(armored));
+    assertThat(service.parsedRegisteredKeyStats().loadSuccessCount()).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("a changed armored key is never answered by the ring parsed from the old text")
+  void aChangedArmoredKeyIsParsedAnew() {
+    final var service = this.serviceAnswering(uri -> notFound());
+    final var other = PgpTestKeys.generate();
+    final var signature = resource(other.detachedSignature(POM));
+
+    assertThatThrownBy(
+            () ->
+                service.verify(
+                    new ByteArrayResource(POM), signature, registeredKeys(keys.armoredPublicKey())))
+        .isInstanceOf(ItemNotFoundException.class);
+
+    assertThatCode(
+            () ->
+                service.verify(
+                    new ByteArrayResource(POM),
+                    signature,
+                    registeredKeys(other.armoredPublicKey())))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("a registered key that does not parse is not cached and does not break the lookup")
+  void aCorruptKeyIsNotCached() {
+    final var service = this.serviceAnswering(uri -> notFound());
+    final var signature = resource(keys.detachedSignature(POM));
+
+    service.verify(
+        new ByteArrayResource(POM),
+        signature,
+        registeredKeys(
+            "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nnot a key", keys.armoredPublicKey()));
+
+    assertThat(service.parsedRegisteredKeyCount()).isEqualTo(1);
+  }
 }
