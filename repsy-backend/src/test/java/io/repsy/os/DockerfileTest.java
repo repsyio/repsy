@@ -152,8 +152,7 @@ class DockerfileTest {
   @DisplayName("RPS-1166: the Dockerfile pnpm pin equals CI's setup-pnpm pin and is a version")
   void dockerfilePnpmEqualsTheCiPin() throws IOException {
     final String image = pin(ROOT.resolve("Dockerfile"), "corepack prepare");
-    final String ci =
-        pin(ROOT.resolve(".github/actions/setup-pnpm/action.yml"), "npm install -g");
+    final String ci = pin(ROOT.resolve(".github/actions/setup-pnpm/action.yml"), "npm install -g");
 
     assertThat(image).as("the Dockerfile's pnpm version").isEqualTo(ci);
     assertThat(read(ROOT.resolve("Dockerfile"))).doesNotContain("pnpm@latest");
@@ -162,8 +161,7 @@ class DockerfileTest {
   @Test
   @DisplayName("RPS-1166: every e2e runner image installs the same pnpm as CI")
   void e2eRunnersUseTheCiPin() throws IOException {
-    final String ci =
-        pin(ROOT.resolve(".github/actions/setup-pnpm/action.yml"), "npm install -g");
+    final String ci = pin(ROOT.resolve(".github/actions/setup-pnpm/action.yml"), "npm install -g");
 
     final var runners = new ArrayList<Path>();
     try (Stream<Path> files = Files.list(ROOT.resolve("e2e/runners"))) {
@@ -183,8 +181,7 @@ class DockerfileTest {
   @Test
   @DisplayName("RPS-1166: the frontend package.json does not pin a different pnpm")
   void frontendPackageJsonAgrees() throws IOException {
-    final String ci =
-        pin(ROOT.resolve(".github/actions/setup-pnpm/action.yml"), "npm install -g");
+    final String ci = pin(ROOT.resolve(".github/actions/setup-pnpm/action.yml"), "npm install -g");
     final Matcher m =
         Pattern.compile("\"packageManager\"\\s*:\\s*\"pnpm@(\\d+\\.\\d+\\.\\d+)")
             .matcher(read(ROOT.resolve("repsy-frontend/package.json")));
