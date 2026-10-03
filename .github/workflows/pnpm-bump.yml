@@ -3,13 +3,13 @@ name: Bump pnpm
 # RPS-1167. The pnpm version is a literal in `run:` lines (SonarCloud githubactions:S8543 reads it
 # there, and the "packageManager" field of package.json would make pnpm 12 rewrite pnpm-lock.yaml),
 # so Dependabot cannot track it. This workflow does: once a week it compares the pin in
-# .github/actions/setup-frontend/action.yml with the newest release of the same major, rewrites
+# .github/actions/setup-pnpm/action.yml with the newest release of the same major, rewrites
 # every pin in one commit (that action, the Dockerfile and the e2e runner Dockerfiles, which
-# DockerfileTest keeps in sync) and opens a PR that is queued for merging once its checks pass.
+# DockerfileTest keeps in sync) and opens a PR that auto-merges once its checks pass.
 #
 # The PR is created with a GitHub App token, not GITHUB_TOKEN: a PR opened with GITHUB_TOKEN triggers
-# no `pull_request` workflows, so the required checks would never report and the merge queue would
-# never take it. Without the App (the PNPM_BUMP_APP_ID variable and PNPM_BUMP_APP_PRIVATE_KEY secret,
+# no `pull_request` workflows, so the required checks would never report and auto-merge would
+# never fire. Without the App (the PNPM_BUMP_APP_ID variable and PNPM_BUMP_APP_PRIVATE_KEY secret,
 # see AGENTS.md "Merging to main") the job only writes a note to its summary.
 
 permissions:
@@ -67,7 +67,7 @@ jobs:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: |
           set -euo pipefail
-          action=.github/actions/setup-frontend/action.yml
+          action=.github/actions/setup-pnpm/action.yml
           files=("$action" Dockerfile e2e/runners/*.Dockerfile)
 
           current=$(sed -nE 's/^[^#]*npm install -g --ignore-scripts pnpm@([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' "$action")
@@ -121,6 +121,6 @@ jobs:
 
           url=$(gh pr create --base main --head "$branch" \
             --title "RPS-1167: Bump the pinned pnpm from $current to $latest" \
-            --body "Bumps the pnpm pin from $current to $latest in the frontend CI setup action, the Dockerfile and the e2e runner images, which \`DockerfileTest\` keeps in sync. Opened by \`.github/workflows/pnpm-bump.yml\` (RPS-1167); it is queued to merge once the required checks pass.")
+            --body "Bumps the pnpm pin from $current to $latest in the frontend CI setup action, the Dockerfile and the e2e runner images, which \`DockerfileTest\` keeps in sync. Opened by \`.github/workflows/pnpm-bump.yml\` (RPS-1167); it auto-merges once the required checks pass.")
           gh pr merge "$url" --auto --squash
           echo "Opened $url" >> "$GITHUB_STEP_SUMMARY"

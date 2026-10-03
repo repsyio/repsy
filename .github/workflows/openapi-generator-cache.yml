@@ -1,7 +1,7 @@
 name: OpenAPI generator cache
 
-# The `Repsy frontend` job in pr-checks.yml caches the openapi-generator jar. A cache is only
-# readable from the ref that saved it and from main, so PRs and merge queue entries can reuse
+# The `Node check - All` job in pr-checks.yml caches the openapi-generator jar. A cache is only
+# readable from the ref that saved it and from main, so PRs can reuse
 # the jar only if a run on main saved it. This workflow does that. The weekly run also keeps the
 # entry from being evicted after 7 days without an access.
 
@@ -34,9 +34,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # The same setup as the "Repsy frontend" job in pr-checks.yml, including the cache step whose
+      # The same setup as the "Node check - All" job in pr-checks.yml, including the cache step whose
       # entry this job saves: on a miss gen:api downloads the jar and the post-job step saves it,
       # on a hit this only refreshes the entry's access time. The generated client itself is
       # thrown away.
       - name: Set up the frontend
-        uses: ./.github/actions/setup-frontend
+        uses: ./.github/actions/setup-pnpm

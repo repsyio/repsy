@@ -6,7 +6,7 @@ updates:
     # directory listed to stay fresh.
     directories:
       - "/"
-      - "/.github/actions/setup-frontend"
+      - "/.github/actions/setup-pnpm"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 3

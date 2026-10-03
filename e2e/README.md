@@ -7235,8 +7235,8 @@ checksums are not dependencies to it. Nothing here adds a PR check; the script i
 `.github/workflows/e2e-nightly.yml` ("E2E Nightly") runs this harness on GitHub Actions: the panel UI
 suite, the wire-level protocol runners, the embedded-H2 smoke run plus one rotating full catalog on H2, and
 the scanner-stub UI specs, the real-scanner contract spec and the `@smoke` of every client over Repsy's own TLS. **It runs nightly (01:23 UTC)
-and on demand only, by the product owner's decision (RPS-1260): it has no `pull_request`, `push` or
-`merge_group` trigger.** PR checks are switched off in this repo on purpose (`pr-checks.yml` is
+and on demand only, by the product owner's decision (RPS-1260): it has no `pull_request` or
+`push` trigger.** PR checks are switched off in this repo on purpose (`pr-checks.yml` is
 `workflow_dispatch` only, `AGENTS.md` "Merging to main"), and this workflow is not a required check.
 
 ### Triggering it
@@ -7452,10 +7452,9 @@ no change in the workflow). To run against an image you already built, set `REPS
 
 The nightly workflow is deliberately not on the PR path. If the maintainers restore PR checks and want
 a fast gate, add a job that runs only `@smoke` of the `ui` runner (about 1 min of stack boot plus about
-5 min of tests, once the image is built) to a workflow that has the `merge_group` trigger (see
-`AGENTS.md`: a required check must report on `merge_group` within 60 minutes). Copy the `image` job and
+5 min of tests, once the image is built) to a workflow with the `pull_request` trigger. Copy the `image` job and
 the `ui` leg of `e2e-nightly.yml` (a matrix of one: `stack: ""`, `protocols: ui`, `grep: @smoke`,
-`ui: true`), add `pull_request` and `merge_group` triggers, and add the job's name to the required checks
+`ui: true`), add a `pull_request` trigger, and add the job's name to the required checks
 of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays off.
 
 ### Not covered yet
