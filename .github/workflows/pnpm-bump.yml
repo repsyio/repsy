@@ -27,7 +27,7 @@ concurrency:
 jobs:
   bump:
     name: Bump the pinned pnpm
-    runs-on: hetzner
+    runs-on: hetzner-sm
     timeout-minutes: 10
     env:
       APP_ID: ${{ vars.PNPM_BUMP_APP_ID }}
