@@ -1021,7 +1021,7 @@ hostname and port are correct and that the postmaster is accepting TCP/IP connec
 (Full chain: `FlywayAutoConfiguration` fails to resolve migration locations because it cannot open a
 JDBC connection at all — this happens before the app can even seed default repos.) This is exactly
 the documentation bug already tracked by
-[RPS-1173](https://zyfera.atlassian.net/browse/RPS-1173) ("README says the embedded H2 database is
+[RPS-1173](https://repsyio.atlassian.net/browse/RPS-1173) ("README says the embedded H2 database is
 the default, but application.yml defaults DB_URL to PostgreSQL") — re-confirmed live here with fresh
 evidence (commented on that ticket) rather than filed again. **Not fixed here**: this step touches
 only `e2e/`, never the backend or its docs. **Fixed by RPS-1173 itself**: the `Dockerfile` now sets
@@ -3337,7 +3337,7 @@ prediction, the actual observed behaviour is what got pinned, not the guess.
   `test.fail`): manifests are content-addressed, an override only moves the tag.
 - **H10** (`HEAD` vs. `GET` by digest): confirmed live at the time — `HEAD` by digest was `404` even
   right after a `GET` by that same digest served `200` — **B1, filed as
-  [RPS-1215](https://zyfera.atlassian.net/browse/RPS-1215) and since fixed** (R8). `HEAD` now
+  [RPS-1215](https://repsyio.atlassian.net/browse/RPS-1215) and since fixed** (R8). `HEAD` now
   resolves through the same `dockerFacade.getManifest(...)` GET uses, for both a tag and a digest
   reference, and mirrors GET's status/headers exactly. Fixing it surfaced one more, genuinely
   separate, previously-masked bug: `AbstractDockerProtocolTxFacade#findPlatformManifests` (building
@@ -3368,7 +3368,7 @@ createdAt DESC`, could pick a DB-only "this manifest is also part of that multi-
 
 ### Backend bug candidates found while reading, and confirmed live (do not fix here)
 
-- **B1 (filed as [RPS-1215](https://zyfera.atlassian.net/browse/RPS-1215), fixed)** — `HEAD` a
+- **B1 (filed as [RPS-1215](https://repsyio.atlassian.net/browse/RPS-1215), fixed)** — `HEAD` a
   manifest by digest used to answer `404` for a manifest a `GET` of that SAME digest served fine
   (distribution spec: "HEAD MUST be identical to GET without the body"). Fixed by making
   `AbstractDockerManifestCheckProtocolMethodHandler` resolve through the same
@@ -3376,7 +3376,7 @@ createdAt DESC`, could pick a DB-only "this manifest is also part of that multi-
   (removed, along with its one now-unreachable caller and its dead 404 branch). See "H10" above for
   the two further, previously-masked bugs this fix's own live verification surfaced and fixed in the
   same PR (a manifest-list's child-by-digest resolution, and a shared-digest row-ordering bug).
-- **B2 (filed as [RPS-1216](https://zyfera.atlassian.net/browse/RPS-1216), fixed)** — Overriding a tag
+- **B2 (filed as [RPS-1216](https://repsyio.atlassian.net/browse/RPS-1216), fixed)** — Overriding a tag
   (`allowOverride: true`) used to make the PREVIOUS manifest unpullable BY DIGEST, even though nothing
   ever explicitly deleted it: the tag's one `Manifest` row was reused in place, so the row's own digest
   simply became the NEW one. A manifest is now content-addressed (one `docker_manifest` row per image
@@ -3394,7 +3394,7 @@ createdAt DESC`, could pick a DB-only "this manifest is also part of that multi-
   pointer, so a second tag adds a pointer and deleting a tag (panel `DELETE .../tags/{tag}`, which only
   removes the pointer) cannot affect another tag. The protocol has no `DELETE`, so this is pinned by the
   backend integration test `DockerManifestOverrideIT.retagSharesOneRowAndOneFile`, not by R9.
-- **sha512 manifest digests (filed as [RPS-1244](https://zyfera.atlassian.net/browse/RPS-1244), fixed)** —
+- **sha512 manifest digests (filed as [RPS-1244](https://repsyio.atlassian.net/browse/RPS-1244), fixed)** —
   RPS-1242 made a `sha512:` reference routable, but a manifest pushed by it was stored as a tag-like row
   named `sha512:...` and every response reported the `sha256`. A manifest now stores both digests
   (`digest_sha512` is filled at push time and, for a row an earlier version wrote, by the manifest-layout
@@ -3402,14 +3402,14 @@ createdAt DESC`, could pick a DB-only "this manifest is also part of that multi-
   push's `Location`) carry the algorithm the client used: a reference by `sha512` gets the `sha512` digest
   back, a tag or a `sha256` reference the `sha256`. A push by digest never creates a tag. A wrong `sha512`
   reference is still `400 DIGEST_INVALID`. `registry-rules.spec.ts`'s R14 pins it with raw HTTP.
-- **B4 (fixed by RPS-1110, #461; R5 now pins the refusal; the text below is the original finding) (pre-existing story, [RPS-1110](https://zyfera.atlassian.net/browse/RPS-1110) — commented with
+- **B4 (fixed by RPS-1110, #461; R5 now pins the refusal; the text below is the original finding) (pre-existing story, [RPS-1110](https://repsyio.atlassian.net/browse/RPS-1110) — commented with
   this live evidence, not a new ticket)** — An unknown manifest `Content-Type` (anything outside the
   5 known docker/OCI types) answers a flat `500 UNKNOWN`, not a `4xx`: `saveManifest`'s `switch`
   throws a bare `IllegalArgumentException("unsupportedMediaType")`, which has no `ErrorHandler`
   mapping. The repo's `Image` row for that image name is ALSO already created by this point
   (`findOrCreateImage` runs before the `Content-Type` switch), so even the failed attempt leaves
   a row behind. Confirmed live: `registry-rules.spec.ts`'s R5.
-- **B5 (fixed by RPS-1116; R12 now pins `400 MANIFEST_INVALID`; the text below is the original finding) (pre-existing story, [RPS-1116](https://zyfera.atlassian.net/browse/RPS-1116) — commented with
+- **B5 (fixed by RPS-1116; R12 now pins `400 MANIFEST_INVALID`; the text below is the original finding) (pre-existing story, [RPS-1116](https://repsyio.atlassian.net/browse/RPS-1116) — commented with
   this live evidence, not a new ticket)** — A config blob missing BOTH `os` and `architecture`
   crashes the manifest push with the same flat `500`: `extractPlatform`'s `org.json`
   `getString("os")`/`getString("architecture")` throws a bare `JSONException`, also unmapped. Low
@@ -3850,7 +3850,7 @@ stops at "basic credential not found". `helm dependency update` does not recurse
 
 ### Backend bug candidates found while reading and confirmed live (do not fix here)
 
-- **B-H1 (filed as [RPS-1217](https://zyfera.atlassian.net/browse/RPS-1217))** — `index.yaml`
+- **B-H1 (filed as [RPS-1217](https://repsyio.atlassian.net/browse/RPS-1217))** — `index.yaml`
   (`generateIndex`) lists every chart version a repo has, INCLUDING ones that only ever went
   through the OCI route, at `charts/<name>-<version>.tgz` — but the classic download handler
   (`getChart`) only ever reads the classic storage path, which an OCI-only publish never wrote, so
@@ -3858,12 +3858,12 @@ stops at "basic credential not found". `helm dependency update` does not recurse
 search`/`install`/`pull <repo>/<chart>`, or a raw `helm pull --repo`) 404s (`chartNotFound`) for a
   chart that was only ever pushed via `helm push oci://`. Confirmed live, cleanly (a chart name that
   never touched the classic route): `tests/helm/publish-consume.spec.ts`'s "HL4".
-- **B-H2 (filed as [RPS-1218](https://zyfera.atlassian.net/browse/RPS-1218); related to, but
+- **B-H2 (filed as [RPS-1218](https://repsyio.atlassian.net/browse/RPS-1218); related to, but
   distinct from, the pre-existing RPS-1111 — see that ticket's description for how)** — An accepted
   OCI override (`allowOverride:true`, different chart bytes, same name:version) updates only the
   manifest row in place; the chart VERSION row (and therefore `index.yaml`'s `digest` field, and the
   panel's own version-detail DTO) stays at the OLD layer digest. Confirmed live: "HL5".
-- **B-H3 (filed as [RPS-1219](https://zyfera.atlassian.net/browse/RPS-1219), fixed; the text below is the
+- **B-H3 (filed as [RPS-1219](https://repsyio.atlassian.net/browse/RPS-1219), fixed; the text below is the
   original finding)** — There was no
   `GET /v2/<repo>/<name>/tags/list` handler at all (`404` with OCI code `NAME_UNKNOWN`, msgId
   `unknownPath`), although `HelmFacade.listTags`/`HelmOciTagListDto` exist (used only by the panel's
@@ -3871,7 +3871,7 @@ search`/`install`/`pull <repo>/<chart>`, or a raw `helm pull --repo`) 404s (`cha
   whenever `--version` is empty or a semver CONSTRAINT, so a real `helm pull`/`install`/`show
 oci://.../<chart>` without an EXACT version fails outright against Repsy. Confirmed live: "HL2",
   "R8".
-- **B-H4 (filed as [RPS-1220](https://zyfera.atlassian.net/browse/RPS-1220), fixed)** — Lived in the
+- **B-H4 (filed as [RPS-1220](https://repsyio.atlassian.net/browse/RPS-1220), fixed)** — Lived in the
   DOCKER provider's token endpoint, surfaced through Helm's shared `/v2/` ping: `helm registry
 login` used to succeed with a WRONG password. Docker's `/v2/token` answered the ping's own
   OAuth2-form POST (no `Authorization` header at all — oras-go's `ForceAttemptOAuth2` path,
@@ -3902,7 +3902,7 @@ login` used to succeed with a WRONG password. Docker's `/v2/token` answered the 
   chart will not be saved locally" — confirmed live that Helm still writes the unverified files to
   the destination directory despite the non-zero exit and a genuine `openpgp: signature made by
 unknown entity` error.
-- **B-H7 (pre-existing story, [RPS-1110](https://zyfera.atlassian.net/browse/RPS-1110) — commented
+- **B-H7 (pre-existing story, [RPS-1110](https://repsyio.atlassian.net/browse/RPS-1110) — commented
   with this live evidence, not a new ticket)** — An OCI manifest push with NO `Content-Type` header
   at all answers a bodyless `400` — no OCI envelope despite RPS-1039 (`OciErrorBodyAdvice`); RPS-1110
   already lists exactly this handler (`AbstractHelmOciManifestPushProtocolMethodHandler`, "a bare 400
@@ -4388,7 +4388,7 @@ RPS-1227 and RPS-1228 are fixed (#447): `registry-rules.spec.ts` now pins `400 i
   left a committed row without its files. The row is now flushed first and stays uncommitted while
   the files are written; a failed write rolls it back and removes the partly written files.
 - **G5** (architectural observation from source, not independently forced live; mentioned in the same
-  [RPS-1124](https://zyfera.atlassian.net/browse/RPS-1124) comment as G4, same root cause) —
+  [RPS-1124](https://repsyio.atlassian.net/browse/RPS-1124) comment as G4, same root cause) —
   `@v/list` and `@latest` read DIFFERENT sources of truth: `handleVersionList` lists the STORAGE
   directory, `handleLatestVersion` reads the DB (`findLatestPublishedVersion`). Every scenario this
   harness's own catalog exercises keeps both in sync (a successful upload always writes both), so this
