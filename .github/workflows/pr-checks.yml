@@ -81,11 +81,12 @@ jobs:
       - name: Install core modules
         run: mvn -B -ntp install -f core/pom.xml -DskipTests -Drat.skip=true -Dcheckstyle.skip=true
 
-      # -T 1C builds independent modules in parallel. it.fork.count is the number of test JVMs the
-      # integration tests of repsy-backend are spread over: one per vCPU of the runner, each with a
-      # postgres:18 container of its own (AbstractIntegrationTest), so none shares a database.
+      # it.fork.count is the number of test JVMs the integration tests of repsy-backend are spread
+      # over: one per vCPU of the runner, each with a postgres:18 container of its own
+      # (AbstractIntegrationTest), so none shares a database. No -T: apache-rat-plugin 0.18 is not
+      # thread-safe and fails a parallel reactor with a ConcurrentModificationException (RPS-1849).
       - name: Build and Verify
-        run: mvn -B -ntp -T 1C verify -Dit.fork.count=4
+        run: mvn -B -ntp verify -Dit.fork.count=4
 
       # The frontend job runs beside this one and normally uploads its report within a minute. Wait
       # for it (at most 10 minutes), but stop as soon as that job has finished without one, that
