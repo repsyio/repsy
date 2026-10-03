@@ -10,20 +10,24 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 3
+    # Minor and patch bumps share one PR; majors stay individual so they get reviewed alone.
     groups:
-      github-actions:
-        patterns:
-          - "*"
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "maven"
     directory: "/"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 3
+    # Minor and patch bumps share one PR; majors stay individual so they get reviewed alone.
     groups:
-      maven-dependencies:
-        patterns:
-          - "*"
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       # io.repsy.core:* (the core-* artifacts) is the core submodule's own
       # groupId — it's built from the core/ directory and already has its
@@ -37,16 +41,24 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 3
+    # Minor and patch bumps share one PR; majors stay individual so they get reviewed alone.
     groups:
-      scanner-maven-dependencies:
-        patterns:
-          - "*"
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "npm"
     directory: "/repsy-frontend"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 3
+    # Minor and patch bumps share one PR; majors stay individual so they get reviewed alone.
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       # RPS-1371: jasmine-core 7 freezes the Jasmine Env, so zone.js's zone-testing patch
       # ("Cannot assign to read only property 'describe'") fails at Karma startup, and no zone.js
@@ -65,6 +77,12 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 3
+    # Minor and patch bumps share one PR; majors stay individual so they get reviewed alone.
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       # Stay on the Java 25 LTS line; only patch/minor tag bumps are proposed.
       - dependency-name: "eclipse-temurin"
@@ -78,6 +96,12 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 3
+    # Minor and patch bumps share one PR; majors stay individual so they get reviewed alone.
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       - dependency-name: "eclipse-temurin"
         update-types: ["version-update:semver-major"]
