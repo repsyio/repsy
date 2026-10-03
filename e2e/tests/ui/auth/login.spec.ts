@@ -330,7 +330,16 @@ test.describe('AUTH-11 auth throttle', { tag: ['@throttle', '@cloud-skip'] }, ()
   const ATTEMPTS = 30;
   const THROTTLE_TOAST = 'Too many failed authentication attempts. Please try again later.';
 
-  test('repeated bad logins are refused with the throttle toast', async ({ page, seededUser }) => {
+  test('repeated bad logins are refused with the throttle toast', async ({
+    page,
+    seededUser,
+    pageErrors,
+  }) => {
+    pageErrors.allowToast(
+      'Username or password is incorrect.',
+      'by design: the case submits bad logins until the throttle answers',
+    );
+    pageErrors.allowToast(THROTTLE_TOAST, 'by design: the case provokes the throttle');
     // eslint-disable-next-line playwright/no-skipped-test -- the opt-in switch of README "UI suite"
     test.skip(
       !optedIn('throttle'),

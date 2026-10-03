@@ -26,9 +26,9 @@
  *   built from the request and follow the forwarded headers; each has the direct answer as the control;
  * - HSTS (`APP_HSTS_MAX_AGE`, set by the overlay) goes out on a request the proxy forwarded as https and not
  *   on the same one made straight to Repsy's plain port (README.md "Security headers");
- * - RPS-1515, pinned: a proxy that puts the port INSIDE `X-Forwarded-Host` and sends no `X-Forwarded-Port`
+ * - RPS-1515: a proxy that puts the port INSIDE `X-Forwarded-Host` and sends no `X-Forwarded-Port`
  *   (nginx with `proxy_set_header X-Forwarded-Host $http_host`, the third proxy listener) gets a public URL
- *   without the port, so a client that follows it reaches the wrong port.
+ *   that keeps the port, so a client that follows it reaches the right port.
  *
  * Skipped without the overlay (`REPSY_E2E_PROXY=1`).
  */
@@ -120,14 +120,9 @@ test.describe('Repsy behind a reverse proxy', { tag: ['@proxy'] }, () => {
     expect(direct.headers.get('strict-transport-security')).toBeNull();
   });
 
-  // RPS-1515. `X-Forwarded-Host: localhost:<port>`, no X-Forwarded-Port: the realm is expected to keep the port (a
-  // client follows this URL). It loses it today, so the test is expected to fail; when it is fixed the pin turns red
-  // ("Expected to fail, but passed") and is deleted.
+  // RPS-1515. `X-Forwarded-Host: localhost:<port>`, no X-Forwarded-Port: the realm keeps the port (a client follows
+  // this URL).
   test('the Docker token realm keeps a port that arrives inside X-Forwarded-Host (RPS-1515)', async () => {
-    test.fail(
-      true,
-      'RPS-1515: X-Forwarded-Host with its own port and no X-Forwarded-Port loses the port',
-    );
     expect(hostPortUrl, 'run.sh gives the runner REPSY_E2E_PROXY_HOSTPORT_URL').toBeTruthy();
 
     const res = await edgeRequest(`${hostPortUrl}/v2/`);
