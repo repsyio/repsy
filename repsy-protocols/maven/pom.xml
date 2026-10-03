@@ -16,7 +16,7 @@
 
   <properties>
     <indexer-core.version>7.1.6</indexer-core.version>
-    <maven.version>3.9.12</maven.version>
+    <maven.version>3.10.0</maven.version>
   </properties>
 
   <dependencies>
