@@ -263,10 +263,22 @@ test.describe('List rows are links', { tag: '@a11y' }, () => {
   });
 
   test('A11Y-08: the dashboard recent-activity rows are links', async ({ adminPage, seeder }) => {
-    const repo = await seeder.createRepo(RepoType.MAVEN);
+    // Recent Activity keeps only the RECENT_ACTIVITY_SIZE newest repositories, and every parallel
+    // worker creates repositories too, so a repo created here can be pushed out of the list before the
+    // dashboard loads. Retry with a fresh repository until one is in the window (the assertions after
+    // it do not depend on the others).
     const dashboard = new DashboardPage(adminPage);
-    await dashboard.goto();
-    await expect(dashboard.recentActivity).toBeVisible();
+    let repo = await seeder.createRepo(RepoType.MAVEN);
+    await expect(async () => {
+      await dashboard.goto();
+      await expect(dashboard.recentActivity).toBeVisible();
+      try {
+        await expect(dashboard.recentRow(repo.name)).toBeVisible({ timeout: 2_000 });
+      } catch (error) {
+        repo = await seeder.createRepo(RepoType.MAVEN);
+        throw error;
+      }
+    }).toPass({ timeout: 30_000 });
     const row = dashboard.recentRow(repo.name);
     const href = await expectRowIsLink(row, repo.name);
     expect(pathOf(href)).toBe(repoRoute(repo.name));
