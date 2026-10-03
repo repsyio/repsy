@@ -21,6 +21,9 @@ jobs:
     permissions:
       contents: read
       security-events: write
+    # Dependency-only bumps add runner time without useful findings; main and the weekly schedule
+    # still get analysed.
+    if: github.actor != 'dependabot[bot]'
     runs-on: hetzner
     timeout-minutes: 30
     steps:
@@ -43,6 +46,9 @@ jobs:
     permissions:
       contents: read
       security-events: write
+    # Dependency-only bumps add runner time without useful findings; main and the weekly schedule
+    # still get analysed.
+    if: github.actor != 'dependabot[bot]'
     runs-on: hetzner
     timeout-minutes: 30
     steps:
@@ -89,6 +95,9 @@ jobs:
     permissions:
       contents: read
       security-events: write
+    # Dependency-only bumps add runner time without useful findings; main and the weekly schedule
+    # still get analysed.
+    if: github.actor != 'dependabot[bot]'
     runs-on: hetzner
     timeout-minutes: 30
     steps:
