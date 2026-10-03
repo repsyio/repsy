@@ -23,7 +23,7 @@ FROM node:24-bookworm-slim
 # harness's own files below is relative to it. Declared after FROM, so it is in scope for this stage only.
 ARG HARNESS_DIR=.
 
-# Pinned the same literal way repsy-frontend/.github/actions/setup-frontend pins pnpm for CI: a
+# Pinned the same literal way repsy-frontend/.github/actions/setup-pnpm pins pnpm for CI: a
 # literal version (not package.json's absent "packageManager" field) and --ignore-scripts. Keep
 # this version equal to the one used to generate pnpm-lock.yaml, or --frozen-lockfile below fails.
 RUN npm install -g --ignore-scripts pnpm@12.5.1
