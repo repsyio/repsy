@@ -18,7 +18,10 @@ concurrency:
 jobs:
   pr-title:
     name: PR title
-    runs-on: hetzner
+    # Deliberately GitHub-hosted, not hetzner (RPS-1849): the check needs no checkout, secrets or
+    # self-hosted tooling and finishes in seconds, so it should not take one of the 10 self-hosted
+    # runners that the whole organization shares. Do not move it back to hetzner.
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Check the PR title
