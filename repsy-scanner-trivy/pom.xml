@@ -25,7 +25,7 @@
     <checkstyle.config.location>${project.basedir}/../core/config/checkstyle.xml</checkstyle.config.location>
     <fmt-maven-plugin.version>2.29</fmt-maven-plugin.version>
     <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
-    <checkstyle.version>14.1.0</checkstyle.version>
+    <checkstyle.version>14.3.0</checkstyle.version>
   </properties>
 
   <dependencies>
