@@ -218,7 +218,14 @@ test.describe('SEC-01 the /security page and the dashboard', { tag: SCANNER_TAG 
     await security.goto();
 
     // The type filter offers All plus exactly the types the backend's scanner supports.
-    expect(await security.typeFilter.options()).toEqual(['ALL', 'DOCKER', 'MAVEN', 'NPM', 'PYPI']);
+    expect(await security.typeFilter.options()).toEqual([
+      'ALL',
+      'DOCKER',
+      'HELM',
+      'MAVEN',
+      'NPM',
+      'PYPI',
+    ]);
   });
 
   test('the dashboard counts the repos with critical or high findings the way the backend does', async ({
