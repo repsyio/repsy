@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-and-push:
-    runs-on: hetzner
+    runs-on: hetzner-md
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -87,7 +87,7 @@ jobs:
   # module's own directory: it is not part of the Maven reactor and needs neither the core submodule
   # nor the OpenAPI generator cache.
   build-and-push-scanner:
-    runs-on: hetzner
+    runs-on: hetzner-md
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -125,7 +125,7 @@ jobs:
 
   helm-update:
     needs: build-and-push
-    runs-on: hetzner
+    runs-on: hetzner-sm
     timeout-minutes: 10
     steps:
       - name: Detect Image Tag
@@ -167,7 +167,7 @@ jobs:
   helm-release:
     if: github.ref_type == 'tag'
     needs: [helm-update, build-and-push-scanner]
-    runs-on: hetzner
+    runs-on: hetzner-sm
     timeout-minutes: 10
     steps:
       - name: Tag repsy-os-helm with the release tag
