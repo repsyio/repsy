@@ -157,7 +157,7 @@ async function stub(
   return handle;
 }
 
-const SEG = '([^/]+)';
+const SEG = '([^/]+(?:%2F[^/]+)*)';
 const SEG_MARK = '\u0001';
 
 /**
