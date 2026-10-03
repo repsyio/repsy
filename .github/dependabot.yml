@@ -8,7 +8,7 @@ updates:
       - "/"
       - "/.github/actions/setup-frontend"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 3
     groups:
       github-actions:
@@ -18,7 +18,7 @@ updates:
   - package-ecosystem: "maven"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 3
     groups:
       maven-dependencies:
@@ -35,7 +35,7 @@ updates:
   - package-ecosystem: "maven"
     directory: "/repsy-scanner-trivy"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 3
     groups:
       scanner-maven-dependencies:
@@ -45,7 +45,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/repsy-frontend"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 3
     ignore:
       # RPS-1371: jasmine-core 7 freezes the Jasmine Env, so zone.js's zone-testing patch
@@ -57,13 +57,13 @@ updates:
   - package-ecosystem: "gitsubmodule"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 3
 
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 3
     ignore:
       # Stay on the Java 25 LTS line; only patch/minor tag bumps are proposed.
@@ -76,7 +76,7 @@ updates:
   - package-ecosystem: "docker"
     directory: "/repsy-scanner-trivy"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 3
     ignore:
       - dependency-name: "eclipse-temurin"
