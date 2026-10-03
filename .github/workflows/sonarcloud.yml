@@ -4,9 +4,12 @@ permissions:
   contents: read
 
 on:
-  push:
-    branches:
-      - main
+  # Pull requests are scanned by pr-checks.yml; main is scanned on a schedule instead of on every
+  # merge (RPS-1849). GitHub runs scheduled workflows on the default branch.
+  schedule:
+    - cron: "0 10,12,14,16,18 * * *"
+      timezone: "Europe/Amsterdam"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

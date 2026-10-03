@@ -300,6 +300,13 @@ builds each PR on top of the entries ahead of it and merges it only if that comb
 - If `main` still goes red, fix it with a PR of its own (as RPS-960 did) rather than folding the
   fix into an unrelated PR.
 
+## Dependabot and code scanning
+
+- SonarCloud (PR analysis in `pr-checks.yml`; `main` is analysed by `sonarcloud.yml` at 10, 12, 14, 16 and 18 o'clock Europe/Amsterdam, not on every merge) is the only code scanner. There is no CodeQL workflow and GitHub code scanning is not configured; do not add them back (RPS-1849).
+- `.github/dependabot.yml` checks daily, except the `gitsubmodule` entry, which checks hourly (`interval: "cron"`) so a `core` merge reaches this repository quickly. Minor and patch updates share one PR per update entry (group `minor-and-patch`); a major update gets its own PR. Every entry keeps `open-pull-requests-limit: 3`.
+- The same rules apply in `repsy-core` and `repsy-mono`; change them in all three repositories together.
+
+
 ## Keeping the pnpm pin up to date
 
 The pnpm version is a literal in `.github/actions/setup-frontend/action.yml`, the `Dockerfile` and every

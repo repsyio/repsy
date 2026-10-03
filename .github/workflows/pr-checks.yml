@@ -131,7 +131,7 @@ jobs:
         # The wait step only runs (and so only succeeds) where a scan makes sense: Dependabot-
         # triggered and fork runs don't receive regular repo secrets, so SONAR_TOKEN is empty and
         # the scanner is rejected, and merge queue runs would analyse a gh-readonly-queue/* branch
-        # that no PR owns (sonarcloud.yml analyses main right after the merge anyway).
+        # that no PR owns (sonarcloud.yml analyses main on a schedule).
         if: steps.frontend-report.outcome == 'success'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
