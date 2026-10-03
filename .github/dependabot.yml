@@ -69,7 +69,8 @@ updates:
   - package-ecosystem: "gitsubmodule"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "cron"
+      cronjob: "0 * * * *"
     open-pull-requests-limit: 3
 
   - package-ecosystem: "docker"
