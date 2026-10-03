@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   # The scan runs in the "analyze" job and reads this report; a project has one analysis per
-  # branch, so the frontend cannot be scanned on its own. Same steps as the "Repsy frontend" job
+  # branch, so the frontend cannot be scanned on its own. Same steps as the "Node check - All" job
   # in pr-checks.yml, minus lint.
   frontend-coverage:
     name: Frontend coverage
@@ -29,11 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # The generator jar is cached like in the "Repsy frontend" job in pr-checks.yml (same path and
+      # The generator jar is cached like in the "Node check - All" job in pr-checks.yml (same path and
       # key, so it hits the entry openapi-generator-cache.yml seeds from main). Everything else is
       # what that job sets up too.
       - name: Set up the frontend
-        uses: ./.github/actions/setup-frontend
+        uses: ./.github/actions/setup-pnpm
         with:
           cache-generator-jar: "true"
 

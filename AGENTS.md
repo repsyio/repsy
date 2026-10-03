@@ -281,23 +281,18 @@ for SonarCloud.
 
 Two PRs can each pass CI against an older `main`, merge without a textual conflict, and still break
 the build together (RPS-901 and RPS-904 did: an unused import failed Checkstyle on `main` and then
-on every open PR). To rule that out, `main` is merged through a **GitHub merge queue**. The queue
-builds each PR on top of the entries ahead of it and merges it only if that combination is green.
+on every open PR). There is no merge queue (removed in RPS-1849): a PR merges once its required checks are green, so
+rebase or update the branch when another PR has just changed the same area, and watch `main` after a merge.
 
-- Enqueue a PR with `gh pr merge <n> --auto --squash` (or the "Merge when ready" button). Do not
-  update the branch by hand before merging: the queue already tests it against the latest `main`.
-- `.github/workflows/pr-checks.yml` runs on `pull_request` and on `merge_group`, so every check
-  below reports on both. A workflow that a required check comes from must keep the `merge_group`
-  trigger, or queued PRs never get a result and time out.
-- Required checks in the `protect default` ruleset: `Repsy check`, `Repsy frontend` and
-  `Editorconfig check - All`. Add a new job to that list when it should gate merges. `PR title`
-  (`pr-title.yml`) is to be added once it has reported on a PR and on a queue entry.
+- Merge a PR with `gh pr merge <n> --auto --squash` (or the "Merge when ready" button): it squashes
+  once the required checks are green. `.github/workflows/pr-checks.yml` runs on `pull_request`.
+- Required checks in the `protect default` ruleset: `Java check - All`,
+  `Node check - All`, `Editorconfig check - All` and `PR title` (`pr-title.yml`). The names match
+  repsy-mono. Add a new job to that list when it should gate merges.
 - Every PR title reads `RPS-1234: Description`, or `RPS-1, RPS-2: Description` for several
   tickets. `pr-title.yml` checks it; Dependabot PRs are exempt. The squash commit takes the title.
-- Queue settings: squash merge, `ALLGREEN` grouping, up to 5 entries built at once, 60 minutes
-  to report checks.
-- `gh pr merge --admin` skips the queue and the required checks. Org admins keep that bypass as a
-  break-glass for a red `main` or a stuck queue only. A PR merged that way is not re-verified
+- `gh pr merge --admin` skips the required checks. Org admins keep that bypass as a
+  break-glass for a red `main` only. A PR merged that way is not re-verified
   against the other open PRs, so do not use it for routine merges.
 - If `main` still goes red, fix it with a PR of its own (as RPS-960 did) rather than folding the
   fix into an unrelated PR.
@@ -311,14 +306,14 @@ builds each PR on top of the entries ahead of it and merges it only if that comb
 
 ## Keeping the pnpm pin up to date
 
-The pnpm version is a literal in `.github/actions/setup-frontend/action.yml`, the `Dockerfile` and every
+The pnpm version is a literal in `.github/actions/setup-pnpm/action.yml`, the `Dockerfile` and every
 `e2e/runners/*.Dockerfile` (`DockerfileTest` keeps them equal). Dependabot cannot track a literal in a
 `run:` line, so `.github/workflows/pnpm-bump.yml` runs weekly, rewrites all of them to the newest release
-of the pinned major in one commit and opens a PR that is queued with `gh pr merge --auto --squash`. A new
+of the pinned major in one commit and opens a PR that auto-merges with `gh pr merge --auto --squash`. A new
 major is left to a person.
 
 The PR is opened with a GitHub App token, because a PR opened with `GITHUB_TOKEN` triggers no
-`pull_request` workflows and the merge queue would wait for checks that never report. One-time setup
+`pull_request` workflows and auto-merge would wait for checks that never report. One-time setup
 (repository admin): create a GitHub App with repository permissions Contents: write, Pull requests:
 write and Metadata: read, install it on `repsyio/repsy`, then store its ID as the Actions variable
 `PNPM_BUMP_APP_ID` and its private key as the secret `PNPM_BUMP_APP_PRIVATE_KEY`. Until then the workflow
@@ -372,7 +367,7 @@ panel API. Edit that file for any API change; there is no other copy. Both sides
 PR, or a clearly called-out part of one), and re-run the core install above afterwards. Pin it
 only to a commit that is on `repsy-core`'s `main`, so merge the `repsy-core` PR first: a commit
 that only exists on a PR branch disappears from the remote when that branch is deleted on merge.
-`repsy-core` merges to `main` through the same merge queue flow described above.
+`repsy-core` merges to `main` the same way, without a merge queue.
 
 repsy-core releases are tags only (no published artifacts, RPS-1085). After a core release, bump
 `<parent><version>` in `pom.xml` together with the pointer.

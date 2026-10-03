@@ -1,5 +1,5 @@
 # pnpm 12's approval gate for dependency install scripts (see the "--ignore-scripts" comment in
-# runners/base.Dockerfile and .github/actions/setup-frontend for the same choice made there):
+# runners/base.Dockerfile and .github/actions/setup-pnpm for the same choice made there):
 # esbuild's postinstall only downloads its own platform binary, which it also ships as a resolved
 # optionalDependency package, so skipping the script does not break it (verified: pnpm gen:api,
 # pnpm exec tsx and pnpm exec playwright all work without it).

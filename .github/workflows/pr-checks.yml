@@ -7,9 +7,6 @@ on:
   pull_request:
     branches:
       - main
-  # The merge queue on main builds every queued PR on top of the ones ahead of it and reports
-  # these same checks. Without this trigger, queued entries never get a result and time out.
-  merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -40,7 +37,7 @@ jobs:
       - run: editorconfig-checker
 
   java-checks:
-    name: Repsy check
+    name: Java check - All
     # RPS-1453: the integration tests of repsy-backend, about nine tenths of the build, run in
     # several test JVMs at once (see "Build and Verify" below) and are CPU-bound, so this job uses
     # the 4x runner: about the same vCPU-minutes per run as the 2x runner took for the 14 minutes
@@ -97,7 +94,6 @@ jobs:
         continue-on-error: true
         if: >-
           github.actor != 'dependabot[bot]'
-          && github.event_name != 'merge_group'
           && github.event.pull_request.head.repo.full_name == github.repository
         env:
           GH_TOKEN: ${{ github.token }}
@@ -108,7 +104,7 @@ jobs:
           }
           for _ in $(seq 60); do
             has_report && exit 0
-            status=$(gh api "$RUN_API/jobs" --jq '.jobs[] | select(.name == "Repsy frontend") | .status')
+            status=$(gh api "$RUN_API/jobs" --jq '.jobs[] | select(.name == "Node check - All") | .status')
             if [ "$status" = completed ]; then
               has_report && exit 0
               echo "::warning::The frontend job finished without a coverage report; skipping the SonarCloud scan."
@@ -131,8 +127,7 @@ jobs:
       - name: Analyze with SonarCloud
         # The wait step only runs (and so only succeeds) where a scan makes sense: Dependabot-
         # triggered and fork runs don't receive regular repo secrets, so SONAR_TOKEN is empty and
-        # the scanner is rejected, and merge queue runs would analyse a gh-readonly-queue/* branch
-        # that no PR owns (sonarcloud.yml analyses main on a schedule).
+        # the scanner is rejected (sonarcloud.yml analyses main on a schedule).
         if: steps.frontend-report.outcome == 'success'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -156,7 +151,7 @@ jobs:
           if-no-files-found: error
 
   repsy-frontend:
-    name: Repsy frontend
+    name: Node check - All
     runs-on: hetzner
     timeout-minutes: 30
     defaults:
@@ -169,7 +164,7 @@ jobs:
       # (the specs import src/generated/api). Shared with sonarcloud.yml and
       # openapi-generator-cache.yml, and the generator jar cache is defined there too.
       - name: Set up the frontend
-        uses: ./.github/actions/setup-frontend
+        uses: ./.github/actions/setup-pnpm
 
       - name: Check
         run: pnpm run lint
@@ -193,7 +188,7 @@ jobs:
       # Karma needs a Chrome binary; the Hetzner runners ship none, so "Set up Chrome" installs it
       # and Karma finds it through CHROME_BIN. The CI launcher in
       # karma.conf.cjs adds --no-sandbox. A failing spec makes ng test exit non-zero. The coverage
-      # report (lcov.info) is what the SonarCloud scan in the "Repsy check" job reads.
+      # report (lcov.info) is what the SonarCloud scan in the "Java check - All" job reads.
       - name: Set up Chrome
         id: chrome
         uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
