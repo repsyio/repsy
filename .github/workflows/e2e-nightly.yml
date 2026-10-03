@@ -197,6 +197,10 @@ jobs:
               fail(f"unknown h2_full runner: {H2_FULL}")
 
           include = []
+          # Legs share one Docker daemon on the Hetzner runners, so each gets its own compose project and
+          # host-port offset. The step is 11 because the stack's base ports (8080, 8090, 8443, 8480, 9090,
+          # 9443, 9490, 9491) differ by 1, 10, 37, 47, 48 or at least 353: no multiple of 11 up to 209 maps one
+          # leg's port onto another's.
           for leg, (owner, stack, runners, default_grep, timeout, opt_in, grep_input) in LEGS.items():
               if suite not in ("all", owner):
                   continue
@@ -207,6 +211,7 @@ jobs:
                   continue
               include.append({
                   "leg": leg,
+                  "port_offset": 11 * (len(include) + 1),
                   "stack": stack,
                   "protocols": " ".join(runners),
                   "ui": "ui" in runners,
@@ -334,6 +339,10 @@ jobs:
       # A throwaway stack that lives for this job only, so a literal is fine. It must also satisfy
       # the panel's login form (6-50 chars, lower + upper case, a digit), or no UI test can log in.
       REPSY_ADMIN_PASSWORD: E2eAdmin-Pass1
+      # This leg's own stack, so legs on the same runner host do not fight over repsy-e2e and 8080/9090 (run.sh
+      # reads both for up, test, logs and down).
+      REPSY_E2E_PROJECT: repsy-e2e-${{ matrix.leg }}
+      REPSY_E2E_PORT_OFFSET: ${{ matrix.port_offset }}
       # Where the legs' reports are collected: e2e-artifacts/<leg>/<runner>/{junit.xml,playwright-report,test-results}
       ARTIFACTS: ${{ github.workspace }}/e2e/e2e-artifacts/${{ matrix.leg }}
       # The release the upgrade legs start from (empty: PREVIOUS_RELEASE, e2e/src/upgrade/previous-release.ts);
