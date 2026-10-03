@@ -197,7 +197,9 @@ several test JVMs at once: `it.fork.count` of them, 4 by default. Each JVM start
 `postgres:18` container and storage root (see "Testing"), so they never share a database. A JVM
 needs about 1.5 GB and one CPU core to itself; set `-Dit.fork.count=` to the number of cores you
 can spare, and `-Dit.fork.count=1` to run them one after the other (for example to look for an
-order-dependent failure). `-T 1C` also builds independent modules in parallel.
+order-dependent failure). Do not add `-T` to `mvn verify`: `apache-rat-plugin` 0.18 is not
+thread-safe and fails a parallel reactor with a `ConcurrentModificationException` (CI does not use
+it either). `-T 1C` is fine for `mvn test`, which does not run RAT.
 
 `mvn verify` (what CI runs) covers unit tests, integration tests, `fmt-maven-plugin`
 (Google Java Format), Checkstyle, SpotBugs, Apache RAT and Error Prone. Run
@@ -225,7 +227,7 @@ for SonarCloud.
   It builds the upstream modules without running their tests and takes about 1.5 minutes on a
   24-thread workstation, most of it compiling; add `-o` when nothing has to be downloaded. Separate
   several classes with commas (`-Dit.test='AIT,BIT'`): a `+` matches nothing and still ends in
-  `BUILD SUCCESS`, so look for `-- in ...IT` lines. The full `mvn -T 1C verify` takes about 5 to 6
+  `BUILD SUCCESS`, so look for `-- in ...IT` lines. The full `mvn verify` takes about 5 to 6
   minutes there (12 to 13 before RPS-1453).
 - Integration tests use Testcontainers with **PostgreSQL 18** (`postgres:18`), wired in through
   `@ServiceConnection`. Keep it on the same major version as the images documented in
