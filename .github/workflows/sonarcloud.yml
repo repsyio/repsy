@@ -21,7 +21,7 @@ jobs:
   # in pr-checks.yml, minus lint.
   frontend-coverage:
     name: Frontend coverage
-    runs-on: hetzner
+    runs-on: hetzner-md
     timeout-minutes: 30
     defaults:
       run:
@@ -61,7 +61,7 @@ jobs:
   analyze:
     name: Analyze main branch
     needs: frontend-coverage
-    runs-on: hetzner
+    runs-on: hetzner-lg
     timeout-minutes: 60
     steps:
       - name: Checkout
