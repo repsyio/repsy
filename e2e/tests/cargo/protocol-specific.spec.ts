@@ -742,10 +742,7 @@ test(
 // written for crates.io's `?` weak-dependency-feature syntax, which a real client only emits a
 // non-empty `features2` for -- this manifest does not use it, and a separate, raw-HTTP test right
 // after this one exercises that `v=2` mapping directly and deterministically instead of depending
-// on a real client to trigger it. A second, unrelated finding surfaced while reading the served
-// entry: `features2` is served as `{}` even though `v` correctly stays `1` -- a backend quirk in
-// `CargoJsonConverter.jsonToFeatures` (repsy-backend), confirmed live and NOT fixed here; see the
-// comment at the assertion below.
+// on a real client to trigger it. The served entry omits `features2` at v=1 (RPS-1730 fixed the old `{}` coercion).
 
 /** Confirms the runner's `rustc` is at least `minMajor.minMinor` before a test relies on a
  *  `rust-version` manifest field it might not be new enough to honour. */
@@ -917,17 +914,8 @@ test(
       entry?.features[featureName],
       'the dep: feature is served in the plain features field',
     ).toEqual([`dep:${optionalDepName}`]);
-    // A backend quirk, confirmed live and NOT fixed here (RPS-1721 finding, see this file's
-    // header): `CargoJsonConverter.jsonToFeatures` (repsy-backend) collapses a stored NULL
-    // `features2` to `Collections.emptyMap()` -- the same coercion it correctly uses for the
-    // always-present `features` field -- so the served entry carries `"features2":{}` even at v=1,
-    // when `CrateIndexEntry`'s own `@JsonInclude(NON_NULL)` says an absent v2 payload should omit
-    // the field entirely. A real cargo client tolerates this fine (every real-client test in this
-    // file passes either way), so this is reported as a finding, not asserted as a requirement.
-    expect(
-      entry?.features2,
-      'features2 is always served as {} even at v=1 (the finding above)',
-    ).toEqual({});
+    // RPS-1730: a stored NULL features2 stays absent in the served entry (no `"features2":{}`).
+    expect(entry?.features2, 'features2 is omitted at v=1').toBeUndefined();
 
     // A fresh, separate consumer project resolves the renamed dependency correctly: Cargo.lock
     // names the REAL crate, never the "foo" alias -- an alias is a source-level `extern crate`

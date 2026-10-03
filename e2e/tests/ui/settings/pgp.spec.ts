@@ -22,6 +22,7 @@
  */
 import type { Route } from '@playwright/test';
 
+import { generateGpgKey } from '../../../src/clients/gpg.js';
 import { PanelHttpError, RepoType } from '../../../src/api/panel-api.js';
 import type {
   AllowedKeyserverItem,
@@ -261,14 +262,8 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     await expect(pgp.publicKeys).toContainText('No public keys registered yet.');
     expect(await pgp.publicKeyCount()).toBe(0);
 
-    // Add a public key. Test with a minimal but valid armored public key block.
-    const armoredKey = `-----BEGIN PGP PUBLIC KEY BLOCK-----
-
-mI0EZvEb6wEEAIJ7c2qpSUzMrlJwRl1L/Q5A6wQfbq/V8VqwCLqEpUfKCZhK
-CrAHBdCa/pGKbG6LPQDA0gFi0rX3LjVEBsZ4xvP7PAQG6gvXhkFGRZVGqo8t
-bG7L6P9xJvIZuR5Rqw==
-=AbC0
------END PGP PUBLIC KEY BLOCK-----`;
+    // The panel accepts only a real armored block holding exactly one key, so generate two.
+    const armoredKey = (await generateGpgKey()).publicKeyArmored;
 
     await pgp.addPublicKey(armoredKey);
     await settings.shell.toasts.expectSuccess('Public key added');
@@ -282,13 +277,7 @@ bG7L6P9xJvIZuR5Rqw==
     expect(await pgp.publicKeyCount()).toBe(1);
 
     // Add another public key.
-    const secondArmoredKey = `-----BEGIN PGP PUBLIC KEY BLOCK-----
-
-mI0EZvEb6wEEAJJ7c2qpSUzMrlJwRl1L/Q5A6wQfbq/V8VqwCLqEpUfKCZhL
-CrAHBdCa/pGKbG6LPQDA0gFi0rX3LjVEBsZ4xvP7PAQG6gvXhkFGRZVGqo8t
-bG7L6P9xJvIZuR5Rqx==
-=CdE1
------END PGP PUBLIC KEY BLOCK-----`;
+    const secondArmoredKey = (await generateGpgKey()).publicKeyArmored;
 
     await pgp.addPublicKey(secondArmoredKey);
     await settings.shell.toasts.expectSuccess('Public key added');
