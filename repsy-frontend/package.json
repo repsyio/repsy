@@ -64,7 +64,7 @@
     "@typescript-eslint/parser": "^8.71.0",
     "angular-eslint": "^22.5.0",
     "autoprefixer": "^10.6.1",
-    "daisyui": "^5.7.46",
+    "daisyui": "^5.7.47",
     "depcheck": "^1.4.7",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
