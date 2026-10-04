@@ -344,17 +344,17 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
 
   private loadOverview(): void {
     this.fetchOverview().subscribe({
-        next: (response) => {
-          this.overview = response ?? null;
+      next: (response) => {
+        this.overview = response ?? null;
 
-          if (this.overview?.scanId) {
-            this.loadScanDetail(this.overview.scanId);
-          }
+        if (this.overview?.scanId) {
+          this.loadScanDetail(this.overview.scanId);
+        }
 
-          this.syncPolling();
-        },
-        error: () => {},
-      });
+        this.syncPolling();
+      },
+      error: () => {},
+    });
   }
 
   private loadScanDetail(scanId: string): void {
@@ -448,11 +448,11 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
 
   private refreshOverviewSeverity(): void {
     this.fetchOverview().subscribe({
-        next: (response) => {
-          this.overview = response ?? this.overview;
-        },
-        error: () => {},
-      });
+      next: (response) => {
+        this.overview = response ?? this.overview;
+      },
+      error: () => {},
+    });
   }
 
   private syncPolling(): void {
