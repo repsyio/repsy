@@ -3,12 +3,15 @@ name: SonarCloud Analysis
 permissions:
   contents: read
 
+# RPS-1877: SonarCloud is disabled until the codebase refactoring is done. The schedule is
+# commented out and every job is skipped; to re-enable, restore the schedule and remove the
+# `if: false` lines.
 on:
   # Pull requests are scanned by pr-checks.yml; main is scanned on a schedule instead of on every
   # merge (RPS-1849). GitHub runs scheduled workflows on the default branch.
-  schedule:
-    - cron: "0 10,12,14,16,18 * * *"
-      timezone: "Europe/Amsterdam"
+  # schedule:
+  #   - cron: "0 10,12,14,16,18 * * *"
+  #     timezone: "Europe/Amsterdam"
   workflow_dispatch:
 
 concurrency:
@@ -20,6 +23,7 @@ jobs:
   # branch, so the frontend cannot be scanned on its own. Same steps as the "Node check - All" job
   # in pr-checks.yml, minus lint.
   frontend-coverage:
+    if: false
     name: Frontend coverage
     runs-on: hetzner-md
     timeout-minutes: 30
@@ -59,6 +63,7 @@ jobs:
           if-no-files-found: error
 
   analyze:
+    if: false
     name: Analyze main branch
     needs: frontend-coverage
     runs-on: hetzner-lg
