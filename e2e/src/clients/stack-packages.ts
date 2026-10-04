@@ -150,7 +150,7 @@ export async function expectListedInPanel(
     const modulesPath = `/api/go/modules/${encodeURIComponent(repoName)}?size=100`;
     const modulesRes = await panelApi.rawRequest('GET', modulesPath);
     expect(modulesRes.status, `${what}: GET ${modulesPath}`).toBe(200);
-    const modules = (modulesRes.body.data as { content?: { modulePath?: string }[] }).content;
+    const modules = (modulesRes.body as { content?: { modulePath?: string }[] }).content;
     expect(
       (modules ?? []).some((candidate) => candidate.modulePath === packageName),
       `${what} lists the module ${packageName}`,
@@ -158,7 +158,7 @@ export async function expectListedInPanel(
     const versionsPath = `/api/go/modules/${encodeURIComponent(repoName)}/versions?modulePath=${encodeURIComponent(packageName)}&size=100`;
     const versionsRes = await panelApi.rawRequest('GET', versionsPath);
     expect(versionsRes.status, `${what}: GET ${versionsPath}`).toBe(200);
-    const versions = (versionsRes.body.data as { content?: { version?: string }[] }).content;
+    const versions = (versionsRes.body as { content?: { version?: string }[] }).content;
     expect(
       (versions ?? []).some((candidate) => candidate.version === version),
       `${what} lists the version ${version}`,

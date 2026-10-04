@@ -45,11 +45,9 @@ describe('GolangModulesListComponent', () => {
 
   function build(): ListFixture {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    golangService = jasmine.createSpyObj<GolangService>(
-      'GolangService',
-      ['fetchModules', 'searchModules', 'deleteModule'],
-      { repoChanges },
-    );
+    golangService = jasmine.createSpyObj<GolangService>('GolangService', ['fetchModules', 'deleteModule'], {
+      repoChanges,
+    });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
     securityService.watchArtifactSecuritySummary.and.returnValue(of({}));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -65,7 +63,7 @@ describe('GolangModulesListComponent', () => {
       component,
       repoChanges,
       load: golangService.fetchModules,
-      args: { sort: 0, page: 1 },
+      args: { search: 0, sort: 1, page: 2 },
       respond: (content, totalPages) =>
         golangService.fetchModules.and.returnValue(of(pageOf(content, totalPages) as never)),
       fail: () => golangService.fetchModules.and.returnValue(throwError(() => 'boom')),
@@ -73,34 +71,35 @@ describe('GolangModulesListComponent', () => {
     };
   }
 
-  // Without search text the listing comes from fetchModules; the search text switches it to searchModules (below).
-  describe('shared list behavior', () => describeRepoListBehavior(build, { security: true }));
+  // The list and the search are one route: fetchModules takes the search text (below).
+  describe('shared list behavior', () =>
+    describeRepoListBehavior(build, { security: true, search: { typed: 'acme', loaded: 'acme' } }));
 
   describe('searching', () => {
     beforeEach(fakeAsync(() => {
       build();
       golangService.fetchModules.and.returnValue(of(pageOf([], 1) as never));
-      golangService.searchModules.and.returnValue(of(pageOf([], 1) as never));
       repoChanges.next(permission(REPO_NAME));
       flushMicrotasks();
       golangService.fetchModules.calls.reset();
     }));
 
-    it('switches to the search endpoint with the text, from the first page', fakeAsync(() => {
+    it('passes the text as q, from the first page', fakeAsync(() => {
       component.loadPage(2);
       flushMicrotasks();
+      golangService.fetchModules.calls.reset();
 
       component.search('acme');
       flushMicrotasks();
 
       expect(component.pageNum).toBe(0);
-      expect(golangService.searchModules).toHaveBeenCalledOnceWith('acme', component.sortOption, 0, 10);
-      expect(golangService.fetchModules).toHaveBeenCalledTimes(1);
+      expect(golangService.fetchModules).toHaveBeenCalledOnceWith('acme', component.sortOption, 0, 10);
     }));
 
     it('keeps searching while paging and sorting', fakeAsync(() => {
       component.search('acme');
       flushMicrotasks();
+      golangService.fetchModules.calls.reset();
       const oldest = component.sortOptions[1];
 
       component.sort(oldest);
@@ -108,14 +107,13 @@ describe('GolangModulesListComponent', () => {
       component.loadPage(1);
       flushMicrotasks();
 
-      expect(golangService.searchModules.calls.allArgs()).toEqual([
-        ['acme', component.sortOptions[0], 0, 10],
+      expect(golangService.fetchModules.calls.allArgs()).toEqual([
         ['acme', oldest, 0, 10],
         ['acme', oldest, 1, 10],
       ]);
     }));
 
-    it('goes back to the plain listing when the search text is cleared', fakeAsync(() => {
+    it('lists without q again when the search text is cleared', fakeAsync(() => {
       component.search('acme');
       flushMicrotasks();
       golangService.fetchModules.calls.reset();
@@ -123,7 +121,7 @@ describe('GolangModulesListComponent', () => {
       component.search('');
       flushMicrotasks();
 
-      expect(golangService.fetchModules).toHaveBeenCalledOnceWith(component.sortOption, 0, 10);
+      expect(golangService.fetchModules).toHaveBeenCalledOnceWith('', component.sortOption, 0, 10);
     }));
   });
 

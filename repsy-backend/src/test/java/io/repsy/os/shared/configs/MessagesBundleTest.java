@@ -54,13 +54,7 @@ class MessagesBundleTest {
         "userDeleted",
         "usersFetched",
         "passwordReset",
-        "tokenRefreshed",
-        // Go
-        "modulesFetched",
-        "moduleInfoFetched",
-        "moduleVersionsFetched",
-        "moduleDeleted",
-        "moduleVersionDeleted"
+        "tokenRefreshed"
       })
   void msgIdHasASentence(final String msgId) {
     assertThat(messages.getProperty(msgId)).isNotBlank().isNotEqualTo(msgId);

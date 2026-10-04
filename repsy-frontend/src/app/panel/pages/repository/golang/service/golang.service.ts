@@ -64,27 +64,17 @@ export class GolangService {
     this.repoSubject.next(null);
   }
 
-  public fetchModules(sortOption: Sort, pageIndex: number, pageSize: number): Observable<PagedData<GoModuleListItem>> {
-    return this.golangModuleControllerService
-      .listGolangModules(this.repoName, pageIndex, pageSize, [`${sortOption.column},${sortOption.type}`])
-      .pipe(
-        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GoModuleListItem>),
-      );
-  }
-
-  public searchModules(
+  public fetchModules(
     search: string,
     sortOption: Sort,
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<GoModuleListItem>> {
     return this.golangModuleControllerService
-      .searchGolangModules(this.repoName, search || undefined, pageIndex, pageSize, [
+      .listGolangModules(this.repoName, search || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
-      .pipe(
-        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GoModuleListItem>),
-      );
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<GoModuleListItem>));
   }
 
   public deleteModule(modulePath: string): Observable<void> {
@@ -103,15 +93,12 @@ export class GolangService {
         `${sortOption.column},${sortOption.type}`,
       ])
       .pipe(
-        map(
-          (r) =>
-            ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GoModuleVersionListItem>,
-        ),
+        map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<GoModuleVersionListItem>),
       );
   }
 
   public fetchModuleInfo(modulePath: string): Observable<GoModuleInfo> {
-    return this.golangModuleControllerService.getGolangModuleInfo(modulePath, this.repoName).pipe(map((r) => r.data!));
+    return this.golangModuleControllerService.getGolangModuleInfo(modulePath, this.repoName).pipe(map((r) => r));
   }
 
   public deleteModuleVersion(modulePath: string, version: string): Observable<void> {

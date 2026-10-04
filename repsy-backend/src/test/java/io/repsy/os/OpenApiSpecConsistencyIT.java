@@ -102,13 +102,10 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
    *       pair.
    *   <li>{@code getSupportedRepoTypes}: a constant list, {@code SecurityScanController} takes no
    *       credentials for it.
-   *   <li>{@code checkSumdbSupported}: the Go toolchain probes it without credentials and always
-   *       gets 404.
    * </ul>
    */
   private static final Set<String> PUBLIC_OPERATIONS =
-      Set.of(
-          "login", "refreshToken", "logout", "getSupportedRepoTypes", "checkGolangSumdbSupported");
+      Set.of("login", "refreshToken", "logout", "getSupportedRepoTypes");
 
   /**
    * RPS-1593: the operations that answer 403 to a USER because their handler calls {@code

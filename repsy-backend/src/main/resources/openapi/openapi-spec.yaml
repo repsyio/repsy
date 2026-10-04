@@ -2296,7 +2296,15 @@ paths:
       operationId: listGolangModules
       description: >-
         Sortable by `id`, `modulePath`, `createdAt` (`property,direction`). The default is `id,desc`.
+        Takes the text filter `q`; there is no separate search route.
       parameters:
+        - name: q
+          in: query
+          required: false
+          description: >-
+            Only modules whose path contains this text, case-insensitive.
+          schema:
+            type: string
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
@@ -2309,7 +2317,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelGoModuleListItem"
+                "$ref": "#/components/schemas/PagedModelGoModuleListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2318,7 +2326,7 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: List Go modules in a repository
+      summary: List or search Go modules in a repository
     delete:
       tags:
         - golang-module-controller
@@ -2330,12 +2338,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          description: No Content
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2387,7 +2391,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelGoModuleVersionListItem"
+                "$ref": "#/components/schemas/PagedModelGoModuleVersionListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2413,12 +2417,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          description: No Content
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2432,67 +2432,6 @@ paths:
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
       summary: Delete Go module versions
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  "/api/go/modules/{repoName}/sumdb/supported":
-    get:
-      tags:
-        - golang-module-controller
-      operationId: checkGolangSumdbSupported
-      parameters:
-        - name: repoName
-          in: path
-          required: true
-          schema:
-            type: string
-      security: []
-      responses:
-        '404':
-          description: >-
-            Always. This proxy does not relay checksum database requests, so the Go toolchain
-            falls back to sum.golang.org (or GONOSUMDB). The body is empty.
-      summary: Check if sum database is supported
-  "/api/go/modules/{repoName}/search":
-    get:
-      tags:
-        - golang-module-controller
-      operationId: searchGolangModules
-      description: >-
-        Sortable by `id`, `modulePath`, `createdAt` (`property,direction`). The default is `id,desc`.
-      parameters:
-        - name: q
-          in: query
-          required: false
-          description: >-
-            Only modules whose path contains this text, case-insensitive.
-          schema:
-            type: string
-        - "$ref": "#/components/parameters/Page"
-        - "$ref": "#/components/parameters/Size"
-        - "$ref": "#/components/parameters/Sort"
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelGoModuleListItem"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Search Go modules in a repository
     parameters:
       - name: repoName
         in: path
@@ -2519,7 +2458,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseGoModuleInfo"
+                "$ref": "#/components/schemas/GoModuleInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -6226,20 +6165,6 @@ components:
             "$ref": "#/components/schemas/GoModuleListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelGoModuleListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelGoModuleListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     GoModuleVersionListItem:
       type: object
       properties:
@@ -6262,20 +6187,6 @@ components:
             "$ref": "#/components/schemas/GoModuleVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelGoModuleVersionListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelGoModuleVersionListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     GoModuleInfo:
       type: object
       properties:
@@ -6293,20 +6204,6 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/GoModuleVersionListItem"
-    RestResponseGoModuleInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/GoModuleInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: helm
     HelmChartListItem:
       type: object

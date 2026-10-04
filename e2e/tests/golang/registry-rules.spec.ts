@@ -64,7 +64,6 @@ import {
   zipRelPath,
   type GoRawResponse,
 } from '../../src/clients/golang-raw.js';
-import { env } from '../../src/env.js';
 import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
@@ -517,7 +516,7 @@ test.describe('golang registry rules (raw HTTP)', () => {
   );
 
   test(
-    'sumdb/supported 404s on both the protocol port and the API port (R12/G9)',
+    'sumdb/supported 404s on the protocol port (R12/G9)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'sumdb');
@@ -528,13 +527,6 @@ test.describe('golang registry rules (raw HTTP)', () => {
         protocolRes.status,
         'the go command lands here and gets a plain storage-miss 404',
       ).toBe(404);
-
-      const apiRes = await fetch(
-        `${env.apiBaseUrl}/api/go/modules/${layout.repoName}/sumdb/supported`,
-      );
-      expect(apiRes.status, 'the API port answers 404 deliberately (checkSumdbSupported)').toBe(
-        404,
-      );
     },
   );
 
