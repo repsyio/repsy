@@ -15,6 +15,7 @@
 ///
 
 import { HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { problemDetail } from '../error-handler/problem.util';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 
@@ -38,7 +39,7 @@ export const errorHandlerInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => error);
       }
 
-      const message = error.error?.text;
+      const message = problemDetail(error);
       let displayMessage: string;
 
       if (error.status === 0) {

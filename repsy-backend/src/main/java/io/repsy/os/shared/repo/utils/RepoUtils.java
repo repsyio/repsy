@@ -15,7 +15,6 @@
  */
 package io.repsy.os.shared.repo.utils;
 
-import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import java.util.Locale;
 import java.util.Set;
@@ -53,7 +52,7 @@ public class RepoUtils {
 
   public void validateRepoName(final @NonNull String repoName) {
     if (!REPO_NAME_PATTERN.matcher(repoName).matches()) {
-      throw new AccessNotAllowedException("invalidRequest");
+      throw new BadRequestException("invalidRequest");
     }
   }
 

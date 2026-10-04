@@ -18,6 +18,7 @@ package io.repsy.os.shared.error_handling.services;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
+import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -84,6 +85,6 @@ final class ConstraintViolationChecks {
     assertThat(answer).isNotNull();
     assertThat(answer.getStatusCode()).isEqualTo(expectedStatus);
     assertThat(answer.getBody()).isNotNull();
-    assertThat(answer.getBody().getMsgId()).isEqualTo(msgId);
+    assertThat(((RestResponse<?>) answer.getBody()).getMsgId()).isEqualTo(msgId);
   }
 }

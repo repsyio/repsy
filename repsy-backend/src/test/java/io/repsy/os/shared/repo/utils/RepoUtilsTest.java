@@ -18,7 +18,6 @@ package io.repsy.os.shared.repo.utils;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -45,7 +44,7 @@ class RepoUtilsTest {
     @DisplayName("rejects a name outside the allowed character set")
     void rejectsDisallowedCharacters(final String name) {
       assertThatThrownBy(() -> RepoUtils.validateRepoName(name))
-          .isInstanceOf(AccessNotAllowedException.class)
+          .isInstanceOf(BadRequestException.class)
           .hasMessage("invalidRequest");
     }
   }
@@ -100,7 +99,7 @@ class RepoUtilsTest {
             + " lets it reach the reserved-name check")
     void faviconIsAlreadyRejectedByTheCharacterSet() {
       assertThatThrownBy(() -> RepoUtils.validateNewRepoName("favicon.ico"))
-          .isInstanceOf(AccessNotAllowedException.class)
+          .isInstanceOf(BadRequestException.class)
           .hasMessage("invalidRequest");
     }
 
@@ -116,7 +115,7 @@ class RepoUtilsTest {
     @DisplayName("still rejects a disallowed character before checking the reserved list")
     void stillChecksCharacterSet(final String name) {
       assertThatThrownBy(() -> RepoUtils.validateNewRepoName(name))
-          .isInstanceOf(AccessNotAllowedException.class)
+          .isInstanceOf(BadRequestException.class)
           .hasMessage("invalidRequest");
     }
   }

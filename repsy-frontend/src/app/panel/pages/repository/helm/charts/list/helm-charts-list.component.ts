@@ -15,6 +15,7 @@
 ///
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
+import { problemDetail } from '../../../../../../shared/error-handler/problem.util';
 import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
@@ -179,7 +180,7 @@ export class HelmChartsListComponent implements OnDestroy {
         },
         // The error interceptor has already shown the failure to the user; the page keeps its text.
         error: (err: HttpErrorResponse) => {
-          this.error = err?.error?.text || 'An error occurred';
+          this.error = problemDetail(err) || 'An error occurred';
         },
       });
   }

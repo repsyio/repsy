@@ -16,6 +16,7 @@
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
+import { problemDetail } from '../../../shared/error-handler/problem.util';
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -98,7 +99,7 @@ export class LoginComponent implements OnInit {
         error: (error: HttpErrorResponse) => {
           // errorHandlerInterceptor leaves 401 responses to their callers, so show invalidCredentials here.
           if (error.status === 401) {
-            this.toastService.show(error.error?.text || 'Username or password is incorrect.', 'error');
+            this.toastService.show(problemDetail(error) || 'Username or password is incorrect.', 'error');
           }
         },
       });

@@ -327,11 +327,14 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.*", hasSize(5)))
-        .andExpect(jsonPath("$.type").value("ERROR"))
-        .andExpect(jsonPath("$.data").value("modulePath"))
-        .andExpect(jsonPath("$.errorCode", matchesPattern(UUID_PATTERN)))
-        .andExpect(jsonPath("$.text").value("Incoming data couldn't be validated."));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("validationError"))
+        .andExpect(jsonPath("$.errors[*].field").value(org.hamcrest.Matchers.hasItem("modulePath")))
+        .andExpect(jsonPath("$.traceId", matchesPattern(UUID_PATTERN)))
+        .andExpect(jsonPath("$.detail").value("Incoming data couldn't be validated."));
 
     this.mockMvc
         .perform(
@@ -340,11 +343,13 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.*", hasSize(5)))
-        .andExpect(jsonPath("$.type").value("ERROR"))
-        .andExpect(jsonPath("$.data").value("moduleNotFound"))
-        .andExpect(jsonPath("$.text").value("Module not found."))
-        .andExpect(jsonPath("$.errorCode", matchesPattern(UUID_PATTERN)));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("moduleNotFound"))
+        .andExpect(jsonPath("$.detail").value("Module not found."))
+        .andExpect(jsonPath("$.traceId", matchesPattern(UUID_PATTERN)));
 
     this.mockMvc
         .perform(
@@ -352,8 +357,11 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.type").value("ERROR"))
-        .andExpect(jsonPath("$.data").value("repoNotFound"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("repoNotFound"));
   }
 
   @Test
@@ -368,9 +376,12 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
     this.mockMvc
         .perform(get("/api/go/modules/{repo}", repo).with(apiPort()))
         .andExpect(status().isUnauthorized())
-        .andExpect(jsonPath("$.type").value("ERROR"))
-        .andExpect(jsonPath("$.data").value("unAuthorized"))
-        .andExpect(jsonPath("$.errorCode", matchesPattern(UUID_PATTERN)));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("loginRequired"))
+        .andExpect(jsonPath("$.traceId", matchesPattern(UUID_PATTERN)));
 
     this.mockMvc
         .perform(
@@ -378,7 +389,10 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, "Bearer malformed"))
         .andExpect(status().isUnauthorized())
-        .andExpect(jsonPath("$.type").value("ERROR"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")));
 
     this.mockMvc
         .perform(
@@ -417,8 +431,11 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.type").value("ERROR"))
-        .andExpect(jsonPath("$.msgId").value("accessDenied"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("accessDenied"));
   }
 
   @Test
@@ -456,9 +473,12 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
     this.mockMvc
         .perform(get("/api/go/modules/{repo}", repo).with(apiPort()))
         .andExpect(status().isUnauthorized())
-        .andExpect(jsonPath("$.type").value("ERROR"))
-        .andExpect(jsonPath("$.data").value("unAuthorized"))
-        .andExpect(jsonPath("$.errorCode", matchesPattern(UUID_PATTERN)));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("loginRequired"))
+        .andExpect(jsonPath("$.traceId", matchesPattern(UUID_PATTERN)));
 
     this.mockMvc
         .perform(
@@ -466,8 +486,13 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.type").value("ERROR"))
-        .andExpect(jsonPath("$.data").value("modulePath"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("validationError"))
+        .andExpect(
+            jsonPath("$.errors[*].field").value(org.hamcrest.Matchers.hasItem("modulePath")));
   }
 
   @Test
@@ -516,7 +541,10 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.type").value("ERROR"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")));
   }
 
   @Test
@@ -553,7 +581,11 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.msgId").value("moduleNotFound"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("moduleNotFound"));
 
     // The proxy answers as it does for a module that was never published: no list, no latest, both
     // not found so the go command tries the next GOPROXY entry (RPS-1428).

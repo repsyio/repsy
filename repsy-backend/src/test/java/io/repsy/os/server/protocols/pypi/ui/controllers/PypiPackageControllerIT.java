@@ -189,13 +189,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
 
   private static void assertErrorEnvelope(
       final String response, final String msgId, final String data) {
-    final Map<String, Object> envelope = JsonPath.read(response, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "ERROR")
-        .containsEntry("data", data);
-    assertThat((String) envelope.get("errorCode")).matches(UUID_PATTERN);
+    assertProblem(response, msgId);
   }
 
   @Test
@@ -530,12 +524,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
                     post("/api/pypi/packages/" + repo.getName() + "/keep-package")
                         .header(AUTHORIZATION, adminToken))
                 .andExpect(status().isNotFound()));
-    assertThat(JsonPath.<Map<String, Object>>read(unsupportedResponse, "$"))
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", "itemNotFound")
-        .containsEntry("type", "ERROR")
-        .containsEntry("data", null);
-    assertThat((String) JsonPath.read(unsupportedResponse, "$.errorCode")).matches(UUID_PATTERN);
+    assertProblem(unsupportedResponse, "itemNotFound");
     verify(this.usageUpdateService, atLeastOnce()).updateUsage(any(UsageChangedInfo.class));
   }
 

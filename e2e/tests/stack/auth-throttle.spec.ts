@@ -63,11 +63,12 @@ interface Answer {
 }
 
 async function answerOf(res: Response): Promise<Answer> {
-  const body = (await res.json().catch(() => ({}))) as { msgId?: string; text?: string };
+  const body = (await res.json().catch(() => ({}))) as { msgId?: string; text?: string; code?: string; detail?: string };
   return {
     status: res.status,
-    msgId: body.msgId,
-    text: body.text,
+    // the panel answers a problem (`code`, `detail`), the protocol routes the envelope (`msgId`, `text`)
+    msgId: body.code ?? body.msgId,
+    text: body.detail ?? body.text,
     retryAfter: res.headers.get('retry-after'),
   };
 }

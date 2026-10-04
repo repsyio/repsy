@@ -63,7 +63,7 @@ describe('errorHandlerInterceptor', () => {
   });
 
   it('rethrows a 401 without a toast, so the refresh interceptor and callers handle it', () => {
-    const error = fail(401, { msgId: 'sessionExpired', text: 'Session expired' });
+    const error = fail(401, { code: 'sessionExpired', detail: 'Session expired' });
 
     expect(error.status).toBe(401);
     expect(toastService.show).not.toHaveBeenCalled();
@@ -80,7 +80,7 @@ describe('errorHandlerInterceptor', () => {
   });
 
   it('shows the server text for a 403 and falls back to "Access denied"', () => {
-    fail(403, { text: 'You may not do this' });
+    fail(403, { detail: 'You may not do this' });
     expect(toastService.show).toHaveBeenCalledWith('You may not do this', 'error');
 
     fail(403, {});
@@ -91,14 +91,14 @@ describe('errorHandlerInterceptor', () => {
     let caught: HttpErrorResponse | undefined;
     http.get('/api', { context: new HttpContext().set(SILENT_ERROR, true) }).subscribe({ error: (e) => (caught = e) });
 
-    httpTesting.expectOne('/api').flush({ msgId: 'accessDenied' }, { status: 403, statusText: 'Forbidden' });
+    httpTesting.expectOne('/api').flush({ code: 'accessDenied' }, { status: 403, statusText: 'Forbidden' });
 
     expect(caught?.status).toBe(403);
     expect(toastService.show).not.toHaveBeenCalled();
   });
 
   it('hides the server text behind a generic message for a 5xx', () => {
-    fail(500, { text: 'NullPointerException at Foo.java:42' });
+    fail(500, { detail: 'NullPointerException at Foo.java:42' });
     expect(toastService.show).toHaveBeenCalledWith('Server error', 'error');
 
     fail(503);
@@ -107,8 +107,8 @@ describe('errorHandlerInterceptor', () => {
 
   it('shows the server text for a 503 that carries one (a lock race or a full scan queue)', () => {
     fail(503, {
-      msgId: 'resourceBusy',
-      text: 'The item is in use by another request. Please try again shortly.',
+      code: 'resourceBusy',
+      detail: 'The item is in use by another request. Please try again shortly.',
     });
 
     expect(toastService.show).toHaveBeenCalledOnceWith(
@@ -118,7 +118,7 @@ describe('errorHandlerInterceptor', () => {
   });
 
   it('shows the server text for other 4xx errors and falls back to a generic message', () => {
-    fail(400, { text: 'Repository name is taken' });
+    fail(400, { detail: 'Repository name is taken' });
     expect(toastService.show).toHaveBeenCalledWith('Repository name is taken', 'error');
 
     fail(404, {});
@@ -126,7 +126,7 @@ describe('errorHandlerInterceptor', () => {
   });
 
   it('shows exactly one toast per failed request', () => {
-    fail(400, { text: 'Bad input' });
+    fail(400, { detail: 'Bad input' });
 
     expect(toastService.show).toHaveBeenCalledTimes(1);
   });

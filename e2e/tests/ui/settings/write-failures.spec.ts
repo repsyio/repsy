@@ -46,7 +46,7 @@ const FAILURES = [
     mode: 'a 500',
     toast: 'Server error',
     fail: (route: import('@playwright/test').Route) =>
-      fulfillJson<ErrorResponse>(route, 500, errorBody({ msgId: 'boom', text: 'boom' })),
+      fulfillJson<ErrorResponse>(route, 500, errorBody({ code: 'boom', detail: 'boom' })),
   },
   {
     mode: 'an aborted request',

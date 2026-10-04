@@ -545,7 +545,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       return repoUrl(ProtocolRepoControllerIT.this.seedMaven(), "/settings");
     }
 
-    /** The status and error envelope of a Basic-authenticated call, minus the random errorCode. */
+    /** The status and error envelope of a Basic-authenticated call, minus the random traceId. */
     private Map<String, Object> basicError(final String authHeader) throws Exception {
       final var response =
           ProtocolRepoControllerIT.this
@@ -555,7 +555,8 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               .getResponse();
       final Map<String, Object> envelope =
           new HashMap<>(JsonPath.read(response.getContentAsString(), "$"));
-      envelope.remove("errorCode");
+      envelope.remove("traceId");
+      envelope.remove("instance");
       envelope.put("status", response.getStatus());
       return envelope;
     }

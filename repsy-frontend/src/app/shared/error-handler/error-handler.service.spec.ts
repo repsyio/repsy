@@ -42,15 +42,15 @@ describe('ErrorHandlerService', () => {
   });
 
   it('returns the text the server sent', () => {
-    expect(service.handle(error(400, { text: 'Repository name is taken' }))).toBe('Repository name is taken');
+    expect(service.handle(error(400, { detail: 'Repository name is taken' }))).toBe('Repository name is taken');
   });
 
   it('falls back to a generic text when the server sent none', () => {
-    expect(service.handle(error(500, { msgId: 'boom' }))).toBe('Error Occurred');
+    expect(service.handle(error(500, { code: 'boom' }))).toBe('Error Occurred');
   });
 
   it('logs the error body for anything but an expired session', () => {
-    const body = { msgId: 'invalidCredentials', text: 'Nope' };
+    const body = { code: 'invalidCredentials', detail: 'Nope' };
 
     service.handle(error(401, body));
 
@@ -61,7 +61,7 @@ describe('ErrorHandlerService', () => {
 
   ['sessionExpired', 'refreshTokenExpired'].forEach((msgId) => {
     it(`clears the stored session and goes to the root on a 401 ${msgId}`, () => {
-      const text = service.handle(error(401, { msgId, text: 'Please sign in again' }));
+      const text = service.handle(error(401, { code: msgId, detail: 'Please sign in again' }));
 
       expect(clearStorage).toHaveBeenCalledTimes(1);
       expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/');
@@ -70,8 +70,8 @@ describe('ErrorHandlerService', () => {
     });
   });
 
-  it('does not treat an expired-session msgId on another status as a sign-out', () => {
-    service.handle(error(403, { msgId: 'sessionExpired' }));
+  it('does not treat an expired-session code on another status as a sign-out', () => {
+    service.handle(error(403, { code: 'sessionExpired' }));
 
     expect(clearStorage).not.toHaveBeenCalled();
     expect(router.navigateByUrl).not.toHaveBeenCalled();

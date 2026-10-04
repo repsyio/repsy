@@ -125,7 +125,11 @@ class MavenDownloadTokenIT extends AbstractIntegrationTest {
                   .param("path", "/" + JAR)
                   .header(AUTHORIZATION, protocolBearerTokenFor(user)))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("accessNotAllowed"));
     }
 
     @Test
@@ -138,7 +142,11 @@ class MavenDownloadTokenIT extends AbstractIntegrationTest {
                   .param("path", "/some-package")
                   .header(AUTHORIZATION, userBearerToken()))
           .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("repoScopeNotMatched"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("repoScopeNotMatched"));
     }
 
     @Test
@@ -149,7 +157,11 @@ class MavenDownloadTokenIT extends AbstractIntegrationTest {
                   .param("path", "/" + JAR)
                   .header(AUTHORIZATION, userBearerToken()))
           .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.msgId").value("repoNotFound"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("repoNotFound"));
     }
 
     @Test
@@ -291,21 +303,33 @@ class MavenDownloadTokenIT extends AbstractIntegrationTest {
 
       perform(get("/api/profile").header(AUTHORIZATION, bearer))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("accessNotAllowed"));
 
       perform(
               get("/api/repos/{repo}/contents", repo.getName())
                   .param("path", "/")
                   .header(AUTHORIZATION, bearer))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("accessNotAllowed"));
 
       perform(
               post("/api/repos/{repo}/download-token", repo.getName())
                   .param("path", "/" + JAR)
                   .header(AUTHORIZATION, bearer))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("accessNotAllowed"));
     }
 
     @Test

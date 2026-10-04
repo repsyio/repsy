@@ -176,7 +176,7 @@ describe('NugetPackagesVersionDetailComponent README', () => {
 
   it('shows a not-found message on the page, without a second toast, when the version cannot be loaded', async () => {
     nugetService.fetchPackageVersion.and.rejectWith(
-      new HttpErrorResponse({ status: 404, error: { text: 'Version not found' } }),
+      new HttpErrorResponse({ status: 404, error: { detail: 'Version not found' } }),
     );
     const fixture = TestBed.createComponent(NugetPackagesVersionDetailComponent);
 

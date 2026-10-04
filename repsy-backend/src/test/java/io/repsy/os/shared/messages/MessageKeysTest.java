@@ -77,7 +77,10 @@ class MessageKeysTest {
 
   private static final Pattern RESPONSE_MSG_ID =
       Pattern.compile(
-          "\\b(?:resp|responseFactory|restResponseFactory)\\s*\\.\\s*(?:success|warning|error)\\(\\s*"
+          "(?:\\b(?:resp|responseFactory|restResponseFactory)\\s*\\.\\s*(?:success|warning|error)\\(\\s*"
+              // ErrorHandler.error(request, status, msgId, ...): the panel answers a problem
+              // document
+              + "|\\bthis\\s*\\.\\s*error\\(\\s*request\\s*,\\s*[\\w.]+\\s*,\\s*)"
               + LITERAL_OR_CONSTANT);
 
   /** Exceptions {@code ErrorHandler} renders with the exception message as the msgId. */

@@ -17,6 +17,7 @@ package io.repsy.os.shared.error_handling.services;
 
 import static io.repsy.core.error_handling.utils.ErrorUtils.exceptionToString;
 
+import com.google.common.base.Splitter;
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
@@ -30,23 +31,30 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
+import io.repsy.libs.multiport.configs.props.MultiPortProperties;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.os.shared.error_handling.dtos.ProblemField;
 import io.repsy.os.shared.error_handling.exceptions.InvalidPagingParameterException;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
+import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import jakarta.persistence.LockTimeoutException;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.PessimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.ValidationException;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.convert.ConversionFailedException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -54,9 +62,13 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.method.ParameterErrors;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -79,10 +91,9 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
 @ControllerAdvice
-@RequiredArgsConstructor
 public class ErrorHandler {
 
-  private static final int UNPROCESSABLE_ENTITY = 422;
+  private static final HttpStatusCode UNPROCESSABLE_ENTITY = HttpStatusCode.valueOf(422);
 
   private static final @NonNull String PANEL_AUTH_CHALLENGE = "Bearer";
 
@@ -112,6 +123,23 @@ public class ErrorHandler {
 
   private final @NonNull RestResponseFactory resp;
 
+  /** Tells the panel port from the protocol ports; {@code null} where only the handler decides. */
+  private final @Nullable MultiPortProperties multiPortProperties;
+
+  @Autowired
+  public ErrorHandler(
+      final @NonNull RestResponseFactory resp,
+      final @Nullable MultiPortProperties multiPortProperties) {
+
+    this.resp = resp;
+    this.multiPortProperties = multiPortProperties;
+  }
+
+  /** For a unit test that has no port configuration: only the handler tells a panel request. */
+  public ErrorHandler(final @NonNull RestResponseFactory resp) {
+    this(resp, null);
+  }
+
   private static final @NonNull Set<String> NOT_LOGGED_EXCEPTIONS =
       Set.of(
           "org.apache.catalina.connector.ClientAbortException",
@@ -132,7 +160,7 @@ public class ErrorHandler {
     MissingMatrixVariableException.class,
     MissingServletRequestPartException.class
   })
-  @Nullable ResponseEntity<RestResponse<String>> handleMissingRequestValue(
+  @Nullable ResponseEntity<Object> handleMissingRequestValue(
       final @NonNull Exception ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -145,12 +173,12 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_BAD_REQUEST, ex.getMessage()));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_BAD_REQUEST, ex.getMessage()));
   }
 
   @ExceptionHandler(Throwable.class)
-  @Nullable ResponseEntity<RestResponse<Object>> defaultExceptionHandler(
+  @Nullable ResponseEntity<Object> defaultExceptionHandler(
       final @NonNull Throwable ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -177,12 +205,12 @@ public class ErrorHandler {
     response.resetBuffer();
 
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_ERROR_OCCURRED));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.INTERNAL_SERVER_ERROR, ERR_ERROR_OCCURRED));
   }
 
   @ExceptionHandler(AccessNotAllowedException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull AccessNotAllowedException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -199,12 +227,12 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.FORBIDDEN)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(messageText, ex.getMessage()));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.FORBIDDEN, messageText, ex.getMessage()));
   }
 
   @ExceptionHandler(InvalidStoragePathException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull InvalidStoragePathException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -217,12 +245,12 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error("invalidStoragePath", ex.getMessage()));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.BAD_REQUEST, "invalidStoragePath", ex.getMessage()));
   }
 
   @ExceptionHandler(BadRequestException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull BadRequestException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -239,12 +267,12 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(messageText, ex.getMessage()));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.BAD_REQUEST, messageText, ex.getMessage()));
   }
 
   @ExceptionHandler(SignatureNotVerifiedException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull SignatureNotVerifiedException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -262,12 +290,12 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(UNPROCESSABLE_ENTITY)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(messageText, ex.getMessage()));
+        .contentType(this.contentType(request))
+        .body(this.error(request, UNPROCESSABLE_ENTITY, messageText, ex.getMessage()));
   }
 
   @ExceptionHandler(ConversionFailedException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull ConversionFailedException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -280,13 +308,13 @@ public class ErrorHandler {
 
     log.info(exceptionToString(ex, request));
 
-    return ResponseEntity.status(HttpStatus.NOT_FOUND)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_ITEM_NOT_FOUND, ex.getMessage()));
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_VALIDATION, ex.getMessage()));
   }
 
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull MethodArgumentTypeMismatchException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -300,8 +328,8 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_VALIDATION, ex.getName()));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_VALIDATION, ex.getName()));
   }
 
   /**
@@ -312,7 +340,7 @@ public class ErrorHandler {
    * @return REST response
    */
   @ExceptionHandler(HandlerMethodValidationException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull HandlerMethodValidationException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -331,8 +359,14 @@ public class ErrorHandler {
             .collect(Collectors.joining(","));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_VALIDATION, invalidParameters));
+        .contentType(this.contentType(request))
+        .body(
+            this.error(
+                request,
+                HttpStatus.BAD_REQUEST,
+                ERR_VALIDATION,
+                invalidParameters,
+                this.fieldsOf(ex)));
   }
 
   /**
@@ -343,7 +377,7 @@ public class ErrorHandler {
    * @return REST response
    */
   @ExceptionHandler(InvalidPagingParameterException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull InvalidPagingParameterException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -356,12 +390,12 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_VALIDATION, ex.getParameterNames()));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_VALIDATION, ex.getParameterNames()));
   }
 
   @ExceptionHandler(ErrorOccurredException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull ErrorOccurredException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -378,12 +412,12 @@ public class ErrorHandler {
     log.error(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(messageText, ex.getMessage()));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.INTERNAL_SERVER_ERROR, messageText, ex.getMessage()));
   }
 
   @ExceptionHandler(RedirectToPathException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull RedirectToPathException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -400,13 +434,13 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.MOVED_PERMANENTLY)
-        .contentType(MediaType.APPLICATION_JSON)
+        .contentType(this.contentType(request))
         .headers(headers)
-        .body(this.resp.error(ERR_MOVED_TO_PATH));
+        .body(this.error(request, HttpStatus.MOVED_PERMANENTLY, ERR_MOVED_TO_PATH));
   }
 
   @ExceptionHandler(HttpMessageNotReadableException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull HttpMessageNotReadableException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -420,8 +454,8 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_VALIDATION));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_VALIDATION));
   }
 
   /**
@@ -432,7 +466,7 @@ public class ErrorHandler {
    * @return REST response
    */
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull HttpRequestMethodNotSupportedException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -447,12 +481,12 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
         .headers(ex.getHeaders())
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_METHOD_NOT_SUPPORTED));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.METHOD_NOT_ALLOWED, ERR_METHOD_NOT_SUPPORTED));
   }
 
   @ExceptionHandler(ItemNotFoundException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull ItemNotFoundException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -469,12 +503,12 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(messageText, ex.getMessage()));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.NOT_FOUND, messageText, ex.getMessage()));
   }
 
   @ExceptionHandler(NoResourceFoundException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull NoResourceFoundException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -488,12 +522,12 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_ITEM_NOT_FOUND));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.NOT_FOUND, ERR_ITEM_NOT_FOUND));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
-  @Nullable ResponseEntity<RestResponse<Void>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull MethodArgumentNotValidException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -507,12 +541,12 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_VALIDATION));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_VALIDATION, null, fieldsOf(ex)));
   }
 
   @ExceptionHandler(MissingServletRequestParameterException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull MissingServletRequestParameterException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -526,12 +560,12 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_VALIDATION, ex.getParameterName()));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_VALIDATION, ex.getParameterName()));
   }
 
   @ExceptionHandler(UnAuthorizedException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull UnAuthorizedException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -546,7 +580,7 @@ public class ErrorHandler {
       ex.getHeaders().forEach(response::addHeader);
     }
 
-    if (isPanelRequest(request) && !response.containsHeader(HttpHeaders.WWW_AUTHENTICATE)) {
+    if (this.isPanelRequest(request) && !response.containsHeader(HttpHeaders.WWW_AUTHENTICATE)) {
       response.addHeader(HttpHeaders.WWW_AUTHENTICATE, PANEL_AUTH_CHALLENGE);
     }
 
@@ -561,22 +595,24 @@ public class ErrorHandler {
    * accessDenied} there (RPS-1268). Every other id, and the wire answer with the shared {@code
    * unAuthorized} id, stay as they are.
    */
-  private ResponseEntity<RestResponse<String>> unauthorizedBody(
+  private ResponseEntity<Object> unauthorizedBody(
       final @NonNull HttpServletRequest request, final @NonNull UnAuthorizedException ex) {
 
     final var exceptionMessage = ex.getMessage();
 
-    if (ErrorConstants.UN_AUTHORIZED.equals(exceptionMessage) && isPanelRequest(request)) {
+    if (ErrorConstants.UN_AUTHORIZED.equals(exceptionMessage) && this.isPanelRequest(request)) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .contentType(MediaType.APPLICATION_JSON)
-          .body(this.resp.error(ERR_PANEL_LOGIN_REQUIRED, exceptionMessage));
+          .contentType(this.contentType(request))
+          .body(
+              this.error(
+                  request, HttpStatus.UNAUTHORIZED, ERR_PANEL_LOGIN_REQUIRED, exceptionMessage));
     }
 
     final var messageText = exceptionMessage != null ? exceptionMessage : ERR_UNAUTHORIZED;
 
     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(messageText, ex.getMessage()));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.UNAUTHORIZED, messageText, ex.getMessage()));
   }
 
   /**
@@ -589,7 +625,7 @@ public class ErrorHandler {
    * @return REST response
    */
   @ExceptionHandler(TooManyRequestsException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull TooManyRequestsException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -602,9 +638,9 @@ public class ErrorHandler {
     log.debug("Too many failed authentication attempts: {}", request.getRemoteAddr());
 
     return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-        .contentType(MediaType.APPLICATION_JSON)
+        .contentType(this.contentType(request))
         .header(HttpHeaders.RETRY_AFTER, Long.toString(ex.getRetryAfterSeconds()))
-        .body(this.resp.error(ERR_TOO_MANY_REQUESTS));
+        .body(this.error(request, HttpStatus.TOO_MANY_REQUESTS, ERR_TOO_MANY_REQUESTS));
   }
 
   /**
@@ -612,11 +648,205 @@ public class ErrorHandler {
    * carrying {@link RestApiPort}; the protocol endpoints on the main port announce their own
    * challenges (Basic, or a Docker Bearer realm) and must not get the panel's.
    */
-  private static boolean isPanelRequest(final @NonNull HttpServletRequest request) {
-    return request.getAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE)
-            instanceof final HandlerMethod handler
-        && (AnnotationUtils.findAnnotation(handler.getMethod(), RestApiPort.class) != null
-            || AnnotationUtils.findAnnotation(handler.getBeanType(), RestApiPort.class) != null);
+  private boolean isPanelRequest(final @NonNull HttpServletRequest request) {
+    if (request.getAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE)
+        instanceof final HandlerMethod handler) {
+      return AnnotationUtils.findAnnotation(handler.getMethod(), RestApiPort.class) != null
+          || AnnotationUtils.findAnnotation(handler.getBeanType(), RestApiPort.class) != null;
+    }
+
+    // No controller served the request (an unknown route, a method or media type no handler
+    // accepts, a missing static file): the port it arrived on says whether it was the panel's.
+    return this.arrivedOnPanelPort(request);
+  }
+
+  private boolean arrivedOnPanelPort(final @NonNull HttpServletRequest request) {
+    final var props = this.multiPortProperties;
+
+    if (props == null || props.getPorts() == null) {
+      return false;
+    }
+
+    final var apiPort = props.getPorts().get(MultiPortNames.PORT_API);
+    final var localPort = request.getLocalPort();
+
+    return apiPort != null
+        && (apiPort == localPort
+            || MultiPortNames.PORT_API.equals(props.getPortAliases().get(localPort)));
+  }
+
+  /**
+   * The content type of an error body: {@code application/problem+json} (RFC 9457) on a panel
+   * request, the {@link RestResponse} JSON the protocol ports and the OCI advice expect otherwise.
+   */
+  private MediaType contentType(final @NonNull HttpServletRequest request) {
+    return this.isPanelRequest(request)
+        ? MediaType.APPLICATION_PROBLEM_JSON
+        : MediaType.APPLICATION_JSON;
+  }
+
+  private Object error(
+      final @NonNull HttpServletRequest request,
+      final @NonNull HttpStatusCode status,
+      final @NonNull String msgId) {
+
+    return this.error(request, status, msgId, null, List.of());
+  }
+
+  private Object error(
+      final @NonNull HttpServletRequest request,
+      final @NonNull HttpStatusCode status,
+      final @NonNull String msgId,
+      final @Nullable String data) {
+
+    return this.error(request, status, msgId, data, List.of());
+  }
+
+  /**
+   * Builds the body of a failure. A panel request gets an RFC 9457 problem: {@code code} is the
+   * message id the clients switch on, {@code traceId} the unique id of this failure, and {@code
+   * errors} lists the offending fields (the {@code data} names, or the given fields). Any other
+   * request gets the {@link RestResponse} envelope, which {@link OciErrorBodyAdvice} and the
+   * protocol clients still read.
+   */
+  private Object error(
+      final @NonNull HttpServletRequest request,
+      final @NonNull HttpStatusCode status,
+      final @NonNull String msgId,
+      final @Nullable String data,
+      final @NonNull List<ProblemField> fields) {
+
+    final RestResponse<String> envelope = this.resp.error(msgId, data);
+
+    if (!this.isPanelRequest(request)) {
+      return envelope;
+    }
+
+    final var problem = ProblemDetail.forStatus(status);
+    problem.setDetail(envelope.getText());
+
+    try {
+      problem.setInstance(URI.create(request.getRequestURI()));
+    } catch (final IllegalArgumentException ignored) {
+      // A request path that is not a valid URI reference: the problem simply has no instance.
+    }
+
+    problem.setProperty("code", envelope.getMsgId());
+
+    final var errors = fields.isEmpty() ? namedFields(msgId, data, envelope.getText()) : fields;
+
+    if (!errors.isEmpty()) {
+      problem.setProperty("errors", errors);
+    }
+
+    problem.setProperty("traceId", envelope.getErrorCode());
+
+    return problem;
+  }
+
+  private static boolean isFieldList(final @NonNull String data, final @NonNull String msgId) {
+    return !data.isBlank() && !data.equals(msgId) && !data.contains(" ");
+  }
+
+  private static @NonNull List<ProblemField> namedFields(
+      final @NonNull String msgId, final @Nullable String data, final @Nullable String text) {
+
+    if (data == null
+        || !(ERR_VALIDATION.equals(msgId) || ERR_MISSING_REQUEST_HEADER.equals(msgId))
+        || !isFieldList(data, msgId)) {
+      return List.of();
+    }
+
+    final var errors = new ArrayList<ProblemField>();
+
+    for (final var name : Splitter.on(',').split(data)) {
+      errors.add(new ProblemField(name, msgId, text));
+    }
+
+    return errors;
+  }
+
+  private static @NonNull List<ProblemField> fieldsOf(
+      final @NonNull MethodArgumentNotValidException ex) {
+
+    return ex.getBindingResult().getAllErrors().stream()
+        .map(
+            error ->
+                new ProblemField(
+                    error instanceof final FieldError fieldError
+                        ? fieldError.getField()
+                        : error.getObjectName(),
+                    lastCode(error.getCodes(), error.getCode()),
+                    error.getDefaultMessage()))
+        .toList();
+  }
+
+  private static @NonNull List<ProblemField> fieldsOf(
+      final @NonNull HandlerMethodValidationException ex) {
+
+    final var fields = new ArrayList<ProblemField>();
+
+    for (final var result : ex.getParameterValidationResults()) {
+      final var parameter = result.getMethodParameter().getParameterName();
+
+      if (result instanceof final ParameterErrors errors) {
+        for (final var error : errors.getFieldErrors()) {
+          fields.add(
+              new ProblemField(
+                  error.getField(),
+                  lastCode(error.getCodes(), error.getCode()),
+                  error.getDefaultMessage()));
+        }
+      } else if (result.getResolvableErrors().isEmpty()) {
+        fields.add(new ProblemField(parameter, ERR_VALIDATION, null));
+      } else {
+        for (final var error : result.getResolvableErrors()) {
+          fields.add(
+              new ProblemField(
+                  parameter, lastCode(error.getCodes(), null), error.getDefaultMessage()));
+        }
+      }
+    }
+
+    return fields;
+  }
+
+  private static @NonNull List<ProblemField> fieldsOf(final @NonNull ValidationException ex) {
+
+    if (!(ex instanceof final ConstraintViolationException violations)) {
+      return List.of();
+    }
+
+    return violations.getConstraintViolations().stream()
+        .map(
+            violation -> {
+              String field = "";
+
+              for (final var node : violation.getPropertyPath()) {
+                field = String.valueOf(node.getName());
+              }
+
+              return new ProblemField(
+                  field,
+                  violation
+                      .getConstraintDescriptor()
+                      .getAnnotation()
+                      .annotationType()
+                      .getSimpleName(),
+                  violation.getMessage());
+            })
+        .toList();
+  }
+
+  /** The most general code Spring resolved for a constraint, i.e. its annotation name. */
+  private static @NonNull String lastCode(
+      final String @Nullable [] codes, final @Nullable String fallback) {
+
+    if (codes != null && codes.length > 0) {
+      return codes[codes.length - 1];
+    }
+
+    return fallback != null ? fallback : ERR_VALIDATION;
   }
 
   /**
@@ -627,7 +857,7 @@ public class ErrorHandler {
    * @return REST response
    */
   @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull HttpMediaTypeNotSupportedException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -642,8 +872,8 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
         .headers(ex.getHeaders())
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_UNSUPPORTED_MEDIA_TYPE));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.UNSUPPORTED_MEDIA_TYPE, ERR_UNSUPPORTED_MEDIA_TYPE));
   }
 
   /**
@@ -655,7 +885,7 @@ public class ErrorHandler {
    * @return REST response
    */
   @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull HttpMediaTypeNotAcceptableException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -670,8 +900,8 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
         .headers(ex.getHeaders())
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_NOT_ACCEPTABLE));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.NOT_ACCEPTABLE, ERR_NOT_ACCEPTABLE));
   }
 
   /**
@@ -682,7 +912,7 @@ public class ErrorHandler {
    * @return REST response
    */
   @ExceptionHandler(MaxUploadSizeExceededException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull MaxUploadSizeExceededException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -696,8 +926,8 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_PAYLOAD_TOO_LARGE));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.PAYLOAD_TOO_LARGE, ERR_PAYLOAD_TOO_LARGE));
   }
 
   /**
@@ -708,7 +938,7 @@ public class ErrorHandler {
    * @return REST response
    */
   @ExceptionHandler(UnsatisfiedServletRequestParameterException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull UnsatisfiedServletRequestParameterException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -722,8 +952,8 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_BAD_REQUEST));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_BAD_REQUEST));
   }
 
   /**
@@ -733,7 +963,7 @@ public class ErrorHandler {
    * @return REST response
    */
   @ExceptionHandler(ValidationException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull ValidationException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -747,12 +977,14 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_VALIDATION, ex.getMessage()));
+        .contentType(this.contentType(request))
+        .body(
+            this.error(
+                request, HttpStatus.BAD_REQUEST, ERR_VALIDATION, ex.getMessage(), fieldsOf(ex)));
   }
 
   @ExceptionHandler(ItemAlreadyExistException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull ItemAlreadyExistException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -768,8 +1000,8 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.CONFLICT)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(messageText, ex.getMessage()));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.CONFLICT, messageText, ex.getMessage()));
   }
 
   /**
@@ -797,7 +1029,7 @@ public class ErrorHandler {
    * @return REST response
    */
   @ExceptionHandler(DataIntegrityViolationException.class)
-  @Nullable ResponseEntity<RestResponse<Object>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull DataIntegrityViolationException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -825,8 +1057,8 @@ public class ErrorHandler {
     log.warn("Constraint violation (SQL state {}): {}", sqlState, exceptionToString(ex, request));
 
     return ResponseEntity.status(status)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(msgId));
+        .contentType(this.contentType(request))
+        .body(this.error(request, status, msgId));
   }
 
   /**
@@ -859,7 +1091,7 @@ public class ErrorHandler {
    * @return REST response
    */
   @ExceptionHandler({OptimisticLockingFailureException.class, OptimisticLockException.class})
-  @Nullable ResponseEntity<RestResponse<String>> handleOptimisticLockFailure(
+  @Nullable ResponseEntity<Object> handleOptimisticLockFailure(
       final @NonNull Exception ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -871,13 +1103,15 @@ public class ErrorHandler {
 
     log.warn("Optimistic lock failure: {}", exceptionToString(ex, request));
 
-    if (!isPanelRequest(request)) {
-      return retryLater(this.resp.error(ERR_CONCURRENT_MODIFICATION));
+    if (!this.isPanelRequest(request)) {
+      return this.retryLater(
+          this.error(request, HttpStatus.SERVICE_UNAVAILABLE, ERR_CONCURRENT_MODIFICATION),
+          request);
     }
 
     return ResponseEntity.status(HttpStatus.CONFLICT)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_CONCURRENT_MODIFICATION));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.CONFLICT, ERR_CONCURRENT_MODIFICATION));
   }
 
   /**
@@ -907,7 +1141,7 @@ public class ErrorHandler {
     PessimisticLockException.class,
     LockTimeoutException.class
   })
-  @Nullable ResponseEntity<RestResponse<String>> handleLockUnavailable(
+  @Nullable ResponseEntity<Object> handleLockUnavailable(
       final @NonNull Exception ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -919,21 +1153,22 @@ public class ErrorHandler {
 
     log.warn("Database lock unavailable: {}", exceptionToString(ex, request));
 
-    return retryLater(this.resp.error(ERR_RESOURCE_BUSY));
+    return this.retryLater(
+        this.error(request, HttpStatus.SERVICE_UNAVAILABLE, ERR_RESOURCE_BUSY), request);
   }
 
   /** A 503 that tells the client to repeat the request after {@code Retry-After} seconds. */
-  private static ResponseEntity<RestResponse<String>> retryLater(
-      final @NonNull RestResponse<String> body) {
+  private ResponseEntity<Object> retryLater(
+      final @NonNull Object body, final @NonNull HttpServletRequest request) {
 
     return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-        .contentType(MediaType.APPLICATION_JSON)
+        .contentType(this.contentType(request))
         .header(HttpHeaders.RETRY_AFTER, LOCK_FAILURE_RETRY_AFTER)
         .body(body);
   }
 
   @ExceptionHandler(RetryableException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull RetryableException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -946,13 +1181,18 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-        .contentType(MediaType.APPLICATION_JSON)
+        .contentType(this.contentType(request))
         .header(HttpHeaders.RETRY_AFTER, LOCK_FAILURE_RETRY_AFTER)
-        .body(this.resp.error(ERR_SCAN_EXECUTOR_SATURATED, ex.getMessage()));
+        .body(
+            this.error(
+                request,
+                HttpStatus.SERVICE_UNAVAILABLE,
+                ERR_SCAN_EXECUTOR_SATURATED,
+                ex.getMessage()));
   }
 
   @ExceptionHandler(MfaException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull MfaException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -968,8 +1208,8 @@ public class ErrorHandler {
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(messageText, ex.getMessage()));
+        .contentType(this.contentType(request))
+        .body(this.error(request, HttpStatus.BAD_REQUEST, messageText, ex.getMessage()));
   }
 
   /**
@@ -982,7 +1222,7 @@ public class ErrorHandler {
    * @return REST response carrying the header name
    */
   @ExceptionHandler(MissingRequestHeaderException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
+  @Nullable ResponseEntity<Object> handleException(
       final @NonNull MissingRequestHeaderException ex,
       final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
@@ -996,13 +1236,14 @@ public class ErrorHandler {
 
     final var authorizationMissing = HttpHeaders.AUTHORIZATION.equalsIgnoreCase(ex.getHeaderName());
 
-    if (authorizationMissing && isPanelRequest(request)) {
+    if (authorizationMissing && this.isPanelRequest(request)) {
       response.addHeader(HttpHeaders.WWW_AUTHENTICATE, PANEL_AUTH_CHALLENGE);
     }
 
-    return ResponseEntity.status(
-            authorizationMissing ? HttpStatus.UNAUTHORIZED : HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_MISSING_REQUEST_HEADER, ex.getHeaderName()));
+    final var status = authorizationMissing ? HttpStatus.UNAUTHORIZED : HttpStatus.BAD_REQUEST;
+
+    return ResponseEntity.status(status)
+        .contentType(this.contentType(request))
+        .body(this.error(request, status, ERR_MISSING_REQUEST_HEADER, ex.getHeaderName()));
   }
 }

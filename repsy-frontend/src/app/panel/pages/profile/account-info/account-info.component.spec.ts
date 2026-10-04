@@ -209,7 +209,7 @@ describe('AccountInfoComponent', () => {
     it('leaves the toast to the error interceptor and unlocks the form when the request fails', () => {
       setPasswords('Passw0rd', 'Passw0rd');
       profileService.updatePassword.and.returnValue(
-        throwError(() => new HttpErrorResponse({ status: 400, error: { text: 'Password is too common' } })),
+        throwError(() => new HttpErrorResponse({ status: 400, error: { detail: 'Password is too common' } })),
       );
 
       component.updatePassword();
@@ -250,7 +250,7 @@ describe('AccountInfoComponent', () => {
     it('leaves the toast to the error interceptor and unlocks the form when the request fails', () => {
       component.usernameForm.get('username').setValue('alice2');
       profileService.updateUsername.and.returnValue(
-        throwError(() => new HttpErrorResponse({ status: 409, error: { text: 'Username is taken' } })),
+        throwError(() => new HttpErrorResponse({ status: 409, error: { detail: 'Username is taken' } })),
       );
 
       component.updateUsername();
