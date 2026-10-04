@@ -402,6 +402,12 @@ This is the first release after `v26.08.4`. Read this section before you upgrade
   `/api/npm/scopes/{repo}/{scope}/packages/{package}[/versions[/{version}]|/tags]`, and `GET
   /api/npm/packages/{repo}/{package}` is a package summary (`scopeName`, `packageName`, `latestVersion`, `createdAt`),
   no longer the latest version detail. Bodies are bare (no `msgId`/`data` envelope) and the deletes answer `204`.
+- Docker panel routes (RPS-1781): bodies are bare and the deletes answer `204`. `GET /api/docker/images/{repo}/{image}`
+  is the image row (the same item the list shows); `/summary` and the default-tag detail are gone. The cleanups moved to
+  `DELETE /api/repos/{repo}/docker/orphan-layers` (`204`) and `DELETE /api/repos/{repo}/docker/untagged-manifests`
+  (`200`, `deletedManifests` and `orphanLayersScheduled`); `/api/docker/images/blobs/...` and `/manifests/...` are `404`.
+  An image name with several segments (`team/app`) is passed as `?image=team/app` with `-` as `{image}`. The manifest
+  and config routes return the stored text as a JSON string.
 - Every list takes its text filter as `q`; the old names (`name`, `query`, `search`, `version`, `groupName`,
   `artifactName`) are ignored, so the list comes back unfiltered. Paging is `page`, `size` (1 to 100; more is `400`)
   and `sort` (an unknown property is `400`). Cargo, NuGet and Ruby lists default to 10 per page (was 20). (RPS-1269,

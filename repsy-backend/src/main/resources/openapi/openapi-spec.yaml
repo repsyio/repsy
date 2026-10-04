@@ -1844,7 +1844,7 @@ paths:
           in: query
           required: false
           description: >-
-            Only images whose name contains this text.
+            Only images whose name contains this text, case-insensitive.
           schema:
             type: string
         - "$ref": "#/components/parameters/Page"
@@ -1859,7 +1859,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelImageListItem"
+                "$ref": "#/components/schemas/PagedModelImageListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1875,18 +1875,17 @@ paths:
         required: true
         schema:
           type: string
-  "/api/docker/images/blobs/{repoName}/orphan-layers":
+  "/api/repos/{repoName}/docker/orphan-layers":
     delete:
       tags:
-        - docker-image-controller
+        - docker-repo-cleanup-controller
       operationId: deleteDockerOrphanLayers
+      description: >-
+        Deletes the layers no manifest uses any more. The layer rows are removed before the response;
+        the blobs are removed in the background.
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1897,17 +1896,17 @@ paths:
           "$ref": "#/components/responses/TooManyRequests"
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete orphan layers for a Docker repository
+      summary: Delete the orphan layers of a Docker repository
     parameters:
       - name: repoName
         in: path
         required: true
         schema:
           type: string
-  "/api/docker/images/manifests/{repoName}/untagged":
+  "/api/repos/{repoName}/docker/untagged-manifests":
     delete:
       tags:
-        - docker-image-controller
+        - docker-repo-cleanup-controller
       operationId: deleteDockerUntaggedManifests
       description: >-
         Deletes the manifests of the repository that no tag points to, directly or through an index,
@@ -1928,7 +1927,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseUntaggedManifestCleanupResult"
+                "$ref": "#/components/schemas/UntaggedManifestCleanupResult"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1946,21 +1945,25 @@ paths:
         required: true
         schema:
           type: string
-  "/api/docker/images/{repoName}/{imageName}/summary":
+  "/api/docker/images/{repoName}/{imageName}":
     get:
       tags:
         - docker-image-controller
-      operationId: getDockerImageSummary
+      operationId: getDockerImage
       description: >-
         The image as the list shows it, including how many tags and untagged manifests it has and
         the size of the untagged ones. An image with no tag is still there while it stores a
-        manifest.
+        manifest. A tag's detail is `.../tags/{tagName}`.
       parameters:
         - name: imageName
           in: path
           required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
           schema:
             type: string
+        - "$ref": "#/components/parameters/DockerImage"
       security:
         - { }
         - bearerAuth: []
@@ -1970,14 +1973,42 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseImageListItem"
+                "$ref": "#/components/schemas/ImageListItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: Get a Docker image with its tag and untagged manifest counts
+      summary: Get a Docker image
+    delete:
+      tags:
+        - docker-image-controller
+      operationId: deleteDockerImage
+      parameters:
+        - name: imageName
+          in: path
+          required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/DockerImage"
+      responses:
+        '204':
+          "$ref": "#/components/responses/NoContent"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Delete a Docker image
     parameters:
       - name: repoName
         in: path
@@ -1995,13 +2026,17 @@ paths:
         - name: imageName
           in: path
           required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
           schema:
             type: string
+        - "$ref": "#/components/parameters/DockerImage"
         - name: q
           in: query
           required: false
           description: >-
-            Only tags whose name contains this text.
+            Only tags whose name contains this text, case-insensitive.
           schema:
             type: string
         - "$ref": "#/components/parameters/Page"
@@ -2016,7 +2051,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelImageTagListItem"
+                "$ref": "#/components/schemas/PagedModelImageTagListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2026,6 +2061,82 @@ paths:
         '429':
           "$ref": "#/components/responses/TooManyRequests"
       summary: List tags of a Docker image
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/docker/images/{repoName}/{imageName}/tags/{tagName}":
+    get:
+      tags:
+        - docker-image-controller
+      operationId: getDockerImageTag
+      parameters:
+        - name: imageName
+          in: path
+          required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/DockerImage"
+        - name: tagName
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TagDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a specific Docker image tag
+    delete:
+      tags:
+        - docker-image-controller
+      operationId: deleteDockerTag
+      parameters:
+        - name: imageName
+          in: path
+          required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/DockerImage"
+        - name: tagName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          "$ref": "#/components/responses/NoContent"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Delete a Docker image tag
     parameters:
       - name: repoName
         in: path
@@ -2043,8 +2154,12 @@ paths:
         - name: imageName
           in: path
           required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
           schema:
             type: string
+        - "$ref": "#/components/parameters/DockerImage"
         - name: tagName
           in: path
           required: true
@@ -2054,7 +2169,7 @@ paths:
           in: query
           required: false
           description: >-
-            Only manifests whose name contains this text.
+            Only manifests whose name contains this text, case-insensitive.
           schema:
             type: string
         - "$ref": "#/components/parameters/Page"
@@ -2069,7 +2184,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelManifestListItem"
+                "$ref": "#/components/schemas/PagedModelManifestListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2090,12 +2205,17 @@ paths:
       tags:
         - docker-image-controller
       operationId: getDockerImageManifest
+      description: The manifest as stored, as a JSON string.
       parameters:
         - name: imageName
           in: path
           required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
           schema:
             type: string
+        - "$ref": "#/components/parameters/DockerImage"
         - name: reference
           in: path
           required: true
@@ -2110,7 +2230,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseString"
+                type: string
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -2124,151 +2244,22 @@ paths:
         required: true
         schema:
           type: string
-  "/api/docker/images/{repoName}/{imageName}":
-    get:
-      tags:
-        - docker-image-controller
-      operationId: getDockerImageDetail
-      parameters:
-        - name: imageName
-          in: path
-          required: true
-          schema:
-            type: string
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseTagDetail"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Get a Docker image
-    delete:
-      tags:
-        - docker-image-controller
-      operationId: deleteDockerImage
-      parameters:
-        - name: imageName
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete a Docker image
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  "/api/docker/images/{repoName}/{imageName}/tags/{tagName}":
-    get:
-      tags:
-        - docker-image-controller
-      operationId: getDockerImageTag
-      parameters:
-        - name: imageName
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: tagName
-          in: path
-          required: true
-          schema:
-            type: string
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseTagDetail"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Get a specific Docker image tag
-    delete:
-      tags:
-        - docker-image-controller
-      operationId: deleteDockerTag
-      parameters:
-        - name: imageName
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: tagName
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete a Docker image tag
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
   "/api/docker/images/{repoName}/{imageName}/configs/{digest}":
     get:
       tags:
         - docker-image-controller
       operationId: getDockerImageConfig
+      description: The config blob as stored, as a JSON string.
       parameters:
         - name: imageName
           in: path
           required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
           schema:
             type: string
+        - "$ref": "#/components/parameters/DockerImage"
         - name: digest
           in: path
           required: true
@@ -2283,7 +2274,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseString"
+                type: string
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -4694,6 +4685,16 @@ components:
         type: array
         items:
           type: string
+    # region: docker
+    DockerImage:
+      name: image
+      in: query
+      required: false
+      description: >-
+        The full name of a Docker image whose name has several segments (`team/app`). Pass `-` as
+        `{imageName}` then. Without it, `{imageName}` is the name.
+      schema:
+        type: string
   responses:
     # region: shared
     BadRequest:
@@ -6043,20 +6044,6 @@ components:
           type: integer
           format: int64
           description: Sum of the sizes of those layers; refunded to the usage as the blobs go.
-    RestResponseUntaggedManifestCleanupResult:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/UntaggedManifestCleanupResult"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ImageListItem:
       type: object
       description: >-
@@ -6095,20 +6082,6 @@ components:
             Size of the distinct layers (config blobs included) that untagged manifests link to and
             no manifest a tag reaches (through indexes of any depth) links to. For an image without
             tags, all it stores.
-    RestResponseImageListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/ImageListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelImageListItem:
       type: object
       properties:
@@ -6118,20 +6091,6 @@ components:
             "$ref": "#/components/schemas/ImageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelImageListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelImageListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ImageTagListItem:
       type: object
       properties:
@@ -6151,20 +6110,6 @@ components:
             "$ref": "#/components/schemas/ImageTagListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelImageTagListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelImageTagListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ManifestListItem:
       type: object
       properties:
@@ -6188,34 +6133,6 @@ components:
             "$ref": "#/components/schemas/ManifestListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelManifestListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelManifestListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseTagDetail:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/TagDetail"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     TagDetail:
       type: object
       properties:

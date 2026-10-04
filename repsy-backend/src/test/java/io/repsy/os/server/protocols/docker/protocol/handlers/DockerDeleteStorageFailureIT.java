@@ -227,7 +227,7 @@ class DockerDeleteStorageFailureIT extends AbstractIntegrationTest {
     Mockito.reset(this.dockerStorageService);
     final var deleted = this.deleteImage(repo);
 
-    assertThat(deleted.getStatus()).as(deleted.getContentAsString()).isEqualTo(200);
+    assertThat(deleted.getStatus()).as(deleted.getContentAsString()).isEqualTo(204);
     assertThat(this.imageRows(repo)).isZero();
     assertThat(this.tagRows(repo)).isZero();
     assertThat(this.manifestRows(repo)).isZero();

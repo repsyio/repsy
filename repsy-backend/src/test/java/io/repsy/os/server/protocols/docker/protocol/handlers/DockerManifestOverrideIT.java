@@ -33,6 +33,7 @@ import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageReposi
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestChildRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
+import io.repsy.os.server.shared.http.BareBodyAssertions;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -130,13 +131,11 @@ class DockerManifestOverrideIT extends AbstractIntegrationTest {
     }
   }
 
-  private String tagDelete(final Repo repo, final String image, final String tag) throws Exception {
-    return this.expectSuccess(
+  private void tagDelete(final Repo repo, final String image, final String tag) throws Exception {
+    BareBodyAssertions.expectNoContent(
         this.perform(
             delete("/api/docker/images/%s/%s/tags/%s".formatted(repo.getName(), image, tag))
-                .header(AUTHORIZATION, this.adminBearerToken())),
-        "tagDeleted",
-        "Tag deleted.");
+                .header(AUTHORIZATION, this.adminBearerToken())));
   }
 
   @Test
@@ -396,23 +395,19 @@ class DockerManifestOverrideIT extends AbstractIntegrationTest {
     assertThat(this.netUsage(repo)).isZero();
     assertThat(this.manifestFiles(repo)).isEqualTo(1);
 
-    this.expectSuccess(
+    BareBodyAssertions.expectNoContent(
         this.perform(
             delete("/api/docker/images/%s/first".formatted(repo.getName()))
-                .header(AUTHORIZATION, this.adminBearerToken())),
-        "imageDeleted",
-        "Image deleted.");
+                .header(AUTHORIZATION, this.adminBearerToken())));
     assertThat(this.manifestFiles(repo)).as("the other image still needs the file").isEqualTo(1);
     assertThat(this.wire.getManifest(repo, "second", "latest").getContentAsString())
         .isEqualTo(manifest);
 
     clearInvocations(this.usageUpdateService);
-    this.expectSuccess(
+    BareBodyAssertions.expectNoContent(
         this.perform(
             delete("/api/docker/images/%s/second".formatted(repo.getName()))
-                .header(AUTHORIZATION, this.adminBearerToken())),
-        "imageDeleted",
-        "Image deleted.");
+                .header(AUTHORIZATION, this.adminBearerToken())));
     assertThat(this.manifestFiles(repo)).as("no image has the manifest any more").isZero();
     assertThat(this.netUsage(repo)).isEqualTo(-bytes(manifest).length);
   }

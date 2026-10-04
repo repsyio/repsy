@@ -37,7 +37,8 @@ import path from 'node:path';
 
 import {
   callOperation,
-  expectContract,
+  expectBare,
+  expectNoContent,
   expectCovers,
   expectFailure,
   expectPagingSweep,
@@ -70,8 +71,7 @@ import type { Seeder } from '../../src/seed/seeder.js';
 /** Every operation of the Docker panel API this spec calls; a route the spec gains must be added (or the check below fails). */
 const EXERCISED = [
   'listDockerImages',
-  'getDockerImageSummary',
-  'getDockerImageDetail',
+  'getDockerImage',
   'listDockerImageTags',
   'getDockerImageTag',
   'listDockerTagManifests',
@@ -186,14 +186,14 @@ interface ManifestRow {
 }
 
 async function summaryOf(session: Session, image: string): Promise<Summary> {
-  return expectContract(
-    'getDockerImageSummary',
-    await callOperation('getDockerImageSummary', values(session, image)),
+  return expectBare(
+    'getDockerImage',
+    await callOperation('getDockerImage', values(session, image)),
   ) as Summary;
 }
 
 async function tagNames(session: Session, image: string): Promise<string[]> {
-  const page = expectContract(
+  const page = expectBare(
     'listDockerImageTags',
     await callOperation('listDockerImageTags', values(session, image), { query: 'size=100' }),
   ) as { content: { name: string }[] };
@@ -224,7 +224,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
   test.setTimeout(300_000);
 
   test('names every operation of the Docker panel API', () => {
-    expectCovers(EXERCISED, '/api/docker/');
+    expectCovers(EXERCISED, '/api/docker/', '/api/repos/{repoName}/docker/');
   });
 
   test('lists, gets and describes what crane pushed, and every digest matches the client', async ({
@@ -255,7 +255,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
     expect(digests.multi).toBe(multi.indexDigest);
 
     // GET /images/{repo}: the image with its tag count and what its tags reach.
-    const listed = expectContract(
+    const listed = expectBare(
       'listDockerImages',
       await callOperation('listDockerImages', { repoName: session.repoName }),
     ) as { content: Summary[]; page: { totalElements: number } };
@@ -271,11 +271,11 @@ test.describe('the Docker panel API against what crane pushed', () => {
       digest: digests.multi,
     });
 
-    // GET .../summary is the same row.
+    // GET /images/{repo}/{image} is the same row.
     expect(await summaryOf(session, image)).toEqual(listed.content[0]);
 
     // GET .../tags: every pushed tag with the platform the client's config says.
-    const tags = expectContract(
+    const tags = expectBare(
       'listDockerImageTags',
       await callOperation('listDockerImageTags', values(session, image)),
     ) as { content: { name: string; platform: string; lastUpdatedAt: string }[] };
@@ -294,7 +294,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
       ['v1b', single],
       ['latest', other],
     ] as [string, BuiltImage][]) {
-      const tag = expectContract(
+      const tag = expectBare(
         'getDockerImageTag',
         await callOperation('getDockerImageTag', values(session, image, { tagName: name })),
       ) as Tag;
@@ -308,7 +308,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
       });
       expect(Date.parse(tag.createdAt)).toBeLessThanOrEqual(Date.parse(tag.lastUpdatedAt));
     }
-    const multiTag = expectContract(
+    const multiTag = expectBare(
       'getDockerImageTag',
       await callOperation('getDockerImageTag', values(session, image, { tagName: 'multi' })),
     ) as Tag;
@@ -320,15 +320,8 @@ test.describe('the Docker panel API against what crane pushed', () => {
     });
     expect(multiTag.configDigest, 'an index has no config').toBeUndefined();
 
-    // GET /images/{repo}/{image}: the tag `latest`.
-    const detail = expectContract(
-      'getDockerImageDetail',
-      await callOperation('getDockerImageDetail', values(session, image)),
-    ) as Tag;
-    expect(detail).toMatchObject({ name: 'latest', digest: other.manifestDigest });
-
     // GET .../tags/{tag}/manifests: one row for a single-arch tag ...
-    const single1 = expectContract(
+    const single1 = expectBare(
       'listDockerTagManifests',
       await callOperation('listDockerTagManifests', values(session, image, { tagName: 'v1' })),
     ) as { content: ManifestRow[] };
@@ -344,7 +337,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
     const indexJson = JSON.parse(
       await craneOk(session, ['manifest', session.ref(image, 'multi')], 'panel-manifest-multi'),
     ) as { manifests: { digest: string; platform: { os: string; architecture: string } }[] };
-    const children = expectContract(
+    const children = expectBare(
       'listDockerTagManifests',
       await callOperation('listDockerTagManifests', values(session, image, { tagName: 'multi' })),
     ) as { content: ManifestRow[]; page: { totalElements: number } };
@@ -366,7 +359,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
 
     // GET .../manifests/{reference}: the bytes the registry stores, by tag and by digest.
     for (const reference of ['v1', single.manifestDigest]) {
-      const manifest = expectContract(
+      const manifest = expectBare(
         'getDockerImageManifest',
         await callOperation('getDockerImageManifest', values(session, image, { reference })),
       ) as string;
@@ -376,7 +369,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
         layers: [{ digest: single.layerDigest, size: single.layerBytes.length }],
       });
     }
-    const indexManifest = expectContract(
+    const indexManifest = expectBare(
       'getDockerImageManifest',
       await callOperation('getDockerImageManifest', values(session, image, { reference: 'multi' })),
     ) as string;
@@ -388,7 +381,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
       ['v1', single],
       ['latest', other],
     ] as [string, BuiltImage][]) {
-      const config = expectContract(
+      const config = expectBare(
         'getDockerImageConfig',
         await callOperation(
           'getDockerImageConfig',
@@ -406,7 +399,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
       expect(JSON.parse(config)).toEqual(JSON.parse(printed));
     }
     const arm = multi.children[1]?.content as ImageContent;
-    const armConfig = expectContract(
+    const armConfig = expectBare(
       'getDockerImageConfig',
       await callOperation(
         'getDockerImageConfig',
@@ -440,16 +433,10 @@ test.describe('the Docker panel API against what crane pushed', () => {
       'loginRequired',
     );
     expectFailure(
-      'getDockerImageSummary',
-      await callOperation('getDockerImageSummary', missingImage),
+      'getDockerImage',
+      await callOperation('getDockerImage', missingImage),
       404,
       'imageNotFound',
-    );
-    expectFailure(
-      'getDockerImageDetail',
-      await callOperation('getDockerImageDetail', values(session, image)),
-      404,
-      'tagNotFound',
     );
     expectFailure(
       'getDockerImageTag',
@@ -586,12 +573,13 @@ test.describe('the Docker panel API against what crane pushed', () => {
     }
     await expectPagingSweep<{ name: string }>({
       operationId: 'listDockerImages',
+      bare: true,
       values: { repoName },
       total: 5,
       keyOf: (row) => row.name,
       sorts: [{ property: 'name', value: (row) => row.name }],
     });
-    const narrowed = expectContract(
+    const narrowed = expectBare(
       'listDockerImages',
       await callOperation('listDockerImages', { repoName }, { query: 'q=pkg-3' }),
     ) as { content: { name: string }[] };
@@ -604,12 +592,13 @@ test.describe('the Docker panel API against what crane pushed', () => {
     }
     await expectPagingSweep<{ name: string }>({
       operationId: 'listDockerImageTags',
+      bare: true,
       values: { repoName, imageName: image },
       total: 5,
       keyOf: (row) => row.name,
       sorts: [{ property: 'name', value: (row) => row.name }],
     });
-    const oneTag = expectContract(
+    const oneTag = expectBare(
       'listDockerImageTags',
       await callOperation(
         'listDockerImageTags',
@@ -643,7 +632,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
 
     // Delete `v1`: the tag is gone on the wire and for the client; `v1b` (same digest), the digest itself and
     // the other image still serve the exact bytes.
-    expectContract(
+    expectNoContent(
       'deleteDockerTag',
       await callOperation('deleteDockerTag', values(session, imageA, { tagName: 'v1' })),
     );
@@ -677,7 +666,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
     ]);
 
     // Delete the last tag of that manifest: the manifest stays, untagged, pullable by digest only.
-    expectContract(
+    expectNoContent(
       'deleteDockerTag',
       await callOperation('deleteDockerTag', values(session, imageA, { tagName: 'v1b' })),
     );
@@ -736,7 +725,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
     await push(session, shared.dir, imageB, 'x');
 
     // Nothing is untagged yet: the cleanup deletes nothing, whole repo and one image alike.
-    const none = expectContract(
+    const none = expectBare(
       'deleteDockerUntaggedManifests',
       await callOperation('deleteDockerUntaggedManifests', { repoName: session.repoName }),
     );
@@ -749,7 +738,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
 
     // Untag everything of A but `amd` and `latest`: `shared` (shared with B) and the index become untagged.
     for (const tag of ['v1', 'multi']) {
-      expectContract(
+      expectNoContent(
         'deleteDockerTag',
         await callOperation('deleteDockerTag', values(session, imageA, { tagName: tag })),
       );
@@ -762,7 +751,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
     });
 
     // Scoped to image B: it has nothing untagged, so nothing of A goes.
-    const scopedB = expectContract(
+    const scopedB = expectBare(
       'deleteDockerUntaggedManifests',
       await callOperation(
         'deleteDockerUntaggedManifests',
@@ -774,7 +763,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
     expect(await manifestStatus(session, imageA, multi.indexDigest)).toBe(200);
 
     // Scoped to image A: three manifest rows go (the `shared` one, the index, the arm64 child).
-    const result = expectContract(
+    const result = expectBare(
       'deleteDockerUntaggedManifests',
       await callOperation(
         'deleteDockerUntaggedManifests',
@@ -836,7 +825,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
 
     // Asking again finds nothing.
     expect(
-      expectContract(
+      expectBare(
         'deleteDockerUntaggedManifests',
         await callOperation('deleteDockerUntaggedManifests', { repoName: session.repoName }),
       ),
@@ -864,7 +853,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
     await push(session, shared.dir, imageB, 'x');
 
     // Delete image A: both its tags and manifests go; B keeps the `shared` manifest file and answers the digest.
-    expectContract(
+    expectNoContent(
       'deleteDockerImage',
       await callOperation('deleteDockerImage', values(session, imageA)),
     );
@@ -873,8 +862,8 @@ test.describe('the Docker panel API against what crane pushed', () => {
     expect(await manifestStatus(session, imageA, own.manifestDigest)).toBe(404);
     expect(await pullExitCode(session, imageA, 'v1'), 'crane pull of a deleted image').not.toBe(0);
     expectFailure(
-      'getDockerImageSummary',
-      await callOperation('getDockerImageSummary', values(session, imageA)),
+      'getDockerImage',
+      await callOperation('getDockerImage', values(session, imageA)),
       404,
       'imageNotFound',
     );
@@ -884,7 +873,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
       404,
       'imageNotFound',
     );
-    const listed = expectContract(
+    const listed = expectBare(
       'listDockerImages',
       await callOperation('listDockerImages', { repoName: session.repoName }),
     ) as { content: { name: string }[] };
@@ -899,7 +888,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
     // The image delete left the blobs: they are swept by the orphan-layers operation, and only the ones
     // no remaining manifest names.
     expect(await blobStatus(session, imageB, own.layerDigest), 'orphan until swept').toBe(200);
-    expectContract(
+    expectNoContent(
       'deleteDockerOrphanLayers',
       await callOperation('deleteDockerOrphanLayers', { repoName: session.repoName }),
     );
@@ -912,13 +901,13 @@ test.describe('the Docker panel API against what crane pushed', () => {
     expect(await pullExitCode(session, imageB, 'x'), 'B still pulls after the sweep').toBe(0);
 
     // Deleting the last image of the shared manifest removes its file too.
-    expectContract(
+    expectNoContent(
       'deleteDockerImage',
       await callOperation('deleteDockerImage', values(session, imageB)),
     );
     expect(await manifestStatus(session, imageB, shared.manifestDigest)).toBe(404);
     expect(await pullExitCode(session, imageB, 'x')).not.toBe(0);
-    const empty = expectContract(
+    const empty = expectBare(
       'listDockerImages',
       await callOperation('listDockerImages', { repoName: session.repoName }),
     ) as { content: unknown[] };
@@ -962,7 +951,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
 
     // Run untagged manifest cleanup (per UntaggedManifestFinder javadoc: "untagged is computed at cleanup time",
     // so child1 will be deleted since no tag reaches it)
-    expectContract(
+    expectBare(
       'deleteDockerUntaggedManifests',
       await callOperation('deleteDockerUntaggedManifests', { repoName: session.repoName }),
     );

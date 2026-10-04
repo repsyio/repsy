@@ -19,7 +19,7 @@ import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
 import {
-  DockerImageControllerService,
+  DockerRepoCleanupControllerService,
   RepoPermissionInfo,
   UntaggedManifestCleanupResult,
 } from '../../../../../../generated/api';
@@ -45,7 +45,7 @@ export class DeleteUntaggedManifestsComponent {
   public deleting = false;
 
   constructor(
-    private readonly dockerImageControllerService: DockerImageControllerService,
+    private readonly dockerRepoCleanupControllerService: DockerRepoCleanupControllerService,
     private readonly dangerModalService: DangerModalService,
     private readonly toastService: ToastService,
   ) {}
@@ -59,7 +59,7 @@ export class DeleteUntaggedManifestsComponent {
         'The layers that only they used are deleted afterwards. This cannot be undone.',
       () => {
         this.deleting = true;
-        this.dockerImageControllerService
+        this.dockerRepoCleanupControllerService
           .deleteDockerUntaggedManifests(this.activeRepository.repoName, this.imageName)
           .pipe(
             finalize(() => {
@@ -68,7 +68,7 @@ export class DeleteUntaggedManifestsComponent {
           )
           .subscribe({
             next: (response) => {
-              this.toastService.show(this.summary(response?.data), 'success');
+              this.toastService.show(this.summary(response), 'success');
               this.cleaned.emit();
             },
             error: () => {},

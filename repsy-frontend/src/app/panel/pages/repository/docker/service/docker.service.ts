@@ -32,6 +32,14 @@ import { PagedData } from '../../../../shared/dto/paged-data';
 import { Sort } from '../../../../shared/dto/sort';
 import { TagListItem } from '../dto/tag-list-item';
 
+/**
+ * A Docker image name can have several segments (`team/app`), which one path segment cannot carry
+ * and the server does not accept encoded slashes in. Such a name is sent in the `image` query and
+ * `-`, which is not a valid image name, stands in the path.
+ */
+const pathName = (imageName: string): string => (imageName.includes('/') ? '-' : imageName);
+const queryName = (imageName: string): string | undefined => (imageName.includes('/') ? imageName : undefined);
+
 @Injectable({
   providedIn: 'root',
 })
@@ -77,9 +85,7 @@ export class DockerService {
       .listDockerImages(this.repoName, name || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
-      .pipe(
-        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ImageListItem>),
-      );
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<ImageListItem>));
   }
 
   public searchTags(
@@ -90,10 +96,16 @@ export class DockerService {
     pageSize: number,
   ): Observable<PagedData<TagListItem>> {
     return this.dockerImageControllerService
-      .listDockerImageTags(imageName, this.repoName, name || undefined, pageIndex, pageSize, [
-        `${sortOption.column},${sortOption.type}`,
-      ])
-      .pipe(map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<TagListItem>));
+      .listDockerImageTags(
+        pathName(imageName),
+        this.repoName,
+        queryName(imageName),
+        name || undefined,
+        pageIndex,
+        pageSize,
+        [`${sortOption.column},${sortOption.type}`],
+      )
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<TagListItem>));
   }
 
   public searchManifests(
@@ -105,12 +117,17 @@ export class DockerService {
     pageSize: number,
   ): Observable<PagedData<ManifestListItem>> {
     return this.dockerImageControllerService
-      .listDockerTagManifests(imageName, tagName, this.repoName, name || undefined, pageIndex, pageSize, [
-        `${sortOption.column},${sortOption.type}`,
-      ])
-      .pipe(
-        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ManifestListItem>),
-      );
+      .listDockerTagManifests(
+        pathName(imageName),
+        tagName,
+        this.repoName,
+        queryName(imageName),
+        name || undefined,
+        pageIndex,
+        pageSize,
+        [`${sortOption.column},${sortOption.type}`],
+      )
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<ManifestListItem>));
   }
 
   /**
@@ -118,38 +135,54 @@ export class DockerService {
    * caller, which leaves the page instead of toasting an error.
    */
   public fetchImageSummary(imageName: string): Observable<ImageListItem> {
-    return this.dockerImageControllerService
-      .getDockerImageSummary(imageName, this.repoName, 'body', false, {
+    return this.dockerImageControllerService.getDockerImage(
+      pathName(imageName),
+      this.repoName,
+      queryName(imageName),
+      'body',
+      false,
+      {
         context: new HttpContext().set(SILENT_ERROR, true),
-      })
-      .pipe(map((r) => r.data!));
+      },
+    );
   }
 
   public deleteImage(imageName: string): Observable<void> {
-    return this.dockerImageControllerService.deleteDockerImage(imageName, this.repoName).pipe(map(() => undefined));
+    return this.dockerImageControllerService
+      .deleteDockerImage(pathName(imageName), this.repoName, queryName(imageName))
+      .pipe(map(() => undefined));
   }
 
   public fetchTag(imageName: string, tagName: string): Observable<TagDetail> {
-    return this.dockerImageControllerService
-      .getDockerImageTag(imageName, tagName, this.repoName)
-      .pipe(map((r) => r.data!));
+    return this.dockerImageControllerService.getDockerImageTag(
+      pathName(imageName),
+      tagName,
+      this.repoName,
+      queryName(imageName),
+    );
   }
 
   public deleteTag(imageName: string, tagName: string): Observable<void> {
     return this.dockerImageControllerService
-      .deleteDockerTag(imageName, tagName, this.repoName)
+      .deleteDockerTag(pathName(imageName), tagName, this.repoName, queryName(imageName))
       .pipe(map(() => undefined));
   }
 
   public fetchManifestText(imageName: string, digest: string): Observable<string> {
-    return this.dockerImageControllerService
-      .getDockerImageManifest(imageName, digest, this.repoName)
-      .pipe(map((r) => r.data!));
+    return this.dockerImageControllerService.getDockerImageManifest(
+      pathName(imageName),
+      digest,
+      this.repoName,
+      queryName(imageName),
+    );
   }
 
   public fetchConfigText(imageName: string, digest: string): Observable<string> {
-    return this.dockerImageControllerService
-      .getDockerImageConfig(imageName, digest, this.repoName)
-      .pipe(map((r) => r.data!));
+    return this.dockerImageControllerService.getDockerImageConfig(
+      pathName(imageName),
+      digest,
+      this.repoName,
+      queryName(imageName),
+    );
   }
 }
