@@ -18,7 +18,6 @@ package io.repsy.os.panel.profile.controllers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -172,8 +171,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     @Test
     @DisplayName("returns 401 when the Authorization header is missing")
     void missingAuthorizationHeader() throws Exception {
-      final var result =
-          ProfileControllerIT.this.perform(get("/api/profile"));
+      final var result = ProfileControllerIT.this.perform(get("/api/profile"));
       result.andExpect(header().string(WWW_AUTHENTICATE, "Bearer"));
       expectError(
           result,
@@ -224,11 +222,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           ProfileControllerIT.this.perform(get("/api/profile").header(AUTHORIZATION, token));
       result.andExpect(header().string(WWW_AUTHENTICATE, "Bearer"));
       expectError(
-          result,
-          HttpStatus.UNAUTHORIZED,
-          "sessionExpired",
-          "sessionExpired",
-          "Session expired.");
+          result, HttpStatus.UNAUTHORIZED, "sessionExpired", "sessionExpired", "Session expired.");
     }
 
     @Test

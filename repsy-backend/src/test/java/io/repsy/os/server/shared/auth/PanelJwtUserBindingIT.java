@@ -18,7 +18,6 @@ package io.repsy.os.server.shared.auth;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
@@ -31,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -131,9 +131,12 @@ class PanelJwtUserBindingIT extends AbstractIntegrationTest {
 
     this.changePassword(admin);
 
-    this.call(route, repoName, token)
-        .andExpect(status().isUnauthorized())
-        .andExpect(jsonPath("$.msgId").value("sessionExpired"));
+    expectError(
+        this.call(route, repoName, token),
+        HttpStatus.UNAUTHORIZED,
+        "sessionExpired",
+        "sessionExpired",
+        "Session expired.");
   }
 
   @ParameterizedTest(name = "{0}: a token stays valid when only another user changed")
@@ -165,9 +168,12 @@ class PanelJwtUserBindingIT extends AbstractIntegrationTest {
     // what the former owner's token carries (it was issued before the rename moved the version).
     final var successor = createUser(oldName, UserRole.ADMIN);
 
-    this.call(route, repoName, formerToken)
-        .andExpect(status().isUnauthorized())
-        .andExpect(jsonPath("$.msgId").value("sessionExpired"));
+    expectError(
+        this.call(route, repoName, formerToken),
+        HttpStatus.UNAUTHORIZED,
+        "sessionExpired",
+        "sessionExpired",
+        "Session expired.");
 
     // The successor's own token is the one that works for the name.
     this.call(route, repoName, this.bearerTokenFor(successor)).andExpect(status().isOk());
@@ -184,9 +190,12 @@ class PanelJwtUserBindingIT extends AbstractIntegrationTest {
     final var forged = this.bearerTokenFor(other.getId(), admin.getUsername());
 
     for (final var route : new Route[] {Route.GENERIC, Route.PROFILE}) {
-      this.call(route, repoName, forged)
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("sessionExpired"));
+      expectError(
+          this.call(route, repoName, forged),
+          HttpStatus.UNAUTHORIZED,
+          "sessionExpired",
+          "sessionExpired",
+          "Session expired.");
     }
   }
 }
