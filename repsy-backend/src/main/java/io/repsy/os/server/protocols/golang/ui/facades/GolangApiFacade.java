@@ -64,11 +64,6 @@ public class GolangApiFacade implements ProtocolApiFacade {
     this.golangStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
-  public @NonNull Page<GoModuleListItem> getModules(
-      final @NonNull UUID repoId, final @NonNull Pageable pageable) {
-    return this.goModuleService.getModules(repoId, pageable);
-  }
-
   public @NonNull Page<GoModuleListItem> searchModules(
       final @NonNull UUID repoId, final @NonNull String search, final @NonNull Pageable pageable) {
     return this.goModuleService.getModulesContainsPath(repoId, search, pageable);

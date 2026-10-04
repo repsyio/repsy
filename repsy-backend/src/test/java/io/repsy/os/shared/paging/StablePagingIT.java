@@ -24,6 +24,10 @@ import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrate;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateRepository;
+import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
+import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModuleVersion;
+import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
+import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleVersionRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChart;
 import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChartVersion;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
@@ -74,6 +78,8 @@ class StablePagingIT extends AbstractIntegrationTest {
 
   @Autowired private ArtifactRepository artifactRepository;
   @Autowired private CargoCrateRepository cargoCrateRepository;
+  @Autowired private GoModuleRepository goModuleRepository;
+  @Autowired private GoModuleVersionRepository goModuleVersionRepository;
   @Autowired private HelmChartRepository helmChartRepository;
   @Autowired private HelmChartVersionRepository helmChartVersionRepository;
   @Autowired private NuGetPackageRepository nugetPackageRepository;
@@ -120,6 +126,7 @@ class StablePagingIT extends AbstractIntegrationTest {
                   || path.startsWith("/api/ruby/")
                   || path.startsWith("/api/npm/")
                   || path.startsWith("/api/mvn/")
+                  || path.startsWith("/api/go/")
               ? "$"
               : "$.data";
       totalPages = JsonPath.<Integer>read(body, root + ".page.totalPages");
@@ -250,6 +257,65 @@ class StablePagingIT extends AbstractIntegrationTest {
         "downloads,desc",
         "name",
         names);
+  }
+
+  @Test
+  @DisplayName("Go modules created in the same instant are each listed once")
+  void goModules() throws Exception {
+    final var repo = this.seedRepo(RepoType.GOLANG, uniqueRepoName("gomod"));
+    final var paths = new ArrayList<String>();
+    for (var i = 0; i < ROWS; i++) {
+      final var goModule = new GoModule();
+      goModule.setRepo(this.repoRepository.getReferenceById(repo.getId()));
+      goModule.setModulePath("example.com/mod" + i);
+      this.goModuleRepository.save(goModule);
+      paths.add("example.com/mod" + i);
+    }
+    this.entityManager.flush();
+    this.jdbcTemplate.update(
+        "update go_module set created_at = ? where repo_id = ?",
+        Timestamp.from(TIED_AT),
+        repo.getId());
+    this.entityManager.clear();
+
+    this.assertEveryRowOnceAndStable(
+        "/api/go/modules/" + repo.getName(),
+        this.adminBearerToken(),
+        "createdAt,desc",
+        "modulePath",
+        paths);
+  }
+
+  @Test
+  @DisplayName("Go module versions created in the same instant are each listed once")
+  void goModuleVersions() throws Exception {
+    final var repo = this.seedRepo(RepoType.GOLANG, uniqueRepoName("gover"));
+    final var goModule = new GoModule();
+    goModule.setRepo(this.repoRepository.getReferenceById(repo.getId()));
+    goModule.setModulePath("example.com/tied");
+    final var savedModule = this.goModuleRepository.save(goModule);
+
+    final var versions = new ArrayList<String>();
+    for (var i = 0; i < ROWS; i++) {
+      final var version = new GoModuleVersion();
+      version.setGoModule(savedModule);
+      version.setVersion("v1.0." + i);
+      this.goModuleVersionRepository.save(version);
+      versions.add("v1.0." + i);
+    }
+    this.entityManager.flush();
+    this.jdbcTemplate.update(
+        "update go_module_version set created_at = ? where module_id = ?",
+        Timestamp.from(TIED_AT),
+        savedModule.getId());
+    this.entityManager.clear();
+
+    this.assertEveryRowOnceAndStable(
+        "/api/go/modules/" + repo.getName() + "/versions?modulePath=example.com/tied",
+        this.adminBearerToken(),
+        "createdAt,desc",
+        "version",
+        versions);
   }
 
   @Test

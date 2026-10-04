@@ -231,7 +231,7 @@ class PagedListsIT extends AbstractIntegrationTest {
               "listGolangModules",
               RepoType.GOLANG,
               "/api/go/modules/{repo}",
-              false,
+              true,
               "id",
               "modulePath",
               "createdAt"),
@@ -242,14 +242,6 @@ class PagedListsIT extends AbstractIntegrationTest {
               true,
               "id",
               "version",
-              "createdAt"),
-          list(
-              "searchGolangModules",
-              RepoType.GOLANG,
-              "/api/go/modules/{repo}/search",
-              true,
-              "id",
-              "modulePath",
               "createdAt"),
           list(
               "listDockerImages",

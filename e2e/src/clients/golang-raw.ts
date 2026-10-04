@@ -82,10 +82,9 @@
  *    module -> `404`; found -> serves that version's `.info` FILE, `application/json`.
  *  - Plain `GET .../@v/<version>.mod|.info|.zip` serves the literal stored path (`text/plain`/
  *    `application/json`/`application/octet-stream`); missing -> `404`.
- *  - `sumdb/supported`: `404` on BOTH the API port (`GolangModuleController.checkSumdbSupported`,
- *    deliberate) and the protocol port (the `go` command's own `GET <GOPROXY>/sumdb/supported` lands
- *    on the download handler, which 404s by a plain storage miss -- confirmed live/G9, the same
- *    observed signal on both ports by accident, not by any shared code path).
+ *  - `sumdb/supported`: `404` on the protocol port (the `go` command's own `GET <GOPROXY>/sumdb/supported`
+ *    lands on the download handler, which 404s by a plain storage miss -- confirmed live/G9). The panel
+ *    port has no such route any more (RPS-1781).
  *  - `HEAD` answers the status and the headers of the matching `GET` (`AbstractGoHeadProtocolMethodHandler`,
  *    RPS-1465), with the `Content-Length` of the file, and the same plain-text `404` for a file that
  *    does not exist. It was a `404` for EVERY path, an existing `.info` included (H17, R15), because

@@ -26,7 +26,6 @@ import {
   PAGE_SIZE,
   PagedCase,
   REPO,
-  restResponse,
   selectRepo,
   SORT,
 } from '../../testing/protocol-service-spec-helpers';
@@ -46,7 +45,6 @@ describe('GolangService', () => {
     ]);
     golangApi = jasmine.createSpyObj<GolangModuleControllerService>('GolangModuleControllerService', [
       'listGolangModules',
-      'searchGolangModules',
       'deleteGolangModule',
       'listGolangModuleVersions',
       'getGolangModuleInfo',
@@ -75,26 +73,18 @@ describe('GolangService', () => {
 
     const paged: PagedCase<GolangService>[] = [
       {
-        // Lists without a search term, so there is no fallback to check.
         name: 'fetchModules',
-        invoke: (s) => s.fetchModules(SORT, PAGE_INDEX, PAGE_SIZE),
+        invoke: (s, search) => s.fetchModules(search, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => golangApi.listGolangModules,
-        args: () => [REPO, ...PAGE_ARGS],
-        searchable: false,
-        notCalled: () => [golangApi.searchGolangModules],
-      },
-      {
-        name: 'searchModules',
-        invoke: (s, search) => s.searchModules(search, SORT, PAGE_INDEX, PAGE_SIZE),
-        api: () => golangApi.searchGolangModules,
         args: (search) => [REPO, search, ...PAGE_ARGS],
-        notCalled: () => [golangApi.listGolangModules],
+        bare: true,
       },
       {
         name: 'fetchModuleVersions',
         invoke: (s, search) => s.fetchModuleVersions(MODULE, search, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => golangApi.listGolangModuleVersions,
         args: (search) => [MODULE, REPO, search, ...PAGE_ARGS],
+        bare: true,
       },
     ];
     describePagedCalls(() => service, paged);
@@ -106,7 +96,7 @@ describe('GolangService', () => {
         invoke: (s) => s.deleteModule(MODULE),
         api: () => golangApi.deleteGolangModule,
         args: [MODULE, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [golangApi.deleteGolangModuleVersion],
       },
@@ -115,7 +105,7 @@ describe('GolangService', () => {
         invoke: (s) => s.fetchModuleInfo(MODULE),
         api: () => golangApi.getGolangModuleInfo,
         args: [MODULE, REPO],
-        response: restResponse(info),
+        response: info,
         expected: info,
       },
       {
@@ -123,7 +113,7 @@ describe('GolangService', () => {
         invoke: (s) => s.deleteModuleVersion(MODULE, VERSION),
         api: () => golangApi.deleteGolangModuleVersion,
         args: [MODULE, VERSION, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [golangApi.deleteGolangModule],
       },
