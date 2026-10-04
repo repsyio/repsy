@@ -24,11 +24,11 @@ import { finalize, switchMap, tap } from 'rxjs/operators';
 import { environment } from '../../../../../../environments/environment';
 import {
   DeployTokenInfoListItem,
+  PagedModelDeployTokenInfoListItem,
   ProtocolDeployTokenControllerService,
   ProtocolRepoControllerService,
   RepoPermissionInfo,
   RepoUsageInfo,
-  RestResponsePagedModelDeployTokenInfoListItem,
 } from '../../../../../../generated/api';
 import { EmptyListComponent } from '../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -109,7 +109,7 @@ export class DeployTokenComponent implements OnInit {
   private fetchRepoUsage() {
     this.protocolRepoControllerService.getRepoUsage(this.activeRepository.repoName).subscribe({
       next: (r) => {
-        this.repoUsage = r.data!;
+        this.repoUsage = r;
       },
       error: () => {},
     });
@@ -131,9 +131,9 @@ export class DeployTokenComponent implements OnInit {
     );
   }
 
-  private showTokens(r: RestResponsePagedModelDeployTokenInfoListItem) {
-    this.pagedData.page = { ...r.data?.page } as PagedData<DeployTokenInfoListItem>['page'];
-    this.deployTokens = r.data?.content ?? [];
+  private showTokens(r: PagedModelDeployTokenInfoListItem) {
+    this.pagedData.page = { ...r.page } as PagedData<DeployTokenInfoListItem>['page'];
+    this.deployTokens = r.content ?? [];
   }
 
   /**
@@ -172,7 +172,7 @@ export class DeployTokenComponent implements OnInit {
             this.fetchDeployTokens();
             this.toastService.show(successMsg, 'success');
             this.createdDeployToken = new TokenCreateInfo();
-            this.createdDeployToken.token = r.data!;
+            this.createdDeployToken.token = r;
             this.createdDeployToken.username = deployToken.username;
             this.createdDeployToken.id = deployToken.id;
             this.showTokenInfoModal = true;

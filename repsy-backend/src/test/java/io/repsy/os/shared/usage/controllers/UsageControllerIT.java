@@ -15,6 +15,7 @@
  */
 package io.repsy.os.shared.usage.controllers;
 
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectBare;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -59,7 +60,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Full-stack integration tests for {@code GET /api/usages}, exercising the real Spring context, MVC
+ * Full-stack integration tests for {@code GET /api/usage}, exercising the real Spring context, MVC
  * dispatch and a containerized PostgreSQL database (Flyway-migrated) end to end.
  *
  * <p>Follows the pattern established by {@code ProfileControllerIT} and {@code UserControllerIT}:
@@ -81,10 +82,10 @@ import org.springframework.transaction.annotation.Transactional;
  * be empty. Tests must not run in parallel with each other.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@DisplayName("UsageController GET /api/usages")
+@DisplayName("UsageController GET /api/usage")
 class UsageControllerIT extends AbstractIntegrationTest {
 
-  private static final String USAGES_PATH = "/api/usages";
+  private static final String USAGES_PATH = "/api/usage";
   private static final String UNAUTHORIZED_TEXT =
       "Please log in: the credentials are missing or invalid, or the account is gone.";
   private static final Duration ASYNC_TIMEOUT = Duration.ofSeconds(10);
@@ -195,13 +196,9 @@ class UsageControllerIT extends AbstractIntegrationTest {
   // Response helpers
   // ---------------------------------------------------------------------------------------------
 
-  /**
-   * Asserts a 200 SUCCESS envelope (exact key set, {@code errorCode} null, {@code text} resolved
-   * from the {@code usageFetched} entry in messages.properties) and returns the raw body for
-   * further assertions on {@code data}.
-   */
+  /** Asserts a 200 with the bare {@code TotalUsageInfo} body and returns the raw body. */
   private static String expectSuccess(final ResultActions result) throws Exception {
-    return expectSuccess(result, "usageFetched", "Usage fetched");
+    return expectBare(result);
   }
 
   /**
@@ -211,11 +208,11 @@ class UsageControllerIT extends AbstractIntegrationTest {
    */
   private void assertTotals(
       final String body, final long diskUsed, final String diskUsedText, final long reposCount) {
-    final Map<String, Object> data = JsonPath.read(body, "$.data");
+    final Map<String, Object> data = JsonPath.read(body, "$");
     assertThat(data).containsOnlyKeys(TOTAL_USAGE_KEYS);
     assertThat(number(data.get("reposCount"))).isEqualTo(this.baselineRepos + reposCount);
 
-    final Map<String, Object> usageInfo = JsonPath.read(body, "$.data.diskUsed");
+    final Map<String, Object> usageInfo = JsonPath.read(body, "$.diskUsed");
     assertThat(usageInfo).containsOnlyKeys(USAGE_INFO_KEYS).containsEntry("text", diskUsedText);
     assertThat(number(usageInfo.get("value"))).isEqualTo(this.baselineDiskUsage + diskUsed);
   }
@@ -544,10 +541,10 @@ class UsageControllerIT extends AbstractIntegrationTest {
 
     static Stream<Arguments> unsupportedMethods() {
       return Stream.of(
-          Arguments.of("POST /api/usages", post(USAGES_PATH)),
-          Arguments.of("PUT /api/usages", put(USAGES_PATH)),
-          Arguments.of("PATCH /api/usages", patch(USAGES_PATH)),
-          Arguments.of("DELETE /api/usages", delete(USAGES_PATH)));
+          Arguments.of("POST /api/usage", post(USAGES_PATH)),
+          Arguments.of("PUT /api/usage", put(USAGES_PATH)),
+          Arguments.of("PATCH /api/usage", patch(USAGES_PATH)),
+          Arguments.of("DELETE /api/usage", delete(USAGES_PATH)));
     }
   }
 }

@@ -16,11 +16,14 @@
 package io.repsy.os.server.protocols.maven.protocol;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.http.HttpHeaders.CACHE_CONTROL;
 import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -78,12 +81,12 @@ class MavenDownloadTokenIT extends AbstractIntegrationTest {
                     .param("path", "/" + path)
                     .header(AUTHORIZATION, this.userBearerToken()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.msgId").value("downloadTokenCreated"))
+            .andExpect(header().string(CACHE_CONTROL, containsString("no-store")))
             .andReturn()
             .getResponse()
             .getContentAsString();
 
-    return JsonPath.read(body, "$.data");
+    return JsonPath.read(body, "$");
   }
 
   private static AbstractMockHttpServletRequestBuilder<?> download(

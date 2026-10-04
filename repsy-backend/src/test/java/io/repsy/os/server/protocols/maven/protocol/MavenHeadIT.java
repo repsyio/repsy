@@ -208,6 +208,6 @@ class MavenHeadIT extends AbstractIntegrationTest {
             .getResponse()
             .getContentAsString(StandardCharsets.UTF_8);
 
-    return JsonPath.read(body, "$.data");
+    return JsonPath.read(body, "$");
   }
 }

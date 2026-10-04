@@ -17,7 +17,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { TotalUsageInfo, UsageControllerService } from '../../../../../generated/api';
 import { describeNoAuthorizationHeader } from '../../../shared/testing/authorization-header-spec-helpers';
-import { CallCase, describeCalls, restResponse } from '../../repository/testing/protocol-service-spec-helpers';
+import { CallCase, describeCalls } from '../../repository/testing/protocol-service-spec-helpers';
 import { UsageService } from './usage.service';
 
 const TOTAL_USAGE: TotalUsageInfo = { diskUsed: { value: 2048, text: '2 KB' }, reposCount: 3 };
@@ -40,7 +40,7 @@ describe('UsageService', () => {
       invoke: (s) => s.getTotalUsage(),
       api: () => api.getTotalUsage,
       args: [],
-      response: restResponse(TOTAL_USAGE),
+      response: TOTAL_USAGE,
       expected: TOTAL_USAGE,
     },
   ];

@@ -299,7 +299,7 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(JsonPath.<List<Object>>read(listed, "$.data.content")).isEmpty();
+    assertThat(JsonPath.<List<Object>>read(listed, "$.content")).isEmpty();
   }
 
   @Test

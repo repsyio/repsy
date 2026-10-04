@@ -19,7 +19,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { filter, finalize, map, switchMap } from 'rxjs/operators';
+import { filter, finalize, switchMap } from 'rxjs/operators';
 
 import { ProtocolRepoControllerService, RepoPermissionInfo, RepoSettingsInfo } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
@@ -103,7 +103,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
         filter((context) => !!context),
         switchMap((context) => {
           this.repoType = context.repoType;
-          return this.protocolRepoControllerService.getRepoPermissions(context.repoName).pipe(map((r) => r.data!));
+          return this.protocolRepoControllerService.getRepoPermissions(context.repoName);
         }),
       )
       .subscribe((repo: RepoPermissionInfo) => {

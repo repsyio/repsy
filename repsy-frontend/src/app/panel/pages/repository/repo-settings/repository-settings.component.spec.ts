@@ -25,9 +25,9 @@ import { RepositorySettingsComponent } from './repository-settings.component';
 
 const REPO = 'acme-repo';
 
-/** A successful `RestResponse*` reply; the generated client's overloads make a typed spy return value unusable. */
+/** A successful bare reply; the generated client's overloads make a typed spy return value unusable. */
 const bare = (data: unknown): never => of(data) as never;
-const reply = (data: unknown): never => of(restResponse(data)) as never;
+const reply = (data: unknown): never => of(data) as never;
 
 function settings(overrides: Partial<RepoSettingsInfo> = {}): RepoSettingsInfo {
   return { privateRepo: true, allowOverride: false, securityScanEnabled: false, ...overrides };

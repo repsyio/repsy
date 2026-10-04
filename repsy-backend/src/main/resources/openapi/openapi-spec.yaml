@@ -650,7 +650,7 @@ paths:
             format: uuid
       responses:
         '204':
-          description: No Content
+          "$ref": "#/components/responses/NoContent"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -683,6 +683,11 @@ paths:
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -748,8 +753,14 @@ paths:
         '201':
           description: Created
           headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
             Location:
-              description: The detail route of the created token
+              description: >-
+                The URL of the created token, `/api/repos/{repoName}/deploy-tokens/{tokenId}`. Only
+                DELETE is served there; there is no token detail route.
               schema:
                 type: string
                 format: uri
@@ -788,7 +799,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseRepoPermissionInfo"
+                "$ref": "#/components/schemas/RepoPermissionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -819,10 +830,15 @@ paths:
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseString"
+                type: string
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -5137,20 +5153,6 @@ components:
             answer is 400 `deployTokenExpirationTooLate`. Defaults to 365 days from now.
       required:
         - name
-    RestResponseTokenInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/TokenInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     TokenInfo:
       type: object
       properties:
@@ -5182,20 +5184,6 @@ components:
         - canWrite
         - canManage
         - private
-    RestResponseRepoPermissionInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/RepoPermissionInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     DeployTokenInfoListItem:
       type: object
       properties:
@@ -5229,36 +5217,8 @@ components:
             "$ref": "#/components/schemas/DeployTokenInfoListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelDeployTokenInfoListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelDeployTokenInfoListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ProtocolApiFacadeMavenAdapter: { }
     # region: usage
-    RestResponseTotalUsageInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/TotalUsageInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     TotalUsageInfo:
       type: object
       properties:
@@ -5280,20 +5240,6 @@ components:
       properties:
         diskUsed:
           "$ref": "#/components/schemas/UsageInfo"
-    RestResponseRepoUsageInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/RepoUsageInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: scans
     ScanStatus:
       type: string

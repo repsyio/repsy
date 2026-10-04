@@ -88,7 +88,7 @@ export function selectRepo(
   repoName: string,
   flags?: Parameters<typeof permission>[1],
 ): Promise<RepoPermissionInfo> {
-  getPermission.and.returnValue(of(restResponse(permission(repoName, flags))));
+  getPermission.and.returnValue(of(permission(repoName, flags)));
   return firstValueFrom(select(service, repoName));
 }
 

@@ -94,7 +94,7 @@ public class DeployTokenService {
         .map(this.deployTokenConverter::toDeployTokenInfo);
   }
 
-  @Transactional(readOnly = false)
+  @Transactional
   public @NonNull NewTokenInfo createDeployToken(
       final @NonNull UUID repoId, final @NonNull DeployTokenForm deployTokenForm) {
 
@@ -124,10 +124,7 @@ public class DeployTokenService {
     this.deployTokenRepository.save(repoDeployToken);
 
     final var tokenInfo =
-        TokenInfo.builder()
-            .token(generatedToken)
-            .username(repoDeployToken.getUsername())
-            .build();
+        TokenInfo.builder().token(generatedToken).username(repoDeployToken.getUsername()).build();
 
     return new NewTokenInfo(tokenInfo, repoDeployToken.getId());
   }

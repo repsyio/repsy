@@ -52,7 +52,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  *
  * <p>None of these is a {@code @RepoOperation}: they name no repository and the repo type is a
  * query parameter or a body field, not a path variable, so {@code ProtocolAuthInterceptor} does not
- * see them and they authenticate like {@code /api/usages}, with a panel Bearer token only. Every
+ * see them and they authenticate like {@code /api/usage}, with a panel Bearer token only. Every
  * authenticated user may list and count, as the panel dashboard and repository list show them to
  * all roles; creating needs the ADMIN role.
  */

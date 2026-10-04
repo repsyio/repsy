@@ -379,7 +379,7 @@ export class OsPanelBackend implements PanelBackend {
         requestBody: form,
       }),
     );
-    return unwrap(res.data, 'createDeployToken');
+    return unwrap(res, 'createDeployToken');
   }
 
   async revokeDeployToken(repoName: string, tokenId: string): Promise<void> {
@@ -396,7 +396,7 @@ export class OsPanelBackend implements PanelBackend {
         tokenId,
       }),
     );
-    return unwrap(res.data, 'rotateDeployToken');
+    return unwrap(res, 'rotateDeployToken');
   }
 
   /**
@@ -417,7 +417,7 @@ export class OsPanelBackend implements PanelBackend {
         sort: ['id,desc'],
       }),
     );
-    const result = unwrap(res.data, 'listDeployTokensPage');
+    const result = unwrap(res, 'listDeployTokensPage');
 
     return {
       content: result.content ?? [],

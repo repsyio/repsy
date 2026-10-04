@@ -17,8 +17,6 @@ package io.repsy.os.server.protocols.shared.controllers;
 
 import static io.repsy.protocols.shared.repo.dtos.Permission.MANAGE;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
@@ -66,7 +64,6 @@ public class ProtocolRepoController {
 
   private final RepoTxService repoTxService;
   private final UsageService usageService;
-  private final RestResponseFactory responseFactory;
   private final JwtUtils jwtUtils;
 
   @GetMapping("/{repoName}")
@@ -99,10 +96,9 @@ public class ProtocolRepoController {
 
   @GetMapping("/{repoName}/permissions")
   @RepoOperation
-  public RestResponse<RepoPermissionInfo> getRepoPermissions(
-      final RepoPermissionInfo repoPermissionInfo) {
+  public RepoPermissionInfo getRepoPermissions(final RepoPermissionInfo repoPermissionInfo) {
 
-    return this.responseFactory.success("repoPermissionsFetched", repoPermissionInfo);
+    return repoPermissionInfo;
   }
 
   @GetMapping("/{repoName}/contents")
@@ -122,7 +118,7 @@ public class ProtocolRepoController {
    */
   @PostMapping("/{repoName}/download-token")
   @RepoOperation(scope = RepoScope.MAVEN)
-  public RestResponse<String> createDownloadToken(
+  public ResponseEntity<String> createDownloadToken(
       final RepoInfo repoInfo,
       @RequestParam final String path,
       final HttpServletResponse response) {
@@ -136,7 +132,7 @@ public class ProtocolRepoController {
 
     NoStore.apply(response);
 
-    return this.responseFactory.success("downloadTokenCreated", token);
+    return ResponseEntities.jsonString(token);
   }
 
   @GetMapping("/{repoName}/settings")

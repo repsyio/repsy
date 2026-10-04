@@ -19,7 +19,9 @@ import java.net.URI;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Builds the success responses of the panel API (API guideline, Decision 5): the bare resource, 201
@@ -29,6 +31,22 @@ import org.springframework.http.ResponseEntity;
 @UtilityClass
 @NullMarked
 public final class ResponseEntities {
+
+  private static final JsonMapper JSON = JsonMapper.builder().build();
+
+  /**
+   * A 200 response whose bare body is a single string, such as a token. Spring writes a {@code
+   * String} as raw text, so the value is written as a JSON string literal here, which is what the
+   * {@code application/json} contract and generated clients expect.
+   *
+   * @param value The string value
+   * @return 200 with the JSON string literal as the body
+   */
+  public static ResponseEntity<String> jsonString(final String value) {
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(JSON.writeValueAsString(value));
+  }
 
   /**
    * A 201 response whose body is the created resource.

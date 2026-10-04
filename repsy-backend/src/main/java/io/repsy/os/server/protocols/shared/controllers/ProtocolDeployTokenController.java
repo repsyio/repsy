@@ -103,7 +103,7 @@ public class ProtocolDeployTokenController {
 
     NoStore.apply(response);
 
-    return ResponseEntity.ok(repoDeployToken);
+    return ResponseEntities.jsonString(repoDeployToken);
   }
 
   @GetMapping

@@ -42,7 +42,7 @@ export class RepoStorageComponent implements OnInit {
   fetchRepoUsage() {
     this.protocolRepoControllerService.getRepoUsage(this.repoName).subscribe({
       next: (r) => {
-        this.usage = r.data!;
+        this.usage = r;
       },
       error: () => {},
     });

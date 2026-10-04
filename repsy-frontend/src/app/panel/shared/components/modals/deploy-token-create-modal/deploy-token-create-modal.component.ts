@@ -121,7 +121,7 @@ export class DeployTokenCreateModalComponent implements OnInit {
       )
       .subscribe({
         next: (r) => {
-          const tokenInfo = r.data as unknown as TokenCreateInfo;
+          const tokenInfo = r as unknown as TokenCreateInfo;
           this.closeModal();
           this.created.emit(tokenInfo);
           this.toastService.show('Deploy token created successfully.', 'success');

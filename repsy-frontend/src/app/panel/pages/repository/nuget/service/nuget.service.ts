@@ -16,7 +16,7 @@
 
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, firstValueFrom, Observable } from 'rxjs';
-import { map, tap } from 'rxjs/operators';
+import { tap } from 'rxjs/operators';
 
 import {
   DeployTokenForm,
@@ -62,10 +62,9 @@ export class NugetService {
   public selectRepository(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
-    return this.protocolRepoControllerService.getRepoPermissions(repoName).pipe(
-      map((r) => r.data!),
-      tap((info) => this.repoSubject.next(info)),
-    );
+    return this.protocolRepoControllerService
+      .getRepoPermissions(repoName)
+      .pipe(tap((info) => this.repoSubject.next(info)));
   }
 
   private resetActiveRepoIfChanged(repoName: string): void {
@@ -77,8 +76,7 @@ export class NugetService {
   }
 
   public async fetchRepositoryUsage(): Promise<RepoUsageInfo> {
-    const response = await firstValueFrom(this.protocolRepoControllerService.getRepoUsage(this.repoName));
-    return response.data!;
+    return firstValueFrom(this.protocolRepoControllerService.getRepoUsage(this.repoName));
   }
 
   public async fetchRepositorySettings(): Promise<RepoSettingsInfo> {
@@ -171,21 +169,15 @@ export class NugetService {
     const response = await firstValueFrom(
       this.protocolDeployTokenControllerService.listDeployTokens(this.repoName, pageNumber, pageSize),
     );
-    return this.toPagedData(response.data);
+    return this.toPagedData(response);
   }
 
   public async rotateDeployToken(tokenId: string): Promise<string> {
-    const response = await firstValueFrom(
-      this.protocolDeployTokenControllerService.rotateDeployToken(tokenId, this.repoName),
-    );
-    return response.data!;
+    return firstValueFrom(this.protocolDeployTokenControllerService.rotateDeployToken(tokenId, this.repoName));
   }
 
   public async createDeployToken(form: DeployTokenForm): Promise<TokenInfo> {
-    const response = await firstValueFrom(
-      this.protocolDeployTokenControllerService.createDeployToken(this.repoName, form),
-    );
-    return response.data!;
+    return firstValueFrom(this.protocolDeployTokenControllerService.createDeployToken(this.repoName, form));
   }
 
   public async revokeDeployToken(tokenId: string): Promise<void> {

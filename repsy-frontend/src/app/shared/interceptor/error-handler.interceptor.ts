@@ -15,11 +15,11 @@
 ///
 
 import { HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
-import { problemDetail } from '../error-handler/problem.util';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 
 import { ToastService } from '../../panel/shared/components/toast/toast.service';
+import { problemDetail } from '../error-handler/problem.util';
 
 /**
  * Set on a request whose failure the caller handles itself (a background load that degrades to an
