@@ -606,29 +606,55 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("a module named like a sub-route is listed, found by q and addressed by modulePath")
+  @DisplayName(
+      "a module whose last path element is a route literal is listed, versioned and deleted as itself")
   void moduleNamedLikeARouteDoesNotCollide() throws Exception {
-    final var user = this.createUser(uniqueUsername("gomod"), UserRole.USER);
+    final var user = this.createUser(uniqueUsername("gomod"), UserRole.ADMIN);
     final var token = this.bearerTokenFor(user);
+    final var protocolToken = this.protocolBearerTokenFor(user);
     final var repo = this.createRepo(unique("go"), false);
-    this.upload(repo, "v1.0.0", this.protocolBearerTokenFor(user));
+    this.upload(repo, "example.com/versions", "v1.0.0", protocolToken);
+    this.upload(repo, "example.com/info", "v1.0.0", protocolToken);
 
     this.mockMvc
         .perform(
             get("/api/go/modules/{repo}", repo)
-                .param("q", "versions")
+                .param("q", "example.com/versions")
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content", hasSize(0)));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].modulePath").value("example.com/versions"));
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}/versions", repo)
+                .param("modulePath", "example.com/versions")
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].version").value("v1.0.0"));
     this.mockMvc
         .perform(
             get("/api/go/modules/{repo}/info", repo)
-                .param("modulePath", MODULE)
+                .param("modulePath", "example.com/info")
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.modulePath").value(MODULE));
+        .andExpect(jsonPath("$.modulePath").value("example.com/info"));
+
+    this.mockMvc
+        .perform(
+            delete("/api/go/modules/{repo}", repo)
+                .param("modulePath", "example.com/versions")
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isNoContent());
+    this.mockMvc
+        .perform(get("/api/go/modules/{repo}", repo).with(apiPort()).header(AUTHORIZATION, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].modulePath").value("example.com/info"));
   }
 
   @Nested
