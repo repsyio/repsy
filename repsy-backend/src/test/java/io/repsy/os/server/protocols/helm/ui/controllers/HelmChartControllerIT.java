@@ -40,6 +40,7 @@ import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
 import io.repsy.os.server.protocols.helm.shared.oci.services.HelmOciBlobService;
 import io.repsy.os.server.protocols.helm.shared.oci.services.HelmOciManifestNameRepairService;
 import io.repsy.os.server.protocols.helm.shared.oci.services.HelmOciManifestService;
+import io.repsy.os.server.shared.http.BareBodyAssertions;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -114,16 +115,10 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       "application/vnd.cncf.helm.chart.provenance.v1.prov";
   private static final String NO_PERMISSION_TEXT =
       "Please log in: the credentials are missing or invalid, or the account is gone.";
-  private static final Map<String, String> SUCCESS_TEXTS =
-      Map.of(
-          "chartsFetched", "Charts fetched.",
-          "chartVersionsFetched", "Chart versions fetched.",
-          "chartDetailFetched", "Chart detail fetched.",
-          "chartTagsFetched", "Chart tags fetched.",
-          "chartDeleted", "Chart deleted.");
-
   private static final Set<String> LIST_ITEM_KEYS =
       Set.of("name", "latestVersion", "description", "type", "updatedAt");
+  private static final Set<String> SUMMARY_KEYS =
+      Set.of("name", "latestVersion", "description", "appVersion", "type", "updatedAt");
   private static final Set<String> VERSION_ITEM_KEYS =
       Set.of("version", "appVersion", "description", "type", "digest", "size", "createdAt");
   private static final Set<String> DETAIL_KEYS =
@@ -476,8 +471,8 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
   /**
    * Inserts a chart version literally named {@code tags} (the chart parser would refuse it, since
-   * it is not semver) together with its package file, to exercise the {@code /{name}/tags} vs
-   * {@code /{name}/{version}} route ambiguity.
+   * it is not semver) together with its package file, to exercise the {@code /{name}/tags} and
+   * {@code /{name}/versions/{version}} routes.
    */
   private void seedVersionNamedTags(final Repo repo, final String chartName) throws IOException {
     final var content = "tags-package".getBytes(StandardCharsets.UTF_8);
@@ -607,19 +602,15 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   // ---------------------------------------------------------------------------------------------
 
   private static Map<String, Object> dataMap(final String body) {
-    return JsonPath.read(body, "$.data");
-  }
-
-  private static List<Map<String, Object>> dataList(final String body) {
-    return JsonPath.read(body, "$.data");
+    return JsonPath.read(body, "$");
   }
 
   private static List<Map<String, Object>> content(final String body) {
-    return JsonPath.read(body, "$.data.content");
+    return JsonPath.read(body, "$.content");
   }
 
   private static List<String> stringList(final String body) {
-    return JsonPath.read(body, "$.data");
+    return JsonPath.read(body, "$");
   }
 
   private static List<String> namesOf(final String body) {
@@ -646,7 +637,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
   private static void assertPage(
       final String body, final int size, final int number, final int total, final int pages) {
-    final Map<String, Object> page = JsonPath.read(body, "$.data.page");
+    final Map<String, Object> page = JsonPath.read(body, "$.page");
     assertThat(page)
         .containsOnlyKeys("size", "number", "totalElements", "totalPages")
         .containsEntry("size", size)
@@ -656,49 +647,84 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   }
 
   private static void assertPagedModel(final String body) {
-    final Map<String, Object> data = JsonPath.read(body, "$.data");
+    final Map<String, Object> data = JsonPath.read(body, "$");
     assertThat(data).containsOnlyKeys("content", "page");
   }
 
   private String search(final Repo repo, final String token) throws Exception {
-    return expectSuccess(
-        this.perform(get("/api/helm/charts/{repo}", repo.getName()).header(AUTHORIZATION, token)),
-        "chartsFetched");
+    return BareBodyAssertions.expectBare(
+        this.perform(get("/api/helm/charts/{repo}", repo.getName()).header(AUTHORIZATION, token)));
   }
 
   private String searchWith(
       final Repo repo, final String token, final String param, final String value)
       throws Exception {
-    return expectSuccess(
+    return BareBodyAssertions.expectBare(
         this.perform(
             get("/api/helm/charts/{repo}", repo.getName())
                 .param(param, value)
-                .header(AUTHORIZATION, token)),
-        "chartsFetched");
+                .header(AUTHORIZATION, token)));
   }
 
   private ResultActions versionsRequest(final Repo repo, final String name, final String token)
       throws Exception {
     return this.perform(
-        get("/api/helm/charts/{repo}/{name}", repo.getName(), name).header(AUTHORIZATION, token));
+        get("/api/helm/charts/{repo}/{name}/versions", repo.getName(), name)
+            .header(AUTHORIZATION, token));
   }
 
   private String versions(final Repo repo, final String name, final String token) throws Exception {
-    return expectSuccess(this.versionsRequest(repo, name, token), "chartVersionsFetched");
+    return BareBodyAssertions.expectBare(this.versionsRequest(repo, name, token));
+  }
+
+  /** The version list with query parameters given as name, value, name, value... */
+  private ResultActions versionsRequestWith(
+      final Repo repo, final String name, final String token, final String... nameValuePairs)
+      throws Exception {
+    final var request =
+        get("/api/helm/charts/{repo}/{name}/versions", repo.getName(), name)
+            .header(AUTHORIZATION, token);
+
+    for (var i = 0; i < nameValuePairs.length; i += 2) {
+      request.param(nameValuePairs[i], nameValuePairs[i + 1]);
+    }
+
+    return this.perform(request);
+  }
+
+  private String versionsWith(
+      final Repo repo, final String name, final String token, final String... nameValuePairs)
+      throws Exception {
+    return BareBodyAssertions.expectBare(
+        this.versionsRequestWith(repo, name, token, nameValuePairs));
+  }
+
+  private static List<String> versionsOf(final String body) {
+    return content(body).stream().map(item -> (String) item.get("version")).toList();
+  }
+
+  private ResultActions chartRequest(final Repo repo, final String name, final String token)
+      throws Exception {
+    return this.perform(
+        get("/api/helm/charts/{repo}/{name}", repo.getName(), name).header(AUTHORIZATION, token));
+  }
+
+  private String chart(final Repo repo, final String name, final String token) throws Exception {
+    return BareBodyAssertions.expectBare(this.chartRequest(repo, name, token));
   }
 
   private ResultActions detailRequest(
       final Repo repo, final String name, final String version, final String token)
       throws Exception {
     return this.perform(
-        get("/api/helm/charts/{repo}/{name}/{version}", repo.getName(), name, version)
+        get("/api/helm/charts/{repo}/{name}/versions/{version}", repo.getName(), name, version)
             .header(AUTHORIZATION, token));
   }
 
   private String detail(
       final Repo repo, final String name, final String version, final String token)
       throws Exception {
-    return expectSuccess(this.detailRequest(repo, name, version, token), "chartDetailFetched");
+    return BareBodyAssertions.expectBare(this.detailRequest(repo, name, version, token));
   }
 
   private ResultActions tagsRequest(final Repo repo, final String name, final String token)
@@ -709,14 +735,14 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   }
 
   private String tags(final Repo repo, final String name, final String token) throws Exception {
-    return expectSuccess(this.tagsRequest(repo, name, token), "chartTagsFetched");
+    return BareBodyAssertions.expectBare(this.tagsRequest(repo, name, token));
   }
 
   private ResultActions deleteVersionRequest(
       final Repo repo, final String name, final String version, final String token)
       throws Exception {
     return this.perform(
-        delete("/api/helm/charts/{repo}/{name}/{version}", repo.getName(), name, version)
+        delete("/api/helm/charts/{repo}/{name}/versions/{version}", repo.getName(), name, version)
             .header(AUTHORIZATION, token));
   }
 
@@ -727,13 +753,8 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
             .header(AUTHORIZATION, token));
   }
 
-  private static String expectSuccess(final ResultActions result, final String msgId)
-      throws Exception {
-    return expectSuccess(result, msgId, SUCCESS_TEXTS.get(msgId));
-  }
-
-  private static String expectDeleted(final ResultActions result) throws Exception {
-    return expectSuccess(result, "chartDeleted");
+  private static void expectDeleted(final ResultActions result) {
+    BareBodyAssertions.expectNoContent(result);
   }
 
   private static void expectUnauthorized(final ResultActions result) throws Exception {
@@ -939,13 +960,12 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     }
 
     private String page(final Repo repo, final String token, final int number) throws Exception {
-      return expectSuccess(
+      return BareBodyAssertions.expectBare(
           HelmChartControllerIT.this.perform(
               get("/api/helm/charts/{repo}", repo.getName())
                   .param("size", "2")
                   .param("page", String.valueOf(number))
-                  .header(AUTHORIZATION, token)),
-          "chartsFetched");
+                  .header(AUTHORIZATION, token)));
     }
 
     @Test
@@ -1059,13 +1079,12 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       it.upload(repo, ChartSpec.of("bravo", "2.0.0"), token);
 
       final var body =
-          expectSuccess(
+          BareBodyAssertions.expectBare(
               it.perform(
                   get("/api/helm/charts/{repo}", repo.getName())
                       .param("sort", "latestVersion,desc")
                       .param("sort", "name,asc")
-                      .header(AUTHORIZATION, token)),
-              "chartsFetched");
+                      .header(AUTHORIZATION, token)));
 
       assertThat(namesOf(body)).containsExactly("bravo", "alpha", "charlie");
     }
@@ -1102,12 +1121,263 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // GET /api/helm/charts/{repoName}/{name}
+  // GET /api/helm/charts/{repoName}/{packageName}
   // ---------------------------------------------------------------------------------------------
 
   @Nested
-  @DisplayName("GET /api/helm/charts/{repoName}/{name} (versions)")
+  @DisplayName("GET /api/helm/charts/{repoName}/{packageName} (chart)")
+  class Chart {
+
+    @Test
+    @DisplayName("describes the chart by its latest version, with the full HelmChartSummary shape")
+    void returnsTheSummary() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      final var from = Instant.now().minusSeconds(5);
+      it.upload(
+          repo,
+          ChartSpec.of("payments", "1.0.0").withRichMetadata().withAppVersion("2.0.0"),
+          token);
+      it.upload(repo, ChartSpec.of("orders", "5.0.0"), token);
+      final var to = Instant.now().plusSeconds(5);
+
+      final var body = it.chart(repo, "payments", token);
+
+      final var summary = dataMap(body);
+      assertKeys(summary, SUMMARY_KEYS);
+      assertThat(summary)
+          .containsEntry("name", "payments")
+          .containsEntry("latestVersion", "1.0.0")
+          .containsEntry("appVersion", "2.0.0")
+          .containsEntry("description", "payments chart")
+          .containsEntry("type", "application");
+      assertInstantBetween(summary.get("updatedAt"), from, to);
+    }
+
+    @Test
+    @DisplayName("'latest' is the most recently uploaded version, not the highest semver")
+    void latestIsTheNewestUpload() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "2.0.0"), token);
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+
+      assertThat(dataMap(it.chart(repo, "payments", token)))
+          .containsEntry("latestVersion", "1.0.0");
+
+      expectDeleted(it.deleteVersionRequest(repo, "payments", "1.0.0", token));
+
+      assertThat(dataMap(it.chart(repo, "payments", token)))
+          .containsEntry("latestVersion", "2.0.0");
+    }
+
+    @Test
+    @DisplayName("omits description and appVersion when the latest version has none")
+    void omitsMissingFields() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(
+          repo, ChartSpec.of("orders", "0.1.0").withDescription(null).withAppVersion(null), token);
+
+      assertKeys(
+          dataMap(it.chart(repo, "orders", token)), SUMMARY_KEYS, "description", "appVersion");
+    }
+
+    @Test
+    @DisplayName("describes a chart that was pushed through OCI")
+    void describesOciPushedChart() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.pushOci(repo, "ocichart", "0.5.0", ChartSpec.of("ocichart", "0.5.0"), token);
+
+      assertThat(dataMap(it.chart(repo, "ocichart", token)))
+          .containsEntry("name", "ocichart")
+          .containsEntry("latestVersion", "0.5.0");
+    }
+
+    @Test
+    @DisplayName("an unknown chart is 404 chartNotFound, matched by exact name and repo")
+    void unknownChartIsNotFound() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      final var other = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+      it.upload(other, ChartSpec.of("elsewhere", "1.0.0"), token);
+
+      expectChartNotFound(it.chartRequest(repo, "does-not-exist", it.userBearerToken()));
+      expectChartNotFound(it.chartRequest(repo, "elsewhere", token));
+      expectChartNotFound(it.chartRequest(repo, "pay", token));
+      expectChartNotFound(it.chartRequest(repo, "PAYMENTS", token));
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // GET /api/helm/charts/{repoName}/{packageName}/versions
+  // ---------------------------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("GET /api/helm/charts/{repoName}/{packageName}/versions")
   class Versions {
+
+    @Test
+    @DisplayName("pages with size/page and reports complete PagedModel metadata")
+    void pagesVersions() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      for (var minor = 0; minor < 5; minor++) {
+        it.upload(repo, ChartSpec.of("payments", "1." + minor + ".0"), token);
+      }
+
+      final var first =
+          it.versionsWith(repo, "payments", token, "size", "2", "page", "0", "sort", "version,asc");
+      final var third =
+          it.versionsWith(repo, "payments", token, "size", "2", "page", "2", "sort", "version,asc");
+      final var beyond =
+          it.versionsWith(repo, "payments", token, "size", "2", "page", "9", "sort", "version,asc");
+
+      assertPagedModel(first);
+      assertThat(versionsOf(first)).containsExactly("1.0.0", "1.1.0");
+      assertPage(first, 2, 0, 5, 3);
+      assertThat(versionsOf(third)).containsExactly("1.4.0");
+      assertPage(third, 2, 2, 5, 3);
+      assertThat(content(beyond)).isEmpty();
+      assertPage(beyond, 2, 9, 5, 3);
+    }
+
+    @Test
+    @DisplayName("q matches the version as a case-insensitive substring")
+    void queryFiltersByVersion() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+      it.upload(repo, ChartSpec.of("payments", "1.1.0-RC.1"), token);
+      it.upload(repo, ChartSpec.of("payments", "2.0.0"), token);
+
+      assertThat(versionsOf(it.versionsWith(repo, "payments", token, "q", "rc")))
+          .containsExactly("1.1.0-RC.1");
+      assertThat(versionsOf(it.versionsWith(repo, "payments", token, "q", "1.")))
+          .containsExactlyInAnyOrder("1.0.0", "1.1.0-RC.1");
+      assertThat(versionsOf(it.versionsWith(repo, "payments", token, "q", ""))).hasSize(3);
+
+      final var none = it.versionsWith(repo, "payments", token, "q", "zzz-no-such-version");
+      assertThat(content(none)).isEmpty();
+      assertPage(none, 10, 0, 0, 0);
+    }
+
+    @Test
+    @DisplayName("sorts by version and createdAt, in both directions")
+    void sortsByVersionAndCreatedAt() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.1.0"), token);
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+      it.upload(repo, ChartSpec.of("payments", "2.0.0"), token);
+
+      assertThat(versionsOf(it.versionsWith(repo, "payments", token, "sort", "version,asc")))
+          .containsExactly("1.0.0", "1.1.0", "2.0.0");
+      assertThat(versionsOf(it.versionsWith(repo, "payments", token, "sort", "version,desc")))
+          .containsExactly("2.0.0", "1.1.0", "1.0.0");
+      assertThat(versionsOf(it.versionsWith(repo, "payments", token, "sort", "createdAt,asc")))
+          .containsExactly("1.1.0", "1.0.0", "2.0.0");
+      assertThat(versionsOf(it.versionsWith(repo, "payments", token, "sort", "createdAt,desc")))
+          .containsExactly("2.0.0", "1.0.0", "1.1.0");
+    }
+
+    @Test
+    @DisplayName("applies several supported sort keys in order")
+    void sortsByMultipleKeys() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+      it.upload(repo, ChartSpec.of("payments", "2.0.0"), token);
+
+      final var body =
+          it.versionsWith(repo, "payments", token, "sort", "createdAt,desc", "sort", "version,asc");
+
+      assertThat(versionsOf(body)).containsExactly("2.0.0", "1.0.0");
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @ValueSource(strings = {"bogus,asc", "id,asc", "digest,asc", "chart.name,asc", "Version,asc"})
+    @DisplayName("returns 400 validationError naming sort for an unsupported sort property")
+    void unknownSortPropertyIs400(final String sort) throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+
+      expectError(
+          it.versionsRequestWith(repo, "payments", token, "sort", sort),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          "sort",
+          "Incoming data couldn't be validated.");
+    }
+
+    @Test
+    @DisplayName("rejects the request when only one of several sort properties is unsupported")
+    void oneUnknownAmongSeveralSortProperties() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+
+      expectError(
+          it.versionsRequestWith(
+              repo, "payments", token, "sort", "version,asc", "sort", "bogus,desc"),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          "sort",
+          "Incoming data couldn't be validated.");
+    }
+
+    @ParameterizedTest(name = "{0}={1}")
+    @MethodSource("invalidPagingParams")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String param, final String value) throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+
+      expectError(
+          it.versionsRequestWith(repo, "payments", token, param, value),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          param,
+          "Incoming data couldn't be validated.");
+    }
+
+    static Stream<Arguments> invalidPagingParams() {
+      return Stream.of(
+          Arguments.of("page", "abc"),
+          Arguments.of("size", "abc"),
+          Arguments.of("page", "-1"),
+          Arguments.of("size", "0"),
+          Arguments.of("size", "-1"),
+          Arguments.of("size", "101"));
+    }
+
+    @Test
+    @DisplayName("the old name of the filter, version, is an unknown parameter and filters nothing")
+    void oldFilterNameIsIgnored() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+      it.upload(repo, ChartSpec.of("payments", "2.0.0"), token);
+
+      assertThat(versionsOf(it.versionsWith(repo, "payments", token, "query", "2.0.0"))).hasSize(2);
+    }
 
     @Test
     @DisplayName("lists every version with the full HelmChartVersionItem shape")
@@ -1129,8 +1399,11 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
       final var body = it.versions(repo, "payments", token);
 
-      // The list is a plain, unpaged array, newest upload first.
-      final var items = dataList(body);
+      assertPagedModel(body);
+      assertPage(body, 10, 0, 3, 1);
+
+      // A page, newest upload first.
+      final var items = content(body);
       assertThat(items)
           .extracting(item -> item.get("version"))
           .containsExactly("1.2.0+build.5", "1.1.0-rc.1", "1.0.0");
@@ -1173,9 +1446,9 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       it.upload(repo, ChartSpec.of("orders", "5.0.0"), token);
       it.upload(other, ChartSpec.of("payments", "9.0.0"), token);
 
-      assertThat(byVersion(dataList(it.versions(repo, "payments", token))))
+      assertThat(byVersion(content(it.versions(repo, "payments", token))))
           .containsOnlyKeys("1.0.0");
-      assertThat(byVersion(dataList(it.versions(other, "payments", token))))
+      assertThat(byVersion(content(it.versions(other, "payments", token))))
           .containsOnlyKeys("9.0.0");
     }
 
@@ -1188,7 +1461,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final var pushed =
           it.pushOci(repo, "ocichart", "0.5.0", ChartSpec.of("ocichart", "0.5.0"), token);
 
-      final var items = dataList(it.versions(repo, "ocichart", token));
+      final var items = content(it.versions(repo, "ocichart", token));
 
       assertThat(items).hasSize(1);
       assertKeys(items.getFirst(), VERSION_ITEM_KEYS);
@@ -1212,7 +1485,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
       it.upload(repo, ChartSpec.of("payments", "1.5.0"), token);
 
-      final var items = dataList(it.versions(repo, "payments", token));
+      final var items = content(it.versions(repo, "payments", token));
 
       assertThat(items)
           .extracting(item -> item.get("version"))
@@ -1243,7 +1516,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   // ---------------------------------------------------------------------------------------------
 
   @Nested
-  @DisplayName("GET /api/helm/charts/{repoName}/{name}/{version} (detail)")
+  @DisplayName("GET /api/helm/charts/{repoName}/{packageName}/versions/{version} (detail)")
   class Detail {
 
     @Test
@@ -1470,41 +1743,51 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     }
 
     /**
-     * {@code /{name}/tags} and {@code /{name}/{version}} overlap. Spring prefers the literal
-     * segment, so {@code GET .../tags} is always the OCI tag list: a chart version that is really
-     * called {@code tags} is listed among the versions but its detail cannot be fetched. For {@code
-     * DELETE} there is no literal {@code tags} route, so it deletes that version.
+     * Versions live under {@code /{name}/versions/{version}} and the OCI tag list under {@code
+     * /{name}/tags}, so a chart version that is really called {@code tags} no longer shares a route
+     * with the tag list: both are reachable, and the old {@code /{name}/tags} delete is gone.
      */
     @Test
-    @DisplayName("a version literally named 'tags': GET is the tag list, DELETE is the version")
-    void routeAmbiguityWithVersionNamedTags() throws Exception {
+    @DisplayName("a version literally named 'tags' has its own detail and delete route")
+    void versionNamedTagsDoesNotCollideWithTagList() throws Exception {
       final var it = HelmChartControllerIT.this;
       final var token = it.adminBearerToken();
       final var repo = it.helmRepo();
       it.pushOci(repo, "routing", "1.0.0", ChartSpec.of("routing", "1.0.0"), token);
       it.seedVersionNamedTags(repo, "routing");
 
-      assertThat(byVersion(dataList(it.versions(repo, "routing", token))))
+      assertThat(byVersion(content(it.versions(repo, "routing", token))))
           .containsOnlyKeys("1.0.0", "tags");
 
-      // GET .../tags is the OCI tag list (["1.0.0"]), not the detail of version "tags".
+      // GET .../tags is the OCI tag list (["1.0.0"]); the version "tags" has its detail under
+      // /versions.
       assertThat(stringList(it.tags(repo, "routing", token))).containsExactly("1.0.0");
+      assertThat(dataMap(it.detail(repo, "routing", "tags", token)))
+          .containsEntry("version", "tags");
 
-      expectDeleted(
+      // DELETE .../tags is not a route any more; the version is deleted under /versions.
+      expectError(
           it.perform(
               delete("/api/helm/charts/{repo}/{name}/tags", repo.getName(), "routing")
-                  .header(AUTHORIZATION, token)));
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.NOT_FOUND,
+          "itemNotFound",
+          null,
+          "The requested item is not found.");
+      assertThat(it.storedVersions(repo, "routing")).containsExactlyInAnyOrder("1.0.0", "tags");
+
+      expectDeleted(it.deleteVersionRequest(repo, "routing", "tags", token));
       assertThat(it.storedVersions(repo, "routing")).containsExactly("1.0.0");
       assertThat(Files.exists(it.chartFile(repo, "routing", "tags"))).isFalse();
     }
   }
 
   // ---------------------------------------------------------------------------------------------
-  // DELETE /api/helm/charts/{repoName}/{name}/{version}
+  // DELETE /api/helm/charts/{repoName}/{name}/versions/{version}
   // ---------------------------------------------------------------------------------------------
 
   @Nested
-  @DisplayName("DELETE /api/helm/charts/{repoName}/{name}/{version}")
+  @DisplayName("DELETE /api/helm/charts/{repoName}/{name}/versions/{version}")
   class DeleteVersion {
 
     @Test
@@ -1519,10 +1802,8 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       assertThat(it.indexYaml(repo)).contains("charts/payments-1.1.0-rc.1.tgz");
       clearInvocations(it.usageUpdateService);
 
-      final var body =
-          expectDeleted(it.deleteVersionRequest(repo, "payments", "1.1.0-rc.1", token));
+      expectDeleted(it.deleteVersionRequest(repo, "payments", "1.1.0-rc.1", token));
 
-      assertThat(JsonPath.<Object>read(body, "$.data")).isNull();
       assertThat(it.storedVersions(repo, "payments")).containsExactly("1.0.0");
       assertThat(Files.exists(it.chartFile(repo, "payments", "1.1.0-rc.1"))).isFalse();
       assertThat(Files.exists(it.chartFile(repo, "payments", "1.0.0"))).isTrue();
@@ -1534,7 +1815,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       it.verifyUsageDelta(repo, -doomed.size());
 
       // The sibling version is untouched and still served through the API.
-      assertThat(byVersion(dataList(it.versions(repo, "payments", token))))
+      assertThat(byVersion(content(it.versions(repo, "payments", token))))
           .containsOnlyKeys("1.0.0");
       assertThat(namesOf(it.search(repo, token))).containsExactlyInAnyOrder("payments", "orders");
     }
@@ -1610,7 +1891,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       expectUnauthorized(
           it.perform(
               delete(
-                  "/api/helm/charts/{repo}/{name}/{version}",
+                  "/api/helm/charts/{repo}/{name}/versions/{version}",
                   repo.getName(),
                   "payments",
                   "1.0.0")));
@@ -1640,9 +1921,8 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       it.upload(repo, ChartSpec.of("orders", "0.1.0"), token);
       clearInvocations(it.usageUpdateService);
 
-      final var body = expectDeleted(it.deleteAllRequest(repo, "payments", token));
+      expectDeleted(it.deleteAllRequest(repo, "payments", token));
 
-      assertThat(JsonPath.<Object>read(body, "$.data")).isNull();
       assertThat(it.chartRowExists(repo, "payments")).isFalse();
       assertThat(it.storedVersions(repo, "payments")).isEmpty();
       for (final var version : List.of("1.0.0", "1.1.0-rc.1", "1.2.0+build.5")) {
@@ -1713,56 +1993,52 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // Authentication and repository resolution, across all six endpoints
+  // Authentication and repository resolution, across all seven endpoints
   // ---------------------------------------------------------------------------------------------
 
-  /** The six endpoints, each addressed at the chart {@code payments} version {@code 1.0.0}. */
+  /** The seven endpoints, each addressed at the chart {@code payments} version {@code 1.0.0}. */
   private enum Endpoint {
-    SEARCH(false, "chartsFetched", 200, name -> get("/api/helm/charts/{repo}", name)),
-    VERSIONS(
-        false,
-        "chartVersionsFetched",
-        404,
-        name -> get("/api/helm/charts/{repo}/{name}", name, "payments")),
+    SEARCH(false, 200, name -> get("/api/helm/charts/{repo}", name)),
+    CHART(false, 404, name -> get("/api/helm/charts/{repo}/{name}", name, "payments")),
+    VERSIONS(false, 404, name -> get("/api/helm/charts/{repo}/{name}/versions", name, "payments")),
     DETAIL(
         false,
-        "chartDetailFetched",
         404,
-        name -> get("/api/helm/charts/{repo}/{name}/{version}", name, "payments", "1.0.0")),
-    TAGS(
-        false,
-        "chartTagsFetched",
-        404,
-        name -> get("/api/helm/charts/{repo}/{name}/tags", name, "payments")),
-    DELETE_ALL(
-        true,
-        "chartDeleted",
-        404,
-        name -> delete("/api/helm/charts/{repo}/{name}", name, "payments")),
+        name ->
+            get("/api/helm/charts/{repo}/{name}/versions/{version}", name, "payments", "1.0.0")),
+    TAGS(false, 404, name -> get("/api/helm/charts/{repo}/{name}/tags", name, "payments")),
+    DELETE_ALL(true, 404, name -> delete("/api/helm/charts/{repo}/{name}", name, "payments")),
     DELETE_VERSION(
         true,
-        "chartDeleted",
         404,
-        name -> delete("/api/helm/charts/{repo}/{name}/{version}", name, "payments", "1.0.0"));
+        name ->
+            delete("/api/helm/charts/{repo}/{name}/versions/{version}", name, "payments", "1.0.0"));
 
     private final boolean manage;
-    private final String successMsgId;
     private final int otherTypeStatus;
     private final Function<String, MockHttpServletRequestBuilder> request;
 
     Endpoint(
         final boolean manage,
-        final String successMsgId,
         final int otherTypeStatus,
         final Function<String, MockHttpServletRequestBuilder> request) {
       this.manage = manage;
-      this.successMsgId = successMsgId;
       this.otherTypeStatus = otherTypeStatus;
       this.request = request;
     }
 
     MockHttpServletRequestBuilder to(final String repoName) {
       return this.request.apply(repoName);
+    }
+  }
+
+  /** A delete endpoint answers 204 with no body, a read endpoint a bare 200. */
+  private static void expectEndpointSuccess(final Endpoint endpoint, final ResultActions result)
+      throws Exception {
+    if (endpoint.manage) {
+      BareBodyAssertions.expectNoContent(result);
+    } else {
+      BareBodyAssertions.expectBare(result);
     }
   }
 
@@ -2297,7 +2573,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       if (endpoint.manage) {
         expectUnauthorized(result);
       } else {
-        expectSuccess(result, endpoint.successMsgId);
+        expectEndpointSuccess(endpoint, result);
       }
     }
 
@@ -2314,7 +2590,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
         expectForbidden(result);
         assertThat(it.storedVersions(repo, "payments")).containsExactly("1.0.0");
       } else {
-        expectSuccess(result, endpoint.successMsgId);
+        expectEndpointSuccess(endpoint, result);
       }
     }
 
@@ -2325,8 +2601,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final var it = HelmChartControllerIT.this;
       final var repo = this.repoWithChart(true);
 
-      expectSuccess(
-          this.send(endpoint, repo.getName(), it.adminBearerToken()), endpoint.successMsgId);
+      expectEndpointSuccess(endpoint, this.send(endpoint, repo.getName(), it.adminBearerToken()));
     }
 
     /** A JWT that does not verify is 401 accessNotAllowed, even for a public repo. */
@@ -2421,7 +2696,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final var result = this.send(endpoint, maven.getName(), it.adminBearerToken());
 
       if (endpoint.otherTypeStatus == 200) {
-        expectSuccess(result, endpoint.successMsgId);
+        expectEndpointSuccess(endpoint, result);
       } else {
         expectChartNotFound(result);
       }
@@ -2465,13 +2740,21 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
           Arguments.of(HttpMethod.POST, "/api/helm/charts/%s/payments"),
           Arguments.of(HttpMethod.PUT, "/api/helm/charts/%s/payments"),
           Arguments.of(HttpMethod.PATCH, "/api/helm/charts/%s/payments"),
-          Arguments.of(HttpMethod.POST, "/api/helm/charts/%s/payments/1.0.0"),
-          Arguments.of(HttpMethod.PUT, "/api/helm/charts/%s/payments/1.0.0"),
-          Arguments.of(HttpMethod.PATCH, "/api/helm/charts/%s/payments/1.0.0"),
+          Arguments.of(HttpMethod.POST, "/api/helm/charts/%s/payments/versions"),
+          Arguments.of(HttpMethod.PUT, "/api/helm/charts/%s/payments/versions"),
+          Arguments.of(HttpMethod.PATCH, "/api/helm/charts/%s/payments/versions"),
+          Arguments.of(HttpMethod.DELETE, "/api/helm/charts/%s/payments/versions"),
+          Arguments.of(HttpMethod.POST, "/api/helm/charts/%s/payments/versions/1.0.0"),
+          Arguments.of(HttpMethod.PUT, "/api/helm/charts/%s/payments/versions/1.0.0"),
+          Arguments.of(HttpMethod.PATCH, "/api/helm/charts/%s/payments/versions/1.0.0"),
+          // The old version routes (/{name}/{version}) are gone: the version lives under /versions.
+          Arguments.of(HttpMethod.GET, "/api/helm/charts/%s/payments/1.0.0"),
+          Arguments.of(HttpMethod.DELETE, "/api/helm/charts/%s/payments/1.0.0"),
+          Arguments.of(HttpMethod.DELETE, "/api/helm/charts/%s/payments/tags"),
           Arguments.of(HttpMethod.POST, "/api/helm/charts/%s/payments/tags"),
           Arguments.of(HttpMethod.PUT, "/api/helm/charts/%s/payments/tags"),
-          Arguments.of(HttpMethod.GET, "/api/helm/charts/%s/payments/1.0.0/extra"),
-          Arguments.of(HttpMethod.DELETE, "/api/helm/charts/%s/payments/1.0.0/extra"));
+          Arguments.of(HttpMethod.GET, "/api/helm/charts/%s/payments/versions/1.0.0/extra"),
+          Arguments.of(HttpMethod.DELETE, "/api/helm/charts/%s/payments/versions/1.0.0/extra"));
     }
   }
 

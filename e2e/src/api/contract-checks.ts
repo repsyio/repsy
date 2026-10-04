@@ -228,9 +228,14 @@ export async function expectPagingSweep<T>(sweep: PagingSweep<T>): Promise<void>
       query: withBase(sweep, query),
     });
     expectFailure(sweep.operationId, res, 400, 'validationError');
-    expect((res.json as { data?: string }).data, `${query}: the offending parameter`).toBe(
-      offending,
-    );
+    // problem+json names the parameter in `errors[].field`; a backend still on the `RestResponse` envelope
+    // (Repsy Cloud, until its migration) names it in `data`.
+    const body = res.json as { data?: string; errors?: { field?: string; code?: string }[] };
+    const named = body.errors ? body.errors.map((error) => error.field) : [body.data];
+    expect(named, `${query}: the offending parameter`).toEqual([offending]);
+    for (const error of body.errors ?? []) {
+      expect(error.code, `${query}: the error code`).toBe('validationError');
+    }
   }
 }
 

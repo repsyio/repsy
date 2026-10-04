@@ -173,8 +173,10 @@ export async function expectListedInPanel(
   const path = `${base}/${encodeURIComponent(repoName)}?size=100`;
   const res = await panelApi.rawRequest('GET', path);
   expect(res.status, `${what}: GET ${path}`).toBe(200);
+  // Helm answers the bare PagedModel (API guideline, Decision 5); the others still use the envelope.
+  const page = pkg.adapter.protocol === 'helm' ? res.body : res.body.data;
   const content = (
-    res.body.data as { content?: { name?: string; latestVersion?: string; digest?: string }[] }
+    page as { content?: { name?: string; latestVersion?: string; digest?: string }[] }
   ).content;
   const item = (content ?? []).find((candidate) => candidate.name === packageName);
   expect(item, `${what} lists ${packageName}`).toBeDefined();

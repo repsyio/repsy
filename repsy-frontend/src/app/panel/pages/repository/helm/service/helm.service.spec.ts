@@ -26,7 +26,6 @@ import {
   PAGE_SIZE,
   PagedCase,
   REPO,
-  restResponse,
   selectRepo,
   SORT,
 } from '../../testing/protocol-service-spec-helpers';
@@ -46,7 +45,8 @@ describe('HelmService', () => {
     ]);
     helmApi = jasmine.createSpyObj<HelmChartControllerService>('HelmChartControllerService', [
       'searchHelmCharts',
-      'getHelmChartVersions',
+      'getHelmChart',
+      'listHelmChartVersions',
       'getHelmChartDetail',
       'deleteAllHelmChartVersions',
       'deleteHelmChartVersion',
@@ -64,8 +64,8 @@ describe('HelmService', () => {
   describeRepoSelection({
     service: () => service,
     getPermission: () => repoApi.getRepoPermissions,
-    probe: (s) => s.getChartVersions(CHART),
-    probeApi: () => helmApi.getHelmChartVersions,
+    probe: (s) => s.getChart(CHART),
+    probeApi: () => helmApi.getHelmChart,
     probeRepoArg: 0,
     resetsOnChange: true,
   });
@@ -79,37 +79,37 @@ describe('HelmService', () => {
         invoke: (s, query) => s.searchCharts(query, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => helmApi.searchHelmCharts,
         args: (query) => [REPO, query, ...PAGE_ARGS],
+        bare: true,
+      },
+      {
+        name: 'fetchChartVersions',
+        invoke: (s, search) => s.fetchChartVersions(CHART, search, SORT, PAGE_INDEX, PAGE_SIZE),
+        api: () => helmApi.listHelmChartVersions,
+        args: (search) => [REPO, CHART, search, ...PAGE_ARGS],
+        bare: true,
       },
     ];
     describePagedCalls(() => service, paged);
 
-    const versions = [{ version: VERSION }];
+    const summary = { name: CHART, latestVersion: VERSION };
     const detail = { name: CHART, version: VERSION };
     const tags = ['1.2.3', 'latest'];
     // Unlike the other services, the Helm client takes the repository name first.
     const calls: CallCase<HelmService>[] = [
       {
-        name: 'getChartVersions',
-        invoke: (s) => s.getChartVersions(CHART),
-        api: () => helmApi.getHelmChartVersions,
+        name: 'getChart',
+        invoke: (s) => s.getChart(CHART),
+        api: () => helmApi.getHelmChart,
         args: [REPO, CHART],
-        response: restResponse(versions),
-        expected: versions,
-      },
-      {
-        name: 'getChartVersions without version data',
-        invoke: (s) => s.getChartVersions(CHART),
-        api: () => helmApi.getHelmChartVersions,
-        args: [REPO, CHART],
-        response: restResponse(undefined),
-        expected: [],
+        response: summary,
+        expected: summary,
       },
       {
         name: 'getChartDetail',
         invoke: (s) => s.getChartDetail(CHART, VERSION),
         api: () => helmApi.getHelmChartDetail,
         args: [REPO, CHART, VERSION],
-        response: restResponse(detail),
+        response: detail,
         expected: detail,
       },
       {
@@ -117,7 +117,7 @@ describe('HelmService', () => {
         invoke: (s) => s.deleteAllVersions(CHART),
         api: () => helmApi.deleteAllHelmChartVersions,
         args: [REPO, CHART],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [helmApi.deleteHelmChartVersion],
       },
@@ -126,7 +126,7 @@ describe('HelmService', () => {
         invoke: (s) => s.deleteChart(CHART, VERSION),
         api: () => helmApi.deleteHelmChartVersion,
         args: [REPO, CHART, VERSION],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [helmApi.deleteAllHelmChartVersions],
       },
@@ -135,7 +135,7 @@ describe('HelmService', () => {
         invoke: (s) => s.getOciTags(CHART),
         api: () => helmApi.getHelmChartOciTags,
         args: [REPO, CHART],
-        response: restResponse(tags),
+        response: tags,
         expected: tags,
       },
       {
@@ -143,7 +143,7 @@ describe('HelmService', () => {
         invoke: (s) => s.getOciTags(CHART),
         api: () => helmApi.getHelmChartOciTags,
         args: [REPO, CHART],
-        response: restResponse(undefined),
+        response: undefined,
         expected: [],
       },
     ];

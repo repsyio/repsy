@@ -149,7 +149,7 @@ test.describe('Helm charts: OCI and classic', { tag: '@packages' }, () => {
       .waitForResponse(
         (res) =>
           res.request().method() === 'GET' &&
-          new URL(res.url()).pathname === `/api/helm/charts/${repo.name}/${chart.name}` &&
+          new URL(res.url()).pathname === `/api/helm/charts/${repo.name}/${chart.name}/versions` &&
           res.status() === 404,
         { timeout: 5_000 },
       )

@@ -98,13 +98,13 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * (the panel's delete), so the same retry covers the chart step.
  *
  * <p>The same class pins the panel side of RPS-1325 end to end: {@code DELETE
- * /api/helm/charts/{repo}/{chart}/{version}} deletes a row that carries a {@code @Version}, and
- * when another request has changed the row since it was read the panel answers 409 {@code
- * concurrentModification} (no {@code Retry-After}: the client re-reads and repeats), where RPS-1325
- * pinned that mapping with a stub controller only. RPS-1355: the classic chart upload on the
- * protocol port loses the same race with 503 and {@code Retry-After}, since a package client treats
- * a 409 as "this version exists". It is one class so that it shares one Spring context (and one
- * connection pool) with the OCI tests.
+ * /api/helm/charts/{repo}/{chart}/versions/{version}} deletes a row that carries a
+ * {@code @Version}, and when another request has changed the row since it was read the panel
+ * answers 409 {@code concurrentModification} (no {@code Retry-After}: the client re-reads and
+ * repeats), where RPS-1325 pinned that mapping with a stub controller only. RPS-1355: the classic
+ * chart upload on the protocol port loses the same race with 503 and {@code Retry-After}, since a
+ * package client treats a 409 as "this version exists". It is one class so that it shares one
+ * Spring context (and one connection pool) with the OCI tests.
  *
  * <p>RPS-1365: a push takes the chart row first and then the version and manifest rows, so a delete
  * of that chart (the panel's, one version or all of them, or the classic protocol's) must take the
@@ -685,7 +685,11 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
 
     final var result =
         this.mockMvc.perform(
-            delete("/api/helm/charts/{repo}/{chart}/{version}", repo.getName(), name, "1.0.0")
+            delete(
+                    "/api/helm/charts/{repo}/{chart}/versions/{version}",
+                    repo.getName(),
+                    name,
+                    "1.0.0")
                 .header(AUTHORIZATION, panelToken)
                 .with(apiPort()));
 
@@ -710,10 +714,14 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
 
     this.mockMvc
         .perform(
-            delete("/api/helm/charts/{repo}/{chart}/{version}", repo.getName(), name, "1.0.0")
+            delete(
+                    "/api/helm/charts/{repo}/{chart}/versions/{version}",
+                    repo.getName(),
+                    name,
+                    "1.0.0")
                 .header(AUTHORIZATION, panelToken)
                 .with(apiPort()))
-        .andExpect(status().isOk());
+        .andExpect(status().isNoContent());
     assertThat(this.versionRows(repo, name))
         .as("the same request repeated without contention")
         .isZero();
@@ -865,7 +873,7 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
                 this.mockMvc
                     .perform(
                         delete(
-                                "/api/helm/charts/{repo}/{chart}/{version}",
+                                "/api/helm/charts/{repo}/{chart}/versions/{version}",
                                 repo.getName(),
                                 name,
                                 "1.0.0")

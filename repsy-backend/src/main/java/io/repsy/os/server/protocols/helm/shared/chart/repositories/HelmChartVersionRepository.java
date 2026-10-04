@@ -39,6 +39,15 @@ public interface HelmChartVersionRepository extends JpaRepository<HelmChartVersi
   /** Newest first; the time-ordered UUIDv7 id breaks ties between versions created together. */
   List<HelmChartVersion> findAllByChartOrderByCreatedAtDescIdDesc(HelmChart chart);
 
+  /**
+   * The newest version of the chart, picked like {@link #findAllByChartOrderByCreatedAtDescIdDesc}.
+   */
+  Optional<HelmChartVersion> findFirstByChartOrderByCreatedAtDescIdDesc(HelmChart chart);
+
+  /** One page of the chart's versions whose version contains {@code version}, any case. */
+  Page<HelmChartVersion> findAllByChartAndVersionContainingIgnoreCase(
+      HelmChart chart, String version, Pageable pageable);
+
   List<HelmChartVersion> findAllByChartRepoId(UUID repoId);
 
   boolean existsByChartRepoIdAndDigest(UUID repoId, String digest);

@@ -23,6 +23,8 @@ import { HelmChartVersionItem, RepoPermissionInfo, VersionSecuritySummary } from
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { PagedData } from '../../../../../shared/dto/paged-data';
+import { Sort } from '../../../../../shared/dto/sort';
 import { SecurityService } from '../../../../security/service/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { REPO_NAME } from '../../../testing/repo-list-spec-helpers';
@@ -37,6 +39,21 @@ const OLD = version('1.0.0', '2026-01-01T00:00:00Z');
 const MIDDLE = version('1.1.0', '2026-02-01T00:00:00Z');
 const NEW = version('2.0.0', '2026-03-01T00:00:00Z');
 
+/** One server page: the items plus the paging block the backend sends. */
+function page(
+  items: HelmChartVersionItem[],
+  totalElements = items.length,
+  number = 0,
+): PagedData<HelmChartVersionItem> {
+  return {
+    content: items,
+    page: { size: 10, number, totalElements, totalPages: Math.max(1, Math.ceil(totalElements / 10)) },
+  } as PagedData<HelmChartVersionItem>;
+}
+
+const NEWEST_FIRST: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
+const OLDEST_FIRST: Sort = { name: 'Oldest', column: 'createdAt', type: 'ASC' };
+
 describe('HelmChartsVersionListComponent', () => {
   let component: HelmChartsVersionListComponent;
   let route: ActivatedRoute;
@@ -49,10 +66,10 @@ describe('HelmChartsVersionListComponent', () => {
 
   beforeEach(() => {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    helmService = jasmine.createSpyObj<HelmService>('HelmService', ['getChartVersions', 'deleteChart'], {
+    helmService = jasmine.createSpyObj<HelmService>('HelmService', ['fetchChartVersions', 'deleteChart'], {
       repoChanges,
     });
-    helmService.getChartVersions.and.returnValue(of([MIDDLE, OLD, NEW]));
+    helmService.fetchChartVersions.and.returnValue(of(page([NEW, MIDDLE, OLD])));
     helmService.deleteChart.and.returnValue(of(undefined));
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
@@ -84,15 +101,15 @@ describe('HelmChartsVersionListComponent', () => {
       expect(component.loading).toBeTrue();
       expect(component.canManage).toBeFalse();
       expect(component.versions).toEqual([]);
-      expect(helmService.getChartVersions).not.toHaveBeenCalled();
+      expect(helmService.fetchChartVersions).not.toHaveBeenCalled();
     });
   });
 
   describe('when a repository is selected', () => {
-    it('loads all versions of the chart in the route, newest first', fakeAsync(() => {
+    it('asks the server for the first page of the chart in the route, newest first', fakeAsync(() => {
       selectRepo();
 
-      expect(helmService.getChartVersions).toHaveBeenCalledOnceWith('nginx');
+      expect(helmService.fetchChartVersions).toHaveBeenCalledOnceWith('nginx', '', NEWEST_FIRST, 0, 10);
       expect(component.chartName).toBe('nginx');
       expect(component.versions).toEqual([NEW, MIDDLE, OLD]);
       expect(component.loading).toBeFalse();
@@ -111,11 +128,11 @@ describe('HelmChartsVersionListComponent', () => {
       repoChanges.next(null);
       flushMicrotasks();
 
-      expect(helmService.getChartVersions).not.toHaveBeenCalled();
+      expect(helmService.fetchChartVersions).not.toHaveBeenCalled();
     }));
 
     it('stops loading without a toast of its own when the versions cannot be loaded (the interceptor shows it)', fakeAsync(() => {
-      helmService.getChartVersions.and.returnValue(
+      helmService.fetchChartVersions.and.returnValue(
         throwError(() => new HttpErrorResponse({ status: 404, error: { detail: 'Chart not found.' } })),
       );
 
@@ -129,7 +146,7 @@ describe('HelmChartsVersionListComponent', () => {
 
     it('refreshPage loads the versions again', fakeAsync(() => {
       selectRepo();
-      helmService.getChartVersions.and.returnValue(of([OLD]));
+      helmService.fetchChartVersions.and.returnValue(of(page([OLD])));
 
       component.refreshPage();
 
@@ -137,91 +154,54 @@ describe('HelmChartsVersionListComponent', () => {
     }));
   });
 
-  describe('searching and sorting', () => {
-    beforeEach(fakeAsync(() => selectRepo()));
+  describe('searching and sorting (done by the server)', () => {
+    beforeEach(fakeAsync(() => {
+      selectRepo();
+      helmService.fetchChartVersions.calls.reset();
+    }));
 
-    it('search keeps the versions that contain the text, ignoring case', () => {
-      component.search('1.');
-
-      expect(component.versions).toEqual([MIDDLE, OLD].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-
-      component.search('');
-      expect(component.versions.length).toBe(3);
-    });
-
-    it('search matches on any part of the version, case-insensitively', () => {
-      helmService.getChartVersions.and.returnValue(of([version('1.0.0-RC1', OLD.createdAt), NEW]));
-      component.refreshPage();
+    it('search sends the text and shows what the server returns', () => {
+      helmService.fetchChartVersions.and.returnValue(of(page([OLD])));
 
       component.search('rc');
 
-      expect(component.versions.map((v) => v.version)).toEqual(['1.0.0-RC1']);
+      expect(helmService.fetchChartVersions).toHaveBeenCalledOnceWith('nginx', 'rc', NEWEST_FIRST, 0, 10);
+      expect(component.searchText).toBe('rc');
+      expect(component.versions).toEqual([OLD]);
     });
 
-    it('sort orders by creation time, oldest first for ascending', () => {
-      component.sort({ name: 'Oldest', column: 'createdAt', type: 'ASC' });
+    it('sort sends the column and direction', () => {
+      component.sort(OLDEST_FIRST);
 
-      expect(component.versions).toEqual([OLD, MIDDLE, NEW]);
+      expect(helmService.fetchChartVersions).toHaveBeenCalledOnceWith('nginx', '', OLDEST_FIRST, 0, 10);
       expect(component.sortOption.type).toBe('ASC');
     });
 
-    it('sort keeps the search filter', () => {
+    it('sort keeps the search text', () => {
       component.search('1.');
+      component.sort(OLDEST_FIRST);
 
-      component.sort({ name: 'Oldest', column: 'createdAt', type: 'ASC' });
-
-      expect(component.versions).toEqual([OLD, MIDDLE]);
+      expect(helmService.fetchChartVersions).toHaveBeenCalledWith('nginx', '1.', OLDEST_FIRST, 0, 10);
     });
 
     it('offers newest and oldest as sort options', () => {
-      expect(component.sortOptions).toEqual([
-        { name: 'Newest', column: 'createdAt', type: 'DESC' },
-        { name: 'Oldest', column: 'createdAt', type: 'ASC' },
-      ]);
+      expect(component.sortOptions).toEqual([NEWEST_FIRST, OLDEST_FIRST]);
       expect(component.sortOptions).toContain(component.sortOption);
     });
   });
 
-  describe('paging', () => {
-    /** Twelve versions, 1.0.0 (oldest) to 1.0.11 (newest). */
-    const twelve = Array.from({ length: 12 }, (_, i) =>
-      version(`1.0.${i}`, `2026-01-${String(i + 1).padStart(2, '0')}T00:00:00Z`),
-    );
-
-    beforeEach(() => helmService.getChartVersions.and.returnValue(of(twelve)));
-
-    it('shows ten versions on the first page and the rest on the second (RPS-1262)', fakeAsync(() => {
+  describe('paging (done by the server)', () => {
+    it('takes the page count from the server and asks for the page that is loaded', fakeAsync(() => {
+      helmService.fetchChartVersions.and.returnValue(of(page([NEW, MIDDLE], 12)));
       selectRepo();
 
-      expect(component.totalPages).toBe(2);
+      expect(component.pagedData.page.totalPages).toBe(2);
       expect(component.pageNum).toBe(0);
-      expect(component.versions.map((v) => v.version)).toEqual([
-        '1.0.11',
-        '1.0.10',
-        '1.0.9',
-        '1.0.8',
-        '1.0.7',
-        '1.0.6',
-        '1.0.5',
-        '1.0.4',
-        '1.0.3',
-        '1.0.2',
-      ]);
 
       component.loadPage(1);
 
       expect(component.pageNum).toBe(1);
-      expect(component.versions.map((v) => v.version)).toEqual(['1.0.1', '1.0.0']);
-    }));
-
-    it('has a single page for up to ten versions', fakeAsync(() => {
-      selectRepo();
-      helmService.getChartVersions.and.returnValue(of(twelve.slice(0, 10)));
-      component.refreshPage();
-      flushMicrotasks();
-
-      expect(component.totalPages).toBe(1);
-      expect(component.versions.length).toBe(10);
+      expect(helmService.fetchChartVersions).toHaveBeenCalledWith('nginx', '', NEWEST_FIRST, 1, 10);
     }));
 
     it('goes back to the first page when the search or the sort changes', fakeAsync(() => {
@@ -230,37 +210,36 @@ describe('HelmChartsVersionListComponent', () => {
 
       component.search('1.0.1');
       expect(component.pageNum).toBe(0);
-      expect(component.versions.map((v) => v.version)).toEqual(['1.0.11', '1.0.10', '1.0.1']);
-      expect(component.totalPages).toBe(1);
 
-      component.search('');
       component.loadPage(1);
       component.sort(component.sortOptions[1]);
       expect(component.pageNum).toBe(0);
-      expect(component.versions[0].version).toBe('1.0.0');
-    }));
-
-    it('stays on the last page that still exists after a refresh returns fewer versions', fakeAsync(() => {
-      selectRepo();
-      component.loadPage(1);
-
-      helmService.getChartVersions.and.returnValue(of(twelve.slice(0, 5)));
-      component.refreshPage();
-      flushMicrotasks();
-
-      expect(component.pageNum).toBe(0);
-      expect(component.versions.length).toBe(5);
+      expect(helmService.fetchChartVersions).toHaveBeenCalledWith('nginx', '1.0.1', OLDEST_FIRST, 0, 10);
     }));
 
     it('keeps the listing when a version is deleted while other versions remain on other pages', fakeAsync(() => {
+      helmService.fetchChartVersions.and.returnValue(of(page([OLD], 11, 1)));
       selectRepo();
       component.loadPage(1);
       component.deleteVersion(component.versions[0]);
 
       dangerModalService.call();
 
-      expect(helmService.deleteChart).toHaveBeenCalledOnceWith('nginx', '1.0.1');
+      expect(helmService.deleteChart).toHaveBeenCalledOnceWith('nginx', '1.0.0');
       expect(router.navigate).not.toHaveBeenCalled();
+    }));
+
+    it('steps back a page when the last version of the last page is deleted', fakeAsync(() => {
+      helmService.fetchChartVersions.and.returnValue(of(page([OLD], 11, 1)));
+      selectRepo();
+      component.loadPage(1);
+      helmService.fetchChartVersions.calls.reset();
+      component.deleteVersion(OLD);
+
+      dangerModalService.call();
+
+      expect(component.pageNum).toBe(0);
+      expect(helmService.fetchChartVersions).toHaveBeenCalledOnceWith('nginx', '', NEWEST_FIRST, 0, 10);
     }));
   });
 
@@ -299,34 +278,34 @@ describe('HelmChartsVersionListComponent', () => {
 
     it('deletes the version, toasts and reloads the versions while others remain', fakeAsync(() => {
       selectRepo();
-      helmService.getChartVersions.calls.reset();
+      helmService.fetchChartVersions.calls.reset();
       component.deleteVersion(OLD);
 
       dangerModalService.call();
 
       expect(helmService.deleteChart).toHaveBeenCalledOnceWith('nginx', '1.0.0');
       expect(toastService.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
-      expect(helmService.getChartVersions).toHaveBeenCalledTimes(1);
+      expect(helmService.fetchChartVersions).toHaveBeenCalledTimes(1);
       expect(router.navigate).not.toHaveBeenCalled();
       expect(component.loading).toBeFalse();
     }));
 
     it('leaves the listing when the only version is deleted', fakeAsync(() => {
-      helmService.getChartVersions.and.returnValue(of([OLD]));
+      helmService.fetchChartVersions.and.returnValue(of(page([OLD])));
       selectRepo();
-      helmService.getChartVersions.calls.reset();
+      helmService.fetchChartVersions.calls.reset();
       component.deleteVersion(OLD);
 
       dangerModalService.call();
 
       expect(helmService.deleteChart).toHaveBeenCalledOnceWith('nginx', '1.0.0');
       expect(router.navigate).toHaveBeenCalledOnceWith(['..'], { relativeTo: route });
-      expect(helmService.getChartVersions).not.toHaveBeenCalled();
+      expect(helmService.fetchChartVersions).not.toHaveBeenCalled();
     }));
 
     it('neither toasts, navigates nor reloads when the delete fails', fakeAsync(() => {
       selectRepo();
-      helmService.getChartVersions.calls.reset();
+      helmService.fetchChartVersions.calls.reset();
       helmService.deleteChart.and.returnValue(throwError(() => 'boom'));
       component.deleteVersion(OLD);
 
@@ -334,7 +313,7 @@ describe('HelmChartsVersionListComponent', () => {
 
       expect(toastService.show).not.toHaveBeenCalled();
       expect(router.navigate).not.toHaveBeenCalled();
-      expect(helmService.getChartVersions).not.toHaveBeenCalled();
+      expect(helmService.fetchChartVersions).not.toHaveBeenCalled();
       expect(component.loading).toBeFalse();
     }));
   });
@@ -350,7 +329,7 @@ describe('HelmChartsVersionListComponent', () => {
       selectRepo();
 
       expect(watched.observed).toBeFalse();
-      expect(helmService.getChartVersions).toHaveBeenCalledTimes(1);
+      expect(helmService.fetchChartVersions).toHaveBeenCalledTimes(1);
     }));
   });
 

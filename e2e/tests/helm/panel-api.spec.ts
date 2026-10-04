@@ -41,9 +41,10 @@ import { parse as parseYaml } from 'yaml';
 
 import {
   callOperation,
-  expectContract,
+  expectBare,
   expectCovers,
   expectFailure,
+  expectNoContent,
   expectPagingSweep,
 } from '../../src/api/contract-checks.js';
 import { RepoType } from '../../src/api/panel-api.js';
@@ -69,7 +70,8 @@ import type { Seeder } from '../../src/seed/seeder.js';
 /** Every operation of the Helm panel API this spec calls; a route the spec gains must be added (or the check below fails). */
 const EXERCISED = [
   'searchHelmCharts',
-  'getHelmChartVersions',
+  'getHelmChart',
+  'listHelmChartVersions',
   'getHelmChartDetail',
   'getHelmChartOciTags',
   'deleteHelmChartVersion',
@@ -250,7 +252,7 @@ async function indexOf(session: Session) {
 
 const chartValues = (session: Session, chartName: string, version?: string) => ({
   repoName: session.repoName,
-  chartName,
+  packageName: chartName,
   ...(version ? { version } : {}),
 });
 
@@ -267,22 +269,24 @@ interface Detail {
 }
 
 async function detailOf(session: Session, chartName: string, version: string): Promise<Detail> {
-  return expectContract(
+  return expectBare(
     'getHelmChartDetail',
     await callOperation('getHelmChartDetail', chartValues(session, chartName, version)),
   ) as Detail;
 }
 
 async function versionsOf(session: Session, chartName: string): Promise<string[]> {
-  const rows = expectContract(
-    'getHelmChartVersions',
-    await callOperation('getHelmChartVersions', chartValues(session, chartName)),
-  ) as { version: string }[];
-  return rows.map((row) => row.version).sort();
+  const page = expectBare(
+    'listHelmChartVersions',
+    await callOperation('listHelmChartVersions', chartValues(session, chartName), {
+      query: 'size=100',
+    }),
+  ) as { content: { version: string }[] };
+  return page.content.map((row) => row.version).sort();
 }
 
 async function chartNames(session: Session): Promise<string[]> {
-  const page = expectContract(
+  const page = expectBare(
     'searchHelmCharts',
     await callOperation('searchHelmCharts', { repoName: session.repoName }, { query: 'size=100' }),
   ) as { content: { name: string }[] };
@@ -319,7 +323,7 @@ test.describe('the Helm panel API against what helm pushed', () => {
     await pushClassic(session, lib2);
 
     // GET /charts/{repo}: one row per chart, the newest version as `latestVersion`.
-    const found = expectContract(
+    const found = expectBare(
       'searchHelmCharts',
       await callOperation('searchHelmCharts', { repoName: session.repoName }),
     ) as {
@@ -339,12 +343,21 @@ test.describe('the Helm panel API against what helm pushed', () => {
       type: 'application',
     });
 
-    // GET .../{chart}: every version with the fields `helm show chart` prints, and the digest and size of the
+    // GET .../{chart}: the summary, the name and the newest version.
+    expect(
+      expectBare('getHelmChart', await callOperation('getHelmChart', chartValues(session, web))),
+    ).toMatchObject({ name: web, latestVersion: '1.1.0', description: `panel contract ${web}` });
+
+    // GET .../{chart}/versions: every version with the fields `helm show chart` prints, and the digest and size of the
     // stored chart file.
-    const webVersions = expectContract(
-      'getHelmChartVersions',
-      await callOperation('getHelmChartVersions', chartValues(session, web)),
-    ) as (Detail & { createdAt: string })[];
+    const webVersionsPage = expectBare(
+      'listHelmChartVersions',
+      await callOperation('listHelmChartVersions', chartValues(session, web), {
+        query: 'size=100',
+      }),
+    ) as { content: (Detail & { createdAt: string })[]; page: { totalElements: number } };
+    const webVersions = webVersionsPage.content;
+    expect(webVersionsPage.page.totalElements).toBe(2);
     expect(webVersions.map((item) => item.version).sort()).toEqual(['1.0.0', '1.1.0']);
     for (const chart of [web1, web2]) {
       const item = webVersions.find((entry) => entry.version === chart.version);
@@ -357,10 +370,14 @@ test.describe('the Helm panel API against what helm pushed', () => {
       });
       expect(item?.type, `type of ${chart.version}`).toBe(chart.type);
     }
-    const libVersions = expectContract(
-      'getHelmChartVersions',
-      await callOperation('getHelmChartVersions', chartValues(session, lib)),
-    ) as Detail[];
+    const libVersions = (
+      expectBare(
+        'listHelmChartVersions',
+        await callOperation('listHelmChartVersions', chartValues(session, lib), {
+          query: 'size=100',
+        }),
+      ) as { content: Detail[] }
+    ).content;
     expect(libVersions.map((item) => item.version).sort()).toEqual(['0.1.0', '0.2.0']);
     expect(libVersions.find((item) => item.version === '0.1.0')?.type).toBe('library');
     expect(libVersions.find((item) => item.version === '0.1.0')?.appVersion).toBeUndefined();
@@ -420,7 +437,7 @@ test.describe('the Helm panel API against what helm pushed', () => {
     }
 
     // GET .../{chart}/tags: the OCI tags and manifest digests of an OCI chart, nothing for a classic chart.
-    const webTags = expectContract(
+    const webTags = expectBare(
       'getHelmChartOciTags',
       await callOperation('getHelmChartOciTags', chartValues(session, web)),
     ) as string[];
@@ -428,7 +445,7 @@ test.describe('the Helm panel API against what helm pushed', () => {
       expect.arrayContaining(['1.0.0', '1.1.0', ...manifestDigests.values()]),
     );
     expect(
-      expectContract(
+      expectBare(
         'getHelmChartOciTags',
         await callOperation('getHelmChartOciTags', chartValues(session, lib)),
       ),
@@ -457,12 +474,9 @@ test.describe('the Helm panel API against what helm pushed', () => {
       401,
       'loginRequired',
     );
-    expectFailure(
-      'getHelmChartVersions',
-      await callOperation('getHelmChartVersions', missing),
-      404,
-      'chartNotFound',
-    );
+    for (const operation of ['getHelmChart', 'listHelmChartVersions']) {
+      expectFailure(operation, await callOperation(operation, missing), 404, 'chartNotFound');
+    }
     expectFailure(
       'getHelmChartOciTags',
       await callOperation('getHelmChartOciTags', missing),
@@ -507,10 +521,11 @@ test.describe('the Helm panel API against what helm pushed', () => {
       operationId: 'searchHelmCharts',
       values: { repoName: repo.name },
       total: 5,
+      bare: true,
       keyOf: (item) => item.name,
       sorts: [{ property: 'name', value: (item) => item.name }],
     });
-    const narrowed = expectContract(
+    const narrowed = expectBare(
       'searchHelmCharts',
       await callOperation('searchHelmCharts', { repoName: repo.name }, { query: 'q=pkg-3' }),
     ) as { content: { name: string }[] };
@@ -529,7 +544,7 @@ test.describe('the Helm panel API against what helm pushed', () => {
     expect(await versionsOf(session, web)).toEqual(['1.0.0', '1.1.0']);
     expect(indexEntry(await indexOf(session), web, '1.0.0')).toBeDefined();
 
-    expectContract(
+    expectNoContent(
       'deleteHelmChartVersion',
       await callOperation('deleteHelmChartVersion', chartValues(session, web, '1.0.0')),
     );
@@ -542,7 +557,7 @@ test.describe('the Helm panel API against what helm pushed', () => {
       404,
       'chartNotFound',
     );
-    const tags = expectContract(
+    const tags = expectBare(
       'getHelmChartOciTags',
       await callOperation('getHelmChartOciTags', chartValues(session, web)),
     ) as string[];
@@ -587,14 +602,14 @@ test.describe('the Helm panel API against what helm pushed', () => {
     expect(sha256(await pulledBytes(session, 'classic', web, '1.1.0'))).toBe(sha256(web2.tgz));
 
     // Deleting the last version removes the chart itself.
-    expectContract(
+    expectNoContent(
       'deleteHelmChartVersion',
       await callOperation('deleteHelmChartVersion', chartValues(session, web, '1.1.0')),
     );
     expect(await chartNames(session)).toEqual([]);
     expectFailure(
-      'getHelmChartVersions',
-      await callOperation('getHelmChartVersions', chartValues(session, web)),
+      'listHelmChartVersions',
+      await callOperation('listHelmChartVersions', chartValues(session, web)),
       404,
       'chartNotFound',
     );
@@ -617,7 +632,7 @@ test.describe('the Helm panel API against what helm pushed', () => {
     const keptBefore = await detailOf(session, keep, '3.0.0');
     const lib2Stored = (await detailOf(session, lib, '0.2.0')).digest;
 
-    expectContract(
+    expectNoContent(
       'deleteHelmChartVersion',
       await callOperation('deleteHelmChartVersion', chartValues(session, lib, '0.1.0')),
     );
@@ -643,14 +658,14 @@ test.describe('the Helm panel API against what helm pushed', () => {
     );
 
     // The whole chart.
-    expectContract(
+    expectNoContent(
       'deleteAllHelmChartVersions',
       await callOperation('deleteAllHelmChartVersions', chartValues(session, lib)),
     );
     expect(await chartNames(session)).toEqual([keep]);
     expectFailure(
-      'getHelmChartVersions',
-      await callOperation('getHelmChartVersions', chartValues(session, lib)),
+      'listHelmChartVersions',
+      await callOperation('listHelmChartVersions', chartValues(session, lib)),
       404,
       'chartNotFound',
     );

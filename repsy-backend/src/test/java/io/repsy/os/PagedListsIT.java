@@ -314,6 +314,13 @@ class PagedListsIT extends AbstractIntegrationTest {
               "createdAt",
               "lastUpdatedAt"),
           list(
+              "listHelmChartVersions",
+              RepoType.HELM,
+              "/api/helm/charts/{repo}/alpha/versions",
+              true,
+              "version",
+              "createdAt"),
+          list(
               "listVulnerabilityScans",
               RepoType.MAVEN,
               "/api/repos/{repo}/artifacts/alpha/versions/1.0.0/scans",

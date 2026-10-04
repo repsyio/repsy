@@ -3867,7 +3867,7 @@ search`/`install`/`pull <repo>/<chart>`, or a raw `helm pull --repo`) 404s (`cha
   original finding)** — There was no
   `GET /v2/<repo>/<name>/tags/list` handler at all (`404` with OCI code `NAME_UNKNOWN`, msgId
   `unknownPath`), although `HelmFacade.listTags`/`HelmOciTagListDto` exist (used only by the panel's
-  own `GET /api/helm/charts/{repo}/{chartName}/tags`). Helm's own `ValidateReference` calls `Tags(...)`
+  own `GET /api/helm/charts/{repo}/{packageName}/tags`). Helm's own `ValidateReference` calls `Tags(...)`
   whenever `--version` is empty or a semver CONSTRAINT, so a real `helm pull`/`install`/`show
 oci://.../<chart>` without an EXACT version fails outright against Repsy. Confirmed live: "HL2",
   "R8".
