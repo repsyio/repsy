@@ -16,7 +16,6 @@
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { problemDetail } from '../../../shared/error-handler/problem.util';
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -25,6 +24,7 @@ import { finalize } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { LoginForm } from '../../../../generated/api';
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
+import { problemDetail } from '../../../shared/error-handler/problem.util';
 import { idFactory } from '../../../shared/util/unique-id';
 import {
   LOGIN_PASSWORD_MESSAGES,

@@ -16,7 +16,6 @@
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { problemDetail } from '../../../../../../shared/error-handler/problem.util';
 import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
@@ -26,6 +25,7 @@ import { environment } from '../../../../../../../environments/environment';
 import { NuGetPackageListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
+import { problemDetail } from '../../../../../../shared/error-handler/problem.util';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';

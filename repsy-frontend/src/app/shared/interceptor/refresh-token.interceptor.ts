@@ -15,7 +15,6 @@
 ///
 
 import { HttpErrorResponse, HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
-import { problemCode } from '../error-handler/problem.util';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { EMPTY, Observable, throwError } from 'rxjs';
@@ -24,6 +23,7 @@ import { catchError, finalize, share, switchMap } from 'rxjs/operators';
 import { AuthService } from '../../auth/pages/service/auth.service';
 import { loginUrlReturningTo } from '../../auth/util/return-url';
 import { ToastService } from '../../panel/shared/components/toast/toast.service';
+import { problemCode } from '../error-handler/problem.util';
 
 const LOGIN_PATH = '/api/auth/login';
 const REFRESH_PATH = '/api/auth/tokens/refresh';
