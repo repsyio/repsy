@@ -26,13 +26,12 @@ import {
   VulnerabilityScanDetail,
   VulnerabilityScanInfo,
 } from '../../../../../generated/api';
-import { restResponse } from '../../../pages/repository/testing/protocol-service-spec-helpers';
 import { SecurityScanSupportService } from '../../service/security-scan-support.service';
 import { ToastService } from '../toast/toast.service';
 import { SecurityScanSectionComponent } from './security-scan-section.component';
 
 const REPO = 'acme-repo';
-const reply = (data: unknown): never => of(restResponse(data)) as never;
+const reply = (data: unknown): never => of(data) as never;
 
 /** RPS-1339: what the rendered failed state shows next to the Re-scan action. */
 describe('SecurityScanSectionComponent failed state', () => {

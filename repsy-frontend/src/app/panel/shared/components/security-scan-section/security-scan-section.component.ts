@@ -21,6 +21,7 @@ import { Observable, Subscription } from 'rxjs';
 import { finalize, map } from 'rxjs/operators';
 
 import {
+  PagedModelVulnerabilityScanInfo,
   ScanOverview,
   ScanStatus,
   Severity,
@@ -33,6 +34,7 @@ import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.
 import { SecurityScanSupportService } from '../../service/security-scan-support.service';
 import { pollUntilTerminal } from '../../util/poll-until-terminal.util';
 import { scanStatusLabel } from '../../util/scan-status-label.util';
+import { splitScopedArtifactName } from '../../util/scoped-artifact.util';
 import { PaginationComponent } from '../pagination/pagination.component';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { ScanFailureReasonComponent } from '../scan-failure-reason/scan-failure-reason.component';
@@ -224,8 +226,21 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
 
   public triggerScan(): void {
     this.triggering = true;
-    this.vulnerabilityScanControllerService
-      .triggerVulnerabilityScan(this.artifactName, this.artifactVersion, this.repoName)
+    const scoped = splitScopedArtifactName(this.artifactName);
+    const trigger$ = scoped
+      ? this.vulnerabilityScanControllerService.triggerScopedVulnerabilityScan(
+          scoped.scope,
+          scoped.name,
+          this.artifactVersion,
+          this.repoName,
+        )
+      : this.vulnerabilityScanControllerService.triggerVulnerabilityScan(
+          this.artifactName,
+          this.artifactVersion,
+          this.repoName,
+        );
+
+    trigger$
       .pipe(
         finalize(() => {
           this.triggering = false;
@@ -249,14 +264,47 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     return !ACTIVE_STATUSES.includes(this.overview?.status ?? ScanStatus.Completed);
   }
 
+  private listScansPage(): Observable<PagedModelVulnerabilityScanInfo> {
+    const scoped = splitScopedArtifactName(this.artifactName);
+
+    return scoped
+      ? this.vulnerabilityScanControllerService.listScopedVulnerabilityScans(
+          scoped.scope,
+          scoped.name,
+          this.artifactVersion,
+          this.repoName,
+          this.pageNum,
+          PAGE_SIZE,
+        )
+      : this.vulnerabilityScanControllerService.listVulnerabilityScans(
+          this.artifactName,
+          this.artifactVersion,
+          this.repoName,
+          this.pageNum,
+          PAGE_SIZE,
+        );
+  }
+
+  private fetchOverview(): Observable<ScanOverview> {
+    const scoped = splitScopedArtifactName(this.artifactName);
+
+    return scoped
+      ? this.vulnerabilityScanControllerService.getScopedScanOverview(
+          scoped.scope,
+          scoped.name,
+          this.artifactVersion,
+          this.repoName,
+        )
+      : this.vulnerabilityScanControllerService.getScanOverview(this.artifactName, this.artifactVersion, this.repoName);
+  }
+
   private refresh(): void {
     this.loading = true;
     this.overview = null;
     this.selectedScan = null;
     this.stopPolling();
 
-    this.vulnerabilityScanControllerService
-      .listVulnerabilityScans(this.artifactName, this.artifactVersion, this.repoName, this.pageNum, PAGE_SIZE)
+    this.listScansPage()
       .pipe(
         finalize(() => {
           this.loading = false;
@@ -264,8 +312,8 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
       )
       .subscribe({
         next: (response) => {
-          this.scans = response.data?.content ?? [];
-          this.totalPages = response.data?.page?.totalPages ?? 0;
+          this.scans = response?.content ?? [];
+          this.totalPages = response?.page?.totalPages ?? 0;
           this.neverScanned = this.scans.length === 0 && this.pageNum === 0;
 
           if (!this.neverScanned) {
@@ -279,8 +327,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
   private loadScans(): void {
     this.loading = true;
 
-    this.vulnerabilityScanControllerService
-      .listVulnerabilityScans(this.artifactName, this.artifactVersion, this.repoName, this.pageNum, PAGE_SIZE)
+    this.listScansPage()
       .pipe(
         finalize(() => {
           this.loading = false;
@@ -288,19 +335,17 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
       )
       .subscribe({
         next: (response) => {
-          this.scans = response.data?.content ?? [];
-          this.totalPages = response.data?.page?.totalPages ?? 0;
+          this.scans = response?.content ?? [];
+          this.totalPages = response?.page?.totalPages ?? 0;
         },
         error: () => {},
       });
   }
 
   private loadOverview(): void {
-    this.vulnerabilityScanControllerService
-      .getScanOverview(this.artifactName, this.artifactVersion, this.repoName)
-      .subscribe({
+    this.fetchOverview().subscribe({
         next: (response) => {
-          this.overview = response.data ?? null;
+          this.overview = response ?? null;
 
           if (this.overview?.scanId) {
             this.loadScanDetail(this.overview.scanId);
@@ -315,7 +360,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
   private loadScanDetail(scanId: string): void {
     this.vulnerabilityScanControllerService.getVulnerabilityScan(scanId, this.repoName).subscribe({
       next: (response) => {
-        this.selectedScan = response.data ?? null;
+        this.selectedScan = response ?? null;
         this.findingsPageNum = 0;
         this.loadFindings(scanId);
       },
@@ -337,9 +382,9 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
       )
       .subscribe({
         next: (response) => {
-          this.findings = response.data?.content ?? [];
-          this.findingsTotalPages = response.data?.page?.totalPages ?? 0;
-          this.findingsTotalCount = response.data?.page?.totalElements ?? this.findings.length;
+          this.findings = response?.content ?? [];
+          this.findingsTotalPages = response?.page?.totalPages ?? 0;
+          this.findingsTotalCount = response?.page?.totalElements ?? this.findings.length;
         },
         error: () => {},
       });
@@ -402,11 +447,9 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
   }
 
   private refreshOverviewSeverity(): void {
-    this.vulnerabilityScanControllerService
-      .getScanOverview(this.artifactName, this.artifactVersion, this.repoName)
-      .subscribe({
+    this.fetchOverview().subscribe({
         next: (response) => {
-          this.overview = response.data ?? this.overview;
+          this.overview = response ?? this.overview;
         },
         error: () => {},
       });
@@ -424,7 +467,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
       () =>
         this.vulnerabilityScanControllerService
           .getVulnerabilityScan(scanId, this.repoName)
-          .pipe(map((response) => response.data!)),
+          .pipe(map((response) => response!)),
       (detail) => TERMINAL_STATUSES.includes(detail.status!),
       POLL_INTERVAL_MS,
     ).subscribe((detail) => this.applyRefreshedScan(detail));

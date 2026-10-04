@@ -134,7 +134,7 @@ Repsy can scan pushed artifacts (Maven, npm, PyPI, Docker) for known vulnerabili
 
 The scanner is published with every release as `repo.repsy.io/repsy/os/repsy-scanner-trivy`, under the same tags as the application image (`repo.repsy.io/repsy/os/repsy`): a release tag without the leading `v` (for example `26.10.0`) and `latest`. Run the application and the scanner of the **same release**: the HTTP contract between them (`POST /scan`, `GET /scan/{scanId}`, the `X-Scanner-Api-Key` header) is not versioned, so a mixed pair is not supported. [`examples/docker-compose.scanner.yml`](./examples/docker-compose.scanner.yml) is a complete Compose example (PostgreSQL, Repsy, the scanner and the `trivy-cache` volume) that pins both images with one `REPSY_VERSION`.
 
-Each repository has a security scan setting that controls whether newly pushed versions are scanned automatically. It does not block manual scans: a version can always be scanned on demand from the panel or with `POST /api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan`, even when the repository's setting is off.
+Each repository has a security scan setting that controls whether newly pushed versions are scanned automatically. It does not block manual scans: a version can always be scanned on demand from the panel or with `POST /api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan` (a scoped npm package: `POST /api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/versions/{version}/scan`; both answer 202 with a `Location` of the scan status resource), even when the repository's setting is off.
 
 ### What a scan covers
 

@@ -57,13 +57,6 @@ class MessagesBundleTest {
         "profileFetched",
         "tokenRefreshed",
         "keyStoresFetched",
-        // Security
-        "artifactSecurityDetailFetched",
-        "artifactSecuritySummaryFetched",
-        "repoSecurityDetailFetched",
-        "securitySummaryFetched",
-        "versionSecuritySummaryFetched",
-        "scanFindingsFetched",
         // Helm
         "chartsFetched",
         "chartDetailFetched",

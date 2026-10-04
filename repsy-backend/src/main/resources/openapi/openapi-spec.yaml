@@ -928,7 +928,59 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelVulnerabilityScanInfo"
+                "$ref": "#/components/schemas/PagedModelVulnerabilityScanInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: List the vulnerability scan history of an artifact version
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/versions/{version}/scans":
+    get:
+      tags:
+        - vulnerability-scan-controller
+      operationId: listScopedVulnerabilityScans
+      description: >-
+        Sortable by `createdAt` (`property,direction`). The default is `createdAt,desc`.
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the artifact is `@scope/artifactName`.
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PagedModelVulnerabilityScanInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -969,7 +1021,57 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseScanOverview"
+                "$ref": "#/components/schemas/ScanOverview"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get the severity breakdown of an artifact version
+      description: >-
+        The scanId, status and scannedAt describe the version's newest scan, whatever its status.
+        The counters describe its newest COMPLETED scan (see lastCompletedAt), so they stay the last
+        known values while a rescan is pending, queued, running or failed, and are all zero only
+        when the version has no completed scan or its completed scan found nothing.
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/versions/{version}/scan-overview":
+    get:
+      tags:
+        - vulnerability-scan-controller
+      operationId: getScopedScanOverview
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the artifact is `@scope/artifactName`.
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ScanOverview"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1005,12 +1107,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseVulnerabilityScanInfo"
+        '202':
+          "$ref": "#/components/responses/Accepted"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1023,13 +1121,65 @@ paths:
           "$ref": "#/components/responses/TooManyRequests"
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Manually trigger a vulnerability re-scan for an artifact version
+      summary: Manually trigger a vulnerability re-scan for an artifact version (the scan runs in the background)
       description: >-
         Scans the version regardless of the repository's `securityScanEnabled` setting: that setting
         only governs the automatic scan on push, and a manual scan is an explicit override. Answers
         400 `scannerDisabled` instead when vulnerability scanning itself is off
         (`SECURITY_SCANNER=disabled`, the default): no scanner is running, so there is nothing to
-        record a result for.
+        record a result for. The 202 answer has no body; its `Location` header is the scan
+        status resource, `GET /api/repos/{repoName}/scans/{scanId}`.
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/versions/{version}/scan":
+    post:
+      tags:
+        - vulnerability-scan-controller
+      operationId: triggerScopedVulnerabilityScan
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the artifact is `@scope/artifactName`.
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          "$ref": "#/components/responses/Accepted"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Manually trigger a vulnerability re-scan for an artifact version (the scan runs in the background)
+      description: >-
+        Scans the version regardless of the repository's `securityScanEnabled` setting: that setting
+        only governs the automatic scan on push, and a manual scan is an explicit override. Answers
+        400 `scannerDisabled` instead when vulnerability scanning itself is off
+        (`SECURITY_SCANNER=disabled`, the default): no scanner is running, so there is nothing to
+        record a result for. The 202 answer has no body; its `Location` header is the scan
+        status resource, `GET /api/repos/{repoName}/scans/{scanId}`.
     parameters:
       - name: repoName
         in: path
@@ -1056,7 +1206,47 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVersionSecuritySummaryMap"
+                "$ref": "#/components/schemas/VersionSecuritySummaryMap"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get every version's latest-scan severity and finding count for one artifact, in a single call
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/security-summary":
+    get:
+      tags:
+        - vulnerability-scan-controller
+      operationId: getScopedVersionSecuritySummary
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the artifact is `@scope/artifactName`.
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/VersionSecuritySummaryMap"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1084,7 +1274,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVersionSecuritySummaryMap"
+                "$ref": "#/components/schemas/VersionSecuritySummaryMap"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1119,7 +1309,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVulnerabilityScanDetail"
+                "$ref": "#/components/schemas/VulnerabilityScanDetail"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1162,7 +1352,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelVulnerabilityFindingInfo"
+                "$ref": "#/components/schemas/PagedModelVulnerabilityFindingInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1192,7 +1382,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseRepoSecurityDetail"
+                "$ref": "#/components/schemas/RepoSecurityDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1226,7 +1416,47 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseRepoSecurityDetail"
+                "$ref": "#/components/schemas/RepoSecurityDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get one artifact's severity breakdown (each version's latest completed scan) plus its most recently scanned versions
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/security-detail":
+    get:
+      tags:
+        - vulnerability-scan-controller
+      operationId: getScopedArtifactSecurityDetail
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the artifact is `@scope/artifactName`.
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RepoSecurityDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1261,7 +1491,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseSecuritySummary"
+                "$ref": "#/components/schemas/SecuritySummary"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Get the worst known severity per repo, across each artifact version's latest completed scan
@@ -1300,7 +1530,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelVulnerabilityScanInfo"
+                "$ref": "#/components/schemas/PagedModelVulnerabilityScanInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1333,7 +1563,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseSecurityScansSummary"
+                "$ref": "#/components/schemas/SecurityScansSummary"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1353,7 +1583,9 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseListString"
+                type: array
+                items:
+                  type: string
       summary: List repo types (e.g. MAVEN, NPM) that have a registered vulnerability scanner, single source of truth for gating scan-related UI/behavior
   # region: cargo
   "/api/cargo/crates/{repoName}":
@@ -5459,20 +5691,6 @@ components:
       type: object
       additionalProperties:
         "$ref": "#/components/schemas/RepoSecuritySummary"
-    RestResponseSecuritySummary:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/SecuritySummary"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     VersionSecuritySummary:
       type: object
       properties:
@@ -5532,20 +5750,6 @@ components:
       type: object
       additionalProperties:
         "$ref": "#/components/schemas/VersionSecuritySummary"
-    RestResponseVersionSecuritySummaryMap:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/VersionSecuritySummaryMap"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelVulnerabilityScanInfo:
       type: object
       properties:
@@ -5555,20 +5759,6 @@ components:
             "$ref": "#/components/schemas/VulnerabilityScanInfo"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelVulnerabilityScanInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelVulnerabilityScanInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelVulnerabilityFindingInfo:
       type: object
       properties:
@@ -5578,20 +5768,6 @@ components:
             "$ref": "#/components/schemas/VulnerabilityFindingInfo"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelVulnerabilityFindingInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelVulnerabilityFindingInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     RecentScannedVersion:
       type: object
       properties:
@@ -5645,20 +5821,6 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/RecentScannedVersion"
-    RestResponseRepoSecurityDetail:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/RepoSecurityDetail"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     SecurityScansSummary:
       type: object
       properties:
@@ -5680,62 +5842,6 @@ components:
         totalCount:
           type: integer
           format: int32
-    RestResponseSecurityScansSummary:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/SecurityScansSummary"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseVulnerabilityScanInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/VulnerabilityScanInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseVulnerabilityScanDetail:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/VulnerabilityScanDetail"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseScanOverview:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/ScanOverview"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: cargo
     CrateListItem:
       type: object

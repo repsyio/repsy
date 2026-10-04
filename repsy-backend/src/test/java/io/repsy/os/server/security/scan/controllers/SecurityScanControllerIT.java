@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.security.scan.controllers;
 
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectBare;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.doReturn;
@@ -383,16 +384,15 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
   // ---------------------------------------------------------------------------------------------
 
   private static String expectScans(final ResultActions result) throws Exception {
-    return expectSuccess(result, "scansFetched", "Vulnerability scans fetched.");
+    return expectBare(result);
   }
 
   private static String expectSummary(final ResultActions result) throws Exception {
-    return expectSuccess(result, "scansSummaryFetched", "Vulnerability scans summary fetched.");
+    return expectBare(result);
   }
 
   private static String expectSupportedRepoTypes(final ResultActions result) throws Exception {
-    return expectSuccess(
-        result, "supportedRepoTypesFetched", "Supported repository types fetched.");
+    return expectBare(result);
   }
 
   private static void expectAccessNotAllowed(final ResultActions result) throws Exception {
@@ -432,7 +432,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
       final int number,
       final long totalElements,
       final int pages) {
-    final Map<String, Object> page = JsonPath.read(body, "$.data.page");
+    final Map<String, Object> page = JsonPath.read(body, "$.page");
     assertThat(page).containsOnlyKeys(PAGE_KEYS);
     assertThat(number(page.get("size"))).isEqualTo(size);
     assertThat(number(page.get("number"))).isEqualTo(number);
@@ -442,12 +442,12 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
 
   /** Asserts the {@code PagedModel} wrapper has exactly {@code content} and {@code page}. */
   private static void assertPagedModelShape(final String body) {
-    final Map<String, Object> data = JsonPath.read(body, "$.data");
+    final Map<String, Object> data = JsonPath.read(body, "$");
     assertThat(data).containsOnlyKeys("content", "page");
   }
 
   private static List<Map<String, Object>> content(final String body) {
-    return JsonPath.read(body, "$.data.content");
+    return JsonPath.read(body, "$.content");
   }
 
   private static List<String> artifactVersions(final String body) {
@@ -461,7 +461,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
       final int medium,
       final int low,
       final int unknown) {
-    final Map<String, Object> data = JsonPath.read(body, "$.data");
+    final Map<String, Object> data = JsonPath.read(body, "$");
     assertThat(data).containsOnlyKeys(SUMMARY_KEYS);
     assertThat(number(data.get("criticalCount"))).isEqualTo(critical);
     assertThat(number(data.get("highCount"))).isEqualTo(high);
@@ -1578,8 +1578,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
       final var body = expectSummary(t.getSummary(t.seededAdminBearerToken()));
 
       assertSummary(body, 2, 2, 1, 3, 1);
-      assertThat((Map<String, Object>) JsonPath.read(body, "$.data"))
-          .containsEntry("totalCount", 9);
+      assertThat((Map<String, Object>) JsonPath.read(body, "$")).containsEntry("totalCount", 9);
     }
 
     @Test
@@ -1844,7 +1843,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
   class SupportedRepoTypes {
 
     private void assertSupportedTypes(final String body) {
-      final List<String> types = JsonPath.read(body, "$.data");
+      final List<String> types = JsonPath.read(body, "$");
       assertThat(types).containsExactlyInAnyOrderElementsOf(STUB_SCANNER_REPO_TYPES);
     }
 
@@ -1857,7 +1856,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
 
       assertSupportedTypes(body);
       // The response is a plain JSON array of strings, not wrapped in an object.
-      assertThat((Object) JsonPath.read(body, "$.data")).isInstanceOf(List.class);
+      assertThat((Object) JsonPath.read(body, "$")).isInstanceOf(List.class);
       assertThat(SecurityScanControllerIT.this.scannerRegistry.getSupportedRepoTypes())
           .isEqualTo(STUB_SCANNER_REPO_TYPES);
     }
@@ -1869,7 +1868,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
           expectSupportedRepoTypes(
               SecurityScanControllerIT.this.perform(get(SUPPORTED_REPO_TYPES_PATH)));
 
-      final List<String> types = JsonPath.read(body, "$.data");
+      final List<String> types = JsonPath.read(body, "$");
       assertThat(types).allSatisfy(type -> assertThat(RepoType.valueOf(type)).isNotNull());
     }
 
@@ -1946,7 +1945,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
           expectSupportedRepoTypes(
               SecurityScanControllerIT.this.perform(get(SUPPORTED_REPO_TYPES_PATH)));
 
-      assertThat((List<?>) JsonPath.read(body, "$.data")).isEmpty();
+      assertThat((List<?>) JsonPath.read(body, "$")).isEmpty();
     }
 
     @Test
@@ -1960,7 +1959,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
           expectSupportedRepoTypes(
               SecurityScanControllerIT.this.perform(get(SUPPORTED_REPO_TYPES_PATH)));
 
-      assertThat((List<String>) JsonPath.read(body, "$.data")).containsExactly("CARGO");
+      assertThat((List<String>) JsonPath.read(body, "$")).containsExactly("CARGO");
     }
   }
 
