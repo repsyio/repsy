@@ -112,13 +112,13 @@ class NpmListOrderIT extends AbstractIntegrationTest {
 
     final var panel =
         this.perform(
-                get("/api/npm/packages/{repo}/package/{package}/tags", repo.getName(), PACKAGE)
+                get("/api/npm/packages/{repo}/{package}/tags", repo.getName(), PACKAGE)
                     .header(AUTHORIZATION, this.adminBearerToken()))
             .andReturn()
             .getResponse()
             .getContentAsString();
 
-    assertThat(JsonPath.<List<String>>read(panel, "$.data[*].tag"))
+    assertThat(JsonPath.<List<String>>read(panel, "$[*].tag"))
         .containsExactly("beta", "latest", "zulu");
   }
 
@@ -158,9 +158,9 @@ class NpmListOrderIT extends AbstractIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(JsonPath.<List<String>>read(panel, "$.data.keywords[*].keyword"))
+    assertThat(JsonPath.<List<String>>read(panel, "$.keywords[*].keyword"))
         .containsExactly("zeta", "alpha", "mid");
-    assertThat(JsonPath.<List<String>>read(panel, "$.data.maintainers[*].name"))
+    assertThat(JsonPath.<List<String>>read(panel, "$.maintainers[*].name"))
         .containsExactly("zed", "amy", "moe");
   }
 

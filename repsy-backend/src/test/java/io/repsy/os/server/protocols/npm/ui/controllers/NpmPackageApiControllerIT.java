@@ -20,12 +20,12 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
-import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -168,42 +168,40 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}", repoName))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("packagesFetched"))
-          .andExpect(jsonPath("$.type").value("SUCCESS"))
-          .andExpect(jsonPath("$.data.content", hasSize(3)))
-          .andExpect(jsonPath("$.data.page.size").value(10))
-          .andExpect(jsonPath("$.data.page.number").value(0))
-          .andExpect(jsonPath("$.data.page.totalElements").value(3))
-          .andExpect(jsonPath("$.data.page.totalPages").value(1));
+          .andExpect(jsonPath("$.*", hasSize(2)))
+          .andExpect(jsonPath("$.content", hasSize(3)))
+          .andExpect(jsonPath("$.page.size").value(10))
+          .andExpect(jsonPath("$.page.number").value(0))
+          .andExpect(jsonPath("$.page.totalElements").value(3))
+          .andExpect(jsonPath("$.page.totalPages").value(1));
 
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}", repoName).param("scope", "tools"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].scope").value("tools"));
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].scope").value("tools"));
       NpmPackageApiControllerIT.this
           .perform(
               get("/api/npm/scopes/{repo}/{scope}/packages", repoName, "tools")
                   .param("q", "scoped"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].scope").value("tools"));
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].scope").value("tools"));
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/scopes/{repo}/{scope}/packages", repoName, "tools"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)));
+          .andExpect(jsonPath("$.content", hasSize(1)));
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/scopes/{repo}/packages", repoName))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(2)))
-          .andExpect(jsonPath("$.data.content[*].scope").doesNotExist());
+          .andExpect(jsonPath("$.content", hasSize(2)))
+          .andExpect(jsonPath("$.content[*].scope").doesNotExist());
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}", repoName).param("page", "1").param("size", "1"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.page.size").value(1))
-          .andExpect(jsonPath("$.data.page.totalPages").value(3));
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.page.size").value(1))
+          .andExpect(jsonPath("$.page.totalPages").value(3));
     }
 
     /**
@@ -217,25 +215,25 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
         NpmPackageApiControllerIT.this
             .perform(get("/api/npm/packages/{repo}", repoName).param("scope", term))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.content", hasSize(1)))
-            .andExpect(jsonPath("$.data.content[0].scope").value("tools"))
-            .andExpect(jsonPath("$.data.content[0].name").value("scoped-package"));
+            .andExpect(jsonPath("$.content", hasSize(1)))
+            .andExpect(jsonPath("$.content[0].scope").value("tools"))
+            .andExpect(jsonPath("$.content[0].name").value("scoped-package"));
       }
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}", repoName).param("scope", "plain-package"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].name").value("plain-package"));
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].name").value("plain-package"));
       NpmPackageApiControllerIT.this
           .perform(
               get("/api/npm/scopes/{repo}/{scope}/packages", repoName, "tools")
                   .param("q", "@tools/scoped-package"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)));
+          .andExpect(jsonPath("$.content", hasSize(1)));
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}", repoName).param("scope", "scoped-package/tools"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(0)));
+          .andExpect(jsonPath("$.content", hasSize(0)));
     }
 
     @Test
@@ -243,52 +241,106 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}/plain-package/versions/1.0.0", repoName))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
-          .andExpect(jsonPath("$.data.packageName").value("plain-package"))
-          .andExpect(jsonPath("$.data.distributionTags[0].tagName").value("latest"))
-          .andExpect(jsonPath("$.data.deleted").value(false))
-          .andExpect(jsonPath("$.data.createdAt").value(notNullValue()));
+          .andExpect(jsonPath("$.packageName").value("plain-package"))
+          .andExpect(jsonPath("$.distributionTags[0].tagName").value("latest"))
+          .andExpect(jsonPath("$.deleted").value(false))
+          .andExpect(jsonPath("$.createdAt").value(notNullValue()));
       NpmPackageApiControllerIT.this
           .perform(
               get(
-                  "/api/npm/packages/{repo}/{scope}/{package}/versions/1.0.0",
+                  "/api/npm/scopes/{repo}/{scope}/packages/{package}/versions/1.0.0",
                   repoName,
                   "tools",
                   "scoped-package"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.scopeName").value("tools"))
-          .andExpect(jsonPath("$.data.packageName").value("scoped-package"));
+          .andExpect(jsonPath("$.scopeName").value("tools"))
+          .andExpect(jsonPath("$.packageName").value("scoped-package"));
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}/scope/versions/1.0.0", repoName))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
-          .andExpect(jsonPath("$.data.packageName").value("scope"));
+          .andExpect(jsonPath("$.packageName").value("scope"));
     }
 
     @Test
-    void returnsTheLatestVersionDetailOfAnUnscopedPackageNamedScope() throws Exception {
+    void returnsTheSummaryOfAnUnscopedPackageNamedScope() throws Exception {
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}/{package}", repoName, "scope"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
-          .andExpect(jsonPath("$.data.packageName").value("scope"))
-          .andExpect(jsonPath("$.data.scopeName").doesNotExist())
-          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
-          .andExpect(jsonPath("$.data.content").doesNotExist());
+          .andExpect(jsonPath("$.packageName").value("scope"))
+          .andExpect(jsonPath("$.scopeName").doesNotExist())
+          .andExpect(jsonPath("$.latestVersion").value("1.0.0"))
+          .andExpect(jsonPath("$.content").doesNotExist());
     }
 
     @Test
-    void returnsTheLatestVersionDetailOfAPackageInAScopeNamedScope() throws Exception {
+    void returnsTheSummaryOfAPackageInAScopeNamedScope() throws Exception {
       NpmPackageApiControllerIT.this.publish("scope", "foo", "1.0.0", "latest");
 
       NpmPackageApiControllerIT.this
-          .perform(get("/api/npm/packages/{repo}/{scope}/{package}", repoName, "scope", "foo"))
+          .perform(
+              get("/api/npm/scopes/{repo}/{scope}/packages/{package}", repoName, "scope", "foo"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
-          .andExpect(jsonPath("$.data.scopeName").value("scope"))
-          .andExpect(jsonPath("$.data.packageName").value("foo"))
-          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
-          .andExpect(jsonPath("$.data.content").doesNotExist());
+          .andExpect(jsonPath("$.scopeName").value("scope"))
+          .andExpect(jsonPath("$.packageName").value("foo"))
+          .andExpect(jsonPath("$.latestVersion").value("1.0.0"))
+          .andExpect(jsonPath("$.content").doesNotExist());
+    }
+
+    /** A package or scope may be named like every literal segment; none of them hides it. */
+    @Test
+    void servesPackagesAndScopesNamedLikeTheLiteralSegments() throws Exception {
+      for (final var name : new String[] {"versions", "tags", "packages"}) {
+        NpmPackageApiControllerIT.this.publish(null, name, "1.0.0", "latest");
+        NpmPackageApiControllerIT.this.publish(name, name, "2.0.0", "latest");
+
+        NpmPackageApiControllerIT.this
+            .perform(get("/api/npm/packages/{repo}/{package}", repoName, name))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.packageName").value(name))
+            .andExpect(jsonPath("$.latestVersion").value("1.0.0"));
+        NpmPackageApiControllerIT.this
+            .perform(get("/api/npm/packages/{repo}/{package}/versions/1.0.0", repoName, name))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.versionName").value("1.0.0"));
+        NpmPackageApiControllerIT.this
+            .perform(get("/api/npm/packages/{repo}/{package}/tags", repoName, name))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].tag").value("latest"));
+
+        NpmPackageApiControllerIT.this
+            .perform(get("/api/npm/scopes/{repo}/{scope}/packages/{package}", repoName, name, name))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.scopeName").value(name))
+            .andExpect(jsonPath("$.latestVersion").value("2.0.0"));
+        NpmPackageApiControllerIT.this
+            .perform(
+                get(
+                    "/api/npm/scopes/{repo}/{scope}/packages/{package}/versions/2.0.0",
+                    repoName,
+                    name,
+                    name))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.scopeName").value(name))
+            .andExpect(jsonPath("$.versionName").value("2.0.0"));
+      }
+    }
+
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource({
+      "GET,/api/npm/packages/{repo}/package/plain-package/versions",
+      "GET,/api/npm/packages/{repo}/package/plain-package/tags",
+      "GET,/api/npm/packages/{repo}/tools/scoped-package",
+      "GET,/api/npm/packages/{repo}/tools/package/scoped-package/versions",
+      "GET,/api/npm/packages/{repo}/tools/package/scoped-package/tags",
+      "DELETE,/api/npm/packages/{repo}/tools/scoped-package/versions/1.0.0"
+    })
+    @DisplayName("answers 404 on the routes the scopes tree replaced (RPS-1781)")
+    void removedRoutesAreGone(final HttpMethod method, final String pathTemplate) throws Exception {
+      NpmPackageApiControllerIT.this
+          .perform(
+              request(method, pathTemplate.replace("{repo}", repoName))
+                  .header(AUTHORIZATION, bearerToken(admin, Duration.ofMinutes(30))))
+          .andExpect(status().isNotFound());
     }
 
     @Test
@@ -298,16 +350,15 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/scopes/{repo}/{scope}/packages", repoName, "scope"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("packagesFetched"))
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].scope").value("scope"))
-          .andExpect(jsonPath("$.data.content[0].name").value("foo"));
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].scope").value("scope"))
+          .andExpect(jsonPath("$.content[0].name").value("foo"));
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/scopes/{repo}/packages", repoName).param("q", "scope"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].name").value("scope"))
-          .andExpect(jsonPath("$.data.content[0].scope").doesNotExist());
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].name").value("scope"))
+          .andExpect(jsonPath("$.content[0].scope").doesNotExist());
     }
 
     @Test
@@ -315,28 +366,27 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}/plain-package/versions/1.0.0", repoName))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.id").value(notNullValue()))
-          .andExpect(jsonPath("$.data.packageName").value("plain-package"))
-          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
-          .andExpect(jsonPath("$.data.description").value("integration fixture"))
-          .andExpect(jsonPath("$.data.authorName").value("Repsy"))
-          .andExpect(jsonPath("$.data.authorEmail").value("test@repsy.io"))
-          .andExpect(jsonPath("$.data.license").value("Apache-2.0"))
-          .andExpect(jsonPath("$.data.homepage").value("https://repsy.io"))
-          .andExpect(jsonPath("$.data.deprecated").value(false))
-          .andExpect(
-              jsonPath("$.data.keywords[*].keyword").value(containsInAnyOrder("fixture", "npm")));
+          .andExpect(jsonPath("$.id").value(notNullValue()))
+          .andExpect(jsonPath("$.packageName").value("plain-package"))
+          .andExpect(jsonPath("$.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.description").value("integration fixture"))
+          .andExpect(jsonPath("$.authorName").value("Repsy"))
+          .andExpect(jsonPath("$.authorEmail").value("test@repsy.io"))
+          .andExpect(jsonPath("$.license").value("Apache-2.0"))
+          .andExpect(jsonPath("$.homepage").value("https://repsy.io"))
+          .andExpect(jsonPath("$.deprecated").value(false))
+          .andExpect(jsonPath("$.keywords[*].keyword").value(containsInAnyOrder("fixture", "npm")));
       NpmPackageApiControllerIT.this
           .perform(
               get(
-                  "/api/npm/packages/{repo}/{scope}/{package}/versions/1.0.0",
+                  "/api/npm/scopes/{repo}/{scope}/packages/{package}/versions/1.0.0",
                   repoName,
                   "tools",
                   "scoped-package"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.scopeName").value("tools"))
-          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
-          .andExpect(jsonPath("$.data.description").value("integration fixture"));
+          .andExpect(jsonPath("$.scopeName").value("tools"))
+          .andExpect(jsonPath("$.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.description").value("integration fixture"));
     }
 
     @Test
@@ -359,88 +409,83 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}/plain-package/versions/1.0.0", repoName))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
-          .andExpect(jsonPath("$.data.packageName").value("plain-package"))
-          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
-          .andExpect(jsonPath("$.data.readme").doesNotExist());
+          .andExpect(jsonPath("$.packageName").value("plain-package"))
+          .andExpect(jsonPath("$.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.readme").doesNotExist());
     }
 
     @Test
-    void populatesVersionNameWhenTheVersionIsOmittedAndDefaultsToLatest() throws Exception {
+    void returnsTheSummaryOfAScopedPackage() throws Exception {
       NpmPackageApiControllerIT.this
           .perform(
               get(
-                  "/api/npm/packages/{repo}/{scope}/{package}",
+                  "/api/npm/scopes/{repo}/{scope}/packages/{package}",
                   repoName,
                   "tools",
                   "scoped-package"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.scopeName").value("tools"))
-          .andExpect(jsonPath("$.data.packageName").value("scoped-package"))
-          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
-          .andExpect(jsonPath("$.data.license").value("Apache-2.0"));
+          .andExpect(jsonPath("$.scopeName").value("tools"))
+          .andExpect(jsonPath("$.packageName").value("scoped-package"))
+          .andExpect(jsonPath("$.latestVersion").value("1.0.0"))
+          .andExpect(jsonPath("$.createdAt").value(notNullValue()))
+          .andExpect(jsonPath("$.versionName").doesNotExist());
     }
 
     @Test
-    void returnsTheLatestVersionDetailOfAnUnscopedPackageWhenTheVersionIsOmitted()
-        throws Exception {
-      // plain-package also has a newer 2.0.0-next.1 published under the "next" tag: the fallback
+    void returnsTheSummaryOfAnUnscopedPackage() throws Exception {
+      // plain-package also has a newer 2.0.0-next.1 published under the "next" tag: the summary
       // follows the package's latest version, not the newest one.
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}/{package}", repoName, "plain-package"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
-          .andExpect(jsonPath("$.type").value("SUCCESS"))
-          .andExpect(jsonPath("$.data.packageName").value("plain-package"))
-          .andExpect(jsonPath("$.data.scopeName").doesNotExist())
-          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
-          .andExpect(jsonPath("$.data.license").value("Apache-2.0"))
-          .andExpect(jsonPath("$.data.content").doesNotExist());
+          .andExpect(jsonPath("$.packageName").value("plain-package"))
+          .andExpect(jsonPath("$.scopeName").doesNotExist())
+          .andExpect(jsonPath("$.latestVersion").value("1.0.0"))
+          .andExpect(jsonPath("$.createdAt").value(notNullValue()))
+          .andExpect(jsonPath("$.versionName").doesNotExist())
+          .andExpect(jsonPath("$.content").doesNotExist());
     }
 
     @Test
     void listsVersionsAndTagsForBothScopeForms() throws Exception {
       NpmPackageApiControllerIT.this
           .perform(
-              get("/api/npm/packages/{repo}/package/{package}/versions", repoName, "plain-package")
+              get("/api/npm/packages/{repo}/{package}/versions", repoName, "plain-package")
                   .param("q", "2.0"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("packageVersionsFetched"))
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].version").value("2.0.0-next.1"))
-          .andExpect(jsonPath("$.data.content[0].deprecated").value(false));
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].version").value("2.0.0-next.1"))
+          .andExpect(jsonPath("$.content[0].deprecated").value(false));
       NpmPackageApiControllerIT.this
           .perform(
               get(
-                  "/api/npm/packages/{repo}/tools/package/{package}/versions",
+                  "/api/npm/scopes/{repo}/tools/packages/{package}/versions",
                   repoName,
                   "scoped-package"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)));
+          .andExpect(jsonPath("$.content", hasSize(1)));
       NpmPackageApiControllerIT.this
-          .perform(
-              get("/api/npm/packages/{repo}/package/{package}/tags", repoName, "plain-package"))
+          .perform(get("/api/npm/packages/{repo}/{package}/tags", repoName, "plain-package"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("packageTagsFetched"))
-          .andExpect(jsonPath("$.data", hasSize(2)))
-          .andExpect(jsonPath("$.data[0].tag").value("latest"));
+          .andExpect(jsonPath("$", hasSize(2)))
+          .andExpect(jsonPath("$[0].tag").value("latest"));
       NpmPackageApiControllerIT.this
           .perform(
               get(
-                  "/api/npm/packages/{repo}/tools/package/{package}/tags",
+                  "/api/npm/scopes/{repo}/tools/packages/{package}/tags",
                   repoName,
                   "scoped-package"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data", hasSize(1)))
-          .andExpect(jsonPath("$.data[0].tag").value("latest"));
+          .andExpect(jsonPath("$", hasSize(1)))
+          .andExpect(jsonPath("$[0].tag").value("latest"));
     }
 
     @ParameterizedTest(name = "{0}")
     @ValueSource(
         strings = {
-          "/api/npm/packages/{repo}/package/missing/tags",
-          "/api/npm/packages/{repo}/tools/package/missing/tags",
-          "/api/npm/packages/{repo}/other/package/scoped-package/tags"
+          "/api/npm/packages/{repo}/missing/tags",
+          "/api/npm/scopes/{repo}/tools/packages/missing/tags",
+          "/api/npm/scopes/{repo}/other/packages/scoped-package/tags"
         })
     @DisplayName("answers 404 packageNotFound for the tags of a missing package")
     void answersNotFoundForTheTagsOfAMissingPackage(final String pathTemplate) throws Exception {
@@ -461,19 +506,17 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       removeLatestTag("tools", "scoped-package");
 
       NpmPackageApiControllerIT.this
-          .perform(get("/api/npm/packages/{repo}/package/{package}/tags", repoName, "scope"))
+          .perform(get("/api/npm/packages/{repo}/{package}/tags", repoName, "scope"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("packageTagsFetched"))
-          .andExpect(jsonPath("$.data", hasSize(0)));
+          .andExpect(jsonPath("$", hasSize(0)));
       NpmPackageApiControllerIT.this
           .perform(
               get(
-                  "/api/npm/packages/{repo}/tools/package/{package}/tags",
+                  "/api/npm/scopes/{repo}/tools/packages/{package}/tags",
                   repoName,
                   "scoped-package"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("packageTagsFetched"))
-          .andExpect(jsonPath("$.data", hasSize(0)));
+          .andExpect(jsonPath("$", hasSize(0)));
     }
 
     private void removeLatestTag(final String scope, final String packageName) {
@@ -577,23 +620,45 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void routesTwoSegmentGetPathsOnlyToTheVersionHandler() {
+    void routesTwoSegmentGetPathsOnlyToThePackageHandler() {
       // Two handlers once matched /api/npm/packages/{repo}/{x}, so which one answered depended on
       // registration order: a listing of every package, a 404, or an ambiguous-handler 500.
       assertThat(getHandlersMatching("/api/npm/packages/repo/missing"))
-          .containsExactly("getVersion");
+          .containsExactly("getPackage");
+    }
+
+    @ParameterizedTest(name = "{0} is {1}")
+    @CsvSource({
+      "/api/npm/packages/repo/scope,getPackage",
+      "/api/npm/packages/repo/versions,getPackage",
+      "/api/npm/packages/repo/tags,getPackage",
+      "/api/npm/packages/repo/versions/versions,listVersions",
+      "/api/npm/packages/repo/tags/versions,listVersions",
+      "/api/npm/packages/repo/versions/tags,listTags",
+      "/api/npm/packages/repo/versions/versions/1.0.0,getVersion",
+      "/api/npm/scopes/repo/versions/packages/versions,getPackage",
+      "/api/npm/scopes/repo/scope/packages/foo,getPackage",
+      "/api/npm/scopes/repo/packages/packages,listByScope",
+      "/api/npm/scopes/repo/packages/packages/foo,getPackage",
+      "/api/npm/scopes/repo/packages/packages/foo/versions,listVersions",
+      "/api/npm/scopes/repo/packages/packages/versions/versions/1.0.0,getVersion",
+      "/api/npm/scopes/repo/tags/packages/tags/tags,listTags"
+    })
+    @DisplayName("routes a package or scope named like a literal segment to one handler (RPS-1781)")
+    void routesTheLiteralNamesToOneHandler(final String path, final String handler) {
+      assertThat(getHandlersMatching(path)).containsExactly(handler);
     }
 
     @ParameterizedTest(name = "{0}")
     @ValueSource(
         strings = {
-          "/api/npm/packages/repo/scope",
-          "/api/npm/packages/repo/scope/foo",
-          "/api/npm/packages/repo/scope/foo/versions/1.0.0",
+          "/api/npm/scopes/repo/foo/packages/bar/baz",
+          "/api/npm/packages/repo/package/foo/tags",
+          "/api/npm/packages/repo/tools/package/foo/versions",
         })
-    @DisplayName("routes a package or scope named scope only to the version handler (RPS-1010)")
-    void routesTheLiteralScopeNameOnlyToTheVersionHandler(final String path) {
-      assertThat(getHandlersMatching(path)).containsExactly("getVersion");
+    @DisplayName("matches no handler on the routes the scopes tree replaced")
+    void matchesNoHandlerOnRemovedRoutes(final String path) {
+      assertThat(getHandlersMatching(path)).isEmpty();
     }
 
     @ParameterizedTest(name = "{0}")
@@ -630,10 +695,8 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
                       "plain-package",
                       "2.0.0-next.1")
                   .header(AUTHORIZATION, bearerToken(admin, Duration.ofMinutes(30))))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("packageVersionDeleted"))
-          .andExpect(jsonPath("$.data").value(nullValue()));
+          .andExpect(status().isNoContent())
+          .andExpect(content().string(""));
       final var packageInfo =
           npmPackageRepository
               .findByRepoIdAndScopeAndName(repo.getId(), null, "plain-package")
@@ -646,14 +709,51 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       perform(
               delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package")
                   .header(AUTHORIZATION, bearerToken(admin, Duration.ofMinutes(30))))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("packageDeleted"));
+          .andExpect(status().isNoContent())
+          .andExpect(content().string(""));
       org.assertj.core.api.Assertions.assertThat(
               npmPackageRepository.findByRepoIdAndScopeAndName(repo.getId(), null, "plain-package"))
           .isEmpty();
       perform(
               delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package")
                   .header(AUTHORIZATION, bearerToken(admin, Duration.ofMinutes(30))))
+          .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deletesAScopedVersionAndPackageThroughTheScopesRoutes() throws Exception {
+      final var token = bearerToken(admin, Duration.ofMinutes(30));
+      NpmPackageApiControllerIT.this.publish("tools", "scoped-package", "2.0.0", "next");
+
+      perform(
+              delete(
+                      "/api/npm/scopes/{repo}/{scope}/packages/{package}/versions/{version}",
+                      repoName,
+                      "tools",
+                      "scoped-package",
+                      "2.0.0")
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isNoContent())
+          .andExpect(content().string(""));
+      perform(
+              delete(
+                      "/api/npm/scopes/{repo}/{scope}/packages/{package}",
+                      repoName,
+                      "tools",
+                      "scoped-package")
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isNoContent())
+          .andExpect(content().string(""));
+      org.assertj.core.api.Assertions.assertThat(
+              npmPackageRepository.findByRepoIdAndScopeAndName(
+                  repo.getId(), "tools", "scoped-package"))
+          .isEmpty();
+      perform(
+              get(
+                  "/api/npm/scopes/{repo}/{scope}/packages/{package}",
+                  repoName,
+                  "tools",
+                  "scoped-package"))
           .andExpect(status().isNotFound());
     }
   }
@@ -717,7 +817,8 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
               "/api/npm/packages/%s",
               "/api/npm/packages/%s/plain-package",
               "/api/npm/packages/%s/plain-package/versions/1.0.0",
-              "/api/npm/packages/%s/tools/scoped-package/versions/1.0.0")
+              "/api/npm/scopes/%s/tools/packages/scoped-package",
+              "/api/npm/scopes/%s/tools/packages/scoped-package/versions/1.0.0")
           .flatMap(
               path ->
                   Stream.of(HttpMethod.PUT, HttpMethod.POST, HttpMethod.PATCH)
@@ -732,10 +833,9 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
     private static final String PACKAGES = "/api/npm/packages/{repo}";
     private static final String UNSCOPED = "/api/npm/scopes/{repo}/packages";
     private static final String SCOPED = "/api/npm/scopes/{repo}/tools/packages";
-    private static final String VERSIONS =
-        "/api/npm/packages/{repo}/package/plain-package/versions";
+    private static final String VERSIONS = "/api/npm/packages/{repo}/plain-package/versions";
     private static final String SCOPED_VERSIONS =
-        "/api/npm/packages/{repo}/tools/package/scoped-package/versions";
+        "/api/npm/scopes/{repo}/tools/packages/scoped-package/versions";
 
     static Stream<String> endpoints() {
       return Stream.of(PACKAGES, UNSCOPED, SCOPED, VERSIONS, SCOPED_VERSIONS);
@@ -785,10 +885,10 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
     void ordersVersions() throws Exception {
       this.list(VERSIONS, "sort", "version,asc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].version").value("1.0.0"));
+          .andExpect(jsonPath("$.content[0].version").value("1.0.0"));
       this.list(VERSIONS, "sort", "version,desc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].version").value("2.0.0-next.1"));
+          .andExpect(jsonPath("$.content[0].version").value("2.0.0-next.1"));
     }
 
     @ParameterizedTest(name = "{0} {1}")
@@ -814,11 +914,11 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
 
       this.list(path, "sort", "latestVersion,desc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].name").value("newest-package"))
-          .andExpect(jsonPath("$.data.content[0].latestVersion").value("3.0.0"));
+          .andExpect(jsonPath("$.content[0].name").value("newest-package"))
+          .andExpect(jsonPath("$.content[0].latestVersion").value("3.0.0"));
       this.list(path, "sort", "latestVersion,asc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].latestVersion").value("1.0.0"));
+          .andExpect(jsonPath("$.content[0].latestVersion").value("1.0.0"));
     }
 
     @Test

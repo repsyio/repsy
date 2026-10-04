@@ -31,6 +31,10 @@ import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
+import io.repsy.os.server.protocols.npm.shared.npm_package.entities.NpmPackage;
+import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageVersion;
+import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
+import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
 import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacadeImpl;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -107,6 +111,8 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private PypiProtocolFacadeImpl pypiProtocolFacade;
+  @Autowired private NpmPackageRepository npmPackageRepository;
+  @Autowired private PackageVersionRepository npmPackageVersionRepository;
   @Autowired private ImageTxService imageTxService;
   @Autowired private ImageRepository imageRepository;
 
@@ -241,6 +247,62 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
 
     this.perform(get(packages + "/demo/releases").header(AUTHORIZATION, user))
         .andExpect(status().isOk());
+  }
+
+  // ---- Panel API: npm
+
+  @Test
+  @DisplayName("cannot delete an npm package or version, which stay, but can read them")
+  void userCannotDeleteFromAPublicNpmRepoButCanReadIt() throws Exception {
+    final var repo = this.createRepo(RepoType.NPM, "npm", null);
+    final var user = this.panelToken(UserRole.USER);
+    final var packages = "/api/npm/packages/" + repo.getName();
+    final var scoped = "/api/npm/scopes/" + repo.getName() + "/tools/packages";
+
+    this.seedNpmVersion(repo, null, "demo");
+    this.seedNpmVersion(repo, "tools", "scoped");
+
+    this.perform(delete(packages + "/demo").header(AUTHORIZATION, user))
+        .andExpect(status().isForbidden());
+    this.perform(delete(packages + "/demo/versions/1.0.0").header(AUTHORIZATION, user))
+        .andExpect(status().isForbidden());
+    this.perform(delete(scoped + "/scoped").header(AUTHORIZATION, user))
+        .andExpect(status().isForbidden());
+    this.perform(delete(scoped + "/scoped/versions/1.0.0").header(AUTHORIZATION, user))
+        .andExpect(status().isForbidden());
+
+    for (final var authorization : this.callers(user)) {
+      final var listed =
+          this.getAs(packages, authorization)
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+
+      assertThat(JsonPath.<List<String>>read(listed, "$.content[*].name")).contains("demo");
+      this.getAs(packages + "/demo", authorization).andExpect(status().isOk());
+      this.getAs(packages + "/demo/versions", authorization).andExpect(status().isOk());
+      this.getAs(scoped + "/scoped", authorization).andExpect(status().isOk());
+    }
+
+    assertThat(this.npmPackageRepository.findByRepoIdAndScopeAndName(repo.getId(), null, "demo"))
+        .isPresent();
+    assertThat(
+            this.npmPackageRepository.findByRepoIdAndScopeAndName(repo.getId(), "tools", "scoped"))
+        .isPresent();
+  }
+
+  private void seedNpmVersion(final Repo repo, final String scope, final String name) {
+    final var pkg = new NpmPackage();
+    pkg.setRepo(this.repoRepository.getReferenceById(repo.getId()));
+    pkg.setScope(scope);
+    pkg.setName(name);
+    pkg.setLatest("1.0.0");
+    final var saved = this.npmPackageRepository.save(pkg);
+    final var version = new PackageVersion();
+    version.setNpmPackage(saved);
+    version.setVersion("1.0.0");
+    this.npmPackageVersionRepository.save(version);
   }
 
   // ---- Panel API: Docker

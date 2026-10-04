@@ -77,11 +77,7 @@ export class NpmService {
       .listNpmPackages(this.repoName, scope || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
-      .pipe(
-        map(
-          (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<NpmPackageListItem>,
-        ),
-      );
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<NpmPackageListItem>));
   }
 
   public searchScopedPackages(
@@ -95,11 +91,7 @@ export class NpmService {
       .listNpmPackagesByScope(scope, this.repoName, name || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
-      .pipe(
-        map(
-          (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<NpmPackageListItem>,
-        ),
-      );
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<NpmPackageListItem>));
   }
 
   public searchUnscopedPackages(
@@ -112,11 +104,7 @@ export class NpmService {
       .listUnscopedNpmPackages(this.repoName, name || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
-      .pipe(
-        map(
-          (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<NpmPackageListItem>,
-        ),
-      );
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<NpmPackageListItem>));
   }
 
   public searchPackageVersions(
@@ -129,7 +117,7 @@ export class NpmService {
   ): Observable<PagedData<PackageVersionListItem>> {
     const sort = [`${sortOption.column},${sortOption.type}`];
     const call = scopeName
-      ? this.npmPackageApiControllerService.listNpmScopedPackageVersions(
+      ? this.npmScopeApiControllerService.listNpmScopedPackageVersions(
           scopeName,
           packageName,
           this.repoName,
@@ -147,17 +135,15 @@ export class NpmService {
           sort,
         );
     return call.pipe(
-      map(
-        (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<PackageVersionListItem>,
-      ),
+      map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<PackageVersionListItem>),
     );
   }
 
   public fetchPackageTags(packageName: string, scopeName: string): Observable<PackageDistributionTagMapListItem[]> {
     const call = scopeName
-      ? this.npmPackageApiControllerService.listNpmScopedPackageTags(scopeName, packageName, this.repoName)
+      ? this.npmScopeApiControllerService.listNpmScopedPackageTags(scopeName, packageName, this.repoName)
       : this.npmPackageApiControllerService.listNpmPackageTags(packageName, this.repoName);
-    return call.pipe(map((r) => r.data ?? []));
+    return call.pipe(map((r) => r ?? []));
   }
 
   public fetchPackageVersion(
@@ -166,26 +152,21 @@ export class NpmService {
     versionName: string,
   ): Observable<PackageVersionDetail> {
     const call = scopeName
-      ? this.npmPackageApiControllerService.getNpmScopedPackageVersion(
-          scopeName,
-          packageName,
-          versionName,
-          this.repoName,
-        )
+      ? this.npmScopeApiControllerService.getNpmScopedPackageVersion(scopeName, packageName, versionName, this.repoName)
       : this.npmPackageApiControllerService.getNpmPackageVersion(packageName, versionName, this.repoName);
-    return call.pipe(map((r) => r.data as unknown as PackageVersionDetail));
+    return call.pipe(map((r) => r as unknown as PackageVersionDetail));
   }
 
   public deletePackage(packageName: string, scopeName: string): Observable<void> {
     const call = scopeName
-      ? this.npmPackageApiControllerService.deleteScopedNpmPackage(scopeName, packageName, this.repoName)
+      ? this.npmScopeApiControllerService.deleteScopedNpmPackage(scopeName, packageName, this.repoName)
       : this.npmPackageApiControllerService.deleteNpmPackage(packageName, this.repoName);
     return call.pipe(map(() => undefined));
   }
 
   public deletePackageVersion(packageName: string, scopeName: string, versionName: string): Observable<void> {
     const call = scopeName
-      ? this.npmPackageApiControllerService.deleteNpmScopedPackageVersion(
+      ? this.npmScopeApiControllerService.deleteNpmScopedPackageVersion(
           scopeName,
           packageName,
           versionName,

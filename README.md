@@ -397,6 +397,11 @@ This is the first release after `v26.08.4`. Read this section before you upgrade
   `POST /api/repos/{repo}/deploy-tokens/{id}/actions/rotate`. (RPS-1269)
 - npm scope lists moved to `GET /api/npm/scopes/{repo}/packages` and `GET /api/npm/scopes/{repo}/{scope}/packages`.
   (RPS-1010)
+- npm panel routes (RPS-1781): the `package` literal between repo and name is gone
+  (`GET /api/npm/packages/{repo}/{package}/versions` and `/tags`), scoped packages moved to
+  `/api/npm/scopes/{repo}/{scope}/packages/{package}[/versions[/{version}]|/tags]`, and `GET
+  /api/npm/packages/{repo}/{package}` is a package summary (`scopeName`, `packageName`, `latestVersion`, `createdAt`),
+  no longer the latest version detail. Bodies are bare (no `msgId`/`data` envelope) and the deletes answer `204`.
 - Every list takes its text filter as `q`; the old names (`name`, `query`, `search`, `version`, `groupName`,
   `artifactName`) are ignored, so the list comes back unfiltered. Paging is `page`, `size` (1 to 100; more is `400`)
   and `sort` (an unknown property is `400`). Cargo, NuGet and Ruby lists default to 10 per page (was 20). (RPS-1269,

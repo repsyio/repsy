@@ -30,6 +30,10 @@ import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepo
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
+import io.repsy.os.server.protocols.npm.shared.npm_package.entities.NpmPackage;
+import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageVersion;
+import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
+import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGem;
@@ -73,6 +77,8 @@ class StablePagingIT extends AbstractIntegrationTest {
   @Autowired private HelmChartRepository helmChartRepository;
   @Autowired private HelmChartVersionRepository helmChartVersionRepository;
   @Autowired private NuGetPackageRepository nugetPackageRepository;
+  @Autowired private NpmPackageRepository npmPackageRepository;
+  @Autowired private PackageVersionRepository npmPackageVersionRepository;
   @Autowired private RubyGemRepository rubyGemRepository;
   @Autowired private RubyGemVersionRepository rubyGemVersionRepository;
   @Autowired private RepoDeployTokenRepository deployTokenRepository;
@@ -111,6 +117,7 @@ class StablePagingIT extends AbstractIntegrationTest {
                   || path.startsWith("/api/helm/")
                   || path.startsWith("/api/nuget/")
                   || path.startsWith("/api/ruby/")
+                  || path.startsWith("/api/npm/")
               ? "$"
               : "$.data";
       totalPages = JsonPath.<Integer>read(body, root + ".page.totalPages");
@@ -347,6 +354,39 @@ class StablePagingIT extends AbstractIntegrationTest {
         "/api/nuget/packages/" + repo.getName() + "/tied/versions",
         this.adminBearerToken(),
         "publishedAt,desc",
+        "version",
+        versions);
+  }
+
+  @Test
+  @DisplayName("npm package versions created in the same instant are each listed once")
+  void npmPackageVersions() throws Exception {
+    final var repo = this.seedRepo(RepoType.NPM, uniqueRepoName("npmv"));
+    final var pkg = new NpmPackage();
+    pkg.setRepo(this.repoRepository.getReferenceById(repo.getId()));
+    pkg.setName("tied");
+    pkg.setLatest("1.0.0");
+    final var savedPackage = this.npmPackageRepository.save(pkg);
+
+    final var versions = new ArrayList<String>();
+    for (var i = 0; i < ROWS; i++) {
+      final var version = new PackageVersion();
+      version.setNpmPackage(savedPackage);
+      version.setVersion("1.0." + i);
+      this.npmPackageVersionRepository.save(version);
+      versions.add("1.0." + i);
+    }
+    this.entityManager.flush();
+    this.jdbcTemplate.update(
+        "update npm_package_version set created_at = ? where package_id = ?",
+        Timestamp.from(TIED_AT),
+        savedPackage.getId());
+    this.entityManager.clear();
+
+    this.assertEveryRowOnceAndStable(
+        "/api/npm/packages/" + repo.getName() + "/tied/versions",
+        this.adminBearerToken(),
+        "createdAt,desc",
         "version",
         versions);
   }

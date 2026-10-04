@@ -14,7 +14,7 @@
 /// limitations under the License.
 
 /**
- * RPS-1483: the panel API of npm (`/api/npm/packages/...` and `/api/npm/scopes/...`, scoped and unscoped), against
+ * RPS-1483, RPS-1781: the panel API of npm (`/api/npm/packages/...` and `/api/npm/scopes/...`, scoped and unscoped; bare bodies, 204 deletes), against
  * what the REAL `npm publish` stored. Each response is validated against the response schema of
  * `openapi-spec.yaml` (`src/api/spec-contract.ts`: the schema, and no property the schema does not declare), and
  * the values are matched to the client-side facts: the package.json the client packed (name, scope, license,
@@ -29,11 +29,13 @@
 import {
   callOperation,
   contractWorld,
-  expectContract,
+  expectBare,
   expectCovers,
   expectFailure,
+  expectNoContent,
   expectPagingSweep,
 } from '../../src/api/contract-checks.js';
+import { adminBearer, apiUrl, edgeRequest } from '../../src/clients/edge-raw.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import * as npm from '../../src/clients/npm.js';
 import { npmAdapter } from '../../src/clients/npm.js';
@@ -70,6 +72,13 @@ interface PackageRow {
   name: string;
   scope?: string;
   latestVersion: string;
+}
+
+interface PackageSummary {
+  scopeName?: string;
+  packageName: string;
+  latestVersion?: string;
+  createdAt: string;
 }
 
 interface VersionDetail {
@@ -144,21 +153,31 @@ async function tarball(names: Names, packageName: string, version: string): Prom
     .status;
 }
 
-async function detail(names: Names, packageName: string, version?: string): Promise<VersionDetail> {
-  const operationId = version
-    ? opOf(packageName, 'getNpmScopedPackageVersion', 'getNpmPackageVersion')
-    : opOf(packageName, 'getNpmScopedPackage', 'getNpmPackage');
-  const res = await callOperation(operationId, {
-    ...pathOf(names, packageName),
-    ...(version ? { version } : {}),
+async function summary(names: Names, packageName: string): Promise<PackageSummary> {
+  const operationId = opOf(packageName, 'getNpmScopedPackage', 'getNpmPackage');
+  const res = await callOperation(operationId, pathOf(names, packageName));
+  return expectBare(operationId, res) as PackageSummary;
+}
+
+async function detail(names: Names, packageName: string, version: string): Promise<VersionDetail> {
+  const operationId = opOf(packageName, 'getNpmScopedPackageVersion', 'getNpmPackageVersion');
+  const res = await callOperation(operationId, { ...pathOf(names, packageName), version });
+  return expectBare(operationId, res) as VersionDetail;
+}
+
+/** What a route of the pre-RPS-1781 shape answers now: 404, for every verb. */
+async function expectRemoved(method: string, path: string): Promise<void> {
+  const res = await edgeRequest(apiUrl(path), {
+    method,
+    headers: { Authorization: `Bearer ${await adminBearer()}` },
   });
-  return expectContract(operationId, res) as VersionDetail;
+  expect(res.status, `${method} ${path} is gone: ${res.text.slice(0, 200)}`).toBe(404);
 }
 
 async function listedVersions(names: Names, packageName: string): Promise<string[]> {
   const operationId = opOf(packageName, 'listNpmScopedPackageVersions', 'listNpmPackageVersions');
   const res = await callOperation(operationId, pathOf(names, packageName));
-  const page = expectContract(operationId, res) as { content: { version: string }[] };
+  const page = expectBare(operationId, res) as { content: { version: string }[] };
   return page.content.map((row) => row.version).sort();
 }
 
@@ -202,7 +221,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
     });
 
     // The three lists of packages: the repo (both), the scope (scoped only) and the unscoped ones.
-    const all = expectContract(
+    const all = expectBare(
       'listNpmPackages',
       await callOperation('listNpmPackages', { repoName: names.repoName }),
     ) as { content: PackageRow[]; page: { totalElements: number } };
@@ -214,7 +233,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
     expect(all.content.find((row) => row.name === names.plain)).toMatchObject({
       latestVersion: first,
     });
-    const scopeRows = expectContract(
+    const scopeRows = expectBare(
       'listNpmPackagesByScope',
       await callOperation('listNpmPackagesByScope', {
         repoName: names.repoName,
@@ -222,14 +241,23 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
       }),
     ) as { content: PackageRow[] };
     expect(scopeRows.content.map((row) => row.name)).toEqual(['scoped-lib']);
-    const unscopedRows = expectContract(
+    const unscopedRows = expectBare(
       'listUnscopedNpmPackages',
       await callOperation('listUnscopedNpmPackages', { repoName: names.repoName }),
     ) as { content: PackageRow[] };
     expect(unscopedRows.content.map((row) => row.name)).toEqual([names.plain]);
 
-    // The package (its newest version) and each version, scoped and unscoped.
-    const scoped = await detail(names, names.scoped);
+    // The package summary (name, scope, latest version) and each version, scoped and unscoped.
+    expect(await summary(names, names.scoped)).toMatchObject({
+      scopeName: names.scope,
+      packageName: 'scoped-lib',
+      latestVersion: second,
+    });
+    const plainSummary = await summary(names, names.plain);
+    expect(plainSummary).toMatchObject({ packageName: names.plain, latestVersion: first });
+    expect(plainSummary.scopeName ?? null).toBeNull();
+
+    const scoped = await detail(names, names.scoped, second);
     expect(scoped).toMatchObject({
       scopeName: names.scope,
       packageName: 'scoped-lib',
@@ -242,14 +270,13 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
       wire && typeof wire !== 'number' ? wire.full.versions[second]?.description : undefined,
     );
     expect(scoped.distributionTags.map((t) => t.tagName)).toEqual(['latest']);
-    const plain = await detail(names, names.plain);
+    const plain = await detail(names, names.plain, first);
     expect(plain).toMatchObject({
       packageName: names.plain,
       versionName: first,
       deprecated: false,
     });
     expect(plain.scopeName ?? null).toBeNull();
-    expect(await detail(names, names.plain, first)).toMatchObject({ versionName: first });
 
     const older = await detail(names, names.scoped, first);
     expect(older).toMatchObject({
@@ -260,10 +287,25 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
     expect(older.distributionTags.map((t) => t.tagName)).toEqual(['beta']);
     expect(await detail(names, names.scoped, second)).toMatchObject({ deprecated: false });
 
+    // The routes of the old shape (the `package` literal, a scope beside the package) are gone.
+    await expectRemoved(
+      'GET',
+      `/api/npm/packages/${names.repoName}/package/${names.plain}/versions`,
+    );
+    await expectRemoved('GET', `/api/npm/packages/${names.repoName}/package/${names.plain}/tags`);
+    await expectRemoved(
+      'GET',
+      `/api/npm/packages/${names.repoName}/${names.scope}/scoped-lib/versions/${second}`,
+    );
+    await expectRemoved(
+      'GET',
+      `/api/npm/packages/${names.repoName}/${names.scope}/package/scoped-lib/versions`,
+    );
+
     // The version lists: the versions the wire lists, with the deprecation flag.
     expect(await listedVersions(names, names.scoped)).toEqual([first, second].sort());
     expect(await listedVersions(names, names.plain)).toEqual([first]);
-    const rows = expectContract(
+    const rows = expectBare(
       'listNpmScopedPackageVersions',
       await callOperation('listNpmScopedPackageVersions', pathOf(names, names.scoped)),
     ) as { content: { version: string; deprecated: boolean }[] };
@@ -271,14 +313,14 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
     expect(rows.content.find((row) => row.version === second)?.deprecated).toBe(false);
 
     // The dist-tags: exactly the ones the packument on the wire has.
-    const tags = expectContract(
+    const tags = expectBare(
       'listNpmScopedPackageTags',
       await callOperation('listNpmScopedPackageTags', pathOf(names, names.scoped)),
     ) as { tag: string; version: string }[];
     expect(Object.fromEntries(tags.map((t) => [t.tag, t.version]))).toEqual(
       typeof wire === 'number' ? {} : wire.distTags,
     );
-    const plainTags = expectContract(
+    const plainTags = expectBare(
       'listNpmPackageTags',
       await callOperation('listNpmPackageTags', pathOf(names, names.plain)),
     ) as { tag: string; version: string }[];
@@ -383,11 +425,12 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
     await expectPagingSweep<Row>({
       operationId: 'listNpmPackagesByScope',
       values: { repoName: names.repoName, scope: names.scope },
+      bare: true,
       total: 5,
       keyOf: (row) => `${row.scope}/${row.name}`,
       sorts: [{ property: 'name', value: (row) => row.name }],
     });
-    const narrowed = expectContract(
+    const narrowed = expectBare(
       'listNpmPackagesByScope',
       await callOperation(
         'listNpmPackagesByScope',
@@ -408,6 +451,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
     await expectPagingSweep<{ version: string }>({
       operationId: 'listNpmPackageVersions',
       values: pathOf(names, names.plain),
+      bare: true,
       total: 5,
       keyOf: (row) => row.version,
       sorts: [{ property: 'version', value: (row) => row.version }],
@@ -428,7 +472,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
     const path = pathOf(names, names.scoped);
 
     const res = await callOperation('deleteNpmScopedPackageVersion', { ...path, version: removed });
-    expectContract('deleteNpmScopedPackageVersion', res);
+    expectNoContent('deleteNpmScopedPackageVersion', res);
 
     expect(await listedVersions(names, names.scoped)).toEqual([kept]);
     expectFailure(
@@ -456,7 +500,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
     );
 
     // Now the whole package.
-    expectContract('deleteScopedNpmPackage', await callOperation('deleteScopedNpmPackage', path));
+    expectNoContent('deleteScopedNpmPackage', await callOperation('deleteScopedNpmPackage', path));
     expect(await packument(names, names.scoped), 'the packument').toBe(404);
     expect(await tarball(names, names.scoped, kept), 'the tarball').toBe(404);
     const lost = await npm.resolve(worldOf(names.repoName, names.scoped, kept));
@@ -467,7 +511,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
       404,
       'packageNotFound',
     );
-    const rows = expectContract(
+    const rows = expectBare(
       'listNpmPackagesByScope',
       await callOperation('listNpmPackagesByScope', {
         repoName: names.repoName,
@@ -496,7 +540,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
     const path = pathOf(names, names.plain);
     expect(await packument(names, names.plain)).toMatchObject({ distTags: { latest: newest } });
 
-    expectContract(
+    expectNoContent(
       'deleteNpmPackageVersion',
       await callOperation('deleteNpmPackageVersion', { ...path, version: newest }),
     );
@@ -505,7 +549,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
       versions: [older],
       distTags: { latest: older },
     });
-    expect(await detail(names, names.plain)).toMatchObject({ versionName: older });
+    expect(await summary(names, names.plain)).toMatchObject({ latestVersion: older });
     expect(await tarball(names, names.plain, newest)).toBe(404);
     const gone = await npm.resolve(worldOf(names.repoName, names.plain, newest));
     expect(gone.clientExitCode, gone.command).not.toBe(0);
@@ -513,7 +557,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
     expect(resolved.clientExitCode, resolved.command).toBe(0);
     expect(resolved.contentSha256).toBe(seeds.get(older));
 
-    expectContract('deleteNpmPackage', await callOperation('deleteNpmPackage', path));
+    expectNoContent('deleteNpmPackage', await callOperation('deleteNpmPackage', path));
     expect(await packument(names, names.plain)).toBe(404);
     expect(await tarball(names, names.plain, older)).toBe(404);
     const lost = await npm.resolve(worldOf(names.repoName, names.plain, older));
