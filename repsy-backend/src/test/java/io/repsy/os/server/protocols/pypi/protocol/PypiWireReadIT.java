@@ -101,11 +101,22 @@ class PypiWireReadIT extends AbstractIntegrationTest {
       final String filename,
       final byte[] content)
       throws Exception {
+    this.publish(repo, packageName, version, filename, content, ">=3.9");
+  }
+
+  private void publish(
+      final RepoInfo repo,
+      final String packageName,
+      final String version,
+      final String filename,
+      final byte[] content,
+      final String requiresPython)
+      throws Exception {
 
     final var parameters = new HashMap<String, Object>();
     parameters.put("name", packageName);
     parameters.put("version", version);
-    parameters.put("requires_python", ">=3.9");
+    parameters.put("requires_python", requiresPython);
     parameters.put("sha256_digest", sha256Hex(content));
 
     final var file =
@@ -221,5 +232,29 @@ class PypiWireReadIT extends AbstractIntegrationTest {
     final var path = URI.create(href).getPath();
 
     this.protocol(get(path)).andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("the project page HTML-escapes requires_python: a quote cannot leave the attribute")
+  void projectPageEscapesRequiresPython() throws Exception {
+    final var repo = this.createRepo();
+    final var filename = "escape_pkg-1.0.0-py3-none-any.whl";
+    final var content = "wheel bytes".getBytes(StandardCharsets.UTF_8);
+
+    this.publish(
+        repo, "escape-pkg", "1.0.0", filename, content, ">=3.9\" onmouseover=\"alert(1)\"&<b>");
+
+    final var body =
+        this.protocol(get("/{repo}/simple/escape-pkg/", repo.getName()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+
+    assertThat(body)
+        .contains(
+            "data-requires-python=\"&gt;=3.9&quot; onmouseover=&quot;alert(1)&quot;&amp;&lt;b&gt;\"")
+        .doesNotContain("onmouseover=\"")
+        .doesNotContain("<b>");
   }
 }

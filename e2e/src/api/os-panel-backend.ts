@@ -580,11 +580,11 @@ export class OsPanelBackend implements PanelBackend {
     );
   }
 
-  /** Deletes one PyPI release (`DELETE /api/pypi/packages/{repoName}/{packageName}/releases/{version}`):
+  /** Deletes one PyPI version (`DELETE /api/pypi/packages/{repoName}/{packageName}/versions/{version}`):
    *  PyPI has no wire delete, so this panel call is the only way a published file goes away. */
-  async deletePypiRelease(repoName: string, packageName: string, version: string): Promise<void> {
+  async deletePypiVersion(repoName: string, packageName: string, version: string): Promise<void> {
     await this.call((c) =>
-      c.pypiPackageController.deletePypiRelease({ repoName, packageName, version }),
+      c.pypiPackageController.deletePypiVersion({ repoName, packageName, version }),
     );
   }
 

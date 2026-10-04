@@ -29,9 +29,10 @@
 import {
   callOperation,
   contractWorld,
-  expectContract,
+  expectBare,
   expectCovers,
   expectFailure,
+  expectNoContent,
   expectPagingSweep,
 } from '../../src/api/contract-checks.js';
 import { RepoType } from '../../src/api/panel-api.js';
@@ -51,9 +52,9 @@ import type { Seeder } from '../../src/seed/seeder.js';
 const EXERCISED = [
   'listPypiPackages',
   'getPypiPackage',
-  'listPypiReleases',
-  'getPypiRelease',
-  'deletePypiRelease',
+  'listPypiVersions',
+  'getPypiVersion',
+  'deletePypiVersion',
   'deletePypiPackage',
 ];
 
@@ -69,6 +70,13 @@ type ReleaseFlags = {
   postRelease: boolean;
   devRelease: boolean;
 };
+
+interface PackageSummary {
+  name: string;
+  stableVersion?: string;
+  latestVersion?: string;
+  createdAt?: string;
+}
 
 interface ReleaseDetail extends ReleaseFlags {
   id: string;
@@ -118,9 +126,9 @@ async function fileStatus(names: Names, version: string): Promise<number> {
   ).status;
 }
 
-async function releaseVersions(names: Names): Promise<string[]> {
-  const res = await callOperation('listPypiReleases', values(names));
-  const page = expectContract('listPypiReleases', res) as { content: { version: string }[] };
+async function versionNames(names: Names): Promise<string[]> {
+  const res = await callOperation('listPypiVersions', values(names));
+  const page = expectBare('listPypiVersions', res) as { content: { version: string }[] };
   return page.content.map((row) => row.version).sort();
 }
 
@@ -159,7 +167,7 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
     expect(await projectFiles(names), 'the project page on the wire').toEqual(files);
 
     // GET /api/pypi/packages/{repo}: one row for the package, the newest upload as `latest`, the newest final release as `stable`.
-    const packages = expectContract(
+    const packages = expectBare(
       'listPypiPackages',
       await callOperation('listPypiPackages', { repoName: names.repoName }),
     ) as { content: Record<string, string>[]; page: { totalElements: number } };
@@ -170,24 +178,24 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
       latestVersion: '1.2.0.dev1',
     });
 
-    // GET .../releases: every uploaded version with its kind.
-    const releases = expectContract(
-      'listPypiReleases',
-      await callOperation('listPypiReleases', values(names)),
+    // GET .../versions: every uploaded version with its kind.
+    const versionPage = expectBare(
+      'listPypiVersions',
+      await callOperation('listPypiVersions', values(names)),
     ) as { content: ({ version: string } & ReleaseFlags)[] };
-    expect(releases.content.map((row) => row.version).sort()).toEqual(versions);
+    expect(versionPage.content.map((row) => row.version).sort()).toEqual(versions);
     for (const [version, flags] of kinds) {
       expect(
-        releases.content.find((row) => row.version === version),
+        versionPage.content.find((row) => row.version === version),
         version,
       ).toMatchObject(flags);
     }
 
-    // GET .../releases/{version}: each release's detail, the METADATA of the wheel twine sent.
+    // GET .../versions/{version}: each release's detail, the METADATA of the wheel twine sent.
     for (const [version, flags] of kinds) {
-      const release = expectContract(
-        'getPypiRelease',
-        await callOperation('getPypiRelease', values(names, version)),
+      const release = expectBare(
+        'getPypiVersion',
+        await callOperation('getPypiVersion', values(names, version)),
       ) as ReleaseDetail;
       expect(release, version).toMatchObject({
         ...flags,
@@ -201,16 +209,17 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
       });
     }
 
-    // GET .../{package}: the newest upload's detail.
-    const latest = expectContract(
+    // GET .../{package}: the package summary, the newest upload as `latestVersion`.
+    const summary = expectBare(
       'getPypiPackage',
       await callOperation('getPypiPackage', values(names)),
-    ) as ReleaseDetail;
-    expect(latest).toMatchObject({
-      packageName: names.name,
-      version: '1.2.0.dev1',
-      devRelease: true,
+    ) as PackageSummary;
+    expect(summary).toMatchObject({
+      name: names.name,
+      stableVersion: '1.0.0',
+      latestVersion: '1.2.0.dev1',
     });
+    expect(summary.createdAt, 'createdAt').toEqual(expect.any(String));
   });
 
   test('answers the failures the spec declares, with the schema of an error', async ({
@@ -239,20 +248,20 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
       'packageNotFound',
     );
     expectFailure(
-      'listPypiReleases',
-      await callOperation('listPypiReleases', missing),
+      'listPypiVersions',
+      await callOperation('listPypiVersions', missing),
       404,
       'packageNotFound',
     );
     expectFailure(
-      'getPypiRelease',
-      await callOperation('getPypiRelease', values(names, '9.9.9')),
+      'getPypiVersion',
+      await callOperation('getPypiVersion', values(names, '9.9.9')),
       404,
       'releaseNotFound',
     );
     expectFailure(
-      'deletePypiRelease',
-      await callOperation('deletePypiRelease', values(names, '9.9.9')),
+      'deletePypiVersion',
+      await callOperation('deletePypiVersion', values(names, '9.9.9')),
       404,
       'releaseNotFound',
     );
@@ -264,7 +273,7 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
     );
 
     // Every failure above left the package where it was.
-    expect(await releaseVersions(names)).toEqual(['1.0.0']);
+    expect(await versionNames(names)).toEqual(['1.0.0']);
   });
 
   test('pages, sorts and narrows the package and release lists, and refuses what the spec bounds', async ({
@@ -279,10 +288,11 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
       operationId: 'listPypiPackages',
       values: { repoName: names.repoName },
       total: 5,
+      bare: true,
       keyOf: (row) => row.name,
       sorts: [{ property: 'name', value: (row) => row.name }],
     });
-    const narrowed = expectContract(
+    const narrowed = expectBare(
       'listPypiPackages',
       await callOperation('listPypiPackages', { repoName: names.repoName }, { query: 'q=pkg-3' }),
     ) as { content: { name: string }[] };
@@ -293,9 +303,10 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
       await seedPackage(repo, seeder, { name: names.name, version });
     }
     await expectPagingSweep<{ version: string }>({
-      operationId: 'listPypiReleases',
+      operationId: 'listPypiVersions',
       values: values(names),
       total: 5,
+      bare: true,
       keyOf: (row) => row.version,
       sorts: [{ property: 'version', value: (row) => row.version }],
     });
@@ -315,15 +326,15 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
       [removed, kept].map((version) => wheelFilename(names.name, version)).sort(),
     );
 
-    expectContract(
-      'deletePypiRelease',
-      await callOperation('deletePypiRelease', values(names, removed)),
+    expectNoContent(
+      'deletePypiVersion',
+      await callOperation('deletePypiVersion', values(names, removed)),
     );
 
-    expect(await releaseVersions(names)).toEqual([kept]);
+    expect(await versionNames(names)).toEqual([kept]);
     expectFailure(
-      'getPypiRelease',
-      await callOperation('getPypiRelease', values(names, removed)),
+      'getPypiVersion',
+      await callOperation('getPypiVersion', values(names, removed)),
       404,
       'releaseNotFound',
     );
@@ -338,17 +349,17 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
     expect(resolved.clientExitCode, resolved.command).toBe(0);
     expect(resolved.contentSha256).toBe(seeds.get(kept));
     expect(
-      expectContract('getPypiPackage', await callOperation('getPypiPackage', values(names))),
-    ).toMatchObject({ version: kept });
+      expectBare('getPypiPackage', await callOperation('getPypiPackage', values(names))),
+    ).toMatchObject({ name: names.name, latestVersion: kept });
     expectFailure(
-      'deletePypiRelease',
-      await callOperation('deletePypiRelease', values(names, removed)),
+      'deletePypiVersion',
+      await callOperation('deletePypiVersion', values(names, removed)),
       404,
       'releaseNotFound',
     );
 
     // Now the whole package.
-    expectContract('deletePypiPackage', await callOperation('deletePypiPackage', values(names)));
+    expectNoContent('deletePypiPackage', await callOperation('deletePypiPackage', values(names)));
     expect(await projectFiles(names), 'the project page').toBe(404);
     expect(await fileStatus(names, kept)).toBe(404);
     const lost = await pypi.resolve(worldOf(names, kept));
@@ -359,7 +370,7 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
       404,
       'packageNotFound',
     );
-    const rows = expectContract(
+    const rows = expectBare(
       'listPypiPackages',
       await callOperation('listPypiPackages', { repoName: names.repoName }),
     ) as { content: unknown[] };

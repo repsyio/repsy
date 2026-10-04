@@ -154,6 +154,6 @@ test.describe('the response validator', () => {
     expect(maven).toContain('deleteMavenArtifactVersion');
     expect(maven).not.toContain('listMavenKeyStores');
     expect(operationsUnder('/api/npm/')).toContain('listNpmPackageTags');
-    expect(operationsUnder('/api/pypi/')).toContain('deletePypiRelease');
+    expect(operationsUnder('/api/pypi/')).toContain('deletePypiVersion');
   });
 });

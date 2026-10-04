@@ -177,23 +177,13 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     return result.andReturn().getResponse().getContentAsString();
   }
 
-  private static void assertSuccessEnvelope(final String response, final String msgId) {
-    final Map<String, Object> envelope = JsonPath.read(response, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "SUCCESS")
-        .containsEntry("errorCode", null);
-    assertThat((String) envelope.get("text")).isNotBlank();
-  }
-
   private static void assertErrorEnvelope(
       final String response, final String msgId, final String data) {
     assertProblem(response, msgId);
   }
 
   @Test
-  @DisplayName("lists packages, filters by name, lists releases and returns complete details")
+  @DisplayName("lists packages, filters by name, lists versions and returns complete details")
   void listsAndReturnsCompletePackageData() throws Exception {
     final var repo = this.createRepo(true);
     final var caller = this.createUser(UserRole.USER);
@@ -209,8 +199,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
                     get("/api/pypi/packages/" + repo.getName() + "?page=0&size=2")
                         .header(AUTHORIZATION, token))
                 .andExpect(status().isOk()));
-    assertSuccessEnvelope(packageResponse, "packagesFetched");
-    final Map<String, Object> packagePage = JsonPath.read(packageResponse, "$.data");
+    final Map<String, Object> packagePage = JsonPath.read(packageResponse, "$");
     assertThat(packagePage).containsOnlyKeys("content", "page");
     assertThat((List<Map<String, Object>>) packagePage.get("content")).hasSize(2);
     assertThat((Map<String, Object>) packagePage.get("page"))
@@ -219,7 +208,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
         .containsEntry("number", 0)
         .containsEntry("totalElements", 2)
         .containsEntry("totalPages", 1);
-    assertThat((Map<String, Object>) JsonPath.read(packageResponse, "$.data.content[0]"))
+    assertThat((Map<String, Object>) JsonPath.read(packageResponse, "$.content[0]"))
         .containsOnlyKeys("name", "stableVersion", "latestVersion", "updatedAt");
 
     final var filteredResponse =
@@ -228,21 +217,19 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
                     get("/api/pypi/packages/" + repo.getName() + "?q=My_Package&page=0&size=20")
                         .header(AUTHORIZATION, token))
                 .andExpect(status().isOk()));
-    assertSuccessEnvelope(filteredResponse, "packagesFetched");
-    assertThat((List<Map<String, Object>>) JsonPath.read(filteredResponse, "$.data.content"))
+    assertThat((List<Map<String, Object>>) JsonPath.read(filteredResponse, "$.content"))
         .extracting(item -> item.get("name"))
         .containsExactly("My_Package");
 
-    final var releasesResponse =
+    final var versionsResponse =
         body(
             this.perform(
                     get("/api/pypi/packages/"
                             + repo.getName()
-                            + "/my-package/releases?q=2&page=0&size=20")
+                            + "/my-package/versions?q=2&page=0&size=20")
                         .header(AUTHORIZATION, token))
                 .andExpect(status().isOk()));
-    assertSuccessEnvelope(releasesResponse, "releasesFetched");
-    assertThat((Map<String, Object>) JsonPath.read(releasesResponse, "$.data.content[0]"))
+    assertThat((Map<String, Object>) JsonPath.read(versionsResponse, "$.content[0]"))
         .containsOnlyKeys(
             "version", "createdAt", "finalRelease", "preRelease", "postRelease", "devRelease")
         .containsEntry("version", "2.0.0")
@@ -254,11 +241,10 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     final var detailResponse =
         body(
             this.perform(
-                    get("/api/pypi/packages/" + repo.getName() + "/MY-PACKAGE/releases/2.0.0")
+                    get("/api/pypi/packages/" + repo.getName() + "/MY-PACKAGE/versions/2.0.0")
                         .header(AUTHORIZATION, token))
                 .andExpect(status().isOk()));
-    assertSuccessEnvelope(detailResponse, "releaseDetailFetched");
-    assertThat((Map<String, Object>) JsonPath.read(detailResponse, "$.data"))
+    assertThat((Map<String, Object>) JsonPath.read(detailResponse, "$"))
         .containsOnlyKeys(
             "id",
             "packageName",
@@ -285,9 +271,9 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
         .containsEntry("requiresPython", ">=3.11")
         .containsEntry("summary", "Integration test package 2.0.0")
         .containsEntry("descriptionContentType", "text/plain");
-    assertThat((List<Map<String, Object>>) JsonPath.read(detailResponse, "$.data.classifiers"))
+    assertThat((List<Map<String, Object>>) JsonPath.read(detailResponse, "$.classifiers"))
         .containsExactly(Map.of("classifier", "Programming Language", "value", "Python :: 3"));
-    assertThat((List<Map<String, Object>>) JsonPath.read(detailResponse, "$.data.projectUrls"))
+    assertThat((List<Map<String, Object>>) JsonPath.read(detailResponse, "$.projectUrls"))
         .containsExactly(Map.of("label", "Homepage", "url", "https://example.test/pypi"));
 
     final var latestResponse =
@@ -296,8 +282,10 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
                     get("/api/pypi/packages/" + repo.getName() + "/my_package")
                         .header(AUTHORIZATION, token))
                 .andExpect(status().isOk()));
-    assertSuccessEnvelope(latestResponse, "releaseDetailFetched");
-    assertThat((String) JsonPath.read(latestResponse, "$.data.version")).isEqualTo("2.0.0");
+    assertThat((Map<String, Object>) JsonPath.read(latestResponse, "$"))
+        .containsOnlyKeys("name", "stableVersion", "latestVersion", "createdAt")
+        .containsEntry("name", "My_Package")
+        .containsEntry("latestVersion", "2.0.0");
   }
 
   @Test
@@ -324,7 +312,6 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
             .andReturn()
             .getResponse()
             .getContentAsString();
-    assertSuccessEnvelope(publicResponse, "packagesFetched");
 
     final var malformedResponse =
         this.perform(
@@ -346,9 +333,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
         body(
             this.perform(get("/api/pypi/packages/" + repo.getName() + "?page=0&size=2"))
                 .andExpect(status().isOk()));
-    assertSuccessEnvelope(emptyResponse, "packagesFetched");
-    assertThat((List<?>) JsonPath.read(emptyResponse, "$.data.content")).isEmpty();
-    assertThat((Map<String, Object>) JsonPath.read(emptyResponse, "$.data.page"))
+    assertThat((List<?>) JsonPath.read(emptyResponse, "$.content")).isEmpty();
+    assertThat((Map<String, Object>) JsonPath.read(emptyResponse, "$.page"))
         .containsOnlyKeys("size", "number", "totalElements", "totalPages")
         .containsEntry("size", 2)
         .containsEntry("number", 0)
@@ -360,9 +346,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
         body(
             this.perform(get("/api/pypi/packages/" + repo.getName() + "?page=1&size=1"))
                 .andExpect(status().isOk()));
-    assertSuccessEnvelope(pageResponse, "packagesFetched");
-    assertThat((List<?>) JsonPath.read(pageResponse, "$.data.content")).isEmpty();
-    assertThat((Map<String, Object>) JsonPath.read(pageResponse, "$.data.page"))
+    assertThat((List<?>) JsonPath.read(pageResponse, "$.content")).isEmpty();
+    assertThat((Map<String, Object>) JsonPath.read(pageResponse, "$.page"))
         .containsEntry("size", 1)
         .containsEntry("number", 1)
         .containsEntry("totalElements", 1)
@@ -372,12 +357,11 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
         body(
             this.perform(get("/api/pypi/packages/" + repo.getName() + "?q=does-not-exist"))
                 .andExpect(status().isOk()));
-    assertSuccessEnvelope(noMatchResponse, "packagesFetched");
-    assertThat((List<?>) JsonPath.read(noMatchResponse, "$.data.content")).isEmpty();
+    assertThat((List<?>) JsonPath.read(noMatchResponse, "$.content")).isEmpty();
   }
 
   @Test
-  @DisplayName("returns complete errors for unknown packages, releases and release filters")
+  @DisplayName("returns complete errors for unknown packages, versions and version filters")
   void handlesMissingPackageReleaseAndFilter() throws Exception {
     final var repo = this.createRepo(false);
     this.upload(repo, "known-package", "1.0.0", "known-package-1.0.0.tar.gz");
@@ -389,14 +373,13 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
 
     final var unknownRelease =
         body(
-            this.perform(get(path + "/known-package/releases/9.9.9"))
+            this.perform(get(path + "/known-package/versions/9.9.9"))
                 .andExpect(status().isNotFound()));
     assertErrorEnvelope(unknownRelease, "releaseNotFound", "releaseNotFound");
 
     final var noReleaseMatch =
-        body(this.perform(get(path + "/known-package/releases?q=9.9")).andExpect(status().isOk()));
-    assertSuccessEnvelope(noReleaseMatch, "releasesFetched");
-    assertThat((List<?>) JsonPath.read(noReleaseMatch, "$.data.content")).isEmpty();
+        body(this.perform(get(path + "/known-package/versions?q=9.9")).andExpect(status().isOk()));
+    assertThat((List<?>) JsonPath.read(noReleaseMatch, "$.content")).isEmpty();
   }
 
   @Test
@@ -408,25 +391,28 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     this.upload(repo, "Delete_Package", "1.0.0", "delete-package-1.0.0.tar.gz");
     this.upload(repo, "delete.package", "2.0.0", "delete-package-2.0.0-py3-none-any.whl");
 
-    final var releaseResponse =
-        this.perform(
-                delete("/api/pypi/packages/" + repo.getName() + "/DELETE-PACKAGE/releases/1.0.0")
-                    .header(AUTHORIZATION, token))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-    assertSuccessEnvelope(releaseResponse, "packageReleaseDeleted");
+    assertThat(
+            this.perform(
+                    delete(
+                            "/api/pypi/packages/"
+                                + repo.getName()
+                                + "/DELETE-PACKAGE/versions/1.0.0")
+                        .header(AUTHORIZATION, token))
+                .andExpect(status().isNoContent())
+                .andReturn()
+                .getResponse()
+                .getContentAsString())
+        .isEmpty();
 
-    final var packageResponse =
-        this.perform(
-                delete("/api/pypi/packages/" + repo.getName() + "/delete_package")
-                    .header(AUTHORIZATION, token))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-    assertSuccessEnvelope(packageResponse, "packageDeleted");
+    assertThat(
+            this.perform(
+                    delete("/api/pypi/packages/" + repo.getName() + "/delete_package")
+                        .header(AUTHORIZATION, token))
+                .andExpect(status().isNoContent())
+                .andReturn()
+                .getResponse()
+                .getContentAsString())
+        .isEmpty();
 
     final var missingResponse =
         this.perform(
@@ -449,11 +435,11 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     this.upload(repo, "local-pkg", "1.0.0", "local_pkg-1.0.0-py3-none-any.whl");
     this.upload(repo, "local-pkg", "1.0.0+local.1", "local_pkg-1.0.0+local.1-py3-none-any.whl");
     this.upload(repo, "local-pkg", "1.0.0+local.2", "local-pkg-1.0.0+local.2.tar.gz");
-    final var base = "/api/pypi/packages/" + repo.getName() + "/local-pkg/releases";
+    final var base = "/api/pypi/packages/" + repo.getName() + "/local-pkg/versions";
 
     final var listed =
         body(this.perform(get(base).header(AUTHORIZATION, token)).andExpect(status().isOk()));
-    assertThat((List<Map<String, Object>>) JsonPath.read(listed, "$.data.content"))
+    assertThat((List<Map<String, Object>>) JsonPath.read(listed, "$.content"))
         .extracting(item -> item.get("version"))
         .containsExactly("1.0.0+local.2", "1.0.0+local.1", "1.0.0");
 
@@ -462,22 +448,22 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
           body(
               this.perform(get(URI.create(base + "/" + spelling)).header(AUTHORIZATION, token))
                   .andExpect(status().isOk()));
-      assertThat((String) JsonPath.read(detail, "$.data.version")).isEqualTo("1.0.0+local.1");
+      assertThat((String) JsonPath.read(detail, "$.version")).isEqualTo("1.0.0+local.1");
     }
 
     this.perform(delete(URI.create(base + "/1.0.0")).header(AUTHORIZATION, token))
-        .andExpect(status().isOk());
+        .andExpect(status().isNoContent());
     final var afterPublicDelete =
         body(this.perform(get(base).header(AUTHORIZATION, token)).andExpect(status().isOk()));
-    assertThat((List<Map<String, Object>>) JsonPath.read(afterPublicDelete, "$.data.content"))
+    assertThat((List<Map<String, Object>>) JsonPath.read(afterPublicDelete, "$.content"))
         .extracting(item -> item.get("version"))
         .containsExactly("1.0.0+local.2", "1.0.0+local.1");
 
     this.perform(delete(URI.create(base + "/1.0.0%2Blocal.2")).header(AUTHORIZATION, token))
-        .andExpect(status().isOk());
+        .andExpect(status().isNoContent());
     final var afterLocalDelete =
         body(this.perform(get(base).header(AUTHORIZATION, token)).andExpect(status().isOk()));
-    assertThat((List<Map<String, Object>>) JsonPath.read(afterLocalDelete, "$.data.content"))
+    assertThat((List<Map<String, Object>>) JsonPath.read(afterLocalDelete, "$.content"))
         .extracting(item -> item.get("version"))
         .containsExactly("1.0.0+local.1");
   }
@@ -501,13 +487,10 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden()));
     assertErrorEnvelope(readOnlyResponse, "accessDenied", "accessDenied");
 
-    final var releaseDeleteResponse =
-        body(
-            this.perform(
-                    delete("/api/pypi/packages/" + repo.getName() + "/KEEP_PACKAGE/releases/1.0.0")
-                        .header(AUTHORIZATION, adminToken))
-                .andExpect(status().isOk()));
-    assertSuccessEnvelope(releaseDeleteResponse, "packageReleaseDeleted");
+    this.perform(
+            delete("/api/pypi/packages/" + repo.getName() + "/KEEP_PACKAGE/versions/1.0.0")
+                .header(AUTHORIZATION, adminToken))
+        .andExpect(status().isNoContent());
 
     final var remainingResponse =
         body(
@@ -515,8 +498,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
                     get("/api/pypi/packages/" + repo.getName() + "/keep.package")
                         .header(AUTHORIZATION, adminToken))
                 .andExpect(status().isOk()));
-    assertSuccessEnvelope(remainingResponse, "releaseDetailFetched");
-    assertThat((String) JsonPath.read(remainingResponse, "$.data.version")).isEqualTo("2.0.0");
+    assertThat((String) JsonPath.read(remainingResponse, "$.latestVersion")).isEqualTo("2.0.0");
 
     final var unsupportedResponse =
         body(
@@ -528,17 +510,50 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     verify(this.usageUpdateService, atLeastOnce()).updateUsage(any(UsageChangedInfo.class));
   }
 
+  @Test
+  @DisplayName("the old releases routes are gone and answer 404")
+  void oldReleasesRoutesAre404() throws Exception {
+    final var repo = this.createRepo(false);
+    this.upload(repo, "gone-package", "1.0.0", "gone-package-1.0.0.tar.gz");
+    final var path = "/api/pypi/packages/" + repo.getName() + "/gone-package";
+
+    this.perform(get(path + "/versions/1.0.0")).andExpect(status().isOk());
+    this.perform(get(path + "/releases")).andExpect(status().isNotFound());
+    this.perform(get(path + "/releases/1.0.0")).andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("a package named versions does not collide with the versions sub-resource")
+  void packageNamedVersionsDoesNotCollide() throws Exception {
+    final var repo = this.createRepo(false);
+    this.upload(repo, "versions", "1.0.0", "versions-1.0.0.tar.gz");
+    this.upload(repo, "versions", "2.0.0", "versions-2.0.0.tar.gz");
+    final var path = "/api/pypi/packages/" + repo.getName();
+
+    final var summary = body(this.perform(get(path + "/versions")).andExpect(status().isOk()));
+    assertThat((String) JsonPath.read(summary, "$.name")).isEqualTo("versions");
+    assertThat((String) JsonPath.read(summary, "$.latestVersion")).isEqualTo("2.0.0");
+
+    final var listed =
+        body(this.perform(get(path + "/versions/versions")).andExpect(status().isOk()));
+    assertThat((List<Map<String, Object>>) JsonPath.read(listed, "$.content"))
+        .extracting(item -> item.get("version"))
+        .containsExactly("2.0.0", "1.0.0");
+
+    this.perform(get(path + "/versions/versions/1.0.0")).andExpect(status().isOk());
+  }
+
   @Nested
   @DisplayName("paging and sorting of the list endpoints")
   class PagingAndSorting {
 
     private static final String PACKAGES = "/api/pypi/packages/{repo}";
     private static final String PACKAGES_LIKE = PACKAGES + "?q=alpha";
-    private static final String RELEASES = PACKAGES + "/alpha/releases";
-    private static final String RELEASES_LIKE = RELEASES + "?q=1";
+    private static final String VERSIONS = PACKAGES + "/alpha/versions";
+    private static final String VERSIONS_LIKE = VERSIONS + "?q=1";
 
     static Stream<String> endpoints() {
-      return Stream.of(PACKAGES, PACKAGES_LIKE, RELEASES, RELEASES_LIKE);
+      return Stream.of(PACKAGES, PACKAGES_LIKE, VERSIONS, VERSIONS_LIKE);
     }
 
     static Stream<Arguments> acceptedSorts() {
@@ -549,7 +564,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
                       Stream.of("id", "name", "latestVersion", "updatedAt")
                           .map(property -> Arguments.of(path, property)));
       final var releaseSorts =
-          Stream.of(RELEASES, RELEASES_LIKE)
+          Stream.of(VERSIONS, VERSIONS_LIKE)
               .flatMap(
                   path ->
                       Stream.of("id", "version", "createdAt")
@@ -604,22 +619,22 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
 
       this.list(seed, PACKAGES, "sort", "name,asc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].name").value("alpha"));
+          .andExpect(jsonPath("$.content[0].name").value("alpha"));
       this.list(seed, PACKAGES, "sort", "name,desc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].name").value("beta"));
-      this.list(seed, RELEASES, "sort", "version,asc")
+          .andExpect(jsonPath("$.content[0].name").value("beta"));
+      this.list(seed, VERSIONS, "sort", "version,asc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].version").value("1.0.0"));
-      this.list(seed, RELEASES, "sort", "version,desc")
+          .andExpect(jsonPath("$.content[0].version").value("1.0.0"));
+      this.list(seed, VERSIONS, "sort", "version,desc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].version").value("1.1.0"));
+          .andExpect(jsonPath("$.content[0].version").value("1.1.0"));
     }
 
     @ParameterizedTest(name = "{0} {1}")
     @CsvSource({
       "/api/pypi/packages/{repo},name",
-      "/api/pypi/packages/{repo}/alpha/releases,version"
+      "/api/pypi/packages/{repo}/alpha/versions,version"
     })
     @DisplayName("filters by q only: the old name of the filter is an unknown parameter")
     void filtersByQOnly(final String path, final String oldName) throws Exception {

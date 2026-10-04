@@ -780,7 +780,7 @@ test.describe('pypi uv client', () => {
       } as const;
       expect((await runUv('uv-deleted-lock', ['lock'], opts)).exitCode).toBe(0);
 
-      await panelApi.deletePypiRelease(layout.repoName, layout.packageName, layout.version);
+      await panelApi.deletePypiVersion(layout.repoName, layout.packageName, layout.version);
       expect(
         (await rawDownload(layout.repoName, credential, layout.packageName, built.filename)).status,
       ).toBe(404);

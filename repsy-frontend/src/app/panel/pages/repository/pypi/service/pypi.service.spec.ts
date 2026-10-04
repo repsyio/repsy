@@ -26,7 +26,6 @@ import {
   PAGE_SIZE,
   PagedCase,
   REPO,
-  restResponse,
   selectRepo,
   SORT,
 } from '../../testing/protocol-service-spec-helpers';
@@ -46,10 +45,10 @@ describe('PypiService', () => {
     ]);
     pypiApi = jasmine.createSpyObj<PypiPackageControllerService>('PypiPackageControllerService', [
       'listPypiPackages',
-      'listPypiReleases',
+      'listPypiVersions',
       'deletePypiPackage',
-      'getPypiRelease',
-      'deletePypiRelease',
+      'getPypiVersion',
+      'deletePypiVersion',
     ]);
     TestBed.configureTestingModule({
       providers: [
@@ -79,12 +78,14 @@ describe('PypiService', () => {
         invoke: (s, name) => s.fetchRepositoryPackagesLikeName(name, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => pypiApi.listPypiPackages,
         args: (name) => [REPO, name, ...PAGE_ARGS],
+        bare: true,
       },
       {
         name: 'fetchPackageReleasesLikeName',
         invoke: (s, version) => s.fetchPackageReleasesLikeName(PACKAGE, version, SORT, PAGE_INDEX, PAGE_SIZE),
-        api: () => pypiApi.listPypiReleases,
+        api: () => pypiApi.listPypiVersions,
         args: (version) => [PACKAGE, REPO, version, ...PAGE_ARGS],
+        bare: true,
       },
     ];
     describePagedCalls(() => service, paged);
@@ -96,24 +97,24 @@ describe('PypiService', () => {
         invoke: (s) => s.deletePackage(PACKAGE),
         api: () => pypiApi.deletePypiPackage,
         args: [PACKAGE, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
-        notCalled: () => [pypiApi.deletePypiRelease],
+        notCalled: () => [pypiApi.deletePypiVersion],
       },
       {
         name: 'fetchRelease',
         invoke: (s) => s.fetchRelease(PACKAGE, RELEASE),
-        api: () => pypiApi.getPypiRelease,
+        api: () => pypiApi.getPypiVersion,
         args: [PACKAGE, RELEASE, REPO],
-        response: restResponse(release),
+        response: release,
         expected: release,
       },
       {
         name: 'deleteRelease',
         invoke: (s) => s.deleteRelease(PACKAGE, RELEASE),
-        api: () => pypiApi.deletePypiRelease,
+        api: () => pypiApi.deletePypiVersion,
         args: [PACKAGE, RELEASE, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [pypiApi.deletePypiPackage],
       },

@@ -4220,7 +4220,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPypiPackageListItem"
+                "$ref": "#/components/schemas/PagedModelPypiPackageListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -4236,11 +4236,11 @@ paths:
         required: true
         schema:
           type: string
-  "/api/pypi/packages/{repoName}/{packageName}/releases":
+  "/api/pypi/packages/{repoName}/{packageName}/versions":
     get:
       tags:
         - pypi-package-controller
-      operationId: listPypiReleases
+      operationId: listPypiVersions
       description: >-
         Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
       parameters:
@@ -4253,7 +4253,7 @@ paths:
           in: query
           required: false
           description: >-
-            Only releases whose version contains this text.
+            Only versions that contain this text.
           schema:
             type: string
         - "$ref": "#/components/parameters/Page"
@@ -4268,7 +4268,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelReleaseListItem"
+                "$ref": "#/components/schemas/PagedModelReleaseListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -4277,18 +4277,18 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: List releases of a PyPI package
+      summary: List versions of a PyPI package
     parameters:
       - name: repoName
         in: path
         required: true
         schema:
           type: string
-  "/api/pypi/packages/{repoName}/{packageName}/releases/{version}":
+  "/api/pypi/packages/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
         - pypi-package-controller
-      operationId: getPypiRelease
+      operationId: getPypiVersion
       parameters:
         - name: packageName
           in: path
@@ -4309,18 +4309,18 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseReleaseDetail"
+                "$ref": "#/components/schemas/ReleaseDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: Get a specific PyPI package release
+      summary: Get a version of a PyPI package
     delete:
       tags:
         - pypi-package-controller
-      operationId: deletePypiRelease
+      operationId: deletePypiVersion
       parameters:
         - name: packageName
           in: path
@@ -4333,12 +4333,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -4349,7 +4345,7 @@ paths:
           "$ref": "#/components/responses/TooManyRequests"
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete a specific PyPI package release
+      summary: Delete a version of a PyPI package
     parameters:
       - name: repoName
         in: path
@@ -4376,7 +4372,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseReleaseDetail"
+                "$ref": "#/components/schemas/PypiPackageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -4395,12 +4391,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -7121,6 +7113,20 @@ components:
         updatedAt:
           type: string
           format: date-time
+    PypiPackageInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        stableVersion:
+          type: string
+        latestVersion:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - name
     PagedModelPypiPackageListItem:
       type: object
       properties:
@@ -7130,20 +7136,6 @@ components:
             "$ref": "#/components/schemas/PypiPackageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelPypiPackageListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelPypiPackageListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelReleaseListItem:
       type: object
       properties:
@@ -7169,20 +7161,6 @@ components:
           type: boolean
         devRelease:
           type: boolean
-    RestResponsePagedModelReleaseListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelReleaseListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ReleaseClassifierInfo:
       type: object
       properties:
@@ -7243,20 +7221,6 @@ components:
         label:
           type: string
         url:
-          type: string
-    RestResponseReleaseDetail:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/ReleaseDetail"
-        errorCode:
-          type: string
-          nullable: true
-        text:
           type: string
     # region: ruby
     GemListItem:
