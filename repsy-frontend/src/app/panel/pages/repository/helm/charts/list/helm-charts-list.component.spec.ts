@@ -66,7 +66,7 @@ describe('HelmChartsListComponent', () => {
       respond: (content, totalPages) => service.searchCharts.and.returnValue(of(pageOf(content, totalPages) as never)),
       fail: () =>
         service.searchCharts.and.returnValue(
-          throwError(() => new HttpErrorResponse({ status: 500, error: { text: 'Charts cannot be listed' } })),
+          throwError(() => new HttpErrorResponse({ status: 500, error: { detail: 'Charts cannot be listed' } })),
         ),
       security: { watch: securityService.watchArtifactSecuritySummary, argsFor: (repoName) => [repoName] },
     };

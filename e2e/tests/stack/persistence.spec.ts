@@ -136,8 +136,8 @@ async function panelStatus(token: string): Promise<{ status: number; msgId: stri
   const res = await fetch(`${env.apiBaseUrl}/api/repos?size=1`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const body = (await res.json()) as { msgId?: string };
-  return { status: res.status, msgId: body.msgId };
+  const body = (await res.json()) as { code?: string };
+  return { status: res.status, msgId: body.code };
 }
 
 async function refreshStatus(
@@ -148,8 +148,8 @@ async function refreshStatus(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken }),
   });
-  const body = (await res.json()) as { msgId?: string };
-  return { status: res.status, msgId: body.msgId };
+  const body = (await res.json()) as { code?: string };
+  return { status: res.status, msgId: body.code };
 }
 
 /** A fresh session of the admin, as a browser or a script would hold it: an access and a refresh token. */

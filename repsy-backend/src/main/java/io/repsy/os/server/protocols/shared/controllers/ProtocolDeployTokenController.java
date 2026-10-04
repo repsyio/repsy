@@ -26,9 +26,11 @@ import io.repsy.os.generated.model.TokenInfo;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfoListItem;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
+import io.repsy.os.shared.http.NoStore;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.os.shared.utils.SortValidator;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.Set;
 import java.util.UUID;
@@ -66,10 +68,14 @@ public class ProtocolDeployTokenController {
   @PostMapping
   @RepoOperation(permission = MANAGE)
   public RestResponse<TokenInfo> create(
-      final RepoInfo repoInfo, @RequestBody @Valid final DeployTokenForm form) {
+      final RepoInfo repoInfo,
+      @RequestBody @Valid final DeployTokenForm form,
+      final HttpServletResponse response) {
 
     final var deployToken =
         this.deployTokenService.createDeployToken(repoInfo.getStorageKey(), form);
+
+    NoStore.apply(response);
 
     return this.restResponseFactory.success("tokenCreated", deployToken);
   }
@@ -87,10 +93,14 @@ public class ProtocolDeployTokenController {
   @PostMapping("/{tokenId}/actions/rotate")
   @RepoOperation(permission = MANAGE)
   public RestResponse<String> rotateDeployToken(
-      final RepoInfo repoInfo, @PathVariable final UUID tokenId) {
+      final RepoInfo repoInfo,
+      @PathVariable final UUID tokenId,
+      final HttpServletResponse response) {
 
     final var repoDeployToken =
         this.deployTokenService.rotateDeployToken(repoInfo.getStorageKey(), tokenId);
+
+    NoStore.apply(response);
 
     return this.restResponseFactory.success("tokenRotated", repoDeployToken);
   }
@@ -106,6 +116,6 @@ public class ProtocolDeployTokenController {
     final var deployTokenInfoList =
         this.deployTokenService.getDeployTokensByRepoInfo(repoInfo.getStorageKey(), pageable);
 
-    return this.restResponseFactory.success("TokenFetched", new PagedModel<>(deployTokenInfoList));
+    return this.restResponseFactory.success("tokensFetched", new PagedModel<>(deployTokenInfoList));
   }
 }

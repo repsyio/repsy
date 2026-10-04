@@ -58,29 +58,25 @@ test.describe('the response validator', () => {
     expect(
       contractProblems('deleteMavenGroup', 200, { ...ENVELOPE, data: 'NOTHING' }).join(),
     ).toContain('/data must be equal to one of the allowed values');
-    // 404 is `#/components/responses/NotFound`: the spec's ErrorResponse, whose errorCode is a uuid.
+    // 404 is `#/components/responses/NotFound`: the spec's ProblemDetail (application/problem+json), whose traceId is a uuid.
     expect(
       contractProblems('deleteMavenGroup', 404, {
-        msgId: 'x',
-        type: 'ERROR',
-        errorCode: '49aff165-f2b9-4f94-a85e-21f050cc4fbc',
+        status: 404,
+        code: 'x',
+        traceId: '49aff165-f2b9-4f94-a85e-21f050cc4fbc',
       }),
     ).toEqual([]);
     expect(
       contractProblems('deleteMavenGroup', 404, {
-        msgId: 'x',
-        type: 'ERROR',
-        errorCode: 'nope',
+        status: 404,
+        code: 'x',
+        traceId: 'nope',
       }).join(),
-    ).toContain('/errorCode must match format "uuid"');
-    // only the success envelope allows a null errorCode: a failure always carries the id of the failure
+    ).toContain('/traceId must match format "uuid"');
+    // the old failure envelope is not a problem: `status` and `code` are required
     expect(
-      contractProblems('deleteMavenGroup', 404, {
-        msgId: 'x',
-        type: 'ERROR',
-        errorCode: null,
-      }).join(),
-    ).toContain('/errorCode must be string');
+      contractProblems('deleteMavenGroup', 404, { msgId: 'x', type: 'ERROR' }).join(),
+    ).toContain("must have required property 'code'");
   });
 
   test('catches a wrong type, a fractional integer and a string where the schema says integer', () => {

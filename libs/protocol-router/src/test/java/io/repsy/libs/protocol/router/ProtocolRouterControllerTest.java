@@ -30,6 +30,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 /**
  * RPS-1114: {@code route} decides, centrally, whether a failed request's post-processing still
@@ -75,6 +76,22 @@ class ProtocolRouterControllerTest {
 
     assertThat(settled.get()).isEqualTo(1);
     assertThat(skipped.get()).isZero();
+  }
+
+  @Test
+  void aMethodNoProtocolHandlesIsAnsweredWith405AndTheMethodsThatExist() {
+    final var handler =
+        new RecordingHandler((context, request, response) -> ResponseEntity.ok().body("ok"));
+    final var controller = controllerFor(new RecordingProvider(), handler);
+
+    assertThatThrownBy(
+            () -> controller.route(requestFor(HttpMethod.TRACE), mock(HttpServletResponse.class)))
+        .isInstanceOfSatisfying(
+            HttpRequestMethodNotSupportedException.class,
+            ex -> {
+              assertThat(ex.getMethod()).isEqualTo("TRACE");
+              assertThat(ex.getSupportedMethods()).isNotEmpty().doesNotContain("TRACE");
+            });
   }
 
   @Test

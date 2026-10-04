@@ -30,9 +30,10 @@
  */
 import type { Route } from '@playwright/test';
 
-import { ResponseType, type ErrorResponse } from './stub-models.js';
+import type { ProblemDetail } from './stub-models.js';
 
-export type { ErrorResponse };
+/** The body of a failed panel request (RFC 9457 `application/problem+json`), the spec's `ProblemDetail`. */
+export type ErrorResponse = ProblemDetail;
 
 /** Answers `route` with `status` and `body` as JSON. `Model` is the generated model the body is an instance of. */
 export async function fulfillJson<Model = never>(
@@ -61,9 +62,10 @@ export async function fulfillText(
 }
 
 /**
- * The failure envelope the backend sends with every error status (`ErrorResponse`): `type` is always `ERROR`.
- * What the panel reads is `msgId` (which message it shows) and `text` (the message itself).
+ * The problem document the backend sends with every failed panel request (`ProblemDetail`). What the panel reads is
+ * `code` (which message it shows) and `detail` (the message itself); `status` and `code` are filled in when a stub
+ * leaves them out.
  */
-export function errorBody(fields: Omit<ErrorResponse, 'type'> = {}): ErrorResponse {
-  return { type: ResponseType.ERROR, ...fields };
+export function errorBody(fields: Partial<ProblemDetail> = {}): ErrorResponse {
+  return { status: 500, code: 'errorOccurred', ...fields };
 }

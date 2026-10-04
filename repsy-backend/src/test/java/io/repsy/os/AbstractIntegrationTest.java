@@ -46,6 +46,7 @@ import java.time.Instant;
 import java.time.temporal.TemporalAmount;
 import java.util.Base64;
 import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -528,7 +529,13 @@ public abstract class AbstractIntegrationTest {
         "Access Denied. Please check your credentials.");
   }
 
-  /** Asserts a complete ERROR envelope, including the generated {@code errorCode} UUID. */
+  /**
+   * Asserts the failure of a panel request: an RFC 9457 {@code application/problem+json} body with
+   * the {@code status}, {@code code} (the stable message id), {@code detail} (the message) and the
+   * generated {@code traceId} UUID. For a validation failure {@code data} is the comma separated
+   * list of offending field names, which must be the {@code errors[].field} members; for any other
+   * failure it is ignored.
+   */
   protected static void expectError(
       final ResultActions result,
       final HttpStatus expectedStatus,
@@ -536,20 +543,23 @@ public abstract class AbstractIntegrationTest {
       final String data,
       final String text)
       throws Exception {
-    final var body =
-        result
-            .andExpect(status().is(expectedStatus.value()))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
+    final var response =
+        result.andExpect(status().is(expectedStatus.value())).andReturn().getResponse();
 
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "ERROR")
-        .containsEntry("data", data)
-        .containsEntry("text", text);
-    assertThat((String) envelope.get("errorCode")).matches(UUID_PATTERN);
+    assertThat(response.getContentType()).startsWith("application/problem+json");
+
+    final Map<String, Object> problem = JsonPath.read(response.getContentAsString(), "$");
+    assertThat(problem)
+        .containsEntry("status", expectedStatus.value())
+        .containsEntry("code", msgId)
+        .containsEntry("detail", text)
+        .containsEntry("title", expectedStatus.getReasonPhrase());
+    assertThat((String) problem.get("traceId")).matches(UUID_PATTERN);
+    assertThat(problem).doesNotContainKeys("msgId", "errorCode", "text", "data");
+
+    if ("validationError".equals(msgId) && data != null && !data.isBlank()) {
+      final List<String> fields = JsonPath.read(response.getContentAsString(), "$.errors[*].field");
+      assertThat(fields).containsExactlyInAnyOrder(data.split(",", -1));
+    }
   }
 }

@@ -192,7 +192,7 @@ export function answerSessionExpired(route: Route): Promise<void> {
   return fulfillJson<ErrorResponse>(
     route,
     401,
-    errorBody({ msgId: 'sessionExpired', data: 'sessionExpired', text: 'Session expired.' }),
+    errorBody({ status: 401, code: 'sessionExpired', detail: 'Session expired.' }),
   );
 }
 

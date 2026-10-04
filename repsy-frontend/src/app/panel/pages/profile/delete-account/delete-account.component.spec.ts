@@ -80,7 +80,7 @@ describe('DeleteAccountComponent', () => {
 
   it('leaves the toast to the error interceptor, and keeps the user signed in, when the deletion fails', () => {
     profileService.deleteAccount.and.returnValue(
-      throwError(() => new HttpErrorResponse({ status: 400, error: { text: 'Cannot delete the last admin' } })),
+      throwError(() => new HttpErrorResponse({ status: 400, error: { detail: 'Cannot delete the last admin' } })),
     );
     component.confirmAccountDelete();
 

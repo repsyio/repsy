@@ -412,13 +412,13 @@ class ErrorHandlerTest {
         .perform(get("/panel/optimistic-lock"))
         .andExpect(status().isConflict())
         .andExpect(header().doesNotExist(HttpHeaders.RETRY_AFTER))
-        .andExpect(jsonPath("$.msgId").value("concurrentModification"))
-        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(jsonPath("$.code").value("concurrentModification"))
+        .andExpect(jsonPath("$.status").value(409))
         .andExpect(
-            jsonPath("$.text")
+            jsonPath("$.detail")
                 .value(
                     "The item was changed by another request at the same time. Please try again."))
-        .andExpect(jsonPath("$.data").doesNotExist());
+        .andExpect(jsonPath("$.msgId").doesNotExist());
   }
 
   @Test
@@ -427,7 +427,7 @@ class ErrorHandlerTest {
     this.mockMvc
         .perform(get("/panel/optimistic-lock/plain"))
         .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.msgId").value("concurrentModification"));
+        .andExpect(jsonPath("$.code").value("concurrentModification"));
   }
 
   @Test
@@ -486,7 +486,7 @@ class ErrorHandlerTest {
         .perform(get("/panel/lock/optimistic-jpa"))
         .andExpect(status().isConflict())
         .andExpect(header().doesNotExist(HttpHeaders.RETRY_AFTER))
-        .andExpect(jsonPath("$.msgId").value("concurrentModification"));
+        .andExpect(jsonPath("$.code").value("concurrentModification"));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -641,7 +641,7 @@ class ErrorHandlerTest {
         .perform(get("/panel/header/authorization"))
         .andExpect(status().isUnauthorized())
         .andExpect(header().stringValues(HttpHeaders.WWW_AUTHENTICATE, "Bearer"))
-        .andExpect(jsonPath("$.msgId").value("missingRequestHeader"));
+        .andExpect(jsonPath("$.code").value("missingRequestHeader"));
   }
 
   @Test
@@ -651,7 +651,7 @@ class ErrorHandlerTest {
         .perform(get("/panel/unauthorized"))
         .andExpect(status().isUnauthorized())
         .andExpect(header().stringValues(HttpHeaders.WWW_AUTHENTICATE, "Bearer"))
-        .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
+        .andExpect(jsonPath("$.code").value("accessNotAllowed"));
   }
 
   @Test
@@ -679,10 +679,9 @@ class ErrorHandlerTest {
     this.mockMvc
         .perform(get("/panel/unauthorized/plain"))
         .andExpect(status().isUnauthorized())
-        .andExpect(jsonPath("$.msgId").value("loginRequired"))
-        .andExpect(jsonPath("$.data").value("unAuthorized"))
+        .andExpect(jsonPath("$.code").value("loginRequired"))
         .andExpect(
-            jsonPath("$.text")
+            jsonPath("$.detail")
                 .value(
                     "Please log in: the credentials are missing or invalid, or the account is gone."));
   }

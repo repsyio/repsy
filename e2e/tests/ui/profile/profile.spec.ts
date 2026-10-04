@@ -335,7 +335,7 @@ test.describe(
           await route.fallback();
           return;
         }
-        await fulfillJson<ErrorResponse>(route, 400, errorBody({ text: REFUSAL }));
+        await fulfillJson<ErrorResponse>(route, 400, errorBody({ status: 400, detail: REFUSAL }));
       });
     }
 

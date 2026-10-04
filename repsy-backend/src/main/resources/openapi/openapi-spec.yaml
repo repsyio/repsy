@@ -12,9 +12,11 @@ info:
     bumped for each one. It is independent of the Repsy release version.
 
 
-    Every response body, success or failure, is the same envelope: `msgId`, `type`, `text`,
-    `errorCode` and `data`. Failures are described by `ErrorResponse`, whose `errorCode` is the
-    unique id of the failure; on a success `errorCode` is always `null`.
+    A successful response body is the envelope `msgId`, `type`, `text`, `errorCode` (always `null`)
+    and `data`. A failed request is answered with an RFC 9457 problem document,
+    `application/problem+json`, described by `ProblemDetail`: `status`, `title`, `detail`,
+    `instance`, `code` (the stable key of the failure), `traceId` (the unique id of the failure)
+    and, for a validation failure, `errors`.
 
 
     Authenticate with the access token that `login` returns, as `Authorization: Bearer <token>`.
@@ -75,7 +77,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -124,7 +126,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -163,7 +165,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -640,7 +642,9 @@ paths:
       description: >-
         Registered keys are tried first when a .pom.asc is verified, then the repo's allowed
         key-server hosts, then the two public default servers. A signature whose key is nowhere
-        among those is refused with 404 and nothing is stored.
+        among those is refused with 404 and nothing is stored. A 400 means the key is not one armored
+        OpenPGP public key (pgpPublicKeyInvalid), or the repository already has the maximum of 20
+        registered keys (pgpPublicKeyLimitReached, RPS-1796).
 
 
         Sortable by `id`, `keyId`, `fingerprint`, `userId`, `createdAt` (`property,direction`). The
@@ -663,13 +667,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponsePgpPublicKeyItem"
         '400':
-          description: >-
-            The key is not one armored OpenPGP public key (pgpPublicKeyInvalid), or the repository
-            already has the maximum of 20 registered keys (pgpPublicKeyLimitReached, RPS-1796).
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+          "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -709,7 +707,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -795,7 +793,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -818,7 +816,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -857,7 +855,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1191,7 +1189,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1253,7 +1251,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1296,7 +1294,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Delete the current user's account
@@ -1396,7 +1394,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1478,7 +1476,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1540,7 +1538,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1612,7 +1610,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -2530,7 +2528,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2613,7 +2611,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2785,7 +2783,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3067,7 +3065,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3139,7 +3137,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3284,7 +3282,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3354,7 +3352,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3478,7 +3476,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3608,7 +3606,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3702,7 +3700,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3793,7 +3791,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3832,7 +3830,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/EmptyResponse"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -4399,9 +4397,9 @@ components:
         where there is one), or a business rule (for example `usernameInUse` or
         `cannotDeleteLastAdminUser`).
       content:
-        application/json:
+        application/problem+json:
           schema:
-            "$ref": "#/components/schemas/ErrorResponse"
+            "$ref": "#/components/schemas/ProblemDetail"
     Unauthorized:
       description: >-
         The request is not authenticated: the token or credentials are missing, wrong or expired,
@@ -4420,9 +4418,9 @@ components:
           schema:
             type: string
       content:
-        application/json:
+        application/problem+json:
           schema:
-            "$ref": "#/components/schemas/ErrorResponse"
+            "$ref": "#/components/schemas/ProblemDetail"
     Forbidden:
       description: >-
         The caller is signed in but is not allowed to do this: the admin role is required
@@ -4431,18 +4429,18 @@ components:
         repository) answers a user who is not an admin with this status, whether or not the
         repository exists. The session stays valid.
       content:
-        application/json:
+        application/problem+json:
           schema:
-            "$ref": "#/components/schemas/ErrorResponse"
+            "$ref": "#/components/schemas/ProblemDetail"
     NotFound:
       description: >-
         The thing the request names does not exist: a repository (`repoNotFound`), a repository
         type, a user, a token or an item in the repository (`itemNotFound`). A caller who may not
         use the repository is answered 401 or 403 instead, so this does not reveal that it exists.
       content:
-        application/json:
+        application/problem+json:
           schema:
-            "$ref": "#/components/schemas/ErrorResponse"
+            "$ref": "#/components/schemas/ProblemDetail"
     Conflict:
       description: >-
         The request collides with something that exists (`itemAlreadyExists`, `repoExists`,
@@ -4450,9 +4448,9 @@ components:
         request that changed the same item at the same moment (`concurrentModification`): read the
         item again and repeat the request.
       content:
-        application/json:
+        application/problem+json:
           schema:
-            "$ref": "#/components/schemas/ErrorResponse"
+            "$ref": "#/components/schemas/ProblemDetail"
     TooManyRequests:
       description: >-
         The client made too many failed password checks and is refused until its window ends
@@ -4464,9 +4462,9 @@ components:
             type: integer
             format: int64
       content:
-        application/json:
+        application/problem+json:
           schema:
-            "$ref": "#/components/schemas/ErrorResponse"
+            "$ref": "#/components/schemas/ProblemDetail"
     ServiceUnavailable:
       description: >-
         The request could not be served right now, and repeating it after a moment is expected to
@@ -4484,9 +4482,9 @@ components:
             type: integer
             format: int64
       content:
-        application/json:
+        application/problem+json:
           schema:
-            "$ref": "#/components/schemas/ErrorResponse"
+            "$ref": "#/components/schemas/ProblemDetail"
   schemas:
     NuGetDependencyInfo:
       type: object
@@ -6682,17 +6680,15 @@ components:
         - ERROR
         - SUCCESS
         - WARNING
-    ErrorResponse:
+    EmptyResponse:
       type: object
       description: >-
-        The envelope of every failed request. `type` is always `ERROR`. `msgId` is the stable key
-        of the failure and `text` its message. `errorCode` is a unique id of this failure, for a
-        bug report. `data` is a detail about the failure (for example the name of the offending
-        parameter), or null.
+        The envelope of a successful request that returns no data: `msgId`, `type`, `text`,
+        `errorCode` (always null) and `data`. Failures do not use it; they are a `ProblemDetail`.
       properties:
         msgId:
           type: string
-          example: validationError
+          example: userDeleted
         type:
           "$ref": "#/components/schemas/ResponseType"
         text:
@@ -6702,7 +6698,68 @@ components:
           format: uuid
         data:
           type: string
-          description: A detail about the failure, or null when there is none.
+          description: A detail about the result, or null when there is none.
+    ProblemDetail:
+      type: object
+      description: >-
+        The body of every failed panel request, an RFC 9457 problem document served as
+        `application/problem+json`. `code` is the stable key of the failure (the same strings the
+        panel has always used as `msgId`) and the key the frontend translates. `traceId` is a unique
+        id of this failure, for a bug report. Protocol routes (npm, Maven, Docker, ...) keep the
+        error format of their own client and do not use it.
+      required:
+        - status
+        - code
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          default: about:blank
+          description: A URI that identifies the kind of problem; `about:blank` when there is none.
+        title:
+          type: string
+          description: The HTTP reason phrase of `status`.
+        status:
+          type: integer
+          format: int32
+          description: The HTTP status code, repeated from the response.
+        detail:
+          type: string
+          description: A human readable message for this failure.
+        instance:
+          type: string
+          format: uri-reference
+          description: The request path the failure happened on.
+        code:
+          type: string
+          example: validationError
+          description: The stable key of the failure, for example `validationError` or `repoNotFound`.
+        traceId:
+          type: string
+          format: uuid
+          description: A unique id of this failure, for a bug report.
+        errors:
+          type: array
+          description: >-
+            The fields, parameters or headers a validation failure is about. Absent on any other
+            failure.
+          items:
+            "$ref": "#/components/schemas/ProblemField"
+    ProblemField:
+      type: object
+      required:
+        - field
+        - code
+      properties:
+        field:
+          type: string
+          description: The name of the offending field, parameter or header.
+        code:
+          type: string
+          description: The constraint that failed (for example `NotBlank`), or the failure code.
+        message:
+          type: string
+          description: A human readable description, or absent.
     UserRole:
       type: string
       enum:

@@ -28,6 +28,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
@@ -71,8 +72,7 @@ public class ProtocolRouterController {
       return staticContentResponseOptional.get();
     }
 
-    final var httpMethod = HttpMethod.valueOf(request.getMethod());
-    final var handlers = this.methodHandlersMap.get(httpMethod);
+    final var handlers = this.handlersFor(request);
 
     for (final var specifiedHandler : handlers) {
       final var handler = specifiedHandler.protocolMethodHandler();
@@ -107,6 +107,26 @@ public class ProtocolRouterController {
     }
 
     throw new ItemNotFoundException("unknownPath");
+  }
+
+  /**
+   * The handlers of the request's method. No protocol registers a handler for some methods (TRACE,
+   * an unknown verb): such a request cannot match any route, so it is answered 405 with the methods
+   * that exist (the Allow header) instead of failing on the missing list with a 500.
+   */
+  private List<SpecifiedProtocolMethodHandler> handlersFor(final HttpServletRequest request)
+      throws HttpRequestMethodNotSupportedException {
+
+    final var handlers = this.methodHandlersMap.get(HttpMethod.valueOf(request.getMethod()));
+
+    if (handlers == null) {
+      final var allowed =
+          this.methodHandlersMap.keySet().stream().map(HttpMethod::name).sorted().toList();
+
+      throw new HttpRequestMethodNotSupportedException(request.getMethod(), allowed);
+    }
+
+    return handlers;
   }
 
   /**

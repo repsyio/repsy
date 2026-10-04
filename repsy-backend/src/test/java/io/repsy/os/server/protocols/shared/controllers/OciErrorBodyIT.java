@@ -249,7 +249,7 @@ class OciErrorBodyIT extends AbstractIntegrationTest {
 
     final var body = response.getContentAsString(StandardCharsets.UTF_8);
     assertThat(response.getStatus()).isEqualTo(404);
-    assertThat(JsonPath.<Map<String, Object>>read(body, "$")).containsOnlyKeys(ENVELOPE_KEYS);
-    assertThat(JsonPath.<String>read(body, "$.type")).isEqualTo("ERROR");
+    assertThat(response.getContentType()).startsWith("application/problem+json");
+    assertThat(JsonPath.<String>read(body, "$.code")).isNotBlank();
   }
 }

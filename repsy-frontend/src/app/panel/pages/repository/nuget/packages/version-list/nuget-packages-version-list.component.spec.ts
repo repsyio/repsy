@@ -87,7 +87,7 @@ describe('NugetPackagesVersionListComponent', () => {
         nugetService.fetchPackageVersions.and.resolveTo(pageOf(content, totalPages) as never),
       fail: () =>
         nugetService.fetchPackageVersions.and.rejectWith(
-          new HttpErrorResponse({ status: 404, error: { text: 'Package not found' } }),
+          new HttpErrorResponse({ status: 404, error: { detail: 'Package not found' } }),
         ),
       security: { watch: securityService.watchVersionSecuritySummary, argsFor: (repoName) => [repoName, 'Acme.Lib'] },
     };

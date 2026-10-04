@@ -93,7 +93,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
           "tokenCreated", "Deploy token created.",
           "tokenRevoked", "Deploy token revoked.",
           "tokenRotated", "Deploy token rotated.",
-          "TokenFetched", "Token fetched.");
+          "tokensFetched", "Token fetched.");
   private static final Instant BASE_TIME = Instant.parse("2026-01-01T00:00:00Z");
 
   private static final String[] TOKEN_INFO_KEYS = {"token", "username"};
@@ -521,8 +521,12 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
               .getContentAsString();
 
       // Everything but the per-error correlation id must match.
-      assertThat(forMissing.replaceAll(UUID_PATTERN, "<id>"))
-          .isEqualTo(forPrivate.replaceAll(UUID_PATTERN, "<id>"));
+      assertThat(
+              forMissing.replaceAll(UUID_PATTERN, "<id>").replaceAll("\"instance\":\"[^\"]*\"", ""))
+          .isEqualTo(
+              forPrivate
+                  .replaceAll(UUID_PATTERN, "<id>")
+                  .replaceAll("\"instance\":\"[^\"]*\"", ""));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -637,7 +641,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
 
       final var listed =
           expectSuccess(
-              it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, token)), "TokenFetched");
+              it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, token)), "tokensFetched");
       assertThat(listed).doesNotContain(secret);
     }
 
@@ -977,7 +981,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var body =
           expectSuccess(
               it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, it.adminBearerToken())),
-              "TokenFetched");
+              "tokensFetched");
 
       final List<Object> content = JsonPath.read(body, "$.data.content");
       assertThat(content).isEmpty();
@@ -1004,7 +1008,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var body =
           expectSuccess(
               it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, it.adminBearerToken())),
-              "TokenFetched");
+              "tokensFetched");
 
       final List<Map<String, Object>> content = JsonPath.read(body, "$.data.content");
       assertThat(content).hasSize(3);
@@ -1043,7 +1047,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var body =
           expectSuccess(
               it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, it.adminBearerToken())),
-              "TokenFetched");
+              "tokensFetched");
 
       final List<Map<String, Object>> content = JsonPath.read(body, "$.data.content");
       assertThat(content).hasSize(1);
@@ -1063,7 +1067,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var body =
           expectSuccess(
               it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, it.adminBearerToken())),
-              "TokenFetched");
+              "tokensFetched");
 
       assertThat(namesOf(body)).containsExactly("mine");
       assertPage(body, 10, 0, 1, 1);
@@ -1094,7 +1098,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
                         .header(AUTHORIZATION, token)
                         .param("page", String.valueOf(entry.getKey()))
                         .param("size", "2")),
-                "TokenFetched");
+                "tokensFetched");
 
         assertThat(namesOf(body)).as("page %d", entry.getKey()).isEqualTo(entry.getValue());
         assertPage(body, 2, entry.getKey(), 5, 3);
@@ -1115,7 +1119,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
                       .header(AUTHORIZATION, it.adminBearerToken())
                       .param("page", "5")
                       .param("size", "2")),
-              "TokenFetched");
+              "tokensFetched");
 
       final List<Object> content = JsonPath.read(body, "$.data.content");
       assertThat(content).isEmpty();
@@ -1136,14 +1140,14 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
           expectSuccess(
               it.perform(
                   get(tokensUrl(repo)).header(AUTHORIZATION, token).param("sort", "name,asc")),
-              "TokenFetched");
+              "tokensFetched");
       assertThat(namesOf(ascending)).containsExactly("alpha", "bravo", "charlie");
 
       final var descending =
           expectSuccess(
               it.perform(
                   get(tokensUrl(repo)).header(AUTHORIZATION, token).param("sort", "name,desc")),
-              "TokenFetched");
+              "tokensFetched");
       assertThat(namesOf(descending)).containsExactly("charlie", "bravo", "alpha");
     }
 
@@ -1173,7 +1177,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
                     get(tokensUrl(repo))
                         .header(AUTHORIZATION, token)
                         .param("sort", property + "," + direction)),
-                "TokenFetched");
+                "tokensFetched");
 
         assertThat(namesOf(body)).as("%s,%s", property, direction).hasSize(2);
         assertPage(body, 10, 0, 2, 1);
@@ -1196,7 +1200,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
                   get(tokensUrl(repo))
                       .header(AUTHORIZATION, token)
                       .param("sort", "expirationDate,asc")),
-              "TokenFetched");
+              "tokensFetched");
       assertThat(namesOf(ascending)).containsExactly("early", "middle", "late");
 
       final var descending =
@@ -1205,7 +1209,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
                   get(tokensUrl(repo))
                       .header(AUTHORIZATION, token)
                       .param("sort", "expirationDate,desc")),
-              "TokenFetched");
+              "tokensFetched");
       assertThat(namesOf(descending)).containsExactly("late", "middle", "early");
     }
 
@@ -1288,7 +1292,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
                   get(tokensUrl(repo))
                       .header(AUTHORIZATION, it.adminBearerToken())
                       .param("size", "100")),
-              "TokenFetched");
+              "tokensFetched");
 
       assertThat(namesOf(body)).containsExactly("only");
       assertPage(body, 100, 0, 1, 1);

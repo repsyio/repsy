@@ -63,7 +63,7 @@ async function withRoute(
 
 /** Answers with `status` and the failure envelope `fields` fill in (`ErrorResponse`, typed from the OpenAPI spec). */
 const respondWith =
-  (status: number, fields: Omit<ErrorResponse, 'type'> = {}): Handler =>
+  (status: number, fields: Partial<ErrorResponse> = {}): Handler =>
   (route) =>
     fulfillJson<ErrorResponse>(route, status, errorBody(fields));
 
@@ -104,7 +104,7 @@ test.describe('Error handling', () => {
     await withRoute(
       adminPage,
       LIST_URL,
-      respondWith(500, { text: 'internal detail that must not reach the user' }),
+      respondWith(500, { detail: 'internal detail that must not reach the user' }),
       async () => {
         const raised = expectToastLater(repos.toasts, 'Server error');
         await adminPage.goto('/repositories');
@@ -264,7 +264,7 @@ test.describe('Error handling', () => {
       await withRoute(
         adminPage,
         USERS_URL,
-        respondWith(403, { text: 'Only administrators may list users' }),
+        respondWith(403, { detail: 'Only administrators may list users' }),
         async () => {
           const raised = expectToastLater(users.shell.toasts, 'Only administrators may list users');
           await adminPage.goto('/users');
@@ -307,7 +307,7 @@ test.describe('Error handling', () => {
       adminPage,
       LIST_URL,
       (route) =>
-        fulfillJson<ErrorResponse>(route, 503, errorBody({ msgId: 'resourceBusy', text: busy }), {
+        fulfillJson<ErrorResponse>(route, 503, errorBody({ status: 503, code: 'resourceBusy', detail: busy }), {
           'Retry-After': '1',
         }),
       async () => {
@@ -330,11 +330,11 @@ test.describe('Error handling', () => {
     await expect(repos.rows().first()).toBeVisible();
   });
 
-  const cases: [string, number, Omit<ErrorResponse, 'type'> | undefined][] = [
+  const cases: [string, number, Partial<ErrorResponse> | undefined][] = [
     ['a 503 without a body', 503, undefined],
-    ['a 503 whose body has no text', 503, {}],
-    ['a 502 with a text', 502, { text: 'upstream detail that must not reach the user' }],
-    ['a 504 with a text', 504, { text: 'gateway detail that must not reach the user' }],
+    ['a 503 whose body has no detail', 503, {}],
+    ['a 502 with a text', 502, { detail: 'upstream detail that must not reach the user' }],
+    ['a 504 with a text', 504, { detail: 'gateway detail that must not reach the user' }],
   ];
   for (const [label, status, body] of cases) {
     test(`ERR-05: ${label} toasts the generic "Server error"`, async ({ adminPage }) => {
@@ -367,14 +367,14 @@ test.describe('Error handling', () => {
     });
   }
 
-  test('ERR-05: a 4xx with a msgId toasts its text, and one without a text toasts "An error occurred"', async ({
+  test('ERR-05: a 4xx with a code toasts its detail, and one without a text toasts "An error occurred"', async ({
     adminPage,
   }) => {
     const repos = new RepositoriesPage(adminPage);
     await withRoute(
       adminPage,
       LIST_URL,
-      respondWith(409, { msgId: 'nameTaken', text: 'That name is already taken' }),
+      respondWith(409, { code: 'nameTaken', detail: 'That name is already taken' }),
       async () => {
         const raised = expectToastLater(repos.toasts, 'That name is already taken');
         await adminPage.goto('/repositories');

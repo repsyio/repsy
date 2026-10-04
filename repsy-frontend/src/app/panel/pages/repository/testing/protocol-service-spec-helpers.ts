@@ -63,7 +63,7 @@ export function expectPaged<T>(actual: PagedData<T>, content: T[], page: PageMet
 }
 
 export function httpError(status = 500): HttpErrorResponse {
-  return new HttpErrorResponse({ status, statusText: 'error', error: { text: 'boom' } });
+  return new HttpErrorResponse({ status, statusText: 'error', error: { detail: 'boom' } });
 }
 
 /** The two names a protocol service uses for "load and activate a repository" (`selectRepository` on PyPI). */
