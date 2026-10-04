@@ -19,12 +19,7 @@ import { firstValueFrom, of, throwError } from 'rxjs';
 import { LoginInfo, ProfileControllerService, ProfileInfo } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { describeNoAuthorizationHeader } from '../../../shared/testing/authorization-header-spec-helpers';
-import {
-  CallCase,
-  describeCalls,
-  httpError,
-  restResponse,
-} from '../../repository/testing/protocol-service-spec-helpers';
+import { CallCase, describeCalls, httpError } from '../../repository/testing/protocol-service-spec-helpers';
 import { ProfileService } from './profile.service';
 
 const PROFILE: ProfileInfo = {
@@ -65,7 +60,7 @@ describe('ProfileService', () => {
       invoke: (s) => s.get(),
       api: () => api.getProfile,
       args: [],
-      response: restResponse(PROFILE),
+      response: PROFILE,
       expected: PROFILE,
     },
     {
@@ -73,7 +68,7 @@ describe('ProfileService', () => {
       invoke: (s) => s.updatePassword('n3w-secret'),
       api: () => api.updatePassword,
       args: [{ password: 'n3w-secret' }],
-      response: restResponse(LOGIN_INFO),
+      response: LOGIN_INFO,
       expected: LOGIN_INFO,
     },
     {
@@ -81,7 +76,7 @@ describe('ProfileService', () => {
       invoke: (s) => s.updateUsername('bob'),
       api: () => api.updateUsername,
       args: [{ username: 'bob' }],
-      response: restResponse(LOGIN_INFO),
+      response: LOGIN_INFO,
       expected: LOGIN_INFO,
     },
     {
@@ -89,7 +84,7 @@ describe('ProfileService', () => {
       invoke: (s) => s.deleteAccount(),
       api: () => api.deleteProfile,
       args: [],
-      response: restResponse(undefined),
+      response: undefined,
       expected: undefined,
     },
   ];
@@ -102,7 +97,7 @@ describe('ProfileService', () => {
 
   describe('updatePassword', () => {
     it('stores the new login info in the auth service once the call succeeds', async () => {
-      (api.updatePassword as jasmine.Spy).and.returnValue(of(restResponse(LOGIN_INFO)));
+      (api.updatePassword as jasmine.Spy).and.returnValue(of(LOGIN_INFO));
 
       const result = service.updatePassword('n3w-secret');
       expect(authService.updateLoginInfo).withContext('nothing happens before subscription').not.toHaveBeenCalled();
@@ -124,7 +119,7 @@ describe('ProfileService', () => {
     // Current behaviour, pinned on purpose: unlike updatePassword the service does not refresh the auth service; the
     // caller (AccountInfoComponent) writes the new login info to localStorage itself and reloads the page.
     it('does not touch the auth service', async () => {
-      (api.updateUsername as jasmine.Spy).and.returnValue(of(restResponse(LOGIN_INFO)));
+      (api.updateUsername as jasmine.Spy).and.returnValue(of(LOGIN_INFO));
 
       await firstValueFrom(service.updateUsername('bob'));
 

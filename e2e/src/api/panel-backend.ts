@@ -191,7 +191,7 @@ export interface PanelBackend {
   changeOwnPassword(password: string): Promise<void>;
   /** A panel request the typed operations cannot express (a repo type in another case), as raw HTTP. */
   rawRequest(
-    method: 'GET' | 'POST' | 'PUT',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH',
     path: string,
     body?: unknown,
   ): Promise<{ status: number; body: { data?: unknown } }>;

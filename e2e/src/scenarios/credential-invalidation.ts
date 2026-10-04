@@ -33,7 +33,7 @@
  *    (the credential is unknown, not merely not allowed);
  *  - nothing of the refused version is stored (an admin looks, `isStored`).
  *
- * Events: `PUT /api/profile/password` by the user, `DELETE /api/users/{id}` by an admin, a deploy token
+ * Events: `PATCH /api/profile/password` by the user, `DELETE /api/users/{id}` by an admin, a deploy token
  * revoked, a deploy token rotated. Only the password events go through the cache; the token ones have no
  * cache of their own and are here because the story names them and a real client is the proof that counts.
  *
@@ -348,7 +348,7 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
 
       const formerApi = await createPanelBackend();
       await formerApi.login(former.username, former.password);
-      const renamed = await formerApi.rawRequest('PUT', '/api/profile/username', {
+      const renamed = await formerApi.rawRequest('PATCH', '/api/profile/username', {
         username: seeder.reserveUsername(),
       });
       expect(renamed.status, `rename: ${JSON.stringify(renamed.body)}`).toBe(200);

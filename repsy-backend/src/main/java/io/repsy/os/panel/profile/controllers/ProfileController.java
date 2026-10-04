@@ -17,8 +17,6 @@ package io.repsy.os.panel.profile.controllers;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.LoginInfo;
 import io.repsy.os.generated.model.PasswordForm;
@@ -26,14 +24,18 @@ import io.repsy.os.generated.model.ProfileInfo;
 import io.repsy.os.generated.model.UpdateUsernameForm;
 import io.repsy.os.panel.profile.services.ProfileService;
 import io.repsy.os.shared.auth.PanelAuthHelper;
+import io.repsy.os.shared.http.NoStore;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -48,23 +50,22 @@ class ProfileController {
   private final @NonNull PanelAuthHelper panelAuthHelper;
   private final @NonNull ProfileService profileService;
   private final @NonNull UserTxService userTxService;
-  private final @NonNull RestResponseFactory resp;
 
   @GetMapping
-  public @NonNull RestResponse<ProfileInfo> get(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
+  public @NonNull ProfileInfo get(@RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
 
     final var profileInfo = this.profileService.getProfile(userId);
 
-    return this.resp.success("profileFetched", profileInfo);
+    return profileInfo;
   }
 
-  @PutMapping("/username")
-  public @NonNull RestResponse<LoginInfo> updateUsername(
+  @PatchMapping("/username")
+  public @NonNull LoginInfo updateUsername(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @RequestBody @Valid final @NonNull UpdateUsernameForm form) {
+      @RequestBody @Valid final @NonNull UpdateUsernameForm form,
+      final @NonNull HttpServletResponse response) {
 
     final var session = this.panelAuthHelper.authenticateSession(authHeader);
 
@@ -72,24 +73,29 @@ class ProfileController {
         this.profileService.updateUsername(
             session.user().getId(), form.getUsername(), session.sessionStart());
 
-    return this.resp.success("usernameUpdated", loginInfo);
+    NoStore.apply(response);
+
+    return loginInfo;
   }
 
-  @PutMapping("/password")
-  public @NonNull RestResponse<LoginInfo> updatePassword(
+  @PatchMapping("/password")
+  public @NonNull LoginInfo updatePassword(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @RequestBody @Valid final @NonNull PasswordForm form) {
+      @RequestBody @Valid final @NonNull PasswordForm form,
+      final @NonNull HttpServletResponse response) {
 
     final var session = this.panelAuthHelper.authenticateSession(authHeader);
 
     final var loginInfo =
         this.profileService.updatePassword(session.user().getId(), form, session.sessionStart());
 
-    return this.resp.success("passwordChanged", loginInfo);
+    NoStore.apply(response);
+
+    return loginInfo;
   }
 
   @DeleteMapping
-  public @NonNull RestResponse<Void> deleteProfile(
+  public @NonNull ResponseEntity<Void> deleteProfile(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
@@ -98,6 +104,6 @@ class ProfileController {
     this.userTxService.getAuthenticatedUserById(userId);
     this.userTxService.deleteUserById(userId);
 
-    return this.resp.success("profileDeleted");
+    return ResponseEntities.noContent();
   }
 }

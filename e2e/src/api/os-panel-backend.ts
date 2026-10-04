@@ -181,7 +181,7 @@ export class OsPanelBackend implements PanelBackend {
   }
 
   /**
-   * `PUT /api/profile/password` as the user this instance is logged in as (RPS-1481): the caller's OWN
+   * `PATCH /api/profile/password` as the user this instance is logged in as (RPS-1481): the caller's OWN
    * password becomes `password`. Log a separate backend in as the user first, an admin one would
    * change the admin's password. The answer is a fresh session, which this instance adopts.
    */
@@ -189,7 +189,7 @@ export class OsPanelBackend implements PanelBackend {
     const res = await this.call((c) =>
       c.profileController.updatePassword({ requestBody: { password } }),
     );
-    this.token = unwrap(unwrap(res.data, 'updatePassword').token, 'updatePassword.token');
+    this.token = unwrap(unwrap(res, 'updatePassword').token, 'updatePassword.token');
   }
 
   /**
@@ -247,7 +247,7 @@ export class OsPanelBackend implements PanelBackend {
    * answer is the HTTP status and the JSON envelope.
    */
   async rawRequest(
-    method: 'GET' | 'POST' | 'PUT',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH',
     path: string,
     body?: unknown,
   ): Promise<{ status: number; body: { data?: unknown } }> {

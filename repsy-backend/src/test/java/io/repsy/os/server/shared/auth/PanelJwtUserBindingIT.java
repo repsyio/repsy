@@ -17,7 +17,7 @@ package io.repsy.os.server.shared.auth;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
@@ -104,7 +104,7 @@ class PanelJwtUserBindingIT extends AbstractIntegrationTest {
 
   private void changePassword(final User user) throws Exception {
     this.perform(
-            put("/api/profile/password")
+            patch("/api/profile/password")
                 .header(AUTHORIZATION, this.bearerTokenFor(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"password\":\"%s\"}".formatted(NEW_PASSWORD)))
@@ -113,7 +113,7 @@ class PanelJwtUserBindingIT extends AbstractIntegrationTest {
 
   private void rename(final User user, final String newName) throws Exception {
     this.perform(
-            put("/api/profile/username")
+            patch("/api/profile/username")
                 .header(AUTHORIZATION, this.bearerTokenFor(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"%s\"}".formatted(newName)))

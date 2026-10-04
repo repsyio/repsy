@@ -18,6 +18,7 @@ package io.repsy.os.server.shared.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -156,7 +157,7 @@ class ProtocolJwtTokenVersionIT extends AbstractIntegrationTest {
 
   private void changePassword(final User user, final String password) throws Exception {
     this.perform(
-            put("/api/profile/password")
+            patch("/api/profile/password")
                 .header(AUTHORIZATION, this.bearerTokenFor(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"password\":\"%s\"}".formatted(password)))
@@ -203,7 +204,7 @@ class ProtocolJwtTokenVersionIT extends AbstractIntegrationTest {
     final var jwt = login(type, repo, user.getUsername(), VALID_PASSWORD);
 
     this.perform(
-            put("/api/profile/username")
+            patch("/api/profile/username")
                 .header(AUTHORIZATION, this.bearerTokenFor(user))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"%s\"}".formatted(uniqueUsername("tvnew"))))
@@ -230,7 +231,7 @@ class ProtocolJwtTokenVersionIT extends AbstractIntegrationTest {
     assertAccepted(type, repo, jwt);
 
     this.perform(
-            put("/api/profile/username")
+            patch("/api/profile/username")
                 .header(AUTHORIZATION, this.bearerTokenFor(former))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"%s\"}".formatted(uniqueUsername("tvmov"))))
@@ -257,7 +258,7 @@ class ProtocolJwtTokenVersionIT extends AbstractIntegrationTest {
     assertAccepted(type, repo, claimless);
 
     this.perform(
-            put("/api/profile/username")
+            patch("/api/profile/username")
                 .header(AUTHORIZATION, this.bearerTokenFor(former))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"%s\"}".formatted(uniqueUsername("tvgmov"))))

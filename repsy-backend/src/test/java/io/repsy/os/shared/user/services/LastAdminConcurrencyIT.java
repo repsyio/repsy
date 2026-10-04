@@ -189,7 +189,8 @@ class LastAdminConcurrencyIT extends AbstractIntegrationTest {
   private static String outcomeOfResponse(
       final org.springframework.test.web.servlet.ResultActions result) throws Exception {
     final var response = result.andReturn().getResponse();
-    if (response.getStatus() == 200) {
+    // 200 for the user update, 204 for the profile delete.
+    if (response.getStatus() == 200 || response.getStatus() == 204) {
       return OK;
     }
     return JsonPath.read(response.getContentAsString(), "$.code");
