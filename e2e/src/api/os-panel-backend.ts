@@ -620,7 +620,7 @@ export class OsPanelBackend implements PanelBackend {
   }
 
   /**
-   * Deletes one Ruby gem version (`DELETE /api/ruby/gems/{repoName}/{gemName}/versions/
+   * Deletes one Ruby gem version (`DELETE /api/ruby/gems/{repoName}/{packageName}/versions/
    * {version}?platform=`, step 4e/RPS-294 R5/R16) -- a real panel-API delete, distinct from a
    * protocol-level `gem yank`. Called directly with `fetch`, like {@link
    * deleteGolangModuleVersion}: the generated client is not worth wiring in for a single endpoint no

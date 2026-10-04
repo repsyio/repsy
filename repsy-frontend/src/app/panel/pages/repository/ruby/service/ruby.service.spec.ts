@@ -26,7 +26,6 @@ import {
   PAGE_SIZE,
   PagedCase,
   REPO,
-  restResponse,
   selectRepo,
   SORT,
 } from '../../testing/protocol-service-spec-helpers';
@@ -79,12 +78,14 @@ describe('RubyService', () => {
         invoke: (s, search) => s.searchGems(search, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => rubyApi.listGems,
         args: (search) => [REPO, search, ...PAGE_ARGS],
+        bare: true,
       },
       {
         name: 'fetchGemVersions',
         invoke: (s, search) => s.fetchGemVersions(GEM, search, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => rubyApi.listGemVersions,
         args: (search) => [GEM, REPO, search, ...PAGE_ARGS],
+        bare: true,
       },
     ];
     describePagedCalls(() => service, paged);
@@ -96,7 +97,7 @@ describe('RubyService', () => {
         invoke: (s) => s.fetchGemVersion(GEM, VERSION, PLATFORM),
         api: () => rubyApi.getGemVersion,
         args: [GEM, VERSION, REPO, PLATFORM],
-        response: restResponse(info),
+        response: info,
         expected: info,
       },
       {
@@ -104,7 +105,7 @@ describe('RubyService', () => {
         invoke: (s) => s.fetchGemVersion(GEM, VERSION),
         api: () => rubyApi.getGemVersion,
         args: [GEM, VERSION, REPO, undefined],
-        response: restResponse(info),
+        response: info,
         expected: info,
       },
       {
@@ -112,7 +113,7 @@ describe('RubyService', () => {
         invoke: (s) => s.deleteGem(GEM),
         api: () => rubyApi.deleteGem,
         args: [GEM, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [rubyApi.deleteGemVersion],
       },
@@ -121,7 +122,7 @@ describe('RubyService', () => {
         invoke: (s) => s.deleteGemVersion(GEM, VERSION, PLATFORM),
         api: () => rubyApi.deleteGemVersion,
         args: [GEM, VERSION, REPO, PLATFORM],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [rubyApi.deleteGem],
       },

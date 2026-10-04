@@ -151,9 +151,9 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
    *   <li>{@code repoName}: the repository. {@code ResolverUtils.REPO_NAME} reads it.
    *   <li>{@code version}: the version of any package, artifact, crate, chart, gem or release. The
    *       only other name is {@code reference} for Docker: an OCI reference is a tag or a digest.
-   *   <li>{@code packageName}, {@code chartName}, {@code crateName}, {@code gemName}, {@code
-   *       imageName}, {@code artifactName}, {@code groupName}, {@code tagName}, {@code scope}: the
-   *       item of a protocol, named after what that protocol calls it.
+   *   <li>{@code packageName}, {@code chartName}, {@code crateName}, {@code imageName}, {@code
+   *       artifactName}, {@code groupName}, {@code tagName}, {@code scope}: the item of a protocol,
+   *       named after what that protocol calls it.
    *   <li>{@code digest}, {@code userId}, {@code tokenId}, {@code publicKeyId}, {@code keyStoreId},
    *       {@code scanId}: the identifier of a panel entity.
    * </ul>
@@ -166,7 +166,6 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
           "packageName",
           "chartName",
           "crateName",
-          "gemName",
           "imageName",
           "artifactName",
           "groupName",

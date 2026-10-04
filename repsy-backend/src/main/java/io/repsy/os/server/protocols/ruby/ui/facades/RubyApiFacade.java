@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.ruby.ui.facades;
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.GemListItem;
+import io.repsy.os.generated.model.GemPackageInfo;
 import io.repsy.os.generated.model.GemVersionInfo;
 import io.repsy.os.generated.model.GemVersionListItem;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.services.RubyGemServiceImpl;
@@ -59,6 +60,10 @@ public class RubyApiFacade implements ProtocolApiFacade {
       final Pageable pageable) {
     final var gemId = this.gemService.getGemId(repoInfo.getStorageKey(), gemName);
     return this.gemService.findAllVersions(gemId, version, pageable);
+  }
+
+  public GemPackageInfo getPackageInfo(final RepoInfo repoInfo, final String packageName) {
+    return this.gemService.getPackageInfo(repoInfo.getStorageKey(), packageName);
   }
 
   public GemVersionInfo getVersionInfo(

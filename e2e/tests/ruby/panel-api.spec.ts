@@ -36,9 +36,10 @@ import path from 'node:path';
 import {
   callOperation,
   contractWorld,
-  expectContract,
+  expectBare,
   expectCovers,
   expectFailure,
+  expectNoContent,
   expectPagingSweep,
 } from '../../src/api/contract-checks.js';
 import { RepoType } from '../../src/api/panel-api.js';
@@ -62,7 +63,14 @@ import { seedPackage } from '../../src/seed/packages.js';
 import type { Seeder } from '../../src/seed/seeder.js';
 
 /** Every operation of the Ruby panel API this spec calls; a route the spec gains must be added (or the check below fails). */
-const EXERCISED = ['listGems', 'deleteGem', 'listGemVersions', 'getGemVersion', 'deleteGemVersion'];
+const EXERCISED = [
+  'listGems',
+  'getGem',
+  'deleteGem',
+  'listGemVersions',
+  'getGemVersion',
+  'deleteGemVersion',
+];
 
 interface Names {
   repoName: string;
@@ -102,7 +110,7 @@ async function newNames(seeder: Seeder): Promise<Names> {
 
 const values = (names: Names, version?: string): Record<string, string> => ({
   repoName: names.repoName,
-  gemName: names.name,
+  packageName: names.name,
   ...(version ? { version } : {}),
 });
 
@@ -135,7 +143,7 @@ async function gemStatus(
 
 async function panelVersions(names: Names): Promise<VersionRow[]> {
   const res = await callOperation('listGemVersions', values(names), { query: 'size=100' });
-  return (expectContract('listGemVersions', res) as { content: VersionRow[] }).content;
+  return (expectBare('listGemVersions', res) as { content: VersionRow[] }).content;
 }
 
 /** Pushes a gem of our own build with the real `gem push`. */
@@ -236,7 +244,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
     expect(bundled.contentSha256).toBe(sums.get(key(plain, 'ruby')));
 
     // GET /api/ruby/gems/{repo}: one row for the gem, its newest version that is not yanked as `latest`.
-    const gems = expectContract(
+    const gems = expectBare(
       'listGems',
       await callOperation('listGems', { repoName: names.repoName }),
     ) as {
@@ -246,6 +254,17 @@ test.describe('the Ruby panel API against what gem push stored', () => {
     expect(gems.page.totalElements).toBe(1);
     expect(gems.content[0]).toMatchObject({ name: names.name, latest: platformed });
     expect(Date.parse(gems.content[0]?.updatedAt ?? ''), 'updatedAt').not.toBeNaN();
+
+    // GET .../{gem}: the gem's summary, described by its latest version that is not yanked.
+    const gemDetail = expectBare('getGem', await callOperation('getGem', values(names))) as {
+      name: string;
+      latestVersion: string;
+      createdAt: string;
+      updatedAt: string;
+    };
+    expect(gemDetail).toMatchObject({ name: names.name, latestVersion: platformed });
+    expect(Date.parse(gemDetail.createdAt), 'createdAt').not.toBeNaN();
+    expect(Date.parse(gemDetail.updatedAt), 'updatedAt').not.toBeNaN();
 
     // GET .../versions: every version and platform, the yank the client made shown on 2.0.0 only.
     const rows = await panelVersions(names);
@@ -263,7 +282,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
 
     // GET .../versions/{version}: the gemspec the client pushed, and the digest of the .gem file.
     const detailOf = async (version: string, platform: string): Promise<VersionDetail> =>
-      expectContract(
+      expectBare(
         'getGemVersion',
         await callOperation('getGemVersion', values(names, version), {
           query: `platform=${platform}`,
@@ -286,7 +305,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
       expect(Date.parse(detail.createdAt)).not.toBeNaN();
     }
     // With no `platform` the plain (ruby) gem is meant, so a version that exists only for other platforms is not found.
-    const plainDetail = expectContract(
+    const plainDetail = expectBare(
       'getGemVersion',
       await callOperation('getGemVersion', values(names, plain)),
     ) as VersionDetail;
@@ -331,7 +350,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
   }) => {
     const names = await newNames(seeder);
     await ruby.seedPublish(worldOf(names, '1.0.0'));
-    const missing = { ...values(names), gemName: 'e2e_no_such_gem' };
+    const missing = { ...values(names), packageName: 'e2e_no_such_gem' };
 
     expectFailure(
       'listGems',
@@ -369,6 +388,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
       404,
       'gemVersionNotFound',
     );
+    expectFailure('getGem', await callOperation('getGem', missing), 404, 'gemNotFound');
     expectFailure('deleteGem', await callOperation('deleteGem', missing), 404, 'gemNotFound');
 
     // Every failure above left the gem where it was.
@@ -386,12 +406,13 @@ test.describe('the Ruby panel API against what gem push stored', () => {
     }
     await expectPagingSweep<{ name: string }>({
       operationId: 'listGems',
+      bare: true,
       values: { repoName: names.repoName },
       total: 5,
       keyOf: (row) => row.name,
       sorts: [{ property: 'name', value: (row) => row.name }],
     });
-    const narrowed = expectContract(
+    const narrowed = expectBare(
       'listGems',
       await callOperation('listGems', { repoName: names.repoName }, { query: 'q=pkg_3' }),
     ) as { content: { name: string }[] };
@@ -404,12 +425,13 @@ test.describe('the Ruby panel API against what gem push stored', () => {
     }
     await expectPagingSweep<{ version: string }>({
       operationId: 'listGemVersions',
+      bare: true,
       values: values(names),
       total: 5,
       keyOf: (row) => row.version,
       sorts: [{ property: 'version', value: (row) => row.version }],
     });
-    const oneVersion = expectContract(
+    const oneVersion = expectBare(
       'listGemVersions',
       await callOperation('listGemVersions', values(names), { query: 'q=1.0.3' }),
     ) as { content: { version: string }[] };
@@ -434,7 +456,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
     );
     expect(await gemStatus(names, removed)).toBe(200);
 
-    expectContract(
+    expectNoContent(
       'deleteGemVersion',
       await callOperation('deleteGemVersion', values(names, removed)),
     );
@@ -469,7 +491,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
     );
 
     // The java variant of 1.1.0: only that platform goes, the plain 1.1.0 stays.
-    expectContract(
+    expectNoContent(
       'deleteGemVersion',
       await callOperation('deleteGemVersion', values(names, kept), { query: 'platform=java' }),
     );
@@ -485,7 +507,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
     expect((await ruby.resolve(worldOf(names, kept))).contentSha256).toBe(seeds.get(kept));
 
     // The last version.
-    expectContract(
+    expectNoContent(
       'deleteGemVersion',
       await callOperation('deleteGemVersion', values(names, kept)),
     );
@@ -501,7 +523,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
       '1.0.0',
       '2.0.0',
     ]);
-    expectContract('deleteGem', await callOperation('deleteGem', values(whole)));
+    expectNoContent('deleteGem', await callOperation('deleteGem', values(whole)));
     expect(await infoEntries(whole)).toBe(404);
     expect(await gemStatus(whole, '2.0.0')).toBe(404);
     const lost = await ruby.resolve(worldOf(whole, '2.0.0', whole.name));
@@ -512,7 +534,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
       404,
       'gemNotFound',
     );
-    const rows = expectContract(
+    const rows = expectBare(
       'listGems',
       await callOperation('listGems', { repoName: names.repoName }),
     ) as { content: unknown[] };

@@ -56,12 +56,6 @@ class MessagesBundleTest {
         "passwordReset",
         "tokenRefreshed",
         "keyStoresFetched",
-        // Ruby
-        "gemsFetched",
-        "gemVersionsFetched",
-        "gemVersionFetched",
-        "gemDeleted",
-        "gemVersionDeleted",
         // Go
         "modulesFetched",
         "moduleInfoFetched",

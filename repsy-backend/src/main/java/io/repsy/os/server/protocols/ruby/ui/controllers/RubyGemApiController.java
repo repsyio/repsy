@@ -15,14 +15,14 @@
  */
 package io.repsy.os.server.protocols.ruby.ui.controllers;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.GemListItem;
+import io.repsy.os.generated.model.GemPackageInfo;
 import io.repsy.os.generated.model.GemVersionInfo;
 import io.repsy.os.generated.model.GemVersionListItem;
 import io.repsy.os.server.protocols.ruby.ui.facades.RubyApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -35,6 +35,7 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -54,12 +55,11 @@ public class RubyGemApiController {
   private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
 
   private final RubyApiFacade rubyApiFacade;
-  private final RestResponseFactory responseFactory;
   private final UsageUpdateService usageUpdateService;
 
   @GetMapping("/{repoName}")
   @RepoOperation
-  public RestResponse<PagedModel<GemListItem>> listGems(
+  public ResponseEntity<PagedModel<GemListItem>> listGems(
       final RepoInfo repoInfo,
       @RequestParam(name = "q", defaultValue = "") final String name,
       @PageableDefault final Pageable pageable) {
@@ -67,51 +67,61 @@ public class RubyGemApiController {
     SortValidator.requireSortableBy(pageable, GEM_SORT_PROPERTIES);
 
     final var gems = this.rubyApiFacade.listGems(repoInfo, name, pageable);
-    return this.responseFactory.success("gemsFetched", new PagedModel<>(gems));
+    return ResponseEntity.ok(new PagedModel<>(gems));
   }
 
-  @GetMapping("/{repoName}/{gemName}/versions")
+  @GetMapping("/{repoName}/{packageName}")
   @RepoOperation
-  public RestResponse<PagedModel<GemVersionListItem>> listVersions(
+  public ResponseEntity<GemPackageInfo> getPackage(
+      final RepoInfo repoInfo, @PathVariable final String packageName) {
+
+    return ResponseEntity.ok(this.rubyApiFacade.getPackageInfo(repoInfo, packageName));
+  }
+
+  @GetMapping("/{repoName}/{packageName}/versions")
+  @RepoOperation
+  public ResponseEntity<PagedModel<GemVersionListItem>> listVersions(
       final RepoInfo repoInfo,
-      @PathVariable final String gemName,
+      @PathVariable final String packageName,
       @RequestParam(name = "q", defaultValue = "") final String version,
       @PageableDefault final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 
-    final var versions = this.rubyApiFacade.listVersions(repoInfo, gemName, version, pageable);
-    return this.responseFactory.success("gemVersionsFetched", new PagedModel<>(versions));
+    final var versions = this.rubyApiFacade.listVersions(repoInfo, packageName, version, pageable);
+    return ResponseEntity.ok(new PagedModel<>(versions));
   }
 
-  @DeleteMapping("/{repoName}/{gemName}")
+  @DeleteMapping("/{repoName}/{packageName}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> deleteGem(final RepoInfo repoInfo, @PathVariable final String gemName) {
-    final var usages = this.rubyApiFacade.deleteGem(repoInfo, gemName);
+  public ResponseEntity<Void> deleteGem(
+      final RepoInfo repoInfo, @PathVariable final String packageName) {
+    final var usages = this.rubyApiFacade.deleteGem(repoInfo, packageName);
     this.usageUpdateService.updateUsage(new UsageChangedInfo(repoInfo.getId(), usages));
-    return this.responseFactory.success("gemDeleted");
+    return ResponseEntities.noContent();
   }
 
-  @GetMapping("/{repoName}/{gemName}/versions/{version}")
+  @GetMapping("/{repoName}/{packageName}/versions/{version}")
   @RepoOperation
-  public RestResponse<GemVersionInfo> getVersion(
+  public ResponseEntity<GemVersionInfo> getVersion(
       final RepoInfo repoInfo,
-      @PathVariable final String gemName,
+      @PathVariable final String packageName,
       @PathVariable final String version,
       @RequestParam(defaultValue = "ruby") final String platform) {
-    final var info = this.rubyApiFacade.getVersionInfo(repoInfo, gemName, version, platform);
-    return this.responseFactory.success("gemVersionFetched", info);
+    final var info = this.rubyApiFacade.getVersionInfo(repoInfo, packageName, version, platform);
+    return ResponseEntity.ok(info);
   }
 
-  @DeleteMapping("/{repoName}/{gemName}/versions/{version}")
+  @DeleteMapping("/{repoName}/{packageName}/versions/{version}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> deleteVersion(
+  public ResponseEntity<Void> deleteVersion(
       final RepoInfo repoInfo,
-      @PathVariable final String gemName,
+      @PathVariable final String packageName,
       @PathVariable final String version,
       @RequestParam(defaultValue = "ruby") final String platform) {
-    final var usages = this.rubyApiFacade.deleteGemVersion(repoInfo, gemName, version, platform);
+    final var usages =
+        this.rubyApiFacade.deleteGemVersion(repoInfo, packageName, version, platform);
     this.usageUpdateService.updateUsage(new UsageChangedInfo(repoInfo.getId(), usages));
-    return this.responseFactory.success("gemVersionDeleted");
+    return ResponseEntities.noContent();
   }
 }

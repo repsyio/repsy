@@ -23,6 +23,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -127,18 +128,16 @@ class RubyGemVersionDeleteIT extends AbstractIntegrationTest {
     this.seed("1.0.0", "2.0.0");
     this.yank("2.0.0");
 
-    this.deleteVersion("2.0.0")
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msgId").value("gemVersionDeleted"));
+    this.deleteVersion("2.0.0").andExpect(status().isNoContent()).andExpect(content().string(""));
 
     this.panelGet(VERSIONS_PATH, this.repo.getName(), GEM)
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.content", hasSize(1)))
-        .andExpect(jsonPath("$.data.content[0].version").value("1.0.0"))
-        .andExpect(jsonPath("$.data.content[0].yanked").value(false));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].version").value("1.0.0"))
+        .andExpect(jsonPath("$.content[0].yanked").value(false));
     this.panelGet("/api/ruby/gems/{repo}", this.repo.getName())
-        .andExpect(jsonPath("$.data.content", hasSize(1)))
-        .andExpect(jsonPath("$.data.content[0].latest").value("1.0.0"));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].latest").value("1.0.0"));
 
     assertThat(this.protocolGet("/{repo}/info/" + GEM)).contains("1.0.0").doesNotContain("2.0.0");
     this.protocol(
@@ -153,16 +152,16 @@ class RubyGemVersionDeleteIT extends AbstractIntegrationTest {
     this.seed("1.0.0", "2.0.0");
     this.yank("2.0.0");
 
-    this.deleteVersion("1.0.0").andExpect(status().isOk());
+    this.deleteVersion("1.0.0").andExpect(status().isNoContent());
 
     this.panelGet(VERSIONS_PATH, this.repo.getName(), GEM)
-        .andExpect(jsonPath("$.data.content", hasSize(1)))
-        .andExpect(jsonPath("$.data.content[0].version").value("2.0.0"))
-        .andExpect(jsonPath("$.data.content[0].yanked").value(true));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].version").value("2.0.0"))
+        .andExpect(jsonPath("$.content[0].yanked").value(true));
     // The gem is still listed, and its latest names a version that still exists.
     this.panelGet("/api/ruby/gems/{repo}", this.repo.getName())
-        .andExpect(jsonPath("$.data.content", hasSize(1)))
-        .andExpect(jsonPath("$.data.content[0].latest").value("2.0.0"));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].latest").value("2.0.0"));
     assertThat(this.protocolGet("/{repo}/versions")).contains(GEM + " -2.0.0 ");
   }
 
@@ -172,10 +171,10 @@ class RubyGemVersionDeleteIT extends AbstractIntegrationTest {
     this.seed("1.0.0");
     this.yank("1.0.0");
 
-    this.deleteVersion("1.0.0").andExpect(status().isOk());
+    this.deleteVersion("1.0.0").andExpect(status().isNoContent());
 
     this.panelGet("/api/ruby/gems/{repo}", this.repo.getName())
-        .andExpect(jsonPath("$.data.content", hasSize(0)));
+        .andExpect(jsonPath("$.content", hasSize(0)));
     this.panelGet(VERSIONS_PATH, this.repo.getName(), GEM).andExpect(status().isNotFound());
   }
 
@@ -184,12 +183,12 @@ class RubyGemVersionDeleteIT extends AbstractIntegrationTest {
   void deletingLatestVersionRecomputesLatest() throws Exception {
     this.seed("1.0.0", "2.0.0", "3.0.0");
 
-    this.deleteVersion("3.0.0").andExpect(status().isOk());
+    this.deleteVersion("3.0.0").andExpect(status().isNoContent());
 
     // The gem list joins on latest, so a stale one would drop the gem from it.
     this.panelGet("/api/ruby/gems/{repo}", this.repo.getName())
-        .andExpect(jsonPath("$.data.content", hasSize(1)))
-        .andExpect(jsonPath("$.data.content[0].latest").value("2.0.0"));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].latest").value("2.0.0"));
   }
 
   @Test
@@ -204,11 +203,11 @@ class RubyGemVersionDeleteIT extends AbstractIntegrationTest {
         .andExpect(status().isOk());
     this.entityManager.flush();
 
-    this.deleteVersion("1.0.0", "java").andExpect(status().isOk());
+    this.deleteVersion("1.0.0", "java").andExpect(status().isNoContent());
 
     this.panelGet("/api/ruby/gems/{repo}", this.repo.getName())
-        .andExpect(jsonPath("$.data.content", hasSize(1)))
-        .andExpect(jsonPath("$.data.content[0].latest").value("1.0.0"));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].latest").value("1.0.0"));
   }
 
   @Test
@@ -216,7 +215,7 @@ class RubyGemVersionDeleteIT extends AbstractIntegrationTest {
   void versionsChecksumFollowsInfoAfterDelete() throws Exception {
     this.seed("1.0.0", "2.0.0");
 
-    this.deleteVersion("2.0.0").andExpect(status().isOk());
+    this.deleteVersion("2.0.0").andExpect(status().isNoContent());
 
     final var info = this.protocolGet("/{repo}/info/" + GEM);
     final var line =
@@ -249,6 +248,6 @@ class RubyGemVersionDeleteIT extends AbstractIntegrationTest {
         .andExpect(jsonPath("$.code").value("gemVersionNotFound"));
 
     this.panelGet(VERSIONS_PATH, this.repo.getName(), GEM)
-        .andExpect(jsonPath("$.data.content", hasSize(2)));
+        .andExpect(jsonPath("$.content", hasSize(2)));
   }
 }

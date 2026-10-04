@@ -21,6 +21,7 @@ import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.GemListItem;
+import io.repsy.os.generated.model.GemPackageInfo;
 import io.repsy.os.generated.model.GemVersionInfo;
 import io.repsy.os.generated.model.GemVersionListItem;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemNameProjection;
@@ -269,6 +270,30 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
             .orElseThrow(() -> new ItemNotFoundException(GEM_VERSION_NOT_FOUND));
     final var deps = this.dependencyRepository.findAllByGemVersionId(gemVersion.getId());
     return this.converter.toGemVersionInfoDto(gemVersion, deps);
+  }
+
+  /**
+   * The package summary: the gem's name and latest version, described by the newest row of that
+   * version (platform variants of one version share the number), and when that version was last
+   * published.
+   *
+   * @throws ItemNotFoundException when the repo has no gem of that name
+   */
+  public GemPackageInfo getPackageInfo(final UUID repoId, final String gemName) {
+    final var gem =
+        this.gemRepository
+            .findByRepoIdAndName(repoId, gemName)
+            .orElseThrow(() -> new ItemNotFoundException(GEM_NOT_FOUND));
+
+    final var latestRows =
+        this.versionRepository.findByGemIdAndVersion(gem.getId(), gem.getLatest());
+    final var newest =
+        latestRows.stream()
+            .max(Comparator.comparing(RubyGemVersion::getCreatedAt))
+            .or(() -> this.versionRepository.findFirstByGemIdOrderByCreatedAtDesc(gem.getId()))
+            .orElseThrow(() -> new ItemNotFoundException(GEM_NOT_FOUND));
+
+    return this.converter.toGemPackageInfoDto(gem, newest);
   }
 
   public UUID getGemId(final UUID repoId, final String gemName) {
