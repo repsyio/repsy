@@ -68,13 +68,6 @@ class MessagesBundleTest {
         "moduleVersionsFetched",
         "moduleDeleted",
         "moduleVersionDeleted",
-        // NuGet
-        "nugetPackagesFetched",
-        "nugetPackageFetched",
-        "nugetVersionsFetched",
-        "nugetVersionFetched",
-        "nugetPackageDeleted",
-        "nugetVersionDeleted",
         // PyPI
         "releasesFetched",
         "releaseDetailFetched"

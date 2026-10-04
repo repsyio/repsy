@@ -21,7 +21,6 @@ import { tap } from 'rxjs/operators';
 import {
   DeployTokenForm,
   DeployTokenInfoListItem,
-  NuGetDeletedItem,
   NugetPackageControllerService,
   NuGetPackageInfo,
   NuGetPackageListItem,
@@ -116,12 +115,11 @@ export class NugetService {
         `${sortOption.column},${sortOption.type}`,
       ]),
     );
-    return this.toPagedData(response.data);
+    return this.toPagedData(response);
   }
 
   public async fetchPackage(packageId: string): Promise<NuGetPackageInfo> {
-    const response = await firstValueFrom(this.nugetPackageControllerService.getNugetPackage(packageId, this.repoName));
-    return response.data!;
+    return firstValueFrom(this.nugetPackageControllerService.getNugetPackage(packageId, this.repoName));
   }
 
   public async fetchPackageVersions(
@@ -141,28 +139,19 @@ export class NugetService {
         [`${sortOption.column},${sortOption.type}`],
       ),
     );
-    return this.toPagedData(response.data);
+    return this.toPagedData(response);
   }
 
   public async fetchPackageVersion(packageId: string, version: string): Promise<NuGetVersionInfo> {
-    const response = await firstValueFrom(
-      this.nugetPackageControllerService.getNugetVersion(packageId, version, this.repoName),
-    );
-    return response.data!;
+    return firstValueFrom(this.nugetPackageControllerService.getNugetVersion(packageId, version, this.repoName));
   }
 
-  public async deletePackage(packageId: string): Promise<NuGetDeletedItem> {
-    const response = await firstValueFrom(
-      this.nugetPackageControllerService.deleteNugetPackage(packageId, this.repoName),
-    );
-    return response.data!;
+  public async deletePackage(packageId: string): Promise<void> {
+    await firstValueFrom(this.nugetPackageControllerService.deleteNugetPackage(packageId, this.repoName));
   }
 
-  public async deletePackageVersion(packageId: string, version: string): Promise<NuGetDeletedItem> {
-    const response = await firstValueFrom(
-      this.nugetPackageControllerService.deleteNugetVersion(packageId, version, this.repoName),
-    );
-    return response.data!;
+  public async deletePackageVersion(packageId: string, version: string): Promise<void> {
+    await firstValueFrom(this.nugetPackageControllerService.deleteNugetVersion(packageId, version, this.repoName));
   }
 
   public async getDeployTokens(pageNumber: number, pageSize: number): Promise<PagedData<DeployTokenInfoListItem>> {

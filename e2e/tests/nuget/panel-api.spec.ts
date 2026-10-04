@@ -34,9 +34,10 @@ import path from 'node:path';
 import {
   callOperation,
   contractWorld,
-  expectContract,
+  expectBare,
   expectCovers,
   expectFailure,
+  expectNoContent,
   expectPagingSweep,
 } from '../../src/api/contract-checks.js';
 import { RepoType } from '../../src/api/panel-api.js';
@@ -197,7 +198,7 @@ async function nupkgStatus(names: Names, version: string, id = names.id): Promis
 
 async function panelVersions(names: Names): Promise<VersionRow[]> {
   const res = await callOperation('listNugetVersions', values(names));
-  return (expectContract('listNugetVersions', res) as { content: VersionRow[] }).content;
+  return (expectBare('listNugetVersions', res) as { content: VersionRow[] }).content;
 }
 
 test.describe('the NuGet panel API against what dotnet nuget push stored', () => {
@@ -263,7 +264,7 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
     expect(restoredStable.contentSha256).toBe(sha256Hex(seeds.get(stable) as Buffer));
 
     // GET /api/nuget/packages/{repo}: the two packages, by id (the wire spells it in lower case).
-    const packages = expectContract(
+    const packages = expectBare(
       'searchNugetPackages',
       await callOperation('searchNugetPackages', { repoName: names.repoName }),
     ) as {
@@ -289,7 +290,7 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
     });
 
     // GET .../{package}: the newest version's metadata.
-    const detail = expectContract(
+    const detail = expectBare(
       'getNugetPackage',
       await callOperation('getNugetPackage', { repoName: names.repoName, packageName: names.id }),
     ) as Record<string, unknown>;
@@ -332,7 +333,7 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
     }
 
     // GET .../versions/{version}: the nuspec the client pushed, read back.
-    const newestDetail = expectContract(
+    const newestDetail = expectBare(
       'getNugetVersion',
       await callOperation('getNugetVersion', values(names, newest)),
     ) as VersionDetail;
@@ -356,13 +357,13 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
     });
     expect(newestDetail.packageId.toLowerCase()).toBe(names.id.toLowerCase());
     // The same version is found by its normalized spelling.
-    const byNormalized = expectContract(
+    const byNormalized = expectBare(
       'getNugetVersion',
       await callOperation('getNugetVersion', values(names, newestNormalized)),
     ) as VersionDetail;
     expect(byNormalized).toEqual(newestDetail);
 
-    const stableDetail = expectContract(
+    const stableDetail = expectBare(
       'getNugetVersion',
       await callOperation('getNugetVersion', values(names, stable)),
     ) as VersionDetail;
@@ -374,7 +375,7 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
     });
     expect(stableDetail.readme ?? null).toBeNull();
 
-    const betaDetail = expectContract(
+    const betaDetail = expectBare(
       'getNugetVersion',
       await callOperation('getNugetVersion', values(names, beta)),
     ) as VersionDetail;
@@ -395,7 +396,7 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
     expect(unlisted.exitCode, `dotnet nuget delete: ${unlisted.command}`).toBe(0);
     expect(await registrationListed(names)).toEqual({ [version]: false });
 
-    const packages = expectContract(
+    const packages = expectBare(
       'searchNugetPackages',
       await callOperation('searchNugetPackages', { repoName: names.repoName }),
     ) as { content: { packageId: string }[] };
@@ -404,7 +405,7 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
       'the list still has the package',
     ).toEqual([names.id.toLowerCase()]);
 
-    const detail = expectContract(
+    const detail = expectBare(
       'getNugetPackage',
       await callOperation('getNugetPackage', values(names)),
     ) as Record<string, unknown>;
@@ -424,7 +425,7 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
 
     // A newer version pushed after the unlist is listed and becomes the latest one.
     await pushPackage(names, { id: names.id, version: '2.0.0' });
-    const afterNewer = expectContract(
+    const afterNewer = expectBare(
       'getNugetPackage',
       await callOperation('getNugetPackage', values(names)),
     ) as Record<string, unknown>;
@@ -498,12 +499,13 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
     }
     await expectPagingSweep<{ packageId: string }>({
       operationId: 'searchNugetPackages',
+      bare: true,
       values: { repoName: names.repoName },
       total: 5,
       keyOf: (row) => row.packageId,
       sorts: [{ property: 'packageId', value: (row) => row.packageId }],
     });
-    const narrowed = expectContract(
+    const narrowed = expectBare(
       'searchNugetPackages',
       await callOperation(
         'searchNugetPackages',
@@ -520,12 +522,13 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
     }
     await expectPagingSweep<{ version: string }>({
       operationId: 'listNugetVersions',
+      bare: true,
       values: values(names),
       total: 5,
       keyOf: (row) => row.version,
       sorts: [{ property: 'version', value: (row) => row.version }],
     });
-    const oneVersion = expectContract(
+    const oneVersion = expectBare(
       'listNugetVersions',
       await callOperation('listNugetVersions', values(names), { query: 'q=1.0.3' }),
     ) as { content: { version: string }[] };
@@ -545,13 +548,11 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
     expect(await flatVersions(names)).toEqual([removed, kept]);
     expect(await nupkgStatus(names, removed)).toBe(200);
 
-    // A version that is not the last: the answer says VERSION.
-    expect(
-      expectContract(
-        'deleteNugetVersion',
-        await callOperation('deleteNugetVersion', values(names, removed)),
-      ),
-    ).toBe('VERSION');
+    // A version that is not the last: 204, the package stays.
+    expectNoContent(
+      'deleteNugetVersion',
+      await callOperation('deleteNugetVersion', values(names, removed)),
+    );
 
     expect((await panelVersions(names)).map((row) => row.version)).toEqual([kept]);
     expectFailure(
@@ -580,13 +581,11 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
       'versionNotFound',
     );
 
-    // The last version: the answer says PACKAGE, and the package is gone with it.
-    expect(
-      expectContract(
-        'deleteNugetVersion',
-        await callOperation('deleteNugetVersion', values(names, kept)),
-      ),
-    ).toBe('PACKAGE');
+    // The last version: 204, and the package is gone with it.
+    expectNoContent(
+      'deleteNugetVersion',
+      await callOperation('deleteNugetVersion', values(names, kept)),
+    );
     expectFailure(
       'getNugetPackage',
       await callOperation('getNugetPackage', values(names)),
@@ -604,12 +603,10 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
       await pushPackage(wholeNames, { id: other, version });
     }
     expect(await flatVersions(wholeNames)).toEqual(['1.0.0', '2.0.0']);
-    expect(
-      expectContract(
-        'deleteNugetPackage',
-        await callOperation('deleteNugetPackage', values(wholeNames)),
-      ),
-    ).toBe('PACKAGE');
+    expectNoContent(
+      'deleteNugetPackage',
+      await callOperation('deleteNugetPackage', values(wholeNames)),
+    );
     expect(await flatVersions(wholeNames)).toBe(404);
     expect(await registrationListed(wholeNames)).toBe(404);
     expect(await nupkgStatus(wholeNames, '2.0.0')).toBe(404);
@@ -623,7 +620,7 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
       404,
       'packageNotFound',
     );
-    const rows = expectContract(
+    const rows = expectBare(
       'searchNugetPackages',
       await callOperation('searchNugetPackages', { repoName: names.repoName }),
     ) as { content: unknown[] };

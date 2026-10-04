@@ -30,6 +30,8 @@ import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepo
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
+import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
+import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -66,6 +68,7 @@ class StablePagingIT extends AbstractIntegrationTest {
   @Autowired private CargoCrateRepository cargoCrateRepository;
   @Autowired private HelmChartRepository helmChartRepository;
   @Autowired private HelmChartVersionRepository helmChartVersionRepository;
+  @Autowired private NuGetPackageRepository nugetPackageRepository;
   @Autowired private RepoDeployTokenRepository deployTokenRepository;
 
   /**
@@ -92,12 +95,14 @@ class StablePagingIT extends AbstractIntegrationTest {
               .getResponse()
               .getContentAsString();
 
-      // the deploy-token, Cargo and Helm lists are bare PagedModels (RPS-1780, RPS-1781); the
+      // the deploy-token, Cargo, Helm and NuGet lists are bare PagedModels (RPS-1780, RPS-1781);
+      // the
       // others still use the envelope
       final var root =
           path.endsWith("/deploy-tokens")
                   || path.startsWith("/api/cargo/")
                   || path.startsWith("/api/helm/")
+                  || path.startsWith("/api/nuget/")
               ? "$"
               : "$.data";
       totalPages = JsonPath.<Integer>read(body, root + ".page.totalPages");
@@ -297,6 +302,43 @@ class StablePagingIT extends AbstractIntegrationTest {
         "/api/helm/charts/" + repo.getName() + "/tied/versions",
         this.adminBearerToken(),
         "createdAt,desc",
+        "version",
+        versions);
+  }
+
+  @Test
+  @DisplayName("NuGet package versions published in the same instant are each listed once")
+  void nugetVersions() throws Exception {
+    final var repo = this.seedRepo(RepoType.NUGET, uniqueRepoName("nuget"));
+    final var pkg = new NuGetPackage();
+    pkg.setRepo(this.repoRepository.getReferenceById(repo.getId()));
+    pkg.setPackageId("tied");
+    final var savedPackage = this.nugetPackageRepository.save(pkg);
+    this.entityManager.flush();
+
+    final var versions = new ArrayList<String>();
+    for (var i = 0; i < ROWS; i++) {
+      this.jdbcTemplate.update(
+          """
+          insert into "public"."nuget_package_version"
+            ("id", "package_id", "version", "is_prerelease", "is_listed", "published_at",
+            "download_count", "dependencies", "created_at")
+          values (?, ?, ?, false, true, ?, 0, cast(? as jsonb), ?)
+          """,
+          UUID.randomUUID(),
+          savedPackage.getId(),
+          "1.0." + i,
+          Timestamp.from(TIED_AT),
+          "[]",
+          Timestamp.from(TIED_AT));
+      versions.add("1.0." + i);
+    }
+    this.entityManager.clear();
+
+    this.assertEveryRowOnceAndStable(
+        "/api/nuget/packages/" + repo.getName() + "/tied/versions",
+        this.adminBearerToken(),
+        "publishedAt,desc",
         "version",
         versions);
   }

@@ -685,13 +685,17 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
 
       NuGetPublishProtocolIT.this
           .perform(
-              get("/api/nuget/packages/{repo}/{id}/{version}", repo.getName(), pkg.id(), "1.0.0")
+              get(
+                      "/api/nuget/packages/{repo}/{id}/versions/{version}",
+                      repo.getName(),
+                      pkg.id(),
+                      "1.0.0")
                   .header(AUTHORIZATION, NuGetPublishProtocolIT.this.adminBearerToken()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.dependencies", hasSize(1)))
-          .andExpect(jsonPath("$.data.dependencies[0].packageId").value("Newtonsoft.Json"))
-          .andExpect(jsonPath("$.data.dependencies[0].versionRange").value("13.0.3"))
-          .andExpect(jsonPath("$.data.dependencies[0].targetFramework").value("net8.0"));
+          .andExpect(jsonPath("$.dependencies", hasSize(1)))
+          .andExpect(jsonPath("$.dependencies[0].packageId").value("Newtonsoft.Json"))
+          .andExpect(jsonPath("$.dependencies[0].versionRange").value("13.0.3"))
+          .andExpect(jsonPath("$.dependencies[0].targetFramework").value("net8.0"));
     }
 
     @Test
@@ -1527,17 +1531,17 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
 
       NuGetPublishProtocolIT.this
           .perform(
-              get("/api/nuget/packages/{repo}/{id}/{version}", repo.getName(), id, "1.0.0")
+              get("/api/nuget/packages/{repo}/{id}/versions/{version}", repo.getName(), id, "1.0.0")
                   .header(AUTHORIZATION, NuGetPublishProtocolIT.this.adminBearerToken()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.title").value(second.title()))
-          .andExpect(jsonPath("$.data.authors").value(second.authors()))
-          .andExpect(jsonPath("$.data.description").value(second.description()))
-          .andExpect(jsonPath("$.data.readme").value(second.readme()))
-          .andExpect(jsonPath("$.data.dependencies", hasSize(1)))
-          .andExpect(jsonPath("$.data.dependencies[0].packageId").value("Serilog"))
-          .andExpect(jsonPath("$.data.dependencies[0].versionRange").value("3.1.1"))
-          .andExpect(jsonPath("$.data.dependencies[0].targetFramework").value(".NETStandard2.0"));
+          .andExpect(jsonPath("$.title").value(second.title()))
+          .andExpect(jsonPath("$.authors").value(second.authors()))
+          .andExpect(jsonPath("$.description").value(second.description()))
+          .andExpect(jsonPath("$.readme").value(second.readme()))
+          .andExpect(jsonPath("$.dependencies", hasSize(1)))
+          .andExpect(jsonPath("$.dependencies[0].packageId").value("Serilog"))
+          .andExpect(jsonPath("$.dependencies[0].versionRange").value("3.1.1"))
+          .andExpect(jsonPath("$.dependencies[0].targetFramework").value(".NETStandard2.0"));
     }
 
     @Test

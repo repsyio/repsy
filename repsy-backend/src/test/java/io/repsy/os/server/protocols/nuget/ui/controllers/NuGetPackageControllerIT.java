@@ -19,11 +19,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
-import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -156,17 +156,14 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("nugetPackagesFetched"))
-          .andExpect(jsonPath("$.type").value("SUCCESS"))
-          .andExpect(jsonPath("$.errorCode").value(nullValue()))
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].packageId").value("fixture.package"))
-          .andExpect(jsonPath("$.data.content[0].latestVersion").value("1.0.0"))
-          .andExpect(jsonPath("$.data.content[0].description").value("integration fixture"))
-          .andExpect(jsonPath("$.data.content[0].totalDownloads").value(0))
-          .andExpect(jsonPath("$.data.page.size").value(10))
-          .andExpect(jsonPath("$.data.page.totalElements").value(1));
+          .andExpect(jsonPath("$.*", hasSize(2)))
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].packageId").value("fixture.package"))
+          .andExpect(jsonPath("$.content[0].latestVersion").value("1.0.0"))
+          .andExpect(jsonPath("$.content[0].description").value("integration fixture"))
+          .andExpect(jsonPath("$.content[0].totalDownloads").value(0))
+          .andExpect(jsonPath("$.page.size").value(10))
+          .andExpect(jsonPath("$.page.totalElements").value(1));
 
       NuGetPackageControllerIT.this
           .mockMvc
@@ -175,13 +172,12 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("nugetPackageFetched"))
-          .andExpect(jsonPath("$.data.packageId").value("fixture.package"))
-          .andExpect(jsonPath("$.data.latestVersion").value("1.0.0"))
-          .andExpect(jsonPath("$.data.title").value("NuGet fixture"))
-          .andExpect(jsonPath("$.data.authors").value("Repsy"))
-          .andExpect(jsonPath("$.data.tags").value("searchable fixture"))
-          .andExpect(jsonPath("$.data.totalDownloads").value(0));
+          .andExpect(jsonPath("$.packageId").value("fixture.package"))
+          .andExpect(jsonPath("$.latestVersion").value("1.0.0"))
+          .andExpect(jsonPath("$.title").value("NuGet fixture"))
+          .andExpect(jsonPath("$.authors").value("Repsy"))
+          .andExpect(jsonPath("$.tags").value("searchable fixture"))
+          .andExpect(jsonPath("$.totalDownloads").value(0));
 
       NuGetPackageControllerIT.this
           .mockMvc
@@ -191,30 +187,28 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("nugetVersionsFetched"))
-          .andExpect(jsonPath("$.data.content", hasSize(2)))
-          .andExpect(jsonPath("$.data.content[0].version").value("1.0.0"))
-          .andExpect(jsonPath("$.data.content[1].version").value("1.0.1-beta.1"))
-          .andExpect(jsonPath("$.data.content[1].prerelease").value(true))
-          .andExpect(jsonPath("$.data.content[0].listed").value(true));
+          .andExpect(jsonPath("$.content", hasSize(2)))
+          .andExpect(jsonPath("$.content[0].version").value("1.0.0"))
+          .andExpect(jsonPath("$.content[1].version").value("1.0.1-beta.1"))
+          .andExpect(jsonPath("$.content[1].prerelease").value(true))
+          .andExpect(jsonPath("$.content[0].listed").value(true));
 
       NuGetPackageControllerIT.this
           .mockMvc
           .perform(
               get(
-                      "/api/nuget/packages/{repo}/{id}/{version}",
+                      "/api/nuget/packages/{repo}/{id}/versions/{version}",
                       repo.getName(),
                       "fixture.package",
                       "1.0.0")
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("nugetVersionFetched"))
-          .andExpect(jsonPath("$.data.packageId").value("fixture.package"))
-          .andExpect(jsonPath("$.data.version").value("1.0.0"))
-          .andExpect(jsonPath("$.data.repositoryUrl").value("https://example.test/repository.git"))
-          .andExpect(jsonPath("$.data.readme").value("# NuGet fixture"))
-          .andExpect(jsonPath("$.data.dependencies", hasSize(0)));
+          .andExpect(jsonPath("$.packageId").value("fixture.package"))
+          .andExpect(jsonPath("$.version").value("1.0.0"))
+          .andExpect(jsonPath("$.repositoryUrl").value("https://example.test/repository.git"))
+          .andExpect(jsonPath("$.readme").value("# NuGet fixture"))
+          .andExpect(jsonPath("$.dependencies", hasSize(0)));
     }
 
     @Test
@@ -267,7 +261,7 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(get("/api/nuget/packages/{repo}", repo.getName()).with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("nugetPackagesFetched"));
+          .andExpect(jsonPath("$.page.number").value(0));
     }
 
     @Test
@@ -282,9 +276,84 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
       NuGetPackageControllerIT.this
           .mockMvc
           .perform(
-              get("/api/nuget/packages/{repo}/{id}/{version}", repo.getName(), "missing", "1.0.0")
+              get(
+                      "/api/nuget/packages/{repo}/{id}/versions/{version}",
+                      repo.getName(),
+                      "missing",
+                      "1.0.0")
                   .with(apiPort()))
           .andExpect(status().isNotFound());
+    }
+  }
+
+  @Nested
+  @DisplayName("the version routes live under /versions (RPS-1781)")
+  class VersionRoutes {
+
+    @Test
+    @DisplayName("the old /{id}/{version} route is gone for both verbs")
+    void oldVersionRouteIsGone() throws Exception {
+      final var it = NuGetPackageControllerIT.this;
+      final var admin = it.createUser(uniqueUsername("nuget"), UserRole.ADMIN);
+      final var repo = it.createRepo(RepoType.NUGET, true);
+      final var token = it.bearerTokenFor(admin);
+      it.publish(repo.getName(), "Old.Route", "1.0.0");
+
+      it.mockMvc
+          .perform(
+              get("/api/nuget/packages/{repo}/{id}/{version}", repo.getName(), "Old.Route", "1.0.0")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isNotFound());
+      it.mockMvc
+          .perform(
+              delete(
+                      "/api/nuget/packages/{repo}/{id}/{version}",
+                      repo.getName(),
+                      "Old.Route",
+                      "1.0.0")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isNotFound());
+      it.mockMvc
+          .perform(
+              get("/api/nuget/packages/{repo}/{id}/versions", repo.getName(), "Old.Route")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.content", hasSize(1)));
+    }
+
+    @Test
+    @DisplayName("a package named versions has its own detail, list and version routes")
+    void packageNamedVersionsDoesNotCollide() throws Exception {
+      final var it = NuGetPackageControllerIT.this;
+      final var user = it.createUser(uniqueUsername("nuget"), UserRole.USER);
+      final var repo = it.createRepo(RepoType.NUGET, true);
+      final var token = it.bearerTokenFor(user);
+      it.publish(repo.getName(), "versions", "1.0.0");
+
+      it.mockMvc
+          .perform(
+              get("/api/nuget/packages/{repo}/versions", repo.getName())
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.packageId").value("versions"));
+      it.mockMvc
+          .perform(
+              get("/api/nuget/packages/{repo}/versions/versions", repo.getName())
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.content[0].version").value("1.0.0"));
+      it.mockMvc
+          .perform(
+              get("/api/nuget/packages/{repo}/versions/versions/1.0.0", repo.getName())
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.version").value("1.0.0"));
     }
   }
 
@@ -324,8 +393,8 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].packageId").value("only.unlisted"));
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].packageId").value("only.unlisted"));
 
       NuGetPackageControllerIT.this
           .mockMvc
@@ -334,12 +403,11 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("nugetPackageFetched"))
-          .andExpect(jsonPath("$.data.packageId").value("only.unlisted"))
-          .andExpect(jsonPath("$.data.latestVersion").value("1.0.0"))
-          .andExpect(jsonPath("$.data.title").value("NuGet fixture"))
-          .andExpect(jsonPath("$.data.description").value("integration fixture"))
-          .andExpect(jsonPath("$.data.totalDownloads").value(0));
+          .andExpect(jsonPath("$.packageId").value("only.unlisted"))
+          .andExpect(jsonPath("$.latestVersion").value("1.0.0"))
+          .andExpect(jsonPath("$.title").value("NuGet fixture"))
+          .andExpect(jsonPath("$.description").value("integration fixture"))
+          .andExpect(jsonPath("$.totalDownloads").value(0));
     }
 
     @Test
@@ -365,7 +433,7 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.latestVersion").value("2.0.0"));
+          .andExpect(jsonPath("$.latestVersion").value("2.0.0"));
     }
 
     @Test
@@ -401,7 +469,7 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.latestVersion").value("1.0.0"));
+          .andExpect(jsonPath("$.latestVersion").value("1.0.0"));
     }
 
     @Test
@@ -426,7 +494,7 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.latestVersion").value("2.0.0"));
+          .andExpect(jsonPath("$.latestVersion").value("2.0.0"));
     }
   }
 
@@ -448,17 +516,14 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(
               delete(
-                      "/api/nuget/packages/{repo}/{id}/{version}",
+                      "/api/nuget/packages/{repo}/{id}/versions/{version}",
                       repo.getName(),
                       "Delete.Me",
                       "1.0.0")
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("nugetVersionDeleted"))
-          .andExpect(jsonPath("$.data").value("VERSION"))
-          .andExpect(jsonPath("$.errorCode").value(nullValue()));
+          .andExpect(status().isNoContent())
+          .andExpect(content().string(""));
 
       NuGetPackageControllerIT.this
           .mockMvc
@@ -466,9 +531,8 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
               delete("/api/nuget/packages/{repo}/{id}", repo.getName(), "Delete.Me")
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("nugetPackageDeleted"))
-          .andExpect(jsonPath("$.data").value("PACKAGE"));
+          .andExpect(status().isNoContent())
+          .andExpect(content().string(""));
 
       NuGetPackageControllerIT.this
           .mockMvc
@@ -638,18 +702,18 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
 
       this.listPage(seed, PACKAGES, "0", "2", null)
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[*].packageId", inOrder(List.of("pkg.a", "pkg.b"))))
-          .andExpect(jsonPath("$.data.page.number").value(0))
-          .andExpect(jsonPath("$.data.page.totalElements").value(3));
+          .andExpect(jsonPath("$.content[*].packageId", inOrder(List.of("pkg.a", "pkg.b"))))
+          .andExpect(jsonPath("$.page.number").value(0))
+          .andExpect(jsonPath("$.page.totalElements").value(3));
 
       this.listPage(seed, PACKAGES, "1", "2", null)
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[*].packageId", inOrder(List.of("pkg.c"))))
-          .andExpect(jsonPath("$.data.page.number").value(1));
+          .andExpect(jsonPath("$.content[*].packageId", inOrder(List.of("pkg.c"))))
+          .andExpect(jsonPath("$.page.number").value(1));
 
       this.listPage(seed, PACKAGES, "2", "2", null)
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(0)));
+          .andExpect(jsonPath("$.content", hasSize(0)));
     }
 
     @ParameterizedTest(name = "sort={0}")
@@ -660,7 +724,7 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
 
       this.listPage(seed, PACKAGES, "0", "10", sort)
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[*].packageId", inOrder(expected)));
+          .andExpect(jsonPath("$.content[*].packageId", inOrder(expected)));
     }
 
     static Stream<Arguments> packageSortOrders() {
@@ -676,9 +740,9 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
       final var seed = this.seedPackages("pkg.b", "pkg.c", "pkg.a");
 
       this.listPage(seed, PACKAGES, "0", "2", "packageId,desc")
-          .andExpect(jsonPath("$.data.content[*].packageId", inOrder(List.of("pkg.c", "pkg.b"))));
+          .andExpect(jsonPath("$.content[*].packageId", inOrder(List.of("pkg.c", "pkg.b"))));
       this.listPage(seed, PACKAGES, "1", "2", "packageId,desc")
-          .andExpect(jsonPath("$.data.content[*].packageId", inOrder(List.of("pkg.a"))));
+          .andExpect(jsonPath("$.content[*].packageId", inOrder(List.of("pkg.a"))));
     }
 
     @ParameterizedTest(name = "sort={0}")
@@ -689,7 +753,7 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
 
       this.listPage(seed, VERSIONS, "0", "10", sort)
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[*].version", inOrder(expected)));
+          .andExpect(jsonPath("$.content[*].version", inOrder(expected)));
     }
 
     static Stream<Arguments> versionSortOrders() {
@@ -707,10 +771,10 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
       final var seed = this.seedDatedVersions();
 
       this.listPage(seed, VERSIONS, "0", "2", "publishedAt,asc")
-          .andExpect(jsonPath("$.data.content[*].version", inOrder(List.of("1.0.0", "2.0.0"))))
-          .andExpect(jsonPath("$.data.page.totalElements").value(3));
+          .andExpect(jsonPath("$.content[*].version", inOrder(List.of("1.0.0", "2.0.0"))))
+          .andExpect(jsonPath("$.page.totalElements").value(3));
       this.listPage(seed, VERSIONS, "1", "2", "publishedAt,asc")
-          .andExpect(jsonPath("$.data.content[*].version", inOrder(List.of("3.0.0"))));
+          .andExpect(jsonPath("$.content[*].version", inOrder(List.of("3.0.0"))));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -773,18 +837,17 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
 
       this.list(seed, "q", "beta", "sort", "version,asc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[*].version", inOrder("1.0.1-Beta.1")))
-          .andExpect(jsonPath("$.data.page.totalElements").value(1));
+          .andExpect(jsonPath("$.content[*].version", inOrder("1.0.1-Beta.1")))
+          .andExpect(jsonPath("$.page.totalElements").value(1));
       this.list(seed, "q", "BETA")
-          .andExpect(jsonPath("$.data.content[*].version", inOrder("1.0.1-Beta.1")));
+          .andExpect(jsonPath("$.content[*].version", inOrder("1.0.1-Beta.1")));
       this.list(seed, "q", "1.0.", "sort", "version,asc")
-          .andExpect(jsonPath("$.data.content[*].version", inOrder("1.0.0", "1.0.1-Beta.1")))
-          .andExpect(jsonPath("$.data.page.totalElements").value(2));
+          .andExpect(jsonPath("$.content[*].version", inOrder("1.0.0", "1.0.1-Beta.1")))
+          .andExpect(jsonPath("$.page.totalElements").value(2));
       // A substring anywhere in the version counts, not only a prefix: "1.0" is inside "2.1.0".
       this.list(seed, "q", "1.0", "sort", "version,asc")
           .andExpect(
-              jsonPath(
-                  "$.data.content[*].version", inOrder("1.0.0", "1.0.1-Beta.1", "1.1.0", "2.1.0")));
+              jsonPath("$.content[*].version", inOrder("1.0.0", "1.0.1-Beta.1", "1.1.0", "2.1.0")));
     }
 
     @Test
@@ -792,8 +855,8 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
     void missAnswersEmptyPage() throws Exception {
       this.list(this.seed(), "q", "zzz")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(0)))
-          .andExpect(jsonPath("$.data.page.totalElements").value(0));
+          .andExpect(jsonPath("$.content", hasSize(0)))
+          .andExpect(jsonPath("$.page.totalElements").value(0));
     }
 
     @Test
@@ -802,11 +865,11 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
       final var seed = this.seed();
 
       this.list(seed, "q", "", "size", "20")
-          .andExpect(jsonPath("$.data.content", hasSize(7)))
-          .andExpect(jsonPath("$.data.page.totalElements").value(7));
+          .andExpect(jsonPath("$.content", hasSize(7)))
+          .andExpect(jsonPath("$.page.totalElements").value(7));
       this.list(seed, "size", "20")
-          .andExpect(jsonPath("$.data.content", hasSize(7)))
-          .andExpect(jsonPath("$.data.page.totalElements").value(7));
+          .andExpect(jsonPath("$.content", hasSize(7)))
+          .andExpect(jsonPath("$.page.totalElements").value(7));
     }
 
     @Test
@@ -815,11 +878,11 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
       final var seed = this.seed();
 
       this.list(seed, "q", "2.", "size", "2", "page", "0", "sort", "version,asc")
-          .andExpect(jsonPath("$.data.content[*].version", inOrder("2.0.0", "2.1.0")))
-          .andExpect(jsonPath("$.data.page.totalElements").value(3))
-          .andExpect(jsonPath("$.data.page.totalPages").value(2));
+          .andExpect(jsonPath("$.content[*].version", inOrder("2.0.0", "2.1.0")))
+          .andExpect(jsonPath("$.page.totalElements").value(3))
+          .andExpect(jsonPath("$.page.totalPages").value(2));
       this.list(seed, "q", "2.", "size", "2", "page", "1", "sort", "version,asc")
-          .andExpect(jsonPath("$.data.content[*].version", inOrder("2.2.0")));
+          .andExpect(jsonPath("$.content[*].version", inOrder("2.2.0")));
     }
 
     @Test
@@ -827,8 +890,8 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
     void wildcardsAreLiteral() throws Exception {
       final var seed = this.seed();
 
-      this.list(seed, "q", "%").andExpect(jsonPath("$.data.page.totalElements").value(0));
-      this.list(seed, "q", "_.0.0").andExpect(jsonPath("$.data.page.totalElements").value(0));
+      this.list(seed, "q", "%").andExpect(jsonPath("$.page.totalElements").value(0));
+      this.list(seed, "q", "_.0.0").andExpect(jsonPath("$.page.totalElements").value(0));
     }
   }
 }
