@@ -179,7 +179,11 @@ class HelmOciTagRelinkIT extends AbstractIntegrationTest {
       final Repo repo, final String name, final String version, final String panelToken)
       throws Exception {
     return this.perform(
-            delete("/api/helm/charts/{repo}/{name}/{version}", repo.getName(), name, version)
+            delete(
+                    "/api/helm/charts/{repo}/{name}/versions/{version}",
+                    repo.getName(),
+                    name,
+                    version)
                 .header(AUTHORIZATION, panelToken))
         .andReturn()
         .getResponse();
@@ -241,7 +245,7 @@ class HelmOciTagRelinkIT extends AbstractIntegrationTest {
     assertThat(secondDigest).as("push response must echo the new manifest's digest").isNotBlank();
 
     final var deleted = this.deleteVersion(repo, CHART, "1.0.0", panelToken);
-    assertThat(deleted.getStatus()).as(deleted.getContentAsString()).isEqualTo(200);
+    assertThat(deleted.getStatus()).as(deleted.getContentAsString()).isEqualTo(204);
 
     final var manifest = this.getManifest(repo, CHART, LATEST, token);
     assertThat(manifest.getStatus())

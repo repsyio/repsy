@@ -153,7 +153,11 @@ class HelmDeleteStorageFailureIT extends AbstractIntegrationTest {
 
   private MockHttpServletResponse panelDeleteVersion(final Repo repo) throws Exception {
     return this.perform(
-            delete("/api/helm/charts/{repo}/{name}/{version}", repo.getName(), CHART, VERSION)
+            delete(
+                    "/api/helm/charts/{repo}/{name}/versions/{version}",
+                    repo.getName(),
+                    CHART,
+                    VERSION)
                 .header(AUTHORIZATION, this.panelAdminToken()))
         .andReturn()
         .getResponse();
@@ -189,7 +193,7 @@ class HelmDeleteStorageFailureIT extends AbstractIntegrationTest {
     assertThat(this.storedVersions(repo)).as("the version row was rolled back").isEqualTo(1);
 
     Mockito.reset(this.helmStorageService);
-    assertThat(this.panelDeleteVersion(repo).getStatus()).as("the retry").isEqualTo(200);
+    assertThat(this.panelDeleteVersion(repo).getStatus()).as("the retry").isEqualTo(204);
     assertThat(this.storedVersions(repo)).isZero();
   }
 
@@ -205,7 +209,7 @@ class HelmDeleteStorageFailureIT extends AbstractIntegrationTest {
     assertThat(this.storedVersions(repo)).as("the chart rows were rolled back").isEqualTo(1);
 
     Mockito.reset(this.helmStorageService);
-    assertThat(this.panelDeleteAllVersions(repo).getStatus()).as("the retry").isEqualTo(200);
+    assertThat(this.panelDeleteAllVersions(repo).getStatus()).as("the retry").isEqualTo(204);
     assertThat(this.storedVersions(repo)).isZero();
   }
 

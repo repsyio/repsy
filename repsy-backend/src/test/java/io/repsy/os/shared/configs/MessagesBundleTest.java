@@ -56,12 +56,6 @@ class MessagesBundleTest {
         "passwordReset",
         "tokenRefreshed",
         "keyStoresFetched",
-        // Helm
-        "chartsFetched",
-        "chartDetailFetched",
-        "chartTagsFetched",
-        "chartVersionsFetched",
-        "chartDeleted",
         // Ruby
         "gemsFetched",
         "gemVersionsFetched",

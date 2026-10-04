@@ -2573,7 +2573,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelHelmChartListItem"
+                "$ref": "#/components/schemas/PagedModelHelmChartListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2589,7 +2589,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/helm/charts/{repoName}/{chartName}":
+  "/api/helm/charts/{repoName}/{packageName}":
     get:
       tags:
         - helm-chart-controller
@@ -2604,7 +2604,9 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseListHelmChartVersionItem"
+                type: array
+                items:
+                  "$ref": "#/components/schemas/HelmChartVersionItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -2618,12 +2620,8 @@ paths:
       operationId: deleteAllHelmChartVersions
       parameters: []
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -2641,12 +2639,12 @@ paths:
         required: true
         schema:
           type: string
-      - name: chartName
+      - name: packageName
         in: path
         required: true
         schema:
           type: string
-  "/api/helm/charts/{repoName}/{chartName}/tags":
+  "/api/helm/charts/{repoName}/{packageName}/tags":
     get:
       tags:
         - helm-chart-controller
@@ -2661,7 +2659,9 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseListString"
+                type: array
+                items:
+                  type: string
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -2675,12 +2675,12 @@ paths:
         required: true
         schema:
           type: string
-      - name: chartName
+      - name: packageName
         in: path
         required: true
         schema:
           type: string
-  "/api/helm/charts/{repoName}/{chartName}/{version}":
+  "/api/helm/charts/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
         - helm-chart-controller
@@ -2695,7 +2695,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseHelmChartDetail"
+                "$ref": "#/components/schemas/HelmChartDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -2709,12 +2709,8 @@ paths:
       operationId: deleteHelmChartVersion
       parameters: []
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -2732,7 +2728,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: chartName
+      - name: packageName
         in: path
         required: true
         schema:
@@ -4954,22 +4950,6 @@ components:
       enum:
         - USER
         - ADMIN
-    RestResponseListString:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: array
-          items:
-            type: string
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     RepoType:
       type: string
       description: >-
@@ -6381,50 +6361,6 @@ components:
             "$ref": "#/components/schemas/HelmChartListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelHelmChartListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelHelmChartListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseListHelmChartVersionItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: array
-          items:
-            "$ref": "#/components/schemas/HelmChartVersionItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseHelmChartDetail:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/HelmChartDetail"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: maven
     ArtifactListItem:
       type: object

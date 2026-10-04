@@ -92,10 +92,14 @@ class StablePagingIT extends AbstractIntegrationTest {
               .getResponse()
               .getContentAsString();
 
-      // the deploy-token and Cargo lists are bare PagedModels (RPS-1780, RPS-1781); the others
-      // still use the envelope
+      // the deploy-token, Cargo and Helm lists are bare PagedModels (RPS-1780, RPS-1781); the
+      // others still use the envelope
       final var root =
-          path.endsWith("/deploy-tokens") || path.startsWith("/api/cargo/") ? "$" : "$.data";
+          path.endsWith("/deploy-tokens")
+                  || path.startsWith("/api/cargo/")
+                  || path.startsWith("/api/helm/")
+              ? "$"
+              : "$.data";
       totalPages = JsonPath.<Integer>read(body, root + ".page.totalPages");
       values.addAll(JsonPath.<List<String>>read(body, root + ".content[*]." + field));
     }

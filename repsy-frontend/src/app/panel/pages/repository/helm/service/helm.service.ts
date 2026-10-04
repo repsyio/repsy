@@ -73,17 +73,15 @@ export class HelmService {
       .searchHelmCharts(this.repoName, query || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
-      .pipe(
-        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<HelmChartListItem>),
-      );
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<HelmChartListItem>));
   }
 
   public getChartVersions(name: string): Observable<HelmChartVersionItem[]> {
-    return this.helmChartControllerService.getHelmChartVersions(this.repoName, name).pipe(map((r) => r.data ?? []));
+    return this.helmChartControllerService.getHelmChartVersions(this.repoName, name).pipe(map((r) => r ?? []));
   }
 
   public getChartDetail(name: string, version: string): Observable<HelmChartDetail> {
-    return this.helmChartControllerService.getHelmChartDetail(this.repoName, name, version).pipe(map((r) => r.data!));
+    return this.helmChartControllerService.getHelmChartDetail(this.repoName, name, version);
   }
 
   public deleteAllVersions(name: string): Observable<void> {
@@ -97,6 +95,6 @@ export class HelmService {
   }
 
   public getOciTags(name: string): Observable<string[]> {
-    return this.helmChartControllerService.getHelmChartOciTags(this.repoName, name).pipe(map((r) => r.data ?? []));
+    return this.helmChartControllerService.getHelmChartOciTags(this.repoName, name).pipe(map((r) => r ?? []));
   }
 }
