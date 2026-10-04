@@ -299,7 +299,7 @@ export interface PanelBackend {
 
   // Other protocols -------------------------------------------------------------------------------
 
-  deletePypiRelease(repoName: string, packageName: string, version: string): Promise<void>;
+  deletePypiVersion(repoName: string, packageName: string, version: string): Promise<void>;
   deleteGolangModuleVersion(repoName: string, modulePath: string, version: string): Promise<void>;
   deleteRubyGemVersion(
     repoName: string,

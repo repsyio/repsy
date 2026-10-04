@@ -101,7 +101,7 @@ class StablePagingIT extends AbstractIntegrationTest {
               .getResponse()
               .getContentAsString();
 
-      // the deploy-token, Cargo, Helm, NuGet and Ruby lists are bare PagedModels (RPS-1780,
+      // the deploy-token, Cargo, Helm, NuGet, PyPI and Ruby lists are bare PagedModels (RPS-1780,
       // RPS-1781);
       // the
       // others still use the envelope
@@ -110,6 +110,7 @@ class StablePagingIT extends AbstractIntegrationTest {
                   || path.startsWith("/api/cargo/")
                   || path.startsWith("/api/helm/")
                   || path.startsWith("/api/nuget/")
+                  || path.startsWith("/api/pypi/")
                   || path.startsWith("/api/ruby/")
               ? "$"
               : "$.data";

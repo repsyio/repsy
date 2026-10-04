@@ -15,16 +15,16 @@
  */
 package io.repsy.os.server.protocols.pypi.ui.controllers;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.os.generated.model.PypiPackageInfo;
 import io.repsy.os.generated.model.PypiPackageListItem;
 import io.repsy.os.generated.model.ReleaseDetail;
 import io.repsy.os.generated.model.ReleaseListItem;
 import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageServiceImpl;
 import io.repsy.os.server.protocols.pypi.ui.facades.PypiApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -34,11 +34,11 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -57,28 +57,27 @@ public class PypiPackageController {
   private static final Set<String> PACKAGE_SORT_PROPERTIES =
       Set.of("id", "name", "latestVersion", "updatedAt");
 
-  private static final Set<String> RELEASE_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
+  private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
 
   private final UsageUpdateService usageUpdateService;
   private final PypiApiFacade pypiApiFacade;
   private final PypiPackageServiceImpl pypiPackageService;
-  private final RestResponseFactory restResponseFactory;
 
   @DeleteMapping("/{repoName}/{packageName}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> delete(
+  public ResponseEntity<Void> delete(
       final RepoInfo repoInfo, @PathVariable final String packageName) {
 
     final var usages = this.pypiApiFacade.deletePackage(repoInfo, packageName);
 
     this.updateUsage(repoInfo, usages);
 
-    return this.restResponseFactory.success("packageDeleted");
+    return ResponseEntities.noContent();
   }
 
-  @DeleteMapping("/{repoName}/{packageName}/releases/{version}")
+  @DeleteMapping("/{repoName}/{packageName}/versions/{version}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> deleteRelease(
+  public ResponseEntity<Void> deleteVersion(
       final RepoInfo repoInfo,
       @PathVariable final String packageName,
       @PathVariable final String version) {
@@ -87,84 +86,64 @@ public class PypiPackageController {
 
     this.updateUsage(repoInfo, usages);
 
-    return this.restResponseFactory.success("packageReleaseDeleted");
+    return ResponseEntities.noContent();
   }
 
   @GetMapping("/{repoName}")
   @RepoOperation
-  public RestResponse<PagedModel<PypiPackageListItem>> list(
+  public ResponseEntity<PagedModel<PypiPackageListItem>> list(
       final RepoInfo repoInfo,
+      @RequestParam(name = "q", defaultValue = "") final String query,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, PACKAGE_SORT_PROPERTIES);
 
     final var packageList =
-        this.pypiPackageService.getPackageList(repoInfo.getStorageKey(), pageable);
+        query.isEmpty()
+            ? this.pypiPackageService.getPackageList(repoInfo.getStorageKey(), pageable)
+            : this.pypiPackageService.getPackagesContainsName(
+                repoInfo.getStorageKey(), query, pageable);
 
-    return this.restResponseFactory.success("packagesFetched", new PagedModel<>(packageList));
+    return ResponseEntity.ok(new PagedModel<>(packageList));
   }
 
-  @GetMapping(value = "/{repoName}", params = "q")
+  @GetMapping("/{repoName}/{packageName}")
   @RepoOperation
-  public RestResponse<PagedModel<PypiPackageListItem>> listLikeName(
-      final RepoInfo repoInfo,
-      @RequestParam(name = "q", required = false, defaultValue = "") final String name,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+  public ResponseEntity<PypiPackageInfo> getPackage(
+      final RepoInfo repoInfo, @PathVariable final String packageName) {
 
-    SortValidator.requireSortableBy(pageable, PACKAGE_SORT_PROPERTIES);
-
-    final var packageList =
-        this.pypiPackageService.getPackagesContainsName(repoInfo.getStorageKey(), name, pageable);
-
-    return this.restResponseFactory.success("packagesFetched", new PagedModel<>(packageList));
+    return ResponseEntity.ok(this.pypiApiFacade.getPackage(repoInfo.getStorageKey(), packageName));
   }
 
-  @GetMapping("/{repoName}/{packageName}/releases")
+  @GetMapping("/{repoName}/{packageName}/versions")
   @RepoOperation
-  public RestResponse<PagedModel<ReleaseListItem>> listReleases(
+  public ResponseEntity<PagedModel<ReleaseListItem>> listVersions(
       final RepoInfo repoInfo,
       @PathVariable final String packageName,
+      @RequestParam(name = "q", defaultValue = "") final String query,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
-    SortValidator.requireSortableBy(pageable, RELEASE_SORT_PROPERTIES);
+    SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 
-    final var releases =
-        this.pypiPackageService.getReleaseList(repoInfo.getStorageKey(), packageName, pageable);
+    final var versions =
+        query.isEmpty()
+            ? this.pypiPackageService.getReleaseList(
+                repoInfo.getStorageKey(), packageName, pageable)
+            : this.pypiPackageService.getReleasesContainsVersion(
+                repoInfo.getStorageKey(), packageName, query, pageable);
 
-    return this.restResponseFactory.success("releasesFetched", new PagedModel<>(releases));
+    return ResponseEntity.ok(new PagedModel<>(versions));
   }
 
-  @GetMapping(value = "/{repoName}/{packageName}/releases", params = "q")
+  @GetMapping("/{repoName}/{packageName}/versions/{version}")
   @RepoOperation
-  public RestResponse<PagedModel<ReleaseListItem>> listReleasesLikeVersion(
+  public ResponseEntity<ReleaseDetail> getVersion(
       final RepoInfo repoInfo,
       @PathVariable final String packageName,
-      @RequestParam(name = "q", required = false, defaultValue = "") final String version,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+      @PathVariable final String version) {
 
-    SortValidator.requireSortableBy(pageable, RELEASE_SORT_PROPERTIES);
-
-    final var releases =
-        this.pypiPackageService.getReleasesContainsVersion(
-            repoInfo.getStorageKey(), packageName, version, pageable);
-
-    return this.restResponseFactory.success("releasesFetched", new PagedModel<>(releases));
-  }
-
-  @GetMapping({
-    "/{repoName}/{packageName}",
-    "/{repoName}/{packageName}/releases/{version}",
-  })
-  @RepoOperation
-  public RestResponse<ReleaseDetail> getRelease(
-      final RepoInfo repoInfo,
-      @PathVariable final String packageName,
-      @PathVariable final @Nullable String version) {
-
-    final var details =
-        this.pypiApiFacade.getReleaseDetail(repoInfo.getStorageKey(), packageName, version);
-
-    return this.restResponseFactory.success("releaseDetailFetched", details);
+    return ResponseEntity.ok(
+        this.pypiApiFacade.getReleaseDetail(repoInfo.getStorageKey(), packageName, version));
   }
 
   private void updateUsage(final RepoInfo repoInfo, final BaseUsages usages) {

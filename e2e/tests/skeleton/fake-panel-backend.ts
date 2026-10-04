@@ -177,8 +177,8 @@ export class FakePanelBackend implements PanelBackend {
   async deleteMavenArtifactVersion(): Promise<void> {
     return unsupported('deleteMavenArtifactVersion');
   }
-  async deletePypiRelease(): Promise<void> {
-    return unsupported('deletePypiRelease');
+  async deletePypiVersion(): Promise<void> {
+    return unsupported('deletePypiVersion');
   }
   async deleteGolangModuleVersion(): Promise<void> {
     return unsupported('deleteGolangModuleVersion');

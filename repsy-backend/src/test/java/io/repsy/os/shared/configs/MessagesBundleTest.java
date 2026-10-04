@@ -61,10 +61,7 @@ class MessagesBundleTest {
         "moduleInfoFetched",
         "moduleVersionsFetched",
         "moduleDeleted",
-        "moduleVersionDeleted",
-        // PyPI
-        "releasesFetched",
-        "releaseDetailFetched"
+        "moduleVersionDeleted"
       })
   void msgIdHasASentence(final String msgId) {
     assertThat(messages.getProperty(msgId)).isNotBlank().isNotEqualTo(msgId);

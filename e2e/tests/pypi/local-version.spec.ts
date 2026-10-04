@@ -25,7 +25,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { callOperation, expectContract, expectFailure } from '../../src/api/contract-checks.js';
+import {
+  callOperation,
+  expectBare,
+  expectFailure,
+  expectNoContent,
+} from '../../src/api/contract-checks.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import * as pypi from '../../src/clients/pypi.js';
 import { pipEnv } from '../../src/clients/pypi.js';
@@ -248,9 +253,9 @@ test.describe('pypi local versions (PEP 440 +local)', () => {
         ...(version ? { version } : {}),
       });
       const versions = async (): Promise<string[]> => {
-        const page = expectContract(
-          'listPypiReleases',
-          await callOperation('listPypiReleases', values()),
+        const page = expectBare(
+          'listPypiVersions',
+          await callOperation('listPypiVersions', values()),
         ) as { content: { version: string }[] };
         return page.content.map((row) => row.version);
       };
@@ -260,13 +265,16 @@ test.describe('pypi local versions (PEP 440 +local)', () => {
         LOCAL_1,
         PUBLIC,
       ]);
-      const detail = expectContract(
-        'getPypiRelease',
-        await callOperation('getPypiRelease', values(LOCAL_1)),
+      const detail = expectBare(
+        'getPypiVersion',
+        await callOperation('getPypiVersion', values(LOCAL_1)),
       ) as { version: string };
       expect(detail.version).toBe(LOCAL_1);
 
-      expectContract('deletePypiRelease', await callOperation('deletePypiRelease', values(PUBLIC)));
+      expectNoContent(
+        'deletePypiVersion',
+        await callOperation('deletePypiVersion', values(PUBLIC)),
+      );
 
       expect(await versions()).toEqual([LOCAL_2, LOCAL_1]);
       expect(await projectFiles(layout), 'only the public file went').toEqual(
@@ -286,14 +294,14 @@ test.describe('pypi local versions (PEP 440 +local)', () => {
       }
 
       // And the other way round: deleting a local build leaves the next one.
-      expectContract(
-        'deletePypiRelease',
-        await callOperation('deletePypiRelease', values(LOCAL_2)),
+      expectNoContent(
+        'deletePypiVersion',
+        await callOperation('deletePypiVersion', values(LOCAL_2)),
       );
       expect(await versions()).toEqual([LOCAL_1]);
       expectFailure(
-        'getPypiRelease',
-        await callOperation('getPypiRelease', values(LOCAL_2)),
+        'getPypiVersion',
+        await callOperation('getPypiVersion', values(LOCAL_2)),
         404,
         'releaseNotFound',
       );

@@ -135,9 +135,9 @@ class PagedListsIT extends AbstractIntegrationTest {
               "latestVersion",
               "updatedAt"),
           list(
-              "listPypiReleases",
+              "listPypiVersions",
               RepoType.PYPI,
-              "/api/pypi/packages/{repo}/alpha/releases",
+              "/api/pypi/packages/{repo}/alpha/versions",
               true,
               "id",
               "version",

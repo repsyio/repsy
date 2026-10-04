@@ -224,7 +224,7 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
 
     this.perform(delete(packages + "/demo").header(AUTHORIZATION, user))
         .andExpect(status().isForbidden());
-    this.perform(delete(packages + "/demo/releases/1.0.0").header(AUTHORIZATION, user))
+    this.perform(delete(packages + "/demo/versions/1.0.0").header(AUTHORIZATION, user))
         .andExpect(status().isForbidden());
 
     for (final var authorization : this.callers(user)) {
@@ -235,11 +235,10 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
               .getResponse()
               .getContentAsString();
 
-      assertThat(JsonPath.<List<String>>read(listed, "$.data.content[*].name"))
-          .containsExactly("demo");
+      assertThat(JsonPath.<List<String>>read(listed, "$.content[*].name")).containsExactly("demo");
     }
 
-    this.perform(get(packages + "/demo/releases").header(AUTHORIZATION, user))
+    this.perform(get(packages + "/demo/versions").header(AUTHORIZATION, user))
         .andExpect(status().isOk());
   }
 

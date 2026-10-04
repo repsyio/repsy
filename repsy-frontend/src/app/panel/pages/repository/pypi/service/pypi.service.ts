@@ -71,11 +71,7 @@ export class PypiService {
   ): Observable<PagedData<PypiPackageListItem>> {
     return this.pypiPackageControllerService
       .listPypiPackages(this.repoName, name || undefined, pageIndex, pageSize, [`${sort.column},${sort.type}`])
-      .pipe(
-        map(
-          (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<PypiPackageListItem>,
-        ),
-      );
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<PypiPackageListItem>));
   }
 
   public fetchPackageReleasesLikeName(
@@ -86,12 +82,10 @@ export class PypiService {
     pageSize: number,
   ): Observable<PagedData<ReleaseListItem>> {
     return this.pypiPackageControllerService
-      .listPypiReleases(packageName, this.repoName, version || undefined, pageIndex, pageSize, [
+      .listPypiVersions(packageName, this.repoName, version || undefined, pageIndex, pageSize, [
         `${sort.column},${sort.type}`,
       ])
-      .pipe(
-        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ReleaseListItem>),
-      );
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<ReleaseListItem>));
   }
 
   public deletePackage(packageName: string): Observable<void> {
@@ -99,14 +93,12 @@ export class PypiService {
   }
 
   public fetchRelease(packageName: string, release: string): Observable<ReleaseDetail> {
-    return this.pypiPackageControllerService
-      .getPypiRelease(packageName, release, this.repoName)
-      .pipe(map((r) => r.data!));
+    return this.pypiPackageControllerService.getPypiVersion(packageName, release, this.repoName);
   }
 
   public deleteRelease(packageName: string, releaseVersion: string): Observable<void> {
     return this.pypiPackageControllerService
-      .deletePypiRelease(packageName, releaseVersion, this.repoName)
+      .deletePypiVersion(packageName, releaseVersion, this.repoName)
       .pipe(map(() => undefined));
   }
 }

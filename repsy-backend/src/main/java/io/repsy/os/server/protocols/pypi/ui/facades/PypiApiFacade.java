@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.pypi.ui.facades;
 
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.os.generated.model.PypiPackageInfo;
 import io.repsy.os.generated.model.ReleaseDetail;
 import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageServiceImpl;
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
@@ -28,7 +29,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
@@ -105,23 +105,31 @@ public class PypiApiFacade implements ProtocolApiFacade {
     }
   }
 
-  public @NonNull ReleaseDetail getReleaseDetail(
-      final @NonNull UUID repoId,
-      final @NonNull String packageName,
-      final @Nullable String releaseVersion) {
+  /** The package's summary: its name and the versions it points at. */
+  public @NonNull PypiPackageInfo getPackage(
+      final @NonNull UUID repoId, final @NonNull String packageName) {
 
     final var packageInfo =
         this.pypiPackageService.getPackage(repoId, PackageUtils.normalizePackageName(packageName));
 
-    final ReleaseDetail releaseDetail;
+    return PypiPackageInfo.builder()
+        .name(packageInfo.getName())
+        .stableVersion(packageInfo.getStableVersion())
+        .latestVersion(packageInfo.getLatestVersion())
+        .createdAt(packageInfo.getCreatedAt())
+        .build();
+  }
 
-    if (releaseVersion == null) {
-      releaseDetail =
-          this.pypiPackageService.getReleaseDetail(
-              packageInfo.getId(), packageInfo.getLatestVersion());
-    } else {
-      releaseDetail = this.pypiPackageService.getReleaseDetail(packageInfo.getId(), releaseVersion);
-    }
+  public @NonNull ReleaseDetail getReleaseDetail(
+      final @NonNull UUID repoId,
+      final @NonNull String packageName,
+      final @NonNull String releaseVersion) {
+
+    final var packageInfo =
+        this.pypiPackageService.getPackage(repoId, PackageUtils.normalizePackageName(packageName));
+
+    final var releaseDetail =
+        this.pypiPackageService.getReleaseDetail(packageInfo.getId(), releaseVersion);
 
     releaseDetail.setPackageName(packageInfo.getName());
     releaseDetail.setStableVersion(packageInfo.getStableVersion());
