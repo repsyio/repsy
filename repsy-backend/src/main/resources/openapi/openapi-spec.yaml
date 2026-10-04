@@ -3403,7 +3403,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
+                "$ref": "#/components/schemas/PagedModelNpmPackageListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3413,6 +3413,114 @@ paths:
         '429':
           "$ref": "#/components/responses/TooManyRequests"
       summary: List npm packages in a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/{packageName}":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: getNpmPackage
+      description: >-
+        The package summary: its latest version and when it was created. The detail of one version is `versions/{version}`.
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/NpmPackageInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a npm package
+    delete:
+      tags:
+        - npm-package-api-controller
+      operationId: deleteNpmPackage
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: No Content
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Delete a npm package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/{packageName}/versions":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: listNpmPackageVersions
+      description: >-
+        Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `createdAt,desc`.
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: q
+          in: query
+          required: false
+          description: >-
+            Only versions that contain this text.
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PagedModelPackageVersionListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: List versions of a npm package
     parameters:
       - name: repoName
         in: path
@@ -3444,7 +3552,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
+                "$ref": "#/components/schemas/PackageVersionDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -3468,12 +3576,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3491,93 +3595,11 @@ paths:
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/{scope}/{packageName}/versions/{version}":
+  "/api/npm/packages/{repoName}/{packageName}/tags":
     get:
       tags:
         - npm-package-api-controller
-      operationId: getNpmScopedPackageVersion
-      parameters:
-        - name: scope
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: version
-          in: path
-          required: true
-          schema:
-            type: string
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Get a specific scoped npm package version
-    delete:
-      tags:
-        - npm-package-api-controller
-      operationId: deleteNpmScopedPackageVersion
-      parameters:
-        - name: scope
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: version
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete a specific scoped npm package version
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  "/api/npm/packages/{repoName}/{packageName}":
-    get:
-      tags:
-        - npm-package-api-controller
-      operationId: getNpmPackage
+      operationId: listNpmPackageTags
       parameters:
         - name: packageName
           in: path
@@ -3593,114 +3615,16 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
+                type: array
+                items:
+                  "$ref": "#/components/schemas/PackageDistributionTagMapListItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: Get an npm package
-    delete:
-      tags:
-        - npm-package-api-controller
-      operationId: deleteNpmPackage
-      parameters:
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete an npm package
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  "/api/npm/packages/{repoName}/{scope}/{packageName}":
-    get:
-      tags:
-        - npm-package-api-controller
-      operationId: getNpmScopedPackage
-      parameters:
-        - name: scope
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Get a scoped npm package
-    delete:
-      tags:
-        - npm-package-api-controller
-      operationId: deleteScopedNpmPackage
-      parameters:
-        - name: scope
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete a scoped npm package
+      summary: List dist-tags for a npm package
     parameters:
       - name: repoName
         in: path
@@ -3735,7 +3659,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
+                "$ref": "#/components/schemas/PagedModelNpmPackageListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3784,7 +3708,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
+                "$ref": "#/components/schemas/PagedModelNpmPackageListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3800,29 +3724,25 @@ paths:
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/package/{packageName}/versions":
+  "/api/npm/scopes/{repoName}/{scope}/packages/{packageName}":
     get:
       tags:
-        - npm-package-api-controller
-      operationId: listNpmPackageVersions
+        - npm-scope-api-controller
+      operationId: getNpmScopedPackage
       description: >-
-        Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
+        The package summary: its latest version and when it was created. The detail of one version is `versions/{version}`.
       parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the package is `@scope/packageName`.
+          schema:
+            type: string
         - name: packageName
           in: path
           required: true
           schema:
             type: string
-        - name: q
-          in: query
-          required: false
-          description: >-
-            Only versions that contain this text.
-          schema:
-            type: string
-        - "$ref": "#/components/parameters/Page"
-        - "$ref": "#/components/parameters/Size"
-        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -3832,33 +3752,62 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageVersionListItem"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
+                "$ref": "#/components/schemas/NpmPackageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: List versions of an npm package
+      summary: Get a scoped npm package
+    delete:
+      tags:
+        - npm-scope-api-controller
+      operationId: deleteScopedNpmPackage
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the package is `@scope/packageName`.
+          schema:
+            type: string
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: No Content
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Delete a scoped npm package
     parameters:
       - name: repoName
         in: path
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/{scope}/package/{packageName}/versions":
+  "/api/npm/scopes/{repoName}/{scope}/packages/{packageName}/versions":
     get:
       tags:
-        - npm-package-api-controller
+        - npm-scope-api-controller
       operationId: listNpmScopedPackageVersions
       description: >-
-        Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
+        Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `createdAt,desc`.
       parameters:
         - name: scope
           in: path
           required: true
+          description: The npm scope without the `@`; the package is `@scope/packageName`.
           schema:
             type: string
         - name: packageName
@@ -3885,7 +3834,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageVersionListItem"
+                "$ref": "#/components/schemas/PagedModelPackageVersionListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3901,13 +3850,24 @@ paths:
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/package/{packageName}/tags":
+  "/api/npm/scopes/{repoName}/{scope}/packages/{packageName}/versions/{version}":
     get:
       tags:
-        - npm-package-api-controller
-      operationId: listNpmPackageTags
+        - npm-scope-api-controller
+      operationId: getNpmScopedPackageVersion
       parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the package is `@scope/packageName`.
+          schema:
+            type: string
         - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
           in: path
           required: true
           schema:
@@ -3921,29 +3881,65 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseListPackageDistributionTagMapListItem"
+                "$ref": "#/components/schemas/PackageVersionDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: List dist-tags for an npm package
+      summary: Get a specific scoped npm package version
+    delete:
+      tags:
+        - npm-scope-api-controller
+      operationId: deleteNpmScopedPackageVersion
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the package is `@scope/packageName`.
+          schema:
+            type: string
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: No Content
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Delete a specific scoped npm package version
     parameters:
       - name: repoName
         in: path
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/{scope}/package/{packageName}/tags":
+  "/api/npm/scopes/{repoName}/{scope}/packages/{packageName}/tags":
     get:
       tags:
-        - npm-package-api-controller
+        - npm-scope-api-controller
       operationId: listNpmScopedPackageTags
       parameters:
         - name: scope
           in: path
           required: true
+          description: The npm scope without the `@`; the package is `@scope/packageName`.
           schema:
             type: string
         - name: packageName
@@ -3960,7 +3956,9 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseListPackageDistributionTagMapListItem"
+                type: array
+                items:
+                  "$ref": "#/components/schemas/PackageDistributionTagMapListItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -6842,6 +6840,20 @@ components:
         updatedAt:
           type: string
           format: date-time
+    NpmPackageInfo:
+      type: object
+      properties:
+        scopeName:
+          type: string
+          nullable: true
+          description: The scope without the `@`; absent for an unscoped package.
+        packageName:
+          type: string
+        latestVersion:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
     PagedModelNpmPackageListItem:
       type: object
       properties:
@@ -6851,20 +6863,6 @@ components:
             "$ref": "#/components/schemas/NpmPackageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelNpmPackageListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelNpmPackageListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PackageDistributionTagListItem:
       type: object
       properties:
@@ -6939,20 +6937,6 @@ components:
         createdAt:
           type: string
           format: date-time
-    RestResponsePackageVersionDetail:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PackageVersionDetail"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PackageVersionListItem:
       type: object
       properties:
@@ -6972,42 +6956,12 @@ components:
             "$ref": "#/components/schemas/PackageVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelPackageVersionListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelPackageVersionListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PackageDistributionTagMapListItem:
       type: object
       properties:
         version:
           type: string
         tag:
-          type: string
-    RestResponseListPackageDistributionTagMapListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: array
-          items:
-            "$ref": "#/components/schemas/PackageDistributionTagMapListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
           type: string
     # region: nuget
     NuGetDependencyInfo:

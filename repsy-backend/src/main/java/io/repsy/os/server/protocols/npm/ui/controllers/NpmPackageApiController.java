@@ -15,16 +15,16 @@
  */
 package io.repsy.os.server.protocols.npm.ui.controllers;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.os.generated.model.NpmPackageInfo;
 import io.repsy.os.generated.model.NpmPackageListItem;
 import io.repsy.os.generated.model.PackageVersionDetail;
 import io.repsy.os.generated.model.PackageVersionListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmPackageServiceImpl;
 import io.repsy.os.server.protocols.npm.ui.facades.NpmApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -35,7 +35,6 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -43,6 +42,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -70,54 +70,40 @@ public class NpmPackageApiController {
           "latestVersion", "latest",
           "updatedAt", "updatedAt");
 
-  private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
-
-  static final String PACKAGES_FETCHED = "packagesFetched";
-
   private final UsageUpdateService usageUpdateService;
   private final NpmPackageServiceImpl npmPackageService;
   private final NpmApiFacade npmFacade;
-  private final RestResponseFactory restResponseFactory;
 
-  @DeleteMapping({
-    "/{repoName}/{packageName}",
-    "/{repoName}/{scope}/{packageName}",
-  })
+  @DeleteMapping("/{repoName}/{packageName}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> delete(
-      final RepoInfo repoInfo,
-      @PathVariable(required = false) final @Nullable String scope,
-      @PathVariable final String packageName) {
+  public ResponseEntity<Void> delete(
+      final RepoInfo repoInfo, @PathVariable final String packageName) {
 
-    final var usages = this.npmFacade.deletePackage(repoInfo, scope, packageName);
+    final var usages = this.npmFacade.deletePackage(repoInfo, null, packageName);
 
     this.updateUsage(repoInfo, usages);
 
-    return this.restResponseFactory.success("packageDeleted");
+    return ResponseEntities.noContent();
   }
 
-  @DeleteMapping({
-    "/{repoName}/{packageName}/versions/{version}",
-    "/{repoName}/{scope}/{packageName}/versions/{version}",
-  })
+  @DeleteMapping("/{repoName}/{packageName}/versions/{version}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> deleteVersion(
+  public ResponseEntity<Void> deleteVersion(
       final RepoInfo repoInfo,
-      @PathVariable(required = false) final @Nullable String scope,
       @PathVariable final String packageName,
       @PathVariable final String version)
       throws IOException {
 
-    final var usages = this.npmFacade.deletePackageVersion(repoInfo, scope, packageName, version);
+    final var usages = this.npmFacade.deletePackageVersion(repoInfo, null, packageName, version);
 
     this.updateUsage(repoInfo, usages);
 
-    return this.restResponseFactory.success("packageVersionDeleted");
+    return ResponseEntities.noContent();
   }
 
   @GetMapping("/{repoName}")
   @RepoOperation
-  public RestResponse<PagedModel<NpmPackageListItem>> list(
+  public ResponseEntity<PagedModel<NpmPackageListItem>> list(
       final RepoInfo repoInfo,
       @RequestParam(required = false) final @Nullable String scope,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
@@ -128,63 +114,49 @@ public class NpmPackageApiController {
             scope,
             SortValidator.resolveSortPaths(pageable, PACKAGE_SORT_PATHS));
 
-    return this.restResponseFactory.success(PACKAGES_FETCHED, new PagedModel<>(packages));
+    return ResponseEntity.ok(new PagedModel<>(packages));
   }
 
-  @GetMapping({
-    "/{repoName}/{packageName}",
-    "/{repoName}/{scope}/{packageName}",
-    "/{repoName}/{packageName}/versions/{version}",
-    "/{repoName}/{scope}/{packageName}/versions/{version}",
-  })
+  @GetMapping("/{repoName}/{packageName}")
   @RepoOperation
-  public RestResponse<PackageVersionDetail> getVersion(
+  public ResponseEntity<NpmPackageInfo> getPackage(
+      final RepoInfo repoInfo, @PathVariable final String packageName) {
+
+    return ResponseEntity.ok(this.npmFacade.getPackage(repoInfo, null, packageName));
+  }
+
+  @GetMapping("/{repoName}/{packageName}/versions/{version}")
+  @RepoOperation
+  public ResponseEntity<PackageVersionDetail> getVersion(
       final RepoInfo repoInfo,
-      @PathVariable(required = false) final @Nullable String scope,
       @PathVariable final String packageName,
-      @PathVariable final @Nullable String version)
+      @PathVariable final String version)
       throws IOException {
 
-    final var packageVersion = this.npmFacade.getVersion(repoInfo, scope, packageName, version);
-
-    return this.restResponseFactory.success("packageVersionFetched", packageVersion);
+    return ResponseEntity.ok(this.npmFacade.getVersion(repoInfo, null, packageName, version));
   }
 
-  @GetMapping({
-    "/{repoName}/package/{packageName}/versions",
-    "/{repoName}/{scope}/package/{packageName}/versions",
-  })
+  @GetMapping("/{repoName}/{packageName}/versions")
   @RepoOperation
-  public RestResponse<PagedModel<PackageVersionListItem>> listVersions(
+  public ResponseEntity<PagedModel<PackageVersionListItem>> listVersions(
       final RepoInfo repoInfo,
-      @PathVariable(required = false) final @Nullable String scope,
       @PathVariable final String packageName,
       @RequestParam(name = "q", required = false, defaultValue = "") final String version,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+      @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
+          final Pageable pageable) {
 
-    SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
-
-    final var versions =
-        this.npmPackageService.getVersionsContainsVersion(
-            repoInfo.getStorageKey(), scope, packageName, version, pageable);
-
-    return this.restResponseFactory.success("packageVersionsFetched", new PagedModel<>(versions));
+    return ResponseEntity.ok(
+        new PagedModel<>(
+            this.npmFacade.listVersions(repoInfo, null, packageName, version, pageable)));
   }
 
-  @GetMapping({
-    "/{repoName}/package/{packageName}/tags",
-    "/{repoName}/{scope}/package/{packageName}/tags",
-  })
+  @GetMapping("/{repoName}/{packageName}/tags")
   @RepoOperation
-  public RestResponse<List<PackageDistributionTagMapListItem>> listTags(
-      final RepoInfo repoInfo,
-      @PathVariable(required = false) final @Nullable String scope,
-      @PathVariable final String packageName) {
+  public ResponseEntity<List<PackageDistributionTagMapListItem>> listTags(
+      final RepoInfo repoInfo, @PathVariable final String packageName) {
 
-    final var tags =
-        this.npmPackageService.getDistributionTags(repoInfo.getStorageKey(), scope, packageName);
-
-    return this.restResponseFactory.success("packageTagsFetched", tags);
+    return ResponseEntity.ok(
+        this.npmPackageService.getDistributionTags(repoInfo.getStorageKey(), null, packageName));
   }
 
   private void updateUsage(final RepoInfo repoInfo, final BaseUsages usages) {

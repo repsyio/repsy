@@ -17,27 +17,35 @@ package io.repsy.os.server.protocols.npm.ui.facades;
 
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.os.generated.model.NpmPackageInfo;
 import io.repsy.os.generated.model.PackageVersionDetail;
+import io.repsy.os.generated.model.PackageVersionListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.mappers.NpmPackageConverter;
 import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmPackageServiceImpl;
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.os.shared.utils.SortValidator;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class NpmApiFacade implements ProtocolApiFacade {
+
+  private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
 
   private final @NonNull NpmPackageServiceImpl npmPackageService;
   private final @NonNull NpmStorageService npmStorageService;
@@ -50,24 +58,40 @@ public class NpmApiFacade implements ProtocolApiFacade {
     this.npmStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
+  public @NonNull NpmPackageInfo getPackage(
+      final @NonNull RepoInfo repoInfo,
+      final @Nullable String scopeName,
+      final @NonNull String packageName) {
+
+    return this.npmPackageConverter.toNpmPackageInfo(
+        this.npmPackageService.getPackage(repoInfo.getStorageKey(), scopeName, packageName));
+  }
+
+  public @NonNull Page<PackageVersionListItem> listVersions(
+      final @NonNull RepoInfo repoInfo,
+      final @Nullable String scopeName,
+      final @NonNull String packageName,
+      final @NonNull String version,
+      final @NonNull Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
+
+    return this.npmPackageService.getVersionsContainsVersion(
+        repoInfo.getStorageKey(), scopeName, packageName, version, pageable);
+  }
+
   public @NonNull PackageVersionDetail getVersion(
       final @NonNull RepoInfo repoInfo,
       final @Nullable String scopeName,
       final @NonNull String packageName,
-      final @Nullable String versionName)
+      final @NonNull String versionName)
       throws IOException {
 
     final var packageInfo =
         this.npmPackageService.getPackage(repoInfo.getStorageKey(), scopeName, packageName);
 
-    var packageVersionName = versionName;
-
-    if (versionName == null) {
-      packageVersionName = packageInfo.getLatest();
-    }
-
     final var packageVersionInfo =
-        this.npmPackageService.getPackageVersion(packageInfo.getId(), packageVersionName);
+        this.npmPackageService.getPackageVersion(packageInfo.getId(), versionName);
 
     final var keywords = this.npmPackageService.getKeywords(packageVersionInfo.getId());
 
@@ -80,7 +104,7 @@ public class NpmApiFacade implements ProtocolApiFacade {
 
     final var readmeFileContent =
         this.npmStorageService.getReadmeContent(
-            repoInfo.getStorageKey(), repoInfo.getName(), packageBasePath, packageVersionName);
+            repoInfo.getStorageKey(), repoInfo.getName(), packageBasePath, versionName);
 
     return this.npmPackageConverter.toPackageVersionDetail(
         packageInfo,

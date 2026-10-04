@@ -175,7 +175,7 @@ class PagedListsIT extends AbstractIntegrationTest {
           list(
               "listNpmPackageVersions",
               RepoType.NPM,
-              "/api/npm/packages/{repo}/package/alpha/versions",
+              "/api/npm/packages/{repo}/alpha/versions",
               true,
               "id",
               "version",
@@ -183,7 +183,7 @@ class PagedListsIT extends AbstractIntegrationTest {
           list(
               "listNpmScopedPackageVersions",
               RepoType.NPM,
-              "/api/npm/packages/{repo}/tools/package/alpha/versions",
+              "/api/npm/scopes/{repo}/tools/packages/alpha/versions",
               true,
               "id",
               "version",

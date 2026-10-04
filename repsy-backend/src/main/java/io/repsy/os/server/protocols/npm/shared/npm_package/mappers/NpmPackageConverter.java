@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.npm.shared.npm_package.mappers;
 
+import io.repsy.os.generated.model.NpmPackageInfo;
 import io.repsy.os.generated.model.PackageVersionDetail;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageDistributionTagListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageInfo;
@@ -123,6 +124,15 @@ public interface NpmPackageConverter {
         .packageName(npmPackage.getName())
         .latest(npmPackage.getLatest())
         .createdAt(npmPackage.getCreatedAt())
+        .build();
+  }
+
+  default NpmPackageInfo toNpmPackageInfo(final PackageInfo packageInfo) {
+    return NpmPackageInfo.builder()
+        .scopeName(packageInfo.getScopeName())
+        .packageName(packageInfo.getPackageName())
+        .latestVersion(packageInfo.getLatest())
+        .createdAt(packageInfo.getCreatedAt())
         .build();
   }
 
