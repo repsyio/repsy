@@ -108,12 +108,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
   }
 
   private static void assertError(final String body, final String msgId) {
-    final var response = envelope(body);
-    assertThat(response)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "ERROR");
-    assertThat((String) response.get("errorCode")).matches(UUID_PATTERN);
+    assertProblem(body, msgId);
   }
 
   private String performCreate(final Repo repo, final String token, final String json)

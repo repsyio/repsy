@@ -169,7 +169,7 @@ class MavenPgpCapsIT extends AbstractIntegrationTest {
     assertThat(
             this.objectMapper
                 .readTree(refused.getResponse().getContentAsString())
-                .path("msgId")
+                .path("code")
                 .asText())
         .isEqualTo("pgpPublicKeyLimitReached");
     assertThat(this.keyCount(repo)).isEqualTo(cap);

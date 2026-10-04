@@ -691,14 +691,17 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
 
     result
         .andExpect(status().isConflict())
-        .andExpect(header().doesNotExist("Retry-After"))
-        .andExpect(jsonPath("$.msgId").value("concurrentModification"))
-        .andExpect(jsonPath("$.type").value("ERROR"))
         .andExpect(
-            jsonPath("$.text")
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(header().doesNotExist("Retry-After"))
+        .andExpect(jsonPath("$.code").value("concurrentModification"))
+        .andExpect(
+            jsonPath("$.detail")
                 .value(
                     "The item was changed by another request at the same time. Please try again."))
-        .andExpect(jsonPath("$.errorCode").isString());
+        .andExpect(jsonPath("$.traceId").isString());
     assertThat(this.bumps).as("the race was forced").hasValue(1);
     assertThat(this.versionRows(repo, name)).as("the losing delete removed nothing").isEqualTo(1);
     assertThat(chartFile).as("and left the chart file alone").exists();

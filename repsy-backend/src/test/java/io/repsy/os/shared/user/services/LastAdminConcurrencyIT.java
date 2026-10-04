@@ -192,7 +192,7 @@ class LastAdminConcurrencyIT extends AbstractIntegrationTest {
     if (response.getStatus() == 200) {
       return OK;
     }
-    return JsonPath.read(response.getContentAsString(), "$.msgId");
+    return JsonPath.read(response.getContentAsString(), "$.code");
   }
 
   // ---------------------------------------------------------------------------------------------

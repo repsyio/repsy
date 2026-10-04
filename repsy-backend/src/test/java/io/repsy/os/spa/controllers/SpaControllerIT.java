@@ -166,13 +166,17 @@ class SpaControllerIT extends AbstractStaticFrontendIntegrationTest {
 
     this.request("/media/remixicon-A1B2C3.woff2", "*/*")
         .andExpect(status().isNotFound())
-        .andExpect(header().string(HttpHeaders.CONTENT_TYPE, containsString("application/json")))
-        .andExpect(jsonPath("$.msgId").value("itemNotFound"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("itemNotFound"));
 
     // /assets/ is not handled by the SPA controller; the two must agree.
     this.request("/assets/missing.woff2", "*/*")
         .andExpect(status().isNotFound())
-        .andExpect(header().string(HttpHeaders.CONTENT_TYPE, containsString("application/json")));
+        .andExpect(
+            header().string(HttpHeaders.CONTENT_TYPE, containsString("application/problem+json")));
   }
 
   @ParameterizedTest(name = "{0}")

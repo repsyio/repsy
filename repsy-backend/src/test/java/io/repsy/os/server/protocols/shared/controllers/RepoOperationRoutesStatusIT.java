@@ -66,7 +66,7 @@ class RepoOperationRoutesStatusIT extends AbstractIntegrationTest {
 
     if (response.getStatus() == 401) {
       softly
-          .assertThat((String) JsonPath.read(response.getContentAsString(), "$.msgId"))
+          .assertThat((String) JsonPath.read(response.getContentAsString(), "$.code"))
           .as("msgId of %s", description)
           .isEqualTo("loginRequired");
     }
