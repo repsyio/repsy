@@ -148,12 +148,9 @@ public class ProtocolRepoController {
 
   @GetMapping("/{repoName}/usage")
   @RepoOperation(permission = MANAGE)
-  public RestResponse<RepoUsageInfo> getRepoUsage(final RepoInfo repoInfo) {
+  public RepoUsageInfo getRepoUsage(final RepoInfo repoInfo) {
 
-    final var usageInfo =
-        this.usageService.getRepoUsageInfo(repoInfo.getName(), repoInfo.getType());
-
-    return this.responseFactory.success("usageFetched", usageInfo);
+    return this.usageService.getRepoUsageInfo(repoInfo.getName(), repoInfo.getType());
   }
 
   @PutMapping("/{repoName}/settings")

@@ -48,6 +48,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DeployTokenService {
 
+  /** The token info and id of a newly created token. */
+  public record NewTokenInfo(@NonNull TokenInfo tokenInfo, @NonNull UUID tokenId) {}
+
   private static final Duration DEFAULT_EXPIRATION_DURATION = Duration.of(365, ChronoUnit.DAYS);
 
   private final @NonNull RepoTxService repoTxService;
@@ -91,8 +94,8 @@ public class DeployTokenService {
         .map(this.deployTokenConverter::toDeployTokenInfo);
   }
 
-  @Transactional
-  public @NonNull TokenInfo createDeployToken(
+  @Transactional(readOnly = false)
+  public @NonNull NewTokenInfo createDeployToken(
       final @NonNull UUID repoId, final @NonNull DeployTokenForm deployTokenForm) {
 
     final var repo = this.repoTxService.getRepoEntity(repoId);
@@ -120,10 +123,13 @@ public class DeployTokenService {
 
     this.deployTokenRepository.save(repoDeployToken);
 
-    return TokenInfo.builder()
-        .token(generatedToken)
-        .username(repoDeployToken.getUsername())
-        .build();
+    final var tokenInfo =
+        TokenInfo.builder()
+            .token(generatedToken)
+            .username(repoDeployToken.getUsername())
+            .build();
+
+    return new NewTokenInfo(tokenInfo, repoDeployToken.getId());
   }
 
   /**

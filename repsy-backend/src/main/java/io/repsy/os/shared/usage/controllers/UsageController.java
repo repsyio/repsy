@@ -17,8 +17,6 @@ package io.repsy.os.shared.usage.controllers;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.TotalUsageInfo;
 import io.repsy.os.shared.auth.PanelAuthHelper;
@@ -33,12 +31,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
-@RequestMapping("/api/usages")
+@RequestMapping("/api/usage")
 @RequiredArgsConstructor
 public class UsageController {
 
   private final @NonNull PanelAuthHelper panelAuthHelper;
-  private final @NonNull RestResponseFactory responseFactory;
   private final @NonNull UsageService usageService;
 
   /**
@@ -46,13 +43,11 @@ public class UsageController {
    * the panel dashboard, which every signed-in user lands on, shows them in its Total Disk card.
    */
   @GetMapping
-  public @NonNull RestResponse<TotalUsageInfo> getTotalUsage(
+  public @NonNull TotalUsageInfo getTotalUsage(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     this.panelAuthHelper.authenticate(authHeader);
 
-    final var totalUsageInfo = this.usageService.getTotalUsageInfo();
-
-    return this.responseFactory.success("usageFetched", totalUsageInfo);
+    return this.usageService.getTotalUsageInfo();
   }
 }

@@ -18,8 +18,6 @@ package io.repsy.os.server.protocols.shared.controllers;
 import static io.repsy.protocols.shared.repo.dtos.Permission.MANAGE;
 import static org.springframework.data.domain.Sort.Direction.DESC;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.DeployTokenForm;
 import io.repsy.os.generated.model.TokenInfo;
@@ -27,11 +25,13 @@ import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfoListItem;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.http.NoStore;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.os.shared.utils.SortValidator;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.net.URI;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +39,7 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -63,36 +64,36 @@ public class ProtocolDeployTokenController {
       Set.of("id", "name", "username", "description", "readOnly", "expirationDate", "createdAt");
 
   private final DeployTokenService deployTokenService;
-  private final RestResponseFactory restResponseFactory;
 
   @PostMapping
   @RepoOperation(permission = MANAGE)
-  public RestResponse<TokenInfo> create(
+  public ResponseEntity<TokenInfo> create(
       final RepoInfo repoInfo,
       @RequestBody @Valid final DeployTokenForm form,
       final HttpServletResponse response) {
 
-    final var deployToken =
-        this.deployTokenService.createDeployToken(repoInfo.getStorageKey(), form);
+    final var result = this.deployTokenService.createDeployToken(repoInfo.getStorageKey(), form);
 
     NoStore.apply(response);
 
-    return this.restResponseFactory.success("tokenCreated", deployToken);
+    final var location =
+        URI.create("/api/repos/" + repoInfo.getName() + "/deploy-tokens/" + result.tokenId());
+    return ResponseEntities.created(location, result.tokenInfo());
   }
 
   @DeleteMapping("/{tokenId}")
   @RepoOperation(permission = MANAGE)
-  public RestResponse<Void> revokeDeployToken(
+  public ResponseEntity<Void> revokeDeployToken(
       final RepoInfo repoInfo, @PathVariable final UUID tokenId) {
 
     this.deployTokenService.revokeDeployToken(repoInfo.getStorageKey(), tokenId);
 
-    return this.restResponseFactory.success("tokenRevoked");
+    return ResponseEntities.noContent();
   }
 
   @PostMapping("/{tokenId}/actions/rotate")
   @RepoOperation(permission = MANAGE)
-  public RestResponse<String> rotateDeployToken(
+  public ResponseEntity<String> rotateDeployToken(
       final RepoInfo repoInfo,
       @PathVariable final UUID tokenId,
       final HttpServletResponse response) {
@@ -102,12 +103,12 @@ public class ProtocolDeployTokenController {
 
     NoStore.apply(response);
 
-    return this.restResponseFactory.success("tokenRotated", repoDeployToken);
+    return ResponseEntity.ok(repoDeployToken);
   }
 
   @GetMapping
   @RepoOperation(permission = MANAGE)
-  public RestResponse<PagedModel<DeployTokenInfoListItem>> list(
+  public PagedModel<DeployTokenInfoListItem> list(
       @PageableDefault(sort = "id", direction = DESC) final Pageable pageable,
       final RepoInfo repoInfo) {
 
@@ -116,6 +117,6 @@ public class ProtocolDeployTokenController {
     final var deployTokenInfoList =
         this.deployTokenService.getDeployTokensByRepoInfo(repoInfo.getStorageKey(), pageable);
 
-    return this.restResponseFactory.success("tokensFetched", new PagedModel<>(deployTokenInfoList));
+    return new PagedModel<>(deployTokenInfoList);
   }
 }

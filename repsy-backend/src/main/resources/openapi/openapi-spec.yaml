@@ -649,12 +649,8 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          description: No Content
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -690,7 +686,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseString"
+                type: string
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -726,7 +722,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelDeployTokenInfoListItem"
+                "$ref": "#/components/schemas/PagedModelDeployTokenInfoListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -749,12 +745,18 @@ paths:
               "$ref": "#/components/schemas/DeployTokenForm"
         required: true
       responses:
-        '200':
-          description: OK
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: The detail route of the created token
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseTokenInfo"
+                "$ref": "#/components/schemas/TokenInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -837,7 +839,7 @@ paths:
         schema:
           type: string
   # region: usage
-  "/api/usages":
+  "/api/usage":
     get:
       tags:
         - usage-controller
@@ -848,7 +850,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseTotalUsageInfo"
+                "$ref": "#/components/schemas/TotalUsageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Get total usage statistics
@@ -863,7 +865,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseRepoUsageInfo"
+                "$ref": "#/components/schemas/RepoUsageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
