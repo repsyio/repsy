@@ -17,13 +17,12 @@ package io.repsy.os.server.protocols.shared.controllers;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.RepoCreateRequest;
 import io.repsy.os.generated.model.RepoListInfo;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.auth.PanelAuthHelper;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.os.shared.utils.SortValidator;
@@ -38,6 +37,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -45,6 +45,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * The repositories of every type as one collection: list, count and create (RPS-1268).
@@ -68,11 +69,10 @@ public class RepoCollectionController {
 
   private final PanelAuthHelper panelAuthHelper;
   private final RepoTxService repoTxService;
-  private final RestResponseFactory responseFactory;
   private final Map<RepoType, ProtocolApiFacade> apiFacadeMap;
 
   @GetMapping
-  public RestResponse<PagedModel<RepoListInfo>> list(
+  public PagedModel<RepoListInfo> list(
       @RequestHeader(AUTHORIZATION) final String authHeader,
       @RequestParam(required = false) final @Nullable RepoType type,
       @RequestParam(required = false) final @Nullable String q,
@@ -83,22 +83,19 @@ public class RepoCollectionController {
 
     SortValidator.requireSortableBy(pageable, SORT_PROPERTIES);
 
-    final var repos = this.repoTxService.listRepos(type, q, pageable);
-
-    return this.responseFactory.success("reposFetched", new PagedModel<>(repos));
+    return new PagedModel<>(this.repoTxService.listRepos(type, q, pageable));
   }
 
   @GetMapping("/counts")
-  public RestResponse<Map<RepoType, Long>> counts(
-      @RequestHeader(AUTHORIZATION) final String authHeader) {
+  public Map<RepoType, Long> counts(@RequestHeader(AUTHORIZATION) final String authHeader) {
 
     this.panelAuthHelper.authenticate(authHeader);
 
-    return this.responseFactory.success("repoCountsFetched", this.repoTxService.getRepoCounts());
+    return this.repoTxService.getRepoCounts();
   }
 
   @PostMapping
-  public RestResponse<RepoListInfo> create(
+  public ResponseEntity<RepoListInfo> create(
       @RequestHeader(AUTHORIZATION) final String authHeader,
       @RequestBody @Valid final RepoCreateRequest form) {
 
@@ -116,7 +113,13 @@ public class RepoCollectionController {
 
     this.apiFacadeMap.get(repoType).createRepo(repoInfo.getStorageKey());
 
-    return this.responseFactory.success(
-        "repoCreated", this.repoTxService.getRepoListInfo(repoInfo.getStorageKey()));
+    final var created = this.repoTxService.getRepoListInfo(repoInfo.getStorageKey());
+
+    return ResponseEntities.created(
+        UriComponentsBuilder.fromPath("/api/repos/{repoName}")
+            .buildAndExpand(created.getName())
+            .encode()
+            .toUri(),
+        created);
   }
 }

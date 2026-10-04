@@ -62,8 +62,7 @@ describe('NugetService', () => {
       'getRepoUsage',
       'getRepoSettings',
       'updateRepoSettings',
-      'renameRepo',
-      'updateRepoDescription',
+      'updateRepo',
       'deleteRepo',
     ]);
     tokenApi = jasmine.createSpyObj<ProtocolDeployTokenControllerService>('ProtocolDeployTokenControllerService', [
@@ -105,17 +104,17 @@ describe('NugetService', () => {
     it('sends the rename for the active repository and re-emits it under the new name', async () => {
       await selectRepo(service, repoApi.getRepoPermissions, REPO, { canManage: true });
       const emissions = collect(service.repoChanges);
-      asSpy(repoApi.renameRepo).and.returnValue(of(restResponse(undefined)));
+      asSpy(repoApi.updateRepo).and.returnValue(of(restResponse(undefined)));
 
       await service.updateRepositoryName(form);
 
-      expect(repoApi.renameRepo).toHaveBeenCalledOnceWith(REPO, form);
+      expect(repoApi.updateRepo).toHaveBeenCalledOnceWith(REPO, form);
       expect(emissions.at(-1)).toEqual(permission('renamed-repo', { canManage: true }));
     });
 
     it('sends the calls that follow to the new name', async () => {
       await selectRepo(service, repoApi.getRepoPermissions, REPO);
-      asSpy(repoApi.renameRepo).and.returnValue(of(restResponse(undefined)));
+      asSpy(repoApi.updateRepo).and.returnValue(of(restResponse(undefined)));
       await service.updateRepositoryName(form);
       asSpy(nugetApi.getNugetPackage).and.returnValue(of(restResponse(null)));
 
@@ -128,7 +127,7 @@ describe('NugetService', () => {
       await selectRepo(service, repoApi.getRepoPermissions, REPO);
       const emissions = collect(service.repoChanges);
       const error = httpError(409);
-      asSpy(repoApi.renameRepo).and.returnValue(throwError(() => error));
+      asSpy(repoApi.updateRepo).and.returnValue(throwError(() => error));
 
       await expectAsync(service.updateRepositoryName(form)).toBeRejectedWith(error);
 
@@ -137,11 +136,11 @@ describe('NugetService', () => {
     });
 
     it('sends the rename without throwing when no repository is selected', async () => {
-      asSpy(repoApi.renameRepo).and.returnValue(of(restResponse(undefined)));
+      asSpy(repoApi.updateRepo).and.returnValue(of(restResponse(undefined)));
 
       await service.updateRepositoryName(form);
 
-      expect(repoApi.renameRepo).toHaveBeenCalledOnceWith('', form);
+      expect(repoApi.updateRepo).toHaveBeenCalledOnceWith('', form);
       expect(collect(service.repoChanges)).toEqual([null]);
     });
   });
@@ -227,7 +226,7 @@ describe('NugetService', () => {
         invoke: (s) => from(s.fetchRepositorySettings()),
         api: () => repoApi.getRepoSettings,
         args: [''],
-        response: restResponse(settings),
+        response: settings,
         expected: settings,
       },
       {
@@ -239,9 +238,9 @@ describe('NugetService', () => {
         expected: undefined,
       },
       {
-        name: 'updateRepoDescription',
+        name: 'updateRepo',
         invoke: (s) => from(s.updateRepoDescription(descriptionForm)),
-        api: () => repoApi.updateRepoDescription,
+        api: () => repoApi.updateRepo,
         args: ['', descriptionForm],
         response: restResponse(undefined),
         expected: undefined,

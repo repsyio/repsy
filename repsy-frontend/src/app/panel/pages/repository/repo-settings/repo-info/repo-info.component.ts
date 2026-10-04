@@ -19,12 +19,7 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import {
-  ProtocolRepoControllerService,
-  RepoDescriptionForm,
-  RepoPermissionInfo,
-  RepoRenameForm,
-} from '../../../../../../generated/api';
+import { ProtocolRepoControllerService, RepoPermissionInfo, RepoUpdateForm } from '../../../../../../generated/api';
 import { idFactory } from '../../../../../shared/util/unique-id';
 import {
   DESCRIPTION_MAX_LENGTH,
@@ -81,14 +76,14 @@ export class RepoInfoComponent implements OnInit {
   }
 
   public renameRepo() {
-    const form: RepoRenameForm = Object.assign({}, this.renameForm.value);
+    const form: RepoUpdateForm = { name: this.renameForm.value.name };
 
     this.dangerModalService.show('Rename Repository', 'Rename', () => {
       this.loading = true;
       this.renameForm.disable();
 
       this.protocolRepoControllerService
-        .renameRepo(this.activeRepository.repoName, form)
+        .updateRepo(this.activeRepository.repoName, form)
         .pipe(
           finalize(() => {
             this.loading = false;
@@ -106,13 +101,13 @@ export class RepoInfoComponent implements OnInit {
   }
 
   public updateRepoDescription() {
-    const form: RepoDescriptionForm = Object.assign({}, this.descriptionForm.value);
+    const form: RepoUpdateForm = { description: this.descriptionForm.value.description };
 
     this.loading = true;
     this.renameForm.disable();
 
     this.protocolRepoControllerService
-      .updateRepoDescription(this.activeRepository.repoName, form)
+      .updateRepo(this.activeRepository.repoName, form)
       .pipe(
         finalize(() => {
           this.loading = false;

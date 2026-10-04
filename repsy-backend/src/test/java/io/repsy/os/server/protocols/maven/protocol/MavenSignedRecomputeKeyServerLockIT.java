@@ -296,6 +296,6 @@ class MavenSignedRecomputeKeyServerLockIT extends AbstractIntegrationTest {
             .getResponse()
             .getStatus();
 
-    assertThat(status).as("PUT settings").isEqualTo(200);
+    assertThat(status).as("PUT settings").isEqualTo(204);
   }
 }

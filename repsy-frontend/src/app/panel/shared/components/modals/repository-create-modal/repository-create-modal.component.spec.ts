@@ -163,7 +163,7 @@ describe('RepositoryCreateModalComponent create', () => {
   });
 
   it('posts ONE request with the upper-case type in the body, next to the form fields', () => {
-    api.createRepository.and.returnValue(of({ data: { name: 'my-repo' } }) as never);
+    api.createRepository.and.returnValue(of({ name: 'my-repo' }) as never);
 
     component.createRepo();
 
@@ -176,7 +176,7 @@ describe('RepositoryCreateModalComponent create', () => {
   });
 
   it('sends the type the user picked in the selector', () => {
-    api.createRepository.and.returnValue(of({ data: { name: 'my-repo' } }) as never);
+    api.createRepository.and.returnValue(of({ name: 'my-repo' }) as never);
     component.selectOption(RepoType.GOLANG);
 
     component.createRepo();
@@ -186,7 +186,7 @@ describe('RepositoryCreateModalComponent create', () => {
 
   it('emits the created repository the server returned, closes the modal and toasts', async () => {
     const item = { name: 'my-repo', type: ApiRepoType.Npm };
-    api.createRepository.and.returnValue(of({ data: item }) as never);
+    api.createRepository.and.returnValue(of(item) as never);
 
     component.createRepo();
     await Promise.resolve();

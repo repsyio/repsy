@@ -209,7 +209,7 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
             .getResponse()
             .getStatus();
 
-    assertThat(status).as("PUT settings").isEqualTo(200);
+    assertThat(status).as("PUT settings").isEqualTo(204);
   }
 
   /** Turns the key-server lookup off, so a key that is not registered is refused without a call. */
@@ -226,7 +226,7 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
             .getResponse()
             .getStatus();
 
-    assertThat(status).as("PUT settings").isEqualTo(200);
+    assertThat(status).as("PUT settings").isEqualTo(204);
   }
 
   private static byte[] pom(final String version) {
@@ -591,7 +591,7 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
             .getResponse()
             .getStatus();
 
-    assertThat(status).as("PUT settings").isEqualTo(200);
+    assertThat(status).as("PUT settings").isEqualTo(204);
   }
 
   /** The versions were uploaded while the setting was off, with the signatures of one key. */

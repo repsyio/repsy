@@ -16,11 +16,13 @@
 package io.repsy.os.server.shared.http;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.experimental.UtilityClass;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 
 /**
  * Assertions for the success shape of the panel API (API guideline, Decision 5): a success body is
@@ -31,6 +33,25 @@ import org.springframework.test.web.servlet.MvcResult;
 public final class BareBodyAssertions {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  /** Asserts 200 with a bare body (no envelope) and returns the raw body. */
+  public static String expectBare(final ResultActions result) throws Exception {
+    final var mvcResult = result.andExpect(status().isOk()).andReturn();
+    assertNoMsgId(mvcResult);
+    return mvcResult.getResponse().getContentAsString();
+  }
+
+  /** Asserts 201 with a {@code Location} header and a bare body, and returns the raw body. */
+  public static String expectCreated(final ResultActions result) throws Exception {
+    final var mvcResult = result.andReturn();
+    assertCreated(mvcResult);
+    return mvcResult.getResponse().getContentAsString();
+  }
+
+  /** Asserts 204 with an empty body. */
+  public static void expectNoContent(final ResultActions result) {
+    assertNoContent(result.andReturn());
+  }
 
   public static void assertCreated(final MvcResult result) throws Exception {
     assertThat(result.getResponse().getStatus()).isEqualTo(201);

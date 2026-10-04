@@ -131,7 +131,7 @@ export class RepositoryCreateModalComponent implements OnInit {
             this.toastService.show('Repository created successfully', 'success');
           });
 
-          this.created.emit(response.data);
+          this.created.emit(response);
           this.closeModal();
         },
         error: () => {},

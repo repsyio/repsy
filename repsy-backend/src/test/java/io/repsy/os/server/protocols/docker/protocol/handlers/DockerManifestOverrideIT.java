@@ -20,6 +20,7 @@ import static io.repsy.os.server.protocols.docker.protocol.handlers.DockerWire.i
 import static io.repsy.os.server.protocols.docker.protocol.handlers.DockerWire.index;
 import static io.repsy.os.server.protocols.docker.protocol.handlers.DockerWire.sha256;
 import static io.repsy.os.server.protocols.docker.protocol.handlers.DockerWire.sha512;
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectNoContent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
@@ -435,12 +436,10 @@ class DockerManifestOverrideIT extends AbstractIntegrationTest {
     this.entityManager.flush();
     this.entityManager.clear();
 
-    this.expectSuccess(
+    expectNoContent(
         this.perform(
             delete("/api/repos/%s".formatted(repo.getName()))
-                .header(AUTHORIZATION, this.adminBearerToken())),
-        "repoDeleted",
-        "Repo deleted.");
+                .header(AUTHORIZATION, this.adminBearerToken())));
     this.entityManager.flush();
     this.entityManager.clear();
 

@@ -217,6 +217,29 @@ public class RepoTxService {
     this.saveOrThrowIfNameTaken(repo);
   }
 
+  /**
+   * Updates the name and/or description of a repo in one transaction. A field that is {@code null}
+   * keeps its current value, and a name equal to the current one is not a rename.
+   *
+   * @return the repo as it is after the update
+   */
+  @Transactional
+  public @NonNull RepoListInfo updateRepo(
+      final @NonNull RepoInfo repoInfo,
+      final @Nullable String newName,
+      final @Nullable String newDescription) {
+
+    if (newName != null && !newName.equals(repoInfo.getName())) {
+      this.renameRepo(repoInfo.getName(), newName, repoInfo.getType());
+    }
+
+    if (newDescription != null) {
+      this.updateDescription(repoInfo.getId(), newDescription);
+    }
+
+    return this.getRepoListInfo(repoInfo.getId());
+  }
+
   @Transactional
   public void updateDescription(final @NonNull UUID repoId, final @Nullable String description) {
     final var repo = this.findRepoById(repoId);

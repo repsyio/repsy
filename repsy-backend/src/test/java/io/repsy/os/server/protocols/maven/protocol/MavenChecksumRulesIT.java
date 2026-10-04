@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.maven.protocol;
 
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectNoContent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
@@ -141,15 +142,13 @@ class MavenChecksumRulesIT extends AbstractIntegrationTest {
         "securityScanEnabled":false}"""
             .formatted(allowOverride, releases, snapshots);
 
-    expectSuccess(
+    expectNoContent(
         this.mockMvc.perform(
             put("/api/repos/{name}/settings", repo.getName())
                 .header(AUTHORIZATION, this.bearerTokenFor(admin))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body)
-                .with(apiPort())),
-        "settingsUpdated",
-        "Settings updated.");
+                .with(apiPort())));
   }
 
   /** Uploads what a client sends for the path: a hash for a checksum, XML for metadata. */

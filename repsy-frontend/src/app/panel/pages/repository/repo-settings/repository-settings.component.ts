@@ -127,7 +127,6 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
     this.protocolRepoControllerService
       .getRepoSettings(this.activeRepository.repoName)
       .pipe(
-        map((r) => r.data!),
         finalize(() => {
           this.loading = false;
         }),

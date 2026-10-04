@@ -146,7 +146,7 @@ export class RepositoryComponent implements OnDestroy {
                 REPO_LIST_SORT,
               ])
               .pipe(
-                map((response) => ({ request, page: response.data })),
+                map((response) => ({ request, page: response })),
                 // The HTTP error interceptor already shows the toast; the failure is kept for the page.
                 catchError(() => of({ request, page: null })),
               ),

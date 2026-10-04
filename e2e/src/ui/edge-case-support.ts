@@ -40,9 +40,13 @@ export async function panelCall(
 
 /** The description the panel returns for repository `name` (`undefined`: no such repository). */
 export async function repoDescription(token: string, name: string): Promise<string | undefined> {
-  const res = await panelCall(token, 'GET', `/api/repos?q=${encodeURIComponent(name)}&size=50`);
-  const content = (res.data as { content?: { name: string; description?: string | null }[] })
-    ?.content;
+  const res = await edgeRequest(apiUrl(`/api/repos?q=${encodeURIComponent(name)}&size=50`), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const content = (
+    res.json as { content?: { name: string; description?: string | null }[] } | undefined
+  )?.content;
   const repo = content?.find((candidate) => candidate.name === name);
   return repo ? (repo.description ?? '') : undefined;
 }

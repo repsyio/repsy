@@ -131,7 +131,7 @@ describe('MavenService', () => {
         invoke: (s) => s.getPathContent(PATH),
         api: () => repoApi.getPathContent,
         args: [PATH, REPO],
-        response: restResponse(files),
+        response: files,
         expected: files,
       },
       {
