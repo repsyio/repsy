@@ -15,8 +15,6 @@
  */
 package io.repsy.os.server.protocols.cargo.ui.controllers;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.CrateInfo;
 import io.repsy.os.generated.model.CrateListItem;
@@ -24,6 +22,7 @@ import io.repsy.os.generated.model.CrateVersionInfo;
 import io.repsy.os.generated.model.CrateVersionListItem;
 import io.repsy.os.server.protocols.cargo.ui.facades.CargoApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -38,6 +37,7 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -73,12 +73,11 @@ public class CargoCrateController {
   private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("version", "createdAt");
 
   private final CargoApiFacade cargoApiFacade;
-  private final RestResponseFactory responseFactory;
   private final UsageUpdateService usageUpdateService;
 
   @GetMapping("/{repoName}")
   @RepoOperation
-  public RestResponse<PagedModel<CrateListItem>> search(
+  public ResponseEntity<PagedModel<CrateListItem>> search(
       final RepoInfo repoInfo,
       @RequestParam(name = "q", defaultValue = "") final String query,
       @PageableDefault final Pageable pageable) {
@@ -87,74 +86,75 @@ public class CargoCrateController {
         this.cargoApiFacade.search(
             repoInfo, query, SortValidator.resolveSortPaths(pageable, CRATE_SORT_PATHS));
 
-    return this.responseFactory.success("cratesFetched", new PagedModel<>(crates));
+    return ResponseEntity.ok(new PagedModel<>(crates));
   }
 
-  @GetMapping("/{repoName}/{crateName}")
+  @GetMapping("/{repoName}/{packageName}")
   @RepoOperation
-  public RestResponse<CrateInfo> get(
-      final RepoInfo repoInfo, @PathVariable final String crateName) {
+  public ResponseEntity<CrateInfo> get(
+      final RepoInfo repoInfo, @PathVariable final String packageName) {
 
-    final var crate = this.cargoApiFacade.getCrate(repoInfo, crateName);
+    final var crate = this.cargoApiFacade.getCrate(repoInfo, packageName);
 
-    return this.responseFactory.success("crateFetched", crate);
+    return ResponseEntity.ok(crate);
   }
 
-  @GetMapping("/{repoName}/{crateName}/{version}")
+  @GetMapping("/{repoName}/{packageName}/versions/{version}")
   @RepoOperation
-  public RestResponse<CrateVersionInfo> getVersion(
+  public ResponseEntity<CrateVersionInfo> getVersion(
       final RepoInfo repoInfo,
-      @PathVariable final String crateName,
+      @PathVariable final String packageName,
       @PathVariable final String version) {
 
-    final var crateVersion = this.cargoApiFacade.getCrateVersion(repoInfo, crateName, version);
+    final var crateVersion = this.cargoApiFacade.getCrateVersion(repoInfo, packageName, version);
 
-    return this.responseFactory.success("crateVersionFetched", crateVersion);
+    return ResponseEntity.ok(crateVersion);
   }
 
-  @GetMapping("/{repoName}/{crateName}/versions")
+  @GetMapping("/{repoName}/{packageName}/versions")
   @RepoOperation
-  public RestResponse<PagedModel<CrateVersionListItem>> listVersions(
+  public ResponseEntity<PagedModel<CrateVersionListItem>> listVersions(
       final RepoInfo repoInfo,
-      @PathVariable final String crateName,
+      @PathVariable final String packageName,
       @RequestParam(name = "q", defaultValue = "") final String query,
       @PageableDefault final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 
-    final var versions = this.cargoApiFacade.getCrateVersions(repoInfo, crateName, query, pageable);
+    final var versions =
+        this.cargoApiFacade.getCrateVersions(repoInfo, packageName, query, pageable);
 
-    return this.responseFactory.success("crateVersionsFetched", new PagedModel<>(versions));
+    return ResponseEntity.ok(new PagedModel<>(versions));
   }
 
-  @DeleteMapping("/{repoName}/{crateName}")
+  @DeleteMapping("/{repoName}/{packageName}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> delete(final RepoInfo repoInfo, @PathVariable final String crateName)
-      throws IOException {
+  public ResponseEntity<Void> delete(
+      final RepoInfo repoInfo, @PathVariable final String packageName) throws IOException {
 
-    final var usages = this.cargoApiFacade.deleteCrate(repoInfo, crateName);
+    final var usages = this.cargoApiFacade.deleteCrate(repoInfo, packageName);
 
     final var usageChangedInfo = new UsageChangedInfo(repoInfo.getId(), usages);
 
     this.usageUpdateService.updateUsage(usageChangedInfo);
 
-    return this.responseFactory.success("crateDeleted");
+    return ResponseEntities.noContent();
   }
 
-  @DeleteMapping("/{repoName}/{crateName}/{version}")
+  @DeleteMapping("/{repoName}/{packageName}/versions/{version}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> deleteVersion(
+  public ResponseEntity<Void> deleteVersion(
       final RepoInfo repoInfo,
-      @PathVariable final String crateName,
+      @PathVariable final String packageName,
       @PathVariable final String version)
       throws IOException {
 
-    final var usages = this.cargoApiFacade.deleteCrateVersion(repoInfo, crateName, version);
+    final var usages = this.cargoApiFacade.deleteCrateVersion(repoInfo, packageName, version);
 
     final var usageChangedInfo = new UsageChangedInfo(repoInfo.getId(), usages);
 
     this.usageUpdateService.updateUsage(usageChangedInfo);
 
-    return this.responseFactory.success("crateVersionDeleted");
+    return ResponseEntities.noContent();
   }
 }

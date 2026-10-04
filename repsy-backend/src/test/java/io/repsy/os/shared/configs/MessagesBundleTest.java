@@ -62,13 +62,6 @@ class MessagesBundleTest {
         "chartTagsFetched",
         "chartVersionsFetched",
         "chartDeleted",
-        // Cargo
-        "cratesFetched",
-        "crateFetched",
-        "crateVersionsFetched",
-        "crateVersionFetched",
-        "crateDeleted",
-        "crateVersionDeleted",
         // Ruby
         "gemsFetched",
         "gemVersionsFetched",

@@ -75,21 +75,15 @@ export class CargoService {
       .searchCargoCrates(this.repoName, search || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
-      .pipe(
-        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<CrateListItem>),
-      );
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<CrateListItem>));
   }
 
   public fetchCrate(crateName: string): Observable<CrateInfo> {
-    return this.cargoCrateControllerService
-      .getCargoCrate(crateName, this.repoName)
-      .pipe(map((r) => r.data as CrateInfo));
+    return this.cargoCrateControllerService.getCargoCrate(crateName, this.repoName);
   }
 
   public fetchCrateVersion(crateName: string, version: string): Observable<CrateVersionInfo> {
-    return this.cargoCrateControllerService
-      .getCargoCrateVersion(crateName, version, this.repoName)
-      .pipe(map((r) => r.data as CrateVersionInfo));
+    return this.cargoCrateControllerService.getCargoCrateVersion(crateName, version, this.repoName);
   }
 
   public fetchCrateVersions(
@@ -103,11 +97,7 @@ export class CargoService {
       .listCargoCrateVersions(crateName, this.repoName, search || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
-      .pipe(
-        map(
-          (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<CrateVersionListItem>,
-        ),
-      );
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<CrateVersionListItem>));
   }
 
   public deleteCrate(crateName: string): Observable<void> {
