@@ -66,7 +66,7 @@ jobs:
   # Decides which legs run, from the dispatch inputs (a scheduled run has none: everything).
   plan:
     name: Plan
-    runs-on: hetzner
+    runs-on: hetzner-sm
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -237,7 +237,7 @@ jobs:
   # a red `tsc`, in a minute and with no stack. It runs on every trigger, whatever the suite input says.
   typecheck:
     name: E2E typecheck and lint
-    runs-on: ${{ vars.E2E_RUNNER || 'hetzner' }}
+    runs-on: ${{ vars.E2E_RUNNER || 'hetzner-md' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -268,7 +268,7 @@ jobs:
   # an artifact: three legs each rebuilding it would triple the slowest step of the run.
   image:
     name: Build Repsy image
-    runs-on: ${{ vars.E2E_RUNNER || 'hetzner' }}
+    runs-on: ${{ vars.E2E_RUNNER || 'hetzner-md' }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -325,7 +325,7 @@ jobs:
   e2e:
     name: E2E ${{ matrix.leg }}
     needs: [plan, image]
-    runs-on: ${{ vars.E2E_RUNNER || 'hetzner' }}
+    runs-on: ${{ vars.E2E_RUNNER || 'hetzner-md' }}
     timeout-minutes: ${{ matrix.timeout }}
     strategy:
       # A red leg must not hide the result of the others.
