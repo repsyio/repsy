@@ -15,8 +15,6 @@
  */
 package io.repsy.os.server.protocols.maven.ui.controllers;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.AllowedKeyserverItem;
 import io.repsy.os.generated.model.KeyStoreForm;
@@ -26,12 +24,14 @@ import io.repsy.os.generated.model.PgpPublicKeyItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.auth.PanelAuthHelper;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.repo.dtos.RepoScope;
 import jakarta.validation.Valid;
+import java.net.URI;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -42,6 +42,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -50,6 +51,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
@@ -64,43 +66,40 @@ public class KeyStoreController {
       Set.of("id", "keyId", "fingerprint", "userId", "createdAt");
 
   private final KeyStoreService keyStoreService;
-  private final RestResponseFactory restResponseFactory;
   private final PanelAuthHelper panelAuthHelper;
 
   @GetMapping("/allowed-servers")
-  public RestResponse<List<AllowedKeyserverItem>> listAllowedServers(
+  public ResponseEntity<List<AllowedKeyserverItem>> listAllowedServers(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader) {
 
     // A signed-in user of the current session, not just a token that verifies (RPS-1604).
     this.panelAuthHelper.authenticate(authHeader);
 
-    return this.restResponseFactory.success(
-        "allowedKeyserversFetched", this.keyStoreService.findAllActiveKeyservers());
+    return ResponseEntity.ok(this.keyStoreService.findAllActiveKeyservers());
   }
 
   @PostMapping("/{repoName}")
   @RepoOperation(scope = RepoScope.MAVEN, permission = Permission.MANAGE)
-  public RestResponse<KeyStoreItem> create(
-      final RepoInfo repoInfo, @RequestBody final KeyStoreForm form) {
+  public ResponseEntity<KeyStoreItem> create(
+      final RepoInfo repoInfo, @RequestBody @Valid final KeyStoreForm form) {
 
-    this.keyStoreService.create(repoInfo, form);
+    final var item = this.keyStoreService.create(repoInfo, form);
 
-    return this.restResponseFactory.success("keyStoreCreated");
+    return ResponseEntities.created(this.location(repoInfo, "/{keyStoreId}", item.getId()), item);
   }
 
   @DeleteMapping("/{repoName}/{keyStoreId}")
   @RepoOperation(scope = RepoScope.MAVEN, permission = Permission.MANAGE)
-  public RestResponse<KeyStoreItem> delete(
-      final RepoInfo repoInfo, @PathVariable final UUID keyStoreId) {
+  public ResponseEntity<Void> delete(final RepoInfo repoInfo, @PathVariable final UUID keyStoreId) {
 
     this.keyStoreService.delete(repoInfo, keyStoreId);
 
-    return this.restResponseFactory.success("keyStoreDeleted");
+    return ResponseEntities.noContent();
   }
 
   @GetMapping("/{repoName}")
   @RepoOperation(scope = RepoScope.MAVEN, permission = Permission.MANAGE)
-  public RestResponse<PagedModel<KeyStoreItem>> list(
+  public ResponseEntity<PagedModel<KeyStoreItem>> list(
       final RepoInfo repoInfo,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
@@ -108,12 +107,12 @@ public class KeyStoreController {
 
     final var result = this.keyStoreService.findAll(repoInfo, pageable);
 
-    return this.restResponseFactory.success("keyStoresFetched", new PagedModel<>(result));
+    return ResponseEntity.ok(new PagedModel<>(result));
   }
 
   @GetMapping("/{repoName}/public-keys")
   @RepoOperation(scope = RepoScope.MAVEN, permission = Permission.MANAGE)
-  public RestResponse<PagedModel<PgpPublicKeyItem>> listPublicKeys(
+  public ResponseEntity<PagedModel<PgpPublicKeyItem>> listPublicKeys(
       final RepoInfo repoInfo,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
@@ -121,26 +120,35 @@ public class KeyStoreController {
 
     final var result = this.keyStoreService.findAllPublicKeys(repoInfo, pageable);
 
-    return this.restResponseFactory.success("pgpPublicKeysFetched", new PagedModel<>(result));
+    return ResponseEntity.ok(new PagedModel<>(result));
   }
 
   @PostMapping("/{repoName}/public-keys")
   @RepoOperation(scope = RepoScope.MAVEN, permission = Permission.MANAGE)
-  public RestResponse<PgpPublicKeyItem> createPublicKey(
+  public ResponseEntity<PgpPublicKeyItem> createPublicKey(
       final RepoInfo repoInfo, @RequestBody @Valid final PgpPublicKeyForm form) {
 
     final var item = this.keyStoreService.createPublicKey(repoInfo, form);
 
-    return this.restResponseFactory.success("pgpPublicKeyCreated", item);
+    return ResponseEntities.created(
+        this.location(repoInfo, "/public-keys/{publicKeyId}", item.getId()), item);
   }
 
   @DeleteMapping("/{repoName}/public-keys/{publicKeyId}")
   @RepoOperation(scope = RepoScope.MAVEN, permission = Permission.MANAGE)
-  public RestResponse<Void> deletePublicKey(
+  public ResponseEntity<Void> deletePublicKey(
       final RepoInfo repoInfo, @PathVariable final UUID publicKeyId) {
 
     this.keyStoreService.deletePublicKey(repoInfo, publicKeyId);
 
-    return this.restResponseFactory.success("pgpPublicKeyDeleted");
+    return ResponseEntities.noContent();
+  }
+
+  private URI location(final RepoInfo repoInfo, final String suffix, final UUID id) {
+
+    return UriComponentsBuilder.fromPath("/api/mvn/key-stores/{repoName}" + suffix)
+        .buildAndExpand(repoInfo.getName(), id)
+        .encode()
+        .toUri();
   }
 }

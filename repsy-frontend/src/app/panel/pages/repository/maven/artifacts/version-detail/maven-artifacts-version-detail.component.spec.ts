@@ -22,17 +22,17 @@ import { HIGHLIGHT_OPTIONS } from 'ngx-highlightjs';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
-import { ArtifactVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { ArtifactVersionInfo, ArtifactVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { PagedData } from '../../../../../shared/dto/paged-data';
 import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { renderComponent } from '../../../testing/render-spec-helpers';
-import { DeletedItem } from '../../dto/deleted-item';
-import { MavenService } from '../../service/maven.service';
+import { MAVEN_VERSION_PROBE_SORT, MavenService } from '../../service/maven.service';
 import {
   formatDevelopers,
   formatLicenses,
@@ -45,6 +45,13 @@ const VERSION = {
   artifactName: 'lib',
   artifactVersionName: '1.2.3',
 } as ArtifactVersionInfo;
+
+function versionsProbe(count: number) {
+  return {
+    content: Array.from({ length: count }, (_, i) => ({ versionName: `${i}.0` })),
+    page: { number: 0, size: 2, totalElements: count, totalPages: 1 },
+  } as unknown as PagedData<ArtifactVersionListItem>;
+}
 
 describe('MavenArtifactsVersionDetailComponent', () => {
   let component: MavenArtifactsVersionDetailComponent;
@@ -66,14 +73,15 @@ describe('MavenArtifactsVersionDetailComponent', () => {
     currentRepo = { repoName: REPO, repoType: 'maven' };
     mavenService = jasmine.createSpyObj<MavenService>(
       'MavenService',
-      ['fetchArtifactVersion', 'deleteVersion', 'getVersionDeleteWarning'],
+      ['fetchArtifactVersion', 'deleteVersion', 'getVersionDeleteWarning', 'searchArtifactVersions'],
       {
         repoChanges,
       },
     );
     mavenService.fetchArtifactVersion.and.returnValue(of(VERSION));
     mavenService.getVersionDeleteWarning.and.returnValue(of(null));
-    mavenService.deleteVersion.and.returnValue(of(DeletedItem.VERSION));
+    mavenService.searchArtifactVersions.and.returnValue(of(versionsProbe(2)));
+    mavenService.deleteVersion.and.returnValue(of(undefined));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     router.navigate.and.resolveTo(true);
@@ -243,18 +251,32 @@ describe('MavenArtifactsVersionDetailComponent', () => {
     });
 
     // The last version takes its artifact with it (and the last artifact its group), so the versions page is gone.
-    for (const deleted of [DeletedItem.ARTIFACT, DeletedItem.GROUP]) {
-      it(`goes to the package list of the repository when the server deleted the ${deleted.toLowerCase()} with it`, async () => {
-        mavenService.deleteVersion.and.returnValue(of(deleted));
-        component.deleteVersion();
+    // The 204 answer says nothing, so the probe read before the delete decides.
+    it('goes to the package list of the repository when it was the last version of the artifact', async () => {
+      mavenService.searchArtifactVersions.and.returnValue(of(versionsProbe(1)));
+      component.deleteVersion();
 
-        dangerModalService.call();
-        await Promise.resolve();
+      dangerModalService.call();
+      await Promise.resolve();
 
-        expect(router.navigate).toHaveBeenCalledOnceWith(['/', REPO]);
-        expect(toastService.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
-      });
-    }
+      expect(router.navigate).toHaveBeenCalledOnceWith(['/', REPO]);
+      expect(toastService.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
+    });
+
+    it('probes the first two versions of the artifact before it deletes', () => {
+      component.deleteVersion();
+
+      dangerModalService.call();
+
+      expect(mavenService.searchArtifactVersions).toHaveBeenCalledOnceWith(
+        'org.acme',
+        'lib',
+        '',
+        MAVEN_VERSION_PROBE_SORT,
+        0,
+        2,
+      );
+    });
 
     it('shows the page as loading until the delete answers', () => {
       const answer = new Subject<never>();

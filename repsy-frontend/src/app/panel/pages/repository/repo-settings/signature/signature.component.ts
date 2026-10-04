@@ -136,7 +136,7 @@ export class SignatureComponent implements OnInit {
   private fetchAllowedKeyservers(): void {
     this.keyStoreControllerService.listMavenAllowedKeyServers().subscribe({
       next: (r) => {
-        this.allowedKeyservers = r.data ?? [];
+        this.allowedKeyservers = r;
         this.serverLabels = this.allowedKeyservers.map((s) => `${s.displayName} (${s.host})`);
         this.selectedServerLabel = this.serverLabels[0] ?? '';
       },
@@ -180,7 +180,7 @@ export class SignatureComponent implements OnInit {
     this.pageNum = 1;
     this.keyStoreControllerService.listMavenKeyStores(this.activeRepository.repoName, 0, this.pageSize).subscribe({
       next: (r) => {
-        this.keyStores = r.data?.content ?? [];
+        this.keyStores = r.content ?? [];
       },
       error: () => {},
     });
@@ -191,7 +191,7 @@ export class SignatureComponent implements OnInit {
       .listMavenKeyStores(this.activeRepository.repoName, this.pageNum, this.pageSize)
       .subscribe({
         next: (r) => {
-          const newItems = r.data?.content ?? [];
+          const newItems = r.content ?? [];
           this.keyStores = [...this.keyStores, ...newItems];
           this.pageNum++;
         },
@@ -258,7 +258,7 @@ export class SignatureComponent implements OnInit {
       .listMavenPgpPublicKeys(this.activeRepository.repoName, 0, this.publicKeyPageSize)
       .subscribe({
         next: (r) => {
-          this.publicKeys = r.data?.content ?? [];
+          this.publicKeys = r.content ?? [];
         },
         error: () => {},
       });
@@ -269,7 +269,7 @@ export class SignatureComponent implements OnInit {
       .listMavenPgpPublicKeys(this.activeRepository.repoName, this.publicKeyPageNum, this.publicKeyPageSize)
       .subscribe({
         next: (r) => {
-          const newItems = r.data?.content ?? [];
+          const newItems = r.content ?? [];
           this.publicKeys = [...this.publicKeys, ...newItems];
           this.publicKeyPageNum++;
         },

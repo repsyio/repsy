@@ -469,7 +469,7 @@ export class OsPanelBackend implements PanelBackend {
         requestBody: { armoredKey },
       }),
     );
-    return unwrap(res.data, 'registerPgpPublicKey');
+    return unwrap(res, 'registerPgpPublicKey');
   }
 
   /** One page of a Maven repo's registered PGP public keys, newest first. */
@@ -486,7 +486,7 @@ export class OsPanelBackend implements PanelBackend {
         sort: ['id,desc'],
       }),
     );
-    const result = unwrap(res.data, 'listPgpPublicKeysPage');
+    const result = unwrap(res, 'listPgpPublicKeysPage');
 
     return {
       content: result.content ?? [],
@@ -522,7 +522,7 @@ export class OsPanelBackend implements PanelBackend {
         version: versionName,
       }),
     );
-    return unwrap(res.data, 'getMavenArtifactVersion');
+    return unwrap(res, 'getMavenArtifactVersion');
   }
 
   /** The artifact names of one Maven group, as the panel lists them (its first page of 100). */
@@ -534,7 +534,7 @@ export class OsPanelBackend implements PanelBackend {
         size: 100,
       }),
     );
-    return (unwrap(res.data, 'listMavenArtifacts').content ?? []).map((a) => a.artifactName ?? '');
+    return (unwrap(res, 'listMavenArtifacts').content ?? []).map((a) => a.artifactName ?? '');
   }
 
   /** The version names of one Maven artifact, as the panel lists them (its first page of 100). */
@@ -551,9 +551,7 @@ export class OsPanelBackend implements PanelBackend {
         size: 100,
       }),
     );
-    return (unwrap(res.data, 'listMavenArtifactVersions').content ?? []).map(
-      (v) => v.versionName ?? '',
-    );
+    return (unwrap(res, 'listMavenArtifactVersions').content ?? []).map((v) => v.versionName ?? '');
   }
 
   /** Deletes one version of a Maven artifact, its files and its entry in the artifact's metadata. */

@@ -68,7 +68,8 @@ public class KeyStoreService {
   private final MavenPgpCaps caps;
 
   @Transactional
-  public void create(final RepoInfo repoInfo, final KeyStoreForm form) {
+  public io.repsy.os.generated.model.KeyStoreItem create(
+      final RepoInfo repoInfo, final KeyStoreForm form) {
 
     final var allowedKeyserver =
         this.allowedKeyserverRepository
@@ -93,8 +94,15 @@ public class KeyStoreService {
     keyStore.setRepo(repo);
     keyStore.setAllowedKeyserver(allowedKeyserver);
 
-    this.keyStoreRepository.save(keyStore);
+    final var saved = this.keyStoreRepository.save(keyStore);
     this.publishKeySourcesChanged(repoInfo);
+
+    return io.repsy.os.generated.model.KeyStoreItem.builder()
+        .id(saved.getId())
+        .allowedKeyserverId(allowedKeyserver.getId())
+        .host(allowedKeyserver.getHost())
+        .displayName(allowedKeyserver.getDisplayName())
+        .build();
   }
 
   @Transactional

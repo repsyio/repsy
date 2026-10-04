@@ -2804,7 +2804,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelArtifactListItem"
+                "$ref": "#/components/schemas/PagedModelArtifactListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2853,7 +2853,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelArtifactListItem"
+                "$ref": "#/components/schemas/PagedModelArtifactListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2874,12 +2874,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseDeletedItem"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -2919,7 +2915,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseMavenGroupSummary"
+                "$ref": "#/components/schemas/MavenGroupSummary"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -2971,7 +2967,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelArtifactVersionListItem"
+                "$ref": "#/components/schemas/PagedModelArtifactVersionListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3012,7 +3008,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseArtifactVersionInfo"
+                "$ref": "#/components/schemas/ArtifactVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -3036,12 +3032,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseDeletedItem"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3087,7 +3079,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseArtifactVersionInfo"
+                "$ref": "#/components/schemas/ArtifactVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -3116,12 +3108,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseDeletedItem"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3149,7 +3137,9 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseListAllowedKeyserverItem"
+                type: array
+                items:
+                  "$ref": "#/components/schemas/AllowedKeyserverItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: List allowed keyservers for the authenticated user
@@ -3170,7 +3160,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelKeyStoreItem"
+                "$ref": "#/components/schemas/PagedModelKeyStoreItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3193,12 +3183,20 @@ paths:
               "$ref": "#/components/schemas/KeyStoreForm"
         required: true
       responses:
-        '200':
-          description: OK
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: >-
+                The URL of the created key store, `/api/mvn/key-stores/{repoName}/{keyStoreId}`. Only
+                DELETE is served there; there is no key store detail route.
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseKeyStoreItem"
+                "$ref": "#/components/schemas/KeyStoreItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3233,7 +3231,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPgpPublicKeyItem"
+                "$ref": "#/components/schemas/PagedModelPgpPublicKeyItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3266,12 +3264,20 @@ paths:
               "$ref": "#/components/schemas/PgpPublicKeyForm"
         required: true
       responses:
-        '200':
-          description: OK
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: >-
+                The URL of the created key, `/api/mvn/key-stores/{repoName}/public-keys/{publicKeyId}`.
+                Only DELETE is served there; there is no public key detail route.
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePgpPublicKeyItem"
+                "$ref": "#/components/schemas/PgpPublicKeyItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3308,12 +3314,8 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          description: No Content
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3344,12 +3346,8 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseKeyStoreItem"
+        '204':
+          description: No Content
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -6381,20 +6379,6 @@ components:
             "$ref": "#/components/schemas/ArtifactListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelArtifactListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelArtifactListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     MavenGroupSummary:
       type: object
       description: >-
@@ -6412,20 +6396,6 @@ components:
         - groupName
         - artifactCount
         - versionCount
-    RestResponseMavenGroupSummary:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/MavenGroupSummary"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ArtifactVersionListItem:
       type: object
       properties:
@@ -6449,20 +6419,6 @@ components:
             "$ref": "#/components/schemas/ArtifactVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelArtifactVersionListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelArtifactVersionListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ArtifactVersionInfo:
       type: object
       properties:
@@ -6527,20 +6483,6 @@ components:
             True when the POM signature was verified or, on a repository with
             pgpVerifyAllSignaturesEnabled, when every file of the version has a verified signature
             (for a snapshot, every file of its newest build).
-    RestResponseArtifactVersionInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/ArtifactVersionInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     VersionDeveloperInfo:
       type: object
       properties:
@@ -6554,24 +6496,6 @@ components:
         name:
           type: string
         url:
-          type: string
-    RestResponseDeletedItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: string
-          enum:
-            - VERSION
-            - ARTIFACT
-            - GROUP
-        errorCode:
-          type: string
-          nullable: true
-        text:
           type: string
     # region: mvn-key-stores
     AllowedKeyserverItem:
@@ -6588,22 +6512,6 @@ components:
         - id
         - host
         - displayName
-    RestResponseListAllowedKeyserverItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: array
-          items:
-            "$ref": "#/components/schemas/AllowedKeyserverItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     KeyStoreForm:
       type: object
       properties:
@@ -6630,20 +6538,6 @@ components:
         - allowedKeyserverId
         - host
         - displayName
-    RestResponseKeyStoreItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/KeyStoreItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PgpPublicKeyForm:
       type: object
       properties:
@@ -6676,20 +6570,6 @@ components:
         - keyId
         - fingerprint
         - createdAt
-    RestResponsePgpPublicKeyItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PgpPublicKeyItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelKeyStoreItem:
       type: object
       properties:
@@ -6699,20 +6579,6 @@ components:
             "$ref": "#/components/schemas/KeyStoreItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelKeyStoreItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelKeyStoreItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelPgpPublicKeyItem:
       type: object
       properties:
@@ -6722,20 +6588,6 @@ components:
             "$ref": "#/components/schemas/PgpPublicKeyItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelPgpPublicKeyItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelPgpPublicKeyItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: npm
     NpmPackageListItem:
       type: object

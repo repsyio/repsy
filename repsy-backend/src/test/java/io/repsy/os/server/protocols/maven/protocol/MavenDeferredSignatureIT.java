@@ -213,7 +213,7 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
                     .content(body))
             .andReturn();
 
-    assertThat(result.getResponse().getStatus()).as("register public key").isEqualTo(200);
+    assertThat(result.getResponse().getStatus()).as("register public key").isEqualTo(201);
   }
 
   private record Fixture(Repo repo, User admin, Map<String, byte[]> bodies) {}
@@ -557,7 +557,7 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
                     .header(AUTHORIZATION, this.bearerTokenFor(f.admin())))
             .andReturn();
 
-    assertThat(result.getResponse().getStatus()).isEqualTo(200);
+    assertThat(result.getResponse().getStatus()).isEqualTo(204);
     assertThat(this.pendingCount(f.repo())).isZero();
   }
 

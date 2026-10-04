@@ -158,7 +158,7 @@ class PendingSignatureLockOrderIT extends AbstractIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(key))
             .andReturn();
-    assertThat(registered.getResponse().getStatus()).as("register public key").isEqualTo(200);
+    assertThat(registered.getResponse().getStatus()).as("register public key").isEqualTo(201);
 
     return new Fixture(repo, admin, bodiesOf(repo));
   }

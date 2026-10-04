@@ -15,18 +15,16 @@
  */
 package io.repsy.os.server.protocols.maven.ui.controllers;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.ArtifactListItem;
 import io.repsy.os.generated.model.ArtifactVersionInfo;
 import io.repsy.os.generated.model.ArtifactVersionListItem;
-import io.repsy.os.server.protocols.maven.shared.artifact.dtos.DeletedItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.components.ArtifactDeletionComponent;
 import io.repsy.os.server.protocols.maven.ui.facades.MavenApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -43,6 +41,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -68,11 +67,10 @@ public class MavenArtifactController {
   private final ArtifactServiceImpl artifactService;
   private final MavenApiFacade mavenApiFacade;
   private final ArtifactDeletionComponent artifactDeletionComponent;
-  private final RestResponseFactory restResponseFactory;
 
   @DeleteMapping("/{repoName}/{groupName}/{artifactName}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<DeletedItem> delete(
+  public ResponseEntity<Void> delete(
       final RepoInfo repoInfo,
       @PathVariable final String groupName,
       @PathVariable final String artifactName) {
@@ -82,12 +80,12 @@ public class MavenArtifactController {
 
     this.updateUsage(repoInfo, deletedItemPair.getSecond());
 
-    return this.restResponseFactory.success("artifactDeleted", deletedItemPair.getFirst());
+    return ResponseEntities.noContent();
   }
 
   @DeleteMapping("/{repoName}/{groupName}/{artifactName}/versions/{version}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<DeletedItem> deleteVersion(
+  public ResponseEntity<Void> deleteVersion(
       final RepoInfo repoInfo,
       @PathVariable final String groupName,
       @PathVariable final String artifactName,
@@ -100,19 +98,19 @@ public class MavenArtifactController {
 
     this.updateUsage(repoInfo, deletedItemPair.getSecond());
 
-    return this.restResponseFactory.success("artifactVersionDeleted", deletedItemPair.getFirst());
+    return ResponseEntities.noContent();
   }
 
   @DeleteMapping("/{repoName}/{groupName}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<DeletedItem> deleteGroup(
+  public ResponseEntity<Void> deleteGroup(
       final RepoInfo repoInfo, @PathVariable final String groupName) {
 
     final var deletedItemPair = this.artifactDeletionComponent.deleteGroup(repoInfo, groupName);
 
     this.updateUsage(repoInfo, deletedItemPair.getSecond());
 
-    return this.restResponseFactory.success("groupDeleted", deletedItemPair.getFirst());
+    return ResponseEntities.noContent();
   }
 
   @GetMapping({
@@ -120,7 +118,7 @@ public class MavenArtifactController {
     "/{repoName}/{groupName}/{artifactName}/versions/{version}"
   })
   @RepoOperation
-  public RestResponse<ArtifactVersionInfo> getVersion(
+  public ResponseEntity<ArtifactVersionInfo> getVersion(
       final RepoInfo repoInfo,
       @PathVariable final String groupName,
       @PathVariable final String artifactName,
@@ -130,12 +128,12 @@ public class MavenArtifactController {
     final var artifactVersion =
         this.mavenApiFacade.findArtifactVersion(repoInfo, groupName, artifactName, version);
 
-    return this.restResponseFactory.success("artifactVersionFetched", artifactVersion);
+    return ResponseEntity.ok(artifactVersion);
   }
 
   @GetMapping("/{repoName}/{groupName}/{artifactName}/versions")
   @RepoOperation
-  public RestResponse<PagedModel<ArtifactVersionListItem>> listVersions(
+  public ResponseEntity<PagedModel<ArtifactVersionListItem>> listVersions(
       final RepoInfo repoInfo,
       @PathVariable final String groupName,
       @PathVariable final String artifactName,
@@ -147,13 +145,12 @@ public class MavenArtifactController {
         this.artifactService.getArtifactVersions(
             repoInfo.getStorageKey(), groupName, artifactName, pageable);
 
-    return this.restResponseFactory.success(
-        "artifactVersionsFetched", new PagedModel<>(artifactVersions));
+    return ResponseEntity.ok(new PagedModel<>(artifactVersions));
   }
 
   @GetMapping(value = "/{repoName}/{groupName}/{artifactName}/versions", params = "q")
   @RepoOperation
-  public RestResponse<PagedModel<ArtifactVersionListItem>> listVersionsLikeVersion(
+  public ResponseEntity<PagedModel<ArtifactVersionListItem>> listVersionsLikeVersion(
       final RepoInfo repoInfo,
       @PathVariable final String groupName,
       @PathVariable final String artifactName,
@@ -166,13 +163,12 @@ public class MavenArtifactController {
         this.artifactService.getArtifactVersionsContainsVersion(
             repoInfo.getStorageKey(), groupName, artifactName, version, pageable);
 
-    return this.restResponseFactory.success(
-        "artifactVersionsFetched", new PagedModel<>(artifactVersions));
+    return ResponseEntity.ok(new PagedModel<>(artifactVersions));
   }
 
   @GetMapping("/{repoName}")
   @RepoOperation
-  public RestResponse<PagedModel<ArtifactListItem>> listMavenGroups(
+  public ResponseEntity<PagedModel<ArtifactListItem>> listMavenGroups(
       final RepoInfo repoInfo,
       @RequestParam(name = "q", required = false, defaultValue = "") final String groupName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
@@ -183,12 +179,12 @@ public class MavenArtifactController {
         this.artifactService.getArtifactsContainsGroupName(
             repoInfo.getStorageKey(), groupName, pageable);
 
-    return this.restResponseFactory.success("artifactsFetched", new PagedModel<>(artifacts));
+    return ResponseEntity.ok(new PagedModel<>(artifacts));
   }
 
   @GetMapping("/{repoName}/{groupName}")
   @RepoOperation
-  public RestResponse<PagedModel<ArtifactListItem>> listMavenArtifacts(
+  public ResponseEntity<PagedModel<ArtifactListItem>> listMavenArtifacts(
       final RepoInfo repoInfo,
       @PathVariable final String groupName,
       @RequestParam(name = "q", required = false, defaultValue = "") final String artifactName,
@@ -200,7 +196,7 @@ public class MavenArtifactController {
         this.artifactService.getArtifactsContainsArtifactName(
             repoInfo.getStorageKey(), groupName, artifactName, pageable);
 
-    return this.restResponseFactory.success("artifactsFetched", new PagedModel<>(artifacts));
+    return ResponseEntity.ok(new PagedModel<>(artifacts));
   }
 
   private void updateUsage(final RepoInfo repoInfo, final BaseUsages usages) {

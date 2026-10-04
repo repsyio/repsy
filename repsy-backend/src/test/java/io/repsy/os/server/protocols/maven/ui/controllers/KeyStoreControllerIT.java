@@ -21,6 +21,7 @@ import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
@@ -95,16 +96,11 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
     return body;
   }
 
-  private static Map<String, Object> envelope(final String body) {
-    return JsonPath.read(body, "$");
-  }
-
-  private static void assertSuccess(final String body, final String msgId) {
-    assertThat(envelope(body))
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "SUCCESS")
-        .containsEntry("errorCode", null);
+  /** A created key store: the bare {@code KeyStoreItem}, not an envelope. */
+  private static void assertKeyStoreItem(final String body) {
+    final Map<String, Object> item = JsonPath.read(body, "$");
+    assertThat(item).containsOnlyKeys(KEY_STORE_KEYS);
+    assertThat((String) item.get("id")).matches(UUID_PATTERN);
   }
 
   private static void assertError(final String body, final String msgId) {
@@ -144,8 +140,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
               .getResponse()
               .getContentAsString();
 
-      assertSuccess(response, "allowedKeyserversFetched");
-      final List<Map<String, Object>> items = JsonPath.read(response, "$.data");
+      final List<Map<String, Object>> items = JsonPath.read(response, "$");
       assertThat(items).hasSize(3);
       assertThat(items)
           .allSatisfy(
@@ -180,7 +175,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
               .getResponse()
               .getContentAsString();
 
-      assertThat((List<String>) JsonPath.read(response, "$.data[*].displayName"))
+      assertThat((List<String>) JsonPath.read(response, "$[*].displayName"))
           .containsExactly("CIRCL OpenPGP Keyserver", "PGP Global Directory", "PGP Keys EU");
     }
 
@@ -203,7 +198,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
               .getResponse()
               .getContentAsString();
 
-      assertThat((List<String>) JsonPath.read(response, "$.data[*].host"))
+      assertThat((List<String>) JsonPath.read(response, "$[*].host"))
           .containsExactlyInAnyOrder("keyserver.pgp.com", "pgpkeys.eu");
     }
 
@@ -267,11 +262,22 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       final var server = KeyStoreControllerIT.this.keyserver("keyserver.pgp.com");
       final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
 
-      final var created =
-          KeyStoreControllerIT.this.performCreate(
-              repo, token, KeyStoreControllerIT.this.body(server.getId()));
-      assertSuccess(created, "keyStoreCreated");
-      assertThat((Object) JsonPath.read(created, "$.data")).isNull();
+      final var createdResult =
+          KeyStoreControllerIT.this
+              .mockMvc
+              .perform(
+                  post("/api/mvn/key-stores/" + repo.getName())
+                      .with(apiPort())
+                      .header(AUTHORIZATION, token)
+                      .contentType(MediaType.APPLICATION_JSON)
+                      .content(KeyStoreControllerIT.this.body(server.getId())))
+              .andExpect(status().isCreated())
+              .andReturn();
+      final var created = createdResult.getResponse().getContentAsString();
+      assertKeyStoreItem(created);
+      assertThat(createdResult.getResponse().getHeader("Location"))
+          .isEqualTo(
+              "/api/mvn/key-stores/" + repo.getName() + "/" + JsonPath.read(created, "$.id"));
       final var row =
           KeyStoreControllerIT.this.keyStoreRepository.findAll().stream().findFirst().orElseThrow();
 
@@ -288,35 +294,30 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
               .andReturn()
               .getResponse()
               .getContentAsString();
-      assertSuccess(listed, "keyStoresFetched");
-      final Map<String, Object> listedData = JsonPath.read(listed, "$.data");
+      final Map<String, Object> listedData = JsonPath.read(listed, "$");
       assertThat(listedData).containsKeys(PAGE_KEYS);
-      final List<Map<String, Object>> content = JsonPath.read(listed, "$.data.content");
+      final List<Map<String, Object>> content = JsonPath.read(listed, "$.content");
       assertThat(content).hasSize(1);
       assertThat(content.getFirst())
           .containsEntry("id", row.getId().toString())
           .containsEntry("allowedKeyserverId", server.getId().toString())
           .containsEntry("host", server.getHost())
           .containsEntry("displayName", server.getDisplayName());
-      final Map<String, Object> page = JsonPath.read(listed, "$.data.page");
+      final Map<String, Object> page = JsonPath.read(listed, "$.page");
       assertThat(page)
           .containsEntry("size", 10)
           .containsEntry("number", 0)
           .containsEntry("totalElements", 1)
           .containsEntry("totalPages", 1);
 
-      final var deleted =
-          KeyStoreControllerIT.this
-              .mockMvc
-              .perform(
-                  delete("/api/mvn/key-stores/" + repo.getName() + "/" + row.getId())
-                      .with(apiPort())
-                      .header(AUTHORIZATION, token))
-              .andExpect(status().isOk())
-              .andReturn()
-              .getResponse()
-              .getContentAsString();
-      assertSuccess(deleted, "keyStoreDeleted");
+      KeyStoreControllerIT.this
+          .mockMvc
+          .perform(
+              delete("/api/mvn/key-stores/" + repo.getName() + "/" + row.getId())
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isNoContent())
+          .andExpect(content().string(""));
       assertThat(KeyStoreControllerIT.this.keyStoreRepository.findById(row.getId())).isEmpty();
     }
 
@@ -329,10 +330,9 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
       final var server = KeyStoreControllerIT.this.keyserver("pgpkeys.eu");
 
-      assertSuccess(
+      assertKeyStoreItem(
           KeyStoreControllerIT.this.performCreate(
-              repo, token, KeyStoreControllerIT.this.body(server.getId())),
-          "keyStoreCreated");
+              repo, token, KeyStoreControllerIT.this.body(server.getId())));
       final var duplicate =
           KeyStoreControllerIT.this.performCreate(
               repo, token, KeyStoreControllerIT.this.body(server.getId()));
@@ -340,7 +340,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       assertThat(
               KeyStoreControllerIT.this.performCreate(
                   otherRepo, token, KeyStoreControllerIT.this.body(server.getId())))
-          .contains("keyStoreCreated");
+          .contains("\"allowedKeyserverId\"");
 
       final var inactive = KeyStoreControllerIT.this.keyserver("pgp.circl.lu");
       inactive.setActive(false);
@@ -412,7 +412,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       final var created =
           KeyStoreControllerIT.this.performCreate(
               maven, adminToken, KeyStoreControllerIT.this.body(server.getId()));
-      assertSuccess(created, "keyStoreCreated");
+      assertKeyStoreItem(created);
       final var row =
           KeyStoreControllerIT.this.keyStoreRepository.findAll().stream().findFirst().orElseThrow();
       final var delete =
@@ -551,11 +551,12 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
 
       final var createdResult =
           this.createPublicKey(repo, token, this.armoredKeyBody(key.armoredPublicKey()))
-              .andExpect(status().isOk())
+              .andExpect(status().isCreated())
               .andReturn();
       final var created = createdResult.getResponse().getContentAsString();
-      assertSuccess(created, "pgpPublicKeyCreated");
-      final Map<String, Object> data = JsonPath.read(created, "$.data");
+      final Map<String, Object> data = JsonPath.read(created, "$");
+      assertThat(createdResult.getResponse().getHeader("Location"))
+          .isEqualTo("/api/mvn/key-stores/" + repo.getName() + "/public-keys/" + data.get("id"));
       assertThat(data).containsOnlyKeys(PGP_PUBLIC_KEY_KEYS);
       assertThat((String) data.get("keyId")).isEqualTo("%016X".formatted(key.keyId()));
       assertThat((String) data.get("id")).matches(UUID_PATTERN);
@@ -574,20 +575,15 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
               .andReturn()
               .getResponse()
               .getContentAsString();
-      assertSuccess(listed, "pgpPublicKeysFetched");
-      final Map<String, Object> listedData = JsonPath.read(listed, "$.data");
+      final Map<String, Object> listedData = JsonPath.read(listed, "$");
       assertThat(listedData).containsKeys(PAGE_KEYS);
-      final List<Map<String, Object>> content = JsonPath.read(listed, "$.data.content");
+      final List<Map<String, Object>> content = JsonPath.read(listed, "$.content");
       assertThat(content).hasSize(1);
       assertThat(content.getFirst()).containsOnlyKeys(PGP_PUBLIC_KEY_KEYS);
 
-      final var deleted =
-          this.deletePublicKey(repo, token, row.getId())
-              .andExpect(status().isOk())
-              .andReturn()
-              .getResponse()
-              .getContentAsString();
-      assertSuccess(deleted, "pgpPublicKeyDeleted");
+      this.deletePublicKey(repo, token, row.getId())
+          .andExpect(status().isNoContent())
+          .andExpect(content().string(""));
       assertThat(KeyStoreControllerIT.this.pgpPublicKeyRepository.findById(row.getId())).isEmpty();
     }
 
@@ -601,15 +597,14 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       final var key = PgpTestKeys.generate();
       final var body = this.armoredKeyBody(key.armoredPublicKey());
 
-      this.createPublicKey(repo, token, body).andExpect(status().isOk());
+      this.createPublicKey(repo, token, body).andExpect(status().isCreated());
 
       final var duplicate = this.createPublicKey(repo, token, body).andReturn();
       assertThat(duplicate.getResponse().getStatus()).isEqualTo(409);
       assertError(duplicate.getResponse().getContentAsString(), "pgpPublicKeyAlreadyExists");
 
       final var onOtherRepo = this.createPublicKey(otherRepo, token, body).andReturn();
-      assertThat(onOtherRepo.getResponse().getStatus()).isEqualTo(200);
-      assertSuccess(onOtherRepo.getResponse().getContentAsString(), "pgpPublicKeyCreated");
+      assertThat(onOtherRepo.getResponse().getStatus()).isEqualTo(201);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -661,7 +656,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       final var created =
           this.createPublicKey(repo, adminToken, this.armoredKeyBody(key.armoredPublicKey()))
               .andReturn();
-      final String id = JsonPath.read(created.getResponse().getContentAsString(), "$.data.id");
+      final String id = JsonPath.read(created.getResponse().getContentAsString(), "$.id");
 
       final var createAttempt =
           this.createPublicKey(
@@ -706,7 +701,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       final var created =
           this.createPublicKey(otherRepo, token, this.armoredKeyBody(key.armoredPublicKey()))
               .andReturn();
-      final String id = JsonPath.read(created.getResponse().getContentAsString(), "$.data.id");
+      final String id = JsonPath.read(created.getResponse().getContentAsString(), "$.id");
 
       final var result = this.deletePublicKey(repo, token, UUID.fromString(id)).andReturn();
 
@@ -726,7 +721,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
       this.createPublicKey(
               repo, token, this.armoredKeyBody(PgpTestKeys.generate().armoredPublicKey()))
-          .andExpect(status().isOk());
+          .andExpect(status().isCreated());
 
       KeyStoreControllerIT.this
           .mockMvc
@@ -798,7 +793,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       final var it = KeyStoreControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
       final var server = it.keyserver("keyserver.pgp.com");
-      assertSuccess(it.performCreate(repo, token, it.body(server.getId())), "keyStoreCreated");
+      assertKeyStoreItem(it.performCreate(repo, token, it.body(server.getId())));
       return repo;
     }
 
