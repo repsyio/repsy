@@ -2593,7 +2593,7 @@ paths:
     get:
       tags:
         - helm-chart-controller
-      operationId: getHelmChartVersions
+      operationId: getHelmChart
       parameters: []
       security:
         - { }
@@ -2604,16 +2604,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  "$ref": "#/components/schemas/HelmChartVersionItem"
+                "$ref": "#/components/schemas/HelmChartSummary"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: List all versions of a chart
+      summary: Get a Helm chart
     delete:
       tags:
         - helm-chart-controller
@@ -2669,6 +2667,54 @@ paths:
         '429':
           "$ref": "#/components/responses/TooManyRequests"
       summary: List OCI tags for a chart
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: packageName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/helm/charts/{repoName}/{packageName}/versions":
+    get:
+      tags:
+        - helm-chart-controller
+      operationId: listHelmChartVersions
+      description: >-
+        Sortable by `version`, `createdAt` (`property,direction`). The default is `createdAt,desc`.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: >-
+            Only versions that contain this text, case-insensitive.
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PagedModelHelmChartVersionItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: List versions of a Helm chart
     parameters:
       - name: repoName
         in: path
@@ -6324,6 +6370,27 @@ components:
         createdAt:
           type: string
           format: date-time
+    HelmChartSummary:
+      type: object
+      description: >-
+        A chart as its latest version describes it.
+      properties:
+        name:
+          type: string
+        latestVersion:
+          type: string
+        description:
+          type: string
+          nullable: true
+        appVersion:
+          type: string
+          nullable: true
+        type:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
     HelmChartDetail:
       type: object
       properties:
@@ -6352,6 +6419,15 @@ components:
           type: string
           format: date-time
           nullable: true
+    PagedModelHelmChartVersionItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/HelmChartVersionItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
     PagedModelHelmChartListItem:
       type: object
       properties:

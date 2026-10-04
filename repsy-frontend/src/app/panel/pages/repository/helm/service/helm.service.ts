@@ -21,6 +21,7 @@ import {
   HelmChartControllerService,
   HelmChartDetail,
   HelmChartListItem,
+  HelmChartSummary,
   HelmChartVersionItem,
   ProtocolRepoControllerService,
   RepoPermissionInfo,
@@ -76,8 +77,22 @@ export class HelmService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<HelmChartListItem>));
   }
 
-  public getChartVersions(name: string): Observable<HelmChartVersionItem[]> {
-    return this.helmChartControllerService.getHelmChartVersions(this.repoName, name).pipe(map((r) => r ?? []));
+  public getChart(name: string): Observable<HelmChartSummary> {
+    return this.helmChartControllerService.getHelmChart(this.repoName, name);
+  }
+
+  public fetchChartVersions(
+    name: string,
+    search: string,
+    sortOption: Sort,
+    pageIndex: number,
+    pageSize: number,
+  ): Observable<PagedData<HelmChartVersionItem>> {
+    return this.helmChartControllerService
+      .listHelmChartVersions(this.repoName, name, search || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<HelmChartVersionItem>));
   }
 
   public getChartDetail(name: string, version: string): Observable<HelmChartDetail> {

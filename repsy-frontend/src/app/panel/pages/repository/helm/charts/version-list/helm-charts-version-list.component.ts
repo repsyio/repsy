@@ -33,7 +33,9 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
+import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
 import { SecurityService } from '../../../../security/service/security.service';
 import { HelmConfigComponent } from '../../config/helm-config.component';
 import { HelmService } from '../../service/helm.service';
@@ -66,7 +68,7 @@ export class HelmChartsVersionListComponent implements OnDestroy {
   public searchText = '';
   public pageNum = 0;
   public pageSize = 10;
-  public totalPages = 0;
+  public pagedData = new PagedData<HelmChartVersionItem>();
   public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
   public sortOptions: Sort[] = [
     { name: 'Newest', column: 'createdAt', type: 'DESC' },
@@ -77,8 +79,6 @@ export class HelmChartsVersionListComponent implements OnDestroy {
   public readonly username: string;
   public securitySummary: Record<string, VersionSecuritySummary> = {};
 
-  private allVersions: HelmChartVersionItem[] = [];
-  private filteredVersions: HelmChartVersionItem[] = [];
   private readonly repositoryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
 
@@ -111,18 +111,18 @@ export class HelmChartsVersionListComponent implements OnDestroy {
   public search(text: string): void {
     this.searchText = text;
     this.pageNum = 0;
-    this.applyFilterAndSort();
+    this.fetchVersions();
   }
 
   public sort(option: Sort): void {
     this.sortOption = option;
     this.pageNum = 0;
-    this.applyFilterAndSort();
+    this.fetchVersions();
   }
 
   public loadPage(pageNum: number): void {
     this.pageNum = pageNum;
-    this.applyPage();
+    this.fetchVersions();
   }
 
   public openConfig(open: boolean): void {
@@ -138,7 +138,7 @@ export class HelmChartsVersionListComponent implements OnDestroy {
   }
 
   public deleteVersion(version: HelmChartVersionItem): void {
-    const isLastVersion = this.allVersions.length === 1;
+    const isLastVersion = this.pagedData.page.totalElements === 1 && !this.searchText;
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       this.helmService
@@ -154,6 +154,7 @@ export class HelmChartsVersionListComponent implements OnDestroy {
             if (isLastVersion) {
               this.router.navigate(['..'], { relativeTo: this.route });
             } else {
+              this.pageNum = pageAfterDelete(this.versions.length, this.pageNum);
               this.fetchVersions();
             }
           },
@@ -169,16 +170,16 @@ export class HelmChartsVersionListComponent implements OnDestroy {
   private fetchVersions(): void {
     this.loading = true;
     this.helmService
-      .getChartVersions(this.chartName)
+      .fetchChartVersions(this.chartName, this.searchText, this.sortOption, this.pageNum, this.pageSize)
       .pipe(
         finalize(() => {
           this.loading = false;
         }),
       )
       .subscribe({
-        next: (versions: HelmChartVersionItem[]) => {
-          this.allVersions = versions;
-          this.applyFilterAndSort();
+        next: (pagedData) => {
+          this.pagedData.page = pagedData.page;
+          this.versions = pagedData.content;
           this.error = null;
         },
         // The error interceptor has already shown the failure to the user.
@@ -196,24 +197,5 @@ export class HelmChartsVersionListComponent implements OnDestroy {
         },
         error: () => {},
       });
-  }
-
-  private applyFilterAndSort(): void {
-    const text = this.searchText.toLowerCase();
-    const filtered = text
-      ? this.allVersions.filter((v) => v.version.toLowerCase().includes(text))
-      : [...this.allVersions];
-    this.filteredVersions = filtered.sort((a, b) => {
-      const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      return this.sortOption.type === 'DESC' ? -diff : diff;
-    });
-    this.applyPage();
-  }
-
-  /** The client-side pager: the API returns every version, so the current page is a slice of the filtered list. */
-  private applyPage(): void {
-    this.totalPages = Math.ceil(this.filteredVersions.length / this.pageSize);
-    this.pageNum = Math.max(0, Math.min(this.pageNum, this.totalPages - 1));
-    this.versions = this.filteredVersions.slice(this.pageNum * this.pageSize, (this.pageNum + 1) * this.pageSize);
   }
 }

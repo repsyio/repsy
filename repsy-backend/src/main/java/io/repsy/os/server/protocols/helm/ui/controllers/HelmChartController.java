@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.helm.ui.controllers;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.HelmChartDetail;
 import io.repsy.os.generated.model.HelmChartListItem;
+import io.repsy.os.generated.model.HelmChartSummary;
 import io.repsy.os.generated.model.HelmChartVersionItem;
 import io.repsy.os.server.protocols.helm.ui.facades.HelmApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
@@ -31,6 +32,7 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
@@ -67,6 +69,8 @@ public class HelmChartController {
           "createdAt", "createdAt",
           "lastUpdatedAt", "lastUpdatedAt");
 
+  private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("version", "createdAt");
+
   private final HelmApiFacade helmApiFacade;
   private final UsageUpdateService usageUpdateService;
 
@@ -87,12 +91,26 @@ public class HelmChartController {
 
   @GetMapping("/{repoName}/{packageName}")
   @RepoOperation
-  public ResponseEntity<List<HelmChartVersionItem>> getHelmChartVersions(
+  public ResponseEntity<HelmChartSummary> getHelmChart(
       final RepoInfo repoInfo, @PathVariable final String packageName) {
 
-    final var versions = this.helmApiFacade.getVersions(repoInfo, packageName);
+    return ResponseEntity.ok(this.helmApiFacade.getChart(repoInfo, packageName));
+  }
 
-    return ResponseEntity.ok(versions);
+  @GetMapping("/{repoName}/{packageName}/versions")
+  @RepoOperation
+  public ResponseEntity<PagedModel<HelmChartVersionItem>> listHelmChartVersions(
+      final RepoInfo repoInfo,
+      @PathVariable final String packageName,
+      @RequestParam(name = "q", defaultValue = "") final String query,
+      @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
+          final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
+
+    final var versions = this.helmApiFacade.getVersions(repoInfo, packageName, query, pageable);
+
+    return ResponseEntity.ok(new PagedModel<>(versions));
   }
 
   @GetMapping("/{repoName}/{packageName}/versions/{version}")

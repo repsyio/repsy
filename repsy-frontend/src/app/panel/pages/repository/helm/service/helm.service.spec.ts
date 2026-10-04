@@ -45,7 +45,8 @@ describe('HelmService', () => {
     ]);
     helmApi = jasmine.createSpyObj<HelmChartControllerService>('HelmChartControllerService', [
       'searchHelmCharts',
-      'getHelmChartVersions',
+      'getHelmChart',
+      'listHelmChartVersions',
       'getHelmChartDetail',
       'deleteAllHelmChartVersions',
       'deleteHelmChartVersion',
@@ -63,8 +64,8 @@ describe('HelmService', () => {
   describeRepoSelection({
     service: () => service,
     getPermission: () => repoApi.getRepoPermissions,
-    probe: (s) => s.getChartVersions(CHART),
-    probeApi: () => helmApi.getHelmChartVersions,
+    probe: (s) => s.getChart(CHART),
+    probeApi: () => helmApi.getHelmChart,
     probeRepoArg: 0,
     resetsOnChange: true,
   });
@@ -80,29 +81,28 @@ describe('HelmService', () => {
         args: (query) => [REPO, query, ...PAGE_ARGS],
         bare: true,
       },
+      {
+        name: 'fetchChartVersions',
+        invoke: (s, search) => s.fetchChartVersions(CHART, search, SORT, PAGE_INDEX, PAGE_SIZE),
+        api: () => helmApi.listHelmChartVersions,
+        args: (search) => [REPO, CHART, search, ...PAGE_ARGS],
+        bare: true,
+      },
     ];
     describePagedCalls(() => service, paged);
 
-    const versions = [{ version: VERSION }];
+    const summary = { name: CHART, latestVersion: VERSION };
     const detail = { name: CHART, version: VERSION };
     const tags = ['1.2.3', 'latest'];
     // Unlike the other services, the Helm client takes the repository name first.
     const calls: CallCase<HelmService>[] = [
       {
-        name: 'getChartVersions',
-        invoke: (s) => s.getChartVersions(CHART),
-        api: () => helmApi.getHelmChartVersions,
+        name: 'getChart',
+        invoke: (s) => s.getChart(CHART),
+        api: () => helmApi.getHelmChart,
         args: [REPO, CHART],
-        response: versions,
-        expected: versions,
-      },
-      {
-        name: 'getChartVersions without version data',
-        invoke: (s) => s.getChartVersions(CHART),
-        api: () => helmApi.getHelmChartVersions,
-        args: [REPO, CHART],
-        response: undefined,
-        expected: [],
+        response: summary,
+        expected: summary,
       },
       {
         name: 'getChartDetail',

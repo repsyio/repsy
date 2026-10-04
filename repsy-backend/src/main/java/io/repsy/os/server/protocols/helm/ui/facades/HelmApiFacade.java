@@ -20,6 +20,7 @@ import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.HelmChartDetail;
 import io.repsy.os.generated.model.HelmChartListItem;
+import io.repsy.os.generated.model.HelmChartSummary;
 import io.repsy.os.generated.model.HelmChartVersionItem;
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartFilesService;
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
@@ -74,16 +75,17 @@ public class HelmApiFacade implements ProtocolApiFacade {
   }
 
   @Transactional(readOnly = true)
-  public List<HelmChartVersionItem> getVersions(final RepoInfo repoInfo, final String name) {
-    final var versions =
-        this.helmChartService.findAllVersionsByName(repoInfo.getStorageKey(), name);
+  public HelmChartSummary getChart(final RepoInfo repoInfo, final String name) {
+    return this.helmChartMapper.toSummary(
+        this.helmChartService.findLatestByName(repoInfo.getStorageKey(), name));
+  }
 
-    // A chart is removed together with its last version, so no versions means no such chart.
-    if (versions.isEmpty()) {
-      throw new ItemNotFoundException("chartNotFound");
-    }
-
-    return versions.stream().map(this.helmChartMapper::toVersionItem).toList();
+  @Transactional(readOnly = true)
+  public Page<HelmChartVersionItem> getVersions(
+      final RepoInfo repoInfo, final String name, final String query, final Pageable pageable) {
+    return this.helmChartService
+        .findVersionsByName(repoInfo.getStorageKey(), name, query, pageable)
+        .map(this.helmChartMapper::toVersionItem);
   }
 
   @Transactional(readOnly = true)

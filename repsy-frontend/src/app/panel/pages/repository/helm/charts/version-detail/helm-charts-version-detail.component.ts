@@ -19,7 +19,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Highlight } from 'ngx-highlightjs';
 import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
 import { Subscription } from 'rxjs';
-import { finalize, map } from 'rxjs/operators';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { HelmChartDetail, RepoPermissionInfo, RepoType } from '../../../../../../../generated/api';
@@ -32,6 +32,8 @@ import { ByteFormatter } from '../../../../../shared/util/byte-formatter';
 import {
   deleteVersionAndCheckLast$,
   landAfterVersionDelete,
+  VERSION_PROBE_SIZE,
+  VERSION_PROBE_SORT,
 } from '../../../../../shared/util/version-delete-landing.util';
 import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
 import { HelmService } from '../../service/helm.service';
@@ -90,7 +92,7 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
       // Deleting the last version removes the chart, so its versions page would answer 404: the page
       // to land on is decided from the versions the chart has right before the delete.
       deleteVersionAndCheckLast$(
-        this.helmService.getChartVersions(this.chartName).pipe(map((versions) => ({ content: versions }))),
+        this.helmService.fetchChartVersions(this.chartName, '', VERSION_PROBE_SORT, 0, VERSION_PROBE_SIZE),
         () => this.helmService.deleteChart(this.chartName, this.versionName),
       )
         .pipe(

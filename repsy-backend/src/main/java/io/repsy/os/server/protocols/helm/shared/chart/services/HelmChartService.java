@@ -164,6 +164,31 @@ public class HelmChartService implements ChartService<UUID> {
         .orElse(List.of());
   }
 
+  /** The latest version of the chart, or 404 {@code chartNotFound} when there is no such chart. */
+  public HelmChartInfo findLatestByName(final UUID repoId, final String name) {
+    return this.helmChartRepository
+        .findByRepoIdAndName(repoId, name)
+        .flatMap(this.helmChartVersionRepository::findFirstByChartOrderByCreatedAtDescIdDesc)
+        .<HelmChartInfo>map(this::toDetail)
+        .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+  }
+
+  /**
+   * One page of the versions of the chart whose version contains {@code query}, any case; 404
+   * {@code chartNotFound} when there is no such chart.
+   */
+  public Page<HelmChartInfo> findVersionsByName(
+      final UUID repoId, final String name, final String query, final Pageable pageable) {
+    final var chart =
+        this.helmChartRepository
+            .findByRepoIdAndName(repoId, name)
+            .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+
+    return this.helmChartVersionRepository
+        .findAllByChartAndVersionContainingIgnoreCase(chart, query, pageable)
+        .map(this::toDetail);
+  }
+
   public boolean existsByRepoIdAndName(final UUID repoId, final String name) {
     return this.helmChartRepository.findByRepoIdAndName(repoId, name).isPresent();
   }

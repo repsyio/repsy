@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.helm.ui.mappers;
 
 import io.repsy.os.generated.model.HelmChartDetail;
 import io.repsy.os.generated.model.HelmChartListItem;
+import io.repsy.os.generated.model.HelmChartSummary;
 import io.repsy.os.generated.model.HelmChartVersionItem;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import org.jspecify.annotations.NullMarked;
@@ -45,6 +46,17 @@ public class HelmChartMapper {
         .digest(info.digest())
         .size(info.size())
         .createdAt(info.createdAt())
+        .build();
+  }
+
+  public HelmChartSummary toSummary(final HelmChartInfo info) {
+    return HelmChartSummary.builder()
+        .name(info.name())
+        .latestVersion(info.version())
+        .description(info.description())
+        .appVersion(info.appVersion())
+        .type(info.type())
+        .updatedAt(info.lastUpdatedAt())
         .build();
   }
 

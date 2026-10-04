@@ -267,6 +267,41 @@ class StablePagingIT extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("Helm chart versions created in the same instant are each listed once")
+  void helmChartVersions() throws Exception {
+    final var repo = this.seedRepo(RepoType.HELM, uniqueRepoName("helmv"));
+    final var chart = new HelmChart();
+    chart.setRepo(this.repoRepository.getReferenceById(repo.getId()));
+    chart.setName("tied");
+    final var savedChart = this.helmChartRepository.save(chart);
+
+    final var versions = new ArrayList<String>();
+    for (var i = 0; i < ROWS; i++) {
+      final var version = new HelmChartVersion();
+      version.setChart(savedChart);
+      version.setVersion("1.0." + i);
+      version.setDigest("sha256:" + UUID.randomUUID().toString().replace("-", ""));
+      version.setSize(1);
+      this.helmChartVersionRepository.save(version);
+      versions.add("1.0." + i);
+    }
+    this.entityManager.flush();
+    this.jdbcTemplate.update(
+        "update helm_chart_version set created_at = ?, last_updated_at = ?" + " where chart_id = ?",
+        Timestamp.from(TIED_AT),
+        Timestamp.from(TIED_AT),
+        savedChart.getId());
+    this.entityManager.clear();
+
+    this.assertEveryRowOnceAndStable(
+        "/api/helm/charts/" + repo.getName() + "/tied/versions",
+        this.adminBearerToken(),
+        "createdAt,desc",
+        "version",
+        versions);
+  }
+
+  @Test
   @DisplayName("deploy tokens created in the same instant are each listed once")
   void deployTokens() throws Exception {
     final var repo = this.seedRepo(RepoType.MAVEN, uniqueRepoName("tok"));
