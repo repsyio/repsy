@@ -654,18 +654,18 @@ export class OsPanelBackend implements PanelBackend {
   }
 
   /**
-   * `GET /api/docker/images/{repoName}/{imageName}/summary` (RPS-1288): the image as the list shows
+   * `GET /api/docker/images/{repoName}/{imageName}` (RPS-1288, RPS-1781): the image as the list shows
    * it, with `tagCount`, `untaggedManifestCount` and `untaggedSize`; a 404 `PanelHttpError` when the image
    * is gone (an image goes with its last manifest).
    */
   async getDockerImageSummary(repoName: string, imageName: string): Promise<ImageListItem> {
     const res = await this.call((c) =>
-      c.dockerImageController.getDockerImageSummary({
+      c.dockerImageController.getDockerImage({
         repoName,
         imageName,
       }),
     );
-    return unwrap(res.data, 'getDockerImageSummary');
+    return unwrap(res, 'getDockerImage');
   }
 
   /**

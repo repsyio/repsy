@@ -27,6 +27,7 @@ import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
+import io.repsy.os.server.shared.http.BareBodyAssertions;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
@@ -287,14 +288,11 @@ class DockerSha512ReferenceIT extends AbstractIntegrationTest {
         .extracting(tag -> tag.getName())
         .containsExactly("latest");
     final var tags =
-        this.expectSuccess(
+        BareBodyAssertions.expectBare(
             this.perform(
                 get("/api/docker/images/%s/%s/tags".formatted(repo.getName(), IMAGE))
-                    .header(AUTHORIZATION, this.adminBearerToken())),
-            "imageTagsFetched",
-            "Image tags fetched.");
-    assertThat(JsonPath.<List<String>>read(tags, "$.data.content[*].name"))
-        .containsExactly("latest");
+                    .header(AUTHORIZATION, this.adminBearerToken())));
+    assertThat(JsonPath.<List<String>>read(tags, "$.content[*].name")).containsExactly("latest");
     assertThat(this.manifestRepository.findAllByImageId(image.getId())).hasSize(2);
     assertThat(manifest).isNotEqualTo(byDigest);
   }

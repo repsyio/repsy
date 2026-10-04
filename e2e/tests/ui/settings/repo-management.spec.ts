@@ -28,7 +28,7 @@ import { rawGetManifest } from '../../../src/clients/docker-raw.js';
 import { adminCredential, minimalPom, rawPut, versionDir } from '../../../src/clients/maven-raw.js';
 import { DESCRIPTION_MAX_TEXT, bulleted } from '../../../src/ui/credential-messages.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
-import { repoRoute } from '../../../src/ui/routes.js';
+import { repoApiPath, repoRoute } from '../../../src/ui/routes.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
 import { RepoSettingsReadback } from '../../../src/ui/pages/repo-settings/readback.js';
 
@@ -220,7 +220,7 @@ test.describe('Repository settings: orphan layers', { tag: SETTINGS }, () => {
     const response = adminPage.waitForResponse(
       (res) =>
         res.request().method() === 'DELETE' &&
-        res.url().includes(`/api/docker/images/blobs/${repo.name}/orphan-layers`),
+        res.url().includes(repoApiPath(repo.name, 'docker', 'orphan-layers')),
     );
     await settings.shell.dangerModal.confirm();
 
@@ -266,18 +266,19 @@ test.describe('Repository settings: orphan layers', { tag: SETTINGS }, () => {
     const response = adminPage.waitForResponse(
       (res) =>
         res.request().method() === 'DELETE' &&
-        res.url().includes(`/api/docker/images/manifests/${repo.name}/untagged`),
+        res.url().includes(repoApiPath(repo.name, 'docker', 'untagged-manifests')),
     );
     await settings.shell.dangerModal.confirm();
 
     const answer = await response;
     expect(answer.ok()).toBe(true);
     const result = (await answer.json()) as {
-      data: { deletedManifests: number; orphanLayersScheduled: number };
+      deletedManifests: number;
+      orphanLayersScheduled: number;
     };
-    expect(result.data.deletedManifests).toBe(1);
+    expect(result.deletedManifests).toBe(1);
     // The layers only that manifest used (its config and layer blobs) are freed with it.
-    expect(result.data.orphanLayersScheduled).toBeGreaterThan(0);
+    expect(result.orphanLayersScheduled).toBeGreaterThan(0);
     await settings.shell.toasts.expectSuccess(
       /^Deleted 1 untagged manifest and \d+ unused layers? \(/,
     );

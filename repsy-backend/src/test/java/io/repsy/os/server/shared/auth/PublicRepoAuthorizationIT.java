@@ -320,11 +320,11 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
     this.perform(delete(images + "/app/tags/latest").header(AUTHORIZATION, user))
         .andExpect(status().isForbidden());
     this.perform(
-            delete("/api/docker/images/manifests/" + repo.getName() + "/untagged")
+            delete("/api/repos/" + repo.getName() + "/docker/untagged-manifests")
                 .header(AUTHORIZATION, user))
         .andExpect(status().isForbidden());
     this.perform(
-            delete("/api/docker/images/blobs/" + repo.getName() + "/orphan-layers")
+            delete("/api/repos/" + repo.getName() + "/docker/orphan-layers")
                 .header(AUTHORIZATION, user))
         .andExpect(status().isForbidden());
 

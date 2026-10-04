@@ -17,28 +17,25 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
-import {
-  DockerImageControllerService,
-  RestResponseUntaggedManifestCleanupResult,
-  UntaggedManifestCleanupResult,
-} from '../../../../../../generated/api';
+import { DockerRepoCleanupControllerService, UntaggedManifestCleanupResult } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { permission } from '../../testing/protocol-service-spec-helpers';
 import { DeleteUntaggedManifestsComponent } from './delete-untagged-manifests.component';
 
-function answer(data: UntaggedManifestCleanupResult): RestResponseUntaggedManifestCleanupResult {
-  return { msgId: 'untaggedManifestsDeleted', type: 'SUCCESS', data };
+/** The answer is the bare result: no envelope. */
+function answer(result: UntaggedManifestCleanupResult): UntaggedManifestCleanupResult {
+  return result;
 }
 
 describe('DeleteUntaggedManifestsComponent', () => {
   let component: DeleteUntaggedManifestsComponent;
-  let dockerService: jasmine.SpyObj<DockerImageControllerService>;
+  let dockerService: jasmine.SpyObj<DockerRepoCleanupControllerService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
 
   beforeEach(() => {
-    dockerService = jasmine.createSpyObj<DockerImageControllerService>('DockerImageControllerService', [
+    dockerService = jasmine.createSpyObj<DockerRepoCleanupControllerService>('DockerRepoCleanupControllerService', [
       'deleteDockerUntaggedManifests',
     ]);
     dockerService.deleteDockerUntaggedManifests.and.returnValue(
@@ -188,7 +185,7 @@ describe('DeleteUntaggedManifestsComponent', () => {
         imports: [DeleteUntaggedManifestsComponent],
         providers: [
           provideRouter([]),
-          { provide: DockerImageControllerService, useValue: dockerService },
+          { provide: DockerRepoCleanupControllerService, useValue: dockerService },
           { provide: ToastService, useValue: toastService },
           { provide: DangerModalService, useValue: dangerModalService },
         ],

@@ -31,6 +31,7 @@ import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageReposi
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.services.DockerManifestLayoutRepairService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.DockerManifestLayoutRepairService.RepairReport;
+import io.repsy.os.server.shared.http.BareBodyAssertions;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -152,13 +153,11 @@ class DockerManifestLayoutRepairIT extends AbstractIntegrationTest {
     assertThat(this.wire.headManifest(repo, IMAGE, digest).getStatus()).isEqualTo(200);
     assertThat(this.wire.getManifest(repo, IMAGE, digest).getContentAsString()).isEqualTo(manifest);
     final var panel =
-        this.expectSuccess(
+        BareBodyAssertions.expectBare(
             this.perform(
                 get("/api/docker/images/%s/%s/manifests/%s"
                         .formatted(repo.getName(), IMAGE, "latest"))
-                    .header(AUTHORIZATION, this.adminBearerToken())),
-            "manifestFetched",
-            "Manifest fetched.");
+                    .header(AUTHORIZATION, this.adminBearerToken())));
     assertThat(panel).contains("schemaVersion");
   }
 
