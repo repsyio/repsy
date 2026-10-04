@@ -453,7 +453,7 @@ public abstract class AbstractIntegrationTest {
                   .header(HttpHeaders.AUTHORIZATION, this.adminBearerToken())
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body))
-          .andExpect(status().isOk());
+          .andExpect(status().isCreated());
     } catch (final Exception e) {
       throw new IllegalStateException("Could not seed repo " + name, e);
     }

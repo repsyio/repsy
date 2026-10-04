@@ -15,6 +15,9 @@
  */
 package io.repsy.os.server.protocols.shared.controllers;
 
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectBare;
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectCreated;
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectNoContent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -118,12 +121,11 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
   }
 
   private String listBody(final String... params) throws Exception {
-    return expectSuccess(
-        this.list(this.userBearerToken(), params), "reposFetched", "Repos fetched.");
+    return expectBare(this.list(this.userBearerToken(), params));
   }
 
   private List<String> names(final String body) {
-    return JsonPath.read(body, "$.data.content[*].name");
+    return JsonPath.read(body, "$.content[*].name");
   }
 
   private List<String> listedNames(final String... params) throws Exception {
@@ -172,15 +174,15 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
 
       final var body = RepoCollectionControllerIT.this.listBody("q", tag);
 
-      assertThat(JsonPath.<Map<String, Object>>read(body, "$.data.content[0]"))
+      assertThat(JsonPath.<Map<String, Object>>read(body, "$.content[0]"))
           .containsOnlyKeys(REPO_LIST_KEYS)
           .containsEntry("name", tag + "-shape")
           .containsEntry("type", "NPM")
           .containsEntry("privateRepo", false)
           .containsEntry("diskUsage", 42)
           .containsEntry("description", "shaped");
-      assertThat(JsonPath.<String>read(body, "$.data.content[0].createdAt")).isNotBlank();
-      assertThat(JsonPath.<Map<String, Object>>read(body, "$.data.page"))
+      assertThat(JsonPath.<String>read(body, "$.content[0].createdAt")).isNotBlank();
+      assertThat(JsonPath.<Map<String, Object>>read(body, "$.page"))
           .containsEntry("size", 10)
           .containsEntry("number", 0)
           .containsEntry("totalElements", 1)
@@ -216,7 +218,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
 
       final var body = RepoCollectionControllerIT.this.listBody("type", "HELM", "size", "100");
 
-      assertThat(JsonPath.<List<String>>read(body, "$.data.content[*].type"))
+      assertThat(JsonPath.<List<String>>read(body, "$.content[*].type"))
           .isNotEmpty()
           .containsOnly("HELM");
       assertThat(RepoCollectionControllerIT.this.names(body)).contains(tag + "-h");
@@ -293,7 +295,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
 
       final var body = RepoCollectionControllerIT.this.listBody("q", q, "size", "100");
 
-      assertThat(JsonPath.<Number>read(body, "$.data.page.totalElements").longValue())
+      assertThat(JsonPath.<Number>read(body, "$.page.totalElements").longValue())
           .isEqualTo(RepoCollectionControllerIT.this.repoRepository.count());
     }
 
@@ -329,7 +331,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
                 "q", tag, "page", String.valueOf(page), "size", "10");
 
         names.addAll(RepoCollectionControllerIT.this.names(body));
-        pages = JsonPath.<Integer>read(body, "$.data.page.totalPages");
+        pages = JsonPath.<Integer>read(body, "$.page.totalPages");
       }
 
       return names;
@@ -346,7 +348,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
       final var last = RepoCollectionControllerIT.this.listBody("q", tag, "page", "2", "size", "2");
 
       assertThat(RepoCollectionControllerIT.this.names(last)).hasSize(1);
-      assertThat(JsonPath.<Map<String, Object>>read(last, "$.data.page"))
+      assertThat(JsonPath.<Map<String, Object>>read(last, "$.page"))
           .containsEntry("size", 2)
           .containsEntry("number", 2)
           .containsEntry("totalElements", 5)
@@ -431,7 +433,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
     void maxSize() throws Exception {
       final var body = RepoCollectionControllerIT.this.listBody("size", "100");
 
-      assertThat(JsonPath.<Integer>read(body, "$.data.page.size")).isEqualTo(100);
+      assertThat(JsonPath.<Integer>read(body, "$.page.size")).isEqualTo(100);
     }
 
     @Test
@@ -444,20 +446,19 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
       RepoCollectionControllerIT.this.repoRepository.saveAndFlush(hidden);
 
       final var asUser =
-          expectSuccess(
+          expectBare(
               RepoCollectionControllerIT.this.list(
-                  RepoCollectionControllerIT.this.userBearerToken(), "q", tag, "sort", "name,asc"),
-              "reposFetched",
-              "Repos fetched.");
+                  RepoCollectionControllerIT.this.userBearerToken(), "q", tag, "sort", "name,asc"));
       final var asAdmin =
-          expectSuccess(
+          expectBare(
               RepoCollectionControllerIT.this.list(
-                  RepoCollectionControllerIT.this.adminBearerToken(), "q", tag, "sort", "name,asc"),
-              "reposFetched",
-              "Repos fetched.");
+                  RepoCollectionControllerIT.this.adminBearerToken(),
+                  "q",
+                  tag,
+                  "sort",
+                  "name,asc"));
 
-      assertThat(JsonPath.<Object>read(asUser, "$.data"))
-          .isEqualTo(JsonPath.read(asAdmin, "$.data"));
+      assertThat(JsonPath.<Object>read(asUser, "$")).isEqualTo(JsonPath.read(asAdmin, "$"));
       assertThat(RepoCollectionControllerIT.this.names(asUser))
           .containsExactly(tag + "-a", tag + "-p");
     }
@@ -475,23 +476,17 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
       assertThat(RepoCollectionControllerIT.this.listedNames("q", tag))
           .containsExactly(newest.getName(), middle.getName(), oldest.getName());
 
-      expectSuccess(
+      expectBare(
           RepoCollectionControllerIT.this.perform(
-              json(
-                      patch("/api/repos/" + oldest.getName() + "/name"),
-                      "{\"name\":\"%s\"}".formatted(renamed))
-                  .header(AUTHORIZATION, admin)),
-          "repoRenamed",
-          "Repo renamed.");
+              json(patch("/api/repos/" + oldest.getName()), "{\"name\":\"%s\"}".formatted(renamed))
+                  .header(AUTHORIZATION, admin)));
 
       assertThat(RepoCollectionControllerIT.this.listedNames("q", tag))
           .containsExactly(newest.getName(), middle.getName(), renamed);
 
-      expectSuccess(
+      expectNoContent(
           RepoCollectionControllerIT.this.perform(
-              delete("/api/repos/" + middle.getName()).header(AUTHORIZATION, admin)),
-          "repoDeleted",
-          "Repo deleted.");
+              delete("/api/repos/" + middle.getName()).header(AUTHORIZATION, admin)));
 
       assertThat(RepoCollectionControllerIT.this.listedNames("q", tag))
           .containsExactly(newest.getName(), renamed);
@@ -508,13 +503,11 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
 
     private Map<String, Object> counts(final String authHeader) throws Exception {
       final var body =
-          expectSuccess(
+          expectBare(
               RepoCollectionControllerIT.this.perform(
-                  get(COUNTS).header(AUTHORIZATION, authHeader)),
-              "repoCountsFetched",
-              "Repo counts fetched.");
+                  get(COUNTS).header(AUTHORIZATION, authHeader)));
 
-      return JsonPath.read(body, "$.data");
+      return JsonPath.read(body, "$");
     }
 
     @Test
@@ -564,11 +557,9 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
 
       assertThat(((Number) this.counts(admin).get("NPM")).longValue()).isEqualTo(before + 2);
 
-      expectSuccess(
+      expectNoContent(
           RepoCollectionControllerIT.this.perform(
-              delete("/api/repos/" + first.getName()).header(AUTHORIZATION, admin)),
-          "repoDeleted",
-          "Repo deleted.");
+              delete("/api/repos/" + first.getName()).header(AUTHORIZATION, admin)));
 
       assertThat(((Number) this.counts(admin).get("NPM")).longValue()).isEqualTo(before + 1);
     }
@@ -596,22 +587,20 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
       final var name = uniqueRepoName(type.name().toLowerCase(Locale.ROOT));
 
       final var body =
-          expectSuccess(
+          expectCreated(
               RepoCollectionControllerIT.this.create(
                   RepoCollectionControllerIT.this.adminBearerToken(),
                   "{\"name\":\"%s\",\"type\":\"%s\",\"privateRepo\":true,\"description\":\"made\"}"
-                      .formatted(name, type.name())),
-              "repoCreated",
-              "Repo created.");
+                      .formatted(name, type.name())));
 
-      assertThat(JsonPath.<Map<String, Object>>read(body, "$.data"))
+      assertThat(JsonPath.<Map<String, Object>>read(body, "$"))
           .containsOnlyKeys(REPO_LIST_KEYS)
           .containsEntry("name", name)
           .containsEntry("type", type.name())
           .containsEntry("privateRepo", true)
           .containsEntry("diskUsage", 0)
           .containsEntry("description", "made");
-      assertThat(JsonPath.<String>read(body, "$.data.createdAt")).isNotBlank();
+      assertThat(JsonPath.<String>read(body, "$.createdAt")).isNotBlank();
 
       final var repo = RepoCollectionControllerIT.this.reloadRepo(name);
       assertThat(repo.getType()).isEqualTo(type);
@@ -629,13 +618,11 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
       final var name = uniqueRepoName("case");
 
       final var body =
-          expectSuccess(
+          expectCreated(
               RepoCollectionControllerIT.this.create(
-                  RepoCollectionControllerIT.this.adminBearerToken(), createBody(name, type)),
-              "repoCreated",
-              "Repo created.");
+                  RepoCollectionControllerIT.this.adminBearerToken(), createBody(name, type)));
 
-      assertThat(JsonPath.<String>read(body, "$.data.type")).isEqualTo("MAVEN");
+      assertThat(JsonPath.<String>read(body, "$.type")).isEqualTo("MAVEN");
       assertThat(RepoCollectionControllerIT.this.reloadRepo(name).getType())
           .isEqualTo(RepoType.MAVEN);
     }
@@ -647,14 +634,12 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
       final var name = uniqueRepoName("lower");
 
       final var body =
-          expectSuccess(
+          expectCreated(
               RepoCollectionControllerIT.this.create(
                   RepoCollectionControllerIT.this.adminBearerToken(),
-                  createBody(name, type.name().toLowerCase(Locale.ROOT))),
-              "repoCreated",
-              "Repo created.");
+                  createBody(name, type.name().toLowerCase(Locale.ROOT))));
 
-      assertThat(JsonPath.<String>read(body, "$.data.type")).isEqualTo(type.name());
+      assertThat(JsonPath.<String>read(body, "$.type")).isEqualTo(type.name());
       assertThat(RepoCollectionControllerIT.this.reloadRepo(name).getType()).isEqualTo(type);
     }
 
@@ -664,13 +649,11 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
       final var name = uniqueRepoName("defaults");
 
       final var body =
-          expectSuccess(
+          expectCreated(
               RepoCollectionControllerIT.this.create(
-                  RepoCollectionControllerIT.this.adminBearerToken(), createBody(name, "MAVEN")),
-              "repoCreated",
-              "Repo created.");
+                  RepoCollectionControllerIT.this.adminBearerToken(), createBody(name, "MAVEN")));
 
-      assertThat(JsonPath.<Map<String, Object>>read(body, "$.data"))
+      assertThat(JsonPath.<Map<String, Object>>read(body, "$"))
           .containsEntry("privateRepo", true)
           .doesNotContainKey("description");
     }
@@ -681,10 +664,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
       final var name = uniqueRepoName("madenew");
       final var admin = RepoCollectionControllerIT.this.adminBearerToken();
 
-      expectSuccess(
-          RepoCollectionControllerIT.this.create(admin, createBody(name, "CARGO")),
-          "repoCreated",
-          "Repo created.");
+      expectCreated(RepoCollectionControllerIT.this.create(admin, createBody(name, "CARGO")));
 
       assertThat(RepoCollectionControllerIT.this.listedNames("q", name, "type", "CARGO"))
           .containsExactly(name);
@@ -693,7 +673,7 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
           .andExpect(status().isOk());
       RepoCollectionControllerIT.this
           .perform(delete("/api/repos/" + name).header(AUTHORIZATION, admin))
-          .andExpect(status().isOk());
+          .andExpect(status().isNoContent());
       assertThat(RepoCollectionControllerIT.this.repoRepository.findByName(name)).isEmpty();
     }
 
@@ -723,12 +703,10 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
     void explicitPrivateFlag(final String flag) throws Exception {
       final var name = uniqueRepoName("flag");
 
-      expectSuccess(
+      expectCreated(
           RepoCollectionControllerIT.this.create(
               RepoCollectionControllerIT.this.adminBearerToken(),
-              "{\"name\":\"%s\",\"type\":\"DOCKER\",\"privateRepo\":%s}".formatted(name, flag)),
-          "repoCreated",
-          "Repo created.");
+              "{\"name\":\"%s\",\"type\":\"DOCKER\",\"privateRepo\":%s}".formatted(name, flag)));
 
       assertThat(RepoCollectionControllerIT.this.reloadRepo(name).isPrivateRepo())
           .isEqualTo(!"false".equals(flag));
@@ -740,11 +718,9 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
     void acceptsAllowedNames(final String name) throws Exception {
       final var unique = name + "-" + randomTag();
 
-      expectSuccess(
+      expectCreated(
           RepoCollectionControllerIT.this.create(
-              RepoCollectionControllerIT.this.adminBearerToken(), createBody(unique, "MAVEN")),
-          "repoCreated",
-          "Repo created.");
+              RepoCollectionControllerIT.this.adminBearerToken(), createBody(unique, "MAVEN")));
 
       assertThat(RepoCollectionControllerIT.this.reloadRepo(unique).getName()).isEqualTo(unique);
     }
@@ -754,11 +730,9 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
     void acceptsMaxLengthName() throws Exception {
       final var name = "a".repeat(24) + randomTag().charAt(0);
 
-      expectSuccess(
+      expectCreated(
           RepoCollectionControllerIT.this.create(
-              RepoCollectionControllerIT.this.adminBearerToken(), createBody(name, "MAVEN")),
-          "repoCreated",
-          "Repo created.");
+              RepoCollectionControllerIT.this.adminBearerToken(), createBody(name, "MAVEN")));
 
       assertThat(RepoCollectionControllerIT.this.reloadRepo(name).getName()).hasSize(25);
     }
@@ -768,13 +742,11 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
     void descriptionOverColumnLength() throws Exception {
       final var admin = RepoCollectionControllerIT.this.adminBearerToken();
       final var ok = uniqueRepoName("d500");
-      expectSuccess(
+      expectCreated(
           RepoCollectionControllerIT.this.create(
               admin,
               "{\"name\":\"%s\",\"type\":\"NPM\",\"description\":\"%s\"}"
-                  .formatted(ok, "d".repeat(500))),
-          "repoCreated",
-          "Repo created.");
+                  .formatted(ok, "d".repeat(500))));
       assertThat(RepoCollectionControllerIT.this.reloadRepo(ok).getDescription()).hasSize(500);
 
       final var tooLong = uniqueRepoName("d501");
@@ -1034,12 +1006,12 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        assertThat(JsonPath.<Number>read(counts, "$.data.MAVEN").longValue()).isEqualTo(1L);
+        assertThat(JsonPath.<Number>read(counts, "$.MAVEN").longValue()).isEqualTo(1L);
       }
 
       RepoCollectionControllerIT.this
           .perform(delete("/api/repos/" + name).header(AUTHORIZATION, admin))
-          .andExpect(status().isOk());
+          .andExpect(status().isNoContent());
 
       assertThat(RepoCollectionControllerIT.this.repoRepository.findByName(name)).isEmpty();
     }

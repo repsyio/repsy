@@ -100,12 +100,12 @@ export class RepoLookupService {
     // caller decides the outcome (canMatch says no, the resolver redirects to /not-found), so a 404 here
     // must not also raise the "Repository not found" toast (RPS-1670).
     return this.protocolRepoControllerService
-      .getRepoFormat(repoName, 'body', false, { context: new HttpContext().set(SILENT_ERROR, true) })
+      .getRepo(repoName, 'body', false, { context: new HttpContext().set(SILENT_ERROR, true) })
       .pipe(
         map((r) => {
-          const slug = toRouteSlug(r.data);
+          const slug = toRouteSlug(r.type);
           if (!slug) {
-            throw new Error(`Unknown repository type "${r.data}" for ${repoName}`);
+            throw new Error(`Unknown repository type "${r.type}" for ${repoName}`);
           }
           return slug;
         }),

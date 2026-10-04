@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.shared.controllers;
 
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectNoContent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -202,7 +203,7 @@ class ProtocolRepoDeleteUsageIT extends AbstractIntegrationTest {
                 .header(AUTHORIZATION, this.token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"%s\",\"type\":\"%s\"}".formatted(name, type.name())))
-        .andExpect(status().isOk());
+        .andExpect(status().isCreated());
 
     final var repo = this.repoRepository.findByName(name).orElseThrow();
     this.createdRepoIds.add(repo.getId());
@@ -233,10 +234,8 @@ class ProtocolRepoDeleteUsageIT extends AbstractIntegrationTest {
   }
 
   private void deleteRepo(final Repo repo) throws Exception {
-    expectSuccess(
-        this.perform(delete("/api/repos/" + repo.getName()).header(AUTHORIZATION, this.token)),
-        "repoDeleted",
-        "Repo deleted.");
+    expectNoContent(
+        this.perform(delete("/api/repos/" + repo.getName()).header(AUTHORIZATION, this.token)));
   }
 
   private record Totals(long diskUsed, long reposCount) {}

@@ -32,7 +32,7 @@ import { expect, test } from '../../src/scenarios/fixtures.js';
 const ALL_TYPES = Object.values(RepoType);
 
 test(
-  '/format answers the upper-case type of a repository, for every type',
+  'GET /api/repos/{repoName} answers the upper-case type of a repository, for every type',
   { tag: ['@smoke'] },
   async ({ seeder, panelApi }) => {
     for (const type of ALL_TYPES) {
@@ -53,8 +53,8 @@ test(
       const created = await panelApi.rawRequest('POST', '/api/repos', { name, type: spelling });
       seeder.adoptRepo(name);
 
-      expect(created.status, spelling).toBe(200);
-      expect(created.body.data).toMatchObject({ name, type: 'MAVEN' });
+      expect(created.status, spelling).toBe(201);
+      expect(created.body).toMatchObject({ name, type: 'MAVEN' });
       expect(await panelApi.getRepoFormat(name)).toBe(RepoType.MAVEN);
     }
   },
@@ -87,7 +87,7 @@ test(
       );
 
       expect(listed.status, spelling).toBe(200);
-      const names = (listed.body.data as { content: { name: string; type: string }[] }).content;
+      const names = (listed.body as { content: { name: string; type: string }[] }).content;
       expect(
         names.map((repo) => repo.name),
         spelling,

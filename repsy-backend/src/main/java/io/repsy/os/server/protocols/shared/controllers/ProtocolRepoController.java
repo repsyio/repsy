@@ -22,11 +22,11 @@ import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
-import io.repsy.os.generated.model.RepoDescriptionForm;
+import io.repsy.os.generated.model.RepoListInfo;
 import io.repsy.os.generated.model.RepoPermissionInfo;
-import io.repsy.os.generated.model.RepoRenameForm;
 import io.repsy.os.generated.model.RepoSettingsForm;
 import io.repsy.os.generated.model.RepoSettingsInfo;
+import io.repsy.os.generated.model.RepoUpdateForm;
 import io.repsy.os.generated.model.RepoUsageInfo;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
@@ -34,17 +34,18 @@ import io.repsy.os.server.protocols.shared.services.ProtocolApiFacadeMavenAdapte
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.http.NoStore;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.RepoScope;
-import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -68,9 +69,24 @@ public class ProtocolRepoController {
   private final RestResponseFactory responseFactory;
   private final JwtUtils jwtUtils;
 
+  @GetMapping("/{repoName}")
+  @RepoOperation
+  public RepoListInfo get(final RepoInfo repoInfo) {
+
+    return this.repoTxService.getRepoListInfo(repoInfo.getId());
+  }
+
+  @PatchMapping("/{repoName}")
+  @RepoOperation(permission = MANAGE)
+  public RepoListInfo update(
+      final RepoInfo repoInfo, @RequestBody @Valid final RepoUpdateForm form) {
+
+    return this.repoTxService.updateRepo(repoInfo, form.getName(), form.getDescription());
+  }
+
   @DeleteMapping("/{repoName}")
   @RepoOperation(permission = MANAGE)
-  public RestResponse<Void> delete(final RepoInfo repoInfo, final ProtocolApiFacade facade) {
+  public ResponseEntity<Void> delete(final RepoInfo repoInfo, final ProtocolApiFacade facade) {
 
     // No usage update for the freed bytes: the usage lives on the repo row, which goes with it.
     // An async update would also race the delete and fail with repoNotFound (RPS-908).
@@ -78,7 +94,7 @@ public class ProtocolRepoController {
 
     this.repoTxService.deleteRepo(repoInfo.getId());
 
-    return this.responseFactory.success("repoDeleted");
+    return ResponseEntities.noContent();
   }
 
   @GetMapping("/{repoName}/permissions")
@@ -91,14 +107,12 @@ public class ProtocolRepoController {
 
   @GetMapping("/{repoName}/contents")
   @RepoOperation(scope = RepoScope.MAVEN)
-  public RestResponse<List<StorageItemInfo>> getPathContent(
+  public List<StorageItemInfo> getPathContent(
       final ProtocolApiFacadeMavenAdapter facade,
       final RepoInfo repoInfo,
       @RequestParam final String path) {
 
-    final var items = facade.getItems(repoInfo, new RelativePath(path));
-
-    return this.responseFactory.success("itemsFetched", items);
+    return facade.getItems(repoInfo, new RelativePath(path));
   }
 
   /**
@@ -127,11 +141,9 @@ public class ProtocolRepoController {
 
   @GetMapping("/{repoName}/settings")
   @RepoOperation(permission = MANAGE)
-  public RestResponse<RepoSettingsInfo> getRepoSettings(final RepoInfo repoInfo) {
+  public RepoSettingsInfo getRepoSettings(final RepoInfo repoInfo) {
 
-    final var settings = this.repoTxService.getRepoSettings(repoInfo.getId());
-
-    return this.responseFactory.success("settingsFetched", settings);
+    return this.repoTxService.getRepoSettings(repoInfo.getId());
   }
 
   @GetMapping("/{repoName}/usage")
@@ -144,40 +156,13 @@ public class ProtocolRepoController {
     return this.responseFactory.success("usageFetched", usageInfo);
   }
 
-  @PatchMapping("/{repoName}/name")
-  @RepoOperation(permission = MANAGE)
-  public RestResponse<Void> renameRepo(
-      final RepoInfo repoInfo, @RequestBody @Valid final RepoRenameForm form) {
-
-    this.repoTxService.renameRepo(repoInfo.getName(), form.getName(), repoInfo.getType());
-
-    return this.responseFactory.success("repoRenamed");
-  }
-
-  @PatchMapping("/{repoName}/description")
-  @RepoOperation(permission = MANAGE)
-  public RestResponse<Void> updateRepoDescription(
-      final RepoInfo repoInfo, @RequestBody @Valid final RepoDescriptionForm form) {
-
-    this.repoTxService.updateDescription(repoInfo.getStorageKey(), form.getDescription());
-
-    return this.responseFactory.success("repoDescriptionEdited");
-  }
-
   @PutMapping("/{repoName}/settings")
   @RepoOperation(permission = MANAGE)
-  public RestResponse<Void> updateRepoSettings(
+  public ResponseEntity<Void> updateRepoSettings(
       final RepoInfo repoInfo, @RequestBody @Valid final RepoSettingsForm form) {
 
     this.repoTxService.updateSettings(repoInfo.getId(), form);
 
-    return this.responseFactory.success("settingsUpdated");
-  }
-
-  @GetMapping("/{repoName}/format")
-  @RepoOperation
-  public RestResponse<RepoType> getRepoFormat(final RepoInfo repoInfo) {
-
-    return this.responseFactory.success("repoTypeFetched", repoInfo.getType());
+    return ResponseEntities.noContent();
   }
 }

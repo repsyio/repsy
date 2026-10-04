@@ -71,7 +71,7 @@ test.describe('RPS-1761 Unicode: what the 500 limit counts', { tag: ['@cloud-ski
       (res) => new URL(res.url()).pathname === '/api/repos' && res.request().method() === 'POST',
     );
     await modal.submitButton.click();
-    expect((await created).status()).toBe(200);
+    expect((await created).status()).toBe(201);
     await modal.expectClosed();
     expect(await repoDescription(adminSession.token, name)).toBe(EMOJI_AT_LIMIT);
   });

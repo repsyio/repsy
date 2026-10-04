@@ -82,6 +82,9 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
   private static final String REPOS_PREFIX = "/api/repos/";
   private static final String BEARER = "bearerAuth";
 
+  /** The success components of components/responses; every other component is an error response. */
+  private static final Set<String> SUCCESS_RESPONSES = Set.of("Created", "NoContent", "Accepted");
+
   private static final Set<String> HTTP_METHODS =
       Set.of("get", "put", "post", "delete", "patch", "head", "options", "trace");
 
@@ -603,7 +606,7 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
     }
 
     // The same floor as the e2e role sweep, so a parser bug cannot empty the check.
-    assertThat(forbidden).as("operations that document 403").isGreaterThanOrEqualTo(48);
+    assertThat(forbidden).as("operations that document 403").isGreaterThanOrEqualTo(47);
     assertNoNewFindings("documented 403 without MANAGE or admin", findings, Map.of());
   }
 
@@ -718,6 +721,28 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("the Created, NoContent and Accepted success components have their shape")
+  void successResponseComponentsHaveTheirShape() throws IOException {
+    final var responses = asMap(asMap(loadSpec().get("components")).get("responses"));
+
+    SUCCESS_RESPONSES.forEach(
+        name -> assertThat(responses).as("components/responses/" + name).containsKey(name));
+
+    final var created = asMap(responses.get("Created"));
+    final var accepted = asMap(responses.get("Accepted"));
+    final var noContent = asMap(responses.get("NoContent"));
+
+    assertThat(asMap(created.get("headers"))).containsKey("Location");
+    assertThat(asMap(accepted.get("headers"))).containsKey("Location");
+    assertThat(noContent).doesNotContainKeys("content", "headers");
+    SUCCESS_RESPONSES.forEach(
+        name ->
+            assertThat(asMap(responses.get(name)).get("content"))
+                .as(name + " has no problem+json body")
+                .isNull());
+  }
+
+  @Test
   @DisplayName("every documented 4xx and 5xx response is a shared problem response")
   void everyErrorResponseIsTheSharedProblem() throws IOException {
     final var doc = loadSpec();
@@ -746,6 +771,9 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
     final var responses = asMap(asMap(doc.get("components")).get("responses"));
     responses.forEach(
         (name, response) -> {
+          if (SUCCESS_RESPONSES.contains(String.valueOf(name))) {
+            return; // success components are checked by successResponseComponentsHaveTheirShape
+          }
           final var content = asMap(asMap(response).get("content"));
           if (!content.containsKey("application/problem+json")
               || content.size() != 1

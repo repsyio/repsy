@@ -80,7 +80,7 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
                 .content(
                     "{\"name\":\"%s\",\"type\":\"%s\",\"privateRepo\":%s}"
                         .formatted(name, type.name(), privateRepo)))
-        .andExpect(status().isOk());
+        .andExpect(status().isCreated());
     this.entityManager.flush();
     return this.repoRepository.findByName(name).orElseThrow();
   }

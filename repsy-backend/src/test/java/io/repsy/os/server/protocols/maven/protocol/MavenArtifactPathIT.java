@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.maven.protocol;
 
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectNoContent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
@@ -201,7 +202,7 @@ class MavenArtifactPathIT extends AbstractIntegrationTest {
   }
 
   private void settings(final Repo repo, final User admin) throws Exception {
-    expectSuccess(
+    expectNoContent(
         this.mockMvc.perform(
             put("/api/repos/{name}/settings", repo.getName())
                 .header(AUTHORIZATION, this.bearerTokenFor(admin))
@@ -210,9 +211,7 @@ class MavenArtifactPathIT extends AbstractIntegrationTest {
                     """
                     {"privateRepo":false,"allowOverride":true,"releases":true,"snapshots":true,\
                     "securityScanEnabled":false}""")
-                .with(apiPort())),
-        "settingsUpdated",
-        "Settings updated.");
+                .with(apiPort())));
   }
 
   private static Path stored(final Repo repo, final String path) {

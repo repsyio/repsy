@@ -100,7 +100,7 @@ export class DashboardContentComponent {
   private fetchRepoCounts(): void {
     this.repoCollectionControllerService.getRepoCounts().subscribe({
       next: (response) => {
-        const counts = response.data ?? {};
+        const counts = response ?? {};
         this.npmRegistryCount = counts[RepoType.Npm] ?? 0;
         this.pypiRepoCount = counts[RepoType.Pypi] ?? 0;
         this.mavenRepoCount = counts[RepoType.Maven] ?? 0;
@@ -125,7 +125,7 @@ export class DashboardContentComponent {
       .listRepos(undefined, undefined, 0, RECENT_REPOSITORY_COUNT, ['createdAt,desc'])
       .subscribe({
         next: (response) => {
-          this.repoListInfos = response.data?.content ?? [];
+          this.repoListInfos = response?.content ?? [];
           this.cdRef.markForCheck();
         },
         // The HTTP error interceptor already shows the failure; the card stays empty.

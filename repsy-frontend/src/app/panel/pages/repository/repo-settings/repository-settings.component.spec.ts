@@ -26,6 +26,7 @@ import { RepositorySettingsComponent } from './repository-settings.component';
 const REPO = 'acme-repo';
 
 /** A successful `RestResponse*` reply; the generated client's overloads make a typed spy return value unusable. */
+const bare = (data: unknown): never => of(data) as never;
 const reply = (data: unknown): never => of(restResponse(data)) as never;
 
 function settings(overrides: Partial<RepoSettingsInfo> = {}): RepoSettingsInfo {
@@ -47,7 +48,7 @@ describe('RepositorySettingsComponent', () => {
     currentRepo$ = new BehaviorSubject<RepoContext | null>(null);
 
     repoApi.getRepoPermissions.and.returnValue(reply(permission(REPO, { canManage: true })));
-    repoApi.getRepoSettings.and.returnValue(reply(settings()));
+    repoApi.getRepoSettings.and.returnValue(bare(settings()));
 
     component = new RepositorySettingsComponent(
       repoApi,
@@ -110,7 +111,7 @@ describe('RepositorySettingsComponent', () => {
   ['npm', 'pypi', 'docker', 'cargo', 'golang', 'helm', 'ruby'].forEach((repoType) => {
     it(`fills the general form for a ${repoType} repository`, () => {
       const info = settings({ privateRepo: true, allowOverride: false, securityScanEnabled: false });
-      repoApi.getRepoSettings.and.returnValue(reply(info));
+      repoApi.getRepoSettings.and.returnValue(bare(info));
       component.ngOnInit();
 
       currentRepo$.next({ repoName: REPO, repoType: repoType as RepoContext['repoType'] });
@@ -130,7 +131,7 @@ describe('RepositorySettingsComponent', () => {
     it(`keeps the override default for a ${repoType} repository, whose settings omit allowOverride (RPS-1435)`, () => {
       const info = settings({ privateRepo: true, securityScanEnabled: false });
       delete info.allowOverride;
-      repoApi.getRepoSettings.and.returnValue(reply(info));
+      repoApi.getRepoSettings.and.returnValue(bare(info));
       component.ngOnInit();
 
       currentRepo$.next({ repoName: REPO, repoType: repoType as RepoContext['repoType'] });
@@ -151,7 +152,7 @@ describe('RepositorySettingsComponent', () => {
       pgpVerifyAllSignaturesEnabled: true,
       pgpKeyServerLookupEnabled: false,
     });
-    repoApi.getRepoSettings.and.returnValue(reply(info));
+    repoApi.getRepoSettings.and.returnValue(bare(info));
     component.ngOnInit();
 
     currentRepo$.next({ repoName: REPO, repoType: 'maven' });
@@ -172,7 +173,7 @@ describe('RepositorySettingsComponent', () => {
 
   it('fills the release-aware form, not the general one, for a NuGet repository', () => {
     const info = settings({ releases: false, snapshots: true });
-    repoApi.getRepoSettings.and.returnValue(reply(info));
+    repoApi.getRepoSettings.and.returnValue(bare(info));
     component.ngOnInit();
 
     currentRepo$.next({ repoName: REPO, repoType: 'nuget' });
@@ -207,7 +208,7 @@ describe('RepositorySettingsComponent', () => {
     component.ngOnInit();
     currentRepo$.next({ repoName: REPO, repoType: 'npm' });
     repoApi.getRepoSettings.calls.reset();
-    repoApi.getRepoSettings.and.returnValue(reply(settings({ privateRepo: false })));
+    repoApi.getRepoSettings.and.returnValue(bare(settings({ privateRepo: false })));
 
     component.getRepoSettings();
 

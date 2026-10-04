@@ -201,11 +201,7 @@ export function answerRefreshTokenExpired(route: Route): Promise<void> {
   return fulfillJson<ErrorResponse>(
     route,
     401,
-    errorBody({
-      msgId: 'refreshTokenExpired',
-      data: 'refreshTokenExpired',
-      text: 'Refresh token expired.',
-    }),
+    errorBody({ status: 401, code: 'refreshTokenExpired', detail: 'Refresh token expired.' }),
   );
 }
 

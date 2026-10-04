@@ -232,13 +232,13 @@ export class OsPanelBackend implements PanelBackend {
         requestBody: { ...form, type: repoType as GeneratedRepoType },
       }),
     );
-    return unwrap(res.data, 'createRepo');
+    return unwrap(res, 'createRepo');
   }
 
-  /** `GET /api/repos/{repoName}/format`: the repository's type, in the API's canonical upper case. */
+  /** `GET /api/repos/{repoName}`: the repository's type, in the API's canonical upper case. */
   async getRepoFormat(repoName: string): Promise<RepoType> {
-    const res = await this.call((c) => c.protocolRepoController.getRepoFormat({ repoName }));
-    return unwrap(res.data, 'getRepoFormat');
+    const res = await this.call((c) => c.protocolRepoController.getRepo({ repoName }));
+    return unwrap(res.type, 'getRepo');
   }
 
   /**
@@ -259,7 +259,7 @@ export class OsPanelBackend implements PanelBackend {
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    return { status: res.status, body: (await res.json()) as { data?: unknown } };
+    return { status: res.status, body: (await res.json().catch(() => ({}))) as { data?: unknown } };
   }
 
   /** `GET /api/security/supported-repo-types`: the repo types that have a scanner (empty while it is off), sorted. */
@@ -332,7 +332,7 @@ export class OsPanelBackend implements PanelBackend {
     const res = await this.call((c) =>
       c.repoCollectionController.listRepos(params as GeneratedRepoListParams),
     );
-    return unwrap(res.data, 'listRepos');
+    return unwrap(res, 'listRepos');
   }
 
   /**
@@ -358,12 +358,12 @@ export class OsPanelBackend implements PanelBackend {
   /** `GET /api/repos/counts`: how many repositories there are of each type (every type is a key). */
   async repoCounts(): Promise<Record<string, number>> {
     const res = await this.call((c) => c.repoCollectionController.getRepoCounts());
-    return unwrap(res.data, 'repoCounts');
+    return unwrap(res, 'repoCounts');
   }
 
   async getSettings(repoName: string): Promise<RepoSettingsInfo> {
     const res = await this.call((c) => c.protocolRepoController.getRepoSettings({ repoName }));
-    return unwrap(res.data, 'getRepoSettings');
+    return unwrap(res, 'getRepoSettings');
   }
 
   async updateSettings(repoName: string, form: RepoSettingsForm): Promise<void> {

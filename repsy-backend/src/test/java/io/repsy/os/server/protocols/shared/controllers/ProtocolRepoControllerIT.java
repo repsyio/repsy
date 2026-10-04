@@ -15,6 +15,9 @@
  */
 package io.repsy.os.server.protocols.shared.controllers;
 
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectBare;
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectCreated;
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectNoContent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -191,6 +194,14 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     return JsonPath.read(body, "$.data");
   }
 
+  private static Map<String, Object> bareObject(final String body) {
+    return JsonPath.read(body, "$");
+  }
+
+  private static List<Map<String, Object>> bareList(final String body) {
+    return JsonPath.read(body, "$");
+  }
+
   private static List<Map<String, Object>> dataList(final String body) {
     return JsonPath.read(body, "$.data");
   }
@@ -293,24 +304,15 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
             Kind.REPO_MANAGE,
             t -> get("/api/repos/" + t.repoName() + "/usage")),
         new Endpoint(
-            "PATCH /api/repos/{repoName}/name",
+            "PATCH /api/repos/{repoName}",
             Kind.REPO_MANAGE,
-            t ->
-                json(
-                    patch("/api/repos/" + t.repoName() + "/name"),
-                    nameBody("probe-" + randomTag()))),
-        new Endpoint(
-            "PATCH /api/repos/{repoName}/description",
-            Kind.REPO_MANAGE,
-            t -> json(patch("/api/repos/" + t.repoName() + "/description"), descriptionBody("x"))),
+            t -> json(patch("/api/repos/" + t.repoName()), nameBody("probe-" + randomTag()))),
         new Endpoint(
             "PUT /api/repos/{repoName}/settings",
             Kind.REPO_MANAGE,
             t -> json(put("/api/repos/" + t.repoName() + "/settings"), "{}")),
         new Endpoint(
-            "GET /api/repos/{repoName}/format",
-            Kind.REPO_READ,
-            t -> get("/api/repos/" + t.repoName() + "/format")));
+            "GET /api/repos/{repoName}", Kind.REPO_READ, t -> get("/api/repos/" + t.repoName())));
   }
 
   private static Stream<Endpoint> endpoints() {
@@ -507,11 +509,9 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var username = uniqueUsername("basic");
       ProtocolRepoControllerIT.this.createUser(username, UserRole.ADMIN);
 
-      expectSuccess(
+      expectBare(
           ProtocolRepoControllerIT.this.perform(
-              get(this.basicUrl()).header(AUTHORIZATION, basicAuth(username, VALID_PASSWORD))),
-          "settingsFetched",
-          "Settings fetched.");
+              get(this.basicUrl()).header(AUTHORIZATION, basicAuth(username, VALID_PASSWORD))));
     }
 
     @Test
@@ -579,15 +579,11 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               type, uniqueRepoName(type.name().toLowerCase(Locale.ROOT)));
       assertThat(storageDirOf(repo)).isDirectory();
 
-      final var body =
-          expectSuccess(
-              ProtocolRepoControllerIT.this.perform(
-                  delete(repoUrl(repo, ""))
-                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-              "repoDeleted",
-              "Repo deleted.");
+      expectNoContent(
+          ProtocolRepoControllerIT.this.perform(
+              delete(repoUrl(repo, ""))
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
 
-      assertThat(JsonPath.<Object>read(body, "$.data")).isNull();
       assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(repo.getName())).isEmpty();
       assertThat(ProtocolRepoControllerIT.this.repoRepository.findById(repo.getId())).isEmpty();
       assertThat(storageDirOf(repo)).doesNotExist();
@@ -603,12 +599,10 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       writeFile(repo, "com/acme/lib/maven-metadata.xml", "<metadata/>");
       writeFile(repo, "root.txt", "root");
 
-      expectSuccess(
+      expectNoContent(
           ProtocolRepoControllerIT.this.perform(
               delete(repoUrl(repo, ""))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "repoDeleted",
-          "Repo deleted.");
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
 
       assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(repo.getName())).isEmpty();
       assertThat(storageDirOf(repo)).doesNotExist();
@@ -622,12 +616,10 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var repo =
           ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("priv"), true, "d");
 
-      expectSuccess(
+      expectNoContent(
           ProtocolRepoControllerIT.this.perform(
               delete(repoUrl(repo, ""))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "repoDeleted",
-          "Repo deleted.");
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
 
       assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(repo.getName())).isEmpty();
     }
@@ -638,12 +630,10 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var victim = ProtocolRepoControllerIT.this.seedMaven();
       final var bystander = ProtocolRepoControllerIT.this.seedMaven();
 
-      expectSuccess(
+      expectNoContent(
           ProtocolRepoControllerIT.this.perform(
               delete(repoUrl(victim, ""))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "repoDeleted",
-          "Repo deleted.");
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
 
       assertThat(ProtocolRepoControllerIT.this.reloadRepo(bystander.getName()))
           .isEqualTo(bystander);
@@ -656,11 +646,9 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
       final var token = ProtocolRepoControllerIT.this.adminBearerToken();
 
-      expectSuccess(
+      expectNoContent(
           ProtocolRepoControllerIT.this.perform(
-              delete(repoUrl(repo, "")).header(AUTHORIZATION, token)),
-          "repoDeleted",
-          "Repo deleted.");
+              delete(repoUrl(repo, "")).header(AUTHORIZATION, token)));
 
       expectRepoNotFound(
           ProtocolRepoControllerIT.this.perform(
@@ -681,12 +669,10 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     void nameIsReusable() throws Exception {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
 
-      expectSuccess(
+      expectNoContent(
           ProtocolRepoControllerIT.this.perform(
               delete(repoUrl(repo, ""))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "repoDeleted",
-          "Repo deleted.");
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
 
       final var recreated = ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, repo.getName());
       assertThat(recreated.getId()).isNotEqualTo(repo.getId());
@@ -795,11 +781,9 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var token = ProtocolRepoControllerIT.this.bearerTokenFor(creator);
       final var name = uniqueRepoName("mine");
 
-      expectSuccess(
+      expectCreated(
           ProtocolRepoControllerIT.this.perform(
-              json(post("/api/repos"), createBody(name)).header(AUTHORIZATION, token)),
-          "repoCreated",
-          "Repo created.");
+              json(post("/api/repos"), createBody(name)).header(AUTHORIZATION, token)));
 
       final var body =
           expectSuccess(
@@ -816,12 +800,9 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     void emptyDescriptionIsKept() throws Exception {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
       final var token = ProtocolRepoControllerIT.this.adminBearerToken();
-      expectSuccess(
+      expectBare(
           ProtocolRepoControllerIT.this.perform(
-              json(patch(repoUrl(repo, "/description")), descriptionBody(""))
-                  .header(AUTHORIZATION, token)),
-          "repoDescriptionEdited",
-          "Repo description updated.");
+              json(patch(repoUrl(repo, "")), descriptionBody("")).header(AUTHORIZATION, token)));
 
       final var body =
           expectSuccess(
@@ -851,13 +832,11 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     private String contents(final Repo repo, final String path) throws Exception {
-      return expectSuccess(
+      return expectBare(
           ProtocolRepoControllerIT.this.perform(
               get(repoUrl(repo, "/contents"))
                   .param("path", path)
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())),
-          "itemsFetched",
-          "Items fetched.");
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));
     }
 
     private static void assertItem(
@@ -883,7 +862,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     void listsRoot(final String path) throws Exception {
       final var repo = this.repoWithContent();
 
-      final var items = dataList(this.contents(repo, path));
+      final var items = bareList(this.contents(repo, path));
 
       assertThat(items).hasSize(2);
       assertItem(items.get(0), "com/", true, null, true);
@@ -895,18 +874,18 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     void listsNestedFolders() throws Exception {
       final var repo = this.repoWithContent();
 
-      final var com = dataList(this.contents(repo, "com"));
+      final var com = bareList(this.contents(repo, "com"));
       assertThat(com).hasSize(2);
       assertItem(com.get(0), "../", true, null, false);
       assertItem(com.get(1), "acme/", true, null, true);
 
-      final var lib = dataList(this.contents(repo, "/com/acme/lib"));
+      final var lib = bareList(this.contents(repo, "/com/acme/lib"));
       assertThat(lib).hasSize(3);
       assertItem(lib.get(0), "../", true, null, false);
       assertItem(lib.get(1), "1.0/", true, null, true);
       assertItem(lib.get(2), "maven-metadata.xml", false, 11L, true);
 
-      final var version = dataList(this.contents(repo, "com/acme/lib/1.0"));
+      final var version = bareList(this.contents(repo, "com/acme/lib/1.0"));
       assertThat(version).hasSize(2);
       assertItem(version.get(0), "../", true, null, false);
       assertItem(version.get(1), "lib-1.0.jar", false, 9L, true);
@@ -917,7 +896,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     void emptyRepo() throws Exception {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
 
-      assertThat(dataList(this.contents(repo, "/"))).isEmpty();
+      assertThat(bareList(this.contents(repo, "/"))).isEmpty();
     }
 
     @Test
@@ -997,13 +976,11 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var repo = this.repoWithContent();
 
       final var body =
-          expectSuccess(
+          expectBare(
               ProtocolRepoControllerIT.this.perform(
-                  get(repoUrl(repo, "/contents")).param("path", "/")),
-              "itemsFetched",
-              "Items fetched.");
+                  get(repoUrl(repo, "/contents")).param("path", "/")));
 
-      assertThat(dataList(body)).hasSize(2);
+      assertThat(bareList(body)).hasSize(2);
     }
   }
 
@@ -1046,22 +1023,18 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
             RepoType.RUBY);
 
     private Map<String, Object> settingsOf(final Repo repo) throws Exception {
-      return dataObject(
-          expectSuccess(
+      return bareObject(
+          expectBare(
               ProtocolRepoControllerIT.this.perform(
                   get(repoUrl(repo, "/settings"))
-                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-              "settingsFetched",
-              "Settings fetched."));
+                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken()))));
     }
 
     private void updateSettings(final Repo repo, final String body) throws Exception {
-      expectSuccess(
+      expectNoContent(
           ProtocolRepoControllerIT.this.perform(
               json(put(repoUrl(repo, "/settings")), body)
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "settingsUpdated",
-          "Settings updated.");
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
     }
 
     @Test
@@ -1600,16 +1573,18 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   // ---------------------------------------------------------------------------------------------
 
   @Nested
-  @DisplayName("PATCH /api/repos/{repoName}/name")
+  @DisplayName("PATCH /api/repos/{repoName}: name")
   class Rename {
 
     private void rename(final Repo repo, final String newName) throws Exception {
-      expectSuccess(
-          ProtocolRepoControllerIT.this.perform(
-              json(patch(repoUrl(repo, "/name")), nameBody(newName))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "repoRenamed",
-          "Repo renamed.");
+      final var body =
+          expectBare(
+              ProtocolRepoControllerIT.this.perform(
+                  json(patch(repoUrl(repo, "")), nameBody(newName))
+                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
+
+      // The answer is the repository as it is after the update.
+      assertThat(bareObject(body)).containsEntry("name", newName);
     }
 
     @Test
@@ -1642,14 +1617,12 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
       this.rename(repo, newName);
 
-      expectSuccess(
+      expectBare(
           ProtocolRepoControllerIT.this.perform(
-              get("/api/repos/" + newName + "/format").header(AUTHORIZATION, token)),
-          "repoTypeFetched",
-          "Repo type fetched.");
+              get("/api/repos/" + newName).header(AUTHORIZATION, token)));
       expectRepoNotFound(
           ProtocolRepoControllerIT.this.perform(
-              get(repoUrl(repo, "/format")).header(AUTHORIZATION, token)));
+              get(repoUrl(repo, "")).header(AUTHORIZATION, token)));
     }
 
     @Test
@@ -1664,15 +1637,12 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 409 repoExists when renaming to the current name (pinned)")
+    @DisplayName("treats the current name as no rename, so a whole-form PATCH is not a 409")
     void sameName() throws Exception {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
       final var before = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
 
-      expectRepoExists(
-          ProtocolRepoControllerIT.this.perform(
-              json(patch(repoUrl(repo, "/name")), nameBody(repo.getName()))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
+      this.rename(repo, repo.getName());
 
       assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName())).isEqualTo(before);
     }
@@ -1689,11 +1659,28 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       for (final var taken : List.of(sameType.getName(), otherType.getName(), "maven", "npm")) {
         expectRepoExists(
             ProtocolRepoControllerIT.this.perform(
-                json(patch(repoUrl(repo, "/name")), nameBody(taken)).header(AUTHORIZATION, token)));
+                json(patch(repoUrl(repo, "")), nameBody(taken)).header(AUTHORIZATION, token)));
       }
 
       assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName()).getId())
           .isEqualTo(repo.getId());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"{}", "{\"name\":null}", "{\"description\":null}"})
+    @DisplayName("an empty body object or null fields change nothing and answer the repo")
+    void emptyUpdateChangesNothing(final String body) throws Exception {
+      final var repo = ProtocolRepoControllerIT.this.seedMaven();
+      final var before = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
+
+      final var answer =
+          expectBare(
+              ProtocolRepoControllerIT.this.perform(
+                  json(patch(repoUrl(repo, "")), body)
+                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
+
+      assertThat(bareObject(answer)).containsEntry("name", repo.getName());
+      assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName())).isEqualTo(before);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -1705,7 +1692,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
       expectValidationError(
           ProtocolRepoControllerIT.this.perform(
-              json(patch(repoUrl(repo, "/name")), body)
+              json(patch(repoUrl(repo, "")), body)
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
 
       assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName())).isEqualTo(before);
@@ -1713,8 +1700,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     static Stream<Arguments> invalidBodies() {
       return Stream.of(
-          Arguments.of("empty object", "{}"),
-          Arguments.of("null name", "{\"name\":null}"),
           Arguments.of("blank name", "{\"name\":\"\"}"),
           Arguments.of("26 characters", "{\"name\":\"" + "a".repeat(26) + "\"}"),
           Arguments.of("space", "{\"name\":\"a b\"}"),
@@ -1761,7 +1746,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProtocolRepoControllerIT.this.perform(
-              json(patch(repoUrl(repo, "/name")), nameBody(name))
+              json(patch(repoUrl(repo, "")), nameBody(name))
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
           HttpStatus.BAD_REQUEST,
           "repoNameReserved",
@@ -1776,7 +1761,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     void unknownRepo() throws Exception {
       expectRepoNotFound(
           ProtocolRepoControllerIT.this.perform(
-              json(patch("/api/repos/nope-" + randomTag() + "/name"), nameBody("whatever"))
+              json(patch("/api/repos/nope-" + randomTag()), nameBody("whatever"))
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
     }
   }
@@ -1786,16 +1771,14 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   // ---------------------------------------------------------------------------------------------
 
   @Nested
-  @DisplayName("PATCH /api/repos/{repoName}/description")
+  @DisplayName("PATCH /api/repos/{repoName}: description")
   class Description {
 
     private String describe(final Repo repo, final String body) throws Exception {
-      return expectSuccess(
+      return expectBare(
           ProtocolRepoControllerIT.this.perform(
-              json(patch(repoUrl(repo, "/description")), body)
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "repoDescriptionEdited",
-          "Repo description updated.");
+              json(patch(repoUrl(repo, "")), body)
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
     }
 
     @Test
@@ -1805,7 +1788,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
       final var body = this.describe(repo, descriptionBody("hello world"));
 
-      assertThat(JsonPath.<Object>read(body, "$.data")).isNull();
+      assertThat(bareObject(body)).containsEntry("description", "hello world");
       assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName()).getDescription())
           .isEqualTo("hello world");
       final var permissions =
@@ -1867,7 +1850,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
       expectValidationError(
           ProtocolRepoControllerIT.this.perform(
-              json(patch(repoUrl(repo, "/description")), descriptionBody("d".repeat(501)))
+              json(patch(repoUrl(repo, "")), descriptionBody("d".repeat(501)))
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
 
       assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName()).getDescription())
@@ -1876,7 +1859,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("invalidBodies")
-    @DisplayName("returns 400 validationError when the description is null, missing or unreadable")
+    @DisplayName("returns 400 validationError when the body is unreadable")
     void invalidBody(final String label, final String body) throws Exception {
       final var repo =
           ProtocolRepoControllerIT.this.seedRepo(
@@ -1884,7 +1867,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
       expectValidationError(
           ProtocolRepoControllerIT.this.perform(
-              json(patch(repoUrl(repo, "/description")), body)
+              json(patch(repoUrl(repo, "")), body)
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
 
       assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName()).getDescription())
@@ -1892,11 +1875,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     static Stream<Arguments> invalidBodies() {
-      return Stream.of(
-          Arguments.of("null description", "{\"description\":null}"),
-          Arguments.of("missing description", "{}"),
-          Arguments.of("malformed JSON", "{not json"),
-          Arguments.of("empty body", ""));
+      return Stream.of(Arguments.of("malformed JSON", "{not json"), Arguments.of("empty body", ""));
     }
 
     @Test
@@ -1904,7 +1883,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     void unknownRepo() throws Exception {
       expectRepoNotFound(
           ProtocolRepoControllerIT.this.perform(
-              json(patch("/api/repos/nope-" + randomTag() + "/description"), descriptionBody("x"))
+              json(patch("/api/repos/nope-" + randomTag()), descriptionBody("x"))
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
     }
   }
@@ -1914,40 +1893,38 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   // ---------------------------------------------------------------------------------------------
 
   @Nested
-  @DisplayName("GET /api/repos/{repoName}/format")
-  class Format {
+  @DisplayName("GET /api/repos/{repoName}")
+  class Detail {
 
     @ParameterizedTest(name = "{0}")
     @EnumSource(RepoType.class)
-    @DisplayName("returns the upper-case type name, the RepoType enum, for every RepoType")
+    @DisplayName("returns the repo with its upper-case type, the RepoType enum, for every RepoType")
     void upperCasedTypeName(final RepoType type) throws Exception {
       final var repo =
           ProtocolRepoControllerIT.this.seedRepo(
               type, uniqueRepoName(type.name().toLowerCase(Locale.ROOT)));
 
       final var body =
-          expectSuccess(
+          expectBare(
               ProtocolRepoControllerIT.this.perform(
-                  get(repoUrl(repo, "/format"))
-                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())),
-              "repoTypeFetched",
-              "Repo type fetched.");
+                  get(repoUrl(repo, ""))
+                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));
 
-      assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo(type.name());
+      assertThat(bareObject(body))
+          .containsEntry("name", repo.getName())
+          .containsEntry("type", type.name());
     }
 
     @Test
     @DisplayName("returns the same for the startup default repo, spelled 'GOLANG' for Go")
     void startupGoRepo() throws Exception {
       final var body =
-          expectSuccess(
+          expectBare(
               ProtocolRepoControllerIT.this.perform(
-                  get("/api/repos/go/format")
-                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())),
-              "repoTypeFetched",
-              "Repo type fetched.");
+                  get("/api/repos/go")
+                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));
 
-      assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo("GOLANG");
+      assertThat(bareObject(body)).containsEntry("type", "GOLANG");
     }
 
     @Test
@@ -1955,13 +1932,9 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     void anonymousPublic() throws Exception {
       final var repo = ProtocolRepoControllerIT.this.seedRepo(RepoType.HELM, uniqueRepoName("pub"));
 
-      final var body =
-          expectSuccess(
-              ProtocolRepoControllerIT.this.perform(get(repoUrl(repo, "/format"))),
-              "repoTypeFetched",
-              "Repo type fetched.");
+      final var body = expectBare(ProtocolRepoControllerIT.this.perform(get(repoUrl(repo, ""))));
 
-      assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo("HELM");
+      assertThat(bareObject(body)).containsEntry("type", "HELM");
     }
 
     @Test
@@ -1970,7 +1943,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var repo =
           ProtocolRepoControllerIT.this.seedRepo(RepoType.HELM, uniqueRepoName("priv"), true, null);
 
-      expectUnauthorized(ProtocolRepoControllerIT.this.perform(get(repoUrl(repo, "/format"))));
+      expectUnauthorized(ProtocolRepoControllerIT.this.perform(get(repoUrl(repo, ""))));
     }
 
     @Test
@@ -1978,7 +1951,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     void unknownRepo() throws Exception {
       expectRepoNotFound(
           ProtocolRepoControllerIT.this.perform(
-              get("/api/repos/nope-" + randomTag() + "/format")
+              get("/api/repos/nope-" + randomTag())
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));
     }
   }
@@ -1995,9 +1968,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       return Stream.of(
           Arguments.of("PUT /api/repos", "PUT", "/api/repos"),
           Arguments.of("DELETE /api/repos", "DELETE", "/api/repos"),
-          Arguments.of("GET /api/repos/{repoName}", "GET", "/api/repos/some-repo"),
           Arguments.of("PUT /api/repos/{repoName}", "PUT", "/api/repos/some-repo"),
-          Arguments.of("PATCH /api/repos/{repoName}", "PATCH", "/api/repos/some-repo"),
           Arguments.of("POST /api/repos/{repoName}", "POST", "/api/repos/some-repo"),
           // The per-type routes RPS-1268 removed: GET /api/repos/{repoType}/info and /count, and
           // POST /api/repos/{repoType}. Their replacements are GET /api/repos, GET
@@ -2009,9 +1980,17 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           Arguments.of("DELETE /api/repos/MAVEN/info", "DELETE", "/api/repos/MAVEN/info"),
           Arguments.of("POST /api/repos/MAVEN/info", "POST", "/api/repos/MAVEN/info"),
           Arguments.of("PUT /api/repos/MAVEN/count", "PUT", "/api/repos/MAVEN/count"),
+          Arguments.of(
+              "GET /api/repos/{repoName}/format (removed)", "GET", "/api/repos/some-repo/format"),
           Arguments.of("POST /api/repos/{repoName}/format", "POST", "/api/repos/some-repo/format"),
           Arguments.of(
               "DELETE /api/repos/{repoName}/format", "DELETE", "/api/repos/some-repo/format"),
+          Arguments.of(
+              "PATCH /api/repos/{repoName}/name (removed)", "PATCH", "/api/repos/some-repo/name"),
+          Arguments.of(
+              "PATCH /api/repos/{repoName}/description (removed)",
+              "PATCH",
+              "/api/repos/some-repo/description"),
           Arguments.of("PUT /api/repos/{repoName}/name", "PUT", "/api/repos/some-repo/name"),
           Arguments.of("POST /api/repos/{repoName}/name", "POST", "/api/repos/some-repo/name"),
           Arguments.of(
