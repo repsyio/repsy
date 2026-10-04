@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -117,13 +118,13 @@ class TokenRealmIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("PUT /api/profile/password rejects a protocol token and leaves the password")
+    @DisplayName("PATCH /api/profile/password rejects a protocol token and leaves the password")
     void rejectsProtocolTokenOnPasswordChange() throws Exception {
       final var user = createUser(uniqueUsername("pwd"), UserRole.USER);
       final var hash = user.getHash();
 
       perform(
-              put("/api/profile/password")
+              patch("/api/profile/password")
                   .header(AUTHORIZATION, protocolBearerTokenFor(user))
                   .contentType(MediaType.APPLICATION_JSON)
                   .content("{\"password\":\"NewPassword2@\"}"))

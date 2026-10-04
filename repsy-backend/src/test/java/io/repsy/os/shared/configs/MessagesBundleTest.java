@@ -54,7 +54,6 @@ class MessagesBundleTest {
         "userDeleted",
         "usersFetched",
         "passwordReset",
-        "profileFetched",
         "tokenRefreshed",
         "keyStoresFetched",
         // Helm

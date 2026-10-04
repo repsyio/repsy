@@ -2505,7 +2505,7 @@ being valid and a deploy with it must be refused at once:
 
 | Event                                                                      | Old credential | Replacement               |
 | -------------------------------------------------------------------------- | -------------- | ------------------------- |
-| `PUT /api/profile/password` as the user (`PanelBackend.changeOwnPassword`) | refused        | the new password deploys  |
+| `PATCH /api/profile/password` as the user (`PanelBackend.changeOwnPassword`) | refused        | the new password deploys  |
 | `DELETE /api/users/{id}` as admin                                          | refused        | none                      |
 | deploy token revoked                                                       | refused        | none                      |
 | deploy token rotated                                                       | refused        | the rotated token deploys |
@@ -2534,7 +2534,7 @@ A protocol JWT a user logged in with (Docker `/v2/token`, the token `npm login` 
 carries the user's `token_version` as its `tv` claim, and every request compares it with the user row it reads
 anyway. A password change (own or an admin's reset), a username change and an admin edit that renames move the
 version on, so the token ends at once instead of when it expires (30 minutes; npm 90 days). Before RPS-1552 a
-Docker token minted before `PUT /api/profile/password` still started a blob upload (202) until it expired.
+Docker token minted before `PATCH /api/profile/password` still started a blob upload (202) until it expired.
 `registerLoginTokenInvalidation` (same file) pins it per protocol with raw HTTP and the stored token, because a
 real docker client exchanges its Basic credentials again for every operation and never holds a stale one:
 

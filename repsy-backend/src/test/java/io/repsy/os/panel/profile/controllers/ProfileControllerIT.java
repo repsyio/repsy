@@ -21,11 +21,13 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.http.HttpHeaders.CACHE_CONTROL;
 import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -118,27 +120,23 @@ class ProfileControllerIT extends AbstractIntegrationTest {
               .mockMvc
               .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
               .andExpect(status().isOk())
-              .andExpect(jsonPath("$.*", hasSize(5)))
-              .andExpect(jsonPath("$.msgId").value("profileFetched"))
-              .andExpect(jsonPath("$.type").value("SUCCESS"))
-              .andExpect(jsonPath("$.errorCode").value(nullValue()))
-              .andExpect(jsonPath("$.text").value("Profile fetched."))
-              .andExpect(jsonPath("$.data.*", hasSize(6)))
-              .andExpect(jsonPath("$.data.id").value(user.getId().toString()))
-              .andExpect(jsonPath("$.data.username").value(user.getUsername()))
-              .andExpect(jsonPath("$.data.role").value("USER"))
+              .andExpect(jsonPath("$.*", hasSize(6)))
+              .andExpect(jsonPath("$.msgId").doesNotExist())
+              .andExpect(jsonPath("$.id").value(user.getId().toString()))
+              .andExpect(jsonPath("$.username").value(user.getUsername()))
+              .andExpect(jsonPath("$.role").value("USER"))
               // ProfileService.getProfile() never populates diskUsage, even though the OpenAPI
               // schema marks it required -- it always serializes as null. Real gap, asserted
               // deliberately.
-              .andExpect(jsonPath("$.data.diskUsage").value(nullValue()))
+              .andExpect(jsonPath("$.diskUsage").value(nullValue()))
               // Freshly created user has never logged in.
-              .andExpect(jsonPath("$.data.lastLoginAt").value(nullValue()))
-              .andExpect(jsonPath("$.data.createdAt").value(notNullValue()))
+              .andExpect(jsonPath("$.lastLoginAt").value(nullValue()))
+              .andExpect(jsonPath("$.createdAt").value(notNullValue()))
               .andReturn()
               .getResponse()
               .getContentAsString();
 
-      final String createdAt = JsonPath.read(body, "$.data.createdAt");
+      final String createdAt = JsonPath.read(body, "$.createdAt");
       assertThat(Instant.parse(createdAt))
           .isCloseTo(user.getCreatedAt(), within(2, ChronoUnit.SECONDS));
     }
@@ -158,12 +156,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
               .mockMvc
               .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
               .andExpect(status().isOk())
-              .andExpect(jsonPath("$.data.lastLoginAt").value(notNullValue()))
+              .andExpect(jsonPath("$.lastLoginAt").value(notNullValue()))
               .andReturn()
               .getResponse()
               .getContentAsString();
 
-      final String lastLoginAt = JsonPath.read(body, "$.data.lastLoginAt");
+      final String lastLoginAt = JsonPath.read(body, "$.lastLoginAt");
       assertThat(Instant.parse(lastLoginAt))
           .isCloseTo(refreshed.getLastLoginAt(), within(2, ChronoUnit.SECONDS));
     }
@@ -266,7 +264,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
   }
 
   @Nested
-  @DisplayName("PUT /api/profile/username")
+  @DisplayName("PATCH /api/profile/username")
   class UpdateUsername {
 
     private static String body(final String username) {
@@ -285,27 +283,24 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           ProfileControllerIT.this
               .mockMvc
               .perform(
-                  put("/api/profile/username")
+                  patch("/api/profile/username")
                       .with(apiPort())
                       .header(AUTHORIZATION, token)
                       .contentType(MediaType.APPLICATION_JSON)
                       .content(body(newUsername)))
               .andExpect(status().isOk())
-              .andExpect(jsonPath("$.*", hasSize(5)))
-              .andExpect(jsonPath("$.msgId").value("usernameUpdated"))
-              .andExpect(jsonPath("$.type").value("SUCCESS"))
-              .andExpect(jsonPath("$.errorCode").value(nullValue()))
-              .andExpect(jsonPath("$.text").value("Username successfully updated."))
-              .andExpect(jsonPath("$.data.*", hasSize(3)))
-              .andExpect(jsonPath("$.data.username").value(newUsername))
-              .andExpect(jsonPath("$.data.token").value(notNullValue()))
-              .andExpect(jsonPath("$.data.refreshToken").value(notNullValue()))
+              .andExpect(header().string(CACHE_CONTROL, "no-store"))
+              .andExpect(jsonPath("$.*", hasSize(3)))
+              .andExpect(jsonPath("$.msgId").doesNotExist())
+              .andExpect(jsonPath("$.username").value(newUsername))
+              .andExpect(jsonPath("$.token").value(notNullValue()))
+              .andExpect(jsonPath("$.refreshToken").value(notNullValue()))
               .andReturn()
               .getResponse()
               .getContentAsString();
 
-      final String accessToken = JsonPath.read(responseBody, "$.data.token");
-      final String refreshToken = JsonPath.read(responseBody, "$.data.refreshToken");
+      final String accessToken = JsonPath.read(responseBody, "$.token");
+      final String refreshToken = JsonPath.read(responseBody, "$.refreshToken");
 
       final var decodedAccess = JWT.decode(accessToken);
       assertThat(decodedAccess.getSubject()).isEqualTo(user.getId().toString());
@@ -338,7 +333,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           ProfileControllerIT.this
               .mockMvc
               .perform(
-                  put("/api/profile/username")
+                  patch("/api/profile/username")
                       .with(apiPort())
                       .header(AUTHORIZATION, token)
                       .contentType(MediaType.APPLICATION_JSON)
@@ -348,7 +343,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
               .getResponse()
               .getContentAsString();
 
-      final String refreshToken = JsonPath.read(responseBody, "$.data.refreshToken");
+      final String refreshToken = JsonPath.read(responseBody, "$.refreshToken");
       final var claims = ProfileControllerIT.this.jwtUtils.verifyRefreshToken(refreshToken);
       assertThat(claims.sessionStart()).isEqualTo(sessionStart);
       // The session has an hour left, so the regular 60-minute refresh token fits inside it.
@@ -367,7 +362,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           ProfileControllerIT.this
               .mockMvc
               .perform(
-                  put("/api/profile/username")
+                  patch("/api/profile/username")
                       .with(apiPort())
                       .header(AUTHORIZATION, token)
                       .contentType(MediaType.APPLICATION_JSON)
@@ -378,7 +373,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
               .getContentAsString();
 
       ProfileControllerIT.this.expectRefreshRejected(oldRefreshToken);
-      final String newRefreshToken = JsonPath.read(responseBody, "$.data.refreshToken");
+      final String newRefreshToken = JsonPath.read(responseBody, "$.refreshToken");
       ProfileControllerIT.this
           .mockMvc
           .perform(
@@ -398,7 +393,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/username")
+              patch("/api/profile/username")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   // "repsy" is seeded into reserved_username by V0001__Initial_Schema.sql.
@@ -423,7 +418,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/username")
+              patch("/api/profile/username")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body(username))),
@@ -450,7 +445,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/username")
+              patch("/api/profile/username")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body(other.getUsername()))),
@@ -471,7 +466,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/username")
+              patch("/api/profile/username")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body(user.getUsername()))),
@@ -489,7 +484,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/username")
+              patch("/api/profile/username")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("ab"))),
@@ -507,7 +502,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/username")
+              patch("/api/profile/username")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("a".repeat(26)))),
@@ -526,7 +521,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/username")
+              patch("/api/profile/username")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("Has-Upper-Case"))),
@@ -545,7 +540,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/username")
+              patch("/api/profile/username")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content("{not-json")),
@@ -560,7 +555,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     void missingAuthorizationHeader() throws Exception {
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/username")
+              patch("/api/profile/username")
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body(uniqueUsername("nobody")))),
           HttpStatus.UNAUTHORIZED,
@@ -578,7 +573,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/username")
+              patch("/api/profile/username")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body(uniqueUsername("newone")))),
@@ -595,7 +590,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/username")
+              patch("/api/profile/username")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body(uniqueUsername("newone")))),
@@ -607,7 +602,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
   }
 
   @Nested
-  @DisplayName("PUT /api/profile/password")
+  @DisplayName("PATCH /api/profile/password")
   class UpdatePassword {
 
     private static String body(final String password) {
@@ -624,7 +619,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       ProfileControllerIT.this
           .mockMvc
           .perform(
-              put("/api/profile/password")
+              patch("/api/profile/password")
                   .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
@@ -649,7 +644,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       ProfileControllerIT.this
           .mockMvc
           .perform(
-              put("/api/profile/password")
+              patch("/api/profile/password")
                   .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
@@ -660,7 +655,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/password")
+              patch("/api/profile/password")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("Attacker3Password@"))),
@@ -686,20 +681,18 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       ProfileControllerIT.this
           .mockMvc
           .perform(
-              put("/api/profile/password")
+              patch("/api/profile/password")
                   .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body(newPassword)))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("passwordChanged"))
-          .andExpect(jsonPath("$.type").value("SUCCESS"))
-          .andExpect(jsonPath("$.data.username").value(user.getUsername()))
-          .andExpect(jsonPath("$.data.token").value(notNullValue()))
-          .andExpect(jsonPath("$.data.refreshToken").value(notNullValue()))
-          .andExpect(jsonPath("$.errorCode").value(nullValue()))
-          .andExpect(jsonPath("$.text").value("Password changed."));
+          .andExpect(header().string(CACHE_CONTROL, "no-store"))
+          .andExpect(jsonPath("$.*", hasSize(3)))
+          .andExpect(jsonPath("$.msgId").doesNotExist())
+          .andExpect(jsonPath("$.username").value(user.getUsername()))
+          .andExpect(jsonPath("$.token").value(notNullValue()))
+          .andExpect(jsonPath("$.refreshToken").value(notNullValue()));
 
       final var persisted =
           ProfileControllerIT.this.userRepository.findById(user.getId()).orElseThrow();
@@ -719,7 +712,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           ProfileControllerIT.this
               .mockMvc
               .perform(
-                  put("/api/profile/password")
+                  patch("/api/profile/password")
                       .with(apiPort())
                       .header(AUTHORIZATION, token)
                       .contentType(MediaType.APPLICATION_JSON)
@@ -731,7 +724,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       ProfileControllerIT.this.expectRefreshRejected(oldRefreshToken);
 
-      final String currentRefreshToken = JsonPath.read(passwordChangeBody, "$.data.refreshToken");
+      final String currentRefreshToken = JsonPath.read(passwordChangeBody, "$.refreshToken");
       ProfileControllerIT.this
           .mockMvc
           .perform(
@@ -778,7 +771,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/password")
+              patch("/api/profile/password")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("Ab1"))),
@@ -796,7 +789,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/password")
+              patch("/api/profile/password")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("Aa1" + "x".repeat(48)))),
@@ -814,7 +807,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/password")
+              patch("/api/profile/password")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("lowercase1"))),
@@ -833,7 +826,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/password")
+              patch("/api/profile/password")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("NoDigitsHere"))),
@@ -851,7 +844,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/password")
+              patch("/api/profile/password")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("Has Space1"))),
@@ -866,7 +859,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     void missingAuthorizationHeader() throws Exception {
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/password")
+              patch("/api/profile/password")
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("NewPassword2@"))),
           HttpStatus.UNAUTHORIZED,
@@ -882,7 +875,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       expectError(
           ProfileControllerIT.this.perform(
-              put("/api/profile/password")
+              patch("/api/profile/password")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("NewPassword2@"))),
@@ -906,13 +899,8 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       ProfileControllerIT.this
           .mockMvc
           .perform(delete("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("profileDeleted"))
-          .andExpect(jsonPath("$.type").value("SUCCESS"))
-          .andExpect(jsonPath("$.data").value(nullValue()))
-          .andExpect(jsonPath("$.errorCode").value(nullValue()))
-          .andExpect(jsonPath("$.text").value("Profile account deleted."));
+          .andExpect(status().isNoContent())
+          .andExpect(content().string(""));
 
       assertThat(ProfileControllerIT.this.userRepository.findById(user.getId())).isEmpty();
     }
@@ -928,8 +916,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       ProfileControllerIT.this
           .mockMvc
           .perform(delete("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("profileDeleted"));
+          .andExpect(status().isNoContent());
 
       assertThat(ProfileControllerIT.this.userRepository.findById(secondAdmin.getId())).isEmpty();
     }

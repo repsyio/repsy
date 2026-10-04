@@ -42,6 +42,11 @@ paths:
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -51,6 +56,14 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Refresh access token using a refresh token
+      description: |-
+        A refresh token can be used once. A successful refresh marks the presented token as used
+        and returns a new pair whose refresh token belongs to the same token family. Presenting a
+        token that was already used (or whose family is revoked) again is a replay: it answers 401
+        `refreshTokenExpired` and revokes every refresh token of that family, so the newer token
+        of the same session stops working too. A password or username change also ends the older
+        refresh tokens of the user (401 `refreshTokenExpired`), and a refresh never extends the
+        session past its original end.
   "/api/auth/login":
     post:
       tags:
@@ -66,6 +79,11 @@ paths:
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -268,7 +286,7 @@ paths:
       summary: Reset a user's password
   # region: profile
   "/api/profile/username":
-    put:
+    patch:
       tags:
         - profile-controller
       operationId: updateUsername
@@ -280,18 +298,25 @@ paths:
         required: true
       responses:
         '200':
-          description: OK
+          description: >-
+            The new token pair: the change bumps the token version, so the tokens of the request
+            stop working and the caller continues with these.
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseLoginInfo"
+                "$ref": "#/components/schemas/LoginInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Update the current user's username
   "/api/profile/password":
-    put:
+    patch:
       tags:
         - profile-controller
       operationId: updatePassword
@@ -303,11 +328,18 @@ paths:
         required: true
       responses:
         '200':
-          description: OK
+          description: >-
+            The new token pair: the change bumps the token version, so the tokens of the request
+            stop working and the caller continues with these.
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseLoginInfo"
+                "$ref": "#/components/schemas/LoginInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -324,7 +356,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseProfileInfo"
+                "$ref": "#/components/schemas/ProfileInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Get the current user's profile
@@ -333,12 +365,8 @@ paths:
         - profile-controller
       operationId: deleteProfile
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Delete the current user's account
@@ -5156,20 +5184,6 @@ components:
         - diskUsage
         - createdAt
         - lastLoginAt
-    RestResponseProfileInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/ProfileInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: repos
     RepoSettingsForm:
       type: object

@@ -15,6 +15,8 @@
  */
 package io.repsy.os.panel.auth.controllers;
 
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectBare;
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectNoContent;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -105,11 +107,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
   private static final Map<String, String> SUCCESS_TEXTS =
       Map.ofEntries(
           Map.entry("loginSucceeded", "Log In succeeded."),
-          Map.entry("passwordChanged", "Password changed."),
           Map.entry("passwordReset", "Password reset."),
-          Map.entry("usernameUpdated", "Username successfully updated."),
-          Map.entry("profileDeleted", "Profile account deleted."),
-          Map.entry("profileFetched", "Profile fetched."),
           Map.entry("loggedOut", "Logged out."),
           Map.entry("tokenRefreshed", "Token refreshed."),
           Map.entry("userCreated", "User created."),
@@ -393,15 +391,12 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final String accessToken = JsonPath.read(loginBody, "$.data.token");
 
       final var profileBody =
-          expectSuccess(
+          expectBare(
               AuthControllerIT.this.perform(
-                  get("/api/profile").header(AUTHORIZATION, AuthUtils.AUTH_BEARER + accessToken)),
-              "profileFetched");
+                  get("/api/profile").header(AUTHORIZATION, AuthUtils.AUTH_BEARER + accessToken)));
 
-      assertThat((String) JsonPath.read(profileBody, "$.data.id"))
-          .isEqualTo(user.getId().toString());
-      assertThat((String) JsonPath.read(profileBody, "$.data.username"))
-          .isEqualTo(user.getUsername());
+      assertThat((String) JsonPath.read(profileBody, "$.id")).isEqualTo(user.getId().toString());
+      assertThat((String) JsonPath.read(profileBody, "$.username")).isEqualTo(user.getUsername());
     }
 
     @Test
@@ -697,19 +692,18 @@ class AuthControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("after PUT /api/profile/password only the new password logs in")
+    @DisplayName("after PATCH /api/profile/password only the new password logs in")
     void passwordChangeReplacesTheOldPassword() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("changepw"), UserRole.USER);
       expectSuccess(
           AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
 
-      expectSuccess(
+      expectBare(
           AuthControllerIT.this.perform(
-              put("/api/profile/password")
+              patch("/api/profile/password")
                   .header(AUTHORIZATION, AuthControllerIT.this.bearerTokenFor(user))
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content("{\"password\":\"%s\"}".formatted(OTHER_VALID_PASSWORD))),
-          "passwordChanged");
+                  .content("{\"password\":\"%s\"}".formatted(OTHER_VALID_PASSWORD))));
       AuthControllerIT.this.entityManager.flush();
 
       expectError(
@@ -728,18 +722,17 @@ class AuthControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("after PUT /api/profile/username the old username is unknown, the new one works")
+    @DisplayName("after PATCH /api/profile/username the old username is unknown, the new one works")
     void usernameChangeMovesTheLogin() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("rename"), UserRole.USER);
       final var oldUsername = user.getUsername();
       final var newUsername = uniqueUsername("renamed");
-      expectSuccess(
+      expectBare(
           AuthControllerIT.this.perform(
-              put("/api/profile/username")
+              patch("/api/profile/username")
                   .header(AUTHORIZATION, AuthControllerIT.this.bearerTokenFor(user))
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content("{\"username\":\"%s\"}".formatted(newUsername))),
-          "usernameUpdated");
+                  .content("{\"username\":\"%s\"}".formatted(newUsername))));
       AuthControllerIT.this.entityManager.flush();
 
       expectInvalidCredentials(AuthControllerIT.this.login(oldUsername, VALID_PASSWORD));
@@ -771,11 +764,10 @@ class AuthControllerIT extends AbstractIntegrationTest {
     void deletedOwnProfileCannotLogIn() throws Exception {
       // The seeded admin keeps the "last admin" guard out of the way; this is a plain USER anyway.
       final var user = AuthControllerIT.this.createUser(uniqueUsername("delself"), UserRole.USER);
-      expectSuccess(
+      expectNoContent(
           AuthControllerIT.this.perform(
               delete("/api/profile")
-                  .header(AUTHORIZATION, AuthControllerIT.this.bearerTokenFor(user))),
-          "profileDeleted");
+                  .header(AUTHORIZATION, AuthControllerIT.this.bearerTokenFor(user))));
       AuthControllerIT.this.entityManager.flush();
 
       expectInvalidCredentials(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
@@ -807,10 +799,9 @@ class AuthControllerIT extends AbstractIntegrationTest {
       AuthControllerIT.this.assertLoginInfo(body, user.getId(), user.getUsername(), before, after);
       // The refreshed tokens work on an authenticated endpoint.
       final String newAccessToken = JsonPath.read(body, "$.data.token");
-      expectSuccess(
+      expectBare(
           AuthControllerIT.this.perform(
-              get("/api/profile").header(AUTHORIZATION, AuthUtils.AUTH_BEARER + newAccessToken)),
-          "profileFetched");
+              get("/api/profile").header(AUTHORIZATION, AuthUtils.AUTH_BEARER + newAccessToken)));
     }
 
     @Test
@@ -1527,14 +1518,13 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var userId = UserDeletion.this.committedUserWithSessions();
 
       try {
-        expectSuccess(
+        expectNoContent(
             AuthControllerIT.this.perform(
                 delete("/api/profile")
                     .header(
                         AUTHORIZATION,
                         AuthControllerIT.this.bearerTokenFor(
-                            AuthControllerIT.this.userRepository.findById(userId).orElseThrow()))),
-            "profileDeleted");
+                            AuthControllerIT.this.userRepository.findById(userId).orElseThrow()))));
 
         assertThat(UserDeletion.this.refreshTokenRows(userId)).isZero();
       } finally {

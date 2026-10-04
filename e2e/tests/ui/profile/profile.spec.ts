@@ -348,7 +348,7 @@ test.describe(
     }
 
     test('a refused password change', CREDENTIALS, async ({ userPage, seededUser, seeder }) => {
-      await refuse(userPage, /\/api\/profile\/password$/, 'PUT');
+      await refuse(userPage, /\/api\/profile\/password$/, 'PATCH');
       const profile = new ProfilePage(userPage);
       await profile.goto();
 
@@ -361,7 +361,7 @@ test.describe(
     });
 
     test('a refused username change', CREDENTIALS, async ({ userPage, seededUser, seeder }) => {
-      await refuse(userPage, /\/api\/profile\/username$/, 'PUT');
+      await refuse(userPage, /\/api\/profile\/username$/, 'PATCH');
       const profile = new ProfilePage(userPage);
       await profile.goto();
 
