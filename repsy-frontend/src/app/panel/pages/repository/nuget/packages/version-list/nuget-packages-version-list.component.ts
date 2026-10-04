@@ -23,7 +23,6 @@ import { Subscription } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
 import {
-  NuGetDeletedItem,
   NuGetPackageInfo,
   NuGetVersionListItem,
   RepoPermissionInfo,
@@ -151,9 +150,9 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
         ? this.nugetService.deletePackage(this.packageId)
         : this.nugetService.deletePackageVersion(this.packageId, version.version);
       action
-        .then((deletedItem) => {
+        .then(() => {
           this.toastService.show('Version deleted successfully', 'success');
-          if (isLastVersion || deletedItem === NuGetDeletedItem.Package) {
+          if (isLastVersion) {
             this.router.navigate(['..'], { relativeTo: this.route });
           } else {
             this.pageNum = pageAfterDelete(this.versions.length, this.pageNum);

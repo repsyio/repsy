@@ -116,7 +116,7 @@ describe('NugetService', () => {
       await selectRepo(service, repoApi.getRepoPermissions, REPO);
       asSpy(repoApi.updateRepo).and.returnValue(of(restResponse(undefined)));
       await service.updateRepositoryName(form);
-      asSpy(nugetApi.getNugetPackage).and.returnValue(of(restResponse(null)));
+      asSpy(nugetApi.getNugetPackage).and.returnValue(of(null));
 
       await service.fetchPackage(PACKAGE);
 
@@ -152,12 +152,14 @@ describe('NugetService', () => {
         invoke: (s, query) => from(s.fetchRepositoryPackages(query, SORT, PAGE_INDEX, PAGE_SIZE)),
         api: () => nugetApi.searchNugetPackages,
         args: (query) => ['', query, ...PAGE_ARGS],
+        bare: true,
       },
       {
         name: 'fetchPackageVersions',
         invoke: (s, query) => from(s.fetchPackageVersions(PACKAGE, query, SORT, PAGE_INDEX, PAGE_SIZE)),
         api: () => nugetApi.listNugetVersions,
         args: (query) => [PACKAGE, '', query, ...PAGE_ARGS],
+        bare: true,
       },
     ];
     describePagedCalls(() => service, paged);
@@ -170,7 +172,7 @@ describe('NugetService', () => {
         invoke: (s) => from(s.fetchPackage(PACKAGE)),
         api: () => nugetApi.getNugetPackage,
         args: [PACKAGE, ''],
-        response: restResponse(info),
+        response: info,
         expected: info,
       },
       {
@@ -178,7 +180,7 @@ describe('NugetService', () => {
         invoke: (s) => from(s.fetchPackageVersion(PACKAGE, VERSION)),
         api: () => nugetApi.getNugetVersion,
         args: [PACKAGE, VERSION, ''],
-        response: restResponse(versionInfo),
+        response: versionInfo,
         expected: versionInfo,
       },
       {
@@ -186,8 +188,8 @@ describe('NugetService', () => {
         invoke: (s) => from(s.deletePackage(PACKAGE)),
         api: () => nugetApi.deleteNugetPackage,
         args: [PACKAGE, ''],
-        response: restResponse('PACKAGE'),
-        expected: 'PACKAGE',
+        response: undefined,
+        expected: undefined,
         notCalled: () => [nugetApi.deleteNugetVersion],
       },
       {
@@ -195,8 +197,8 @@ describe('NugetService', () => {
         invoke: (s) => from(s.deletePackageVersion(PACKAGE, VERSION)),
         api: () => nugetApi.deleteNugetVersion,
         args: [PACKAGE, VERSION, ''],
-        response: restResponse('VERSION'),
-        expected: 'VERSION',
+        response: undefined,
+        expected: undefined,
         notCalled: () => [nugetApi.deleteNugetPackage],
       },
     ];

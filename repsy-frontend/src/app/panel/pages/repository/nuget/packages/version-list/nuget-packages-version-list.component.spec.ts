@@ -19,12 +19,7 @@ import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import moment from 'moment';
 import { BehaviorSubject, of } from 'rxjs';
 
-import {
-  NuGetDeletedItem,
-  NuGetPackageInfo,
-  NuGetVersionListItem,
-  RepoPermissionInfo,
-} from '../../../../../../../generated/api';
+import { NuGetPackageInfo, NuGetVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
@@ -144,25 +139,9 @@ describe('NugetPackagesVersionListComponent', () => {
       navigate: router.navigate,
       navigateArgs: [['..'], { relativeTo: route }],
       answer: {
-        ok: () => Promise.resolve(NuGetDeletedItem.Version),
+        ok: () => Promise.resolve(),
         fail: () => Promise.reject(new HttpErrorResponse({ status: 409 })),
       },
-    }));
-
-    it('also leaves the listing when the server reports that it deleted the whole package', fakeAsync(() => {
-      build().respond([{}, {}], 1);
-      repoChanges.next(permission(REPO_NAME));
-      flushMicrotasks();
-      nugetService.fetchPackageVersions.calls.reset();
-      nugetService.deletePackageVersion.and.resolveTo(NuGetDeletedItem.Package);
-      router.navigate.and.resolveTo(true);
-
-      component.deleteVersion(VERSION);
-      dangerModalService.call();
-      flushMicrotasks();
-
-      expect(router.navigate).toHaveBeenCalledOnceWith(['..'], { relativeTo: route });
-      expect(nugetService.fetchPackageVersions).not.toHaveBeenCalled();
     }));
   });
 
@@ -173,7 +152,7 @@ describe('NugetPackagesVersionListComponent', () => {
       remove: nugetService.deletePackageVersion,
       invoke: () => component.deleteVersion(VERSION),
       navigate: router.navigate,
-      answer: () => Promise.resolve(NuGetDeletedItem.Version),
+      answer: () => Promise.resolve(),
     }));
   });
 

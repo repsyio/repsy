@@ -4003,7 +4003,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelNuGetPackageListItem"
+                "$ref": "#/components/schemas/PagedModelNuGetPackageListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -4040,7 +4040,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseNuGetPackageInfo"
+                "$ref": "#/components/schemas/NuGetPackageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -4059,12 +4059,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseNuGetDeletedItem"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -4114,7 +4110,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelNuGetVersionListItem"
+                "$ref": "#/components/schemas/PagedModelNuGetVersionListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -4131,7 +4127,7 @@ paths:
         schema:
           type: string
 
-  "/api/nuget/packages/{repoName}/{packageName}/{version}":
+  "/api/nuget/packages/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
         - nuget-package-controller
@@ -4156,7 +4152,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseNuGetVersionInfo"
+                "$ref": "#/components/schemas/NuGetVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -4180,12 +4176,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseNuGetDeletedItem"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -7123,48 +7115,6 @@ components:
       enum:
         - PACKAGE
         - VERSION
-    RestResponseNuGetDeletedItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/NuGetDeletedItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseNuGetPackageInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/NuGetPackageInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseNuGetVersionInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/NuGetVersionInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelNuGetPackageListItem:
       type: object
       properties:
@@ -7174,20 +7124,6 @@ components:
             "$ref": "#/components/schemas/NuGetPackageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelNuGetPackageListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelNuGetPackageListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelNuGetVersionListItem:
       type: object
       properties:
@@ -7197,20 +7133,6 @@ components:
             "$ref": "#/components/schemas/NuGetVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelNuGetVersionListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelNuGetVersionListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: pypi
     PypiPackageListItem:
       type: object

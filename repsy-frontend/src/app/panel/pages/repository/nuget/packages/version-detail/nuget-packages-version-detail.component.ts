@@ -22,7 +22,6 @@ import { Subscription } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
 import {
-  NuGetDeletedItem,
   NuGetDependencyInfo,
   NuGetVersionInfo,
   RepoPermissionInfo,
@@ -34,9 +33,17 @@ import { MarkdownComponent } from '../../../../../shared/components/markdown/mar
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { landAfterVersionDelete } from '../../../../../shared/util/version-delete-landing.util';
+import { Sort } from '../../../../../shared/dto/sort';
+import {
+  isLastVersion,
+  landAfterVersionDelete,
+  VERSION_PROBE_SIZE,
+} from '../../../../../shared/util/version-delete-landing.util';
 import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
 import { NugetService } from '../../service/nuget.service';
+
+/** The sort of the probe above: any valid one will do, the probe only counts. */
+const PROBE_SORT: Sort = { name: 'Newest', column: 'publishedAt', type: 'DESC' };
 
 @Component({
   selector: 'app-nuget-packages-version-detail',
@@ -127,16 +134,15 @@ export class NugetPackagesVersionDetailComponent implements OnDestroy {
   public deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
+      // Deleting the last version removes the package, so its versions page would answer 404: the page
+      // to land on is decided from the versions the package has right before the delete.
       this.nugetService
-        .deletePackageVersion(this.packageId, this.versionName)
-        .then((deletedItem) => {
-          landAfterVersionDelete(
-            this.router,
-            this.route,
-            this.toastService,
-            this.activeRepo.repoName,
-            deletedItem === NuGetDeletedItem.Package,
-          );
+        .fetchPackageVersions(this.packageId, '', PROBE_SORT, 0, VERSION_PROBE_SIZE)
+        .then((probe) =>
+          this.nugetService.deletePackageVersion(this.packageId, this.versionName).then(() => isLastVersion(probe)),
+        )
+        .then((wasLastVersion) => {
+          landAfterVersionDelete(this.router, this.route, this.toastService, this.activeRepo.repoName, wasLastVersion);
         })
         // The error interceptor has already shown the failure to the user.
         .catch(() => undefined)
