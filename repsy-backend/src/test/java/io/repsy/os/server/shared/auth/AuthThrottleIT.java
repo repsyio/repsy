@@ -174,14 +174,32 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     return response.getContentAsString(StandardCharsets.UTF_8);
   }
 
-  /** The body without its {@code errorCode}, which is a fresh id for every error. */
-  private static String bodyWithoutErrorCode(final MockHttpServletResponse response)
+  /** The body without its {@code traceId}, which is a fresh id for every error. */
+  private static String bodyWithoutTraceId(final MockHttpServletResponse response)
       throws Exception {
-    return body(response).replaceAll("\"errorCode\":\"[^\"]*\"", "");
+    return body(response).replaceAll("\"traceId\":\"[^\"]*\"", "");
   }
 
   /** The panel answer to a client that is over the limit. */
   private static void expectThrottled(final MockHttpServletResponse response) throws Exception {
+    final var body = body(response);
+
+    assertThat(response.getStatus()).as(body).isEqualTo(429);
+    assertThat(Long.parseLong(response.getHeader(RETRY_AFTER))).isBetween(1L, 60L);
+    assertThat(response.getHeader(WWW_AUTHENTICATE)).isNull();
+    final Map<String, Object> problem = JsonPath.read(body, "$");
+    assertThat(problem)
+        .containsEntry("status", 429)
+        .containsEntry("code", "tooManyRequests")
+        .containsEntry("detail", TOO_MANY_TEXT)
+        .containsEntry("title", "Too Many Requests")
+        .doesNotContainKeys("msgId", "errorCode", "text", "data");
+    assertThat((String) problem.get("traceId")).matches(UUID_PATTERN);
+  }
+
+  /** A protocol route answers a client over the limit in its own, unchanged, ERROR envelope. */
+  private static void expectThrottledProtocol(final MockHttpServletResponse response)
+      throws Exception {
     final var body = body(response);
 
     assertThat(response.getStatus()).as(body).isEqualTo(429);
@@ -283,7 +301,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
 
     for (final var response : responses) {
       expectThrottled(response);
-      assertThat(bodyWithoutErrorCode(response)).isEqualTo(bodyWithoutErrorCode(unknownUser));
+      assertThat(bodyWithoutTraceId(response)).isEqualTo(bodyWithoutTraceId(unknownUser));
       assertThat(response.getHeader(RETRY_AFTER)).isEqualTo(unknownUser.getHeader(RETRY_AFTER));
       assertThat(response.getHeaderNames()).isEqualTo(unknownUser.getHeaderNames());
     }
@@ -409,13 +427,13 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     }
 
     final var refused = this.protocolBasic(repo, this.username, "wrong");
-    expectThrottled(refused);
+    expectThrottledProtocol(refused);
 
     // A deploy token is looked up before the user's password, costs no hash and never fails here.
     assertThat(this.protocolBasic(repo, deployToken.username(), deployToken.secret()).getStatus())
         .isEqualTo(404);
     // A client whose password is right is refused all the same, so it learns nothing.
-    expectThrottled(this.protocolBasic(repo, this.username, VALID_PASSWORD));
+    expectThrottledProtocol(this.protocolBasic(repo, this.username, VALID_PASSWORD));
   }
 
   @Test
@@ -465,7 +483,8 @@ class AuthThrottleIT extends AbstractIntegrationTest {
       final var user = i % 2 == 0 ? this.username : uniqueUsername("nobody");
       final var response = this.panelLogin(user, "Wrong1" + i);
       assertThat(response.getStatus()).isEqualTo(401);
-      assertThat(JsonPath.<String>read(body(response), "$.msgId")).isEqualTo("invalidCredentials");
+      final Map<String, Object> problem = JsonPath.read(body(response), "$");
+      assertThat(problem).containsEntry("code", "invalidCredentials");
     }
     clearInvocations(this.spiedUsers);
 
@@ -475,7 +494,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
 
     for (final var response : List.of(unknownUser, wrongPassword, rightPassword)) {
       expectThrottled(response);
-      assertThat(bodyWithoutErrorCode(response)).isEqualTo(bodyWithoutErrorCode(unknownUser));
+      assertThat(bodyWithoutTraceId(response)).isEqualTo(bodyWithoutTraceId(unknownUser));
     }
     verify(this.spiedUsers, never()).getUserByUsername(anyString());
   }
@@ -524,9 +543,9 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     }
 
     final var refused = this.npmBearer(repo, "Bearer " + revoked.secret());
-    expectThrottled(refused);
+    expectThrottledProtocol(refused);
     // The count is the client's, so a wrong Basic password on any route is refused as well.
-    expectThrottled(this.protocolBasic(this.seedDeployTokenRepo(), this.username, "wrong"));
+    expectThrottledProtocol(this.protocolBasic(this.seedDeployTokenRepo(), this.username, "wrong"));
   }
 
   @Test
@@ -541,7 +560,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
       assertThat(JsonPath.<String>read(body(response), "$.msgId")).isEqualTo("unAuthorized");
     }
 
-    expectThrottled(this.npmBearer(repo, "Bearer not.a.token"));
+    expectThrottledProtocol(this.npmBearer(repo, "Bearer not.a.token"));
   }
 
   @Test
@@ -554,7 +573,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     for (var i = 0; i < MAX_FAILURES; i++) {
       assertThat(this.npmBearer(repo, "Bearer not.a.token." + i).getStatus()).isEqualTo(401);
     }
-    expectThrottled(this.npmBearer(repo, "Bearer not.a.token"));
+    expectThrottledProtocol(this.npmBearer(repo, "Bearer not.a.token"));
 
     // Neither is a 401 or a 429: the package does not exist, which is what an authorized read of
     // an empty repo answers.

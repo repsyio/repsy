@@ -124,7 +124,7 @@ class RepoNameRaceIT extends AbstractIntegrationTest {
   private static String msgIdOf(final MvcResult result) throws Exception {
     final Map<String, Object> envelope =
         JsonPath.read(result.getResponse().getContentAsString(), "$");
-    return (String) envelope.get("msgId");
+    return (String) envelope.get("code");
   }
 
   @Test

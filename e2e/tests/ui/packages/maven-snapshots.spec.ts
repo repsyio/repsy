@@ -647,7 +647,7 @@ test.describe('Maven file browser states', { tag: '@packages' }, () => {
           fulfillJson<ErrorResponse>(
             route,
             status,
-            errorBody({ msgId: 'itemNotFound', text: 'Resource not found.' }),
+            errorBody({ status: 404, code: 'itemNotFound', detail: 'Resource not found.' }),
           ),
         );
         await openBrowser(adminPage, repo.name);

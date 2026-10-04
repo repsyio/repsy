@@ -25,7 +25,9 @@ import io.repsy.os.panel.auth.services.AuthUserService;
 import io.repsy.os.shared.auth.services.RefreshTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
+import io.repsy.os.shared.http.NoStore;
 import io.repsy.os.shared.utils.MultiPortNames;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -46,23 +48,30 @@ class AuthController {
   private final @NonNull RestResponseFactory resp;
 
   @PostMapping("/login")
-  public @NonNull RestResponse<LoginInfo> login(@RequestBody @Valid final @NonNull LoginForm form) {
+  public @NonNull RestResponse<LoginInfo> login(
+      @RequestBody @Valid final @NonNull LoginForm form,
+      final @NonNull HttpServletResponse response) {
 
     // The form only limits the characters; BCrypt reads bytes. No account has a longer password.
     PasswordHasher.requireFitsBcrypt(form.getPassword());
 
     final var loginInfo = this.authUserService.login(form);
 
+    NoStore.apply(response);
+
     return this.resp.success("loginSucceeded", loginInfo);
   }
 
   @PostMapping("/tokens/refresh")
   public @NonNull RestResponse<LoginInfo> refreshToken(
-      @RequestBody @Valid final @NonNull RefreshTokenForm form) {
+      @RequestBody @Valid final @NonNull RefreshTokenForm form,
+      final @NonNull HttpServletResponse response) {
 
     final var claims = this.jwtUtils.verifyRefreshToken(form.getRefreshToken());
 
     final var loginInfo = this.authUserService.refreshToken(claims);
+
+    NoStore.apply(response);
 
     return this.resp.success("tokenRefreshed", loginInfo);
   }

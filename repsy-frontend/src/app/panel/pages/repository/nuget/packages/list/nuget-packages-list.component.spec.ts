@@ -33,7 +33,7 @@ import { NugetPackagesListComponent } from './nuget-packages-list.component';
 const REPO = 'nuget-repo';
 
 function httpError(text: string, status = 400): HttpErrorResponse {
-  return new HttpErrorResponse({ status, error: { text } });
+  return new HttpErrorResponse({ status, error: { detail: text } });
 }
 const DEFAULT_SORT: Sort = { name: 'Name (A-Z)', column: 'packageId', type: 'ASC' };
 const SECURITY_SUMMARY: Record<string, VersionSecuritySummary> = {

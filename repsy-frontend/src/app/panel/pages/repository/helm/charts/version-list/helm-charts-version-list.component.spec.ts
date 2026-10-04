@@ -116,7 +116,7 @@ describe('HelmChartsVersionListComponent', () => {
 
     it('stops loading without a toast of its own when the versions cannot be loaded (the interceptor shows it)', fakeAsync(() => {
       helmService.getChartVersions.and.returnValue(
-        throwError(() => new HttpErrorResponse({ status: 404, error: { text: 'Chart not found.' } })),
+        throwError(() => new HttpErrorResponse({ status: 404, error: { detail: 'Chart not found.' } })),
       );
 
       selectRepo();

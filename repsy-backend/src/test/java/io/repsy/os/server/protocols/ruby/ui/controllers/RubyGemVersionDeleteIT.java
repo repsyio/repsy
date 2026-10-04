@@ -235,10 +235,18 @@ class RubyGemVersionDeleteIT extends AbstractIntegrationTest {
 
     this.deleteVersion("9.9.9")
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.msgId").value("gemVersionNotFound"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("gemVersionNotFound"));
     this.deleteVersion("1.0.0", "java")
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.msgId").value("gemVersionNotFound"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("gemVersionNotFound"));
 
     this.panelGet(VERSIONS_PATH, this.repo.getName(), GEM)
         .andExpect(jsonPath("$.data.content", hasSize(2)));

@@ -24,10 +24,12 @@ import io.repsy.os.generated.model.UserCreateForm;
 import io.repsy.os.generated.model.UserResponse;
 import io.repsy.os.generated.model.UserUpdateForm;
 import io.repsy.os.shared.auth.PanelAuthHelper;
+import io.repsy.os.shared.http.NoStore;
 import io.repsy.os.shared.user.services.ReservedUsernameService;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.os.shared.utils.SortValidator;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.Set;
 import java.util.UUID;
@@ -137,11 +139,14 @@ final class UserController {
   @PostMapping("/{userId}/actions/reset-password")
   public @NonNull RestResponse<String> resetPassword(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @PathVariable final @NonNull UUID userId) {
+      @PathVariable final @NonNull UUID userId,
+      final @NonNull HttpServletResponse response) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
     final var newPassword = this.userTxService.resetUserPassword(userId);
+
+    NoStore.apply(response);
 
     return this.resp.success("passwordReset", newPassword);
   }

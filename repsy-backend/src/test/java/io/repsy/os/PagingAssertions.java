@@ -56,7 +56,7 @@ public final class PagingAssertions {
   }
 
   /**
-   * Asserts the 400 {@code validationError} envelope that names the offending request parameter.
+   * Asserts the 400 {@code validationError} problem that names the offending request parameter.
    *
    * @param result Response to check
    * @param parameter Parameter the response has to name: {@code page}, {@code size} or {@code sort}
@@ -64,22 +64,23 @@ public final class PagingAssertions {
   public static void expectInvalidParameter(final ResultActions result, final String parameter)
       throws Exception {
 
-    final var body =
-        result
-            .andExpect(status().is(HttpStatus.BAD_REQUEST.value()))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
+    final var response =
+        result.andExpect(status().is(HttpStatus.BAD_REQUEST.value())).andReturn().getResponse();
+    final var body = response.getContentAsString();
 
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
+    assertThat(response.getContentType()).startsWith("application/problem+json");
 
-    assertThat(envelope)
-        .containsOnlyKeys("msgId", "type", "data", "errorCode", "text")
-        .containsEntry("msgId", "validationError")
-        .containsEntry("type", "ERROR")
-        .containsEntry("data", parameter)
-        .containsEntry("text", "Incoming data couldn't be validated.");
-    assertThat((String) envelope.get("errorCode")).matches(UUID_PATTERN);
+    final Map<String, Object> problem = JsonPath.read(body, "$");
+
+    assertThat(problem)
+        .containsEntry("status", 400)
+        .containsEntry("title", "Bad Request")
+        .containsEntry("code", "validationError")
+        .containsEntry("detail", "Incoming data couldn't be validated.")
+        .doesNotContainKeys("msgId", "errorCode", "text", "data");
+    assertThat((String) problem.get("traceId")).matches(UUID_PATTERN);
+    assertThat(JsonPath.<java.util.List<String>>read(body, "$.errors[*].field"))
+        .containsExactly(parameter);
   }
 
   /**

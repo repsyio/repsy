@@ -16,6 +16,7 @@
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
+import { problemDetail } from '../../../../../../shared/error-handler/problem.util';
 import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
@@ -154,7 +155,7 @@ export class NugetPackagesListComponent implements OnDestroy {
       })
       // The error interceptor has already toasted the failure; keep the message for the page.
       .catch((err: HttpErrorResponse) => {
-        this.error = err.error?.text ?? 'Error Occurred';
+        this.error = problemDetail(err) ?? 'Error Occurred';
       })
       .finally(() => {
         this.loading = false;

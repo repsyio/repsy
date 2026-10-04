@@ -96,7 +96,7 @@ async function call(
   });
 }
 
-const msgId = (res: EdgeResponse): unknown => (res.json as { msgId?: unknown } | undefined)?.msgId;
+const msgId = (res: EdgeResponse): unknown => (res.json as { code?: unknown } | undefined)?.code;
 
 /** Bodies that pass validation, on names that cannot exist, for the operations that need one. */
 const PLACEHOLDER_WORLD = {

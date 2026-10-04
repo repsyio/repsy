@@ -310,8 +310,12 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.msgId").value("artifactVersionNotFound"))
-        .andExpect(jsonPath("$.data").value("artifactVersionNotFound"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("artifactVersionNotFound"))
+        .andExpect(jsonPath("$.code").value("artifactVersionNotFound"));
 
     this.assertArtifactExists(group, artifactName);
     this.assertVersionExists(group, artifactName, "1.0");
@@ -530,7 +534,11 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
     // A retry of the same delete is an ordinary 404 now: the version is really gone.
     this.deleteVersion(group, artifactName, "1.0")
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.msgId").value("artifactVersionNotFound"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("artifactVersionNotFound"));
   }
 
   @Test
@@ -591,7 +599,11 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
 
     this.deleteVersion(group, artifactName, "1.0")
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.msgId").value("malformedMetadataFile"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("malformedMetadataFile"));
 
     this.assertVersionExists(group, artifactName, "1.0");
     this.assertVersionExists(group, artifactName, "2.0");
@@ -756,7 +768,11 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.msgId").value("artifactNotFound"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("artifactNotFound"));
 
     this.assertArtifactExists(group, "real");
     this.assertVersionExists(group, "real", "1.0");
@@ -777,7 +793,11 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.msgId").value("artifactNotFound"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("artifactNotFound"));
 
     this.assertArtifactExists(group, "alpha");
     this.assertArtifactExists(group, "beta");
@@ -794,7 +814,11 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.msgId").value("groupNotFound"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("groupNotFound"));
 
     this.assertArtifactExists("io.repsy.realgroup", "real");
   }
@@ -824,6 +848,10 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.msgId").value("groupNotFound"));
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                .string(
+                    "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+        .andExpect(jsonPath("$.code").value("groupNotFound"));
   }
 }

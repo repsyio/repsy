@@ -16,6 +16,7 @@
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
+import { problemDetail } from '../../../../../../shared/error-handler/problem.util';
 import { Component, ElementRef, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
@@ -235,7 +236,7 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
         // error state, not the last data it had.
         error: (err: HttpErrorResponse) => {
           this.versions = undefined;
-          this.error = err.error?.text ?? 'Error Occurred';
+          this.error = problemDetail(err) ?? 'Error Occurred';
         },
       });
   }

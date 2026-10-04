@@ -15,6 +15,7 @@
 ///
 
 import { HttpErrorResponse, HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
+import { problemCode } from '../error-handler/problem.util';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { EMPTY, Observable, throwError } from 'rxjs';
@@ -32,7 +33,7 @@ const SESSION_INVALID_MESSAGE = 'Session invalid, please log in again.';
 
 /**
  * Every 401 an authenticated call gets ends in a defined state (RPS-1279). The backend answers a
- * 401 with one of these `msgId`s, and the rule per case is:
+ * 401 with one of these problem `code`s, and the rule per case is:
  *
  * - Login call (`invalidCredentials`): not a session problem, the login form shows it.
  * - `sessionExpired` (expired access token, or a token version the account has moved past): the
@@ -87,7 +88,7 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
           return this._logOut(SESSION_EXPIRED_MESSAGE);
         }
 
-        if (res.error?.msgId === 'sessionExpired') {
+        if (problemCode(res) === 'sessionExpired') {
           return this._refreshToken().pipe(
             switchMap((accessToken: string) =>
               next.handle(req.clone({ setHeaders: { Authorization: `Bearer ${accessToken}` } })).pipe(
@@ -101,7 +102,7 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
         }
 
         return this._logOut(
-          res.error?.msgId === 'refreshTokenExpired' ? SESSION_EXPIRED_MESSAGE : SESSION_INVALID_MESSAGE,
+          problemCode(res) === 'refreshTokenExpired' ? SESSION_EXPIRED_MESSAGE : SESSION_INVALID_MESSAGE,
         );
       }),
     );

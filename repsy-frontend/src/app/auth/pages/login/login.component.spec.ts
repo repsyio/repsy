@@ -117,7 +117,7 @@ describe('LoginComponent', () => {
   });
 
   it('shows the invalidCredentials text on a 401, which errorHandlerInterceptor leaves to the caller', () => {
-    failLogin(401, { msgId: 'invalidCredentials', text: INVALID_CREDENTIALS_TEXT });
+    failLogin(401, { code: 'invalidCredentials', detail: INVALID_CREDENTIALS_TEXT });
 
     expect(toastService.show).toHaveBeenCalledOnceWith(INVALID_CREDENTIALS_TEXT, 'error');
     expect(navigateByUrl).not.toHaveBeenCalled();
@@ -133,7 +133,7 @@ describe('LoginComponent', () => {
   });
 
   it('leaves other errors to errorHandlerInterceptor, which already shows them', () => {
-    failLogin(500, { text: 'Server error' });
+    failLogin(500, { detail: 'Server error' });
 
     expect(toastService.show).not.toHaveBeenCalled();
     expect(component.loading).toBeFalse();

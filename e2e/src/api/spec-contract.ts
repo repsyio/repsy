@@ -199,7 +199,8 @@ export class SpecContract {
       }
       response = component;
     }
-    const schema = response.content?.['application/json']?.schema;
+    const content = response.content;
+    const schema = (content?.['application/problem+json'] ?? content?.['application/json'])?.schema;
     if (!schema) {
       throw new Error(`${operationId} ${status}: the spec declares no JSON body`);
     }

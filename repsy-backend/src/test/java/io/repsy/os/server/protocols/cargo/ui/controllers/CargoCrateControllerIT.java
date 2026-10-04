@@ -224,13 +224,7 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
             .andReturn()
             .getResponse()
             .getContentAsString();
-    final var envelope = (Map<String, Object>) JsonPath.read(response, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "ERROR")
-        .containsEntry("text", text);
-    assertThat((String) envelope.get("errorCode")).matches(UUID_PATTERN);
+    assertThat(assertProblem(response, msgId)).containsEntry("detail", text);
   }
 
   @Nested

@@ -447,10 +447,12 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       NpmPackageApiControllerIT.this
           .perform(get(pathTemplate, repoName))
           .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("packageNotFound"))
-          .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("packageNotFound"))
+          .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)));
     }
 
     @Test
@@ -501,7 +503,11 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       npmApiFacade.createRepo(info.getId());
       perform(get("/api/npm/packages/{repo}", privateRepoName))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.type").value("ERROR"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type",
+                      org.hamcrest.Matchers.startsWith("application/problem+json")));
       perform(
               get("/api/npm/packages/{repo}", privateRepoName)
                   .header(AUTHORIZATION, "Bearer malformed"))
@@ -522,37 +528,52 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
     void requiresManageForDeleteAndReturnsCompleteErrors() throws Exception {
       perform(delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package"))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.data").value("unAuthorized"))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("loginRequired"))
+          .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)));
       final var user = createUser(uniqueUsername("npm-it-"), UserRole.USER);
       perform(
               delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package")
                   .header(AUTHORIZATION, bearerToken(user, Duration.ofMinutes(30))))
           .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.msgId").value("accessDenied"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("accessDenied"));
       // Anonymous callers cannot tell a missing repo from a private one (RPS-887).
       perform(get("/api/npm/packages/missing-repo")).andExpect(status().isUnauthorized());
       perform(
               get("/api/npm/packages/missing-repo")
                   .header(AUTHORIZATION, bearerToken(user, Duration.ofMinutes(30))))
           .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)));
       perform(get("/api/npm/packages/{repo}/missing/versions/1.0.0", repoName))
           .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)));
     }
 
     @Test
     void answersNotFoundWithTheErrorEnvelopeForAMissingPackage() throws Exception {
       perform(get("/api/npm/packages/{repo}/{package}", repoName, "missing"))
           .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("packageNotFound"))
-          .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("packageNotFound"))
+          .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)));
     }
 
     @Test
@@ -657,12 +678,13 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
 
       perform(request(method, path).contentType(MediaType.APPLICATION_JSON).content("{}"))
           .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("itemNotFound"))
-          .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.data").value(nullValue()))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)))
-          .andExpect(jsonPath("$.text").value("The requested item is not found."));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("itemNotFound"))
+          .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)))
+          .andExpect(jsonPath("$.detail").value("The requested item is not found."));
     }
 
     @ParameterizedTest(name = "{0} {1} with an admin token")
@@ -678,8 +700,12 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content("{}"))
           .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.msgId").value("itemNotFound"))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("itemNotFound"))
+          .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)));
 
       org.assertj.core.api.Assertions.assertThat(
               npmPackageRepository.findByRepoIdAndScopeAndName(repo.getId(), null, "plain-package"))

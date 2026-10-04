@@ -698,25 +698,66 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("ErrorResponse lists the members of the envelope the error handler really writes")
-  void errorResponseIsTheRealEnvelope() throws Exception {
+  @DisplayName("ProblemDetail lists the members of the problem the error handler really writes")
+  void problemDetailIsTheRealProblem() throws Exception {
     final var doc = loadSpec();
     final var schema =
-        asMap(asMap(asMap(doc.get("components")).get("schemas")).get("ErrorResponse"));
+        asMap(asMap(asMap(doc.get("components")).get("schemas")).get("ProblemDetail"));
 
-    final var body =
-        this.perform(MockMvcRequestBuilders.get("/api/usages"))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
+    final var result =
+        this.perform(MockMvcRequestBuilders.get("/api/users").param("page", "-1")).andReturn();
+    final Map<String, Object> problem =
+        JsonPath.read(result.getResponse().getContentAsString(), "$");
 
+    assertThat(result.getResponse().getContentType()).startsWith("application/problem+json");
     assertThat(asMap(schema.get("properties")).keySet())
-        .containsExactlyInAnyOrder(ENVELOPE_KEYS)
-        .containsExactlyInAnyOrderElementsOf(envelope.keySet());
-    assertThat(envelope).containsEntry("type", "ERROR");
-    assertThat(asMap(asMap(schema.get("properties")).get("type")).get("$ref"))
-        .isEqualTo("#/components/schemas/ResponseType");
+        .containsExactlyInAnyOrder(
+            "type", "title", "status", "detail", "instance", "code", "traceId", "errors");
+    assertThat(asMap(schema.get("properties")).keySet()).containsAll(problem.keySet());
+    assertThat(problem).containsEntry("code", "validationError");
+  }
+
+  @Test
+  @DisplayName("every documented 4xx and 5xx response is a shared problem response")
+  void everyErrorResponseIsTheSharedProblem() throws IOException {
+    final var doc = loadSpec();
+    final var findings = new TreeSet<String>();
+
+    specOperations(doc)
+        .forEach(
+            (key, operation) ->
+                asMap(operation.raw().get("responses"))
+                    .forEach(
+                        (status, response) -> {
+                          final var code = String.valueOf(status);
+                          if (!code.startsWith("4") && !code.startsWith("5")) {
+                            return;
+                          }
+                          final var ref = asMap(response).get("$ref");
+                          if (ref == null && !asMap(response).containsKey("content")) {
+                            return; // a deliberately empty body, such as the Go sumdb 404
+                          }
+                          if (ref == null
+                              || !String.valueOf(ref).startsWith("#/components/responses/")) {
+                            findings.add(key + " " + code + " is not a shared response");
+                          }
+                        }));
+
+    final var responses = asMap(asMap(doc.get("components")).get("responses"));
+    responses.forEach(
+        (name, response) -> {
+          final var content = asMap(asMap(response).get("content"));
+          if (!content.containsKey("application/problem+json")
+              || content.size() != 1
+              || !"#/components/schemas/ProblemDetail"
+                  .equals(
+                      asMap(asMap(content.get("application/problem+json")).get("schema"))
+                          .get("$ref"))) {
+            findings.add("components/responses/" + name + " is not a ProblemDetail response");
+          }
+        });
+
+    assertNoNewFindings("error responses that are not the shared problem", findings, Map.of());
   }
 
   @Test

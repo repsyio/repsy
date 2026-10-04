@@ -246,7 +246,7 @@ test.describe('AUTH-09 refresh call that fails without a 401 (RPS-1754)', () => 
         fulfillJson<ErrorResponse>(
           route,
           503,
-          errorBody({ msgId: 'resourceBusy', data: 'resourceBusy' }),
+          errorBody({ status: 503, code: 'resourceBusy' }),
         ),
     },
     { name: 'a dropped connection', fail: (route: Route) => route.abort('connectionreset') },
@@ -332,7 +332,7 @@ test.describe('AUTH-12 permission failure is not a lost session', { tag: ['@clou
     ];
     for (const response of refused) {
       expect(response.status(), `${response.url()}`).toBe(403);
-      expect(((await response.json()) as { msgId: string }).msgId).toBe('accessDenied');
+      expect(((await response.json()) as { code: string }).code).toBe('accessDenied');
     }
     expect(
       (await userPage.request.get(`${repoUrl}/permissions`, { headers: authorization })).ok(),
@@ -361,7 +361,7 @@ test.describe('AUTH-12 permission failure is not a lost session', { tag: ['@clou
     );
     expect(response.status()).toBe(401);
     // A msgId of its own, so nothing can mistake it for the permission failure above.
-    expect(((await response.json()) as { msgId: string }).msgId).toBe('accessNotAllowed');
+    expect(((await response.json()) as { code: string }).code).toBe('accessNotAllowed');
 
     await setStoredSessionValue(userPage, 'token', tampered);
     await userPage.reload();

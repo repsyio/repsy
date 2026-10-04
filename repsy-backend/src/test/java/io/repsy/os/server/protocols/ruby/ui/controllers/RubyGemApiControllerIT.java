@@ -425,7 +425,11 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)));
     }
 
     @Test
@@ -477,8 +481,12 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, RubyGemApiControllerIT.this.bearerTokenFor(user)))
           .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.msgId").value("accessDenied"))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("accessDenied"))
+          .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)));
     }
 
     @Test

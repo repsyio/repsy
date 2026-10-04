@@ -228,7 +228,7 @@ describe('HelmChartsVersionDetailComponent', () => {
     // toast service read "[object Object]" (RPS-1302).
     it('shows no toast of its own and stays on the page when the delete fails', () => {
       helmService.deleteChart.and.returnValue(
-        throwError(() => new HttpErrorResponse({ status: 500, error: { text: 'Chart is locked' } })),
+        throwError(() => new HttpErrorResponse({ status: 500, error: { detail: 'Chart is locked' } })),
       );
       component.deleteVersion();
 

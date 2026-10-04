@@ -76,7 +76,7 @@ describe('panel HTTP pipeline (provideAppHttpClient)', () => {
   it('401 sessionExpired, refresh ok, retry ok: no toast, and the retry carries the new token', async () => {
     http.get('/api/things').subscribe({ error: () => undefined });
 
-    httpTesting.expectOne('/api/things').flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
+    httpTesting.expectOne('/api/things').flush({ code: 'sessionExpired' }, SESSION_EXPIRED);
     (await nextRefresh()).flush({ data: { username: 'jane', token: 'new-access', refreshToken: 'new-refresh' } });
     await settle();
     const retry = httpTesting.expectOne('/api/things');
@@ -90,9 +90,9 @@ describe('panel HTTP pipeline (provideAppHttpClient)', () => {
     http.get('/api/things').subscribe({ error: () => undefined });
     http.get('/api/other').subscribe({ error: () => undefined });
 
-    httpTesting.expectOne('/api/things').flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
-    httpTesting.expectOne('/api/other').flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
-    (await nextRefresh()).flush({ text: 'busy' }, { status: 503, statusText: 'Service Unavailable' });
+    httpTesting.expectOne('/api/things').flush({ code: 'sessionExpired' }, SESSION_EXPIRED);
+    httpTesting.expectOne('/api/other').flush({ code: 'sessionExpired' }, SESSION_EXPIRED);
+    (await nextRefresh()).flush({ detail: 'busy' }, { status: 503, statusText: 'Service Unavailable' });
     await settle();
 
     expect(toastService.show.calls.allArgs()).toEqual([[SESSION_EXPIRED_TOAST, 'error']]);
@@ -103,7 +103,7 @@ describe('panel HTTP pipeline (provideAppHttpClient)', () => {
   it('the refresh call fails with status 0: exactly one toast, "Session expired"', async () => {
     http.get('/api/things').subscribe({ error: () => undefined });
 
-    httpTesting.expectOne('/api/things').flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
+    httpTesting.expectOne('/api/things').flush({ code: 'sessionExpired' }, SESSION_EXPIRED);
     (await nextRefresh()).error(new ProgressEvent('error'));
     await settle();
 
@@ -114,10 +114,10 @@ describe('panel HTTP pipeline (provideAppHttpClient)', () => {
   it('the retry after a good refresh answers 500: exactly one "Server error" toast', async () => {
     http.get('/api/things').subscribe({ error: () => undefined });
 
-    httpTesting.expectOne('/api/things').flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
+    httpTesting.expectOne('/api/things').flush({ code: 'sessionExpired' }, SESSION_EXPIRED);
     (await nextRefresh()).flush({ data: { username: 'jane', token: 'new-access', refreshToken: 'new-refresh' } });
     await settle();
-    httpTesting.expectOne('/api/things').flush({ text: 'detail' }, { status: 500, statusText: 'Error' });
+    httpTesting.expectOne('/api/things').flush({ detail: 'detail' }, { status: 500, statusText: 'Error' });
 
     expect(toastService.show.calls.allArgs()).toEqual([['Server error', 'error']]);
   });
@@ -125,7 +125,7 @@ describe('panel HTTP pipeline (provideAppHttpClient)', () => {
   it('a plain 500 on an ordinary GET: exactly one "Server error" toast', () => {
     http.get('/api/things').subscribe({ error: () => undefined });
 
-    httpTesting.expectOne('/api/things').flush({ text: 'detail' }, { status: 500, statusText: 'Error' });
+    httpTesting.expectOne('/api/things').flush({ detail: 'detail' }, { status: 500, statusText: 'Error' });
 
     expect(toastService.show.calls.allArgs()).toEqual([['Server error', 'error']]);
   });

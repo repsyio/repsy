@@ -351,8 +351,11 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                       "com.nobody.published")
                   .with(apiPort()))
           .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.data").value("groupNotFound"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("groupNotFound"));
     }
 
     /**
@@ -521,12 +524,14 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                       GROUP)
                   .with(apiPort()))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.msgId").value("loginRequired"))
-          .andExpect(jsonPath("$.data").value("unAuthorized"))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)))
-          .andExpect(jsonPath("$.text").value(notNullValue()));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("loginRequired"))
+          .andExpect(jsonPath("$.code").value("loginRequired"))
+          .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)))
+          .andExpect(jsonPath("$.detail").value(notNullValue()));
     }
   }
 
@@ -546,13 +551,15 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                       ARTIFACT)
                   .with(apiPort()))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("loginRequired"))
-          .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.data").value("unAuthorized"))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)))
           .andExpect(
-              jsonPath("$.text")
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("loginRequired"))
+          .andExpect(jsonPath("$.code").value("loginRequired"))
+          .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)))
+          .andExpect(
+              jsonPath("$.detail")
                   .value(
                       "Please log in: the credentials are missing or invalid, or the account is gone."));
     }
@@ -568,11 +575,13 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                       GROUP)
                   .with(apiPort()))
           .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.data").value("artifactNotFound"))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)))
-          .andExpect(jsonPath("$.text").value(notNullValue()));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("artifactNotFound"))
+          .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)))
+          .andExpect(jsonPath("$.detail").value(notNullValue()));
     }
   }
 

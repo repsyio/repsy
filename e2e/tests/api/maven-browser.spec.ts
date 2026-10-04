@@ -147,11 +147,11 @@ test.describe('the contents of a Maven repo', { tag: ['@smoke'] }, () => {
 
     const escaped = await contents(setup, '../x');
     expect(escaped.status).toBe(400);
-    expect(escaped.json).toMatchObject({ msgId: 'invalidStoragePath' });
+    expect(escaped.json).toMatchObject({ code: 'invalidStoragePath' });
 
     const missing = await contents(setup, 'no/such/dir');
     expect(missing.status).toBe(404);
-    expect(missing.json).toMatchObject({ msgId: 'resourceNotFound' });
+    expect(missing.json).toMatchObject({ code: 'resourceNotFound' });
   });
 
   test('is not readable anonymously on a private repo', async ({ seeder }) => {
@@ -160,7 +160,7 @@ test.describe('the contents of a Maven repo', { tag: ['@smoke'] }, () => {
     const res = await contents(setup, '', {});
 
     expect(res.status).toBe(401);
-    expect(res.json).toMatchObject({ msgId: 'loginRequired' });
+    expect(res.json).toMatchObject({ code: 'loginRequired' });
   });
 });
 
@@ -200,7 +200,7 @@ test.describe('the download token', { tag: ['@smoke'] }, () => {
       { method: 'POST', headers: setup.bearer },
     );
     expect(escaped.status).toBe(400);
-    expect(escaped.json).toMatchObject({ msgId: 'invalidStoragePath' });
+    expect(escaped.json).toMatchObject({ code: 'invalidStoragePath' });
   });
 
   test('is refused for any other path of the same repo', async ({ seeder }) => {
@@ -211,7 +211,7 @@ test.describe('the download token', { tag: ['@smoke'] }, () => {
       const res = await wire(setup.repo.name, path, token);
 
       expect(res.status, path).toBe(401);
-      expect(res.json, path).toMatchObject({ msgId: 'accessNotAllowed' });
+      expect(res.json, path).toMatchObject({ code: 'accessNotAllowed' });
     }
   });
 
@@ -222,7 +222,7 @@ test.describe('the download token', { tag: ['@smoke'] }, () => {
     const res = await wire(setup.other.name, setup.jarPath, token);
 
     expect(res.status).toBe(401);
-    expect(res.json).toMatchObject({ msgId: 'accessNotAllowed' });
+    expect(res.json).toMatchObject({ code: 'accessNotAllowed' });
   });
 
   test('is refused when it is not a token at all', async ({ seeder }) => {
@@ -299,6 +299,6 @@ test.describe('the download token', { tag: ['@smoke'] }, () => {
 
     const expired = await wire(setup.repo.name, setup.jarPath, token);
     expect(expired.status).toBe(401);
-    expect(expired.json).toMatchObject({ msgId: 'downloadTokenExpired' });
+    expect(expired.json).toMatchObject({ code: 'downloadTokenExpired' });
   });
 });

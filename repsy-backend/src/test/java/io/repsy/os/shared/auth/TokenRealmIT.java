@@ -108,8 +108,12 @@ class TokenRealmIT extends AbstractIntegrationTest {
 
       perform(get("/api/profile").header(AUTHORIZATION, protocolBearerTokenFor(user)))
           .andExpect(status().isUnauthorized())
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
           .andExpect(header().string(WWW_AUTHENTICATE, "Bearer"))
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
+          .andExpect(jsonPath("$.code").value("accessNotAllowed"));
     }
 
     @Test
@@ -124,7 +128,11 @@ class TokenRealmIT extends AbstractIntegrationTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content("{\"password\":\"NewPassword2@\"}"))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("accessNotAllowed"));
 
       assertThat(userRepository.findById(user.getId()).orElseThrow().getHash()).isEqualTo(hash);
     }
@@ -140,7 +148,11 @@ class TokenRealmIT extends AbstractIntegrationTest {
 
       perform(get("/api/profile").header(AUTHORIZATION, token))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("accessNotAllowed"));
     }
 
     @Test
@@ -154,7 +166,11 @@ class TokenRealmIT extends AbstractIntegrationTest {
 
       perform(get("/api/profile").header(AUTHORIZATION, token))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("accessNotAllowed"));
     }
 
     @Test
@@ -164,7 +180,11 @@ class TokenRealmIT extends AbstractIntegrationTest {
 
       perform(get("/api/users").header(AUTHORIZATION, protocolBearerTokenFor(admin)))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("accessNotAllowed"));
     }
 
     @Test
@@ -178,7 +198,11 @@ class TokenRealmIT extends AbstractIntegrationTest {
               get("/api/npm/packages/{repo}", repoName)
                   .header(AUTHORIZATION, protocolBearerTokenFor(user)))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("accessNotAllowed"));
     }
 
     @Test
@@ -188,7 +212,11 @@ class TokenRealmIT extends AbstractIntegrationTest {
 
       perform(get("/api/profile").header(AUTHORIZATION, claimlessBearerTokenFor(user)))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("sessionExpired"));
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .string(
+                      "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
+          .andExpect(jsonPath("$.code").value("sessionExpired"));
     }
   }
 

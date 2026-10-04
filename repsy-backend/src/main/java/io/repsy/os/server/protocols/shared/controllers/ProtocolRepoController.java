@@ -33,12 +33,14 @@ import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacadeMavenAdapter;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.http.NoStore;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.RepoScope;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -107,7 +109,9 @@ public class ProtocolRepoController {
   @PostMapping("/{repoName}/download-token")
   @RepoOperation(scope = RepoScope.MAVEN)
   public RestResponse<String> createDownloadToken(
-      final RepoInfo repoInfo, @RequestParam final String path) {
+      final RepoInfo repoInfo,
+      @RequestParam final String path,
+      final HttpServletResponse response) {
 
     // Rejects a path that leaves the repo before a token is issued for it.
     final var relativePath = new RelativePath(path);
@@ -115,6 +119,8 @@ public class ProtocolRepoController {
     final var token =
         this.jwtUtils.createDownloadToken(
             repoInfo.getStorageKey(), relativePath.getPath(), AuthUtils.TIMEOUT_DOWNLOAD_TOKEN);
+
+    NoStore.apply(response);
 
     return this.responseFactory.success("downloadTokenCreated", token);
   }

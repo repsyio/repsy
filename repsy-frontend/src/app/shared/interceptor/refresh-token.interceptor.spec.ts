@@ -72,7 +72,7 @@ describe('RefreshTokenInterceptor', () => {
   afterEach(() => httpTesting.verify());
 
   function expireSession(url: string): void {
-    httpTesting.expectOne(url).flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
+    httpTesting.expectOne(url).flush({ code: 'sessionExpired' }, SESSION_EXPIRED);
   }
 
   function expectRetriedWith(url: string, accessToken: string): void {
@@ -106,7 +106,7 @@ describe('RefreshTokenInterceptor', () => {
 
     expireSession('/a');
     expireSession('/b');
-    const failure = new HttpErrorResponse({ status: 401, error: { msgId: 'refreshTokenExpired' } });
+    const failure = new HttpErrorResponse({ status: 401, error: { code: 'refreshTokenExpired' } });
     refreshes[0].error(failure);
 
     expect(errors).toEqual([failure, failure]);
@@ -121,7 +121,7 @@ describe('RefreshTokenInterceptor', () => {
     http.get('/b').subscribe({ error: (e) => errors.push(e) });
     expireSession('/a');
     expireSession('/b');
-    refreshes[0].error(new HttpErrorResponse({ status: 401, error: { msgId: 'refreshTokenExpired' } }));
+    refreshes[0].error(new HttpErrorResponse({ status: 401, error: { code: 'refreshTokenExpired' } }));
     expect(errors.length).toBe(2);
 
     // The user signs in again, and two requests expire together.
@@ -161,7 +161,7 @@ describe('RefreshTokenInterceptor', () => {
 
         const refused = httpTesting.expectOne('/api/repos/x');
         expect(refused.request.method).toBe(method.toUpperCase());
-        refused.flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
+        refused.flush({ code: 'sessionExpired' }, SESSION_EXPIRED);
         expect(authService.refreshToken).toHaveBeenCalledTimes(1);
         refreshes[0].next('token-1');
         refreshes[0].complete();
@@ -184,8 +184,8 @@ describe('RefreshTokenInterceptor', () => {
       router.url = '/my-repo/settings';
       write('post', results, errors);
 
-      httpTesting.expectOne('/api/repos/x').flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
-      refreshes[0].error(new HttpErrorResponse({ status: 401, error: { msgId: 'refreshTokenExpired' } }));
+      httpTesting.expectOne('/api/repos/x').flush({ code: 'sessionExpired' }, SESSION_EXPIRED);
+      refreshes[0].error(new HttpErrorResponse({ status: 401, error: { code: 'refreshTokenExpired' } }));
 
       httpTesting.expectNone('/api/repos/x');
       expect(results).toEqual([]);
@@ -200,10 +200,10 @@ describe('RefreshTokenInterceptor', () => {
       const errors: unknown[] = [];
       write('put', results, errors);
 
-      httpTesting.expectOne('/api/repos/x').flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
+      httpTesting.expectOne('/api/repos/x').flush({ code: 'sessionExpired' }, SESSION_EXPIRED);
       refreshes[0].next('token-1');
       refreshes[0].complete();
-      httpTesting.expectOne('/api/repos/x').flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
+      httpTesting.expectOne('/api/repos/x').flush({ code: 'sessionExpired' }, SESSION_EXPIRED);
 
       httpTesting.expectNone('/api/repos/x');
       expect(authService.refreshToken).toHaveBeenCalledTimes(1);
@@ -223,7 +223,7 @@ describe('RefreshTokenInterceptor', () => {
         complete: () => (completed = true),
       });
 
-      httpTesting.expectOne('/api/repos/x').flush({ msgId: 'sessionExpired' }, SESSION_EXPIRED);
+      httpTesting.expectOne('/api/repos/x').flush({ code: 'sessionExpired' }, SESSION_EXPIRED);
       // AuthService.refreshToken() completes empty when the storage says the session is gone.
       refreshes[0].complete();
 
@@ -235,7 +235,7 @@ describe('RefreshTokenInterceptor', () => {
     });
   });
 
-  // RPS-1279: the rule per 401 msgId is documented on RefreshTokenInterceptor.
+  // RPS-1279: the rule per 401 code is documented on RefreshTokenInterceptor.
   describe('a 401 on an ordinary call', () => {
     const REFUSED = { status: 401, statusText: 'Unauthorized' };
     let completed: boolean;
@@ -251,7 +251,7 @@ describe('RefreshTokenInterceptor', () => {
     }
 
     function refuse(msgId: string | null, url = '/a'): void {
-      httpTesting.expectOne(url).flush(msgId ? { msgId } : null, REFUSED);
+      httpTesting.expectOne(url).flush(msgId ? { code: msgId } : null, REFUSED);
     }
 
     function expectLoggedOut(message: string): void {
@@ -284,7 +284,7 @@ describe('RefreshTokenInterceptor', () => {
       refuse('sessionExpired');
       refreshes[0].next('token-1');
       refreshes[0].complete();
-      httpTesting.expectOne('/a').flush({ msgId: 'sessionExpired' }, REFUSED);
+      httpTesting.expectOne('/a').flush({ code: 'sessionExpired' }, REFUSED);
 
       expect(authService.refreshToken).toHaveBeenCalledTimes(1);
       expect(authService.logOut).toHaveBeenCalledTimes(1);
@@ -311,7 +311,7 @@ describe('RefreshTokenInterceptor', () => {
       expectLoggedOut('Session expired, please log in again.');
     });
 
-    it('an unknown msgId logs out without a refresh', () => {
+    it('an unknown code logs out without a refresh', () => {
       call();
       refuse('somethingNew');
       expectLoggedOut('Session invalid, please log in again.');
@@ -348,7 +348,7 @@ describe('RefreshTokenInterceptor', () => {
 
     it('a 403 accessDenied (signed in, not allowed) leaves the session alone: no refresh, no logout (RPS-1284)', () => {
       call();
-      httpTesting.expectOne('/a').flush({ msgId: 'accessDenied' }, { status: 403, statusText: 'Forbidden' });
+      httpTesting.expectOne('/a').flush({ code: 'accessDenied' }, { status: 403, statusText: 'Forbidden' });
 
       expect(errors.length).toBe(1);
       expect(authService.refreshToken).not.toHaveBeenCalled();

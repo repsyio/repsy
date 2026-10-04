@@ -18,7 +18,6 @@ package io.repsy.os.panel.profile.controllers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -48,6 +47,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -75,14 +75,15 @@ class ProfileControllerIT extends AbstractIntegrationTest {
   }
 
   private void expectRefreshRejected(final String refreshToken) throws Exception {
-    this.mockMvc
-        .perform(
+    expectError(
+        this.perform(
             post("/api/auth/tokens/refresh")
-                .with(apiPort())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"refreshToken\":\"%s\"}".formatted(refreshToken)))
-        .andExpect(status().isUnauthorized())
-        .andExpect(jsonPath("$.msgId").value("refreshTokenExpired"));
+                .content("{\"refreshToken\":\"%s\"}".formatted(refreshToken))),
+        HttpStatus.UNAUTHORIZED,
+        "refreshTokenExpired",
+        "refreshTokenExpired",
+        "Refresh token expired.");
   }
 
   /**
@@ -170,51 +171,44 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     @Test
     @DisplayName("returns 401 when the Authorization header is missing")
     void missingAuthorizationHeader() throws Exception {
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(get("/api/profile").with(apiPort()))
-          .andExpect(status().isUnauthorized())
-          .andExpect(header().string(WWW_AUTHENTICATE, "Bearer"))
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
-          .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.data").value("Authorization"))
-          .andExpect(
-              jsonPath("$.errorCode")
-                  .value(
-                      matchesPattern(
-                          "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")))
-          .andExpect(jsonPath("$.text").value("A required request header is missing."));
+      final var result = ProfileControllerIT.this.perform(get("/api/profile"));
+      result.andExpect(header().string(WWW_AUTHENTICATE, "Bearer"));
+      expectError(
+          result,
+          HttpStatus.UNAUTHORIZED,
+          "missingRequestHeader",
+          "Authorization",
+          "A required request header is missing.");
     }
 
     @Test
     @DisplayName("returns 401 for a header without a Bearer prefix")
     void nonBearerAuthorizationHeader() throws Exception {
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, "Basic dXNlcjpwYXNz"))
-          .andExpect(status().isUnauthorized())
-          .andExpect(header().string(WWW_AUTHENTICATE, "Bearer"))
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"))
-          .andExpect(jsonPath("$.data").value("accessNotAllowed"))
-          .andExpect(jsonPath("$.text").value("Access isn't allowed."))
-          .andExpect(
-              jsonPath("$.errorCode")
-                  .value(
-                      matchesPattern(
-                          "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")));
+      final var result =
+          ProfileControllerIT.this.perform(
+              get("/api/profile").header(AUTHORIZATION, "Basic dXNlcjpwYXNz"));
+      result.andExpect(header().string(WWW_AUTHENTICATE, "Bearer"));
+      expectError(
+          result,
+          HttpStatus.UNAUTHORIZED,
+          "accessNotAllowed",
+          "accessNotAllowed",
+          "Access isn't allowed.");
     }
 
     @Test
     @DisplayName("returns 401 for a malformed/garbage bearer token")
     void malformedBearerToken() throws Exception {
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, "Bearer not-a-jwt"))
-          .andExpect(status().isUnauthorized())
-          .andExpect(header().string(WWW_AUTHENTICATE, "Bearer"))
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"))
-          .andExpect(jsonPath("$.text").value("Access isn't allowed."));
+      final var result =
+          ProfileControllerIT.this.perform(
+              get("/api/profile").header(AUTHORIZATION, "Bearer not-a-jwt"));
+      result.andExpect(header().string(WWW_AUTHENTICATE, "Bearer"));
+      expectError(
+          result,
+          HttpStatus.UNAUTHORIZED,
+          "accessNotAllowed",
+          "accessNotAllowed",
+          "Access isn't allowed.");
     }
 
     @Test
@@ -224,14 +218,11 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           ProfileControllerIT.this.createUser(uniqueUsername("expired"), UserRole.USER);
       final var token = ProfileControllerIT.this.expiredBearerTokenFor(user);
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isUnauthorized())
-          .andExpect(header().string(WWW_AUTHENTICATE, "Bearer"))
-          .andExpect(jsonPath("$.msgId").value("sessionExpired"))
-          .andExpect(jsonPath("$.data").value("sessionExpired"))
-          .andExpect(jsonPath("$.text").value("Session expired."));
+      final var result =
+          ProfileControllerIT.this.perform(get("/api/profile").header(AUTHORIZATION, token));
+      result.andExpect(header().string(WWW_AUTHENTICATE, "Bearer"));
+      expectError(
+          result, HttpStatus.UNAUTHORIZED, "sessionExpired", "sessionExpired", "Session expired.");
     }
 
     @Test
@@ -239,16 +230,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     void nonUuidSubject() throws Exception {
       final var token = ProfileControllerIT.this.serverSignedBearerToken("not-a-uuid");
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("loginRequired"))
-          .andExpect(jsonPath("$.data").value("unAuthorized"))
-          .andExpect(
-              jsonPath("$.text")
-                  .value(
-                      "Please log in: the credentials are missing or invalid, or the account is gone."));
+      expectError(
+          ProfileControllerIT.this.perform(get("/api/profile").header(AUTHORIZATION, token)),
+          HttpStatus.UNAUTHORIZED,
+          "loginRequired",
+          "unAuthorized",
+          "Please log in: the credentials are missing or invalid, or the account is gone.");
     }
 
     @Test
@@ -256,16 +243,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     void missingSubject() throws Exception {
       final var token = ProfileControllerIT.this.serverSignedBearerToken(null);
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("loginRequired"))
-          .andExpect(jsonPath("$.data").value("unAuthorized"))
-          .andExpect(
-              jsonPath("$.text")
-                  .value(
-                      "Please log in: the credentials are missing or invalid, or the account is gone."));
+      expectError(
+          ProfileControllerIT.this.perform(get("/api/profile").header(AUTHORIZATION, token)),
+          HttpStatus.UNAUTHORIZED,
+          "loginRequired",
+          "unAuthorized",
+          "Please log in: the credentials are missing or invalid, or the account is gone.");
     }
 
     @Test
@@ -273,16 +256,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     void userNoLongerExists() throws Exception {
       final var token = ProfileControllerIT.this.bearerTokenFor(UUID.randomUUID(), "ghost");
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("loginRequired"))
-          .andExpect(jsonPath("$.data").value("unAuthorized"))
-          .andExpect(
-              jsonPath("$.text")
-                  .value(
-                      "Please log in: the credentials are missing or invalid, or the account is gone."));
+      expectError(
+          ProfileControllerIT.this.perform(get("/api/profile").header(AUTHORIZATION, token)),
+          HttpStatus.UNAUTHORIZED,
+          "loginRequired",
+          "unAuthorized",
+          "Please log in: the credentials are missing or invalid, or the account is gone.");
     }
   }
 
@@ -417,19 +396,17 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("resv"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/username")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   // "repsy" is seeded into reserved_username by V0001__Initial_Schema.sql.
-                  .content(body("repsy")))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("usernameInUse"))
-          .andExpect(jsonPath("$.data").value("usernameInUse"))
-          .andExpect(jsonPath("$.text").value("Username is in use. Please try another one."));
+                  .content(body("repsy"))),
+          HttpStatus.BAD_REQUEST,
+          "usernameInUse",
+          "usernameInUse",
+          "Username is in use. Please try another one.");
     }
 
     /**
@@ -444,16 +421,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("rcase"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/username")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body(username)))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("validationError"));
+                  .content(body(username))),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          null,
+          "Incoming data couldn't be validated.");
 
       assertThat(
               ProfileControllerIT.this
@@ -471,16 +448,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("wants"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/username")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body(other.getUsername())))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("usernameInUse"));
+                  .content(body(other.getUsername()))),
+          HttpStatus.BAD_REQUEST,
+          "usernameInUse",
+          "usernameInUse",
+          "Username is in use. Please try another one.");
     }
 
     @Test
@@ -492,16 +469,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           ProfileControllerIT.this.createUser(uniqueUsername("samesame"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/username")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body(user.getUsername())))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("usernameInUse"));
+                  .content(body(user.getUsername()))),
+          HttpStatus.BAD_REQUEST,
+          "usernameInUse",
+          "usernameInUse",
+          "Username is in use. Please try another one.");
     }
 
     @Test
@@ -510,18 +487,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("short"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/username")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("ab")))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("validationError"))
-          .andExpect(jsonPath("$.data").value(nullValue()))
-          .andExpect(jsonPath("$.text").value("Incoming data couldn't be validated."));
+                  .content(body("ab"))),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          null,
+          "Incoming data couldn't be validated.");
     }
 
     @Test
@@ -530,16 +505,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("long"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/username")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("a".repeat(26))))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("validationError"));
+                  .content(body("a".repeat(26)))),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          null,
+          "Incoming data couldn't be validated.");
     }
 
     @Test
@@ -549,16 +524,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           ProfileControllerIT.this.createUser(uniqueUsername("pattern"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/username")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("Has-Upper-Case")))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("validationError"));
+                  .content(body("Has-Upper-Case"))),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          null,
+          "Incoming data couldn't be validated.");
     }
 
     @Test
@@ -568,31 +543,30 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           ProfileControllerIT.this.createUser(uniqueUsername("badjson"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/username")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content("{not-json"))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("validationError"));
+                  .content("{not-json")),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          null,
+          "Incoming data couldn't be validated.");
     }
 
     @Test
     @DisplayName("returns 401 when the Authorization header is missing")
     void missingAuthorizationHeader() throws Exception {
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/username")
-                  .with(apiPort())
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body(uniqueUsername("nobody"))))
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
-          .andExpect(jsonPath("$.text").value("A required request header is missing."));
+                  .content(body(uniqueUsername("nobody")))),
+          HttpStatus.UNAUTHORIZED,
+          "missingRequestHeader",
+          "Authorization",
+          "A required request header is missing.");
     }
 
     @Test
@@ -602,16 +576,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("expusr"), UserRole.USER);
       final var token = ProfileControllerIT.this.expiredBearerTokenFor(user);
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/username")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body(uniqueUsername("newone"))))
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("sessionExpired"));
+                  .content(body(uniqueUsername("newone")))),
+          HttpStatus.UNAUTHORIZED,
+          "sessionExpired",
+          "sessionExpired",
+          "Session expired.");
     }
 
     @Test
@@ -619,16 +593,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     void userNoLongerExists() throws Exception {
       final var token = ProfileControllerIT.this.bearerTokenFor(UUID.randomUUID(), "ghost");
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/username")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body(uniqueUsername("newone"))))
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("loginRequired"));
+                  .content(body(uniqueUsername("newone")))),
+          HttpStatus.UNAUTHORIZED,
+          "loginRequired",
+          "unAuthorized",
+          "Please log in: the credentials are missing or invalid, or the account is gone.");
     }
   }
 
@@ -657,11 +631,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
                   .content(body("NewPassword2@")))
           .andExpect(status().isOk());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("sessionExpired"));
+      expectError(
+          ProfileControllerIT.this.perform(get("/api/profile").header(AUTHORIZATION, token)),
+          HttpStatus.UNAUTHORIZED,
+          "sessionExpired",
+          "sessionExpired",
+          "Session expired.");
     }
 
     @Test
@@ -683,16 +658,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var hashAfterChange =
           ProfileControllerIT.this.userRepository.findById(user.getId()).orElseThrow().getHash();
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/password")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("Attacker3Password@")))
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("sessionExpired"));
+                  .content(body("Attacker3Password@"))),
+          HttpStatus.UNAUTHORIZED,
+          "sessionExpired",
+          "sessionExpired",
+          "Session expired.");
 
       final var persisted =
           ProfileControllerIT.this.userRepository.findById(user.getId()).orElseThrow();
@@ -801,17 +776,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           ProfileControllerIT.this.createUser(uniqueUsername("shortpw"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/password")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("Ab1")))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("validationError"))
-          .andExpect(jsonPath("$.text").value("Incoming data couldn't be validated."));
+                  .content(body("Ab1"))),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          null,
+          "Incoming data couldn't be validated.");
     }
 
     @Test
@@ -820,16 +794,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("longpw"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/password")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("Aa1" + "x".repeat(48))))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("validationError"));
+                  .content(body("Aa1" + "x".repeat(48)))),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          null,
+          "Incoming data couldn't be validated.");
     }
 
     @Test
@@ -838,16 +812,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("nouppr"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/password")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("lowercase1")))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("validationError"));
+                  .content(body("lowercase1"))),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          null,
+          "Incoming data couldn't be validated.");
     }
 
     @Test
@@ -857,16 +831,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           ProfileControllerIT.this.createUser(uniqueUsername("nodigit"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/password")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("NoDigitsHere")))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("validationError"));
+                  .content(body("NoDigitsHere"))),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          null,
+          "Incoming data couldn't be validated.");
     }
 
     @Test
@@ -875,31 +849,30 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("wspw"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/password")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("Has Space1")))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("validationError"));
+                  .content(body("Has Space1"))),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          null,
+          "Incoming data couldn't be validated.");
     }
 
     @Test
     @DisplayName("returns 401 when the Authorization header is missing")
     void missingAuthorizationHeader() throws Exception {
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/password")
-                  .with(apiPort())
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("NewPassword2@")))
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
-          .andExpect(jsonPath("$.text").value("A required request header is missing."));
+                  .content(body("NewPassword2@"))),
+          HttpStatus.UNAUTHORIZED,
+          "missingRequestHeader",
+          "Authorization",
+          "A required request header is missing.");
     }
 
     @Test
@@ -907,16 +880,16 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     void userNoLongerExists() throws Exception {
       final var token = ProfileControllerIT.this.bearerTokenFor(UUID.randomUUID(), "ghost");
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
+      expectError(
+          ProfileControllerIT.this.perform(
               put("/api/profile/password")
-                  .with(apiPort())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("NewPassword2@")))
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("loginRequired"));
+                  .content(body("NewPassword2@"))),
+          HttpStatus.UNAUTHORIZED,
+          "loginRequired",
+          "unAuthorized",
+          "Please log in: the credentials are missing or invalid, or the account is gone.");
     }
   }
 
@@ -969,13 +942,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var token =
           ProfileControllerIT.this.bearerTokenFor(lastAdmin.getId(), lastAdmin.getUsername());
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(delete("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.msgId").value("cannotDeleteLastAdminUser"))
-          .andExpect(jsonPath("$.data").value("cannotDeleteLastAdminUser"))
-          .andExpect(jsonPath("$.text").value("You cannot delete the last admin user."));
+      expectError(
+          ProfileControllerIT.this.perform(delete("/api/profile").header(AUTHORIZATION, token)),
+          HttpStatus.BAD_REQUEST,
+          "cannotDeleteLastAdminUser",
+          "cannotDeleteLastAdminUser",
+          "You cannot delete the last admin user.");
 
       assertThat(ProfileControllerIT.this.userRepository.findById(lastAdmin.getId())).isPresent();
     }
@@ -983,12 +955,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     @Test
     @DisplayName("returns 401 when the Authorization header is missing")
     void missingAuthorizationHeader() throws Exception {
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(delete("/api/profile").with(apiPort()))
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
-          .andExpect(jsonPath("$.text").value("A required request header is missing."));
+      expectError(
+          ProfileControllerIT.this.perform(delete("/api/profile")),
+          HttpStatus.UNAUTHORIZED,
+          "missingRequestHeader",
+          "Authorization",
+          "A required request header is missing.");
     }
 
     @Test
@@ -997,11 +969,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("delexp"), UserRole.USER);
       final var token = ProfileControllerIT.this.expiredBearerTokenFor(user);
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(delete("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("sessionExpired"));
+      expectError(
+          ProfileControllerIT.this.perform(delete("/api/profile").header(AUTHORIZATION, token)),
+          HttpStatus.UNAUTHORIZED,
+          "sessionExpired",
+          "sessionExpired",
+          "Session expired.");
 
       assertThat(ProfileControllerIT.this.userRepository.findById(user.getId())).isPresent();
     }
@@ -1011,11 +984,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     void userNoLongerExists() throws Exception {
       final var token = ProfileControllerIT.this.bearerTokenFor(UUID.randomUUID(), "ghost");
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(delete("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("loginRequired"));
+      expectError(
+          ProfileControllerIT.this.perform(delete("/api/profile").header(AUTHORIZATION, token)),
+          HttpStatus.UNAUTHORIZED,
+          "loginRequired",
+          "unAuthorized",
+          "Please log in: the credentials are missing or invalid, or the account is gone.");
     }
   }
 }
