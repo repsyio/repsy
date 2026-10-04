@@ -21,6 +21,7 @@ info:
 security:
 - bearerAuth: []
 paths:
+  # region: auth
   /api/auth/login:
     post:
       tags:
@@ -95,6 +96,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
       summary: Refresh access token using a refresh token
+  # region: users
   /api/users:
     get:
       tags:
@@ -257,6 +259,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
       summary: Reset a user's password
+  # region: profile
   /api/profile:
     get:
       tags:
@@ -4382,35 +4385,6 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetail'
-    Created:
-      description: >-
-        The resource was created successfully. The response carries a `Location` header with the
-        URI of the new resource (the detail route) and the resource itself in the body.
-      headers:
-        Location:
-          description: The URI of the newly created resource.
-          schema:
-            type: string
-            format: uri
-      content:
-        application/json:
-          schema:
-            type: object
-    NoContent:
-      description: >-
-        The request completed successfully and returns no content (status 204). This is used for
-        successful deletes and updates that do not return a resource.
-    Accepted:
-      description: >-
-        The request was accepted and is being processed asynchronously (status 202). The response
-        carries a `Location` header with the URI of a status resource where the caller can poll
-        the progress or result of the operation.
-      headers:
-        Location:
-          description: The URI of the status resource for this async operation.
-          schema:
-            type: string
-            format: uri
   schemas:
     EmptyResponse:
       type: object
