@@ -218,7 +218,7 @@ describe('NugetService', () => {
         invoke: (s) => from(s.fetchRepositoryUsage()),
         api: () => repoApi.getRepoUsage,
         args: [''],
-        response: restResponse(usage),
+        response: usage,
         expected: usage,
       },
       {
@@ -258,7 +258,7 @@ describe('NugetService', () => {
         invoke: (s) => from(s.getDeployTokens(1, 5)),
         api: () => tokenApi.listDeployTokens,
         args: ['', 1, 5],
-        response: restResponse(tokenPage),
+        response: tokenPage,
         expected: tokenPage,
       },
       {
@@ -266,7 +266,7 @@ describe('NugetService', () => {
         invoke: (s) => from(s.rotateDeployToken(TOKEN)),
         api: () => tokenApi.rotateDeployToken,
         args: [TOKEN, ''],
-        response: restResponse('rotated'),
+        response: 'rotated',
         expected: 'rotated',
       },
       {
@@ -274,7 +274,7 @@ describe('NugetService', () => {
         invoke: (s) => from(s.createDeployToken(tokenForm)),
         api: () => tokenApi.createDeployToken,
         args: ['', tokenForm],
-        response: restResponse(tokenInfo),
+        response: tokenInfo,
         expected: tokenInfo,
       },
       {
@@ -290,7 +290,7 @@ describe('NugetService', () => {
 
     it('sends the selected repository name to the repository-scoped calls', async () => {
       await selectRepo(service, repoApi.getRepoPermissions, REPO);
-      asSpy(repoApi.getRepoUsage).and.returnValue(of(restResponse(usage)));
+      asSpy(repoApi.getRepoUsage).and.returnValue(of(usage));
       asSpy(tokenApi.revokeDeployToken).and.returnValue(of(restResponse(undefined)));
 
       await service.fetchRepositoryUsage();

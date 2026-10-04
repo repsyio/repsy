@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.shared.controllers;
 
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectBare;
 import static io.repsy.os.server.shared.http.BareBodyAssertions.expectNoContent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -141,7 +142,7 @@ class ProtocolRepoDeleteUsageIT extends AbstractIntegrationTest {
     }
   }
 
-  private static final String USAGES_PATH = "/api/usages";
+  private static final String USAGES_PATH = "/api/usage";
   private static final Duration ASYNC_TIMEOUT = Duration.ofSeconds(10);
 
   /** How long the tests keep watching for a late ERROR from an async task after the delete. */
@@ -241,15 +242,11 @@ class ProtocolRepoDeleteUsageIT extends AbstractIntegrationTest {
   private record Totals(long diskUsed, long reposCount) {}
 
   private Totals totals() throws Exception {
-    final var body =
-        expectSuccess(
-            this.perform(get(USAGES_PATH).header(AUTHORIZATION, this.token)),
-            "usageFetched",
-            "Usage fetched");
+    final var body = expectBare(this.perform(get(USAGES_PATH).header(AUTHORIZATION, this.token)));
 
     return new Totals(
-        JsonPath.<Number>read(body, "$.data.diskUsed.value").longValue(),
-        JsonPath.<Number>read(body, "$.data.reposCount").longValue());
+        JsonPath.<Number>read(body, "$.diskUsed.value").longValue(),
+        JsonPath.<Number>read(body, "$.reposCount").longValue());
   }
 
   /**

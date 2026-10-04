@@ -51,10 +51,9 @@ export class GolangService {
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
-    return this.protocolRepoControllerService.getRepoPermissions(repoName).pipe(
-      map((r) => r.data!),
-      tap((info) => this.repoSubject.next(info)),
-    );
+    return this.protocolRepoControllerService
+      .getRepoPermissions(repoName)
+      .pipe(tap((info) => this.repoSubject.next(info)));
   }
 
   private resetActiveRepoIfChanged(repoName: string): void {

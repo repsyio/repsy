@@ -139,7 +139,7 @@ describe('MavenService', () => {
         invoke: (s) => s.createDownloadToken(PATH),
         api: () => repoApi.createDownloadToken,
         args: [PATH, REPO],
-        response: restResponse('token-1'),
+        response: 'token-1',
         expected: 'token-1',
       },
       {

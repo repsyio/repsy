@@ -92,8 +92,10 @@ class StablePagingIT extends AbstractIntegrationTest {
               .getResponse()
               .getContentAsString();
 
-      totalPages = JsonPath.<Integer>read(body, "$.data.page.totalPages");
-      values.addAll(JsonPath.<List<String>>read(body, "$.data.content[*]." + field));
+      // the deploy-token list is a bare PagedModel (RPS-1780); the others still use the envelope
+      final var root = path.endsWith("/deploy-tokens") ? "$" : "$.data";
+      totalPages = JsonPath.<Integer>read(body, root + ".page.totalPages");
+      values.addAll(JsonPath.<List<String>>read(body, root + ".content[*]." + field));
     }
 
     return values;

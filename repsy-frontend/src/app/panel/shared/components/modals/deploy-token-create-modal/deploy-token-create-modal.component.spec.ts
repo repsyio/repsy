@@ -44,7 +44,7 @@ describe('DeployTokenCreateModalComponent', () => {
       'createDeployToken',
     ]);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
-    api.createDeployToken.and.returnValue(of({ data: TOKEN }) as never);
+    api.createDeployToken.and.returnValue(of(TOKEN) as never);
 
     component = new DeployTokenCreateModalComponent(api, new FormBuilder(), toastService);
     component.repoName = REPO;
@@ -181,7 +181,7 @@ describe('DeployTokenCreateModalComponent', () => {
       expect(component.loading).toBeTrue();
       expect(component.form.disabled).toBeTrue();
 
-      response.next({ data: TOKEN });
+      response.next(TOKEN);
       response.complete();
 
       expect(component.loading).toBeFalse();

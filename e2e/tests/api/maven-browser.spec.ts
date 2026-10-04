@@ -101,7 +101,7 @@ async function downloadToken(
     { method: 'POST', headers: setup.bearer },
   );
   expect(res.status, res.text).toBe(200);
-  const token = (res.json as { data?: string }).data;
+  const token = res.json as string | undefined;
   expect(token).toBeTruthy();
   return token as string;
 }

@@ -7482,11 +7482,11 @@ of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays o
   `GET /api/repos` (`type`, `q`, `page`, `size` 1-100, `sort`: the paged list; `OsPanelBackend.listRepos` reads a
   page, `listAllRepos` all pages), `GET /api/repos/counts` (`PanelBackend.repoCounts`), `GET`/`PUT
 /api/repos/{repoName}/settings`.
-- `POST /api/repos/{repoName}/deploy-tokens` (`name`, `readOnly`, `expirationDate`, `username`),
-  `DELETE .../deploy-tokens/{tokenId}`, `POST .../deploy-tokens/{tokenId}/actions/rotate` (rotate; the old
+- `POST /api/repos/{repoName}/deploy-tokens` (`name`, `readOnly`, `expirationDate`, `username`; answers `201`
+  with the bare `{ tokenId, ... }` body and `Cache-Control: no-store`; its `Location` names the future detail route, there is none yet),
+  `DELETE .../deploy-tokens/{tokenId}` (`204`), `POST .../deploy-tokens/{tokenId}/actions/rotate` (rotate; the old
   `PUT .../deploy-tokens/{tokenId}` is gone, RPS-1269), `GET
-.../deploy-tokens` (the create response has no token id; `seeder.ts` looks it up by name right
-  after creating it).
+.../deploy-tokens` (a bare `PagedModel`; the rotate response is a bare JSON string with `no-store`).
 - A **past `expirationDate` is accepted** — `DeployTokenService.createDeployToken` does not
   reject it — which is how `seeder.ts` creates an already-expired token.
 - Deleting an already-deleted repo or user answers `404` (`repoNotFound`/`userNotFound`); `Seeder.
