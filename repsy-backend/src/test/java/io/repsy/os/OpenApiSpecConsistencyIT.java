@@ -606,7 +606,7 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
     }
 
     // The same floor as the e2e role sweep, so a parser bug cannot empty the check.
-    assertThat(forbidden).as("operations that document 403").isGreaterThanOrEqualTo(48);
+    assertThat(forbidden).as("operations that document 403").isGreaterThanOrEqualTo(47);
     assertNoNewFindings("documented 403 without MANAGE or admin", findings, Map.of());
   }
 

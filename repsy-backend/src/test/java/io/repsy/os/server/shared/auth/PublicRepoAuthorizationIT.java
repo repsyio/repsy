@@ -134,7 +134,7 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
 
     this.perform(delete(base).header(AUTHORIZATION, user)).andExpect(status().isForbidden());
     this.perform(
-            patch(base + "/description")
+            patch(base)
                 .header(AUTHORIZATION, user)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"description\":\"defaced\"}"))
@@ -151,8 +151,8 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
     // reads: the signed-in user and an anonymous caller both get the repo's detail
     this.perform(get(base + "/permissions").header(AUTHORIZATION, user)).andExpect(status().isOk());
     this.perform(get(base + "/permissions")).andExpect(status().isOk());
-    this.perform(get(base + "/format").header(AUTHORIZATION, user)).andExpect(status().isOk());
-    this.perform(get(base + "/format")).andExpect(status().isOk());
+    this.perform(get(base).header(AUTHORIZATION, user)).andExpect(status().isOk());
+    this.perform(get(base)).andExpect(status().isOk());
 
     // ... and an admin still manages it
     this.perform(get(base + "/settings").header(AUTHORIZATION, this.panelToken(UserRole.ADMIN)))
@@ -369,7 +369,7 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
                 .header(AUTHORIZATION, this.panelToken(UserRole.ADMIN))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
-        .andExpect(status().isOk());
+        .andExpect(status().isCreated());
 
     final var repo = this.repoRepository.findByName(name).orElseThrow();
 

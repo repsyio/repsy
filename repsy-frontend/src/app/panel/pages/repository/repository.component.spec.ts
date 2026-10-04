@@ -42,7 +42,7 @@ function repo(name: string, type: ApiRepoType = ApiRepoType.Maven): RepoListInfo
 }
 
 function page(content: RepoListInfo[], totalPages = 1, number = 0) {
-  return { data: { content, page: { number, size: 10, totalElements: content.length, totalPages } } };
+  return { content, page: { number, size: 10, totalElements: content.length, totalPages } };
 }
 
 /** One `listRepos` call: what it was asked for, and the subject the test answers it with. */

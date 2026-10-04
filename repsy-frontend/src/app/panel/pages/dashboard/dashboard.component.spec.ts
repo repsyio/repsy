@@ -49,8 +49,8 @@ describe('DashboardComponent in an OnPush host (RPS-1459)', () => {
   let fixture: ComponentFixture<OnPushHostComponent>;
   let profileAnswers: Subject<{ role: string }>[];
   let usage: Subject<TotalUsageInfo>;
-  let counts: Subject<{ data: Record<string, number> }>;
-  let recent: Subject<{ data: { content: RepoListInfo[] } }>;
+  let counts: Subject<Record<string, number>>;
+  let recent: Subject<{ content: RepoListInfo[] }>;
   let security: Subject<Record<string, RepoSecuritySummary>>;
 
   const query = (testId: string): HTMLElement | null =>
@@ -111,7 +111,7 @@ describe('DashboardComponent in an OnPush host (RPS-1459)', () => {
   });
 
   it('shows the repository counts when they answer', () => {
-    counts.next({ data: { [RepoType.Maven]: 3, [RepoType.Npm]: 2 } });
+    counts.next({ [RepoType.Maven]: 3, [RepoType.Npm]: 2 });
     fixture.detectChanges();
 
     expect(text('repo-count-value-maven')).toBe('3');
@@ -120,9 +120,7 @@ describe('DashboardComponent in an OnPush host (RPS-1459)', () => {
 
   it('lists the recent repositories when they answer', () => {
     recent.next({
-      data: {
-        content: [{ name: 'my-repo', type: RepoType.Maven, diskUsage: 1024, createdAt: new Date().toISOString() }],
-      },
+      content: [{ name: 'my-repo', type: RepoType.Maven, diskUsage: 1024, createdAt: new Date().toISOString() }],
     });
     fixture.detectChanges();
 

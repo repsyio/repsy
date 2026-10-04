@@ -29,11 +29,10 @@ import {
   NuGetVersionListItem,
   ProtocolDeployTokenControllerService,
   ProtocolRepoControllerService,
-  RepoDescriptionForm,
   RepoPermissionInfo,
-  RepoRenameForm,
   RepoSettingsForm,
   RepoSettingsInfo,
+  RepoUpdateForm,
   RepoUsageInfo,
   TokenInfo,
 } from '../../../../../../generated/api';
@@ -84,26 +83,24 @@ export class NugetService {
 
   public async fetchRepositorySettings(): Promise<RepoSettingsInfo> {
     const response = await firstValueFrom(this.protocolRepoControllerService.getRepoSettings(this.repoName));
-    return response.data!;
+    return response;
   }
 
   public async updateRepoSettings(repoSettingsForm: RepoSettingsForm): Promise<void> {
     await firstValueFrom(this.protocolRepoControllerService.updateRepoSettings(this.repoName, repoSettingsForm));
   }
 
-  public async updateRepositoryName(repositoryNameForm: RepoRenameForm): Promise<void> {
-    await firstValueFrom(this.protocolRepoControllerService.renameRepo(this.repoName, repositoryNameForm));
+  public async updateRepositoryName(repositoryNameForm: RepoUpdateForm): Promise<void> {
+    await firstValueFrom(this.protocolRepoControllerService.updateRepo(this.repoName, repositoryNameForm));
 
     const active = this.repoSubject.getValue();
     if (active) {
-      this.repoSubject.next({ ...active, repoName: repositoryNameForm.name });
+      this.repoSubject.next({ ...active, repoName: repositoryNameForm.name ?? active.repoName });
     }
   }
 
-  public async updateRepoDescription(repositoryDescriptionForm: RepoDescriptionForm): Promise<void> {
-    await firstValueFrom(
-      this.protocolRepoControllerService.updateRepoDescription(this.repoName, repositoryDescriptionForm),
-    );
+  public async updateRepoDescription(repositoryDescriptionForm: RepoUpdateForm): Promise<void> {
+    await firstValueFrom(this.protocolRepoControllerService.updateRepo(this.repoName, repositoryDescriptionForm));
   }
 
   public async deleteRepository(repoName: string): Promise<void> {

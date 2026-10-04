@@ -151,7 +151,7 @@ class RepoNameRaceIT extends AbstractIntegrationTest {
       final var statuses = results.stream().map(RepoNameRaceIT::statusOf).sorted().toList();
       assertThat(statuses)
           .as("one winner (200) and one loser (409), never a 500")
-          .containsExactly(HttpStatus.OK.value(), HttpStatus.CONFLICT.value());
+          .containsExactly(HttpStatus.CREATED.value(), HttpStatus.CONFLICT.value());
 
       final var loser =
           results.stream()
@@ -183,7 +183,7 @@ class RepoNameRaceIT extends AbstractIntegrationTest {
     final Callable<MvcResult> renameA =
         () ->
             this.perform(
-                    patch("/api/repos/" + repoA.getName() + "/name")
+                    patch("/api/repos/" + repoA.getName())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
                         .header(AUTHORIZATION, token))
@@ -191,7 +191,7 @@ class RepoNameRaceIT extends AbstractIntegrationTest {
     final Callable<MvcResult> renameB =
         () ->
             this.perform(
-                    patch("/api/repos/" + repoB.getName() + "/name")
+                    patch("/api/repos/" + repoB.getName())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
                         .header(AUTHORIZATION, token))

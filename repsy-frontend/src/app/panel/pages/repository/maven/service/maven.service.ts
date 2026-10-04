@@ -83,7 +83,7 @@ export class MavenService {
   public getPathContent(path: string): Observable<FsItemInfo[]> {
     return this.protocolRepoControllerService
       .getPathContent(path, this.repoName)
-      .pipe(map((r) => r.data as unknown as FsItemInfo[]));
+      .pipe(map((r) => r as unknown as FsItemInfo[]));
   }
 
   public createDownloadToken(path: string): Observable<string> {

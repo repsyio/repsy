@@ -354,7 +354,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseRepoSettingsInfo"
+                "$ref": "#/components/schemas/RepoSettingsInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -375,12 +375,8 @@ paths:
               "$ref": "#/components/schemas/RepoSettingsForm"
         required: true
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -441,7 +437,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelRepoListInfo"
+                "$ref": "#/components/schemas/PagedModelRepoListInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -468,12 +464,18 @@ paths:
               "$ref": "#/components/schemas/RepoCreateRequest"
         required: true
       responses:
-        '200':
-          description: OK
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: The URL of the created repository, `/api/repos/{repoName}`
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseRepoListInfo"
+                "$ref": "#/components/schemas/RepoListInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -499,112 +501,10 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseRepoCounts"
+                "$ref": "#/components/schemas/RepoCounts"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Count the repositories of each type
-  "/api/repos/{repoName}/name":
-    patch:
-      tags:
-        - protocol-repo-controller
-      operationId: renameRepo
-      requestBody:
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/RepoRenameForm"
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '409':
-          "$ref": "#/components/responses/Conflict"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Rename a repository
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  "/api/repos/{repoName}/description":
-    patch:
-      tags:
-        - protocol-repo-controller
-      operationId: updateRepoDescription
-      requestBody:
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/RepoDescriptionForm"
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Update repository description
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  "/api/repos/{repoName}/format":
-    get:
-      tags:
-        - protocol-repo-controller
-      operationId: getRepoFormat
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseRepoType"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Get the format of a repository
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
   "/api/repos/{repoName}/contents":
     get:
       tags:
@@ -625,7 +525,9 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseListStorageItemInfo"
+                type: array
+                items:
+                  "$ref": "#/components/schemas/StorageItemInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -642,17 +544,80 @@ paths:
         schema:
           type: string
   "/api/repos/{repoName}":
-    delete:
+    get:
       tags:
         - protocol-repo-controller
-      operationId: deleteRepo
+      operationId: getRepo
+      description: >-
+        One repository: its name, description, type (the format), visibility, disk usage and
+        creation time. A public repository may be read anonymously; a private one needs read
+        access (404 for a caller who may not know it exists).
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+                "$ref": "#/components/schemas/RepoListInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a repository
+    patch:
+      tags:
+        - protocol-repo-controller
+      operationId: updateRepo
+      description: >-
+        Renames the repository and/or changes its description. A field that is omitted (or sent as
+        null) keeps its current value; a description is cleared by sending an empty string. Answers
+        the repository as it is after the update, so a client that renamed it reads the new name
+        from the body. Needs the MANAGE permission.
+
+
+        Answers 400 `validationError` for an invalid name or description, `invalidRequest` for a
+        name with characters outside `a-z A-Z 0-9 _ -`, and `repoNameReserved` for a name the
+        panel reserves; 409 `repoExists` when the new name is taken.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RepoUpdateForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RepoListInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Rename a repository or change its description
+    delete:
+      tags:
+        - protocol-repo-controller
+      operationId: deleteRepo
+      responses:
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -5011,39 +4976,20 @@ components:
             false, a signature made with a key that is not registered on the repository is refused
             with 404 artifactSigningKeyNotRegistered, without asking any public key server (for
             installs that cannot reach the internet). Defaults to true.
-    RestResponseRepoType:
+    RepoUpdateForm:
       type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/RepoType"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RepoRenameForm:
-      type: object
+      description: >-
+        The fields of a repository a client may change. A field that is omitted keeps its value.
       properties:
         name:
           type: string
           maxLength: 25
           minLength: 0
           pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_\\-]*$"
-      required:
-        - name
-    RepoDescriptionForm:
-      type: object
-      properties:
         description:
           type: string
           maxLength: 500
           minLength: 0
-      required:
-        - description
     RepoListInfo:
       type: object
       properties:
@@ -5096,34 +5042,6 @@ components:
             "$ref": "#/components/schemas/RepoListInfo"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelRepoListInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelRepoListInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseRepoListInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/RepoListInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     RepoCounts:
       type: object
       description: >-
@@ -5132,20 +5050,6 @@ components:
       additionalProperties:
         type: integer
         format: int64
-    RestResponseRepoCounts:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/RepoCounts"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     RepoSettingsInfo:
       type: object
       properties:
@@ -5189,36 +5093,6 @@ components:
       required:
         - privateRepo
         - securityScanEnabled
-    RestResponseRepoSettingsInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/RepoSettingsInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseListStorageItemInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: array
-          items:
-            "$ref": "#/components/schemas/StorageItemInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     StorageItemInfo:
       type: object
       properties:

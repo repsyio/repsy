@@ -22,14 +22,14 @@ import { SILENT_ERROR } from '../../../../shared/interceptor/error-handler.inter
 import { RepoLookupService } from './repo-lookup.service';
 
 describe('RepoLookupService', () => {
-  let getRepoFormat: jasmine.Spy;
+  let getRepo: jasmine.Spy;
   let service: RepoLookupService;
 
   beforeEach(() => {
-    getRepoFormat = jasmine
-      .createSpy('getRepoFormat')
-      .and.callFake((repoName: string) => of({ data: repoName.startsWith('npm') ? 'NPM' : 'MAVEN' }));
-    service = new RepoLookupService({ getRepoFormat } as unknown as ProtocolRepoControllerService);
+    getRepo = jasmine
+      .createSpy('getRepo')
+      .and.callFake((repoName: string) => of({ type: repoName.startsWith('npm') ? 'NPM' : 'MAVEN' }));
+    service = new RepoLookupService({ getRepo } as unknown as ProtocolRepoControllerService);
   });
 
   it('has no current repo until one is looked up', () => {
@@ -39,25 +39,25 @@ describe('RepoLookupService', () => {
   it('marks the lookup silent, so a resolver or canMatch guard that 404s does not also toast (RPS-1670)', async () => {
     await firstValueFrom(service.getRepoType('acme-maven'));
 
-    const context = getRepoFormat.calls.mostRecent().args[3]?.context as HttpContext;
+    const context = getRepo.calls.mostRecent().args[3]?.context as HttpContext;
     expect(context).toBeInstanceOf(HttpContext);
     expect(context.get(SILENT_ERROR)).toBeTrue();
   });
 
   it('shares one in-flight request between concurrent callers instead of firing one each (RPS-1670)', async () => {
-    const response = new Subject<{ data: string }>();
-    getRepoFormat.and.returnValue(response.asObservable());
+    const response = new Subject<{ type: string }>();
+    getRepo.and.returnValue(response.asObservable());
 
     // Nine canMatch guards and the resolver, all asking for the same unknown name before any of them
     // can see it in the cache: this used to fire one HTTP call per caller (about ten in the real route
     // tree) and toast "not found" once per call.
     const callers = Array.from({ length: 10 }, () => firstValueFrom(service.checkRepoType('acme-maven')));
 
-    expect(getRepoFormat).toHaveBeenCalledTimes(1);
-    response.next({ data: 'MAVEN' });
+    expect(getRepo).toHaveBeenCalledTimes(1);
+    response.next({ type: 'MAVEN' });
     response.complete();
     expect(await Promise.all(callers)).toEqual(new Array(10).fill('maven'));
-    expect(getRepoFormat).toHaveBeenCalledTimes(1);
+    expect(getRepo).toHaveBeenCalledTimes(1);
   });
 
   it('lets a lookup started after the in-flight one settled start a request of its own', async () => {
@@ -65,44 +65,44 @@ describe('RepoLookupService', () => {
     // A different name is not cached, so it is a new request, not a replay of the first one's.
     await firstValueFrom(service.checkRepoType('npm-one'));
 
-    expect(getRepoFormat).toHaveBeenCalledTimes(2);
+    expect(getRepo).toHaveBeenCalledTimes(2);
   });
 
   it('shares an in-flight request that fails too, and lets the next lookup retry', async () => {
-    const response = new Subject<{ data: string }>();
-    getRepoFormat.and.returnValue(response.asObservable());
+    const response = new Subject<{ type: string }>();
+    getRepo.and.returnValue(response.asObservable());
 
     const callers = Array.from({ length: 3 }, () =>
       firstValueFrom(service.checkRepoType('acme-maven')).catch((error: Error) => error.message),
     );
     response.error(new Error('not found'));
     expect(await Promise.all(callers)).toEqual(['not found', 'not found', 'not found']);
-    expect(getRepoFormat).toHaveBeenCalledTimes(1);
+    expect(getRepo).toHaveBeenCalledTimes(1);
 
-    getRepoFormat.and.returnValue(of({ data: 'MAVEN' }));
+    getRepo.and.returnValue(of({ type: 'MAVEN' }));
     expect(await firstValueFrom(service.checkRepoType('acme-maven'))).toBe('maven');
-    expect(getRepoFormat).toHaveBeenCalledTimes(2);
+    expect(getRepo).toHaveBeenCalledTimes(2);
   });
 
   describe('getRepoType', () => {
     it('fetches the type and publishes it as the current repo', async () => {
       expect(await firstValueFrom(service.getRepoType('acme-maven'))).toBe('maven');
 
-      expect(getRepoFormat).toHaveBeenCalledTimes(1);
-      expect(getRepoFormat.calls.mostRecent().args[0]).toBe('acme-maven');
+      expect(getRepo).toHaveBeenCalledTimes(1);
+      expect(getRepo.calls.mostRecent().args[0]).toBe('acme-maven');
       expect(service.currentRepo).toEqual({ repoName: 'acme-maven', repoType: 'maven' });
     });
 
     it('maps the API type (upper case) to the lower-case route slug, for every type', async () => {
       for (const type of Object.values(RepoType)) {
-        getRepoFormat.and.returnValue(of({ data: type }));
+        getRepo.and.returnValue(of({ type: type }));
 
         expect(await firstValueFrom(service.checkRepoType(`repo-${type}`))).toBe(type.toLowerCase());
       }
     });
 
     it('fails a lookup that answers a type it does not know', async () => {
-      getRepoFormat.and.returnValue(of({ data: 'BOGUS' }));
+      getRepo.and.returnValue(of({ type: 'BOGUS' }));
 
       await expectAsync(firstValueFrom(service.getRepoType('acme-maven'))).toBeRejectedWithError(
         'Unknown repository type "BOGUS" for acme-maven',
@@ -114,7 +114,7 @@ describe('RepoLookupService', () => {
       await firstValueFrom(service.getRepoType('acme-maven'));
       expect(await firstValueFrom(service.getRepoType('acme-maven'))).toBe('maven');
 
-      expect(getRepoFormat).toHaveBeenCalledTimes(1);
+      expect(getRepo).toHaveBeenCalledTimes(1);
     });
 
     it('still switches the current repo when the type comes from the cache', async () => {
@@ -124,7 +124,7 @@ describe('RepoLookupService', () => {
 
       await firstValueFrom(service.getRepoType('acme-maven'));
 
-      expect(getRepoFormat).toHaveBeenCalledTimes(2);
+      expect(getRepo).toHaveBeenCalledTimes(2);
       expect(service.currentRepo).toEqual({ repoName: 'acme-maven', repoType: 'maven' });
     });
 
@@ -139,16 +139,16 @@ describe('RepoLookupService', () => {
     });
 
     it('does not cache or publish a failed lookup, so the next call retries', async () => {
-      getRepoFormat.and.returnValues(
+      getRepo.and.returnValues(
         throwError(() => new Error('not found')),
-        of({ data: 'MAVEN' }),
+        of({ type: 'MAVEN' }),
       );
 
       await expectAsync(firstValueFrom(service.getRepoType('acme-maven'))).toBeRejectedWithError('not found');
       expect(service.currentRepo).toBeNull();
 
       expect(await firstValueFrom(service.getRepoType('acme-maven'))).toBe('maven');
-      expect(getRepoFormat).toHaveBeenCalledTimes(2);
+      expect(getRepo).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -157,7 +157,7 @@ describe('RepoLookupService', () => {
       expect(await firstValueFrom(service.checkRepoType('acme-maven'))).toBe('maven');
       expect(await firstValueFrom(service.checkRepoType('acme-maven'))).toBe('maven');
 
-      expect(getRepoFormat).toHaveBeenCalledTimes(1);
+      expect(getRepo).toHaveBeenCalledTimes(1);
       expect(service.currentRepo).toBeNull();
     });
 
@@ -165,7 +165,7 @@ describe('RepoLookupService', () => {
       await firstValueFrom(service.checkRepoType('acme-maven'));
       await firstValueFrom(service.getRepoType('acme-maven'));
 
-      expect(getRepoFormat).toHaveBeenCalledTimes(1);
+      expect(getRepo).toHaveBeenCalledTimes(1);
       expect(service.currentRepo).toEqual({ repoName: 'acme-maven', repoType: 'maven' });
     });
   });

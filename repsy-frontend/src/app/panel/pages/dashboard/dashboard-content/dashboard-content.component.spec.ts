@@ -82,8 +82,8 @@ describe('DashboardContentComponent', () => {
       'getRepoCounts',
       'listRepos',
     ]);
-    repoService.getRepoCounts.and.callFake((() => of({ data: counts })) as never);
-    repoService.listRepos.and.callFake((() => of({ data: { content: recent, page: {} } })) as never);
+    repoService.getRepoCounts.and.callFake((() => of(counts)) as never);
+    repoService.listRepos.and.callFake((() => of({ content: recent, page: {} })) as never);
     usageService = jasmine.createSpyObj<UsageService>('UsageService', ['getTotalUsage']);
     usageService.getTotalUsage.and.returnValue(of({ reposCount: 3 }) as never);
     profileService = jasmine.createSpyObj<ProfileService>('ProfileService', ['get']);
@@ -320,13 +320,13 @@ describe('DashboardContentComponent', () => {
     });
 
     it('the counts', () => {
-      counted.next({ data: COUNTS });
+      counted.next(COUNTS);
 
       expect(cdRef.markForCheck).toHaveBeenCalledTimes(1);
     });
 
     it('the recent repositories', () => {
-      listed.next({ data: { content: [] } });
+      listed.next({ content: [] });
 
       expect(cdRef.markForCheck).toHaveBeenCalledTimes(1);
     });

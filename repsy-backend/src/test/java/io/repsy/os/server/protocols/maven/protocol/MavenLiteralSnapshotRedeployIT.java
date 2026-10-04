@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.maven.protocol;
 
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectNoContent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -131,15 +132,13 @@ class MavenLiteralSnapshotRedeployIT extends AbstractIntegrationTest {
         "securityScanEnabled":false}"""
             .formatted(allowOverride, snapshots);
 
-    expectSuccess(
+    expectNoContent(
         this.mockMvc.perform(
             put("/api/repos/{name}/settings", repo.getName())
                 .header(AUTHORIZATION, this.bearerTokenFor(admin))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body)
-                .with(apiPort())),
-        "settingsUpdated",
-        "Settings updated.");
+                .with(apiPort())));
   }
 
   private static String pom(final String version, final String name) {
