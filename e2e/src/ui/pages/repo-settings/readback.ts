@@ -69,6 +69,17 @@ export class RepoSettingsReadback {
     return body.data;
   }
 
+  /** A GET whose answer is the bare resource, with no `data` envelope (API guideline, Decision 5). */
+  private async getBare<T>(path: string): Promise<T> {
+    const res = await fetch(`${env.apiBaseUrl}${path}`, {
+      headers: { Authorization: `Bearer ${this.bearerToken}` },
+    });
+    if (!res.ok) {
+      throw new Error(`GET ${path} answered ${res.status}`);
+    }
+    return (await res.json()) as T;
+  }
+
   /** The repo's description, privacy and what the caller may do with it. */
   permissions(repoName: string): Promise<RepoPermissions> {
     return this.get<RepoPermissions>(repoApiPath(encodeURIComponent(repoName), 'permissions'));
@@ -84,12 +95,12 @@ export class RepoSettingsReadback {
 
   /** The key servers a Maven repo may register (the PGP section's selector options). */
   allowedKeyServers(): Promise<AllowedKeyserver[]> {
-    return this.get<AllowedKeyserver[]>('/api/mvn/key-stores/allowed-servers');
+    return this.getBare<AllowedKeyserver[]>('/api/mvn/allowed-key-servers');
   }
 
   /** The key servers registered on a Maven repo (first page of 50). */
   async keyStores(repoName: string): Promise<KeyStore[]> {
-    const page = await this.get<{ content?: KeyStore[] }>(
+    const page = await this.getBare<{ content?: KeyStore[] }>(
       `/api/mvn/key-stores/${encodeURIComponent(repoName)}?page=0&size=50`,
     );
     return page.content ?? [];

@@ -68,12 +68,12 @@ describe('SignatureComponent', () => {
       'createMavenPgpPublicKey',
       'deleteMavenPgpPublicKey',
     ]);
-    keyStoreService.listMavenAllowedKeyServers.and.returnValue(of({ data: [UBUNTU, OPENPGP] }) as never);
-    keyStoreService.listMavenKeyStores.and.returnValue(of({ data: { content: [keyStore('k1')] } }) as never);
+    keyStoreService.listMavenAllowedKeyServers.and.returnValue(of([UBUNTU, OPENPGP]) as never);
+    keyStoreService.listMavenKeyStores.and.returnValue(of({ content: [keyStore('k1')] }) as never);
     keyStoreService.createMavenKeyStore.and.returnValue(of({}) as never);
     keyStoreService.deleteMavenKeyStore.and.returnValue(of({}) as never);
-    keyStoreService.listMavenPgpPublicKeys.and.returnValue(of({ data: { content: [publicKey('pk1')] } }) as never);
-    keyStoreService.createMavenPgpPublicKey.and.returnValue(of({ data: publicKey('pk2') }) as never);
+    keyStoreService.listMavenPgpPublicKeys.and.returnValue(of({ content: [publicKey('pk1')] }) as never);
+    keyStoreService.createMavenPgpPublicKey.and.returnValue(of(publicKey('pk2')) as never);
     keyStoreService.deleteMavenPgpPublicKey.and.returnValue(of({}) as never);
     repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
       'updateRepoSettings',
@@ -196,7 +196,7 @@ describe('SignatureComponent', () => {
     });
 
     it('selects nothing when no keyserver is allowed', () => {
-      keyStoreService.listMavenAllowedKeyServers.and.returnValue(of({}) as never);
+      keyStoreService.listMavenAllowedKeyServers.and.returnValue(of([]) as never);
 
       component.ngOnInit();
 
@@ -272,7 +272,7 @@ describe('SignatureComponent', () => {
     beforeEach(() => component.ngOnInit());
 
     it('loadMoreKeyStores appends the next page and moves on', () => {
-      keyStoreService.listMavenKeyStores.and.returnValue(of({ data: { content: [keyStore('k2')] } }) as never);
+      keyStoreService.listMavenKeyStores.and.returnValue(of({ content: [keyStore('k2')] }) as never);
 
       component.loadMoreKeyStores();
 
@@ -406,7 +406,7 @@ describe('SignatureComponent', () => {
     beforeEach(() => component.ngOnInit());
 
     it('loadMorePublicKeys appends the next page and moves on', () => {
-      keyStoreService.listMavenPgpPublicKeys.and.returnValue(of({ data: { content: [publicKey('pk2')] } }) as never);
+      keyStoreService.listMavenPgpPublicKeys.and.returnValue(of({ content: [publicKey('pk2')] }) as never);
 
       component.loadMorePublicKeys();
 

@@ -165,6 +165,8 @@ class KeyStoreServiceTest {
     when(this.allowedKeyserverRepository.findByIdAndActiveTrue(allowedId))
         .thenReturn(Optional.of(allowed));
     when(this.repoRepository.findById(this.repoId)).thenReturn(Optional.of(new Repo()));
+    when(this.keyStoreRepository.save(any(KeyStore.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
 
     this.service.create(
         this.repoInfo, KeyStoreForm.builder().allowedKeyserverId(allowedId).build());

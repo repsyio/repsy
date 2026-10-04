@@ -16,7 +16,7 @@
 
 /**
  * SET-08: the PGP Signature Key Stores section of a Maven repo. The selector offers the key servers
- * the instance allows (`GET /api/mvn/key-stores/allowed-servers`); adding one registers it on the
+ * the instance allows (`GET /api/mvn/allowed-key-servers`); adding one registers it on the
  * repo, and it can be deleted again through the danger modal. The built-in servers are listed for
  * information only.
  */
@@ -26,8 +26,7 @@ import { PanelHttpError, RepoType } from '../../../src/api/panel-api.js';
 import type {
   AllowedKeyserverItem,
   KeyStoreItem,
-  RestResponseListAllowedKeyserverItem,
-  RestResponsePagedModelKeyStoreItem,
+  PagedModelKeyStoreItem,
 } from '../../../src/api/generated/index.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { fulfillJson } from '../../../src/ui/stub-responses.js';
@@ -36,11 +35,11 @@ import { RepoSettingsReadback } from '../../../src/ui/pages/repo-settings/readba
 
 const SETTINGS = '@settings';
 
-const ALLOWED_SERVERS_URL = /\/api\/mvn\/key-stores\/allowed-servers/;
+const ALLOWED_SERVERS_URL = /\/api\/mvn\/allowed-key-servers/;
 const keyStoresUrl = (repoName: string) => new RegExp(`/api/mvn/key-stores/${repoName}(\\?|$)`);
 
-function allowedKeyserversBody(data: AllowedKeyserverItem[]): RestResponseListAllowedKeyserverItem {
-  return { msgId: 'allowedKeyserversFetched', data };
+function allowedKeyserversBody(data: AllowedKeyserverItem[]): AllowedKeyserverItem[] {
+  return data;
 }
 
 /** A page of `KeyStoreItem`s, in the shape `PagedModel` serialises (`content` plus `page`). */
@@ -49,13 +48,10 @@ function keyStoresPage(
   page: number,
   size: number,
   totalElements: number,
-): RestResponsePagedModelKeyStoreItem {
+): PagedModelKeyStoreItem {
   return {
-    msgId: 'keyStoresFetched',
-    data: {
-      content: items,
-      page: { size, number: page, totalElements, totalPages: Math.ceil(totalElements / size) },
-    },
+    content: items,
+    page: { size, number: page, totalElements, totalPages: Math.ceil(totalElements / size) },
   };
 }
 
@@ -156,7 +152,7 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     // the three of `V0007__Allowed_Keyserver.sql`, so this state cannot be reached with real data):
     // the selector and the Add button are not shown, since there is nothing to add.
     await adminPage.route(ALLOWED_SERVERS_URL, (route: Route) =>
-      fulfillJson<RestResponseListAllowedKeyserverItem>(route, 200, allowedKeyserversBody([])),
+      fulfillJson<AllowedKeyserverItem[]>(route, 200, allowedKeyserversBody([])),
     );
     await settings.reload();
     await expect(pgp.serverSelector).toHaveCount(0);
@@ -184,7 +180,7 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
       const page = Number(url.searchParams.get('page') ?? 0);
       const size = Number(url.searchParams.get('size') ?? 5);
       requestedPages.push(page);
-      return fulfillJson<RestResponsePagedModelKeyStoreItem>(
+      return fulfillJson<PagedModelKeyStoreItem>(
         route,
         200,
         keyStoresPage(all.slice(page * size, (page + 1) * size), page, size, all.length),
@@ -234,7 +230,7 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     expect(rejected).toBeInstanceOf(PanelHttpError);
     expect((rejected as PanelHttpError).status).toBe(400);
     expect((rejected as PanelHttpError).body as Record<string, unknown>).toMatchObject({
-      msgId: 'pgpSettingsUnsupported',
+      code: 'pgpSettingsUnsupported',
     });
 
     // Nothing about the repo changed: there is no PGP state to read back for a non-Maven repo (the

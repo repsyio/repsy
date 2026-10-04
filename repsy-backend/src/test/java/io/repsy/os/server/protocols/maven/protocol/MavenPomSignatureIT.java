@@ -205,7 +205,7 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
                     .content(body))
             .andReturn();
 
-    assertThat(result.getResponse().getStatus()).as("register public key").isEqualTo(200);
+    assertThat(result.getResponse().getStatus()).as("register public key").isEqualTo(201);
   }
 
   private static byte[] pom(final String version) {

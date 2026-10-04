@@ -119,6 +119,7 @@ class StablePagingIT extends AbstractIntegrationTest {
                   || path.startsWith("/api/pypi/")
                   || path.startsWith("/api/ruby/")
                   || path.startsWith("/api/npm/")
+                  || path.startsWith("/api/mvn/")
               ? "$"
               : "$.data";
       totalPages = JsonPath.<Integer>read(body, root + ".page.totalPages");

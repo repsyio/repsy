@@ -385,7 +385,7 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(JsonPath.<List<Object>>read(listed, "$.data.content")).isEmpty();
+    assertThat(JsonPath.<List<Object>>read(listed, "$.content")).isEmpty();
   }
 
   // ---- helpers
@@ -491,7 +491,7 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    return JsonPath.read(body, "$.data.content[*].artifactName");
+    return JsonPath.read(body, "$.content[*].artifactName");
   }
 
   private void uploadPypiPackage(final Repo repo, final String name, final String version)

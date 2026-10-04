@@ -191,7 +191,7 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
             .getResponse()
             .getStatus();
 
-    assertThat(status).as("register public key").isEqualTo(200);
+    assertThat(status).as("register public key").isEqualTo(201);
   }
 
   /** PUTs the setting through the API, as the panel does. */
@@ -574,7 +574,7 @@ class MavenSignedRecomputeIT extends AbstractIntegrationTest {
             .getResponse()
             .getStatus();
 
-    assertThat(status).as("delete public key").isEqualTo(200);
+    assertThat(status).as("delete public key").isEqualTo(204);
   }
 
   private void putKeyServerLookup(final Repo repo, final User admin, final boolean enabled)

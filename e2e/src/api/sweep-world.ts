@@ -81,10 +81,6 @@ export interface SweepWorld {
   fresh: { username: string; repoName: string };
 }
 
-interface Envelope {
-  data?: unknown;
-}
-
 async function adminJson(
   adminToken: string,
   method: string,
@@ -99,7 +95,7 @@ async function adminJson(
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  return { status: res.status, data: (res.json as Envelope | undefined)?.data };
+  return { status: res.status, data: res.json };
 }
 
 /** Seeds the world in the calling test's own `seeder`, which removes it all again. */
@@ -121,7 +117,7 @@ export async function seedSweepWorld(
 
   const token = await seeder.createToken(repos.maven.name);
 
-  const servers = await adminJson(adminToken, 'GET', '/api/mvn/key-stores/allowed-servers');
+  const servers = await adminJson(adminToken, 'GET', '/api/mvn/allowed-key-servers');
   const keyserver = (servers.data as { id?: string }[] | undefined)?.[0]?.id;
   if (!keyserver) {
     throw new Error(`no allowed key server to seed a key store with: ${JSON.stringify(servers)}`);
@@ -132,7 +128,7 @@ export async function seedSweepWorld(
   const keyStores = await adminJson(adminToken, 'GET', `/api/mvn/key-stores/${repos.maven.name}`);
   const keyStoreId = ((keyStores.data as { content?: { id: string }[] } | undefined)?.content ??
     [])[0]?.id;
-  if (keyStore.status !== 200 || !keyStoreId) {
+  if (keyStore.status !== 201 || !keyStoreId) {
     throw new Error(`could not seed a key store: ${keyStore.status} ${JSON.stringify(keyStores)}`);
   }
   const { publicKeyArmored } = await generateKeyPair();

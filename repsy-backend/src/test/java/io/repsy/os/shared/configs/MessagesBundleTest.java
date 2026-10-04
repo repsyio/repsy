@@ -55,7 +55,6 @@ class MessagesBundleTest {
         "usersFetched",
         "passwordReset",
         "tokenRefreshed",
-        "keyStoresFetched",
         // Go
         "modulesFetched",
         "moduleInfoFetched",
