@@ -174,10 +174,10 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     return response.getContentAsString(StandardCharsets.UTF_8);
   }
 
-  /** The body without its {@code errorCode}, which is a fresh id for every error. */
-  private static String bodyWithoutErrorCode(final MockHttpServletResponse response)
+  /** The body without its {@code traceId}, which is a fresh id for every error. */
+  private static String bodyWithoutTraceId(final MockHttpServletResponse response)
       throws Exception {
-    return body(response).replaceAll("\"errorCode\":\"[^\"]*\"", "");
+    return body(response).replaceAll("\"traceId\":\"[^\"]*\"", "");
   }
 
   /** The panel answer to a client that is over the limit. */
@@ -187,9 +187,14 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     assertThat(response.getStatus()).as(body).isEqualTo(429);
     assertThat(Long.parseLong(response.getHeader(RETRY_AFTER))).isBetween(1L, 60L);
     assertThat(response.getHeader(WWW_AUTHENTICATE)).isNull();
-    assertThat(JsonPath.<String>read(body, "$.msgId")).isEqualTo("tooManyRequests");
-    assertThat(JsonPath.<String>read(body, "$.type")).isEqualTo("ERROR");
-    assertThat(JsonPath.<String>read(body, "$.text")).isEqualTo(TOO_MANY_TEXT);
+    final Map<String, Object> problem = JsonPath.read(body, "$");
+    assertThat(problem)
+        .containsEntry("status", 429)
+        .containsEntry("code", "tooManyRequests")
+        .containsEntry("detail", TOO_MANY_TEXT)
+        .containsEntry("title", "Too Many Requests")
+        .doesNotContainKeys("msgId", "errorCode", "text", "data");
+    assertThat((String) problem.get("traceId")).matches(UUID_PATTERN);
   }
 
   private Repo seedDeployTokenRepo() {
@@ -465,7 +470,8 @@ class AuthThrottleIT extends AbstractIntegrationTest {
       final var user = i % 2 == 0 ? this.username : uniqueUsername("nobody");
       final var response = this.panelLogin(user, "Wrong1" + i);
       assertThat(response.getStatus()).isEqualTo(401);
-      assertThat(JsonPath.<String>read(body(response), "$.msgId")).isEqualTo("invalidCredentials");
+      final Map<String, Object> problem = JsonPath.read(body(response), "$");
+      assertThat(problem).containsEntry("code", "invalidCredentials");
     }
     clearInvocations(this.spiedUsers);
 
@@ -475,7 +481,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
 
     for (final var response : List.of(unknownUser, wrongPassword, rightPassword)) {
       expectThrottled(response);
-      assertThat(bodyWithoutErrorCode(response)).isEqualTo(bodyWithoutErrorCode(unknownUser));
+      assertThat(bodyWithoutTraceId(response)).isEqualTo(bodyWithoutTraceId(unknownUser));
     }
     verify(this.spiedUsers, never()).getUserByUsername(anyString());
   }
