@@ -41,6 +41,9 @@ import { expect, test } from '../../src/scenarios/fixtures.js';
 const GRADLE_TIMEOUT_MS = 300_000;
 
 test.describe('Gradle verification-metadata', () => {
+  // Two cold Gradle runs plus an mvn deploy do not fit the 120 s default test timeout on a busy runner.
+  test.setTimeout(GRADLE_TIMEOUT_MS * 2);
+
   test(
     'generates verification-metadata.xml with correct SHA256 checksums from Repsy',
     { tag: ['@smoke'] },

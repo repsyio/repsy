@@ -22,7 +22,6 @@
  */
 import type { Route } from '@playwright/test';
 
-import { generateGpgKey } from '../../../src/clients/gpg.js';
 import { PanelHttpError, RepoType } from '../../../src/api/panel-api.js';
 import type {
   AllowedKeyserverItem,
@@ -71,6 +70,26 @@ function stubKeyStore(index: number): KeyStoreItem {
 
 const label = (server: { displayName: string; host: string }) =>
   `${server.displayName} (${server.host})`;
+
+// Real ed25519 public keys (no expiry, throwaway user ids): the UI runner image has no gpg to generate them.
+const FIXTURE_PUBLIC_KEY_1 = `-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEasHerxYJKwYBBAHaRw8BAQdApVeKuyvPG5HiiVWQQCV5ynIiEL8CQbEWzGA3
+fIVU+3S0IWUyZS1maXh0dXJlLTEgPGUyZTFAZXhhbXBsZS50ZXN0PoiTBBMWCgA7
+FiEE7PqUUA4fKjuukGSpqouCxFUAf5AFAmrB3q8CGwMFCwkIBwICIgIGFQoJCAsC
+BBYCAwECHgcCF4AACgkQqouCxFUAf5BKvQEA5mWBynWtf6Ugq9YIDEX30GVfj+Hv
+Z9ixreUdhzNM50IA/joskOIMrk5M+tiJ9sG0jGcG6kvZW/wuZR3VUiMyAv4E
+=9KzX
+-----END PGP PUBLIC KEY BLOCK-----`;
+const FIXTURE_PUBLIC_KEY_2 = `-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEasHerxYJKwYBBAHaRw8BAQdAOfMn68jBe4pDmR9/fdGWnaSHUadX+FIW1CnX
+YQRtJeO0IWUyZS1maXh0dXJlLTIgPGUyZTJAZXhhbXBsZS50ZXN0PoiTBBMWCgA7
+FiEECyU54fpfQnldA1xLg3I3BpH+28AFAmrB3q8CGwMFCwkIBwICIgIGFQoJCAsC
+BBYCAwECHgcCF4AACgkQg3I3BpH+28ASdQD/Z2YXKBAtwm2hxjIiRTjsdHw6Nlfs
+bHDhFlks1Fbb/loA/0JAYxjuYrsnIOdwzbNxftWLLiUqUmA6TlvrEQ6nvj0E
+=0eYV
+-----END PGP PUBLIC KEY BLOCK-----`;
 
 test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
   test('SET-08 add an allowed key server, see it listed, delete it', async ({
@@ -262,8 +281,8 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     await expect(pgp.publicKeys).toContainText('No public keys registered yet.');
     expect(await pgp.publicKeyCount()).toBe(0);
 
-    // The panel accepts only a real armored block holding exactly one key, so generate two.
-    const armoredKey = (await generateGpgKey()).publicKeyArmored;
+    // The panel accepts only a real armored block holding exactly one key.
+    const armoredKey = FIXTURE_PUBLIC_KEY_1;
 
     await pgp.addPublicKey(armoredKey);
     await settings.shell.toasts.expectSuccess('Public key added');
@@ -277,7 +296,7 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     expect(await pgp.publicKeyCount()).toBe(1);
 
     // Add another public key.
-    const secondArmoredKey = (await generateGpgKey()).publicKeyArmored;
+    const secondArmoredKey = FIXTURE_PUBLIC_KEY_2;
 
     await pgp.addPublicKey(secondArmoredKey);
     await settings.shell.toasts.expectSuccess('Public key added');
