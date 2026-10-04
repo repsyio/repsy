@@ -32,6 +32,10 @@ import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGem;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGemVersion;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemRepository;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemVersionRepository;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -69,6 +73,8 @@ class StablePagingIT extends AbstractIntegrationTest {
   @Autowired private HelmChartRepository helmChartRepository;
   @Autowired private HelmChartVersionRepository helmChartVersionRepository;
   @Autowired private NuGetPackageRepository nugetPackageRepository;
+  @Autowired private RubyGemRepository rubyGemRepository;
+  @Autowired private RubyGemVersionRepository rubyGemVersionRepository;
   @Autowired private RepoDeployTokenRepository deployTokenRepository;
 
   /**
@@ -95,7 +101,8 @@ class StablePagingIT extends AbstractIntegrationTest {
               .getResponse()
               .getContentAsString();
 
-      // the deploy-token, Cargo, Helm and NuGet lists are bare PagedModels (RPS-1780, RPS-1781);
+      // the deploy-token, Cargo, Helm, NuGet and Ruby lists are bare PagedModels (RPS-1780,
+      // RPS-1781);
       // the
       // others still use the envelope
       final var root =
@@ -103,6 +110,7 @@ class StablePagingIT extends AbstractIntegrationTest {
                   || path.startsWith("/api/cargo/")
                   || path.startsWith("/api/helm/")
                   || path.startsWith("/api/nuget/")
+                  || path.startsWith("/api/ruby/")
               ? "$"
               : "$.data";
       totalPages = JsonPath.<Integer>read(body, root + ".page.totalPages");
@@ -339,6 +347,41 @@ class StablePagingIT extends AbstractIntegrationTest {
         "/api/nuget/packages/" + repo.getName() + "/tied/versions",
         this.adminBearerToken(),
         "publishedAt,desc",
+        "version",
+        versions);
+  }
+
+  @Test
+  @DisplayName("Ruby gem versions created in the same instant are each listed once")
+  void rubyGemVersions() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("rubyv"));
+    final var gem = new RubyGem();
+    gem.setRepo(this.repoRepository.getReferenceById(repo.getId()));
+    gem.setName("tied");
+    gem.setLatest("1.0.0");
+    final var savedGem = this.rubyGemRepository.save(gem);
+
+    final var versions = new ArrayList<String>();
+    for (var i = 0; i < ROWS; i++) {
+      final var version = new RubyGemVersion();
+      version.setGem(savedGem);
+      version.setVersion("1.0." + i);
+      version.setPlatform("ruby");
+      version.setChecksum(UUID.randomUUID().toString().replace("-", "").repeat(2));
+      this.rubyGemVersionRepository.save(version);
+      versions.add("1.0." + i);
+    }
+    this.entityManager.flush();
+    this.jdbcTemplate.update(
+        "update ruby_gem_version set created_at = ? where gem_id = ?",
+        Timestamp.from(TIED_AT),
+        savedGem.getId());
+    this.entityManager.clear();
+
+    this.assertEveryRowOnceAndStable(
+        "/api/ruby/gems/" + repo.getName() + "/tied/versions",
+        this.adminBearerToken(),
+        "createdAt,desc",
         "version",
         versions);
   }

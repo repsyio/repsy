@@ -4448,7 +4448,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelGemListItem"
+                "$ref": "#/components/schemas/PagedModelGemListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -4464,24 +4464,49 @@ paths:
         required: true
         schema:
           type: string
-  "/api/ruby/gems/{repoName}/{gemName}":
-    delete:
+  "/api/ruby/gems/{repoName}/{packageName}":
+    get:
       tags:
         - ruby-gem-api-controller
-      operationId: deleteGem
+      operationId: getGem
+      description: >-
+        The gem summary: its latest version, described by that version's gemspec fields.
       parameters:
-        - name: gemName
+        - name: packageName
           in: path
           required: true
           schema:
             type: string
+      security:
+        - { }
+        - bearerAuth: []
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+                "$ref": "#/components/schemas/GemPackageInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a Ruby gem
+    delete:
+      tags:
+        - ruby-gem-api-controller
+      operationId: deleteGem
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -4497,7 +4522,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/ruby/gems/{repoName}/{gemName}/versions":
+  "/api/ruby/gems/{repoName}/{packageName}/versions":
     get:
       tags:
         - ruby-gem-api-controller
@@ -4505,7 +4530,7 @@ paths:
       description: >-
         Sortable by `id`, `version`, `createdAt` (`property,direction`).
       parameters:
-        - name: gemName
+        - name: packageName
           in: path
           required: true
           schema:
@@ -4529,7 +4554,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelGemVersionListItem"
+                "$ref": "#/components/schemas/PagedModelGemVersionListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -4545,13 +4570,13 @@ paths:
         required: true
         schema:
           type: string
-  "/api/ruby/gems/{repoName}/{gemName}/versions/{version}":
+  "/api/ruby/gems/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
         - ruby-gem-api-controller
       operationId: getGemVersion
       parameters:
-        - name: gemName
+        - name: packageName
           in: path
           required: true
           schema:
@@ -4576,7 +4601,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseGemVersionInfo"
+                "$ref": "#/components/schemas/GemVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -4589,7 +4614,7 @@ paths:
         - ruby-gem-api-controller
       operationId: deleteGemVersion
       parameters:
-        - name: gemName
+        - name: packageName
           in: path
           required: true
           schema:
@@ -4606,12 +4631,8 @@ paths:
             type: string
             default: 'ruby'
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -7303,20 +7324,25 @@ components:
             "$ref": "#/components/schemas/GemListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelGemListItem:
+    GemPackageInfo:
       type: object
       properties:
-        msgId:
+        name:
           type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelGemListItem"
-        errorCode:
+        latestVersion:
           type: string
-          nullable: true
-        text:
+        description:
           type: string
+        authors:
+          type: string
+        homepage:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     GemVersionListItem:
       type: object
       properties:
@@ -7338,20 +7364,6 @@ components:
             "$ref": "#/components/schemas/GemVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelGemVersionListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelGemVersionListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     GemDependencyInfo:
       type: object
       properties:
@@ -7394,17 +7406,3 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/GemDependencyInfo"
-    RestResponseGemVersionInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/GemVersionInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string

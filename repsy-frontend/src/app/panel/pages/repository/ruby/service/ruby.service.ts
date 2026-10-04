@@ -71,7 +71,7 @@ export class RubyService {
   ): Observable<PagedData<GemListItem>> {
     return this.rubyGemApiControllerService
       .listGems(this.repoName, search || undefined, pageIndex, pageSize, [`${sortOption.column},${sortOption.type}`])
-      .pipe(map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GemListItem>));
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<GemListItem>));
   }
 
   public fetchGemVersions(
@@ -85,17 +85,11 @@ export class RubyService {
       .listGemVersions(gemName, this.repoName, search || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
-      .pipe(
-        map(
-          (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GemVersionListItem>,
-        ),
-      );
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<GemVersionListItem>));
   }
 
   public fetchGemVersion(gemName: string, version: string, platform?: string): Observable<GemVersionInfo> {
-    return this.rubyGemApiControllerService
-      .getGemVersion(gemName, version, this.repoName, platform)
-      .pipe(map((r) => r.data as GemVersionInfo));
+    return this.rubyGemApiControllerService.getGemVersion(gemName, version, this.repoName, platform);
   }
 
   public deleteGem(gemName: string): Observable<void> {
