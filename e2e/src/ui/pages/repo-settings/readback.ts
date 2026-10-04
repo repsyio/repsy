@@ -95,7 +95,7 @@ export class RepoSettingsReadback {
 
   /** The key servers a Maven repo may register (the PGP section's selector options). */
   allowedKeyServers(): Promise<AllowedKeyserver[]> {
-    return this.getBare<AllowedKeyserver[]>('/api/mvn/key-stores/allowed-servers');
+    return this.getBare<AllowedKeyserver[]>('/api/mvn/allowed-key-servers');
   }
 
   /** The key servers registered on a Maven repo (first page of 50). */

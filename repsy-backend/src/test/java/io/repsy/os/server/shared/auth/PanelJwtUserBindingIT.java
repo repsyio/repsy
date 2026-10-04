@@ -67,7 +67,7 @@ class PanelJwtUserBindingIT extends AbstractIntegrationTest {
     KEYSERVERS(null) {
       @Override
       String path(final String repoName) {
-        return "/api/mvn/key-stores/allowed-servers";
+        return "/api/mvn/allowed-key-servers";
       }
     },
     /** {@code PanelAuthHelper}. */

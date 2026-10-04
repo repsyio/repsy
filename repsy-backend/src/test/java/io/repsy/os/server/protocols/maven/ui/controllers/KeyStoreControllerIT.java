@@ -122,7 +122,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
   }
 
   @Nested
-  @DisplayName("GET /allowed-servers")
+  @DisplayName("GET /allowed-key-servers")
   class AllowedServers {
 
     @Test
@@ -132,7 +132,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
           KeyStoreControllerIT.this
               .mockMvc
               .perform(
-                  get("/api/mvn/key-stores/allowed-servers")
+                  get("/api/mvn/allowed-key-servers")
                       .with(apiPort())
                       .header(AUTHORIZATION, KeyStoreControllerIT.this.bearerTokenFor(user)))
               .andExpect(status().isOk())
@@ -167,7 +167,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
           KeyStoreControllerIT.this
               .mockMvc
               .perform(
-                  get("/api/mvn/key-stores/allowed-servers")
+                  get("/api/mvn/allowed-key-servers")
                       .with(apiPort())
                       .header(AUTHORIZATION, KeyStoreControllerIT.this.bearerTokenFor(user)))
               .andExpect(status().isOk())
@@ -190,7 +190,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
           KeyStoreControllerIT.this
               .mockMvc
               .perform(
-                  get("/api/mvn/key-stores/allowed-servers")
+                  get("/api/mvn/allowed-key-servers")
                       .with(apiPort())
                       .header(AUTHORIZATION, KeyStoreControllerIT.this.bearerTokenFor(user)))
               .andExpect(status().isOk())
@@ -205,7 +205,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
     @Test
     void rejectsMissingMalformedExpiredAndDeletedUserTokens() throws Exception {
       final var user = KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.USER);
-      final var path = "/api/mvn/key-stores/allowed-servers";
+      final var path = "/api/mvn/allowed-key-servers";
       final var missing =
           KeyStoreControllerIT.this.mockMvc.perform(get(path).with(apiPort())).andReturn();
       assertThat(missing.getResponse().getStatus()).isEqualTo(401);
@@ -281,6 +281,21 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       final var row =
           KeyStoreControllerIT.this.keyStoreRepository.findAll().stream().findFirst().orElseThrow();
 
+      // The Location is a real detail route and returns the created item.
+      final var fetched =
+          KeyStoreControllerIT.this
+              .mockMvc
+              .perform(
+                  get(createdResult.getResponse().getHeader("Location"))
+                      .with(apiPort())
+                      .header(AUTHORIZATION, token))
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      assertThat(JsonPath.<Object>read(fetched, "$"))
+          .isEqualTo(JsonPath.<Object>read(created, "$"));
+
       final var listed =
           KeyStoreControllerIT.this
               .mockMvc
@@ -319,6 +334,68 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
           .andExpect(status().isNoContent())
           .andExpect(content().string(""));
       assertThat(KeyStoreControllerIT.this.keyStoreRepository.findById(row.getId())).isEmpty();
+    }
+
+    @Test
+    void aKeyStoreOfAnotherRepoIsNotFoundOnTheDetailRoute() throws Exception {
+      final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var otherRepo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
+      final var server = KeyStoreControllerIT.this.keyserver("pgpkeys.eu");
+      final String id =
+          JsonPath.read(
+              KeyStoreControllerIT.this.performCreate(
+                  otherRepo, token, KeyStoreControllerIT.this.body(server.getId())),
+              "$.id");
+
+      final var result =
+          KeyStoreControllerIT.this
+              .mockMvc
+              .perform(
+                  get("/api/mvn/key-stores/" + repo.getName() + "/" + id)
+                      .with(apiPort())
+                      .header(AUTHORIZATION, token))
+              .andReturn();
+
+      assertThat(result.getResponse().getStatus()).isEqualTo(404);
+      assertError(result.getResponse().getContentAsString(), "keyStoreNotFound");
+    }
+
+    @Test
+    @DisplayName("a repo named like the old allowed-servers route keeps its key stores addressable")
+    void aRepoNamedLikeTheOldAllowedServersLiteralIsAddressable() throws Exception {
+      KeyStoreControllerIT.this.repoTxService.createRepo(
+          "allowed-servers", RepoType.MAVEN, true, null);
+      KeyStoreControllerIT.this.entityManager.flush();
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
+      final var server = KeyStoreControllerIT.this.keyserver("pgpkeys.eu");
+
+      KeyStoreControllerIT.this
+          .mockMvc
+          .perform(
+              post("/api/mvn/key-stores/allowed-servers")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(KeyStoreControllerIT.this.body(server.getId())))
+          .andExpect(status().isCreated());
+
+      final var listed =
+          KeyStoreControllerIT.this
+              .mockMvc
+              .perform(
+                  get("/api/mvn/key-stores/allowed-servers")
+                      .with(apiPort())
+                      .header(AUTHORIZATION, token))
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      assertThat(JsonPath.<List<Object>>read(listed, "$.content")).hasSize(1);
     }
 
     @Test
@@ -569,6 +646,20 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
               .orElseThrow();
       assertThat(row.getFingerprint()).isEqualTo(data.get("fingerprint"));
 
+      // The Location is a real detail route and returns the created item.
+      final var fetched =
+          KeyStoreControllerIT.this
+              .mockMvc
+              .perform(
+                  get(createdResult.getResponse().getHeader("Location"))
+                      .with(apiPort())
+                      .header(AUTHORIZATION, token))
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      assertThat(JsonPath.<Object>read(fetched, "$")).isEqualTo(data);
+
       final var listed =
           this.listPublicKeys(repo, token)
               .andExpect(status().isOk())
@@ -687,6 +778,33 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
 
       assertThat(result.getResponse().getStatus()).isEqualTo(400);
       assertError(result.getResponse().getContentAsString(), "repoScopeNotMatched");
+    }
+
+    @Test
+    @DisplayName("reading another repo's key id answers 404 pgpPublicKeyNotFound")
+    void readingAnotherReposKeyIdIsNotFound() throws Exception {
+      final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var otherRepo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
+      final var key = PgpTestKeys.generate();
+      final var created =
+          this.createPublicKey(otherRepo, token, this.armoredKeyBody(key.armoredPublicKey()))
+              .andReturn();
+      final String id = JsonPath.read(created.getResponse().getContentAsString(), "$.id");
+
+      final var result =
+          KeyStoreControllerIT.this
+              .mockMvc
+              .perform(
+                  get("/api/mvn/key-stores/" + repo.getName() + "/public-keys/" + id)
+                      .with(apiPort())
+                      .header(AUTHORIZATION, token))
+              .andReturn();
+
+      assertThat(result.getResponse().getStatus()).isEqualTo(404);
+      assertError(result.getResponse().getContentAsString(), "pgpPublicKeyNotFound");
     }
 
     @Test

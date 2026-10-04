@@ -3126,7 +3126,7 @@ paths:
         schema:
           type: string
   # region: mvn-key-stores
-  "/api/mvn/key-stores/allowed-servers":
+  "/api/mvn/allowed-key-servers":
     get:
       tags:
         - key-store-controller
@@ -3302,6 +3302,35 @@ paths:
         schema:
           type: string
   "/api/mvn/key-stores/{repoName}/public-keys/{publicKeyId}":
+    get:
+      tags:
+        - key-store-controller
+      operationId: getMavenPgpPublicKey
+      parameters:
+        - name: publicKeyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PgpPublicKeyItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a registered PGP public key of a Maven repository
     delete:
       tags:
         - key-store-controller
@@ -3334,6 +3363,35 @@ paths:
         schema:
           type: string
   "/api/mvn/key-stores/{repoName}/{keyStoreId}":
+    get:
+      tags:
+        - key-store-controller
+      operationId: getMavenKeyStore
+      parameters:
+        - name: keyStoreId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/KeyStoreItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a key store of a Maven repository
     delete:
       tags:
         - key-store-controller

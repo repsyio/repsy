@@ -117,7 +117,7 @@ export async function seedSweepWorld(
 
   const token = await seeder.createToken(repos.maven.name);
 
-  const servers = await adminJson(adminToken, 'GET', '/api/mvn/key-stores/allowed-servers');
+  const servers = await adminJson(adminToken, 'GET', '/api/mvn/allowed-key-servers');
   const keyserver = (servers.data as { id?: string }[] | undefined)?.[0]?.id;
   if (!keyserver) {
     throw new Error(`no allowed key server to seed a key store with: ${JSON.stringify(servers)}`);

@@ -16,7 +16,7 @@
 
 /**
  * SET-08: the PGP Signature Key Stores section of a Maven repo. The selector offers the key servers
- * the instance allows (`GET /api/mvn/key-stores/allowed-servers`); adding one registers it on the
+ * the instance allows (`GET /api/mvn/allowed-key-servers`); adding one registers it on the
  * repo, and it can be deleted again through the danger modal. The built-in servers are listed for
  * information only.
  */
@@ -35,7 +35,7 @@ import { RepoSettingsReadback } from '../../../src/ui/pages/repo-settings/readba
 
 const SETTINGS = '@settings';
 
-const ALLOWED_SERVERS_URL = /\/api\/mvn\/key-stores\/allowed-servers/;
+const ALLOWED_SERVERS_URL = /\/api\/mvn\/allowed-key-servers/;
 const keyStoresUrl = (repoName: string) => new RegExp(`/api/mvn/key-stores/${repoName}(\\?|$)`);
 
 function allowedKeyserversBody(data: AllowedKeyserverItem[]): AllowedKeyserverItem[] {

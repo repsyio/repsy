@@ -105,6 +105,22 @@ public class KeyStoreService {
         .build();
   }
 
+  public io.repsy.os.generated.model.KeyStoreItem find(
+      final RepoInfo repoInfo, final UUID keyStoreId) {
+
+    final var keyStore =
+        this.keyStoreRepository
+            .findByIdAndRepoId(keyStoreId, repoInfo.getStorageKey())
+            .orElseThrow(() -> new ItemNotFoundException("keyStoreNotFound"));
+
+    return io.repsy.os.generated.model.KeyStoreItem.builder()
+        .id(keyStore.getId())
+        .allowedKeyserverId(keyStore.getAllowedKeyserver().getId())
+        .host(keyStore.getAllowedKeyserver().getHost())
+        .displayName(keyStore.getAllowedKeyserver().getDisplayName())
+        .build();
+  }
+
   @Transactional
   public void delete(final RepoInfo repoInfo, final UUID keyStoreId) {
 
@@ -185,6 +201,14 @@ public class KeyStoreService {
     this.publishKeySourcesChanged(repoInfo);
 
     return this.artifactConverter.toPgpPublicKeyItemDto(saved);
+  }
+
+  public PgpPublicKeyItem findPublicKey(final RepoInfo repoInfo, final UUID id) {
+
+    return this.pgpPublicKeyRepository
+        .findByIdAndRepoId(id, repoInfo.getStorageKey())
+        .map(this.artifactConverter::toPgpPublicKeyItemDto)
+        .orElseThrow(() -> new ItemNotFoundException("pgpPublicKeyNotFound"));
   }
 
   @Transactional

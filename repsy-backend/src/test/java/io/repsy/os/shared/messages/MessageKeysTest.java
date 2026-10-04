@@ -348,7 +348,6 @@ class MessageKeysTest {
     assertThat(usedMsgIds.keySet())
         .contains(
             "usersFetched", // literal in a controller
-            "packagesFetched", // constant in a controller
             "repoNotFound", // literal in an exception
             "unAuthorized", // ErrorConstants constant in an exception
             "validationError", // constant in ErrorHandler
