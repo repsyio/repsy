@@ -85,7 +85,10 @@ export function expectContract(operationId: string, res: EdgeResponse, status = 
   return (res.json as { data?: unknown }).data;
 }
 
-/** Asserts a declared failure: `status`, the spec's error schema, and the stable `msgId`. */
+/**
+ * Asserts a declared failure: `status`, the spec's error schema (RFC 9457 `application/problem+json`),
+ * and the stable error `code` (formerly `msgId`).
+ */
 export function expectFailure(
   operationId: string,
   res: EdgeResponse,
@@ -93,7 +96,7 @@ export function expectFailure(
   msgId: string,
 ): void {
   expectContract(operationId, res, status);
-  expect(res.json, `${operationId} ${status}`).toMatchObject({ type: 'ERROR', msgId });
+  expect(res.json, `${operationId} ${status}`).toMatchObject({ code: msgId });
 }
 
 export interface Page<T> {

@@ -69,11 +69,26 @@ export interface RawResponse {
   body: Buffer;
 }
 
-/** Reads a Repsy JSON error envelope's `msgId`, when the body is one; `undefined` otherwise. */
+/**
+ * Reads a Repsy error response's code. Panel routes use RFC 9457 `application/problem+json` with `code`;
+ * protocol routes keep the old envelope with `msgId`. Both are read as the stable machine-readable key.
+ * Returns `undefined` if the body is not a JSON error.
+ */
 export function msgIdOf(body: Buffer): string | undefined {
   try {
-    const parsed = JSON.parse(body.toString('utf8')) as { msgId?: unknown };
-    return typeof parsed.msgId === 'string' ? parsed.msgId : undefined;
+    const parsed = JSON.parse(body.toString('utf8')) as {
+      code?: unknown;
+      msgId?: unknown;
+    };
+    // Problem+json (panel routes): RFC 9457 format with `code`
+    if (typeof parsed.code === 'string') {
+      return parsed.code;
+    }
+    // Envelope format (protocol routes and legacy): older `msgId` field
+    if (typeof parsed.msgId === 'string') {
+      return parsed.msgId;
+    }
+    return undefined;
   } catch {
     return undefined;
   }
