@@ -122,13 +122,11 @@ export class VersionSecurityModalComponent implements OnChanges {
         )
       : this.vulnerabilityScanControllerService.getScanOverview(this.artifactName, this.artifactVersion, this.repoName);
 
-    overview$
-      .pipe(finalize(() => (this.loading = false)))
-      .subscribe({
-        next: (response) => {
-          this.overview = response ?? null;
-        },
-        error: () => {},
-      });
+    overview$.pipe(finalize(() => (this.loading = false))).subscribe({
+      next: (response) => {
+        this.overview = response ?? null;
+      },
+      error: () => {},
+    });
   }
 }

@@ -26,7 +26,6 @@ import {
   PAGE_SIZE,
   PagedCase,
   REPO,
-  restResponse,
   selectRepo,
   SORT,
 } from '../../testing/protocol-service-spec-helpers';
@@ -79,12 +78,14 @@ describe('CargoService', () => {
         invoke: (s, search) => s.searchCrates(search, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => cargoApi.searchCargoCrates,
         args: (search) => [REPO, search, ...PAGE_ARGS],
+        bare: true,
       },
       {
         name: 'fetchCrateVersions',
         invoke: (s, search) => s.fetchCrateVersions(CRATE, search, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => cargoApi.listCargoCrateVersions,
         args: (search) => [CRATE, REPO, search, ...PAGE_ARGS],
+        bare: true,
       },
     ];
     describePagedCalls(() => service, paged);
@@ -97,7 +98,7 @@ describe('CargoService', () => {
         invoke: (s) => s.fetchCrate(CRATE),
         api: () => cargoApi.getCargoCrate,
         args: [CRATE, REPO],
-        response: restResponse(crate),
+        response: crate,
         expected: crate,
       },
       {
@@ -105,7 +106,7 @@ describe('CargoService', () => {
         invoke: (s) => s.fetchCrateVersion(CRATE, VERSION),
         api: () => cargoApi.getCargoCrateVersion,
         args: [CRATE, VERSION, REPO],
-        response: restResponse(crateVersion),
+        response: crateVersion,
         expected: crateVersion,
       },
       {
@@ -113,7 +114,7 @@ describe('CargoService', () => {
         invoke: (s) => s.deleteCrate(CRATE),
         api: () => cargoApi.deleteCargoCrate,
         args: [CRATE, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [cargoApi.deleteCargoCrateVersion],
       },
@@ -122,7 +123,7 @@ describe('CargoService', () => {
         invoke: (s) => s.deleteCrateVersion(CRATE, VERSION),
         api: () => cargoApi.deleteCargoCrateVersion,
         args: [CRATE, VERSION, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [cargoApi.deleteCargoCrate],
       },

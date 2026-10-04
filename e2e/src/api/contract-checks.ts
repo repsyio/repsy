@@ -86,6 +86,28 @@ export function expectContract(operationId: string, res: EdgeResponse, status = 
 }
 
 /**
+ * Asserts `res` has `status` and a bare body (API guideline, Decision 5: no `RestResponse` envelope) that is exactly
+ * what the spec declares for it. Returns the body itself.
+ */
+export function expectBare(operationId: string, res: EdgeResponse, status = 200): unknown {
+  expect(res.status, `${operationId}: ${res.text.slice(0, 300)}`).toBe(status);
+  expect(res.json, `${operationId}: a JSON body`).toBeDefined();
+  expect(res.json, `${operationId}: no msgId envelope`).not.toHaveProperty('msgId');
+  expect(contractProblems(operationId, status, res.json), `${operationId} ${status}`).toEqual([]);
+  expect(
+    specContract().undeclaredProperties(operationId, status, res.json),
+    `${operationId} ${status}: properties the spec does not declare`,
+  ).toEqual([]);
+  return res.json;
+}
+
+/** Asserts a 204 with an empty body, the success of a delete. */
+export function expectNoContent(operationId: string, res: EdgeResponse): void {
+  expect(res.status, `${operationId}: ${res.text.slice(0, 300)}`).toBe(204);
+  expect(res.text, `${operationId}: an empty body`).toBe('');
+}
+
+/**
  * Asserts a declared failure: `status`, the spec's error schema (RFC 9457 `application/problem+json`),
  * and the stable error `code` (formerly `msgId`).
  */
@@ -117,6 +139,8 @@ export interface PagingSweep<T> {
   total: number;
   /** Query parameters every request of the sweep carries (`modulePath=...`, for an operation that names its subject there). */
   baseQuery?: string;
+  /** True once the route answers the bare `PagedModel` (API guideline, Decision 5) instead of the `RestResponse` envelope. */
+  bare?: boolean;
   /** A key that identifies one row. */
   keyOf: (item: T) => string;
   /** Sort properties that order the seeded rows the same way in any collation (names that differ only in a trailing number). */
@@ -132,7 +156,9 @@ async function page<T>(sweep: PagingSweep<T>, query: string): Promise<Page<T>> {
   const res = await callOperation(sweep.operationId, sweep.values, {
     query: withBase(sweep, query),
   });
-  return expectContract(sweep.operationId, res) as Page<T>;
+  return (
+    sweep.bare ? expectBare(sweep.operationId, res) : expectContract(sweep.operationId, res)
+  ) as Page<T>;
 }
 
 /**

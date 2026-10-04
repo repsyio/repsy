@@ -1644,7 +1644,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelCrateListItem"
+                "$ref": "#/components/schemas/PagedModelCrateListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1660,13 +1660,13 @@ paths:
         required: true
         schema:
           type: string
-  "/api/cargo/crates/{repoName}/{crateName}":
+  "/api/cargo/crates/{repoName}/{packageName}":
     get:
       tags:
         - cargo-crate-controller
       operationId: getCargoCrate
       parameters:
-        - name: crateName
+        - name: packageName
           in: path
           required: true
           schema:
@@ -1680,7 +1680,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseCrateInfo"
+                "$ref": "#/components/schemas/CrateInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1693,18 +1693,14 @@ paths:
         - cargo-crate-controller
       operationId: deleteCargoCrate
       parameters:
-        - name: crateName
+        - name: packageName
           in: path
           required: true
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1720,13 +1716,13 @@ paths:
         required: true
         schema:
           type: string
-  "/api/cargo/crates/{repoName}/{crateName}/{version}":
+  "/api/cargo/crates/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
         - cargo-crate-controller
       operationId: getCargoCrateVersion
       parameters:
-        - name: crateName
+        - name: packageName
           in: path
           required: true
           schema:
@@ -1745,7 +1741,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseCrateVersionInfo"
+                "$ref": "#/components/schemas/CrateVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1758,7 +1754,7 @@ paths:
         - cargo-crate-controller
       operationId: deleteCargoCrateVersion
       parameters:
-        - name: crateName
+        - name: packageName
           in: path
           required: true
           schema:
@@ -1769,12 +1765,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1790,7 +1782,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/cargo/crates/{repoName}/{crateName}/versions":
+  "/api/cargo/crates/{repoName}/{packageName}/versions":
     get:
       tags:
         - cargo-crate-controller
@@ -1798,7 +1790,7 @@ paths:
       description: >-
         Sortable by `version`, `createdAt` (`property,direction`).
       parameters:
-        - name: crateName
+        - name: packageName
           in: path
           required: true
           schema:
@@ -1822,7 +1814,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelCrateVersionListItem"
+                "$ref": "#/components/schemas/PagedModelCrateVersionListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -5881,20 +5873,6 @@ components:
             "$ref": "#/components/schemas/CrateListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelCrateListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelCrateListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     CrateInfo:
       type: object
       properties:
@@ -5930,20 +5908,6 @@ components:
         totalDownloads:
           type: integer
           format: int64
-    RestResponseCrateInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/CrateInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     CrateVersionInfo:
       type: object
       properties:
@@ -6003,20 +5967,6 @@ components:
           type: string
         packageName:
           type: string
-    RestResponseCrateVersionInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/CrateVersionInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     CrateVersionListItem:
       type: object
       properties:
@@ -6036,20 +5986,6 @@ components:
             "$ref": "#/components/schemas/CrateVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelCrateVersionListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelCrateVersionListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: docker
     UntaggedManifestCleanupResult:
       type: object

@@ -109,6 +109,9 @@ public final class PagingAssertions {
     final var body =
         result.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
-    return JsonPath.<Number>read(body, "$.data.page.totalElements").intValue();
+    // A migrated route answers the bare PagedModel (Decision 5); the others still use the envelope.
+    final var bare = JsonPath.<java.util.Map<String, Object>>read(body, "$").containsKey("page");
+
+    return JsonPath.<Number>read(body, (bare ? "$" : "$.data") + ".page.totalElements").intValue();
   }
 }
