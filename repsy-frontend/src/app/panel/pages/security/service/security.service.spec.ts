@@ -28,7 +28,7 @@ import {
   VulnerabilityScanControllerService,
 } from '../../../../../generated/api';
 import { describeNoAuthorizationHeader } from '../../../shared/testing/authorization-header-spec-helpers';
-import { CallCase, describeCalls, restResponse } from '../../repository/testing/protocol-service-spec-helpers';
+import { CallCase, describeCalls } from '../../repository/testing/protocol-service-spec-helpers';
 import { SecurityService } from './security.service';
 
 const REPO = 'acme-repo';
@@ -57,6 +57,8 @@ describe('SecurityService', () => {
     vulnerabilityApi = jasmine.createSpyObj<VulnerabilityScanControllerService>('VulnerabilityScanControllerService', [
       'getSecuritySummary',
       'getVersionSecuritySummary',
+      'getScopedVersionSecuritySummary',
+      'getScopedArtifactSecurityDetail',
       'getArtifactSecuritySummary',
       'getRepoSecurityDetail',
       'getArtifactSecurityDetail',
@@ -78,7 +80,7 @@ describe('SecurityService', () => {
       invoke: (s) => s.listScans(Severity.High, RepoType.Maven, REPO, 1, 20),
       api: () => scanApi.listSecurityScans,
       args: ['HIGH', 'MAVEN', REPO, 1, 20],
-      response: restResponse(SCANS),
+      response: SCANS,
       expected: SCANS,
     },
     {
@@ -86,7 +88,7 @@ describe('SecurityService', () => {
       invoke: (s) => s.listScans(),
       api: () => scanApi.listSecurityScans,
       args: [undefined, undefined, undefined, undefined, undefined],
-      response: restResponse(SCANS),
+      response: SCANS,
       expected: SCANS,
     },
     {
@@ -94,7 +96,7 @@ describe('SecurityService', () => {
       invoke: (s) => s.getSecuritySummary([REPO, 'other-repo']),
       api: () => vulnerabilityApi.getSecuritySummary,
       args: [[REPO, 'other-repo']],
-      response: restResponse(SUMMARY),
+      response: SUMMARY,
       expected: SUMMARY,
     },
     {
@@ -102,7 +104,7 @@ describe('SecurityService', () => {
       invoke: (s) => s.getSecuritySummary(),
       api: () => vulnerabilityApi.getSecuritySummary,
       args: [undefined],
-      response: restResponse(SUMMARY),
+      response: SUMMARY,
       expected: SUMMARY,
     },
     {
@@ -111,7 +113,16 @@ describe('SecurityService', () => {
       invoke: (s) => s.getVersionSecuritySummary(REPO, ARTIFACT),
       api: () => vulnerabilityApi.getVersionSecuritySummary,
       args: [ARTIFACT, REPO],
-      response: restResponse(VERSION_SUMMARY),
+      response: VERSION_SUMMARY,
+      expected: VERSION_SUMMARY,
+    },
+    {
+      // A scoped npm name travels as /scopes/{scope}/artifacts/{name}, not as one segment with a slash.
+      name: 'getVersionSecuritySummary of a scoped npm package',
+      invoke: (s) => s.getVersionSecuritySummary(REPO, '@acme/widget'),
+      api: () => vulnerabilityApi.getScopedVersionSecuritySummary,
+      args: ['acme', 'widget', REPO],
+      response: VERSION_SUMMARY,
       expected: VERSION_SUMMARY,
     },
     {
@@ -119,7 +130,7 @@ describe('SecurityService', () => {
       invoke: (s) => s.getArtifactSecuritySummary(REPO),
       api: () => vulnerabilityApi.getArtifactSecuritySummary,
       args: [REPO],
-      response: restResponse(VERSION_SUMMARY),
+      response: VERSION_SUMMARY,
       expected: VERSION_SUMMARY,
     },
     {
@@ -127,7 +138,7 @@ describe('SecurityService', () => {
       invoke: (s) => s.getRepoSecurityDetail(REPO),
       api: () => vulnerabilityApi.getRepoSecurityDetail,
       args: [REPO],
-      response: restResponse(DETAIL),
+      response: DETAIL,
       expected: DETAIL,
     },
     {
@@ -136,7 +147,15 @@ describe('SecurityService', () => {
       invoke: (s) => s.getArtifactSecurityDetail(REPO, ARTIFACT),
       api: () => vulnerabilityApi.getArtifactSecurityDetail,
       args: [ARTIFACT, REPO],
-      response: restResponse(DETAIL),
+      response: DETAIL,
+      expected: DETAIL,
+    },
+    {
+      name: 'getArtifactSecurityDetail of a scoped npm package',
+      invoke: (s) => s.getArtifactSecurityDetail(REPO, '@acme/widget'),
+      api: () => vulnerabilityApi.getScopedArtifactSecurityDetail,
+      args: ['acme', 'widget', REPO],
+      response: DETAIL,
       expected: DETAIL,
     },
     {
@@ -144,7 +163,7 @@ describe('SecurityService', () => {
       invoke: (s) => s.getScansSummary(RepoType.Npm, REPO),
       api: () => scanApi.getSecurityScansSummary,
       args: ['NPM', REPO],
-      response: restResponse(SCANS_SUMMARY),
+      response: SCANS_SUMMARY,
       expected: SCANS_SUMMARY,
     },
     {
@@ -152,7 +171,7 @@ describe('SecurityService', () => {
       invoke: (s) => s.getScansSummary(),
       api: () => scanApi.getSecurityScansSummary,
       args: [undefined, undefined],
-      response: restResponse(SCANS_SUMMARY),
+      response: SCANS_SUMMARY,
       expected: SCANS_SUMMARY,
     },
   ];
@@ -194,7 +213,7 @@ describe('SecurityService', () => {
 
     for (const c of watchCalls) {
       it(`${c.name} polls until nothing is in progress, then stops`, fakeAsync(() => {
-        c.api().and.returnValues(of(restResponse(c.scanning)), of(restResponse(c.done)));
+        c.api().and.returnValues(of(c.scanning), of(c.done));
         const seen: unknown[] = [];
         let completed = false;
 
@@ -209,7 +228,7 @@ describe('SecurityService', () => {
       }));
 
       it(`${c.name} stops polling when unsubscribed`, fakeAsync(() => {
-        c.api().and.returnValue(of(restResponse(c.scanning)));
+        c.api().and.returnValue(of(c.scanning));
 
         const subscription = c.watch().subscribe();
         tick(10_000);
@@ -223,7 +242,7 @@ describe('SecurityService', () => {
     }
   });
 
-  describe('the maps default to an empty object when the response has no data', () => {
+  describe('the maps default to an empty object when the response has no body', () => {
     const emptyMapCalls: { name: string; api: () => jasmine.Spy; invoke: () => Observable<unknown> }[] = [
       {
         name: 'getSecuritySummary',
@@ -244,8 +263,8 @@ describe('SecurityService', () => {
 
     for (const c of emptyMapCalls) {
       for (const data of [undefined, null]) {
-        it(`${c.name} answers {} for data ${data}`, async () => {
-          c.api().and.returnValue(of(restResponse(data)));
+        it(`${c.name} answers {} for body ${data}`, async () => {
+          c.api().and.returnValue(of(data));
 
           expect(await firstValueFrom(c.invoke())).toEqual({});
         });
@@ -275,7 +294,7 @@ describe('SecurityService', () => {
 
     for (const c of objectCalls) {
       it(`${c.name} emits undefined`, async () => {
-        c.api().and.returnValue(of(restResponse(undefined)));
+        c.api().and.returnValue(of(undefined));
 
         expect(await firstValueFrom(c.invoke())).toBeUndefined();
       });

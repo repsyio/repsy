@@ -265,29 +265,31 @@ export class OsPanelBackend implements PanelBackend {
   /** `GET /api/security/supported-repo-types`: the repo types that have a scanner (empty while it is off), sorted. */
   async supportedScanRepoTypes(): Promise<string[]> {
     const res = await this.call((c) => c.securityScanController.getSupportedRepoTypes());
-    return [...unwrap(res.data, 'getSupportedRepoTypes')].sort();
+    return [...unwrap(res, 'getSupportedRepoTypes')].sort();
   }
 
   /**
    * `GET .../versions/{version}/scans`: the scan history of one version, newest first (up to 100). Over
-   * raw `fetch` because the generated client leaves a `/` in a path parameter as it is, and an npm
-   * scope (`@scope/name`) has one, which the panel sends as `%2F`.
+   * raw `fetch` so one call covers the plain and the scoped route.
    */
   async listVersionScans(
     repoName: string,
     artifactName: string,
     version: string,
   ): Promise<VulnerabilityScanInfo[]> {
-    const path = [repoName, 'artifacts', artifactName, 'versions', version]
-      .map((part) => encodeURIComponent(part))
-      .join('/');
+    // A scoped npm package (`@scope/name`) is addressed as /scopes/{scope}/artifacts/{name}.
+    const scoped = /^@([^/]+)\/(.+)$/.exec(artifactName);
+    const segments = scoped
+      ? [repoName, 'scopes', scoped[1], 'artifacts', scoped[2], 'versions', version]
+      : [repoName, 'artifacts', artifactName, 'versions', version];
+    const path = segments.map((part) => encodeURIComponent(part)).join('/');
     const url = `${this.baseUrl}/api/repos/${path}/scans?size=100&sort=createdAt,desc`;
     const res = await fetch(url, { headers: { Authorization: this.authorization() } });
     if (!res.ok) {
       throw new PanelApiError(`GET ${url} answered ${res.status}: ${await res.text()}`);
     }
-    const body = (await res.json()) as { data?: { content?: VulnerabilityScanInfo[] } };
-    return body.data?.content ?? [];
+    const body = (await res.json()) as { content?: VulnerabilityScanInfo[] };
+    return body.content ?? [];
   }
 
   /** `GET /api/repos/{repo}/scans/{scanId}/findings`: the findings of one scan (up to 100), worst first. */
@@ -299,7 +301,7 @@ export class OsPanelBackend implements PanelBackend {
         size: 100,
       }),
     );
-    return unwrap(res.data, 'getVulnerabilityScanFindings').content ?? [];
+    return unwrap(res, 'getVulnerabilityScanFindings').content ?? [];
   }
 
   /** `GET /api/security/scans/summary`: findings per severity over the latest completed scan of every version (admin only). */
@@ -309,7 +311,7 @@ export class OsPanelBackend implements PanelBackend {
     const res = await this.call((c) =>
       c.securityScanController.getSecurityScansSummary(filter as GeneratedRepoTypeFilter),
     );
-    return unwrap(res.data, 'getSecurityScansSummary');
+    return unwrap(res, 'getSecurityScansSummary');
   }
 
   /** `GET /api/repos/security-summary[?repoNames=...]`: one entry per repo that has one (all repos when none are named). */
@@ -317,7 +319,7 @@ export class OsPanelBackend implements PanelBackend {
     const res = await this.call((c) =>
       c.vulnerabilityScanController.getSecuritySummary({ repoNames }),
     );
-    return unwrap(res.data, 'getSecuritySummary');
+    return unwrap(res, 'getSecuritySummary');
   }
 
   async deleteRepo(repoName: string): Promise<void> {

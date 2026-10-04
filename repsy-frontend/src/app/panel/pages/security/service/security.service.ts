@@ -28,6 +28,7 @@ import {
   VersionSecuritySummary,
   VulnerabilityScanControllerService,
 } from '../../../../../generated/api';
+import { splitScopedArtifactName } from '../../../shared/util/scoped-artifact.util';
 import { pollSecuritySummary } from '../../../shared/util/security-summary-poll.util';
 
 @Injectable({
@@ -46,26 +47,27 @@ export class SecurityService {
     page?: number,
     size?: number,
   ): Observable<PagedModelVulnerabilityScanInfo> {
-    return this.securityScanControllerService
-      .listSecurityScans(severity, repoType, repoName, page, size)
-      .pipe(map((r) => r.data!));
+    return this.securityScanControllerService.listSecurityScans(severity, repoType, repoName, page, size);
   }
 
   public getSecuritySummary(repoNames?: string[]): Observable<Record<string, RepoSecuritySummary>> {
-    return this.vulnerabilityScanControllerService.getSecuritySummary(repoNames).pipe(map((r) => r.data ?? {}));
+    return this.vulnerabilityScanControllerService.getSecuritySummary(repoNames).pipe(map((r) => r ?? {}));
   }
 
   public getVersionSecuritySummary(
     repoName: string,
     artifactName: string,
   ): Observable<Record<string, VersionSecuritySummary>> {
-    return this.vulnerabilityScanControllerService
-      .getVersionSecuritySummary(artifactName, repoName)
-      .pipe(map((r) => r.data ?? {}));
+    const scoped = splitScopedArtifactName(artifactName);
+    const summary$ = scoped
+      ? this.vulnerabilityScanControllerService.getScopedVersionSecuritySummary(scoped.scope, scoped.name, repoName)
+      : this.vulnerabilityScanControllerService.getVersionSecuritySummary(artifactName, repoName);
+
+    return summary$.pipe(map((r) => r ?? {}));
   }
 
   public getArtifactSecuritySummary(repoName: string): Observable<Record<string, VersionSecuritySummary>> {
-    return this.vulnerabilityScanControllerService.getArtifactSecuritySummary(repoName).pipe(map((r) => r.data ?? {}));
+    return this.vulnerabilityScanControllerService.getArtifactSecuritySummary(repoName).pipe(map((r) => r ?? {}));
   }
 
   /** The repository summary, fetched again while a scan of one of the repositories is unfinished. */
@@ -87,16 +89,18 @@ export class SecurityService {
   }
 
   public getRepoSecurityDetail(repoName: string): Observable<RepoSecurityDetail> {
-    return this.vulnerabilityScanControllerService.getRepoSecurityDetail(repoName).pipe(map((r) => r.data!));
+    return this.vulnerabilityScanControllerService.getRepoSecurityDetail(repoName);
   }
 
   public getArtifactSecurityDetail(repoName: string, artifactName: string): Observable<RepoSecurityDetail> {
-    return this.vulnerabilityScanControllerService
-      .getArtifactSecurityDetail(artifactName, repoName)
-      .pipe(map((r) => r.data!));
+    const scoped = splitScopedArtifactName(artifactName);
+
+    return scoped
+      ? this.vulnerabilityScanControllerService.getScopedArtifactSecurityDetail(scoped.scope, scoped.name, repoName)
+      : this.vulnerabilityScanControllerService.getArtifactSecurityDetail(artifactName, repoName);
   }
 
   public getScansSummary(repoType?: RepoType, repoName?: string): Observable<SecurityScansSummary> {
-    return this.securityScanControllerService.getSecurityScansSummary(repoType, repoName).pipe(map((r) => r.data!));
+    return this.securityScanControllerService.getSecurityScansSummary(repoType, repoName);
   }
 }

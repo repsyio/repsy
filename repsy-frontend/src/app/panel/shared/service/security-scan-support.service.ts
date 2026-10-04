@@ -29,7 +29,7 @@ export class SecurityScanSupportService {
 
   constructor(private readonly securityScanControllerService: SecurityScanControllerService) {
     this.supportedRepoTypes$ = this.securityScanControllerService.getSupportedRepoTypes().pipe(
-      map((response) => new Set((response.data ?? []).map((repoType) => toApiRepoType(repoType) ?? repoType))),
+      map((response) => new Set((response ?? []).map((repoType) => toApiRepoType(repoType) ?? repoType))),
       catchError(() => of(new Set<string>())),
       shareReplay({ bufferSize: 1, refCount: false }),
     );

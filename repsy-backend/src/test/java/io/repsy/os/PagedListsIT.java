@@ -320,6 +320,12 @@ class PagedListsIT extends AbstractIntegrationTest {
               false,
               "createdAt"),
           list(
+              "listScopedVulnerabilityScans",
+              RepoType.NPM,
+              "/api/repos/{repo}/scopes/acme/artifacts/widget/versions/1.0.0/scans",
+              false,
+              "createdAt"),
+          list(
               "getVulnerabilityScanFindings",
               RepoType.MAVEN,
               "/api/repos/{repo}/scans/" + SCAN_ID + "/findings",
