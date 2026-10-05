@@ -108,7 +108,6 @@ class AuthControllerIT extends AbstractIntegrationTest {
       Map.ofEntries(
           Map.entry("loginSucceeded", "Log In succeeded."),
           Map.entry("passwordReset", "Password reset."),
-          Map.entry("loggedOut", "Logged out."),
           Map.entry("tokenRefreshed", "Token refreshed."),
           Map.entry("userCreated", "User created."),
           Map.entry("userUpdated", "User updated."),
@@ -1316,7 +1315,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
               AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
       final String refreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
 
-      expectSuccess(AuthControllerIT.this.logoutWith(refreshToken), "loggedOut");
+      expectNoContent(AuthControllerIT.this.logoutWith(refreshToken));
 
       expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(refreshToken));
     }
@@ -1334,7 +1333,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
           expectSuccess(AuthControllerIT.this.refreshWith(originalRefreshToken), "tokenRefreshed");
       final String childRefreshToken = JsonPath.read(refreshedBody, "$.data.refreshToken");
 
-      expectSuccess(AuthControllerIT.this.logoutWith(childRefreshToken), "loggedOut");
+      expectNoContent(AuthControllerIT.this.logoutWith(childRefreshToken));
 
       expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(childRefreshToken));
     }
@@ -1347,20 +1346,20 @@ class AuthControllerIT extends AbstractIntegrationTest {
           AuthControllerIT.this.createUser(uniqueUsername("logoutunspent"), UserRole.USER);
       final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
 
-      expectSuccess(AuthControllerIT.this.logoutWith(refreshToken), "loggedOut");
+      expectNoContent(AuthControllerIT.this.logoutWith(refreshToken));
 
       expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(refreshToken));
     }
 
     @Test
-    @DisplayName("is idempotent: logging out twice with the same token still answers loggedOut")
+    @DisplayName("is idempotent: logging out twice with the same token still answers 204")
     void isIdempotent() throws Exception {
       final var user =
           AuthControllerIT.this.createUser(uniqueUsername("logouttwice"), UserRole.USER);
       final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
 
-      expectSuccess(AuthControllerIT.this.logoutWith(refreshToken), "loggedOut");
-      expectSuccess(AuthControllerIT.this.logoutWith(refreshToken), "loggedOut");
+      expectNoContent(AuthControllerIT.this.logoutWith(refreshToken));
+      expectNoContent(AuthControllerIT.this.logoutWith(refreshToken));
     }
 
     @Test
@@ -1377,7 +1376,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
               AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
       final String secondRefreshToken = JsonPath.read(secondLogin, "$.data.refreshToken");
 
-      expectSuccess(AuthControllerIT.this.logoutWith(firstRefreshToken), "loggedOut");
+      expectNoContent(AuthControllerIT.this.logoutWith(firstRefreshToken));
 
       expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(firstRefreshToken));
       expectSuccess(AuthControllerIT.this.refreshWith(secondRefreshToken), "tokenRefreshed");
@@ -1390,13 +1389,12 @@ class AuthControllerIT extends AbstractIntegrationTest {
           AuthControllerIT.this.createUser(uniqueUsername("logoutnoauth"), UserRole.USER);
       final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
 
-      expectSuccess(
+      expectNoContent(
           AuthControllerIT.this.perform(
               post("/api/auth/logout")
                   .header(AUTHORIZATION, "Bearer not-a-jwt")
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(refreshBody(refreshToken))),
-          "loggedOut");
+                  .content(refreshBody(refreshToken))));
     }
 
     @Test
