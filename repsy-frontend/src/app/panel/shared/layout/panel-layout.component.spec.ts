@@ -70,6 +70,7 @@ const provideSession = (
     let fixture: ComponentFixture<unknown>;
     let router: Router;
     let viewport: FakeMediaQueryList;
+    let viewportStyle: HTMLStyleElement;
 
     const query = <T extends HTMLElement = HTMLElement>(testId: string): T | null =>
       fixture.nativeElement.querySelector(`[data-testid="${testId}"]`);
@@ -89,6 +90,12 @@ const provideSession = (
     };
 
     beforeEach(() => {
+      // The drawer and the burger are `md:hidden` in the real stylesheet, so in a browser window at least 768px wide (headed
+      // Chrome, the default `ng test` browser) they have no box and cannot take focus. The focus specs must not depend on it.
+      viewportStyle = document.createElement('style');
+      viewportStyle.textContent =
+        '[data-testid="mobile-sidebar"] { display: flex !important; } [data-testid="header-burger"] { display: inline-flex !important; }';
+      document.head.appendChild(viewportStyle);
       viewport = new FakeMediaQueryList();
       spyOn(window, 'matchMedia').and.returnValue(viewport as unknown as MediaQueryList);
       TestBed.configureTestingModule({
@@ -108,6 +115,7 @@ const provideSession = (
 
     afterEach(() => {
       fixture.destroy();
+      viewportStyle.remove();
       document.body.style.overflow = '';
     });
 
