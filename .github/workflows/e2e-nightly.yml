@@ -2,19 +2,20 @@ name: E2E Nightly
 
 # Runs the e2e harness (e2e/, README.md "CI"): the panel UI suite (headless Chromium, and @smoke in Firefox and WebKit) and the
 # wire-level protocol runners (real mvn/npm/cargo/... clients) against a Repsy image built from this
-# checkout. NIGHTLY AND MANUAL ONLY, by the product owner's decision (RPS-1260): there is
-# deliberately no pull_request or push trigger, because PR checks are switched off in
-# this repo (see pr-checks.yml and AGENTS.md "Merging to main"). Do not add one here; a PR gate is a
-# separate, later decision (README.md "CI" says how to add a smoke gate).
+# checkout. MANUAL ONLY: there is deliberately no pull_request or push trigger, by the product owner's
+# decision (RPS-1260). Do not add one here; a PR gate is a separate, later decision (README.md "CI" says
+# how to add a smoke gate).
+#
+# Paused: RPS-1957, re-enable: RPS-1958; the previous triggers are in the git history.
+# The nightly schedule (01:23 UTC) is off too, because the remote e2e runs fail too often to be a signal,
+# so this workflow only runs when someone starts it. It is not a required check, and nothing depends on
+# it, so nothing is blocked by the pause.
 #
 # Run it by hand: gh workflow run e2e-nightly.yml [-f suite=ui] [-f protocol=maven,npm] [-f grep=@smoke] [-f h2_full=docker]
 permissions:
   contents: read
 
 on:
-  schedule:
-    # 01:23 UTC, off-peak and off the round hour, when scheduled runs are delayed the most.
-    - cron: "23 1 * * *"
   workflow_dispatch:
     inputs:
       suite:
@@ -63,7 +64,7 @@ env:
   REPSY_IMAGE: repsy-os-e2e:ci
 
 jobs:
-  # Decides which legs run, from the dispatch inputs (a scheduled run has none: everything).
+  # Decides which legs run, from the dispatch inputs (a dispatch that leaves them empty: everything).
   plan:
     name: Plan
     runs-on: hetzner-sm

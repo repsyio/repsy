@@ -7234,10 +7234,15 @@ checksums are not dependencies to it. Nothing here adds a PR check; the script i
 
 `.github/workflows/e2e-nightly.yml` ("E2E Nightly") runs this harness on GitHub Actions: the panel UI
 suite, the wire-level protocol runners, the embedded-H2 smoke run plus one rotating full catalog on H2, and
-the scanner-stub UI specs, the real-scanner contract spec and the `@smoke` of every client over Repsy's own TLS. **It runs nightly (01:23 UTC)
-and on demand only, by the product owner's decision (RPS-1260): it has no `pull_request` or
-`push` trigger.** PR checks are switched off in this repo on purpose (`pr-checks.yml` is
-`workflow_dispatch` only, `AGENTS.md` "Merging to main"), and this workflow is not a required check.
+the scanner-stub UI specs, the real-scanner contract spec and the `@smoke` of every client over Repsy's own TLS. It has
+no `pull_request` or `push` trigger, by the product owner's decision (RPS-1260).
+
+**Paused (RPS-1957): it runs on demand only.** The nightly schedule (01:23 UTC) is off as well, because the
+remote e2e runs fail too often to be a signal; RPS-1958 fixes them and restores it. Nothing depends on this
+workflow and it is not a required check — the required checks of the `protect default` ruleset come from
+`pr-checks.yml` (which does run on `pull_request`) and `pr-title.yml`, see `AGENTS.md` "Merging to main" —
+so the pause blocks no PR and no release. Until it is lifted, run the harness locally before a change to a
+protocol or a panel flow.
 
 ### Triggering it
 
