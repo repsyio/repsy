@@ -40,16 +40,25 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.asm.ClassReader;
+import org.springframework.asm.ClassVisitor;
+import org.springframework.asm.MethodVisitor;
+import org.springframework.asm.Opcodes;
+import org.springframework.asm.Type;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.DefaultParameterNameDiscoverer;
+import org.springframework.core.ResolvableType;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -1069,8 +1078,322 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
   }
 
   // ---------------------------------------------------------------------------------------------
+  // Status codes and body presence (RPS-1886)
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * RPS-1886: known drift between a handler and the spec's success responses. Empty means none; an
+   * entry carries the reason.
+   */
+  private static final Map<String, String> KNOWN_RESPONSE_DRIFT = Map.of();
+
+  /**
+   * RPS-1886: mappings that are deliberately in no panel spec, by {@code Controller.method}: the
+   * wire protocols, the SPA forwarding and the framework's own endpoints. The protocol routes keep
+   * their own error formats and are documented by the protocol, not by the panel spec.
+   */
+  private static final Map<String, String> OUTSIDE_THE_PANEL_SPEC =
+      Map.of(
+          "BasicErrorController.error", "Spring Boot's /error page, not a panel route",
+          "BasicErrorController.errorHtml", "Spring Boot's /error page, not a panel route",
+          "SpaController.forward",
+              "the panel's SPA forwarding, serves index.html, not an API route",
+          "OpenApiWebMvcResource.openapiJson", "springdoc's generated /v3/api-docs, not the spec",
+          "OpenApiWebMvcResource.openapiYaml",
+              "springdoc's generated /v3/api-docs.yaml, not the spec",
+          "SwaggerConfigResource.openapiJson", "springdoc's swagger-ui configuration",
+          "SwaggerWelcomeWebMvc.redirectToUi", "springdoc's redirect to the Swagger UI",
+          "ProtocolRouterController.route",
+              "the catch-all of every wire protocol (npm, Maven, OCI, ...), which has its own"
+                  + " formats and is not part of the panel spec");
+
+  @Test
+  @DisplayName("the success responses of an operation match what its handler returns")
+  void successResponsesMatchTheHandlers() throws IOException {
+    final var findings = responseFindings(loadSpec(), this.panelRoutes());
+
+    assertNoNewFindings("success status and body", findings, KNOWN_RESPONSE_DRIFT);
+  }
+
+  /**
+   * Flip-and-fail: a handler that returns no body next to a spec 2xx that promises one, a handler
+   * that returns a body next to a spec that has none (or a 204), and a 201 the spec does not
+   * declare.
+   */
+  @Test
+  @DisplayName("the response rule fires on a body mismatch, a 204 with a body and a missing 201")
+  void responseRuleFires() throws IOException {
+    final var doc = loadSpec();
+    final var routes = this.panelRoutes();
+    final var operations = specOperations(doc);
+
+    // a void handler whose spec promises a body
+    final var noBody =
+        operations.values().stream()
+            .filter(op -> returnShapeOf(routes, op.key()) == Shape.NONE)
+            .filter(op -> successCodes(op).contains("204"))
+            .findFirst()
+            .orElseThrow();
+    asMap(noBody.raw().get("responses"))
+        .put(
+            "204",
+            Map.of(
+                "description",
+                "x",
+                "content",
+                Map.of("application/json", Map.of("schema", Map.of("type", "string")))));
+
+    // a body-returning handler whose spec has no content, and one whose spec says 204
+    final var withBody =
+        operations.values().stream()
+            .filter(op -> returnShapeOf(routes, op.key()) == Shape.BODY)
+            .filter(op -> successCodes(op).contains("200"))
+            .toList();
+    asMap(asMap(withBody.get(0).raw().get("responses")).get("200")).remove("content");
+    asMap(withBody.get(1).raw().get("responses")).put("204", Map.of("description", "x"));
+
+    // a handler that answers 201 whose spec lost the 201
+    final var created =
+        operations.values().stream()
+            .filter(op -> inferredCodesOf(routes, op.key()).contains(201))
+            .findFirst()
+            .orElseThrow();
+    asMap(created.raw().get("responses")).remove("201");
+
+    final var findings = responseFindings(doc, routes);
+
+    assertThat(findings)
+        .anyMatch(f -> f.startsWith(noBody.key()) && f.contains("returns no body"))
+        .anyMatch(f -> f.startsWith(withBody.get(0).key()) && f.contains("has no content"))
+        .anyMatch(f -> f.startsWith(withBody.get(1).key()) && f.contains("declares 204"))
+        .anyMatch(f -> f.startsWith(created.key()) && f.contains("does not declare 201"));
+  }
+
+  private static Shape returnShapeOf(final List<RouteInfo> routes, final String key) {
+    return routes.stream()
+        .filter(route -> route.key().equals(key))
+        .map(RouteInfo::returnShape)
+        .findFirst()
+        .orElse(Shape.UNKNOWN);
+  }
+
+  private static Set<Integer> inferredCodesOf(final List<RouteInfo> routes, final String key) {
+    return routes.stream()
+        .filter(route -> route.key().equals(key))
+        .flatMap(route -> route.inferredSuccessCodes().stream())
+        .collect(Collectors.toSet());
+  }
+
+  private static Set<String> successCodes(final SpecOperation operation) {
+    return asMap(operation.raw().get("responses")).keySet().stream()
+        .map(String::valueOf)
+        .filter(code -> code.startsWith("2"))
+        .collect(Collectors.toCollection(TreeSet::new));
+  }
+
+  /**
+   * Compares the 2xx responses of every spec operation with what each of its handlers returns: a
+   * {@code void} or {@code ResponseEntity<Void>} handler has no body, so no 2xx may promise
+   * content; any other handler has one, so a 2xx must carry content and 204 is not declared; and
+   * every 201, 202 or 204 the handler is seen to produce ({@code ResponseEntities.created}, {@code
+   * accepted}, {@code noContent}, {@code ResponseEntity.created/accepted/noContent}, {@code
+   * HttpStatus.CREATED...}, {@code @ResponseStatus}) is a code the spec declares. A handler that
+   * delegates its status to a callee is not seen, so the status direction is one-way.
+   */
+  private static Set<String> responseFindings(
+      final Map<String, Object> doc, final List<RouteInfo> routes) {
+
+    final var findings = new TreeSet<String>();
+
+    for (final var operation : specOperations(doc).values()) {
+      final var responses = asMap(operation.raw().get("responses"));
+      final var codes = successCodes(operation);
+
+      if (codes.isEmpty()) {
+        findings.add(operation.key() + ": no 2xx response declared");
+      }
+
+      final var hasContent = new TreeSet<String>();
+
+      for (final var code : codes) {
+        if (deref(doc, responses.get(code)).containsKey("content")) {
+          hasContent.add(code);
+        }
+      }
+
+      for (final var route : routes) {
+        if (!route.key().equals(operation.key())) {
+          continue;
+        }
+
+        final var name = handlerName(route.handler());
+
+        switch (route.returnShape()) {
+          case NONE -> {
+            if (!hasContent.isEmpty()) {
+              findings.add(
+                  operation.key()
+                      + ": "
+                      + name
+                      + " returns no body but the spec promises one in "
+                      + hasContent);
+            }
+          }
+          case BODY -> {
+            if (hasContent.isEmpty()) {
+              findings.add(
+                  operation.key()
+                      + ": "
+                      + name
+                      + " returns a body but the spec 2xx "
+                      + codes
+                      + " has no content");
+            }
+
+            if (codes.contains("204")) {
+              findings.add(
+                  operation.key() + ": " + name + " returns a body but the spec declares 204");
+            }
+          }
+          case UNKNOWN -> {
+            // ResponseEntity<?> or Object: the body cannot be derived from the signature
+          }
+        }
+
+        for (final var inferred : route.inferredSuccessCodes()) {
+          if (!codes.contains(String.valueOf(inferred))) {
+            findings.add(
+                operation.key()
+                    + ": "
+                    + name
+                    + " answers "
+                    + inferred
+                    + " but the spec does not declare "
+                    + inferred
+                    + " (declares "
+                    + codes
+                    + ")");
+          }
+        }
+      }
+    }
+
+    return findings;
+  }
+
+  /** Follows a {@code $ref} (a shared response component) to the node it names. */
+  private static Map<String, Object> deref(final Map<String, Object> doc, final Object node) {
+    var current = asMap(node);
+
+    while (current.get("$ref") instanceof final String target && resolves(doc, target)) {
+      Object next = doc;
+
+      for (final var part : target.substring(2).split("/")) {
+        next = asMap(next).get(part);
+      }
+
+      current = asMap(next);
+    }
+
+    return current;
+  }
+
+  private static String handlerName(final HandlerMethod handler) {
+    return handler.getBeanType().getSimpleName() + "." + handler.getMethod().getName();
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Every mapping is in the spec (RPS-1886)
+  // ---------------------------------------------------------------------------------------------
+
+  @Test
+  @DisplayName("every controller mapping is in the spec, or deliberately outside it")
+  void everyMappingIsInTheSpecOrAllowListed() throws IOException {
+    final var spec = specOperations(loadSpec()).keySet();
+    final var findings = new TreeSet<String>();
+    final var used = new TreeSet<String>();
+
+    for (final var finding : unspecifiedMappings(this.handlerMapping, spec)) {
+      if (OUTSIDE_THE_PANEL_SPEC.containsKey(finding.handler())) {
+        used.add(finding.handler());
+      } else {
+        findings.add(finding.toString());
+      }
+    }
+
+    // a stale entry would let a renamed handler escape the rule
+    final var stale = new TreeSet<>(OUTSIDE_THE_PANEL_SPEC.keySet());
+    stale.removeAll(used);
+    stale.forEach(name -> findings.add("OUTSIDE_THE_PANEL_SPEC lists no such mapping: " + name));
+
+    assertNoNewFindings("controller mappings in no spec", findings, Map.of());
+  }
+
+  /** Flip-and-fail: a mapping whose spec operation was removed is reported. */
+  @Test
+  @DisplayName("the mapping rule fires on a path missing from the spec")
+  void mappingRuleFires() throws IOException {
+    final var someRoute = this.panelRoutes().get(0);
+    final var all = new TreeSet<>(specOperations(loadSpec()).keySet());
+    all.remove(someRoute.key());
+
+    assertThat(unspecifiedMappings(this.handlerMapping, all))
+        .extracting(Unspecified::key)
+        .contains(someRoute.key());
+  }
+
+  /**
+   * Every (method, pattern) of every handler of the application that is not a spec operation: a
+   * panel route missing from the spec, or a mapping that is not a panel route at all (the protocol
+   * router, the SPA routes, the error page).
+   */
+  private static List<Unspecified> unspecifiedMappings(
+      final RequestMappingHandlerMapping mapping, final Set<String> specKeys) {
+
+    final var found = new ArrayList<Unspecified>();
+
+    for (final var entry : mapping.getHandlerMethods().entrySet()) {
+      final var info = entry.getKey();
+      final var handler = entry.getValue();
+      final var methods =
+          info.getMethodsCondition().getMethods().isEmpty()
+              ? Set.of("ANY")
+              : info.getMethodsCondition().getMethods().stream()
+                  .map(Enum::name)
+                  .collect(Collectors.toSet());
+
+      for (final var pattern : info.getPatternValues()) {
+        for (final var method : methods) {
+          final var key = method + " " + normalize(pattern);
+
+          if (!specKeys.contains(key)) {
+            found.add(new Unspecified(handlerName(handler), key));
+          }
+        }
+      }
+    }
+
+    return found;
+  }
+
+  private record Unspecified(String handler, String key) {
+
+    @Override
+    public String toString() {
+      return "in a controller, in no spec: " + this.handler + " " + this.key;
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
   // Model
   // ---------------------------------------------------------------------------------------------
+
+  /** What a handler returns, from its signature. */
+  private enum Shape {
+    NONE,
+    BODY,
+    UNKNOWN
+  }
 
   private enum Access {
     PUBLIC,
@@ -1174,6 +1497,112 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
       }
 
       return names;
+    }
+
+    /** Whether the handler writes a body: {@code void} and {@code ResponseEntity<Void>} do not. */
+    Shape returnShape() {
+      var type = ResolvableType.forMethodReturnType(this.handler.getMethod());
+
+      if (HttpEntity.class.isAssignableFrom(type.toClass())) {
+        type = type.as(HttpEntity.class).getGeneric(0);
+      }
+
+      final var raw = type.resolve();
+
+      if (raw == null || raw.equals(Object.class)) {
+        return Shape.UNKNOWN;
+      }
+
+      return raw.equals(void.class) || raw.equals(Void.class) ? Shape.NONE : Shape.BODY;
+    }
+
+    /**
+     * The 201, 202 and 204 the handler is seen to produce: {@code @ResponseStatus}, and calls of
+     * {@code ResponseEntities.created/accepted/noContent} (or the {@code ResponseEntity} ones) and
+     * reads of {@code HttpStatus.CREATED, ACCEPTED, NO_CONTENT} in its bytecode. A status chosen in
+     * a callee is not seen.
+     */
+    Set<Integer> inferredSuccessCodes() {
+      final var codes = new TreeSet<Integer>();
+      final var method = this.handler.getMethod();
+      final var annotated =
+          AnnotatedElementUtils.findMergedAnnotation(method, ResponseStatus.class);
+
+      if (annotated != null
+          && annotated.code().is2xxSuccessful()
+          && annotated.code().value() != 200) {
+        codes.add(annotated.code().value());
+      }
+
+      final var declaring = method.getDeclaringClass();
+      final var descriptor = Type.getMethodDescriptor(method);
+
+      try (var in =
+          declaring.getResourceAsStream("/" + declaring.getName().replace('.', '/') + ".class")) {
+        if (in == null) {
+          return codes;
+        }
+
+        new ClassReader(in)
+            .accept(
+                new ClassVisitor(Opcodes.ASM9) {
+                  @Override
+                  public MethodVisitor visitMethod(
+                      final int access,
+                      final String name,
+                      final String desc,
+                      final String signature,
+                      final String[] exceptions) {
+
+                    if (!name.equals(method.getName()) || !desc.equals(descriptor)) {
+                      return null;
+                    }
+
+                    return new MethodVisitor(Opcodes.ASM9) {
+                      @Override
+                      public void visitMethodInsn(
+                          final int opcode,
+                          final String owner,
+                          final String callee,
+                          final String calleeDesc,
+                          final boolean itf) {
+
+                        if (owner.equals("org/springframework/http/ResponseEntity")
+                            || owner.equals("io/repsy/os/shared/http/ResponseEntities")) {
+                          switch (callee) {
+                            case "created" -> codes.add(201);
+                            case "accepted" -> codes.add(202);
+                            case "noContent" -> codes.add(204);
+                            default -> {}
+                          }
+                        }
+                      }
+
+                      @Override
+                      public void visitFieldInsn(
+                          final int opcode,
+                          final String owner,
+                          final String field,
+                          final String d) {
+
+                        if (owner.equals("org/springframework/http/HttpStatus")) {
+                          switch (field) {
+                            case "CREATED" -> codes.add(201);
+                            case "ACCEPTED" -> codes.add(202);
+                            case "NO_CONTENT" -> codes.add(204);
+                            default -> {}
+                          }
+                        }
+                      }
+                    };
+                  }
+                },
+                ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+      } catch (final IOException e) {
+        throw new java.io.UncheckedIOException(e);
+      }
+
+      return codes;
     }
 
     /** The names the handler's {@code @PathVariable} parameters bind. */

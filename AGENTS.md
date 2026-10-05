@@ -319,6 +319,107 @@ write and Metadata: read, install it on `repsyio/repsy`, then store its ID as th
 `PNPM_BUMP_APP_ID` and its private key as the secret `PNPM_BUMP_APP_PRIVATE_KEY`. Until then the workflow
 only writes a note to its run summary. Trigger it once with `gh workflow run pnpm-bump.yml`.
 
+## API guideline
+
+This is the shared contract of the **Repsy OS panel API** and the **Repsy Cloud panel API** (the routes the web
+panel calls; the wire protocols of the package formats are not covered). It is the same text as the "API guideline"
+section of `repsy-mono`'s `AGENTS.md`, adapted to the single tenant OS: read OS paths without `{repoOwner}`. When a
+rule changes, change it in both repositories together. Every API change follows it.
+
+### Principle
+
+- OS is single tenant and Cloud is multi tenant. The OS spec is the reference. A Cloud path is the OS path with
+  `{repoOwner}` inserted before `{repoName}` (OS `/api/repos/{repoName}/settings`, Cloud
+  `/api/repos/{repoOwner}/{repoName}/settings`). Everything after the repo segment is identical: verbs, parameter
+  names, request and response schemas, status codes, error codes.
+- Tenant-only features (billing, subscriptions, coupons, custom domains, public profiles, MFA, OAuth, webhooks, proxy
+  repos, support) exist only in Cloud; OS has users instead of tenants. Do not port them to OS.
+- Breaking changes are allowed if this guideline is followed and every client (the panel frontend, e2e, generated API
+  clients) is updated in the same PR.
+- Where the spec lives: `repsy-backend/src/main/resources/openapi/openapi-spec.yaml` (OpenAPI 3.1, `Repsy Panel API`,
+  hand written). The Cloud spec lives in `repsy-mono`; this repository owns every schema both products share
+  (`PagedModel`, `RepoType`, the problem+json error, per-format list items, scan findings). `repsy-core` is also used
+  by other projects, so no Repsy API spec or fragment lives in it.
+
+### URL shape
+
+- Repo-generic routes: `/api/repos/{repoName}/...`. Per-format routes: `/api/{format}/{plural}/{repoName}/...`
+  (`cargo/crates`, `docker/images`, `go/modules`, `helm/charts`, `mvn/artifacts`, `npm/packages`, `nuget/packages`,
+  `pypi/packages`, `ruby/gems`).
+- Paths are lowercase kebab-case nouns; verbs go in the HTTP method. An action that is not CRUD is
+  `POST .../actions/{kebab-name}` (`deploy-tokens/{tokenId}/actions/rotate`, `users/{userId}/actions/reset-password`).
+- **A literal segment never sits at a level where `{repoOwner}` can appear in Cloud**, because a tenant may be named
+  like the literal. Put the repo first and the literal after it (`/api/repos/{repoName}/cache/browse`); a literal is
+  fine as the first segment after `/api/` and after a complete repo pair (`/settings`, `/deploy-tokens`).
+- Path variable names are the same in both APIs and in every format: `{repoName}`, `{packageName}` (the unit that holds
+  versions: crate, chart, npm, NuGet or PyPI package, gem), `{imageName}`, `{groupName}` and `{artifactName}` (Maven),
+  `{version}`, `{tagName}`, `{digest}`, `{reference}`, `{userId}`, `{tokenId}`, `{scanId}`, `{keyStoreId}`. Ids are
+  always `{xxxId}`, never `{xxxUuid}`.
+- **Version sub-resource for every format**: `/{packageName}/versions` (list) and `/{packageName}/versions/{version}`
+  (detail, delete).
+- The panel API addresses repos and packages by name, not by database id.
+- **Scoped npm names, one encoding**: the scope is its own path segment without the `@`, and scoped packages live in
+  the scopes tree. Unscoped: `/api/npm/packages/{repoName}/{packageName}[/versions/{version}|/tags]`. Scoped:
+  `/api/npm/scopes/{repoName}/{scope}/packages/{packageName}[/versions/{version}|/tags]`. The scope listing is
+  `/api/npm/scopes/{repoName}/packages` and `/api/npm/scopes/{repoName}/{scope}/packages`. The npm wire protocol
+  (`@scope%2Fname` in the registry URL) is unaffected.
+- **Docker names with several segments** (`team/app`) use an `image` query parameter on the nested image routes;
+  `{imageName}` stays for single segment names. Encoded slashes are not enabled, because that weakens path traversal
+  protection.
+
+### Search, list and detail
+
+- The one search parameter is `q` (case-insensitive contains). Filters that are not free text keep their own names
+  (`type`, `severity`, `platform`, `repoNames`, `modulePath`, `path`).
+- One list shape, one detail shape and one search shape per format: every list is `GET .../{plural}/{repoName}`
+  returning the `PagedModel` of that format's list item; every detail is `GET .../{packageName}`; search is `q` on the
+  list, never a separate `/search` route.
+- Pagination (enforced by `PagingParameterInterceptor`): `page` zero based, default 0; `size` 1 to 100, default 10;
+  `sort=property,direction` repeatable, ties broken by id; anything out of range, or an unknown sort property, is
+  `400 validationError`. List responses use `PagedModel` with `page: {size, number, totalElements, totalPages}`. A new
+  list must reuse the `Page`, `Size` and `Sort` parameter components (`components/parameters`) and must not invent
+  defaults. An unpaged list needs a stated reason.
+
+### Methods and status codes
+
+| Situation | Status | Notes |
+| --- | --- | --- |
+| Read, update, action that returns a body | 200 | |
+| Create that returns the new resource | 201 + `Location` header | `Location` is the detail route of the resource. |
+| Delete, or update with nothing to return | 204, no body | 404 if absent, so deletes are not idempotent on purpose. |
+| Work accepted and finished later (scan start, data export) | 202 + `Location` of a status resource | |
+| Malformed body, failed validation, bad page or sort | 400 | `validationError`, `data` names the parameter. |
+| Missing or invalid credentials | 401 | An authenticated caller without permission is 403. Public repos can be read anonymously. |
+| Authenticated but not allowed | 403 | |
+| No such resource, or a private one the caller may not know exists | 404 | |
+| Name already taken, state conflict | 409 | |
+| Wrong method | 405 | |
+| Cannot produce the requested media type | 406 | |
+| Unsupported request content type | 415 | |
+| Body above the multipart limit | 413 | `MaxUploadSizeExceededException`. |
+| Too many failed logins | 429 + `Retry-After` | |
+
+`POST /api/auth/logout` is a 204 (RPS-1886): it revokes the refresh token family and has nothing to return. Over quota
+(403 with `diskUsageExceeded` or `trafficLimitExceeded`) is a Cloud-only plan feature; OS has no quota.
+
+### Error body
+
+- Failures are `application/problem+json` (RFC 9457): `type` (URI, default `about:blank`), `title`, `status`,
+  `detail`, `instance`, plus these extensions: `code`, the stable machine key (today's `msgId`, for example
+  `validationError`, `usernameInUse`; codes are never renamed or reused); `errors[]`, per-field failures
+  `{field, code, message}`; `traceId`, the unique id of the failure for a bug report (today's `errorCode`, a UUID).
+- The success body is the bare resource: `PagedModel` for lists, 201 with `Location` on create, 204 when empty; no
+  `RestResponse` envelope on success. Until a format is migrated its success bodies stay as they are.
+- The OCI, Maven and other protocol routes keep their own protocol error formats; this section covers the panel API
+  only.
+
+### Headers and caching
+
+- Responses that carry a secret send `Cache-Control: no-store` (login and token refresh, deploy token create and
+  rotate, `download-token`, user password reset); see `NoStore`.
+- ETag and `If-Match` are not used: updates are last write wins. `Idempotency-Key` is not supported: creates answer
+  409 on a duplicate name, which is the retry safety net.
+
 ## API spec
 
 `repsy-backend/src/main/resources/openapi/openapi-spec.yaml` is the single source of truth for the
@@ -328,6 +429,24 @@ panel API. Edit that file for any API change; there is no other copy. Both sides
   `target/generated-sources/openapi` during the Maven build.
 - Frontend client: `pnpm gen:api` in `repsy-frontend/` writes `src/generated/api`, which is git-ignored.
   Re-run it after the spec changes. The `Dockerfile` runs the same generator.
+
+- **The spec is the single source.** Change the spec first, then the controller, then regenerate the clients; never
+  the other way round. Regenerate in the same PR: `pnpm gen:api` in `repsy-frontend/` and `pnpm gen:api` in `e2e/`
+  (the e2e harness client). The backend DTOs are generated by the Maven build.
+- **Cloud = OS + `{repoOwner}`.** The Cloud spec in `repsy-mono` follows this one. A spec change here needs the matching
+  change there (its `OpenApiSpecConsistencyIT` compares the two and lists the known differences); state in the PR
+  whether it does and link it.
+- **What `OpenApiSpecConsistencyIT` enforces** (`repsy-backend`, Failsafe): every panel route is in the spec and every
+  spec operation has a handler; every other controller mapping is in the spec or in `OUTSIDE_THE_PANEL_SPEC` (the
+  protocol router, the `/error` page; a stale entry fails the IT); path variable names and declared path and query
+  parameters match the handler; the success responses match the handler (a `void` or `ResponseEntity<Void>` handler
+  has no content in any 2xx, any other has content in a 2xx and no 204, and a 201, 202 or 204 the handler produces via
+  `ResponseEntities.created/accepted/noContent`, `ResponseEntity.*`, `HttpStatus.*` or `@ResponseStatus` is
+  declared); security, 401 and 403 documentation, camelCase names, `$ref`s resolve and `ProblemDetail` matches the
+  real failure. Each new rule has a test that fails on a planted drift. A status a handler takes from a callee is not
+  seen, so that direction of the check is one-way.
+- **Known gap**: `GET /api/usage` documents no 400 (Cloud documents one for its year and month filters, which OS does
+  not have: the OS handler takes no parameter that can fail validation, so there is nothing to document here).
 
 ## Database
 

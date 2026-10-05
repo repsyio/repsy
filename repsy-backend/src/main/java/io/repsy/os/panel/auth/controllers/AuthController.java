@@ -26,11 +26,13 @@ import io.repsy.os.shared.auth.services.RefreshTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.http.NoStore;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -84,16 +86,16 @@ class AuthController {
    * nothing left to revoke that {@code consume} would not already have revoked on its own replay,
    * so it answers the same 401 the verify itself throws; a well-formed token of an already-revoked
    * or unknown family is accepted and revoked again for no further effect, so a client can always
-   * call this and get a clean 200 on logout.
+   * call this and get a clean 204 on logout.
    */
   @PostMapping("/logout")
-  public @NonNull RestResponse<Void> logout(
+  public @NonNull ResponseEntity<Void> logout(
       @RequestBody @Valid final @NonNull RefreshTokenForm form) {
 
     final var claims = this.jwtUtils.verifyRefreshToken(form.getRefreshToken());
 
     this.refreshTokenService.revoke(claims.familyId());
 
-    return this.resp.success("loggedOut");
+    return ResponseEntities.noContent();
   }
 }
