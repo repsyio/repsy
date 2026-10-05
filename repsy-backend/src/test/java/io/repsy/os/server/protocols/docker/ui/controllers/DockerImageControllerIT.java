@@ -317,6 +317,38 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
               "name", "size", "updatedAt", "tagCount", "untaggedManifestCount", "untaggedSize");
     }
 
+    @Test
+    @DisplayName("_ and % in q match literally on the image list and the tag list (RPS-1891)")
+    void likeWildcardsInQMatchLiterally() throws Exception {
+      final var it = DockerImageControllerIT.this;
+      final var repo = it.dockerRepo();
+      for (final var image : List.of("a_b", "axb")) {
+        for (final var tag : List.of("v_1", "vx1")) {
+          it.seedImage(repo, image, tag);
+        }
+      }
+
+      final var images = "/api/docker/images/%s".formatted(repo.getName());
+      final var auth = it.adminBearerToken();
+      final var literalImage =
+          it.perform(get(images).param("q", "a_b").header(AUTHORIZATION, auth));
+      literalImage
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.page.totalElements").value(1))
+          .andExpect(jsonPath("$.content[0].name").value("a_b"));
+      it.perform(get(images).param("q", "%").header(AUTHORIZATION, auth))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.page.totalElements").value(0));
+
+      it.perform(get(images + "/a_b/tags").param("q", "v_1").header(AUTHORIZATION, auth))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.page.totalElements").value(1))
+          .andExpect(jsonPath("$.content[0].name").value("v_1"));
+      it.perform(get(images + "/a_b/tags").param("q", "%").header(AUTHORIZATION, auth))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.page.totalElements").value(0));
+    }
+
     private Map<String, Object> listedImage(final Repo repo, final String imageName)
         throws Exception {
       final var body =

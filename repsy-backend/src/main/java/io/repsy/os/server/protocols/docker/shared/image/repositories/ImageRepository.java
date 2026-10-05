@@ -76,7 +76,7 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
       LIST_ITEM_SELECT
           + """
             where re.id = :repoId
-              and i.name like %:name%
+              and lower(i.name) like :name escape '\\'
           """)
   Page<ImageListItem> findAllByRepoIdAndContainsName(UUID repoId, String name, Pageable pageable);
 

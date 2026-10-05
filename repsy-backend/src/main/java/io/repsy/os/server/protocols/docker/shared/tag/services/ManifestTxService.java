@@ -31,6 +31,7 @@ import io.repsy.os.server.protocols.docker.shared.tag.mappers.ManifestConverter;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestChildRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
+import io.repsy.os.shared.utils.LikePatterns;
 import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
 import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;
 import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
@@ -244,7 +245,8 @@ public class ManifestTxService implements ManifestService<UUID> {
       final UUID repoId, final String imageName, final String tagName, final Pageable pageable) {
 
     return this.tagRepository
-        .findAllByImageRepoIdAndImageNameContainsName(repoId, imageName, tagName, pageable)
+        .findAllByImageRepoIdAndImageNameContainsName(
+            repoId, imageName, LikePatterns.of("%", tagName, "%"), pageable)
         .map(this.manifestConverter::toTagDto);
   }
 

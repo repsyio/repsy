@@ -5357,8 +5357,10 @@ components:
             When false, uploading a version that already exists is refused. Maven: a release, and a
             timestamped snapshot build, cannot be replaced, but a non-unique snapshot (the literal
             -SNAPSHOT file names that sbt and Ivy deploy every time) can always be deployed again,
-            unless snapshots is false. Ignored (not rejected) for Cargo and Go, which never replace
-            a published version.
+            unless snapshots is false. Docker: a tag that points at a manifest cannot be moved to
+            another manifest; pushing the same manifest again, or a manifest by digest, is always
+            accepted. Ignored (not rejected) for Cargo and Go, which never replace a published
+            version.
         releases:
           type: boolean
           nullable: false
@@ -5492,8 +5494,9 @@ components:
             When false, uploading a version that already exists is refused. Maven: a release, and a
             timestamped snapshot build, cannot be replaced, but a non-unique snapshot (the literal
             -SNAPSHOT file names that sbt and Ivy deploy every time) can always be deployed again,
-            unless snapshots is false. Omitted for Cargo and Go, which never replace a published
-            version.
+            unless snapshots is false. Docker: a tag that points at a manifest cannot be moved to
+            another manifest; pushing the same manifest again, or a manifest by digest, is always
+            accepted. Omitted for Cargo and Go, which never replace a published version.
         securityScanEnabled:
           type: boolean
           nullable: false

@@ -41,6 +41,7 @@ import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.utils.LikePatterns;
 import io.repsy.os.shared.utils.VersionSortPaging;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
@@ -547,7 +548,10 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
       final UUID repoId, final @Nullable String scope, final Pageable pageable) {
 
     return this.npmPackageRepository
-        .findAllByRepoIdAndLatestVersionContainsScope(repoId, withoutAtSign(scope), pageable)
+        .findAllByRepoIdAndLatestVersionContainsScope(
+            repoId,
+            scope == null ? null : LikePatterns.of("%", withoutAtSign(scope), "%"),
+            pageable)
         .map(this.npmPackageConverter::toPackageListItemDto);
   }
 
@@ -556,13 +560,14 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
 
     if (scope == null) {
       return this.npmPackageRepository
-          .findAllByRepoIdAndLatestVersionAndScopeIsNullContainsName(repoId, name, pageable)
+          .findAllByRepoIdAndLatestVersionAndScopeIsNullContainsName(
+              repoId, LikePatterns.of("%", name, "%"), pageable)
           .map(this.npmPackageConverter::toPackageListItemDto);
     }
 
     return this.npmPackageRepository
         .findAllByRepoIdAndLatestVersionAndScopeContainsName(
-            repoId, scope, withoutAtSign(name), pageable)
+            repoId, scope, LikePatterns.of("%", withoutAtSign(name), "%"), pageable)
         .map(this.npmPackageConverter::toPackageListItemDto);
   }
 
@@ -612,7 +617,7 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     if (versionOrder != null) {
       final var versions =
           this.packageVersionRepository.findAllByNpmPackageIdContainsVersion(
-              npmPackage.getId(), version);
+              npmPackage.getId(), LikePatterns.of("%", version, "%"));
 
       return VersionSortPaging.sortAndPage(
           versions.stream().map(this.npmPackageConverter::toPackageVersionListItemDto).toList(),
@@ -624,7 +629,8 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     }
 
     return this.packageVersionRepository
-        .findAllByNpmPackageIdContainsVersion(npmPackage.getId(), version, pageable)
+        .findAllByNpmPackageIdContainsVersion(
+            npmPackage.getId(), LikePatterns.of("%", version, "%"), pageable)
         .map(this.npmPackageConverter::toPackageVersionListItemDto);
   }
 
