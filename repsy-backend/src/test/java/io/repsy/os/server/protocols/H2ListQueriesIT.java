@@ -78,7 +78,7 @@ class H2ListQueriesIT extends H2IntegrationTest {
 
     final var page =
         this.helmChartVersionRepository.findLatestByRepoIdAndQuery(
-            repo.getId(), "", PageRequest.of(0, 10));
+            repo.getId(), "%%", PageRequest.of(0, 10));
 
     assertThat(page.getTotalElements()).isEqualTo(1);
     assertThat(page.getContent()).hasSize(1);

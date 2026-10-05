@@ -44,7 +44,7 @@
  * OS `USER` account, which may use any repo, or a Repsy Cloud collaborator with a read/write grant on it. A
  * tenant that was merely registered has no grant on the repo, so its deploy would be refused for a reason
  * that is not the one under test (RPS-1481). A user that is not the one deploying or logging in (the
- * "other user" of a password change, the successor of a reused name) stays a plain `seeder.createUser()`.
+ * "other user" of a password change, the successor of a reused name is seeded like the deploying user, a grant included, RPS-1890) stays a plain `seeder.createUser()` only when it never uses the repo.
  *
  * RPS-1552 adds {@link registerLoginTokenInvalidation}: the same events seen through the token a client KEEPS
  * after logging in (a Docker `/v2/token` JWT, the token `npm login` stores, the Cargo `/me` token). Those
@@ -353,7 +353,17 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
       });
       expect(renamed.status, `rename: ${JSON.stringify(renamed.body)}`).toBe(200);
 
-      const successor = await seeder.createUser({ username: former.username });
+      // The successor deploys and logs in, so it is seeded through the target's `user-password` credential
+      // under the freed name (a Repsy Cloud tenant needs a grant on the repo, RPS-1890), not `createUser()`.
+      const successor = await seeder.backend.seedUserCredential({
+        seeder,
+        repoName: repo.name,
+        repoType: protocol.repoType,
+        username: former.username,
+      });
+      expect(successor.username, 'the successor was seeded under the freed name').toBe(
+        former.username,
+      );
 
       await endedSession(
         repo.name,
@@ -361,7 +371,7 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
         'the old login token, the name now belongs to another user',
       );
 
-      const fresh = await protocol.login(repo.name, successor.username, successor.password);
+      const fresh = await protocol.login(repo.name, former.username, successor.password!);
       await accepted(repo.name, fresh, 'the token of the new owner of the name');
     });
 

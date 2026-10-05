@@ -84,7 +84,7 @@ test('a settings PUT with a single field changed leaves every other field alone 
 async function expectReleasesSnapshotsUnsupported(promise: Promise<void>): Promise<void> {
   await expect(promise).rejects.toMatchObject({
     status: 400,
-    body: { msgId: 'releasesSnapshotsUnsupported' },
+    body: { code: 'releasesSnapshotsUnsupported' },
   });
 }
 

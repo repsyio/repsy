@@ -139,8 +139,11 @@ export class OsPanelBackend implements PanelBackend {
   }
 
   /** A plain `USER` account: the seeder creates it and deletes it at cleanup. */
-  async seedUserCredential({ seeder }: CredentialSeedContext): Promise<MaterializedCredential> {
-    const user = await seeder.createUser();
+  async seedUserCredential({
+    seeder,
+    username,
+  }: CredentialSeedContext): Promise<MaterializedCredential> {
+    const user = await seeder.createUser(username === undefined ? {} : { username });
     return {
       transport: 'basic',
       username: user.username,
