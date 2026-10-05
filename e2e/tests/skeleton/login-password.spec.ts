@@ -36,7 +36,10 @@ async function login(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
-  return { status: res.status, body: (await res.json()) as { msgId?: string; code?: string; data?: unknown } };
+  return {
+    status: res.status,
+    body: (await res.json()) as { msgId?: string; code?: string; data?: unknown },
+  };
 }
 
 test(

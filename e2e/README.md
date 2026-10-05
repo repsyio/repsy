@@ -2503,12 +2503,12 @@ deploy with the credential comes first, so that the Basic-auth cache (`VerifiedP
 password and stored hash) is warm and what is proved is invalidation, not a cold miss. Then the credential stops
 being valid and a deploy with it must be refused at once:
 
-| Event                                                                      | Old credential | Replacement               |
-| -------------------------------------------------------------------------- | -------------- | ------------------------- |
+| Event                                                                        | Old credential | Replacement               |
+| ---------------------------------------------------------------------------- | -------------- | ------------------------- |
 | `PATCH /api/profile/password` as the user (`PanelBackend.changeOwnPassword`) | refused        | the new password deploys  |
-| `DELETE /api/users/{id}` as admin                                          | refused        | none                      |
-| deploy token revoked                                                       | refused        | none                      |
-| deploy token rotated                                                       | refused        | the rotated token deploys |
+| `DELETE /api/users/{id}` as admin                                            | refused        | none                      |
+| deploy token revoked                                                         | refused        | none                      |
+| deploy token rotated                                                         | refused        | the rotated token deploys |
 
 "Refused" means the real client exits non-zero, the raw probe of the same credential (`adapter.publish`) answers 401
 (not 403 or 404), and an admin sees nothing of the refused version stored. `--grep "credential invalidation"`

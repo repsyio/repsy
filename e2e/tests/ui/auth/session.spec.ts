@@ -243,11 +243,7 @@ test.describe('AUTH-09 refresh call that fails without a 401 (RPS-1754)', () => 
     {
       name: 'a 503',
       fail: (route: Route) =>
-        fulfillJson<ErrorResponse>(
-          route,
-          503,
-          errorBody({ status: 503, code: 'resourceBusy' }),
-        ),
+        fulfillJson<ErrorResponse>(route, 503, errorBody({ status: 503, code: 'resourceBusy' })),
     },
     { name: 'a dropped connection', fail: (route: Route) => route.abort('connectionreset') },
   ];
