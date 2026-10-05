@@ -26,6 +26,7 @@ import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.utils.LikePatterns;
 import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
 import java.time.Instant;
@@ -196,7 +197,8 @@ public class ImageTxService implements ImageService<UUID> {
             .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
 
     final var page =
-        this.imageRepository.findAllByRepoIdAndContainsName(repo.getId(), imageName, pageable);
+        this.imageRepository.findAllByRepoIdAndContainsName(
+            repo.getId(), LikePatterns.of("%", imageName, "%"), pageable);
     final var untagged = this.untaggedStatsOf(page.getContent());
 
     return page.map(item -> this.toDto(item, untagged.get(item.getId())));

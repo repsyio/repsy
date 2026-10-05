@@ -48,7 +48,7 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
         gv.yanked as yanked, gv.createdAt as createdAt
       from RubyGemVersion gv
       where gv.gem.id = :gemId
-        and (:version is null or gv.version like %:version%)
+        and (:version is null or lower(gv.version) like :version escape '\\')
       """)
   Page<GemVersionListItem> findAllByGemId(UUID gemId, String version, Pageable pageable);
 
@@ -64,7 +64,7 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
         gv.yanked as yanked, gv.createdAt as createdAt
       from RubyGemVersion gv
       where gv.gem.id = :gemId
-        and (:version is null or gv.version like %:version%)
+        and (:version is null or lower(gv.version) like :version escape '\\')
       """)
   List<GemVersionListItem> findAllByGemId(UUID gemId, String version);
 

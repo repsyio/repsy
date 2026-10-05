@@ -36,6 +36,7 @@ import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemVer
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.utils.LikePatterns;
 import io.repsy.os.shared.utils.VersionSortPaging;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemCompactEntry;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
@@ -238,7 +239,7 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   public Page<GemListItem> findAllGems(
       final UUID repoId, final String name, final Pageable pageable) {
     return this.gemRepository
-        .findAllByRepoIdContainsName(repoId, name, pageable)
+        .findAllByRepoIdContainsName(repoId, LikePatterns.of("%", name, "%"), pageable)
         .map(this.converter::toGemListItemDto);
   }
 
@@ -248,7 +249,8 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
     final var versionOrder = VersionSortPaging.directionFor(pageable, "version");
 
     if (versionOrder != null) {
-      final var versions = this.versionRepository.findAllByGemId(gemId, version);
+      final var versions =
+          this.versionRepository.findAllByGemId(gemId, LikePatterns.of("%", version, "%"));
 
       return VersionSortPaging.sortAndPage(
           versions.stream().map(this.converter::toGemVersionListItemDto).toList(),
@@ -258,7 +260,7 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
     }
 
     return this.versionRepository
-        .findAllByGemId(gemId, version, pageable)
+        .findAllByGemId(gemId, LikePatterns.of("%", version, "%"), pageable)
         .map(this.converter::toGemVersionListItemDto);
   }
 

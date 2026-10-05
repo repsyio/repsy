@@ -23,6 +23,7 @@ import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChartVersion;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
+import io.repsy.os.shared.utils.LikePatterns;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
@@ -146,7 +147,7 @@ public class HelmChartService implements ChartService<UUID> {
   public Page<HelmChartInfo> search(
       final UUID repoId, final String query, final Pageable pageable) {
     return this.helmChartVersionRepository
-        .findLatestByRepoIdAndQuery(repoId, query, pageable)
+        .findLatestByRepoIdAndQuery(repoId, LikePatterns.of("%", query, "%"), pageable)
         .map(this::toDetail);
   }
 

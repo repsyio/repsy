@@ -65,7 +65,7 @@ public interface RubyGemRepository extends JpaRepository<RubyGem, UUID> {
       select g.name as name, g.latest as latest, max(gv.createdAt) as updatedAt
       from RubyGem g join g.versions gv
       where g.repo.id = :repoId and g.latest = gv.version
-        and (:name is null or g.name like %:name%)
+        and (:name is null or lower(g.name) like :name escape '\\')
       group by g.id, g.name, g.latest
       """)
   Page<GemListItem> findAllByRepoIdContainsName(UUID repoId, String name, Pageable pageable);
