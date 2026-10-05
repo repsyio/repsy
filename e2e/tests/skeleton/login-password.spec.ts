@@ -30,13 +30,13 @@ import { expect, test } from '../../src/scenarios/fixtures.js';
 async function login(
   username: string,
   password: string,
-): Promise<{ status: number; body: { msgId?: string; data?: unknown } }> {
+): Promise<{ status: number; body: { msgId?: string; code?: string; data?: unknown } }> {
   const res = await fetch(`${env.apiBaseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
-  return { status: res.status, body: (await res.json()) as { msgId?: string; data?: unknown } };
+  return { status: res.status, body: (await res.json()) as { msgId?: string; code?: string; data?: unknown } };
 }
 
 test(
@@ -61,7 +61,8 @@ test(
         const answer = await login(username, password);
 
         expect(answer.status, `${username} / ${password}`).toBe(401);
-        expect(answer.body.msgId, `${username} / ${password}`).toBe('invalidCredentials');
+        // A failure on a panel route is problem+json (RFC 9457): the stable key is `code`.
+        expect(answer.body.code, `${username} / ${password}`).toBe('invalidCredentials');
       }
     }
   },
