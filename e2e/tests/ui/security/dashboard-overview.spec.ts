@@ -35,8 +35,7 @@ test.describe('SEC-02e Security Overview', { tag: MOCKED }, () => {
     const response = await adminPage.request.get('/api/repos/security-summary', {
       headers: { Authorization: `Bearer ${adminSession.token}` },
     });
-    const real = ((await response.json()) as { data: Record<string, { severity?: string | null }> })
-      .data;
+    const real = (await response.json()) as Record<string, { severity?: string | null }>;
     // The premise: nothing in the stack has ever been scanned.
     expect(Object.values(real).filter((entry) => entry.severity)).toEqual([]);
 
