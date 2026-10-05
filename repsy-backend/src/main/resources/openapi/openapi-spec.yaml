@@ -1941,6 +1941,149 @@ paths:
         required: true
         schema:
           type: string
+  "/api/repos/{repoName}/docker/cleanup-policy":
+    get:
+      tags:
+        - docker-cleanup-policy-controller
+      operationId: getDockerCleanupPolicy
+      description: >-
+        The cleanup policy of a Docker repository. A disabled default policy is created on the
+        first read, so nothing is ever deleted until a policy is enabled. Fails with 400
+        (`repoScopeNotMatched`) when the repository is not a Docker repository.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CleanupPolicyItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: The cleanup policy of a Docker repository
+    put:
+      tags:
+        - docker-cleanup-policy-controller
+      operationId: updateDockerCleanupPolicy
+      description: >-
+        Replaces the rules of the cleanup policy. The policy must be enabled (400
+        `cleanupPolicyDisabled`). A tag is deleted when its name matches `nameRegex` (the whole
+        name), it is older than `keepDays`, it does not match `nameRegexKeep`, it is not `latest`
+        and it is not one of the `keepLastN` newest tags of its image. The untagged manifests of the
+        cleaned images that are older than `keepDays`, and the layers only they used, are deleted
+        with them.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CleanupPolicyForm"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CleanupPolicyItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Replace the rules of the cleanup policy
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/docker/cleanup-policy/status":
+    patch:
+      tags:
+        - docker-cleanup-policy-controller
+      operationId: updateDockerCleanupPolicyStatus
+      description: >-
+        Enables or disables the cleanup policy. Enabling makes the policy due at once, so the next
+        scheduler pass runs it. Disabling clears `nextRunAt`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CleanupPolicyStatusForm"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CleanupPolicyItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Enable or disable the cleanup policy
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/docker/cleanup-policy/actions/run":
+    post:
+      tags:
+        - docker-cleanup-policy-controller
+      operationId: runDockerCleanupPolicy
+      description: >-
+        Makes the cleanup policy due now; the scheduler runs it on its next pass and the work
+        finishes later. The `Location` header is the policy, whose `lastRunAt` reports the outcome.
+        The policy must be enabled (400 `cleanupPolicyDisabled`).
+      responses:
+        '202':
+          "$ref": "#/components/responses/Accepted"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Run the cleanup policy now
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
   "/api/docker/images/{repoName}/{imageName}":
     get:
       tags:
@@ -6008,6 +6151,75 @@ components:
         page:
           "$ref": "#/components/schemas/PageMetadata"
     # region: docker
+    CleanupPolicyForm:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Ignored; enable or disable the policy through `/status`.
+        cadence:
+          type: string
+          enum:
+            - DAILY
+            - WEEKLY
+            - BIWEEKLY
+            - MONTHLY
+            - QUARTERLY
+        keepLastN:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 1
+        keepDays:
+          type: integer
+          format: int32
+          maximum: 90
+          minimum: 7
+        nameRegex:
+          type: string
+        nameRegexKeep:
+          type: string
+      required:
+        - cadence
+        - nameRegex
+    CleanupPolicyItem:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        cadence:
+          type: string
+          enum:
+            - DAILY
+            - WEEKLY
+            - BIWEEKLY
+            - MONTHLY
+            - QUARTERLY
+        keepLastN:
+          type: integer
+          format: int32
+        keepDays:
+          type: integer
+          format: int32
+        nameRegex:
+          type: string
+        nameRegexKeep:
+          type: string
+        lastRunAt:
+          type: string
+          format: date-time
+          description: When the policy last ran, absent if it never did.
+        nextRunAt:
+          type: string
+          format: date-time
+          description: When the policy runs next, absent while it is disabled.
+    CleanupPolicyStatusForm:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      required:
+        - enabled
     UntaggedManifestCleanupResult:
       type: object
       properties:
