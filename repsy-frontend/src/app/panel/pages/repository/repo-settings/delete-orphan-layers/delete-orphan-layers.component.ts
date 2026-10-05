@@ -18,7 +18,7 @@ import { Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import { DockerRepoCleanupControllerService, RepoPermissionInfo } from '../../../../../../generated/api';
+import { DockerRepoCleanupApi, RepoPermissionInfo } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 
@@ -35,7 +35,7 @@ export class DeleteOrphanLayersComponent {
   public deleting = false;
 
   constructor(
-    private readonly dockerRepoCleanupControllerService: DockerRepoCleanupControllerService,
+    private readonly dockerRepoCleanupApi: DockerRepoCleanupApi,
     private readonly dangerModalService: DangerModalService,
     private readonly toastService: ToastService,
   ) {}
@@ -43,7 +43,7 @@ export class DeleteOrphanLayersComponent {
   public deleteOrphanLayers(): void {
     this.dangerModalService.show('Delete Orphan Layers', 'Delete', () => {
       this.deleting = true;
-      this.dockerRepoCleanupControllerService
+      this.dockerRepoCleanupApi
         .deleteDockerOrphanLayers(this.activeRepository.repoName)
         .pipe(
           finalize(() => {

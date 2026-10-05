@@ -17,9 +17,9 @@ import { TestBed } from '@angular/core/testing';
 
 import {
   PagedModelUserResponse,
-  UserControllerService,
   UserCreateForm,
   UserResponse,
+  UsersApi,
   UserUpdateForm,
 } from '../../../../../generated/api';
 import { describeNoAuthorizationHeader } from '../../../shared/testing/authorization-header-spec-helpers';
@@ -41,11 +41,11 @@ const CREATE_FORM: UserCreateForm = { username: 'bob', password: 'secret', role:
 const UPDATE_FORM: UserUpdateForm = { username: 'bobby', role: 'USER' };
 
 describe('UserService', () => {
-  let api: jasmine.SpyObj<UserControllerService>;
+  let api: jasmine.SpyObj<UsersApi>;
   let service: UserService;
 
   beforeEach(() => {
-    api = jasmine.createSpyObj<UserControllerService>('UserControllerService', [
+    api = jasmine.createSpyObj<UsersApi>('UsersApi', [
       'listUsers',
       'countAdmins',
       'createUser',
@@ -54,7 +54,7 @@ describe('UserService', () => {
       'resetPassword',
     ]);
     TestBed.configureTestingModule({
-      providers: [{ provide: UserControllerService, useValue: api }],
+      providers: [{ provide: UsersApi, useValue: api }],
     });
     service = TestBed.inject(UserService);
   });

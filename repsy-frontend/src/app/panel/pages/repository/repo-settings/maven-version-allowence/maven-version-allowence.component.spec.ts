@@ -16,7 +16,7 @@
 
 import { of, Subject, throwError } from 'rxjs';
 
-import { ProtocolRepoControllerService } from '../../../../../../generated/api';
+import { ReposApi } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { RepoSupport, RepoType } from '../../../../shared/dto/repo/repo-type';
 import { lastSentForm, releaseAwareParentForm } from '../testing/repo-settings-spec-helpers';
@@ -26,14 +26,12 @@ const REPO = 'acme-repo';
 
 describe('VersionAllowanceComponent', () => {
   let component: VersionAllowanceComponent;
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
   let toastService: jasmine.SpyObj<ToastService>;
   let fetchCount: number;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'updateRepoSettings',
-    ]);
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['updateRepoSettings']);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     repoApi.updateRepoSettings.and.returnValue(of({}) as never);
 

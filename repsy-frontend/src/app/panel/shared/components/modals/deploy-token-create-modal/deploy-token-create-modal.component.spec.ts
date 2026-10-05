@@ -17,7 +17,7 @@
 import { FormBuilder } from '@angular/forms';
 import { of, Subject, throwError } from 'rxjs';
 
-import { ProtocolDeployTokenControllerService } from '../../../../../../generated/api';
+import { DeployTokensApi } from '../../../../../../generated/api';
 import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
 import { ToastService } from '../../toast/toast.service';
 import { DeployTokenCreateModalComponent } from './deploy-token-create-modal.component';
@@ -31,7 +31,7 @@ const TOKEN: TokenCreateInfo = { id: 'token-1', username: 'bot', token: 'secret'
 
 describe('DeployTokenCreateModalComponent', () => {
   let component: DeployTokenCreateModalComponent;
-  let api: jasmine.SpyObj<ProtocolDeployTokenControllerService>;
+  let api: jasmine.SpyObj<DeployTokensApi>;
   let toastService: jasmine.SpyObj<ToastService>;
   let openChange: boolean[];
   let created: TokenCreateInfo[];
@@ -40,9 +40,7 @@ describe('DeployTokenCreateModalComponent', () => {
     jasmine.clock().install();
     jasmine.clock().mockDate(NOW);
 
-    api = jasmine.createSpyObj<ProtocolDeployTokenControllerService>('ProtocolDeployTokenControllerService', [
-      'createDeployToken',
-    ]);
+    api = jasmine.createSpyObj<DeployTokensApi>('DeployTokensApi', ['createDeployToken']);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     api.createDeployToken.and.returnValue(of(TOKEN) as never);
 

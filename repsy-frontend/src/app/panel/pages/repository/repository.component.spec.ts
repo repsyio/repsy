@@ -18,13 +18,7 @@ import { By } from '@angular/platform-browser';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
-import {
-  ProtocolRepoControllerService,
-  RepoCollectionControllerService,
-  RepoListInfo,
-  RepoSecuritySummary,
-  RepoType as ApiRepoType,
-} from '../../../../generated/api';
+import { RepoListInfo, ReposApi, RepoSecuritySummary, RepoType as ApiRepoType } from '../../../../generated/api';
 import { DangerModalService } from '../../shared/components/modals/danger-modal/danger-modal.service';
 import { RepositoryCreateModalComponent } from '../../shared/components/modals/repository-create-modal/repository-create-modal.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
@@ -62,8 +56,8 @@ function activatedRoute(queryParams: Record<string, string> = {}): ActivatedRout
 
 describe('RepositoryComponent', () => {
   let calls: ListCall[];
-  let repoApi: jasmine.SpyObj<RepoCollectionControllerService>;
-  let protocolApi: jasmine.SpyObj<ProtocolRepoControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let protocolApi: jasmine.SpyObj<ReposApi>;
   let securityService: jasmine.SpyObj<SecurityService>;
   let toast: jasmine.SpyObj<ToastService>;
   let dangerModal: DangerModalService;
@@ -79,7 +73,6 @@ describe('RepositoryComponent', () => {
       activatedRoute(queryParams),
       router,
       repoApi,
-      protocolApi,
       securityService,
       profile as unknown as ProfileService,
       toast,
@@ -106,7 +99,7 @@ describe('RepositoryComponent', () => {
     created = [];
     fixtures = [];
     watched = new Subject();
-    repoApi = jasmine.createSpyObj<RepoCollectionControllerService>('RepoCollectionControllerService', ['listRepos']);
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['listRepos', 'deleteRepo']);
     // Positional, exactly like the generated client: (type, q, page, size, sort). q and sort are strings, so a
     // swapped order would still compile; recording them by position makes the specs fail on it.
     repoApi.listRepos.and.callFake(((
@@ -120,7 +113,7 @@ describe('RepositoryComponent', () => {
       calls.push({ type, q, page: pageIndex, size, sort, answer: answerSubject });
       return answerSubject;
     }) as never);
-    protocolApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['deleteRepo']);
+    protocolApi = repoApi;
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchSecuritySummary']);
     securityService.watchSecuritySummary.and.returnValue(watched);
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -726,8 +719,7 @@ describe('RepositoryComponent', () => {
         providers: [
           provideRouter([]),
           { provide: ActivatedRoute, useValue: activatedRoute() },
-          { provide: RepoCollectionControllerService, useValue: repoApi },
-          { provide: ProtocolRepoControllerService, useValue: protocolApi },
+          { provide: ReposApi, useValue: repoApi },
           { provide: SecurityService, useValue: securityService },
           { provide: ProfileService, useValue: profile },
           { provide: ToastService, useValue: toast },

@@ -15,7 +15,7 @@
 
 import { TestBed } from '@angular/core/testing';
 
-import { TotalUsageInfo, UsageControllerService } from '../../../../../generated/api';
+import { TotalUsageInfo, UsageApi } from '../../../../../generated/api';
 import { describeNoAuthorizationHeader } from '../../../shared/testing/authorization-header-spec-helpers';
 import { CallCase, describeCalls } from '../../repository/testing/protocol-service-spec-helpers';
 import { UsageService } from './usage.service';
@@ -23,13 +23,13 @@ import { UsageService } from './usage.service';
 const TOTAL_USAGE: TotalUsageInfo = { diskUsed: { value: 2048, text: '2 KB' }, reposCount: 3 };
 
 describe('UsageService', () => {
-  let api: jasmine.SpyObj<UsageControllerService>;
+  let api: jasmine.SpyObj<UsageApi>;
   let service: UsageService;
 
   beforeEach(() => {
-    api = jasmine.createSpyObj<UsageControllerService>('UsageControllerService', ['getTotalUsage']);
+    api = jasmine.createSpyObj<UsageApi>('UsageApi', ['getTotalUsage']);
     TestBed.configureTestingModule({
-      providers: [{ provide: UsageControllerService, useValue: api }],
+      providers: [{ provide: UsageApi, useValue: api }],
     });
     service = TestBed.inject(UsageService);
   });

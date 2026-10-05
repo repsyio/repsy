@@ -20,7 +20,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import { RepoCollectionControllerService, RepoCreateRequest, RepoListInfo } from '../../../../../../generated/api';
+import { RepoCreateRequest, RepoListInfo, ReposApi } from '../../../../../../generated/api';
 import { idFactory } from '../../../../../shared/util/unique-id';
 import {
   DESCRIPTION_MAX_LENGTH,
@@ -70,7 +70,7 @@ export class RepositoryCreateModalComponent implements OnInit {
   public readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
 
   constructor(
-    private readonly repoCollectionControllerService: RepoCollectionControllerService,
+    private readonly reposApi: ReposApi,
     private readonly fb: FormBuilder,
     private readonly router: Router,
     private readonly toastService: ToastService,
@@ -114,7 +114,7 @@ export class RepositoryCreateModalComponent implements OnInit {
     const type = toApiRepoType(this.selectedOption);
     const body: RepoCreateRequest = { ...this.form.getRawValue(), type };
 
-    this.repoCollectionControllerService
+    this.reposApi
       .createRepository(body)
       .pipe(
         finalize(() => {

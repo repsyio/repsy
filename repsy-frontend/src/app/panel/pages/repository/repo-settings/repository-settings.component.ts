@@ -21,7 +21,7 @@ import { Router, RouterModule } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { filter, finalize, switchMap } from 'rxjs/operators';
 
-import { ProtocolRepoControllerService, RepoPermissionInfo, RepoSettingsInfo } from '../../../../../generated/api';
+import { RepoPermissionInfo, ReposApi, RepoSettingsInfo } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { RepoType } from '../../../shared/dto/repo/repo-type';
@@ -77,7 +77,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
   public mavenSettingsForm: FormGroup;
 
   constructor(
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly reposApi: ReposApi,
     private readonly toastService: ToastService,
     private readonly router: Router,
     private readonly repoLookupService: RepoLookupService,
@@ -105,7 +105,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
         filter((context) => !!context),
         switchMap((context) => {
           this.repoType = context.repoType;
-          return this.protocolRepoControllerService.getRepoPermissions(context.repoName);
+          return this.reposApi.getRepoPermissions(context.repoName);
         }),
       )
       .subscribe((repo: RepoPermissionInfo) => {
@@ -126,7 +126,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
   }
 
   public getRepoSettings() {
-    this.protocolRepoControllerService
+    this.reposApi
       .getRepoSettings(this.activeRepository.repoName)
       .pipe(
         finalize(() => {

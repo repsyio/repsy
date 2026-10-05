@@ -18,7 +18,7 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
-import { ProtocolRepoControllerService, RepoUsageInfo } from '../../../../../../generated/api';
+import { ReposApi, RepoUsageInfo } from '../../../../../../generated/api';
 
 @Component({
   selector: 'app-repo-storage',
@@ -33,14 +33,14 @@ export class RepoStorageComponent implements OnInit {
 
   public usage: RepoUsageInfo;
 
-  constructor(private readonly protocolRepoControllerService: ProtocolRepoControllerService) {}
+  constructor(private readonly reposApi: ReposApi) {}
 
   ngOnInit(): void {
     this.fetchRepoUsage();
   }
 
   fetchRepoUsage() {
-    this.protocolRepoControllerService.getRepoUsage(this.repoName).subscribe({
+    this.reposApi.getRepoUsage(this.repoName).subscribe({
       next: (r) => {
         this.usage = r;
       },

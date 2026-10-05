@@ -19,7 +19,7 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import { ProtocolRepoControllerService, RepoPermissionInfo } from '../../../../../../generated/api';
+import { RepoPermissionInfo, ReposApi } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 
@@ -39,7 +39,7 @@ export class DeleteRepoComponent {
   public visibilityForm: FormGroup;
 
   constructor(
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly reposApi: ReposApi,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
@@ -53,7 +53,7 @@ export class DeleteRepoComponent {
     const successMsg = 'Repository deleted successfully';
     this.dangerModalService.show('Delete Repository', 'Delete', () => {
       this.loading = true;
-      this.protocolRepoControllerService
+      this.reposApi
         .deleteRepo(this.activeRepository.repoName)
         .pipe(
           finalize(() => {

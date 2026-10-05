@@ -16,7 +16,7 @@
 import { ChangeDetectorRef } from '@angular/core';
 import { of, Subject, throwError } from 'rxjs';
 
-import { ProfileInfo, RepoCollectionControllerService, RepoListInfo, RepoType } from '../../../../../generated/api';
+import { ProfileInfo, RepoListInfo, ReposApi, RepoType } from '../../../../../generated/api';
 import { ProfileService } from '../../profile/service/profile.service';
 import { UsageService } from '../service/usage.service';
 import { DashboardContentComponent, RECENT_REPOSITORY_COUNT } from './dashboard-content.component';
@@ -68,7 +68,7 @@ async function collectUnhandledErrors(body: () => void): Promise<unknown[]> {
 }
 
 describe('DashboardContentComponent', () => {
-  let repoService: jasmine.SpyObj<RepoCollectionControllerService>;
+  let repoService: jasmine.SpyObj<ReposApi>;
   let usageService: jasmine.SpyObj<UsageService>;
   let profileService: jasmine.SpyObj<ProfileService>;
   let cdRef: jasmine.SpyObj<ChangeDetectorRef>;
@@ -78,10 +78,7 @@ describe('DashboardContentComponent', () => {
   beforeEach(() => {
     counts = { ...COUNTS };
     recent = [];
-    repoService = jasmine.createSpyObj<RepoCollectionControllerService>('RepoCollectionControllerService', [
-      'getRepoCounts',
-      'listRepos',
-    ]);
+    repoService = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoCounts', 'listRepos']);
     repoService.getRepoCounts.and.callFake((() => of(counts)) as never);
     repoService.listRepos.and.callFake((() => of({ content: recent, page: {} })) as never);
     usageService = jasmine.createSpyObj<UsageService>('UsageService', ['getTotalUsage']);

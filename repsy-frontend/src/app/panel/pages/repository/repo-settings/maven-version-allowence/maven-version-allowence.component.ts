@@ -18,7 +18,7 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
-import { ProtocolRepoControllerService, RepoSettingsForm } from '../../../../../../generated/api';
+import { ReposApi, RepoSettingsForm } from '../../../../../../generated/api';
 import { SelectorComponent } from '../../../../shared/components/selector/selector.component';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { RepoSupport, RepoType } from '../../../../shared/dto/repo/repo-type';
@@ -50,7 +50,7 @@ export class VersionAllowanceComponent implements OnInit {
   private readonly NUGET_OPTIONS = [RepoSupport.ALL, RepoSupport.PRE_RELEASE, RepoSupport.STABLE];
 
   constructor(
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly reposApi: ReposApi,
     private readonly toastService: ToastService,
   ) {}
 
@@ -73,7 +73,7 @@ export class VersionAllowanceComponent implements OnInit {
     // Only the two fields this selector owns are sent (RPS-1619): the rest of the form was loaded when the page opened.
     const form: RepoSettingsForm = { snapshots, releases };
 
-    saveRepoSetting(this.protocolRepoControllerService.updateRepoSettings(this.repoName, form), {
+    saveRepoSetting(this.reposApi.updateRepoSettings(this.repoName, form), {
       saved: () => {
         this.savedOption = option as RepoSupport;
         this.fetch.emit();

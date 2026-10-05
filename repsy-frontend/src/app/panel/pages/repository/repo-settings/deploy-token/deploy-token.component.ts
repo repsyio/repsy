@@ -24,10 +24,10 @@ import { finalize, switchMap, tap } from 'rxjs/operators';
 import { environment } from '../../../../../../environments/environment';
 import {
   DeployTokenInfoListItem,
+  DeployTokensApi,
   PagedModelDeployTokenInfoListItem,
-  ProtocolDeployTokenControllerService,
-  ProtocolRepoControllerService,
   RepoPermissionInfo,
+  ReposApi,
   RepoUsageInfo,
 } from '../../../../../../generated/api';
 import { EmptyListComponent } from '../../../../shared/components/empty-list/empty-list.component';
@@ -94,8 +94,8 @@ export class DeployTokenComponent implements OnInit {
   public repoUsage: RepoUsageInfo;
 
   constructor(
-    private readonly protocolDeployTokenControllerService: ProtocolDeployTokenControllerService,
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly deployTokensApi: DeployTokensApi,
+    private readonly reposApi: ReposApi,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
@@ -107,7 +107,7 @@ export class DeployTokenComponent implements OnInit {
   }
 
   private fetchRepoUsage() {
-    this.protocolRepoControllerService.getRepoUsage(this.activeRepository.repoName).subscribe({
+    this.reposApi.getRepoUsage(this.activeRepository.repoName).subscribe({
       next: (r) => {
         this.repoUsage = r;
       },
@@ -124,11 +124,7 @@ export class DeployTokenComponent implements OnInit {
   }
 
   private listPage(pageNum: number) {
-    return this.protocolDeployTokenControllerService.listDeployTokens(
-      this.activeRepository.repoName,
-      pageNum,
-      this.pageSize,
-    );
+    return this.deployTokensApi.listDeployTokens(this.activeRepository.repoName, pageNum, this.pageSize);
   }
 
   private showTokens(r: PagedModelDeployTokenInfoListItem) {
@@ -160,7 +156,7 @@ export class DeployTokenComponent implements OnInit {
     this.dangerModalService.show('Rotate Deploy Token', 'Rotate', () => {
       this.operationLock = true;
 
-      this.protocolDeployTokenControllerService
+      this.deployTokensApi
         .rotateDeployToken(deployToken.id, this.activeRepository.repoName)
         .pipe(
           finalize(() => {
@@ -188,7 +184,7 @@ export class DeployTokenComponent implements OnInit {
     this.dangerModalService.show('Delete Deploy Token', 'Delete', () => {
       this.operationLock = true;
 
-      this.protocolDeployTokenControllerService
+      this.deployTokensApi
         .revokeDeployToken(deployToken.id, this.activeRepository.repoName)
         .pipe(
           tap(() => this.toastService.show('Deploy token revoked successfully', 'success')),

@@ -15,7 +15,7 @@
 
 import { TestBed } from '@angular/core/testing';
 
-import { CargoCrateControllerService, ProtocolRepoControllerService } from '../../../../../../generated/api';
+import { CargoCratesApi, ReposApi } from '../../../../../../generated/api';
 import {
   CallCase,
   describeCalls,
@@ -35,15 +35,13 @@ const CRATE = 'serde';
 const VERSION = '1.0.0';
 
 describe('CargoService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let cargoApi: jasmine.SpyObj<CargoCrateControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let cargoApi: jasmine.SpyObj<CargoCratesApi>;
   let service: CargoService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoPermissions',
-    ]);
-    cargoApi = jasmine.createSpyObj<CargoCrateControllerService>('CargoCrateControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoPermissions']);
+    cargoApi = jasmine.createSpyObj<CargoCratesApi>('CargoCratesApi', [
       'searchCargoCrates',
       'getCargoCrate',
       'getCargoCrateVersion',
@@ -53,8 +51,8 @@ describe('CargoService', () => {
     ]);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: CargoCrateControllerService, useValue: cargoApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: CargoCratesApi, useValue: cargoApi },
       ],
     });
     service = TestBed.inject(CargoService);

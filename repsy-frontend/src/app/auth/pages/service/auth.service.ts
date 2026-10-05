@@ -33,7 +33,7 @@ import {
 } from 'rxjs';
 
 import { LoginForm, LoginInfo } from '../../../../generated/api';
-import { AuthControllerService } from '../../../../generated/api/api/auth-controller.service';
+import { AuthApi } from '../../../../generated/api/api/auth.api';
 import { SILENT_ERROR } from '../../../shared/interceptor/error-handler.interceptor';
 
 const USERNAME_KEY = 'username';
@@ -159,7 +159,7 @@ export class AuthService {
   };
 
   constructor(
-    private readonly authControllerService: AuthControllerService,
+    private readonly authApi: AuthApi,
     @Inject(PLATFORM_ID) platformId: object,
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
@@ -190,7 +190,7 @@ export class AuthService {
   }
 
   public logIn(form: LoginForm): Observable<void> {
-    return this.authControllerService.login(form).pipe(
+    return this.authApi.login(form).pipe(
       map((r) => {
         this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
       }),
@@ -240,7 +240,7 @@ export class AuthService {
     this._authenticated$.next(this.isAuthenticated());
 
     if (refreshToken) {
-      this.authControllerService.logout({ refreshToken }).subscribe({ error: () => undefined });
+      this.authApi.logout({ refreshToken }).subscribe({ error: () => undefined });
     }
   }
 
@@ -342,7 +342,7 @@ export class AuthService {
     // The refresh call completes without an answer when `RefreshTokenInterceptor` logged the session out
     // for a refused refresh token: no token, like the session that ended in another tab.
     return firstValueFrom(
-      this.authControllerService
+      this.authApi
         .refreshToken({ refreshToken: this._refreshToken }, 'body', false, {
           // Not toasted by `errorHandlerInterceptor` (RPS-1754): a failed refresh ends the session, and
           // `RefreshTokenInterceptor` shows the one "Session expired" toast for it.
