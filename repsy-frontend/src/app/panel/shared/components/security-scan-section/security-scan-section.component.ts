@@ -24,9 +24,9 @@ import {
   PagedModelVulnerabilityScanInfo,
   ScanOverview,
   ScanStatus,
+  SecurityScansApi,
   Severity,
   VulnerabilityFindingInfo,
-  VulnerabilityScanControllerService,
   VulnerabilityScanDetail,
   VulnerabilityScanInfo,
 } from '../../../../../generated/api';
@@ -100,7 +100,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
   private pollingSub: Subscription | null = null;
 
   constructor(
-    private readonly vulnerabilityScanControllerService: VulnerabilityScanControllerService,
+    private readonly securityScansApi: SecurityScansApi,
     private readonly toastService: ToastService,
     private readonly route: ActivatedRoute,
     private readonly securityScanSupportService: SecurityScanSupportService,
@@ -228,17 +228,13 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     this.triggering = true;
     const scoped = splitScopedArtifactName(this.artifactName);
     const trigger$ = scoped
-      ? this.vulnerabilityScanControllerService.triggerScopedVulnerabilityScan(
+      ? this.securityScansApi.triggerScopedVulnerabilityScan(
           scoped.scope,
           scoped.name,
           this.artifactVersion,
           this.repoName,
         )
-      : this.vulnerabilityScanControllerService.triggerVulnerabilityScan(
-          this.artifactName,
-          this.artifactVersion,
-          this.repoName,
-        );
+      : this.securityScansApi.triggerVulnerabilityScan(this.artifactName, this.artifactVersion, this.repoName);
 
     trigger$
       .pipe(
@@ -268,7 +264,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     const scoped = splitScopedArtifactName(this.artifactName);
 
     return scoped
-      ? this.vulnerabilityScanControllerService.listScopedVulnerabilityScans(
+      ? this.securityScansApi.listScopedVulnerabilityScans(
           scoped.scope,
           scoped.name,
           this.artifactVersion,
@@ -276,7 +272,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
           this.pageNum,
           PAGE_SIZE,
         )
-      : this.vulnerabilityScanControllerService.listVulnerabilityScans(
+      : this.securityScansApi.listVulnerabilityScans(
           this.artifactName,
           this.artifactVersion,
           this.repoName,
@@ -289,13 +285,8 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     const scoped = splitScopedArtifactName(this.artifactName);
 
     return scoped
-      ? this.vulnerabilityScanControllerService.getScopedScanOverview(
-          scoped.scope,
-          scoped.name,
-          this.artifactVersion,
-          this.repoName,
-        )
-      : this.vulnerabilityScanControllerService.getScanOverview(this.artifactName, this.artifactVersion, this.repoName);
+      ? this.securityScansApi.getScopedScanOverview(scoped.scope, scoped.name, this.artifactVersion, this.repoName)
+      : this.securityScansApi.getScanOverview(this.artifactName, this.artifactVersion, this.repoName);
   }
 
   private refresh(): void {
@@ -358,7 +349,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
   }
 
   private loadScanDetail(scanId: string): void {
-    this.vulnerabilityScanControllerService.getVulnerabilityScan(scanId, this.repoName).subscribe({
+    this.securityScansApi.getVulnerabilityScan(scanId, this.repoName).subscribe({
       next: (response) => {
         this.selectedScan = response ?? null;
         this.findingsPageNum = 0;
@@ -373,7 +364,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
 
     const sort = [`severity,${this.findingsSortDirection}`];
 
-    this.vulnerabilityScanControllerService
+    this.securityScansApi
       .getVulnerabilityScanFindings(scanId, this.repoName, this.findingsPageNum, FINDINGS_PAGE_SIZE, sort)
       .pipe(
         finalize(() => {
@@ -464,10 +455,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     }
 
     this.pollingSub = pollUntilTerminal(
-      () =>
-        this.vulnerabilityScanControllerService
-          .getVulnerabilityScan(scanId, this.repoName)
-          .pipe(map((response) => response!)),
+      () => this.securityScansApi.getVulnerabilityScan(scanId, this.repoName).pipe(map((response) => response!)),
       (detail) => TERMINAL_STATUSES.includes(detail.status!),
       POLL_INTERVAL_MS,
     ).subscribe((detail) => this.applyRefreshedScan(detail));

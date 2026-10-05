@@ -7478,8 +7478,8 @@ of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays o
 
 - `POST /api/auth/login` → `{ data: { token, refreshToken } }`; every other call in `os-panel-backend.ts`
   sends `Authorization: Bearer <token>`. The openapi spec only lists `Authorization` as an explicit
-  parameter for `user-controller` routes; `protocol-repo-controller` and
-  `protocol-deploy-token-controller` routes need it too, just via an argument resolver the spec
+  parameter for `users` routes; `repos` and
+  `deploy-tokens` routes need it too, just via an argument resolver the spec
   does not document.
 - `POST /api/users`, `DELETE /api/users/{userId}`, `GET /api/users` (ADMIN only).
 - `POST /api/repos` (the body carries `name`, `type` (upper-case `RepoType`: `MAVEN`, `NPM`, ...),

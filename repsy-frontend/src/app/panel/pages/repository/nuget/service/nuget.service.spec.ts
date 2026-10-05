@@ -17,11 +17,7 @@
 import { TestBed } from '@angular/core/testing';
 import { from, of, throwError } from 'rxjs';
 
-import {
-  NugetPackageControllerService,
-  ProtocolDeployTokenControllerService,
-  ProtocolRepoControllerService,
-} from '../../../../../../generated/api';
+import { DeployTokensApi, NugetPackagesApi, ReposApi } from '../../../../../../generated/api';
 import {
   CallCase,
   collect,
@@ -51,13 +47,13 @@ const VERSION = '1.2.3';
 const TOKEN = 'token-1';
 
 describe('NugetService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let tokenApi: jasmine.SpyObj<ProtocolDeployTokenControllerService>;
-  let nugetApi: jasmine.SpyObj<NugetPackageControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let tokenApi: jasmine.SpyObj<DeployTokensApi>;
+  let nugetApi: jasmine.SpyObj<NugetPackagesApi>;
   let service: NugetService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', [
       'getRepoPermissions',
       'getRepoUsage',
       'getRepoSettings',
@@ -65,13 +61,13 @@ describe('NugetService', () => {
       'updateRepo',
       'deleteRepo',
     ]);
-    tokenApi = jasmine.createSpyObj<ProtocolDeployTokenControllerService>('ProtocolDeployTokenControllerService', [
+    tokenApi = jasmine.createSpyObj<DeployTokensApi>('DeployTokensApi', [
       'listDeployTokens',
       'rotateDeployToken',
       'createDeployToken',
       'revokeDeployToken',
     ]);
-    nugetApi = jasmine.createSpyObj<NugetPackageControllerService>('NugetPackageControllerService', [
+    nugetApi = jasmine.createSpyObj<NugetPackagesApi>('NugetPackagesApi', [
       'searchNugetPackages',
       'getNugetPackage',
       'listNugetVersions',
@@ -81,9 +77,9 @@ describe('NugetService', () => {
     ]);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: ProtocolDeployTokenControllerService, useValue: tokenApi },
-        { provide: NugetPackageControllerService, useValue: nugetApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: DeployTokensApi, useValue: tokenApi },
+        { provide: NugetPackagesApi, useValue: nugetApi },
       ],
     });
     service = TestBed.inject(NugetService);

@@ -19,13 +19,13 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
 
 import {
-  CargoCrateControllerService,
+  CargoCratesApi,
   CrateInfo,
   CrateListItem,
   CrateVersionInfo,
   CrateVersionListItem,
-  ProtocolRepoControllerService,
   RepoPermissionInfo,
+  ReposApi,
 } from '../../../../../../generated/api';
 import { PagedData } from '../../../../shared/dto/paged-data';
 import { Sort } from '../../../../shared/dto/sort';
@@ -39,8 +39,8 @@ export class CargoService {
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
   constructor(
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
-    private readonly cargoCrateControllerService: CargoCrateControllerService,
+    private readonly reposApi: ReposApi,
+    private readonly cargoCratesApi: CargoCratesApi,
   ) {
     this.repoChanges = this.repoSubject.asObservable();
   }
@@ -52,9 +52,7 @@ export class CargoService {
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
-    return this.protocolRepoControllerService
-      .getRepoPermissions(repoName)
-      .pipe(tap((info) => this.repoSubject.next(info)));
+    return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
   }
 
   private resetActiveRepoIfChanged(repoName: string): void {
@@ -71,7 +69,7 @@ export class CargoService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<CrateListItem>> {
-    return this.cargoCrateControllerService
+    return this.cargoCratesApi
       .searchCargoCrates(this.repoName, search || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
@@ -79,11 +77,11 @@ export class CargoService {
   }
 
   public fetchCrate(crateName: string): Observable<CrateInfo> {
-    return this.cargoCrateControllerService.getCargoCrate(crateName, this.repoName);
+    return this.cargoCratesApi.getCargoCrate(crateName, this.repoName);
   }
 
   public fetchCrateVersion(crateName: string, version: string): Observable<CrateVersionInfo> {
-    return this.cargoCrateControllerService.getCargoCrateVersion(crateName, version, this.repoName);
+    return this.cargoCratesApi.getCargoCrateVersion(crateName, version, this.repoName);
   }
 
   public fetchCrateVersions(
@@ -93,7 +91,7 @@ export class CargoService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<CrateVersionListItem>> {
-    return this.cargoCrateControllerService
+    return this.cargoCratesApi
       .listCargoCrateVersions(crateName, this.repoName, search || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
@@ -101,12 +99,10 @@ export class CargoService {
   }
 
   public deleteCrate(crateName: string): Observable<void> {
-    return this.cargoCrateControllerService.deleteCargoCrate(crateName, this.repoName).pipe(map(() => undefined));
+    return this.cargoCratesApi.deleteCargoCrate(crateName, this.repoName).pipe(map(() => undefined));
   }
 
   public deleteCrateVersion(crateName: string, version: string): Observable<void> {
-    return this.cargoCrateControllerService
-      .deleteCargoCrateVersion(crateName, version, this.repoName)
-      .pipe(map(() => undefined));
+    return this.cargoCratesApi.deleteCargoCrateVersion(crateName, version, this.repoName).pipe(map(() => undefined));
   }
 }

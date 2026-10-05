@@ -16,7 +16,7 @@
 
 import { of, Subject, throwError } from 'rxjs';
 
-import { ProtocolRepoControllerService } from '../../../../../../generated/api';
+import { ReposApi } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { renderComponent } from '../../testing/render-spec-helpers';
@@ -27,14 +27,12 @@ const REPO = 'acme-repo';
 
 describe('PackageOverrideComponent', () => {
   let component: PackageOverrideComponent;
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
   let toastService: jasmine.SpyObj<ToastService>;
   let fetchCount: number;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'updateRepoSettings',
-    ]);
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['updateRepoSettings']);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     repoApi.updateRepoSettings.and.returnValue(of({}) as never);
 
@@ -154,7 +152,7 @@ describe('PackageOverrideComponent template', () => {
     const { el } = await renderComponent(
       PackageOverrideComponent,
       [
-        { provide: ProtocolRepoControllerService, useValue: {} },
+        { provide: ReposApi, useValue: {} },
         { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
       ],
       { repoName: REPO, repoType: RepoType.NPM, parentForm: generalParentForm({ allowOverride: true }) },
@@ -167,7 +165,7 @@ describe('PackageOverrideComponent template', () => {
   });
 
   const providers = () => [
-    { provide: ProtocolRepoControllerService, useValue: {} },
+    { provide: ReposApi, useValue: {} },
     { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
   ];
 
@@ -198,14 +196,12 @@ describe('PackageOverrideComponent template', () => {
 describe('PackageOverrideComponent toggle', () => {
   it('ignores a second click while the first save is on its way (RPS-1618)', async () => {
     const inFlight = new Subject<object>();
-    const repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'updateRepoSettings',
-    ]);
+    const repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['updateRepoSettings']);
     repoApi.updateRepoSettings.and.returnValue(inFlight as never);
     const { el, fixture } = await renderComponent(
       PackageOverrideComponent,
       [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
+        { provide: ReposApi, useValue: repoApi },
         { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
       ],
       { repoName: REPO, repoType: RepoType.NPM, parentForm: generalParentForm({ allowOverride: true }) },

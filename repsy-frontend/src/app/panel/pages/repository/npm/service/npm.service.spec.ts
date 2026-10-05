@@ -15,11 +15,7 @@
 
 import { TestBed } from '@angular/core/testing';
 
-import {
-  NpmPackageApiControllerService,
-  NpmScopeApiControllerService,
-  ProtocolRepoControllerService,
-} from '../../../../../../generated/api';
+import { NpmPackagesApi, NpmScopesApi, ReposApi } from '../../../../../../generated/api';
 import {
   CallCase,
   describeCalls,
@@ -40,16 +36,14 @@ const PACKAGE = 'widget';
 const VERSION = '1.2.3';
 
 describe('NpmService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let packageApi: jasmine.SpyObj<NpmPackageApiControllerService>;
-  let scopeApi: jasmine.SpyObj<NpmScopeApiControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let packageApi: jasmine.SpyObj<NpmPackagesApi>;
+  let scopeApi: jasmine.SpyObj<NpmScopesApi>;
   let service: NpmService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoPermissions',
-    ]);
-    packageApi = jasmine.createSpyObj<NpmPackageApiControllerService>('NpmPackageApiControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoPermissions']);
+    packageApi = jasmine.createSpyObj<NpmPackagesApi>('NpmPackagesApi', [
       'listNpmPackages',
       'listNpmPackageVersions',
       'listNpmPackageTags',
@@ -57,7 +51,7 @@ describe('NpmService', () => {
       'deleteNpmPackage',
       'deleteNpmPackageVersion',
     ]);
-    scopeApi = jasmine.createSpyObj<NpmScopeApiControllerService>('NpmScopeApiControllerService', [
+    scopeApi = jasmine.createSpyObj<NpmScopesApi>('NpmScopesApi', [
       'listNpmPackagesByScope',
       'listUnscopedNpmPackages',
       'listNpmScopedPackageVersions',
@@ -68,9 +62,9 @@ describe('NpmService', () => {
     ]);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: NpmPackageApiControllerService, useValue: packageApi },
-        { provide: NpmScopeApiControllerService, useValue: scopeApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: NpmPackagesApi, useValue: packageApi },
+        { provide: NpmScopesApi, useValue: scopeApi },
       ],
     });
     service = TestBed.inject(NpmService);

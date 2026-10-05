@@ -21,14 +21,14 @@ import { tap } from 'rxjs/operators';
 import {
   DeployTokenForm,
   DeployTokenInfoListItem,
-  NugetPackageControllerService,
+  DeployTokensApi,
   NuGetPackageInfo,
   NuGetPackageListItem,
+  NugetPackagesApi,
   NuGetVersionInfo,
   NuGetVersionListItem,
-  ProtocolDeployTokenControllerService,
-  ProtocolRepoControllerService,
   RepoPermissionInfo,
+  ReposApi,
   RepoSettingsForm,
   RepoSettingsInfo,
   RepoUpdateForm,
@@ -47,9 +47,9 @@ export class NugetService {
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
   constructor(
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
-    private readonly protocolDeployTokenControllerService: ProtocolDeployTokenControllerService,
-    private readonly nugetPackageControllerService: NugetPackageControllerService,
+    private readonly reposApi: ReposApi,
+    private readonly deployTokensApi: DeployTokensApi,
+    private readonly nugetPackagesApi: NugetPackagesApi,
   ) {
     this.repoChanges = this.repoSubject.asObservable();
   }
@@ -61,9 +61,7 @@ export class NugetService {
   public selectRepository(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
-    return this.protocolRepoControllerService
-      .getRepoPermissions(repoName)
-      .pipe(tap((info) => this.repoSubject.next(info)));
+    return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
   }
 
   private resetActiveRepoIfChanged(repoName: string): void {
@@ -75,20 +73,20 @@ export class NugetService {
   }
 
   public async fetchRepositoryUsage(): Promise<RepoUsageInfo> {
-    return firstValueFrom(this.protocolRepoControllerService.getRepoUsage(this.repoName));
+    return firstValueFrom(this.reposApi.getRepoUsage(this.repoName));
   }
 
   public async fetchRepositorySettings(): Promise<RepoSettingsInfo> {
-    const response = await firstValueFrom(this.protocolRepoControllerService.getRepoSettings(this.repoName));
+    const response = await firstValueFrom(this.reposApi.getRepoSettings(this.repoName));
     return response;
   }
 
   public async updateRepoSettings(repoSettingsForm: RepoSettingsForm): Promise<void> {
-    await firstValueFrom(this.protocolRepoControllerService.updateRepoSettings(this.repoName, repoSettingsForm));
+    await firstValueFrom(this.reposApi.updateRepoSettings(this.repoName, repoSettingsForm));
   }
 
   public async updateRepositoryName(repositoryNameForm: RepoUpdateForm): Promise<void> {
-    await firstValueFrom(this.protocolRepoControllerService.updateRepo(this.repoName, repositoryNameForm));
+    await firstValueFrom(this.reposApi.updateRepo(this.repoName, repositoryNameForm));
 
     const active = this.repoSubject.getValue();
     if (active) {
@@ -97,11 +95,11 @@ export class NugetService {
   }
 
   public async updateRepoDescription(repositoryDescriptionForm: RepoUpdateForm): Promise<void> {
-    await firstValueFrom(this.protocolRepoControllerService.updateRepo(this.repoName, repositoryDescriptionForm));
+    await firstValueFrom(this.reposApi.updateRepo(this.repoName, repositoryDescriptionForm));
   }
 
   public async deleteRepository(repoName: string): Promise<void> {
-    await firstValueFrom(this.protocolRepoControllerService.deleteRepo(repoName));
+    await firstValueFrom(this.reposApi.deleteRepo(repoName));
   }
 
   public async fetchRepositoryPackages(
@@ -111,7 +109,7 @@ export class NugetService {
     pageSize: number,
   ): Promise<PagedData<NuGetPackageListItem>> {
     const response = await firstValueFrom(
-      this.nugetPackageControllerService.searchNugetPackages(this.repoName, query || undefined, pageIndex, pageSize, [
+      this.nugetPackagesApi.searchNugetPackages(this.repoName, query || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ]),
     );
@@ -119,7 +117,7 @@ export class NugetService {
   }
 
   public async fetchPackage(packageId: string): Promise<NuGetPackageInfo> {
-    return firstValueFrom(this.nugetPackageControllerService.getNugetPackage(packageId, this.repoName));
+    return firstValueFrom(this.nugetPackagesApi.getNugetPackage(packageId, this.repoName));
   }
 
   public async fetchPackageVersions(
@@ -130,47 +128,40 @@ export class NugetService {
     pageSize: number,
   ): Promise<PagedData<NuGetVersionListItem>> {
     const response = await firstValueFrom(
-      this.nugetPackageControllerService.listNugetVersions(
-        packageId,
-        this.repoName,
-        query || undefined,
-        pageIndex,
-        pageSize,
-        [`${sortOption.column},${sortOption.type}`],
-      ),
+      this.nugetPackagesApi.listNugetVersions(packageId, this.repoName, query || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ]),
     );
     return this.toPagedData(response);
   }
 
   public async fetchPackageVersion(packageId: string, version: string): Promise<NuGetVersionInfo> {
-    return firstValueFrom(this.nugetPackageControllerService.getNugetVersion(packageId, version, this.repoName));
+    return firstValueFrom(this.nugetPackagesApi.getNugetVersion(packageId, version, this.repoName));
   }
 
   public async deletePackage(packageId: string): Promise<void> {
-    await firstValueFrom(this.nugetPackageControllerService.deleteNugetPackage(packageId, this.repoName));
+    await firstValueFrom(this.nugetPackagesApi.deleteNugetPackage(packageId, this.repoName));
   }
 
   public async deletePackageVersion(packageId: string, version: string): Promise<void> {
-    await firstValueFrom(this.nugetPackageControllerService.deleteNugetVersion(packageId, version, this.repoName));
+    await firstValueFrom(this.nugetPackagesApi.deleteNugetVersion(packageId, version, this.repoName));
   }
 
   public async getDeployTokens(pageNumber: number, pageSize: number): Promise<PagedData<DeployTokenInfoListItem>> {
-    const response = await firstValueFrom(
-      this.protocolDeployTokenControllerService.listDeployTokens(this.repoName, pageNumber, pageSize),
-    );
+    const response = await firstValueFrom(this.deployTokensApi.listDeployTokens(this.repoName, pageNumber, pageSize));
     return this.toPagedData(response);
   }
 
   public async rotateDeployToken(tokenId: string): Promise<string> {
-    return firstValueFrom(this.protocolDeployTokenControllerService.rotateDeployToken(tokenId, this.repoName));
+    return firstValueFrom(this.deployTokensApi.rotateDeployToken(tokenId, this.repoName));
   }
 
   public async createDeployToken(form: DeployTokenForm): Promise<TokenInfo> {
-    return firstValueFrom(this.protocolDeployTokenControllerService.createDeployToken(this.repoName, form));
+    return firstValueFrom(this.deployTokensApi.createDeployToken(this.repoName, form));
   }
 
   public async revokeDeployToken(tokenId: string): Promise<void> {
-    await firstValueFrom(this.protocolDeployTokenControllerService.revokeDeployToken(tokenId, this.repoName));
+    await firstValueFrom(this.deployTokensApi.revokeDeployToken(tokenId, this.repoName));
   }
 
   private toPagedData<T>(data: { content?: T[]; page?: unknown } | undefined): PagedData<T> {

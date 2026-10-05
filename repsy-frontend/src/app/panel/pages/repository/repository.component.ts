@@ -21,13 +21,7 @@ import moment from 'moment';
 import { of, Subject, Subscription, timer } from 'rxjs';
 import { catchError, filter, finalize, map, switchMap, tap } from 'rxjs/operators';
 
-import {
-  PagedModelRepoListInfo,
-  ProtocolRepoControllerService,
-  RepoCollectionControllerService,
-  RepoListInfo,
-  RepoSecuritySummary,
-} from '../../../../generated/api';
+import { PagedModelRepoListInfo, RepoListInfo, ReposApi, RepoSecuritySummary } from '../../../../generated/api';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../shared/components/ellipsis/ellipsis.pipe';
@@ -127,8 +121,7 @@ export class RepositoryComponent implements OnDestroy {
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
-    private readonly repoCollectionControllerService: RepoCollectionControllerService,
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly reposApi: ReposApi,
     private readonly securityService: SecurityService,
     private readonly profileFacadeService: ProfileService,
     private readonly toastService: ToastService,
@@ -141,7 +134,7 @@ export class RepositoryComponent implements OnDestroy {
         .pipe(
           tap((request) => this.startLoading(request)),
           switchMap((request) =>
-            this.repoCollectionControllerService
+            this.reposApi
               .listRepos(toApiRepoType(request.option), request.q || undefined, request.page, this.pageSize, [
                 REPO_LIST_SORT,
               ])
@@ -233,7 +226,7 @@ export class RepositoryComponent implements OnDestroy {
     const previouslyFocused = document.activeElement;
     this.dangerModalService.show('Delete Repository', 'Delete', () => {
       this.operationLock = true;
-      this.protocolRepoControllerService
+      this.reposApi
         .deleteRepo(repo.name)
         .pipe(
           finalize(() => {

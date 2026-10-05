@@ -18,13 +18,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Subject } from 'rxjs';
 
-import {
-  RepoCollectionControllerService,
-  RepoListInfo,
-  RepoSecuritySummary,
-  RepoType,
-  TotalUsageInfo,
-} from '../../../../generated/api';
+import { RepoListInfo, ReposApi, RepoSecuritySummary, RepoType, TotalUsageInfo } from '../../../../generated/api';
 import { AuthService } from '../../../auth/pages/service/auth.service';
 import { SplashService } from '../../../shared/components/splash-screen/splasht.service';
 import { ProfileService } from '../profile/service/profile.service';
@@ -81,7 +75,7 @@ describe('DashboardComponent in an OnPush host (RPS-1459)', () => {
         },
         { provide: UsageService, useValue: { getTotalUsage: () => usage.asObservable() } },
         {
-          provide: RepoCollectionControllerService,
+          provide: ReposApi,
           useValue: { getRepoCounts: () => counts.asObservable(), listRepos: () => recent.asObservable() },
         },
         { provide: SecurityService, useValue: { getSecuritySummary: () => security.asObservable() } },

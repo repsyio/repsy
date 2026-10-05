@@ -17,7 +17,7 @@
 import { ChangeDetectorRef, Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-import { RepoCollectionControllerService, RepoListInfo, RepoType, TotalUsageInfo } from '../../../../../generated/api';
+import { RepoListInfo, ReposApi, RepoType, TotalUsageInfo } from '../../../../../generated/api';
 import { RepositoryCreateModalComponent } from '../../../shared/components/modals/repository-create-modal/repository-create-modal.component';
 import { ProfileService } from '../../profile/service/profile.service';
 import { RecentActivityComponent } from '../recent-activity/recent-activity.component';
@@ -60,7 +60,7 @@ export class DashboardContentComponent {
   public isAdmin = false;
 
   constructor(
-    private readonly repoCollectionControllerService: RepoCollectionControllerService,
+    private readonly reposApi: ReposApi,
     private readonly usageService: UsageService,
     private readonly profileService: ProfileService,
     private readonly cdRef: ChangeDetectorRef,
@@ -98,7 +98,7 @@ export class DashboardContentComponent {
 
   /** One request for all nine types. A count that cannot be fetched stays at zero. */
   private fetchRepoCounts(): void {
-    this.repoCollectionControllerService.getRepoCounts().subscribe({
+    this.reposApi.getRepoCounts().subscribe({
       next: (response) => {
         const counts = response ?? {};
         this.npmRegistryCount = counts[RepoType.Npm] ?? 0;
@@ -121,15 +121,13 @@ export class DashboardContentComponent {
    * so no per-repository usage call is made (that call needs the MANAGE permission a USER lacks).
    */
   private fetchRecentRepos(): void {
-    this.repoCollectionControllerService
-      .listRepos(undefined, undefined, 0, RECENT_REPOSITORY_COUNT, ['createdAt,desc'])
-      .subscribe({
-        next: (response) => {
-          this.repoListInfos = response?.content ?? [];
-          this.cdRef.markForCheck();
-        },
-        // The HTTP error interceptor already shows the failure; the card stays empty.
-        error: () => {},
-      });
+    this.reposApi.listRepos(undefined, undefined, 0, RECENT_REPOSITORY_COUNT, ['createdAt,desc']).subscribe({
+      next: (response) => {
+        this.repoListInfos = response?.content ?? [];
+        this.cdRef.markForCheck();
+      },
+      // The HTTP error interceptor already shows the failure; the card stays empty.
+      error: () => {},
+    });
   }
 }

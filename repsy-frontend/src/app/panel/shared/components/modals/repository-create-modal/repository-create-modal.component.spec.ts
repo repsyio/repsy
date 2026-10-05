@@ -21,7 +21,7 @@ import { By } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
-import { RepoCollectionControllerService, RepoType as ApiRepoType } from '../../../../../../generated/api';
+import { ReposApi, RepoType as ApiRepoType } from '../../../../../../generated/api';
 import { RepoType } from '../../../dto/repo/repo-type';
 import { ToastService } from '../../toast/toast.service';
 import { RepositoryCreateModalComponent } from './repository-create-modal.component';
@@ -31,7 +31,7 @@ describe('RepositoryCreateModalComponent name validation', () => {
 
   beforeEach(() => {
     component = new RepositoryCreateModalComponent(
-      {} as RepoCollectionControllerService,
+      {} as ReposApi,
       new FormBuilder(),
       {} as Router,
       {} as ToastService,
@@ -87,7 +87,7 @@ describe('RepositoryCreateModalComponent buttons', () => {
     TestBed.configureTestingModule({
       imports: [RepositoryCreateModalComponent],
       providers: [
-        { provide: RepoCollectionControllerService, useValue: {} },
+        { provide: ReposApi, useValue: {} },
         { provide: Router, useValue: {} },
         { provide: ToastService, useValue: {} },
       ],
@@ -136,7 +136,7 @@ describe('RepositoryCreateModalComponent buttons', () => {
 });
 
 describe('RepositoryCreateModalComponent create', () => {
-  let api: jasmine.SpyObj<RepoCollectionControllerService>;
+  let api: jasmine.SpyObj<ReposApi>;
   let router: jasmine.SpyObj<Router>;
   let toast: jasmine.SpyObj<ToastService>;
   let changeDetector: jasmine.SpyObj<ChangeDetectorRef>;
@@ -145,9 +145,7 @@ describe('RepositoryCreateModalComponent create', () => {
   let closed: boolean[];
 
   beforeEach(() => {
-    api = jasmine.createSpyObj<RepoCollectionControllerService>('RepoCollectionControllerService', [
-      'createRepository',
-    ]);
+    api = jasmine.createSpyObj<ReposApi>('ReposApi', ['createRepository']);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     router.navigate.and.returnValue(Promise.resolve(true));
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -241,7 +239,7 @@ describe('RepositoryCreateModalComponent in an OnPush host (RPS-1459)', () => {
     TestBed.configureTestingModule({
       imports: [OnPushHostComponent],
       providers: [
-        { provide: RepoCollectionControllerService, useValue: { createRepository: () => answer.asObservable() } },
+        { provide: ReposApi, useValue: { createRepository: () => answer.asObservable() } },
         { provide: Router, useValue: { navigate: () => Promise.resolve(true) } },
         { provide: ToastService, useValue: { show: jasmine.createSpy('show') } },
       ],
