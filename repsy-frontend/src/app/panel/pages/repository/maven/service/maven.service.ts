@@ -127,7 +127,9 @@ export class MavenService {
       .listMavenArtifactVersions(groupName, artifactName, this.repoName, version || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
-      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<ArtifactVersionListItem>));
+      .pipe(
+        map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<ArtifactVersionListItem>),
+      );
   }
 
   public fetchArtifactVersion(
