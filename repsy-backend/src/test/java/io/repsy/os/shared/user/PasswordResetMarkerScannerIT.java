@@ -108,7 +108,7 @@ class PasswordResetMarkerScannerIT extends AbstractIntegrationTest {
     final var user = this.createUser(uniqueUsername("lost"), UserRole.USER);
     final var refreshToken =
         JsonPath.<String>read(
-            this.login(user.getUsername(), VALID_PASSWORD, 200), "$.data.refreshToken");
+            this.login(user.getUsername(), VALID_PASSWORD, 200), "$.refreshToken");
     final var versionBefore = user.getTokenVersion();
     final var marker = this.marker(user.getUsername());
 

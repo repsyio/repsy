@@ -124,9 +124,8 @@ export class OsPanelBackend implements PanelBackend {
 
   async login(username: string, password: string): Promise<LoginInfo> {
     const res = await this.call((c) => c.auth.login({ requestBody: { username, password } }));
-    const data = unwrap(res.data, 'login');
-    this.token = unwrap(data.token, 'login.token');
-    return data;
+    this.token = unwrap(res.token, 'login.token');
+    return res;
   }
 
   private authorization(): string {
@@ -174,7 +173,7 @@ export class OsPanelBackend implements PanelBackend {
       role: (spec.role ?? UserRole.USER) as UserCreateForm['role'],
     };
     const res = await this.call((c) => c.users.createUser({ requestBody: form }));
-    return unwrap(res.data, 'createUser');
+    return unwrap(res, 'createUser');
   }
 
   async deleteRepoUser(userId: string): Promise<void> {
@@ -199,7 +198,7 @@ export class OsPanelBackend implements PanelBackend {
     params: { q?: string; page?: number; size?: number; sort?: string[] } = {},
   ): Promise<UserResponse[]> {
     const res = await this.call((c) => c.users.listUsers(params));
-    return unwrap(res.data, 'listUsers').content ?? [];
+    return unwrap(res, 'listUsers').content ?? [];
   }
 
   /**
@@ -212,7 +211,7 @@ export class OsPanelBackend implements PanelBackend {
 
     for (let page = 0; ; page += 1) {
       const res = await this.call((c) => c.users.listUsers({ ...filter, page, size: 100 }));
-      const result = unwrap(res.data, 'listAllUsers');
+      const result = unwrap(res, 'listAllUsers');
       for (const user of result.content ?? []) {
         byId.set(user.id, user);
       }

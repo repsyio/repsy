@@ -89,7 +89,7 @@ test.describe('the https listeners next to the http ones', { tag: ['@tls', '@smo
         body: JSON.stringify({ username: env.adminUsername, password: env.adminPassword }),
       });
     const bearerOf = async (res: Response): Promise<string> =>
-      ((await res.json()) as { data: { token: string } }).data.token;
+      ((await res.json()) as { token: string }).token;
 
     const overTls = await login(tlsApi);
     const overPlain = await login(plainApi);

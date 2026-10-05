@@ -192,7 +192,7 @@ export class AuthService {
   public logIn(form: LoginForm): Observable<void> {
     return this.authApi.login(form).pipe(
       map((r) => {
-        this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
+        this._update(r.username!, r.token!, r.refreshToken!);
       }),
     );
   }
@@ -350,8 +350,8 @@ export class AuthService {
         })
         .pipe(
           map((r) => {
-            this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
-            return r.data!.token!;
+            this._update(r.username!, r.token!, r.refreshToken!);
+            return r.token!;
           }),
         ),
       { defaultValue: null },

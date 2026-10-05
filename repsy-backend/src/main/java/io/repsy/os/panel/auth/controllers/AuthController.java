@@ -15,8 +15,6 @@
  */
 package io.repsy.os.panel.auth.controllers;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.LoginForm;
 import io.repsy.os.generated.model.LoginInfo;
@@ -47,10 +45,9 @@ class AuthController {
   private final @NonNull AuthUserService authUserService;
   private final @NonNull JwtUtils jwtUtils;
   private final @NonNull RefreshTokenService refreshTokenService;
-  private final @NonNull RestResponseFactory resp;
 
   @PostMapping("/login")
-  public @NonNull RestResponse<LoginInfo> login(
+  public @NonNull LoginInfo login(
       @RequestBody @Valid final @NonNull LoginForm form,
       final @NonNull HttpServletResponse response) {
 
@@ -61,11 +58,11 @@ class AuthController {
 
     NoStore.apply(response);
 
-    return this.resp.success("loginSucceeded", loginInfo);
+    return loginInfo;
   }
 
   @PostMapping("/tokens/refresh")
-  public @NonNull RestResponse<LoginInfo> refreshToken(
+  public @NonNull LoginInfo refreshToken(
       @RequestBody @Valid final @NonNull RefreshTokenForm form,
       final @NonNull HttpServletResponse response) {
 
@@ -75,7 +72,7 @@ class AuthController {
 
     NoStore.apply(response);
 
-    return this.resp.success("tokenRefreshed", loginInfo);
+    return loginInfo;
   }
 
   /**

@@ -23,7 +23,7 @@ import {
   UserUpdateForm,
 } from '../../../../../generated/api';
 import { describeNoAuthorizationHeader } from '../../../shared/testing/authorization-header-spec-helpers';
-import { CallCase, describeCalls, restResponse } from '../../repository/testing/protocol-service-spec-helpers';
+import { CallCase, describeCalls } from '../../repository/testing/protocol-service-spec-helpers';
 import { UserService } from './user.service';
 
 const USER: UserResponse = {
@@ -65,7 +65,7 @@ describe('UserService', () => {
       invoke: (s) => s.listUsers('ali', 1, 10),
       api: () => api.listUsers,
       args: ['ali', 1, 10],
-      response: restResponse(PAGE),
+      response: PAGE,
       expected: PAGE,
     },
     {
@@ -73,7 +73,7 @@ describe('UserService', () => {
       invoke: (s) => s.listUsers(),
       api: () => api.listUsers,
       args: [undefined, undefined, undefined],
-      response: restResponse(PAGE),
+      response: PAGE,
       expected: PAGE,
     },
     {
@@ -81,7 +81,7 @@ describe('UserService', () => {
       invoke: (s) => s.countAdmins(),
       api: () => api.countAdmins,
       args: [],
-      response: restResponse(3),
+      response: 3,
       expected: 3,
     },
     {
@@ -89,7 +89,7 @@ describe('UserService', () => {
       invoke: (s) => s.createUser(CREATE_FORM),
       api: () => api.createUser,
       args: [CREATE_FORM],
-      response: restResponse(USER),
+      response: USER,
       expected: USER,
     },
     {
@@ -97,7 +97,7 @@ describe('UserService', () => {
       invoke: (s) => s.updateUser('user-1', UPDATE_FORM),
       api: () => api.updateUser,
       args: ['user-1', UPDATE_FORM],
-      response: restResponse(USER),
+      response: USER,
       expected: USER,
     },
     {
@@ -105,7 +105,7 @@ describe('UserService', () => {
       invoke: (s) => s.deleteUser('user-1'),
       api: () => api.deleteUser,
       args: ['user-1'],
-      response: restResponse(undefined),
+      response: undefined,
       expected: undefined,
     },
     {
@@ -113,7 +113,7 @@ describe('UserService', () => {
       invoke: (s) => s.resetPassword('user-1'),
       api: () => api.resetPassword,
       args: ['user-1'],
-      response: restResponse('generated-password'),
+      response: 'generated-password',
       expected: 'generated-password',
     },
   ];

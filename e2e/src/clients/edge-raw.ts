@@ -81,7 +81,7 @@ export async function adminBearer(): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: env.adminUsername, password: env.adminPassword }),
   });
-  const token = (res.json as { data?: { token?: string } } | undefined)?.data?.token;
+  const token = (res.json as { token?: string } | undefined)?.token;
   if (res.status !== 200 || !token) {
     throw new Error(
       `admin login on the api port answered ${res.status}: ${res.text.slice(0, 200)}`,

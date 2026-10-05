@@ -1411,6 +1411,158 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
     return findings;
   }
 
+  /**
+   * RPS-1959: operations whose 2xx body may be a {@code RestResponse} envelope, by operation key,
+   * with the reason. Empty: every panel success body is the bare resource (API guideline, Decision
+   * 5). The wire-protocol routes are not in the panel spec at all, so they need no entry.
+   */
+  private static final Map<String, String> ENVELOPED_SUCCESS_ALLOWED = Map.of();
+
+  @Test
+  @DisplayName("no 2xx body of the panel spec is a RestResponse envelope")
+  void noSuccessBodyIsAnEnvelope() throws IOException {
+    final var findings = envelopeFindings(loadSpec(), ENVELOPED_SUCCESS_ALLOWED.keySet());
+
+    assertThat(findings).as("enveloped 2xx bodies").isEmpty();
+  }
+
+  /** Flip-and-fail: an envelope schema on a 2xx fails, and the allow-list is the only way out. */
+  @Test
+  @DisplayName(
+      "the envelope rule fires on RestResponse and msgId bodies and honours the allow-list")
+  void envelopeRuleFires() throws IOException {
+    final var doc = loadSpec();
+    final var operations = specOperations(doc).values().stream().toList();
+    final var byName = operations.get(0);
+    final var byShape = operations.get(1);
+    final var inline = operations.get(2);
+    final var schemas = asMap(asMap(doc.get("components")).get("schemas"));
+
+    schemas.put("RestResponseFlip", Map.of("type", "object"));
+    asMap(byName.raw().get("responses"))
+        .put(
+            "200",
+            Map.of(
+                "description",
+                "x",
+                "content",
+                Map.of(
+                    "application/json",
+                    Map.of("schema", Map.of("$ref", "#/components/schemas/RestResponseFlip")))));
+
+    schemas.put(
+        "Wrapped",
+        Map.of(
+            "type",
+            "object",
+            "properties",
+            Map.of("msgId", Map.of("type", "string"), "type", Map.of("type", "string"))));
+    asMap(byShape.raw().get("responses"))
+        .put(
+            "200",
+            Map.of(
+                "description",
+                "x",
+                "content",
+                Map.of(
+                    "application/json",
+                    Map.of("schema", Map.of("$ref", "#/components/schemas/Wrapped")))));
+
+    asMap(inline.raw().get("responses"))
+        .put(
+            "200",
+            Map.of(
+                "description",
+                "x",
+                "content",
+                Map.of(
+                    "application/json",
+                    Map.of(
+                        "schema",
+                        Map.of(
+                            "type",
+                            "object",
+                            "properties",
+                            Map.of("msgId", Map.of("type", "string")))))));
+
+    assertThat(envelopeFindings(doc, Set.of()))
+        .anyMatch(f -> f.startsWith(byName.key()))
+        .anyMatch(f -> f.startsWith(byShape.key()))
+        .anyMatch(f -> f.startsWith(inline.key()));
+    assertThat(envelopeFindings(doc, Set.of(byName.key(), byShape.key(), inline.key()))).isEmpty();
+  }
+
+  /**
+   * The 2xx responses whose body schema is an envelope: a {@code RestResponse*} or {@code
+   * EmptyResponse} schema, or any schema (also inside {@code allOf}, {@code items}) that has a
+   * {@code msgId} property.
+   */
+  private static Set<String> envelopeFindings(
+      final Map<String, Object> doc, final Set<String> allowed) {
+
+    final var findings = new TreeSet<String>();
+
+    for (final var operation : specOperations(doc).values()) {
+      if (allowed.contains(operation.key())) {
+        continue;
+      }
+
+      final var responses = asMap(operation.raw().get("responses"));
+
+      for (final var code : successCodes(operation)) {
+        final var content = mapOrEmpty(deref(doc, responses.get(code)).get("content"));
+
+        for (final var media : content.values()) {
+          final var schema = mapOrEmpty(asMap(media).get("schema"));
+
+          if (isEnvelope(doc, schema, 0)) {
+            findings.add(operation.key() + ": " + code + " body is an envelope");
+          }
+        }
+      }
+    }
+
+    return findings;
+  }
+
+  private static Map<String, Object> mapOrEmpty(final Object value) {
+    return value == null ? Map.of() : asMap(value);
+  }
+
+  private static boolean isEnvelope(
+      final Map<String, Object> doc, final Map<String, Object> schema, final int depth) {
+
+    if (depth > 6) {
+      return false;
+    }
+
+    if (schema.get("$ref") instanceof final String ref) {
+      final var name = ref.substring(ref.lastIndexOf('/') + 1);
+
+      if (name.startsWith("RestResponse") || name.equals("EmptyResponse")) {
+        return true;
+      }
+
+      return resolves(doc, ref) && isEnvelope(doc, deref(doc, schema), depth + 1);
+    }
+
+    if (mapOrEmpty(schema.get("properties")).containsKey("msgId")) {
+      return true;
+    }
+
+    if (isEnvelope(doc, mapOrEmpty(schema.get("items")), depth + 1)) {
+      return true;
+    }
+
+    for (final var part : schema.get("allOf") instanceof final List<?> parts ? parts : List.of()) {
+      if (isEnvelope(doc, asMap(part), depth + 1)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   /** Follows a {@code $ref} (a shared response component) to the node it names. */
   private static Map<String, Object> deref(final Map<String, Object> doc, final Object node) {
     var current = asMap(node);

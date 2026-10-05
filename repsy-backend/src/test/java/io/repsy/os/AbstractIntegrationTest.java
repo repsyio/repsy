@@ -89,7 +89,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
  *       so every request must fake the local port onto {@code multiport.ports.api} (8080);
  *   <li>{@link #protocolPort()}: the same for wire-protocol requests, which the protocol router
  *       serves on the main port (9090) and resolves from the servlet path (RPS-903);
- *   <li>user, JWT and repo seeding helpers plus assertions for the {@code RestResponse} envelope.
+ *   <li>user, JWT and repo seeding helpers plus assertions for the failure bodies.
  * </ul>
  *
  * <p>Every test method runs in one transaction that is rolled back afterwards, so the only data
@@ -495,25 +495,6 @@ public abstract class AbstractIntegrationTest {
   // ---------------------------------------------------------------------------------------------
   // Response assertions
   // ---------------------------------------------------------------------------------------------
-
-  /**
-   * Asserts a 200 SUCCESS envelope (exact key set, {@code errorCode} null) and returns the raw body
-   * for further assertions on {@code data}.
-   */
-  protected static String expectSuccess(
-      final ResultActions result, final String msgId, final String text) throws Exception {
-    final var body =
-        result.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "SUCCESS")
-        .containsEntry("errorCode", null)
-        .containsEntry("text", text);
-    return body;
-  }
 
   /**
    * Asserts the 403 {@code accessDenied} of a signed-in caller who lacks the permission (a

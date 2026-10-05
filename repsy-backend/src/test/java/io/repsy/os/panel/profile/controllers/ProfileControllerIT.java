@@ -382,7 +382,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content("{\"refreshToken\":\"%s\"}".formatted(newRefreshToken)))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("tokenRefreshed"));
+          .andExpect(jsonPath("$.msgId").doesNotExist());
     }
 
     @Test
@@ -733,7 +733,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content("{\"refreshToken\":\"%s\"}".formatted(currentRefreshToken)))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("tokenRefreshed"));
+          .andExpect(jsonPath("$.msgId").doesNotExist());
 
       // A subsequent login also gets a refresh token that works.
       final var loginBody =
@@ -750,7 +750,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
               .andReturn()
               .getResponse()
               .getContentAsString();
-      final String newRefreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
+      final String newRefreshToken = JsonPath.read(loginBody, "$.refreshToken");
       ProfileControllerIT.this
           .mockMvc
           .perform(
@@ -759,7 +759,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content("{\"refreshToken\":\"%s\"}".formatted(newRefreshToken)))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("tokenRefreshed"));
+          .andExpect(jsonPath("$.msgId").doesNotExist());
     }
 
     @Test

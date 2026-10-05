@@ -386,13 +386,14 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
         const token = await protocol.login(repo.name, user.username, user.password);
         await accepted(repo.name, token, 'the login token before the reset');
 
-        // The admin's own session (`panelApi`); the reset answers the generated password as the envelope's data.
+        // The admin's own session (`panelApi`); the reset answers the generated password as a bare JSON string.
         const reset = await panelApi.rawRequest(
           'POST',
           `/api/users/${user.id}/actions/reset-password`,
         );
         expect(reset.status, `reset-password: ${JSON.stringify(reset.body)}`).toBe(200);
-        const generated = String(reset.body.data);
+        // The body is the bare string, typed as the generic `{ data?: unknown }` of `rawRequest`.
+        const generated = String(reset.body as unknown);
 
         await endedSession(repo.name, token, 'the login token after the admin reset');
         const fresh = await protocol.login(repo.name, user.username, generated);

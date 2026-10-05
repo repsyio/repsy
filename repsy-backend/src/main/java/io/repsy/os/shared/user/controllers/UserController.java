@@ -17,20 +17,20 @@ package io.repsy.os.shared.user.controllers;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.UserCreateForm;
 import io.repsy.os.generated.model.UserResponse;
 import io.repsy.os.generated.model.UserUpdateForm;
 import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.http.NoStore;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.user.services.ReservedUsernameService;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.os.shared.utils.SortValidator;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.net.URI;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +39,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -61,10 +62,9 @@ final class UserController {
   private final @NonNull PanelAuthHelper panelAuthHelper;
   private final @NonNull UserTxService userTxService;
   private final @NonNull ReservedUsernameService reservedUsernameService;
-  private final @NonNull RestResponseFactory resp;
 
   @GetMapping
-  public @NonNull RestResponse<PagedModel<UserResponse>> list(
+  public @NonNull PagedModel<UserResponse> list(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestParam(name = "q", required = false, defaultValue = "") final @NonNull String search,
       @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
@@ -76,7 +76,7 @@ final class UserController {
 
     final var usersPage = this.userTxService.getAllUsers(search, pageable);
 
-    return this.resp.success("usersFetched", new PagedModel<>(usersPage));
+    return new PagedModel<>(usersPage);
   }
 
   /**
@@ -84,16 +84,15 @@ final class UserController {
    * uses it to tell whether the admin it is about to delete or demote is the last one.
    */
   @GetMapping("/admin-count")
-  public @NonNull RestResponse<Long> countAdmins(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
+  public @NonNull Long countAdmins(@RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
-    return this.resp.success("adminCountFetched", this.userTxService.countAdmins());
+    return this.userTxService.countAdmins();
   }
 
   @PostMapping
-  public @NonNull RestResponse<UserResponse> createUser(
+  public @NonNull ResponseEntity<UserResponse> createUser(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @Valid @RequestBody final @NonNull UserCreateForm dto) {
 
@@ -103,11 +102,11 @@ final class UserController {
 
     final var createdUser = this.userTxService.createUserWithRole(dto);
 
-    return this.resp.success("userCreated", createdUser);
+    return ResponseEntities.created(URI.create("/api/users/" + createdUser.getId()), createdUser);
   }
 
   @PutMapping("/{userId}")
-  public @NonNull RestResponse<UserResponse> updateUser(
+  public @NonNull UserResponse updateUser(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull UUID userId,
       @Valid @RequestBody final @NonNull UserUpdateForm dto) {
@@ -121,11 +120,11 @@ final class UserController {
 
     final var updatedUser = this.userTxService.updateUserDetails(userId, dto);
 
-    return this.resp.success("userUpdated", updatedUser);
+    return updatedUser;
   }
 
   @DeleteMapping("/{userId}")
-  public @NonNull RestResponse<Void> deleteUser(
+  public @NonNull ResponseEntity<Void> deleteUser(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull UUID userId) {
 
@@ -133,11 +132,11 @@ final class UserController {
 
     this.userTxService.deleteUserById(userId);
 
-    return this.resp.success("userDeleted");
+    return ResponseEntities.noContent();
   }
 
   @PostMapping("/{userId}/actions/reset-password")
-  public @NonNull RestResponse<String> resetPassword(
+  public @NonNull ResponseEntity<String> resetPassword(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull UUID userId,
       final @NonNull HttpServletResponse response) {
@@ -148,6 +147,6 @@ final class UserController {
 
     NoStore.apply(response);
 
-    return this.resp.success("passwordReset", newPassword);
+    return ResponseEntities.jsonString(newPassword);
   }
 }
