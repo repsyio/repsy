@@ -58,7 +58,9 @@ class GrantingFakeCloud extends FakeCloudPanelBackend {
 
   override async seedUserCredential(ctx: CredentialSeedContext): Promise<MaterializedCredential> {
     this.asked.push(ctx);
-    const created = await ctx.seeder.createUser();
+    const created = await ctx.seeder.createUser(
+      ctx.username === undefined ? {} : { username: ctx.username },
+    );
     this.grants.set(created.username, new Set([ctx.repoName]));
     return {
       transport: 'basic',
