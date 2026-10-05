@@ -59,6 +59,9 @@
       <div><app-repo-storage [repoType]="repoType" [repoName]="activeRepository?.repoName" /></div>
       <div><app-repo-info [repoType]="repoType" [activeRepository]="activeRepository" /></div>
       @if (repoType === 'docker') {
+        @if (activeRepository) {
+          <div><app-cleanup-policy [activeRepository]="activeRepository" /></div>
+        }
         <div><app-delete-untagged-manifests [activeRepository]="activeRepository" /></div>
         <div><app-delete-orphan-layers [activeRepository]="activeRepository" /></div>
       }

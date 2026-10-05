@@ -23,6 +23,7 @@ import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorage
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestFileService.ManifestFileRef;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -66,11 +67,25 @@ public class UntaggedManifestCleanupService {
   @Transactional
   public Result deleteUntagged(final RepoInfo repoInfo, final @Nullable String imageName) {
 
+    return this.deleteUntagged(repoInfo, imageName, null);
+  }
+
+  /**
+   * Like {@link #deleteUntagged(RepoInfo, String)}, but only manifests created before {@code
+   * olderThan} go, so a digest-pushed manifest of a push still running is left alone (the cleanup
+   * policy uses its retention). {@code null} takes every untagged manifest.
+   */
+  @Transactional
+  public Result deleteUntagged(
+      final RepoInfo repoInfo,
+      final @Nullable String imageName,
+      final @Nullable Instant olderThan) {
+
     var deleted = 0;
     var freedBytes = 0L;
 
     for (final var image : this.findImages(repoInfo, imageName)) {
-      final var result = this.deleteUntaggedOfImage(repoInfo, image);
+      final var result = this.deleteUntaggedOfImage(repoInfo, image, olderThan);
 
       deleted += result.deletedManifests();
       freedBytes += result.freedBytes();
@@ -94,12 +109,20 @@ public class UntaggedManifestCleanupService {
             .orElseThrow(() -> new ItemNotFoundException("imageNotFound")));
   }
 
-  private Result deleteUntaggedOfImage(final RepoInfo repoInfo, final Image image) {
+  private Result deleteUntaggedOfImage(
+      final RepoInfo repoInfo, final Image image, final @Nullable Instant olderThan) {
 
     // Locked before anything is read, so a push that is writing to the image is waited for.
     this.imageService.lockImage(image.getId());
 
-    final var untagged = this.untaggedManifestFinder.findUntagged(image.getId());
+    final var untagged =
+        this.untaggedManifestFinder.findUntagged(image.getId()).stream()
+            .filter(
+                manifest ->
+                    olderThan == null
+                        || (manifest.getCreatedAt() != null
+                            && manifest.getCreatedAt().isBefore(olderThan)))
+            .toList();
 
     if (untagged.isEmpty()) {
       // An image with no manifest at all goes too: only an image an earlier version left behind (a

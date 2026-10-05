@@ -27,6 +27,7 @@ import { ToastService } from '../../../shared/components/toast/toast.service';
 import { RepoType } from '../../../shared/dto/repo/repo-type';
 import { MavenRepoSettingsForm } from '../maven/dto/maven-repo-settings-form';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
+import { CleanupPolicyComponent } from './cleanup-policy/cleanup-policy.component';
 import { DeleteOrphanLayersComponent } from './delete-orphan-layers/delete-orphan-layers.component';
 import { DeleteRepoComponent } from './delete-repo/delete-repo.component';
 import { DeleteUntaggedManifestsComponent } from './delete-untagged-manifests/delete-untagged-manifests.component';
@@ -51,6 +52,7 @@ import { VulnerabilityScanningComponent } from './vulnerability-scanning/vulnera
     RepoInfoComponent,
     NgOptimizedImage,
     DeleteRepoComponent,
+    CleanupPolicyComponent,
     DeleteUntaggedManifestsComponent,
     DeleteOrphanLayersComponent,
     VersionAllowanceComponent,
