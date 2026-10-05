@@ -18,7 +18,7 @@ import { TestBed } from '@angular/core/testing';
 import { FormBuilder } from '@angular/forms';
 import { of, throwError } from 'rxjs';
 
-import { CleanupPolicyItem, DockerCleanupPolicyControllerService } from '../../../../../../generated/api';
+import { CleanupPolicyItem, DockerCleanupPolicyApi } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { permission } from '../../testing/protocol-service-spec-helpers';
 import { CleanupPolicyComponent } from './cleanup-policy.component';
@@ -32,12 +32,12 @@ const DISABLED: CleanupPolicyItem = {
 };
 
 describe('CleanupPolicyComponent', () => {
-  let api: jasmine.SpyObj<DockerCleanupPolicyControllerService>;
+  let api: jasmine.SpyObj<DockerCleanupPolicyApi>;
   let toast: jasmine.SpyObj<ToastService>;
   let component: CleanupPolicyComponent;
 
   beforeEach(() => {
-    api = jasmine.createSpyObj<DockerCleanupPolicyControllerService>('DockerCleanupPolicyControllerService', [
+    api = jasmine.createSpyObj<DockerCleanupPolicyApi>('DockerCleanupPolicyApi', [
       'getDockerCleanupPolicy',
       'updateDockerCleanupPolicy',
       'updateDockerCleanupPolicyStatus',

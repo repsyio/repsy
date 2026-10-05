@@ -21,11 +21,10 @@ import {
   RepoSecurityDetail,
   RepoSecuritySummary,
   RepoType,
-  SecurityScanControllerService,
+  SecurityScansApi,
   SecurityScansSummary,
   Severity,
   VersionSecuritySummary,
-  VulnerabilityScanControllerService,
 } from '../../../../../generated/api';
 import { describeNoAuthorizationHeader } from '../../../shared/testing/authorization-header-spec-helpers';
 import { CallCase, describeCalls } from '../../repository/testing/protocol-service-spec-helpers';
@@ -45,16 +44,14 @@ const DETAIL: RepoSecurityDetail = { criticalCount: 1, highCount: 2, totalCount:
 const SCANS_SUMMARY: SecurityScansSummary = { criticalCount: 1, highCount: 2, totalCount: 3 };
 
 describe('SecurityService', () => {
-  let scanApi: jasmine.SpyObj<SecurityScanControllerService>;
-  let vulnerabilityApi: jasmine.SpyObj<VulnerabilityScanControllerService>;
+  let scanApi: jasmine.SpyObj<SecurityScansApi>;
+  let vulnerabilityApi: jasmine.SpyObj<SecurityScansApi>;
   let service: SecurityService;
 
   beforeEach(() => {
-    scanApi = jasmine.createSpyObj<SecurityScanControllerService>('SecurityScanControllerService', [
+    scanApi = jasmine.createSpyObj<SecurityScansApi>('SecurityScansApi', [
       'listSecurityScans',
       'getSecurityScansSummary',
-    ]);
-    vulnerabilityApi = jasmine.createSpyObj<VulnerabilityScanControllerService>('VulnerabilityScanControllerService', [
       'getSecuritySummary',
       'getVersionSecuritySummary',
       'getScopedVersionSecuritySummary',
@@ -63,11 +60,9 @@ describe('SecurityService', () => {
       'getRepoSecurityDetail',
       'getArtifactSecurityDetail',
     ]);
+    vulnerabilityApi = scanApi;
     TestBed.configureTestingModule({
-      providers: [
-        { provide: SecurityScanControllerService, useValue: scanApi },
-        { provide: VulnerabilityScanControllerService, useValue: vulnerabilityApi },
-      ],
+      providers: [{ provide: SecurityScansApi, useValue: scanApi }],
     });
     service = TestBed.inject(SecurityService);
   });

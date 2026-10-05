@@ -18,7 +18,7 @@ import { Injectable } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 
 import { LoginInfo, ProfileInfo } from '../../../../../generated/api';
-import { ProfileControllerService } from '../../../../../generated/api';
+import { ProfileApi } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
 
 @Injectable({
@@ -26,25 +26,25 @@ import { AuthService } from '../../../../auth/pages/service/auth.service';
 })
 export class ProfileService {
   constructor(
-    private readonly profileControllerService: ProfileControllerService,
+    private readonly profileApi: ProfileApi,
     private readonly authService: AuthService,
   ) {}
 
   public get(): Observable<ProfileInfo> {
-    return this.profileControllerService.getProfile();
+    return this.profileApi.getProfile();
   }
 
   public updatePassword(password: string): Observable<LoginInfo> {
-    return this.profileControllerService
+    return this.profileApi
       .updatePassword({ password })
       .pipe(tap((loginInfo) => this.authService.updateLoginInfo(loginInfo)));
   }
 
   public updateUsername(username: string): Observable<LoginInfo> {
-    return this.profileControllerService.updateUsername({ username });
+    return this.profileApi.updateUsername({ username });
   }
 
   public deleteAccount(): Observable<void> {
-    return this.profileControllerService.deleteProfile();
+    return this.profileApi.deleteProfile();
   }
 }

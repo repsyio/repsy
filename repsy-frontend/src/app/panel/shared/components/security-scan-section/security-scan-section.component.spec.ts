@@ -23,9 +23,9 @@ import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import {
   ScanOverview,
   ScanStatus,
+  SecurityScansApi,
   Severity,
   VulnerabilityFindingInfo,
-  VulnerabilityScanControllerService,
   VulnerabilityScanDetail,
   VulnerabilityScanInfo,
 } from '../../../../../generated/api';
@@ -63,7 +63,7 @@ function overviewOf(scanId: string, status: ScanStatus, counts: Partial<ScanOver
 
 describe('SecurityScanSectionComponent', () => {
   let component: SecurityScanSectionComponent;
-  let api: jasmine.SpyObj<VulnerabilityScanControllerService>;
+  let api: jasmine.SpyObj<SecurityScansApi>;
   let toastService: jasmine.SpyObj<ToastService>;
   let supportService: jasmine.SpyObj<SecurityScanSupportService>;
   let scroller: jasmine.SpyObj<ViewportScroller>;
@@ -85,7 +85,7 @@ describe('SecurityScanSectionComponent', () => {
     };
     findings = [finding('a', Severity.Critical), finding('b', Severity.High), finding('c', Severity.High)];
 
-    api = jasmine.createSpyObj<VulnerabilityScanControllerService>('VulnerabilityScanControllerService', [
+    api = jasmine.createSpyObj<SecurityScansApi>('SecurityScansApi', [
       'listVulnerabilityScans',
       'getScanOverview',
       'getVulnerabilityScan',

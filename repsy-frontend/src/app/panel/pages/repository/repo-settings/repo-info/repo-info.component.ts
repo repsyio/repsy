@@ -19,7 +19,7 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import { ProtocolRepoControllerService, RepoPermissionInfo, RepoUpdateForm } from '../../../../../../generated/api';
+import { RepoPermissionInfo, ReposApi, RepoUpdateForm } from '../../../../../../generated/api';
 import { idFactory } from '../../../../../shared/util/unique-id';
 import {
   DESCRIPTION_MAX_LENGTH,
@@ -51,7 +51,7 @@ export class RepoInfoComponent implements OnInit {
   public readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
 
   constructor(
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly reposApi: ReposApi,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
@@ -82,7 +82,7 @@ export class RepoInfoComponent implements OnInit {
       this.loading = true;
       this.renameForm.disable();
 
-      this.protocolRepoControllerService
+      this.reposApi
         .updateRepo(this.activeRepository.repoName, form)
         .pipe(
           finalize(() => {
@@ -106,7 +106,7 @@ export class RepoInfoComponent implements OnInit {
     this.loading = true;
     this.renameForm.disable();
 
-    this.protocolRepoControllerService
+    this.reposApi
       .updateRepo(this.activeRepository.repoName, form)
       .pipe(
         finalize(() => {

@@ -87,6 +87,16 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
 
   private static final String SPEC_RESOURCE = "openapi/openapi-spec.yaml";
+
+  /**
+   * RPS-1897: the tag table, shared with the Cloud IT (it reads the same file from the classpath).
+   * {@code allowedTags} is every tag either spec may use; {@code os}, {@code cloud} and {@code
+   * cloudAdmin} map the old springdoc tag of each spec to its new one.
+   */
+  private static final String TAG_TABLE_RESOURCE = "openapi/openapi-tags.json";
+
+  private static final String CONTROLLER_SUFFIX = "-controller";
+  private static final Pattern KEBAB_CASE = Pattern.compile("[a-z][a-z0-9]*(-[a-z0-9]+)*");
   private static final String PANEL_PREFIX = "/api/";
   private static final String REPOS_PREFIX = "/api/repos/";
   private static final String BEARER = "bearerAuth";
@@ -881,6 +891,126 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
           .forEach(value -> collectNonCamelCaseProperties(value, doc, schema, visited, findings));
     } else if (node instanceof final Collection<?> items) {
       items.forEach(item -> collectNonCamelCaseProperties(item, doc, schema, visited, findings));
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Tags (RPS-1897)
+  // ---------------------------------------------------------------------------------------------
+
+  @Test
+  @DisplayName("every operation has exactly one tag, a clean domain noun from the tag table")
+  void tagsAreCleanAndFromTheTable() throws IOException {
+    final var doc = loadSpec();
+    final var table = loadTagTable();
+
+    assertNoNewFindings("operation tags", tagFindings(doc, allowedTags(table)), Map.of());
+  }
+
+  @Test
+  @DisplayName("the tag table is consistent and describes the OS spec")
+  void tagTableIsConsistent() throws IOException {
+    final var doc = loadSpec();
+    final var table = loadTagTable();
+    final var allowed = allowedTags(table);
+    final var findings = new TreeSet<String>();
+
+    for (final var section : List.of("os", "cloud", "cloudAdmin")) {
+      asMap(table.get(section))
+          .forEach(
+              (oldTag, newTag) -> {
+                if (!String.valueOf(oldTag).endsWith(CONTROLLER_SUFFIX)) {
+                  findings.add(section + ": old tag " + oldTag + " has no -controller suffix");
+                }
+                if (!allowed.contains(String.valueOf(newTag))) {
+                  findings.add(section + ": " + oldTag + " maps to unlisted " + newTag);
+                }
+              });
+    }
+
+    for (final var tag : allowed) {
+      if (!KEBAB_CASE.matcher(tag).matches() || tag.endsWith(CONTROLLER_SUFFIX)) {
+        findings.add("allowed tag " + tag + " is not a kebab-case noun without -controller");
+      }
+    }
+
+    final var osTags = new TreeSet<String>();
+    asMap(table.get("os")).values().forEach(v -> osTags.add(String.valueOf(v)));
+    final var used = new TreeSet<String>();
+    specOperations(doc).values().forEach(op -> used.addAll(tagsOf(op)));
+
+    if (!osTags.equals(used)) {
+      findings.add("the os mapping yields " + osTags + " but the spec uses " + used);
+    }
+
+    assertNoNewFindings("the tag table", findings, Map.of());
+  }
+
+  /** Flip-and-fail: the tag rules see a -controller tag, no tag, two tags and an unlisted tag. */
+  @Test
+  @DisplayName(
+      "the tag rules fire on a -controller tag, a missing tag, two tags and an unlisted tag")
+  void tagRulesFire() throws IOException {
+    final var doc = loadSpec();
+    final var allowed = allowedTags(loadTagTable());
+    final var paths = asMap(doc.get("paths"));
+
+    asMap(asMap(paths.get("/api/users")).get("get")).put("tags", List.of("user-controller"));
+    asMap(asMap(paths.get("/api/users")).get("post")).remove("tags");
+    asMap(asMap(paths.get("/api/usage")).get("get")).put("tags", List.of("usage", "users"));
+    asMap(asMap(paths.get("/api/auth/login")).get("post")).put("tags", List.of("authentication"));
+
+    assertThat(tagFindings(doc, allowed))
+        .contains(
+            "GET /api/users has a tag ending in -controller: user-controller",
+            "POST /api/users has no tag",
+            "GET /api/usage has 2 tags: [usage, users]",
+            "POST /api/auth/login has a tag outside the table: authentication");
+  }
+
+  private static Set<String> tagFindings(final Map<String, Object> doc, final Set<String> allowed) {
+    final var findings = new TreeSet<String>();
+
+    specOperations(doc)
+        .forEach(
+            (key, operation) -> {
+              final var tags = tagsOf(operation);
+
+              if (tags.isEmpty()) {
+                findings.add(key + " has no tag");
+                return;
+              }
+              if (tags.size() > 1) {
+                findings.add(key + " has " + tags.size() + " tags: " + tags);
+              }
+              for (final var tag : tags) {
+                if (tag.endsWith(CONTROLLER_SUFFIX)) {
+                  findings.add(key + " has a tag ending in -controller: " + tag);
+                } else if (!allowed.contains(tag)) {
+                  findings.add(key + " has a tag outside the table: " + tag);
+                }
+              }
+            });
+
+    return findings;
+  }
+
+  private static List<String> tagsOf(final SpecOperation operation) {
+    final var tags = operation.raw().get("tags");
+
+    return tags == null ? List.of() : asList(tags).stream().map(String::valueOf).toList();
+  }
+
+  private static Set<String> allowedTags(final Map<String, Object> table) {
+    return asList(table.get("allowedTags")).stream()
+        .map(String::valueOf)
+        .collect(Collectors.toCollection(TreeSet::new));
+  }
+
+  private static Map<String, Object> loadTagTable() throws IOException {
+    try (var in = new ClassPathResource(TAG_TABLE_RESOURCE).getInputStream()) {
+      // JSON is YAML; the spec loader's parser reads it.
+      return asMap(new Yaml(new SafeConstructor(new LoaderOptions())).load(in));
     }
   }
 

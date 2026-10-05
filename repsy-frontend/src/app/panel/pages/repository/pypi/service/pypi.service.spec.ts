@@ -15,7 +15,7 @@
 
 import { TestBed } from '@angular/core/testing';
 
-import { ProtocolRepoControllerService, PypiPackageControllerService } from '../../../../../../generated/api';
+import { PypiPackagesApi, ReposApi } from '../../../../../../generated/api';
 import {
   CallCase,
   describeCalls,
@@ -35,15 +35,13 @@ const PACKAGE = 'requests';
 const RELEASE = '2.31.0';
 
 describe('PypiService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let pypiApi: jasmine.SpyObj<PypiPackageControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let pypiApi: jasmine.SpyObj<PypiPackagesApi>;
   let service: PypiService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoPermissions',
-    ]);
-    pypiApi = jasmine.createSpyObj<PypiPackageControllerService>('PypiPackageControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoPermissions']);
+    pypiApi = jasmine.createSpyObj<PypiPackagesApi>('PypiPackagesApi', [
       'listPypiPackages',
       'listPypiVersions',
       'deletePypiPackage',
@@ -52,8 +50,8 @@ describe('PypiService', () => {
     ]);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: PypiPackageControllerService, useValue: pypiApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: PypiPackagesApi, useValue: pypiApi },
       ],
     });
     service = TestBed.inject(PypiService);

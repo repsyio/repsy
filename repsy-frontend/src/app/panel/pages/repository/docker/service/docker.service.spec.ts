@@ -17,11 +17,7 @@ import { HttpContext } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of } from 'rxjs';
 
-import {
-  DockerImageControllerService,
-  ImageListItem,
-  ProtocolRepoControllerService,
-} from '../../../../../../generated/api';
+import { DockerImagesApi, ImageListItem, ReposApi } from '../../../../../../generated/api';
 import { SILENT_ERROR } from '../../../../../shared/interceptor/error-handler.interceptor';
 import {
   CallCase,
@@ -45,15 +41,13 @@ const TAG = 'v1';
 const DIGEST = 'sha256:abc';
 
 describe('DockerService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let dockerApi: jasmine.SpyObj<DockerImageControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let dockerApi: jasmine.SpyObj<DockerImagesApi>;
   let service: DockerService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoPermissions',
-    ]);
-    dockerApi = jasmine.createSpyObj<DockerImageControllerService>('DockerImageControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoPermissions']);
+    dockerApi = jasmine.createSpyObj<DockerImagesApi>('DockerImagesApi', [
       'listDockerImages',
       'listDockerImageTags',
       'listDockerTagManifests',
@@ -66,8 +60,8 @@ describe('DockerService', () => {
     ]);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: DockerImageControllerService, useValue: dockerApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: DockerImagesApi, useValue: dockerApi },
       ],
     });
     service = TestBed.inject(DockerService);
