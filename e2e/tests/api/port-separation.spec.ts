@@ -74,7 +74,8 @@ test.describe('the panel API is not served on the protocol port', { tag: ['@smok
     });
 
     expect(res.status).toBe(200);
-    expect(res.json).toMatchObject({ type: 'SUCCESS', data: { content: expect.any(Array) } });
+    expect(res.json).toMatchObject({ content: expect.any(Array) });
+    expect(res.json).not.toHaveProperty('msgId');
   });
 });
 

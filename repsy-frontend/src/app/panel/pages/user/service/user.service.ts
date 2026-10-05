@@ -27,20 +27,20 @@ export class UserService {
   constructor(private readonly usersApi: UsersApi) {}
 
   public listUsers(q?: string, page?: number, size?: number): Observable<PagedModelUserResponse> {
-    return this.usersApi.listUsers(q, page, size).pipe(map((r) => r.data!));
+    return this.usersApi.listUsers(q, page, size);
   }
 
   /** The number of admins on the server, whatever page or search the list shows. */
   public countAdmins(): Observable<number> {
-    return this.usersApi.countAdmins().pipe(map((r) => r.data!));
+    return this.usersApi.countAdmins();
   }
 
   public createUser(form: UserCreateForm): Observable<UserResponse> {
-    return this.usersApi.createUser(form).pipe(map((r) => r.data!));
+    return this.usersApi.createUser(form);
   }
 
   public updateUser(userId: string, form: UserUpdateForm): Observable<UserResponse> {
-    return this.usersApi.updateUser(userId, form).pipe(map((r) => r.data!));
+    return this.usersApi.updateUser(userId, form);
   }
 
   public deleteUser(userId: string): Observable<void> {
@@ -48,6 +48,6 @@ export class UserService {
   }
 
   public resetPassword(userId: string): Observable<string> {
-    return this.usersApi.resetPassword(userId).pipe(map((r) => r.data!));
+    return this.usersApi.resetPassword(userId);
   }
 }

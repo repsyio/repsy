@@ -19,7 +19,7 @@ import { PLATFORM_ID } from '@angular/core';
 import { fakeAsync, flushMicrotasks, TestBed, tick } from '@angular/core/testing';
 import { EMPTY, firstValueFrom, from, of, throwError } from 'rxjs';
 
-import { AuthApi, LoginInfo, RestResponseLoginInfo } from '../../../../generated/api';
+import { AuthApi, LoginInfo } from '../../../../generated/api';
 import { SILENT_ERROR } from '../../../shared/interceptor/error-handler.interceptor';
 import { AuthService } from './auth.service';
 
@@ -33,8 +33,8 @@ const STORAGE_KEYS = ['username', 'token', 'refresh-token'];
 
 const SESSION: LoginInfo = { username: 'alice', token: 'access-1', refreshToken: 'refresh-1' };
 
-function response(data: LoginInfo): RestResponseLoginInfo {
-  return { data };
+function response(data: LoginInfo): LoginInfo {
+  return data;
 }
 
 describe('AuthService', () => {

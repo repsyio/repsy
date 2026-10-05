@@ -30,13 +30,25 @@ import { expect, test } from '../../src/scenarios/fixtures.js';
 async function login(
   username: string,
   password: string,
-): Promise<{ status: number; body: { msgId?: string; code?: string; data?: unknown } }> {
+): Promise<{
+  status: number;
+  body: { token?: string; refreshToken?: string; username?: string; code?: string; msgId?: string };
+}> {
   const res = await fetch(`${env.apiBaseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
-  return { status: res.status, body: (await res.json()) as { msgId?: string; code?: string; data?: unknown } };
+  return {
+    status: res.status,
+    body: (await res.json()) as {
+      token?: string;
+      refreshToken?: string;
+      username?: string;
+      code?: string;
+      msgId?: string;
+    },
+  };
 }
 
 test(
@@ -76,7 +88,10 @@ test(
 
     const ok = await login(user.username, user.password);
     expect(ok.status).toBe(200);
-    expect(ok.body.msgId).toBe('loginSucceeded');
+    expect(ok.body.msgId, 'a bare LoginInfo, no envelope').toBeUndefined();
+    expect(ok.body.username).toBe(user.username);
+    expect(ok.body.token).toBeTruthy();
+    expect(ok.body.refreshToken).toBeTruthy();
 
     // Missing or empty password, one over 72 characters, and one over 72 bytes (37 two-byte characters).
     for (const password of ['', 'x'.repeat(73), 'é'.repeat(37)]) {

@@ -12,8 +12,8 @@ info:
     bumped for each one. It is independent of the Repsy release version.
 
 
-    A successful response body is the envelope `msgId`, `type`, `text`, `errorCode` (always `null`)
-    and `data`. A failed request is answered with an RFC 9457 problem document,
+    A successful response body is the bare resource: no envelope. A create answers 201 with a
+    `Location` header, a delete or an update with nothing to return answers 204. A failed request is answered with an RFC 9457 problem document,
     `application/problem+json`, described by `ProblemDetail`: `status`, `title`, `detail`,
     `instance`, `code` (the stable key of the failure), `traceId` (the unique id of the failure)
     and, for a validation failure, `errors`.
@@ -50,7 +50,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseLoginInfo"
+                "$ref": "#/components/schemas/LoginInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -87,7 +87,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseLoginInfo"
+                "$ref": "#/components/schemas/LoginInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -140,7 +140,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseUserResponse"
+                "$ref": "#/components/schemas/UserResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -162,12 +162,8 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -190,7 +186,8 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseLong"
+                type: integer
+                format: int64
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -220,7 +217,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelUserResponse"
+                "$ref": "#/components/schemas/PagedModelUserResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -239,12 +236,18 @@ paths:
               "$ref": "#/components/schemas/UserCreateForm"
         required: true
       responses:
-        '200':
-          description: OK
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: The URL of the created user, `/api/users/{userId}`
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseUserResponse"
+                "$ref": "#/components/schemas/UserResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -266,11 +269,16 @@ paths:
             format: uuid
       responses:
         '200':
-          description: OK
+          description: The new password, as a JSON string
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseString"
+                type: string
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -4978,33 +4986,6 @@ components:
             this setting.
         type:
           "$ref": "#/components/schemas/RepoType"
-    RestResponseVoid:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data: { }
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseString:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: string
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     LoginInfo:
       type: object
       properties:
@@ -5013,20 +4994,6 @@ components:
         token:
           type: string
         refreshToken:
-          type: string
-    RestResponseLoginInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/LoginInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
           type: string
     PageMetadata:
       type: object
@@ -5043,31 +5010,6 @@ components:
         totalPages:
           type: integer
           format: int64
-    ResponseType:
-      type: string
-      enum:
-        - ERROR
-        - SUCCESS
-        - WARNING
-    EmptyResponse:
-      type: object
-      description: >-
-        The envelope of a successful request that returns no data: `msgId`, `type`, `text`,
-        `errorCode` (always null) and `data`. Failures do not use it; they are a `ProblemDetail`.
-      properties:
-        msgId:
-          type: string
-          example: userDeleted
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        text:
-          type: string
-        errorCode:
-          type: string
-          format: uuid
-        data:
-          type: string
-          description: A detail about the result, or null when there is none.
     ProblemDetail:
       type: object
       description: >-
@@ -5194,20 +5136,6 @@ components:
       required:
         - username
         - role
-    RestResponseUserResponse:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/UserResponse"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     UserResponse:
       type: object
       properties:
@@ -5260,35 +5188,6 @@ components:
             "$ref": "#/components/schemas/UserResponse"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelUserResponse:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelUserResponse"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseLong:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: integer
-          format: int64
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: profile
     UpdateUsernameForm:
       type: object
