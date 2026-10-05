@@ -24,7 +24,6 @@
 export {
   FixStatus,
   RepoType,
-  ResponseType,
   ScanStatus,
   Severity,
   type ProblemDetail,
