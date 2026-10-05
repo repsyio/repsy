@@ -117,12 +117,11 @@ test.describe('the operations the spec declares 403 on', { tag: ['@smoke'] }, ()
       expect(ids.has(op.operationId), label(op)).toBe(true);
     }
     expect(ids.has('createRepository')).toBe(true);
-    // A repo's own settings, tokens, name, description and key stores.
+    // A repo's own settings, tokens, name and description (one PATCH, `updateRepo`) and key stores.
     for (const id of [
       'getRepoSettings',
       'updateRepoSettings',
-      'renameRepo',
-      'updateRepoDescription',
+      'updateRepo',
       'listDeployTokens',
       'createDeployToken',
       'revokeDeployToken',
