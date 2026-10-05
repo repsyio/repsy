@@ -76,8 +76,8 @@ test.describe('SEC-02e security: sidebar and route, by role', { tag: MOCKED }, (
       headers: { Authorization: `Bearer ${session.token}` },
     });
     expect(res.status).toBe(403);
-    const body = (await res.json()) as { msgId?: string };
-    expect(body.msgId).toBe('accessDenied');
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe('accessDenied');
   });
 });
 

@@ -168,7 +168,9 @@ export function valuesFor(op: SpecOperation, world: SweepWorld): Record<string, 
     version: pkg.version,
     groupName: first ?? '',
     artifactName: second ?? pkg.name,
-    scope: isScopedName ? (first ?? '') : '',
+    // A route with {scope} on a non-npm repo still needs a non-empty segment: `/scopes//artifacts` is
+    // normalised away and answers 404 before the authentication the sweep is looking at.
+    scope: isScopedName ? (first ?? '') : 'e2e-sweep-scope',
     packageName: isScopedName ? (second ?? '') : pkg.name,
     imageName: pkg.name,
     tagName: pkg.version,
@@ -189,10 +191,8 @@ export function bodyFor(operationId: string, world: Pick<SweepWorld, 'fresh'>): 
       return { name: world.fresh.repoName, type: 'MAVEN', privateRepo: true };
     case 'updateRepoSettings':
       return { privateRepo: false, allowOverride: false };
-    case 'updateRepoDescription':
+    case 'updateRepo':
       return { description: 'changed by the sweep' };
-    case 'renameRepo':
-      return { name: world.fresh.repoName };
     case 'createDeployToken':
       return { name: 'e2e-sweep-token' };
     case 'createMavenKeyStore':
@@ -202,10 +202,10 @@ export function bodyFor(operationId: string, world: Pick<SweepWorld, 'fresh'>): 
   }
 }
 
-/** An error answer carries a fresh `errorCode` (a log correlation id) every time; the rest is the answer. */
+/** An error answer carries a fresh `errorCode` or problem+json `traceId` (a log correlation id) every time; the rest is the answer. */
 function withoutErrorCode(body: unknown): unknown {
   if (body !== null && typeof body === 'object' && !Array.isArray(body)) {
-    const { errorCode: _errorCode, ...rest } = body as Record<string, unknown>;
+    const { errorCode: _errorCode, traceId: _traceId, ...rest } = body as Record<string, unknown>;
     return rest;
   }
   return body;

@@ -100,11 +100,21 @@ for (const timeZone of ZONES) {
       panelApi,
     }) => {
       await loginSession(seededUser.username, seededUser.password);
-      const stored = (await panelApi.listUsers({ q: seededUser.username })).find(
-        (user) => user.username === seededUser.username,
-      );
-      const lastLoginAt = stored?.lastLoginAt as unknown as string | number | undefined;
-      expect(lastLoginAt, 'the server recorded the login').toBeTruthy();
+      // The server stamps lastLoginAt from an @Async login listener, so it can land a moment after the
+      // login answered (a flake of this spec on origin/main, RPS-1961): poll for it.
+      let lastLoginAt: string | number | undefined;
+      await expect
+        .poll(
+          async () => {
+            const stored = (await panelApi.listUsers({ q: seededUser.username })).find(
+              (user) => user.username === seededUser.username,
+            );
+            lastLoginAt = stored?.lastLoginAt as unknown as string | number | undefined;
+            return Boolean(lastLoginAt);
+          },
+          { message: 'the server recorded the login' },
+        )
+        .toBe(true);
 
       await usersPage.goto();
       await usersPage.search(seededUser.username);
