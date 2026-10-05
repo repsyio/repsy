@@ -7,61 +7,54 @@ import prettierConfig from 'eslint-config-prettier';
 
 export default tseslint.config(
   {
-    files: ["**/*.ts"],
+    files: ['**/*.ts'],
     extends: [
       eslint.configs.recommended,
       ...tseslint.configs.recommended,
       ...tseslint.configs.stylistic,
       ...angular.configs.tsRecommended,
-      prettierConfig
+      prettierConfig,
     ],
     processor: angular.processInlineTemplates,
     plugins: {
-      "simple-import-sort": simpleImportSort,
+      'simple-import-sort': simpleImportSort,
     },
     rules: {
       '@typescript-eslint/no-empty-function': 'off',
-      "@angular-eslint/prefer-inject": "off",
-      "no-useless-escape": "off",
-      "curly": ["error", "all"],
-      "@angular-eslint/directive-selector": [
-        "error",
+      '@angular-eslint/prefer-inject': 'off',
+      'no-useless-escape': 'off',
+      curly: ['error', 'all'],
+      '@angular-eslint/directive-selector': [
+        'error',
         {
-          type: "attribute",
-          prefix: "app",
-          style: "camelCase",
+          type: 'attribute',
+          prefix: 'app',
+          style: 'camelCase',
         },
       ],
-      "@angular-eslint/component-selector": [
-        "error",
+      '@angular-eslint/component-selector': [
+        'error',
         {
-          type: "element",
-          prefix: "app",
-          style: "kebab-case",
+          type: 'element',
+          prefix: 'app',
+          style: 'kebab-case',
         },
       ],
-      "simple-import-sort/imports": [
-        "error",
+      'simple-import-sort/imports': [
+        'error',
         {
           groups: [['^\\u0000'], ['^@?(?!baf)\\w'], ['^@baf?\\w'], ['^\\w'], ['^[^.]'], ['^\\.']],
         },
       ],
-      "simple-import-sort/exports": "error",
+      'simple-import-sort/exports': 'error',
     },
-    ignores: [
-      "**/env.d.ts",
-      "src/generated/**"
-    ]
+    ignores: ['**/env.d.ts', 'src/generated/**'],
   },
   {
-    files: ["**/*.html"],
-    extends: [
-      ...angular.configs.templateRecommended,
-      ...angular.configs.templateAccessibility,
-      prettierConfig
-    ],
+    files: ['**/*.html'],
+    extends: [...angular.configs.templateRecommended, ...angular.configs.templateAccessibility, prettierConfig],
     rules: {
-      "no-unused-expressions": "off"
+      'no-unused-expressions': 'off',
     },
-  }
+  },
 );

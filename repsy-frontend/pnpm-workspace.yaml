@@ -11,8 +11,8 @@
 #     cache, used for repeated/incremental builds and `ng serve`. A one-shot `build:prod` needs
 #     neither.
 allowBuilds:
-  "@openapitools/openapi-generator-cli": false
+  '@openapitools/openapi-generator-cli': false
   esbuild: false
-  "@parcel/watcher": false
+  '@parcel/watcher': false
   lmdb: false
   msgpackr-extract: false
