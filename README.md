@@ -134,7 +134,7 @@ Repsy can scan pushed artifacts (Maven, npm, PyPI, Docker) for known vulnerabili
 
 The scanner is published with every release as `repo.repsy.io/repsy/os/repsy-scanner-trivy`, under the same tags as the application image (`repo.repsy.io/repsy/os/repsy`): a release tag without the leading `v` (for example `26.10.0`) and `latest`. Run the application and the scanner of the **same release**: the HTTP contract between them (`POST /scan`, `GET /scan/{scanId}`, the `X-Scanner-Api-Key` header) is not versioned, so a mixed pair is not supported. [`examples/docker-compose.scanner.yml`](./examples/docker-compose.scanner.yml) is a complete Compose example (PostgreSQL, Repsy, the scanner and the `trivy-cache` volume) that pins both images with one `REPSY_VERSION`.
 
-Each repository has a security scan setting that controls whether newly pushed versions are scanned automatically. It does not block manual scans: a version can always be scanned on demand from the panel or with `POST /api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan`, even when the repository's setting is off.
+Each repository has a security scan setting that controls whether newly pushed versions are scanned automatically. It does not block manual scans: a version can always be scanned on demand from the panel or with `POST /api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan` (a scoped npm package: `POST /api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/versions/{version}/scan`; both answer 202 with a `Location` of the scan status resource), even when the repository's setting is off.
 
 ### What a scan covers
 
@@ -397,6 +397,19 @@ This is the first release after `v26.08.4`. Read this section before you upgrade
   `POST /api/repos/{repo}/deploy-tokens/{id}/actions/rotate`. (RPS-1269)
 - npm scope lists moved to `GET /api/npm/scopes/{repo}/packages` and `GET /api/npm/scopes/{repo}/{scope}/packages`.
   (RPS-1010)
+- npm panel routes (RPS-1781): the `package` literal between repo and name is gone
+  (`GET /api/npm/packages/{repo}/{package}/versions` and `/tags`), scoped packages moved to
+  `/api/npm/scopes/{repo}/{scope}/packages/{package}[/versions[/{version}]|/tags]`, and `GET
+  /api/npm/packages/{repo}/{package}` is a package summary (`scopeName`, `packageName`, `latestVersion`, `createdAt`),
+  no longer the latest version detail. Bodies are bare (no `msgId`/`data` envelope) and the deletes answer `204`.
+- Docker panel routes (RPS-1781): bodies are bare and the deletes answer `204`. `GET /api/docker/images/{repo}/{image}`
+  is the image row (the same item the list shows); `/summary` and the default-tag detail are gone. The cleanups moved to
+  `DELETE /api/repos/{repo}/docker/orphan-layers` (`204`) and `DELETE /api/repos/{repo}/docker/untagged-manifests`
+  (`200`, `deletedManifests` and `orphanLayersScheduled`); `/api/docker/images/blobs/...` and `/manifests/...` are `404`.
+  An image name with several segments (`team/app`) is passed as `?image=team/app` with `-` as `{image}`. The manifest
+  and config routes return the stored text as a JSON string.
+- Go panel routes (RPS-1781): `GET /api/go/modules/{repo}/search` is gone, use `?q=` on `GET /api/go/modules/{repo}`.
+  The `sumdb/supported` panel route is removed. Bodies are bare and the deletes answer `204`.
 - Every list takes its text filter as `q`; the old names (`name`, `query`, `search`, `version`, `groupName`,
   `artifactName`) are ignored, so the list comes back unfiltered. Paging is `page`, `size` (1 to 100; more is `400`)
   and `sort` (an unknown property is `400`). Cargo, NuGet and Ruby lists default to 10 per page (was 20). (RPS-1269,

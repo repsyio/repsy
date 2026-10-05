@@ -16,7 +16,7 @@
 
 /**
  * SET-08: the PGP Signature Key Stores section of a Maven repo. The selector offers the key servers
- * the instance allows (`GET /api/mvn/key-stores/allowed-servers`); adding one registers it on the
+ * the instance allows (`GET /api/mvn/allowed-key-servers`); adding one registers it on the
  * repo, and it can be deleted again through the danger modal. The built-in servers are listed for
  * information only.
  */
@@ -26,9 +26,9 @@ import { PanelHttpError, RepoType } from '../../../src/api/panel-api.js';
 import type {
   AllowedKeyserverItem,
   KeyStoreItem,
-  RestResponseListAllowedKeyserverItem,
-  RestResponsePagedModelKeyStoreItem,
+  PagedModelKeyStoreItem,
 } from '../../../src/api/generated/index.js';
+import { generateKeyPair } from '../../../src/clients/pgp.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { fulfillJson } from '../../../src/ui/stub-responses.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
@@ -36,11 +36,11 @@ import { RepoSettingsReadback } from '../../../src/ui/pages/repo-settings/readba
 
 const SETTINGS = '@settings';
 
-const ALLOWED_SERVERS_URL = /\/api\/mvn\/key-stores\/allowed-servers/;
+const ALLOWED_SERVERS_URL = /\/api\/mvn\/allowed-key-servers/;
 const keyStoresUrl = (repoName: string) => new RegExp(`/api/mvn/key-stores/${repoName}(\\?|$)`);
 
-function allowedKeyserversBody(data: AllowedKeyserverItem[]): RestResponseListAllowedKeyserverItem {
-  return { msgId: 'allowedKeyserversFetched', data };
+function allowedKeyserversBody(data: AllowedKeyserverItem[]): AllowedKeyserverItem[] {
+  return data;
 }
 
 /** A page of `KeyStoreItem`s, in the shape `PagedModel` serialises (`content` plus `page`). */
@@ -49,13 +49,10 @@ function keyStoresPage(
   page: number,
   size: number,
   totalElements: number,
-): RestResponsePagedModelKeyStoreItem {
+): PagedModelKeyStoreItem {
   return {
-    msgId: 'keyStoresFetched',
-    data: {
-      content: items,
-      page: { size, number: page, totalElements, totalPages: Math.ceil(totalElements / size) },
-    },
+    content: items,
+    page: { size, number: page, totalElements, totalPages: Math.ceil(totalElements / size) },
   };
 }
 
@@ -70,26 +67,6 @@ function stubKeyStore(index: number): KeyStoreItem {
 
 const label = (server: { displayName: string; host: string }) =>
   `${server.displayName} (${server.host})`;
-
-// Real ed25519 public keys (no expiry, throwaway user ids): the UI runner image has no gpg to generate them.
-const FIXTURE_PUBLIC_KEY_1 = `-----BEGIN PGP PUBLIC KEY BLOCK-----
-
-mDMEasHerxYJKwYBBAHaRw8BAQdApVeKuyvPG5HiiVWQQCV5ynIiEL8CQbEWzGA3
-fIVU+3S0IWUyZS1maXh0dXJlLTEgPGUyZTFAZXhhbXBsZS50ZXN0PoiTBBMWCgA7
-FiEE7PqUUA4fKjuukGSpqouCxFUAf5AFAmrB3q8CGwMFCwkIBwICIgIGFQoJCAsC
-BBYCAwECHgcCF4AACgkQqouCxFUAf5BKvQEA5mWBynWtf6Ugq9YIDEX30GVfj+Hv
-Z9ixreUdhzNM50IA/joskOIMrk5M+tiJ9sG0jGcG6kvZW/wuZR3VUiMyAv4E
-=9KzX
------END PGP PUBLIC KEY BLOCK-----`;
-const FIXTURE_PUBLIC_KEY_2 = `-----BEGIN PGP PUBLIC KEY BLOCK-----
-
-mDMEasHerxYJKwYBBAHaRw8BAQdAOfMn68jBe4pDmR9/fdGWnaSHUadX+FIW1CnX
-YQRtJeO0IWUyZS1maXh0dXJlLTIgPGUyZTJAZXhhbXBsZS50ZXN0PoiTBBMWCgA7
-FiEECyU54fpfQnldA1xLg3I3BpH+28AFAmrB3q8CGwMFCwkIBwICIgIGFQoJCAsC
-BBYCAwECHgcCF4AACgkQg3I3BpH+28ASdQD/Z2YXKBAtwm2hxjIiRTjsdHw6Nlfs
-bHDhFlks1Fbb/loA/0JAYxjuYrsnIOdwzbNxftWLLiUqUmA6TlvrEQ6nvj0E
-=0eYV
------END PGP PUBLIC KEY BLOCK-----`;
 
 test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
   test('SET-08 add an allowed key server, see it listed, delete it', async ({
@@ -176,7 +153,7 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     // the three of `V0007__Allowed_Keyserver.sql`, so this state cannot be reached with real data):
     // the selector and the Add button are not shown, since there is nothing to add.
     await adminPage.route(ALLOWED_SERVERS_URL, (route: Route) =>
-      fulfillJson<RestResponseListAllowedKeyserverItem>(route, 200, allowedKeyserversBody([])),
+      fulfillJson<AllowedKeyserverItem[]>(route, 200, allowedKeyserversBody([])),
     );
     await settings.reload();
     await expect(pgp.serverSelector).toHaveCount(0);
@@ -204,7 +181,7 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
       const page = Number(url.searchParams.get('page') ?? 0);
       const size = Number(url.searchParams.get('size') ?? 5);
       requestedPages.push(page);
-      return fulfillJson<RestResponsePagedModelKeyStoreItem>(
+      return fulfillJson<PagedModelKeyStoreItem>(
         route,
         200,
         keyStoresPage(all.slice(page * size, (page + 1) * size), page, size, all.length),
@@ -254,7 +231,7 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     expect(rejected).toBeInstanceOf(PanelHttpError);
     expect((rejected as PanelHttpError).status).toBe(400);
     expect((rejected as PanelHttpError).body as Record<string, unknown>).toMatchObject({
-      msgId: 'pgpSettingsUnsupported',
+      code: 'pgpSettingsUnsupported',
     });
 
     // Nothing about the repo changed: there is no PGP state to read back for a non-Maven repo (the
@@ -278,29 +255,30 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     const { pgp } = settings;
 
     // No public keys are registered yet.
-    await expect(pgp.publicKeys).toContainText('No public keys registered yet.');
-    expect(await pgp.publicKeyCount()).toBe(0);
+    // The list container is only rendered with keys; the empty state is a paragraph beside it.
+    await expect(pgp.root).toContainText('No public keys registered yet.');
+    await pgp.expectPublicKeyCount(0);
 
-    // The panel accepts only a real armored block holding exactly one key.
-    const armoredKey = FIXTURE_PUBLIC_KEY_1;
+    // Add a public key: the server parses it, so it has to be a real armored key (a made-up block is a 400).
+    const armoredKey = (await generateKeyPair()).publicKeyArmored;
 
     await pgp.addPublicKey(armoredKey);
     await settings.shell.toasts.expectSuccess('Public key added');
 
     // The key is now visible in the list.
-    await expect(pgp.publicKeys).not.toContainText('No public keys registered yet.');
-    expect(await pgp.publicKeyCount()).toBe(1);
+    await expect(pgp.root).not.toContainText('No public keys registered yet.');
+    await pgp.expectPublicKeyCount(1);
 
     // It is still there after a reload.
     await settings.reload();
-    expect(await pgp.publicKeyCount()).toBe(1);
+    await pgp.expectPublicKeyCount(1);
 
     // Add another public key.
-    const secondArmoredKey = FIXTURE_PUBLIC_KEY_2;
+    const secondArmoredKey = (await generateKeyPair()).publicKeyArmored;
 
     await pgp.addPublicKey(secondArmoredKey);
     await settings.shell.toasts.expectSuccess('Public key added');
-    expect(await pgp.publicKeyCount()).toBe(2);
+    await pgp.expectPublicKeyCount(2);
 
     // Delete the first one; the second remains.
     const uuids = await pgp.publicKeyUuids();
@@ -311,12 +289,12 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     await settings.shell.dangerModal.expectOpen('Delete Public Key');
     await settings.shell.dangerModal.cancel();
     await settings.shell.dangerModal.expectClosed();
-    expect(await pgp.publicKeyCount()).toBe(2);
+    await pgp.expectPublicKeyCount(2);
 
     await pgp.deletePublicKey(firstUuid);
     await settings.shell.dangerModal.expectOpen('Delete Public Key');
     await settings.shell.dangerModal.confirm();
     await settings.shell.toasts.expectSuccess('Public key deleted');
-    expect(await pgp.publicKeyCount()).toBe(1);
+    await pgp.expectPublicKeyCount(1);
   });
 });

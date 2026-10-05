@@ -511,8 +511,7 @@ test.describe.serial(
         'GET',
         `/api/docker/images/${encodeURIComponent(docker.repoName)}?size=100`,
       );
-      const listed = (images.body.data as { content?: { name?: string; tagCount?: number }[] })
-        .content;
+      const listed = (images.body as { content?: { name?: string; tagCount?: number }[] }).content;
       expect(
         (listed ?? []).map((item) => `${item.name}:${item.tagCount}`).sort(),
         'the panel lists both images with their tag counts',
@@ -527,7 +526,7 @@ test.describe.serial(
         `/api/docker/images/${encodeURIComponent(docker.repoName)}/${encodeURIComponent(docker.image)}/tags?size=100`,
       );
       expect(
-        ((tagNames.body.data as { content?: { name?: string }[] }).content ?? [])
+        ((tagNames.body as { content?: { name?: string }[] }).content ?? [])
           .map((tag) => tag.name)
           .sort(),
         'the panel lists the tags of the image',

@@ -43,6 +43,7 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.HtmlUtils;
 
 @Slf4j
 @NullMarked
@@ -140,7 +141,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
             .collect(
                 Collectors.toMap(
                     ReleaseVersionRequiresPython::getVersion,
-                    r -> r.getRequiresPython().replace("<", "&lt;").replace(">", "&gt;")));
+                    r -> HtmlUtils.htmlEscape(r.getRequiresPython())));
 
     return this.pypiStorageService.getPackageArchiveFileList(
         repoInfo, packageNormalizedName, requiresPythonMap);

@@ -150,7 +150,7 @@ export async function expectListedInPanel(
     const modulesPath = `/api/go/modules/${encodeURIComponent(repoName)}?size=100`;
     const modulesRes = await panelApi.rawRequest('GET', modulesPath);
     expect(modulesRes.status, `${what}: GET ${modulesPath}`).toBe(200);
-    const modules = (modulesRes.body.data as { content?: { modulePath?: string }[] }).content;
+    const modules = (modulesRes.body as { content?: { modulePath?: string }[] }).content;
     expect(
       (modules ?? []).some((candidate) => candidate.modulePath === packageName),
       `${what} lists the module ${packageName}`,
@@ -158,7 +158,7 @@ export async function expectListedInPanel(
     const versionsPath = `/api/go/modules/${encodeURIComponent(repoName)}/versions?modulePath=${encodeURIComponent(packageName)}&size=100`;
     const versionsRes = await panelApi.rawRequest('GET', versionsPath);
     expect(versionsRes.status, `${what}: GET ${versionsPath}`).toBe(200);
-    const versions = (versionsRes.body.data as { content?: { version?: string }[] }).content;
+    const versions = (versionsRes.body as { content?: { version?: string }[] }).content;
     expect(
       (versions ?? []).some((candidate) => candidate.version === version),
       `${what} lists the version ${version}`,
@@ -173,8 +173,11 @@ export async function expectListedInPanel(
   const path = `${base}/${encodeURIComponent(repoName)}?size=100`;
   const res = await panelApi.rawRequest('GET', path);
   expect(res.status, `${what}: GET ${path}`).toBe(200);
+  // Helm and npm answer the bare PagedModel (API guideline, Decision 5); the others still use the envelope.
+  const bare = pkg.adapter.protocol === 'helm' || pkg.adapter.protocol === 'npm';
+  const page = bare ? res.body : res.body.data;
   const content = (
-    res.body.data as { content?: { name?: string; latestVersion?: string; digest?: string }[] }
+    page as { content?: { name?: string; latestVersion?: string; digest?: string }[] }
   ).content;
   const item = (content ?? []).find((candidate) => candidate.name === packageName);
   expect(item, `${what} lists ${packageName}`).toBeDefined();

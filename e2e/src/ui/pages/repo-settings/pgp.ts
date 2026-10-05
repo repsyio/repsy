@@ -138,10 +138,10 @@ export class PgpSection {
 
   /** Expects the public key count to match (RPS-1803). */
   async expectPublicKeyCount(count: number): Promise<void> {
-    await expect(this.publicKeys).toContainText(
-      count === 0 ? 'No public keys registered yet.' : '',
-    );
-    if (count > 0) {
+    if (count === 0) {
+      // The list container is only rendered with keys; the empty state is a paragraph beside it.
+      await expect(this.root).toContainText('No public keys registered yet.');
+    } else {
       await expect(
         this.publicKeys.locator('[data-testid^="settings-pgp-public-key-delete-"]'),
       ).toHaveCount(count);

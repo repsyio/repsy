@@ -15,7 +15,7 @@
 
 import { TestBed } from '@angular/core/testing';
 
-import { CargoCrateControllerService, ProtocolRepoControllerService } from '../../../../../../generated/api';
+import { CargoCratesApi, ReposApi } from '../../../../../../generated/api';
 import {
   CallCase,
   describeCalls,
@@ -26,7 +26,6 @@ import {
   PAGE_SIZE,
   PagedCase,
   REPO,
-  restResponse,
   selectRepo,
   SORT,
 } from '../../testing/protocol-service-spec-helpers';
@@ -36,15 +35,13 @@ const CRATE = 'serde';
 const VERSION = '1.0.0';
 
 describe('CargoService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let cargoApi: jasmine.SpyObj<CargoCrateControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let cargoApi: jasmine.SpyObj<CargoCratesApi>;
   let service: CargoService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoPermissions',
-    ]);
-    cargoApi = jasmine.createSpyObj<CargoCrateControllerService>('CargoCrateControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoPermissions']);
+    cargoApi = jasmine.createSpyObj<CargoCratesApi>('CargoCratesApi', [
       'searchCargoCrates',
       'getCargoCrate',
       'getCargoCrateVersion',
@@ -54,8 +51,8 @@ describe('CargoService', () => {
     ]);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: CargoCrateControllerService, useValue: cargoApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: CargoCratesApi, useValue: cargoApi },
       ],
     });
     service = TestBed.inject(CargoService);
@@ -79,12 +76,14 @@ describe('CargoService', () => {
         invoke: (s, search) => s.searchCrates(search, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => cargoApi.searchCargoCrates,
         args: (search) => [REPO, search, ...PAGE_ARGS],
+        bare: true,
       },
       {
         name: 'fetchCrateVersions',
         invoke: (s, search) => s.fetchCrateVersions(CRATE, search, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => cargoApi.listCargoCrateVersions,
         args: (search) => [CRATE, REPO, search, ...PAGE_ARGS],
+        bare: true,
       },
     ];
     describePagedCalls(() => service, paged);
@@ -97,7 +96,7 @@ describe('CargoService', () => {
         invoke: (s) => s.fetchCrate(CRATE),
         api: () => cargoApi.getCargoCrate,
         args: [CRATE, REPO],
-        response: restResponse(crate),
+        response: crate,
         expected: crate,
       },
       {
@@ -105,7 +104,7 @@ describe('CargoService', () => {
         invoke: (s) => s.fetchCrateVersion(CRATE, VERSION),
         api: () => cargoApi.getCargoCrateVersion,
         args: [CRATE, VERSION, REPO],
-        response: restResponse(crateVersion),
+        response: crateVersion,
         expected: crateVersion,
       },
       {
@@ -113,7 +112,7 @@ describe('CargoService', () => {
         invoke: (s) => s.deleteCrate(CRATE),
         api: () => cargoApi.deleteCargoCrate,
         args: [CRATE, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [cargoApi.deleteCargoCrateVersion],
       },
@@ -122,7 +121,7 @@ describe('CargoService', () => {
         invoke: (s) => s.deleteCrateVersion(CRATE, VERSION),
         api: () => cargoApi.deleteCargoCrateVersion,
         args: [CRATE, VERSION, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [cargoApi.deleteCargoCrate],
       },

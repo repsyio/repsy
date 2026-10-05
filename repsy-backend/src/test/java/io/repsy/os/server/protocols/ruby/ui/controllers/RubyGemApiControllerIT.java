@@ -19,11 +19,11 @@ import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.PUBLISH_PATH;
 import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.gem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
-import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -106,19 +106,15 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("gemsFetched"))
-          .andExpect(jsonPath("$.type").value("SUCCESS"))
-          .andExpect(jsonPath("$.errorCode").value(nullValue()))
-          .andExpect(jsonPath("$.text").value("Gems fetched."))
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].name").value("fixture-gem"))
-          .andExpect(jsonPath("$.data.content[0].latest").value("1.1.0"))
-          .andExpect(jsonPath("$.data.content[0].updatedAt").isNotEmpty())
-          .andExpect(jsonPath("$.data.page.size").value(10))
-          .andExpect(jsonPath("$.data.page.number").value(0))
-          .andExpect(jsonPath("$.data.page.totalElements").value(1))
-          .andExpect(jsonPath("$.data.page.totalPages").value(1));
+          .andExpect(jsonPath("$.*", hasSize(2)))
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].name").value("fixture-gem"))
+          .andExpect(jsonPath("$.content[0].latest").value("1.1.0"))
+          .andExpect(jsonPath("$.content[0].updatedAt").isNotEmpty())
+          .andExpect(jsonPath("$.page.size").value(10))
+          .andExpect(jsonPath("$.page.number").value(0))
+          .andExpect(jsonPath("$.page.totalElements").value(1))
+          .andExpect(jsonPath("$.page.totalPages").value(1));
 
       RubyGemApiControllerIT.this
           .mockMvc
@@ -129,12 +125,11 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("gemVersionsFetched"))
-          .andExpect(jsonPath("$.data.content", hasSize(2)))
-          .andExpect(jsonPath("$.data.content[0].version").value("1.1.0"))
-          .andExpect(jsonPath("$.data.content[0].platform").value("ruby"))
-          .andExpect(jsonPath("$.data.content[0].yanked").value(false))
-          .andExpect(jsonPath("$.data.content[1].platform").value("x86_64-linux"));
+          .andExpect(jsonPath("$.content", hasSize(2)))
+          .andExpect(jsonPath("$.content[0].version").value("1.1.0"))
+          .andExpect(jsonPath("$.content[0].platform").value("ruby"))
+          .andExpect(jsonPath("$.content[0].yanked").value(false))
+          .andExpect(jsonPath("$.content[1].platform").value("x86_64-linux"));
 
       RubyGemApiControllerIT.this
           .mockMvc
@@ -147,21 +142,20 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("gemVersionFetched"))
-          .andExpect(jsonPath("$.data.version").value("1.1.0"))
-          .andExpect(jsonPath("$.data.platform").value("ruby"))
-          .andExpect(jsonPath("$.data.checksum").value(matchesPattern("[0-9a-f]{64}")))
-          .andExpect(jsonPath("$.data.authors").value("Alice, Bob"))
-          .andExpect(jsonPath("$.data.description").value("latest fixture"))
-          .andExpect(jsonPath("$.data.homepage").value("https://example.test/fixture-gem"))
-          .andExpect(jsonPath("$.data.requiredRubyVersion").value(">= 3.1.0"))
-          .andExpect(jsonPath("$.data.runtimeDependencies[0].name").value("rack"))
-          .andExpect(jsonPath("$.data.runtimeDependencies[0].requirements").value(">= 3.0.0"))
-          .andExpect(jsonPath("$.data.runtimeDependencies[0].type").value("runtime"))
-          .andExpect(jsonPath("$.data.developmentDependencies[0].name").value("rake"))
-          .andExpect(jsonPath("$.data.yanked").value(false))
-          .andExpect(jsonPath("$.data.createdAt").isNotEmpty());
+          .andExpect(jsonPath("$.*", hasSize(12)))
+          .andExpect(jsonPath("$.version").value("1.1.0"))
+          .andExpect(jsonPath("$.platform").value("ruby"))
+          .andExpect(jsonPath("$.checksum").value(matchesPattern("[0-9a-f]{64}")))
+          .andExpect(jsonPath("$.authors").value("Alice, Bob"))
+          .andExpect(jsonPath("$.description").value("latest fixture"))
+          .andExpect(jsonPath("$.homepage").value("https://example.test/fixture-gem"))
+          .andExpect(jsonPath("$.requiredRubyVersion").value(">= 3.1.0"))
+          .andExpect(jsonPath("$.runtimeDependencies[0].name").value("rack"))
+          .andExpect(jsonPath("$.runtimeDependencies[0].requirements").value(">= 3.0.0"))
+          .andExpect(jsonPath("$.runtimeDependencies[0].type").value("runtime"))
+          .andExpect(jsonPath("$.developmentDependencies[0].name").value("rake"))
+          .andExpect(jsonPath("$.yanked").value(false))
+          .andExpect(jsonPath("$.createdAt").isNotEmpty());
 
       RubyGemApiControllerIT.this
           .mockMvc
@@ -175,8 +169,8 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.platform").value("x86_64-linux"))
-          .andExpect(jsonPath("$.data.description").value("native fixture"));
+          .andExpect(jsonPath("$.platform").value("x86_64-linux"))
+          .andExpect(jsonPath("$.description").value("native fixture"));
     }
 
     @Test
@@ -187,7 +181,7 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(get("/api/ruby/gems/{repo}", repo.getName()).with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("gemsFetched"));
+          .andExpect(jsonPath("$.page.number").value(0));
     }
 
     @Test
@@ -204,7 +198,7 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, RubyGemApiControllerIT.this.bearerTokenFor(user)))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("gemsFetched"));
+          .andExpect(jsonPath("$.page.number").value(0));
 
       RubyGemApiControllerIT.this
           .mockMvc
@@ -242,11 +236,11 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].name").value("beta-gem"))
-          .andExpect(jsonPath("$.data.page.number").value(0))
-          .andExpect(jsonPath("$.data.page.size").value(1))
-          .andExpect(jsonPath("$.data.page.totalElements").value(1));
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].name").value("beta-gem"))
+          .andExpect(jsonPath("$.page.number").value(0))
+          .andExpect(jsonPath("$.page.size").value(1))
+          .andExpect(jsonPath("$.page.totalElements").value(1));
 
       RubyGemApiControllerIT.this
           .mockMvc
@@ -257,9 +251,9 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.page.totalElements").value(3))
-          .andExpect(jsonPath("$.data.page.totalPages").value(2));
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.page.totalElements").value(3))
+          .andExpect(jsonPath("$.page.totalPages").value(2));
 
       RubyGemApiControllerIT.this
           .mockMvc
@@ -269,8 +263,8 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(0)))
-          .andExpect(jsonPath("$.data.page.totalElements").value(0));
+          .andExpect(jsonPath("$.content", hasSize(0)))
+          .andExpect(jsonPath("$.page.totalElements").value(0));
     }
 
     @Test
@@ -378,12 +372,8 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .param("platform", "java")
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("gemVersionDeleted"))
-          .andExpect(jsonPath("$.type").value("SUCCESS"))
-          .andExpect(jsonPath("$.data").value(nullValue()))
-          .andExpect(jsonPath("$.errorCode").value(nullValue()));
+          .andExpect(status().isNoContent())
+          .andExpect(content().string(""));
 
       RubyGemApiControllerIT.this
           .mockMvc
@@ -393,9 +383,9 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(2)))
-          .andExpect(jsonPath("$.data.content[0].platform").value("ruby"))
-          .andExpect(jsonPath("$.data.content[1].version").value("2.0.0"));
+          .andExpect(jsonPath("$.content", hasSize(2)))
+          .andExpect(jsonPath("$.content[0].platform").value("ruby"))
+          .andExpect(jsonPath("$.content[1].version").value("2.0.0"));
 
       RubyGemApiControllerIT.this
           .mockMvc
@@ -403,9 +393,8 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
               delete("/api/ruby/gems/{repo}/{gem}", repo.getName(), "delete-me")
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("gemDeleted"))
-          .andExpect(jsonPath("$.data").value(nullValue()));
+          .andExpect(status().isNoContent())
+          .andExpect(content().string(""));
 
       RubyGemApiControllerIT.this
           .mockMvc
@@ -415,8 +404,8 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(0)))
-          .andExpect(jsonPath("$.data.page.totalElements").value(0));
+          .andExpect(jsonPath("$.content", hasSize(0)))
+          .andExpect(jsonPath("$.page.totalElements").value(0));
 
       RubyGemApiControllerIT.this
           .mockMvc
@@ -451,9 +440,8 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                       "1.0.0")
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("gemVersionDeleted"))
-          .andExpect(jsonPath("$.data").value(nullValue()));
+          .andExpect(status().isNoContent())
+          .andExpect(content().string(""));
 
       RubyGemApiControllerIT.this
           .mockMvc
@@ -462,7 +450,7 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(0)));
+          .andExpect(jsonPath("$.content", hasSize(0)));
     }
 
     @Test
@@ -502,6 +490,102 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(post("/api/ruby/gems/{repo}/{gem}", repo.getName(), "missing").with(apiPort()))
           .andExpect(status().isNotFound());
+    }
+  }
+
+  @Nested
+  @DisplayName("the gem routes (RPS-1781)")
+  class GemRoutes {
+
+    @Test
+    @DisplayName("the gem detail answers the latest version and its description")
+    void gemDetail() throws Exception {
+      final var it = RubyGemApiControllerIT.this;
+      final var user = it.createUser(uniqueUsername("ruby"), UserRole.USER);
+      final var repo = it.createRepo(true);
+      final var token = it.bearerTokenFor(user);
+      it.publish(repo.getName(), "detail-gem", "1.0.0", "ruby", "stable");
+      it.publish(repo.getName(), "detail-gem", "1.1.0", "ruby", "latest");
+
+      it.mockMvc
+          .perform(
+              get("/api/ruby/gems/{repo}/{gem}", repo.getName(), "detail-gem")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.name").value("detail-gem"))
+          .andExpect(jsonPath("$.latestVersion").value("1.1.0"))
+          .andExpect(jsonPath("$.description").value("latest"))
+          .andExpect(jsonPath("$.createdAt").isNotEmpty())
+          .andExpect(jsonPath("$.updatedAt").isNotEmpty());
+
+      it.mockMvc
+          .perform(
+              get("/api/ruby/gems/{repo}/{gem}", repo.getName(), "missing")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("the version number is not a route of its own, only /versions/{version} is")
+    void versionOnlyUnderVersions() throws Exception {
+      final var it = RubyGemApiControllerIT.this;
+      final var admin = it.createUser(uniqueUsername("ruby"), UserRole.ADMIN);
+      final var repo = it.createRepo(true);
+      final var token = it.bearerTokenFor(admin);
+      it.publish(repo.getName(), "old-route", "1.0.0", "ruby", "stable");
+
+      it.mockMvc
+          .perform(
+              get("/api/ruby/gems/{repo}/{gem}/{version}", repo.getName(), "old-route", "1.0.0")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isNotFound());
+      it.mockMvc
+          .perform(
+              delete("/api/ruby/gems/{repo}/{gem}/{version}", repo.getName(), "old-route", "1.0.0")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("a gem named versions has its own detail, list, version and delete routes")
+    void gemNamedVersionsDoesNotCollide() throws Exception {
+      final var it = RubyGemApiControllerIT.this;
+      final var admin = it.createUser(uniqueUsername("ruby"), UserRole.ADMIN);
+      final var repo = it.createRepo(true);
+      final var token = it.bearerTokenFor(admin);
+      it.publish(repo.getName(), "versions", "1.0.0", "ruby", "named like the route");
+
+      it.mockMvc
+          .perform(
+              get("/api/ruby/gems/{repo}/versions", repo.getName())
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.name").value("versions"));
+      it.mockMvc
+          .perform(
+              get("/api/ruby/gems/{repo}/versions/versions", repo.getName())
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.content[0].version").value("1.0.0"));
+      it.mockMvc
+          .perform(
+              get("/api/ruby/gems/{repo}/versions/versions/1.0.0", repo.getName())
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.version").value("1.0.0"));
+      it.mockMvc
+          .perform(
+              delete("/api/ruby/gems/{repo}/versions", repo.getName())
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isNoContent());
     }
   }
 
@@ -572,16 +656,16 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
 
       this.list(seed, GEMS, "sort", "name,asc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].name").value("fixture-gem"));
+          .andExpect(jsonPath("$.content[0].name").value("fixture-gem"));
       this.list(seed, GEMS, "sort", "name,desc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].name").value("other-gem"));
+          .andExpect(jsonPath("$.content[0].name").value("other-gem"));
       this.list(seed, VERSIONS, "sort", "version,asc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].version").value("1.0.0"));
+          .andExpect(jsonPath("$.content[0].version").value("1.0.0"));
       this.list(seed, VERSIONS, "sort", "version,desc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].version").value("1.1.0"));
+          .andExpect(jsonPath("$.content[0].version").value("1.1.0"));
     }
 
     @ParameterizedTest(name = "{0} {1}")

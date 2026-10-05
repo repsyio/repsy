@@ -47,14 +47,15 @@ async function apiUsage(
   request: APIRequestContext,
   token: string,
 ): Promise<{ text: string; reposCount: number }> {
-  const response = await request.get('/api/usages', {
+  const response = await request.get('/api/usage', {
     headers: { Authorization: `Bearer ${token}` },
   });
   expect(response.ok()).toBe(true);
-  const { data } = (await response.json()) as {
-    data: { diskUsed: { text: string }; reposCount: number };
+  const { diskUsed, reposCount } = (await response.json()) as {
+    diskUsed: { text: string };
+    reposCount: number;
   };
-  return { text: data.diskUsed.text, reposCount: data.reposCount };
+  return { text: diskUsed.text, reposCount };
 }
 
 async function apiSecurityTotal(request: APIRequestContext, token: string): Promise<number> {
@@ -62,8 +63,8 @@ async function apiSecurityTotal(request: APIRequestContext, token: string): Prom
     headers: { Authorization: `Bearer ${token}` },
   });
   expect(response.ok()).toBe(true);
-  const { data } = (await response.json()) as { data: Record<string, unknown> };
-  return Object.keys(data).length;
+  const summaries = (await response.json()) as Record<string, unknown>;
+  return Object.keys(summaries).length;
 }
 
 test.describe('Dashboard', () => {

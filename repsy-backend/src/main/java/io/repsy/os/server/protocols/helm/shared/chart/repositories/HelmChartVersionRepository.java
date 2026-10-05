@@ -39,6 +39,15 @@ public interface HelmChartVersionRepository extends JpaRepository<HelmChartVersi
   /** Newest first; the time-ordered UUIDv7 id breaks ties between versions created together. */
   List<HelmChartVersion> findAllByChartOrderByCreatedAtDescIdDesc(HelmChart chart);
 
+  /**
+   * The newest version of the chart, picked like {@link #findAllByChartOrderByCreatedAtDescIdDesc}.
+   */
+  Optional<HelmChartVersion> findFirstByChartOrderByCreatedAtDescIdDesc(HelmChart chart);
+
+  /** One page of the chart's versions whose version contains {@code version}, any case. */
+  Page<HelmChartVersion> findAllByChartAndVersionContainingIgnoreCase(
+      HelmChart chart, String version, Pageable pageable);
+
   List<HelmChartVersion> findAllByChartRepoId(UUID repoId);
 
   boolean existsByChartRepoIdAndDigest(UUID repoId, String digest);
@@ -56,7 +65,8 @@ public interface HelmChartVersionRepository extends JpaRepository<HelmChartVersi
       @Param("repoId") UUID repoId, @Param("name") String name, @Param("version") String version);
 
   /**
-   * The latest version of each chart whose name contains {@code query}: exactly one row per chart.
+   * The latest version of each chart whose name matches {@code pattern} (built by {@code
+   * LikePatterns}: lower-cased, {@code %} and {@code _} escaped): exactly one row per chart.
    * Versions created in the same instant are told apart by their id (the same order {@link
    * #findAllByChartOrderByCreatedAtDescIdDesc} lists them in), so a chart is never listed twice.
    */
@@ -65,7 +75,7 @@ public interface HelmChartVersionRepository extends JpaRepository<HelmChartVersi
           """
           SELECT v FROM HelmChartVersion v
           WHERE v.chart.repo.id = :repoId
-            AND (:query = '' OR LOWER(v.chart.name) LIKE LOWER(CONCAT('%', :query, '%')))
+            AND LOWER(v.chart.name) LIKE :pattern ESCAPE '\\'
             AND NOT EXISTS (
               SELECT 1 FROM HelmChartVersion v2
               WHERE v2.chart.id = v.chart.id
@@ -77,8 +87,8 @@ public interface HelmChartVersionRepository extends JpaRepository<HelmChartVersi
           """
           SELECT COUNT(DISTINCT v.chart.id) FROM HelmChartVersion v
           WHERE v.chart.repo.id = :repoId
-            AND (:query = '' OR LOWER(v.chart.name) LIKE LOWER(CONCAT('%', :query, '%')))
+            AND LOWER(v.chart.name) LIKE :pattern ESCAPE '\\'
           """)
   Page<HelmChartVersion> findLatestByRepoIdAndQuery(
-      @Param("repoId") UUID repoId, @Param("query") String query, Pageable pageable);
+      @Param("repoId") UUID repoId, @Param("pattern") String pattern, Pageable pageable);
 }

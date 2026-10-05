@@ -225,10 +225,10 @@ test.describe('RPS-1622 G06 logout revokes the refresh token family', () => {
       data: { refreshToken: copiedRefreshToken },
     });
     expect(replayed.status()).toBe(401);
-    expect(((await replayed.json()) as { msgId: string }).msgId).toBe('refreshTokenExpired');
+    expect(((await replayed.json()) as { code: string }).code).toBe('refreshTokenExpired');
   });
 
-  test('logging out calls the backend: POST /api/auth/logout answers loggedOut', async ({
+  test('logging out calls the backend: POST /api/auth/logout answers 204', async ({
     seededUser,
     openUiPage,
   }) => {
@@ -245,7 +245,7 @@ test.describe('RPS-1622 G06 logout revokes the refresh token family', () => {
     await new Shell(page).logoutViaSidebar();
     const response = await logoutResponse;
 
-    expect(response.status()).toBe(200);
-    expect(((await response.json()) as { msgId: string }).msgId).toBe('loggedOut');
+    expect(response.status()).toBe(204);
+    expect(await response.text()).toBe('');
   });
 });

@@ -19,10 +19,10 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
-import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -228,6 +228,63 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
   @DisplayName("listing and version details")
   class Reads {
 
+    /**
+     * The segments after the repo are all names, so a group or an artifact may be called like the
+     * literal {@code versions} without any route taking the request for another one (RPS-1781).
+     */
+    @Test
+    void groupsAndArtifactsNamedLikeTheVersionsLiteralStayAddressable() throws Exception {
+      MavenArtifactControllerIT.this.seedExtraArtifact("versions", "versions", "1.0.0");
+      // the detail routes read the POM and the metadata from storage
+      final var dir =
+          Path.of(
+              MavenArtifactControllerIT.this.storageBasePath,
+              "maven",
+              MavenArtifactControllerIT.this.repo.getId().toString(),
+              "versions",
+              "versions");
+      Files.createDirectories(dir.resolve("1.0.0"));
+      Files.writeString(
+          dir.resolve("1.0.0").resolve("versions-1.0.0.pom"),
+          "<project><modelVersion>4.0.0</modelVersion><groupId>versions</groupId>"
+              + "<artifactId>versions</artifactId><version>1.0.0</version>"
+              + "<packaging>jar</packaging><name>Versions</name></project>",
+          StandardCharsets.UTF_8);
+      Files.writeString(
+          dir.resolve("maven-metadata.xml"),
+          "<metadata><groupId>versions</groupId><artifactId>versions</artifactId>"
+              + "<versioning><latest>1.0.0</latest><release>1.0.0</release>"
+              + "<versions><version>1.0.0</version></versions></versioning></metadata>",
+          StandardCharsets.UTF_8);
+      final var repo = MavenArtifactControllerIT.this.repoName;
+
+      MavenArtifactControllerIT.this
+          .mockMvc
+          .perform(get("/api/mvn/artifacts/{repo}/versions", repo).with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].artifactName").value("versions"));
+      MavenArtifactControllerIT.this
+          .mockMvc
+          .perform(get("/api/mvn/artifacts/{repo}/versions/versions", repo).with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.artifactName").value("versions"))
+          .andExpect(jsonPath("$.artifactGroupName").value("versions"));
+      MavenArtifactControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/mvn/artifacts/{repo}/versions/versions/versions", repo).with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.content[*].versionName").value(contains("1.0.0")));
+      MavenArtifactControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/mvn/artifacts/{repo}/versions/versions/versions/1.0.0", repo)
+                  .with(apiPort()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.versionName").value("1.0.0"));
+    }
+
     @Test
     void listsArtifactsByGroupAndArtifactFilters() throws Exception {
       MavenArtifactControllerIT.this
@@ -237,19 +294,15 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                   .param("q", "example")
                   .with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("artifactsFetched"))
-          .andExpect(jsonPath("$.type").value("SUCCESS"))
-          .andExpect(jsonPath("$.errorCode").value(nullValue()))
-          .andExpect(jsonPath("$.text").value("Artifacts have been fetched."))
-          .andExpect(jsonPath("$.data.page.*", hasSize(4)))
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].groupName").value(GROUP))
-          .andExpect(jsonPath("$.data.content[0].artifactName").value(ARTIFACT))
-          .andExpect(jsonPath("$.data.page.size").value(10))
-          .andExpect(jsonPath("$.data.page.number").value(0))
-          .andExpect(jsonPath("$.data.page.totalElements").value(1))
-          .andExpect(jsonPath("$.data.page.totalPages").value(1));
+          .andExpect(jsonPath("$.*", hasSize(2)))
+          .andExpect(jsonPath("$.page.*", hasSize(4)))
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].groupName").value(GROUP))
+          .andExpect(jsonPath("$.content[0].artifactName").value(ARTIFACT))
+          .andExpect(jsonPath("$.page.size").value(10))
+          .andExpect(jsonPath("$.page.number").value(0))
+          .andExpect(jsonPath("$.page.totalElements").value(1))
+          .andExpect(jsonPath("$.page.totalPages").value(1));
 
       MavenArtifactControllerIT.this
           .mockMvc
@@ -261,9 +314,8 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                   .param("q", "dem")
                   .with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("artifactsFetched"))
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].artifactName").value(ARTIFACT));
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].artifactName").value(ARTIFACT));
     }
 
     /**
@@ -281,8 +333,8 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                     .param("q", term)
                     .with(apiPort()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.content", hasSize(1)))
-            .andExpect(jsonPath("$.data.content[0].artifactName").value(ARTIFACT));
+            .andExpect(jsonPath("$.content", hasSize(1)))
+            .andExpect(jsonPath("$.content[0].artifactName").value(ARTIFACT));
       }
       MavenArtifactControllerIT.this
           .mockMvc
@@ -294,7 +346,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                   .param("q", key)
                   .with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)));
+          .andExpect(jsonPath("$.content", hasSize(1)));
       MavenArtifactControllerIT.this
           .mockMvc
           .perform(
@@ -302,7 +354,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                   .param("q", ARTIFACT + ":" + GROUP)
                   .with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(0)));
+          .andExpect(jsonPath("$.content", hasSize(0)));
     }
 
     /**
@@ -320,12 +372,10 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
               get("/api/mvn/groups/{repo}/{group}", MavenArtifactControllerIT.this.repoName, GROUP)
                   .with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("groupSummaryFetched"))
-          .andExpect(jsonPath("$.type").value("SUCCESS"))
-          .andExpect(jsonPath("$.data.groupName").value(GROUP))
-          .andExpect(jsonPath("$.data.artifactCount").value(2))
+          .andExpect(jsonPath("$.groupName").value(GROUP))
+          .andExpect(jsonPath("$.artifactCount").value(2))
           // demo: 1.0.0 and 1.1.0-SNAPSHOT, second: three
-          .andExpect(jsonPath("$.data.versionCount").value(5));
+          .andExpect(jsonPath("$.versionCount").value(5));
 
       MavenArtifactControllerIT.this
           .mockMvc
@@ -336,8 +386,8 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                       GROUP + ".sub")
                   .with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.artifactCount").value(1))
-          .andExpect(jsonPath("$.data.versionCount").value(1));
+          .andExpect(jsonPath("$.artifactCount").value(1))
+          .andExpect(jsonPath("$.versionCount").value(1));
     }
 
     @Test
@@ -376,11 +426,10 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                       "1.0.0")
                   .with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("artifactVersionFetched"))
-          .andExpect(jsonPath("$.data.artifactName").value(ARTIFACT))
-          .andExpect(jsonPath("$.data.artifactGroupName").value(GROUP))
-          .andExpect(jsonPath("$.data.artifactVersionName").value("1.0.0"))
-          .andExpect(jsonPath("$.data.versionName").value("1.0.0"));
+          .andExpect(jsonPath("$.artifactName").value(ARTIFACT))
+          .andExpect(jsonPath("$.artifactGroupName").value(GROUP))
+          .andExpect(jsonPath("$.artifactVersionName").value("1.0.0"))
+          .andExpect(jsonPath("$.versionName").value("1.0.0"));
     }
 
     @Test
@@ -395,14 +444,11 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                       ARTIFACT)
                   .with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("artifactVersionFetched"))
-          .andExpect(jsonPath("$.type").value("SUCCESS"))
-          .andExpect(jsonPath("$.data.artifactName").value(ARTIFACT))
-          .andExpect(jsonPath("$.data.artifactGroupName").value(GROUP))
-          .andExpect(jsonPath("$.data.artifactVersionName").value("1.1.0-SNAPSHOT"))
-          .andExpect(jsonPath("$.data.versionName").value("1.1.0-SNAPSHOT"))
-          .andExpect(jsonPath("$.data.pomFile").value(notNullValue()));
+          .andExpect(jsonPath("$.artifactName").value(ARTIFACT))
+          .andExpect(jsonPath("$.artifactGroupName").value(GROUP))
+          .andExpect(jsonPath("$.artifactVersionName").value("1.1.0-SNAPSHOT"))
+          .andExpect(jsonPath("$.versionName").value("1.1.0-SNAPSHOT"))
+          .andExpect(jsonPath("$.pomFile").value(notNullValue()));
 
       MavenArtifactControllerIT.this
           .mockMvc
@@ -415,12 +461,11 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                   .param("size", "1")
                   .with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("artifactVersionsFetched"))
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].versionName").value("1.1.0-SNAPSHOT"))
-          .andExpect(jsonPath("$.data.page.size").value(1))
-          .andExpect(jsonPath("$.data.page.totalElements").value(2))
-          .andExpect(jsonPath("$.data.page.totalPages").value(2));
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].versionName").value("1.1.0-SNAPSHOT"))
+          .andExpect(jsonPath("$.page.size").value(1))
+          .andExpect(jsonPath("$.page.totalElements").value(2))
+          .andExpect(jsonPath("$.page.totalPages").value(2));
     }
   }
 
@@ -441,13 +486,8 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                       "1.0.0")
                   .header(AUTHORIZATION, MavenArtifactControllerIT.this.bearerToken())
                   .with(apiPort()))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("artifactVersionDeleted"))
-          .andExpect(jsonPath("$.type").value("SUCCESS"))
-          .andExpect(jsonPath("$.errorCode").value(nullValue()))
-          .andExpect(jsonPath("$.text").value("Artifact version has been deleted."))
-          .andExpect(jsonPath("$.data", notNullValue()));
+          .andExpect(status().isNoContent())
+          .andExpect(content().string(""));
 
       MavenArtifactControllerIT.this
           .mockMvc
@@ -459,8 +499,8 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                       ARTIFACT)
                   .with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].versionName").value("1.1.0-SNAPSHOT"));
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].versionName").value("1.1.0-SNAPSHOT"));
     }
 
     /**
@@ -484,7 +524,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
               .andExpect(status().isOk())
               .andReturn();
       final String shownVersion =
-          JsonPath.read(detail.getResponse().getContentAsString(), "$.data.artifactVersionName");
+          JsonPath.read(detail.getResponse().getContentAsString(), "$.artifactVersionName");
 
       MavenArtifactControllerIT.this
           .mockMvc
@@ -497,7 +537,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                       shownVersion)
                   .header(AUTHORIZATION, MavenArtifactControllerIT.this.bearerToken())
                   .with(apiPort()))
-          .andExpect(status().isOk());
+          .andExpect(status().isNoContent());
 
       MavenArtifactControllerIT.this
           .mockMvc
@@ -509,8 +549,8 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                       ARTIFACT)
                   .with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].versionName").value("1.1.0-SNAPSHOT"));
+          .andExpect(jsonPath("$.content", hasSize(1)))
+          .andExpect(jsonPath("$.content[0].versionName").value("1.1.0-SNAPSHOT"));
     }
 
     @Test
@@ -644,10 +684,10 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
     void ordersVersions() throws Exception {
       this.list(VERSIONS, "sort", "versionName,asc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].versionName").value("1.0.0"));
+          .andExpect(jsonPath("$.content[0].versionName").value("1.0.0"));
       this.list(VERSIONS, "sort", "versionName,desc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].versionName").value("1.1.0-SNAPSHOT"));
+          .andExpect(jsonPath("$.content[0].versionName").value("1.1.0-SNAPSHOT"));
     }
 
     /**
@@ -669,7 +709,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                   .with(apiPort()))
           .andExpect(status().isOk())
           .andExpect(
-              jsonPath("$.data.content[*].versionName")
+              jsonPath("$.content[*].versionName")
                   .value(contains("1.11.0", "1.10.0", "1.10.0-SNAPSHOT", "1.9.0")));
 
       it.mockMvc
@@ -679,7 +719,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                   .with(apiPort()))
           .andExpect(status().isOk())
           .andExpect(
-              jsonPath("$.data.content[*].versionName")
+              jsonPath("$.content[*].versionName")
                   .value(contains("1.9.0", "1.10.0-SNAPSHOT", "1.10.0", "1.11.0")));
     }
 
@@ -702,8 +742,8 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                   .param("page", "0")
                   .with(apiPort()))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[*].versionName").value(contains("1.11.0", "1.10.0")))
-          .andExpect(jsonPath("$.data.page.totalElements").value(4));
+          .andExpect(jsonPath("$.content[*].versionName").value(contains("1.11.0", "1.10.0")))
+          .andExpect(jsonPath("$.page.totalElements").value(4));
 
       it.mockMvc
           .perform(
@@ -714,8 +754,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                   .with(apiPort()))
           .andExpect(status().isOk())
           .andExpect(
-              jsonPath("$.data.content[*].versionName")
-                  .value(contains("1.10.0-SNAPSHOT", "1.9.0")));
+              jsonPath("$.content[*].versionName").value(contains("1.10.0-SNAPSHOT", "1.9.0")));
     }
 
     @ParameterizedTest(name = "{0} {1}")
@@ -810,9 +849,8 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
       MavenArtifactControllerIT.this
           .versionDetail("sbtlib", "2.0-SNAPSHOT")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("artifactVersionFetched"))
-          .andExpect(jsonPath("$.data.versionName").value("2.0-SNAPSHOT"))
-          .andExpect(jsonPath("$.data.pomFile").value("<project>literal pom</project>"));
+          .andExpect(jsonPath("$.versionName").value("2.0-SNAPSHOT"))
+          .andExpect(jsonPath("$.pomFile").value("<project>literal pom</project>"));
     }
 
     @Test
@@ -829,7 +867,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
       MavenArtifactControllerIT.this
           .versionDetail("hand", "2.0-SNAPSHOT")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.pomFile").value("<project>build 2</project>"));
+          .andExpect(jsonPath("$.pomFile").value("<project>build 2</project>"));
     }
 
     @Test
@@ -862,8 +900,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
       MavenArtifactControllerIT.this
           .versionDetail("garbled", "2.0-SNAPSHOT")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.msgId").value("artifactVersionFetched"))
-          .andExpect(jsonPath("$.data.pomFile").value("<project>build 2</project>"));
+          .andExpect(jsonPath("$.pomFile").value("<project>build 2</project>"));
     }
 
     @Test

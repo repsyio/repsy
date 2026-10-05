@@ -25,7 +25,7 @@ import { UI_REPO_TYPES, type UiRepoType } from '../repo-types.js';
 import { UiPage } from './base.js';
 import { RepoCreateModal } from './repo-create-modal.js';
 
-const USAGES_URL = /\/api\/usages(\?|$)/;
+const USAGES_URL = /\/api\/usage(\?|$)/;
 const PROFILE_URL = /\/api\/profile(\?|$)/;
 const COUNTS_URL = /\/api\/repos\/counts(\?|$)/;
 const LIST_URL = /\/api\/repos(\?|$)/;

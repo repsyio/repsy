@@ -12,8 +12,8 @@ info:
     bumped for each one. It is independent of the Repsy release version.
 
 
-    A successful response body is the envelope `msgId`, `type`, `text`, `errorCode` (always `null`)
-    and `data`. A failed request is answered with an RFC 9457 problem document,
+    A successful response body is the bare resource: no envelope. A create answers 201 with a
+    `Location` header, a delete or an update with nothing to return answers 204. A failed request is answered with an RFC 9457 problem document,
     `application/problem+json`, described by `ProblemDetail`: `status`, `title`, `detail`,
     `instance`, `code` (the stable key of the failure), `traceId` (the unique id of the failure)
     and, for a validation failure, `errors`.
@@ -30,7 +30,7 @@ paths:
   "/api/auth/tokens/refresh":
     post:
       tags:
-        - auth-controller
+        - auth
       operationId: refreshToken
       requestBody:
         content:
@@ -42,19 +42,32 @@ paths:
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseLoginInfo"
+                "$ref": "#/components/schemas/LoginInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Refresh access token using a refresh token
+      description: |-
+        A refresh token can be used once. A successful refresh marks the presented token as used
+        and returns a new pair whose refresh token belongs to the same token family. Presenting a
+        token that was already used (or whose family is revoked) again is a replay: it answers 401
+        `refreshTokenExpired` and revokes every refresh token of that family, so the newer token
+        of the same session stops working too. A password or username change also ends the older
+        refresh tokens of the user (401 `refreshTokenExpired`), and a refresh never extends the
+        session past its original end.
   "/api/auth/login":
     post:
       tags:
-        - auth-controller
+        - auth
       operationId: login
       requestBody:
         content:
@@ -66,10 +79,15 @@ paths:
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseLoginInfo"
+                "$ref": "#/components/schemas/LoginInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -80,7 +98,7 @@ paths:
   "/api/auth/logout":
     post:
       tags:
-        - auth-controller
+        - auth
       operationId: logout
       requestBody:
         content:
@@ -90,12 +108,8 @@ paths:
         required: true
       security: []
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -105,7 +119,7 @@ paths:
   "/api/users/{userId}":
     put:
       tags:
-        - user-controller
+        - users
       operationId: updateUser
       parameters:
         - name: userId
@@ -126,7 +140,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseUserResponse"
+                "$ref": "#/components/schemas/UserResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -138,7 +152,7 @@ paths:
       summary: Update a user
     delete:
       tags:
-        - user-controller
+        - users
       operationId: deleteUser
       parameters:
         - name: userId
@@ -148,12 +162,8 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -168,7 +178,7 @@ paths:
   "/api/users/admin-count":
     get:
       tags:
-        - user-controller
+        - users
       operationId: countAdmins
       responses:
         '200':
@@ -176,7 +186,8 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseLong"
+                type: integer
+                format: int64
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -185,7 +196,7 @@ paths:
   "/api/users":
     get:
       tags:
-        - user-controller
+        - users
       operationId: listUsers
       description: >-
         Sortable by `createdAt`, `username` (`property,direction`). The default is `createdAt,desc`.
@@ -206,7 +217,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelUserResponse"
+                "$ref": "#/components/schemas/PagedModelUserResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -216,7 +227,7 @@ paths:
       summary: List all users
     post:
       tags:
-        - user-controller
+        - users
       operationId: createUser
       requestBody:
         content:
@@ -225,12 +236,18 @@ paths:
               "$ref": "#/components/schemas/UserCreateForm"
         required: true
       responses:
-        '200':
-          description: OK
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: The URL of the created user, `/api/users/{userId}`
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseUserResponse"
+                "$ref": "#/components/schemas/UserResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -241,7 +258,7 @@ paths:
   "/api/users/{userId}/actions/reset-password":
     post:
       tags:
-        - user-controller
+        - users
       operationId: resetPassword
       parameters:
         - name: userId
@@ -252,11 +269,16 @@ paths:
             format: uuid
       responses:
         '200':
-          description: OK
+          description: The new password, as a JSON string
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseString"
+                type: string
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -268,9 +290,9 @@ paths:
       summary: Reset a user's password
   # region: profile
   "/api/profile/username":
-    put:
+    patch:
       tags:
-        - profile-controller
+        - profile
       operationId: updateUsername
       requestBody:
         content:
@@ -280,20 +302,27 @@ paths:
         required: true
       responses:
         '200':
-          description: OK
+          description: >-
+            The new token pair: the change bumps the token version, so the tokens of the request
+            stop working and the caller continues with these.
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseLoginInfo"
+                "$ref": "#/components/schemas/LoginInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Update the current user's username
   "/api/profile/password":
-    put:
+    patch:
       tags:
-        - profile-controller
+        - profile
       operationId: updatePassword
       requestBody:
         content:
@@ -303,11 +332,18 @@ paths:
         required: true
       responses:
         '200':
-          description: OK
+          description: >-
+            The new token pair: the change bumps the token version, so the tokens of the request
+            stop working and the caller continues with these.
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseLoginInfo"
+                "$ref": "#/components/schemas/LoginInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -316,7 +352,7 @@ paths:
   "/api/profile":
     get:
       tags:
-        - profile-controller
+        - profile
       operationId: getProfile
       responses:
         '200':
@@ -324,21 +360,17 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseProfileInfo"
+                "$ref": "#/components/schemas/ProfileInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Get the current user's profile
     delete:
       tags:
-        - profile-controller
+        - profile
       operationId: deleteProfile
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Delete the current user's account
@@ -346,7 +378,7 @@ paths:
   "/api/repos/{repoName}/settings":
     get:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: getRepoSettings
       responses:
         '200':
@@ -366,7 +398,7 @@ paths:
       summary: Get settings for a repository
     put:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: updateRepoSettings
       requestBody:
         content:
@@ -400,7 +432,7 @@ paths:
   "/api/repos":
     get:
       tags:
-        - repo-collection-controller
+        - repos
       operationId: listRepos
       description: >-
         Lists the repositories of every type, one page at a time. Open to every authenticated
@@ -445,7 +477,7 @@ paths:
       summary: List repositories, filtered by type and name
     post:
       tags:
-        - repo-collection-controller
+        - repos
       operationId: createRepository
       description: >-
         Creates a repository of the type given in the body and returns it. Admin only (403
@@ -490,7 +522,7 @@ paths:
   "/api/repos/counts":
     get:
       tags:
-        - repo-collection-controller
+        - repos
       operationId: getRepoCounts
       description: >-
         The number of repositories of each type. Every type is a key, zero included. Open to every
@@ -508,7 +540,7 @@ paths:
   "/api/repos/{repoName}/contents":
     get:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: getPathContent
       parameters:
         - name: path
@@ -546,7 +578,7 @@ paths:
   "/api/repos/{repoName}":
     get:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: getRepo
       description: >-
         One repository: its name, description, type (the format), visibility, disk usage and
@@ -571,7 +603,7 @@ paths:
       summary: Get a repository
     patch:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: updateRepo
       description: >-
         Renames the repository and/or changes its description. A field that is omitted (or sent as
@@ -613,7 +645,7 @@ paths:
       summary: Rename a repository or change its description
     delete:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: deleteRepo
       responses:
         '204':
@@ -639,7 +671,7 @@ paths:
   "/api/repos/{repoName}/deploy-tokens/{tokenId}":
     delete:
       tags:
-        - protocol-deploy-token-controller
+        - deploy-tokens
       operationId: revokeDeployToken
       parameters:
         - name: tokenId
@@ -649,12 +681,8 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -675,7 +703,7 @@ paths:
   "/api/repos/{repoName}/deploy-tokens/{tokenId}/actions/rotate":
     post:
       tags:
-        - protocol-deploy-token-controller
+        - deploy-tokens
       operationId: rotateDeployToken
       parameters:
         - name: tokenId
@@ -687,10 +715,15 @@ paths:
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseString"
+                type: string
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -711,7 +744,7 @@ paths:
   "/api/repos/{repoName}/deploy-tokens":
     get:
       tags:
-        - protocol-deploy-token-controller
+        - deploy-tokens
       operationId: listDeployTokens
       description: >-
         Sortable by `id`, `name`, `username`, `description`, `readOnly`, `expirationDate`, `createdAt`
@@ -726,7 +759,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelDeployTokenInfoListItem"
+                "$ref": "#/components/schemas/PagedModelDeployTokenInfoListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -740,7 +773,7 @@ paths:
       summary: List deploy tokens for a repository
     post:
       tags:
-        - protocol-deploy-token-controller
+        - deploy-tokens
       operationId: createDeployToken
       requestBody:
         content:
@@ -749,12 +782,24 @@ paths:
               "$ref": "#/components/schemas/DeployTokenForm"
         required: true
       responses:
-        '200':
-          description: OK
+        '201':
+          description: Created
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
+            Location:
+              description: >-
+                The URL of the created token, `/api/repos/{repoName}/deploy-tokens/{tokenId}`. Only
+                DELETE is served there; there is no token detail route.
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseTokenInfo"
+                "$ref": "#/components/schemas/TokenInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -775,7 +820,7 @@ paths:
   "/api/repos/{repoName}/permissions":
     get:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: getRepoPermissions
       security:
         - { }
@@ -786,7 +831,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseRepoPermissionInfo"
+                "$ref": "#/components/schemas/RepoPermissionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -803,7 +848,7 @@ paths:
   "/api/repos/{repoName}/download-token":
     post:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: createDownloadToken
       parameters:
         - name: path
@@ -817,10 +862,15 @@ paths:
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseString"
+                type: string
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -837,10 +887,10 @@ paths:
         schema:
           type: string
   # region: usage
-  "/api/usages":
+  "/api/usage":
     get:
       tags:
-        - usage-controller
+        - usage
       operationId: getTotalUsage
       responses:
         '200':
@@ -848,14 +898,14 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseTotalUsageInfo"
+                "$ref": "#/components/schemas/TotalUsageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Get total usage statistics
   "/api/repos/{repoName}/usage":
     get:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: getRepoUsage
       responses:
         '200':
@@ -863,7 +913,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseRepoUsageInfo"
+                "$ref": "#/components/schemas/RepoUsageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -883,7 +933,7 @@ paths:
   "/api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scans":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: listVulnerabilityScans
       description: >-
         Sortable by `createdAt` (`property,direction`). The default is `createdAt,desc`.
@@ -910,7 +960,59 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelVulnerabilityScanInfo"
+                "$ref": "#/components/schemas/PagedModelVulnerabilityScanInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: List the vulnerability scan history of an artifact version
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/versions/{version}/scans":
+    get:
+      tags:
+        - security-scans
+      operationId: listScopedVulnerabilityScans
+      description: >-
+        Sortable by `createdAt` (`property,direction`). The default is `createdAt,desc`.
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the artifact is `@scope/artifactName`.
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PagedModelVulnerabilityScanInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -929,7 +1031,7 @@ paths:
   "/api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan-overview":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getScanOverview
       parameters:
         - name: artifactName
@@ -951,7 +1053,57 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseScanOverview"
+                "$ref": "#/components/schemas/ScanOverview"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get the severity breakdown of an artifact version
+      description: >-
+        The scanId, status and scannedAt describe the version's newest scan, whatever its status.
+        The counters describe its newest COMPLETED scan (see lastCompletedAt), so they stay the last
+        known values while a rescan is pending, queued, running or failed, and are all zero only
+        when the version has no completed scan or its completed scan found nothing.
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/versions/{version}/scan-overview":
+    get:
+      tags:
+        - security-scans
+      operationId: getScopedScanOverview
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the artifact is `@scope/artifactName`.
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ScanOverview"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -973,7 +1125,7 @@ paths:
   "/api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan":
     post:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: triggerVulnerabilityScan
       parameters:
         - name: artifactName
@@ -987,12 +1139,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseVulnerabilityScanInfo"
+        '202':
+          "$ref": "#/components/responses/Accepted"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1005,13 +1153,65 @@ paths:
           "$ref": "#/components/responses/TooManyRequests"
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Manually trigger a vulnerability re-scan for an artifact version
+      summary: Manually trigger a vulnerability re-scan for an artifact version (the scan runs in the background)
       description: >-
         Scans the version regardless of the repository's `securityScanEnabled` setting: that setting
         only governs the automatic scan on push, and a manual scan is an explicit override. Answers
         400 `scannerDisabled` instead when vulnerability scanning itself is off
         (`SECURITY_SCANNER=disabled`, the default): no scanner is running, so there is nothing to
-        record a result for.
+        record a result for. The 202 answer has no body; its `Location` header is the scan
+        status resource, `GET /api/repos/{repoName}/scans/{scanId}`.
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/versions/{version}/scan":
+    post:
+      tags:
+        - security-scans
+      operationId: triggerScopedVulnerabilityScan
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the artifact is `@scope/artifactName`.
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          "$ref": "#/components/responses/Accepted"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Manually trigger a vulnerability re-scan for an artifact version (the scan runs in the background)
+      description: >-
+        Scans the version regardless of the repository's `securityScanEnabled` setting: that setting
+        only governs the automatic scan on push, and a manual scan is an explicit override. Answers
+        400 `scannerDisabled` instead when vulnerability scanning itself is off
+        (`SECURITY_SCANNER=disabled`, the default): no scanner is running, so there is nothing to
+        record a result for. The 202 answer has no body; its `Location` header is the scan
+        status resource, `GET /api/repos/{repoName}/scans/{scanId}`.
     parameters:
       - name: repoName
         in: path
@@ -1021,7 +1221,7 @@ paths:
   "/api/repos/{repoName}/artifacts/{artifactName}/security-summary":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getVersionSecuritySummary
       parameters:
         - name: artifactName
@@ -1038,7 +1238,47 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVersionSecuritySummaryMap"
+                "$ref": "#/components/schemas/VersionSecuritySummaryMap"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get every version's latest-scan severity and finding count for one artifact, in a single call
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/security-summary":
+    get:
+      tags:
+        - security-scans
+      operationId: getScopedVersionSecuritySummary
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the artifact is `@scope/artifactName`.
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/VersionSecuritySummaryMap"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1055,7 +1295,7 @@ paths:
   "/api/repos/{repoName}/artifacts/security-summary":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getArtifactSecuritySummary
       security:
         - { }
@@ -1066,7 +1306,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVersionSecuritySummaryMap"
+                "$ref": "#/components/schemas/VersionSecuritySummaryMap"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1083,7 +1323,7 @@ paths:
   "/api/repos/{repoName}/scans/{scanId}":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getVulnerabilityScan
       parameters:
         - name: scanId
@@ -1101,7 +1341,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVulnerabilityScanDetail"
+                "$ref": "#/components/schemas/VulnerabilityScanDetail"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1120,7 +1360,7 @@ paths:
   "/api/repos/{repoName}/scans/{scanId}/findings":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getVulnerabilityScanFindings
       description: >-
         Sortable by `id`, `cveId`, `severity`, `packageName`, `packageVersion`, `fixedVersion`,
@@ -1144,7 +1384,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelVulnerabilityFindingInfo"
+                "$ref": "#/components/schemas/PagedModelVulnerabilityFindingInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1163,7 +1403,7 @@ paths:
   "/api/repos/{repoName}/security-detail":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getRepoSecurityDetail
       security:
         - { }
@@ -1174,7 +1414,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseRepoSecurityDetail"
+                "$ref": "#/components/schemas/RepoSecurityDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1191,7 +1431,7 @@ paths:
   "/api/repos/{repoName}/artifacts/{artifactName}/security-detail":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getArtifactSecurityDetail
       parameters:
         - name: artifactName
@@ -1208,7 +1448,47 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseRepoSecurityDetail"
+                "$ref": "#/components/schemas/RepoSecurityDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get one artifact's severity breakdown (each version's latest completed scan) plus its most recently scanned versions
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/security-detail":
+    get:
+      tags:
+        - security-scans
+      operationId: getScopedArtifactSecurityDetail
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the artifact is `@scope/artifactName`.
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RepoSecurityDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1225,7 +1505,7 @@ paths:
   "/api/repos/security-summary":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getSecuritySummary
       parameters:
         - name: repoNames
@@ -1243,14 +1523,14 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseSecuritySummary"
+                "$ref": "#/components/schemas/SecuritySummary"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Get the worst known severity per repo, across each artifact version's latest completed scan
   "/api/security/scans":
     get:
       tags:
-        - security-scan-controller
+        - security-scans
       operationId: listSecurityScans
       description: >-
         Sortable by `createdAt` (`property,direction`). The default is `createdAt,desc`.
@@ -1282,7 +1562,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelVulnerabilityScanInfo"
+                "$ref": "#/components/schemas/PagedModelVulnerabilityScanInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1293,7 +1573,7 @@ paths:
   "/api/security/scans/summary":
     get:
       tags:
-        - security-scan-controller
+        - security-scans
       operationId: getSecurityScansSummary
       parameters:
         - name: repoType
@@ -1315,7 +1595,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseSecurityScansSummary"
+                "$ref": "#/components/schemas/SecurityScansSummary"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1326,7 +1606,7 @@ paths:
   "/api/security/supported-repo-types":
     get:
       tags:
-        - security-scan-controller
+        - security-scans
       operationId: getSupportedRepoTypes
       security: []
       responses:
@@ -1335,13 +1615,15 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseListString"
+                type: array
+                items:
+                  type: string
       summary: List repo types (e.g. MAVEN, NPM) that have a registered vulnerability scanner, single source of truth for gating scan-related UI/behavior
   # region: cargo
   "/api/cargo/crates/{repoName}":
     get:
       tags:
-        - cargo-crate-controller
+        - cargo-crates
       operationId: searchCargoCrates
       description: >-
         Sortable by `id`, `name`, `maxVersion`, `downloads`, `totalDownloads`, `updatedAt`,
@@ -1366,7 +1648,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelCrateListItem"
+                "$ref": "#/components/schemas/PagedModelCrateListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1382,13 +1664,13 @@ paths:
         required: true
         schema:
           type: string
-  "/api/cargo/crates/{repoName}/{crateName}":
+  "/api/cargo/crates/{repoName}/{packageName}":
     get:
       tags:
-        - cargo-crate-controller
+        - cargo-crates
       operationId: getCargoCrate
       parameters:
-        - name: crateName
+        - name: packageName
           in: path
           required: true
           schema:
@@ -1402,7 +1684,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseCrateInfo"
+                "$ref": "#/components/schemas/CrateInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1412,21 +1694,17 @@ paths:
       summary: Get a Cargo crate
     delete:
       tags:
-        - cargo-crate-controller
+        - cargo-crates
       operationId: deleteCargoCrate
       parameters:
-        - name: crateName
+        - name: packageName
           in: path
           required: true
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1442,13 +1720,13 @@ paths:
         required: true
         schema:
           type: string
-  "/api/cargo/crates/{repoName}/{crateName}/{version}":
+  "/api/cargo/crates/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
-        - cargo-crate-controller
+        - cargo-crates
       operationId: getCargoCrateVersion
       parameters:
-        - name: crateName
+        - name: packageName
           in: path
           required: true
           schema:
@@ -1467,7 +1745,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseCrateVersionInfo"
+                "$ref": "#/components/schemas/CrateVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1477,10 +1755,10 @@ paths:
       summary: Get a specific Cargo crate version
     delete:
       tags:
-        - cargo-crate-controller
+        - cargo-crates
       operationId: deleteCargoCrateVersion
       parameters:
-        - name: crateName
+        - name: packageName
           in: path
           required: true
           schema:
@@ -1491,12 +1769,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1512,15 +1786,15 @@ paths:
         required: true
         schema:
           type: string
-  "/api/cargo/crates/{repoName}/{crateName}/versions":
+  "/api/cargo/crates/{repoName}/{packageName}/versions":
     get:
       tags:
-        - cargo-crate-controller
+        - cargo-crates
       operationId: listCargoCrateVersions
       description: >-
         Sortable by `version`, `createdAt` (`property,direction`).
       parameters:
-        - name: crateName
+        - name: packageName
           in: path
           required: true
           schema:
@@ -1544,7 +1818,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelCrateVersionListItem"
+                "$ref": "#/components/schemas/PagedModelCrateVersionListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1564,7 +1838,7 @@ paths:
   "/api/docker/images/{repoName}":
     get:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: listDockerImages
       description: >-
         Sortable by `id`, `name`, `updatedAt`, `lastUpdatedAt` (`property,direction`). The default is
@@ -1574,7 +1848,7 @@ paths:
           in: query
           required: false
           description: >-
-            Only images whose name contains this text.
+            Only images whose name contains this text, case-insensitive.
           schema:
             type: string
         - "$ref": "#/components/parameters/Page"
@@ -1589,7 +1863,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelImageListItem"
+                "$ref": "#/components/schemas/PagedModelImageListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1605,18 +1879,17 @@ paths:
         required: true
         schema:
           type: string
-  "/api/docker/images/blobs/{repoName}/orphan-layers":
+  "/api/repos/{repoName}/docker/orphan-layers":
     delete:
       tags:
-        - docker-image-controller
+        - docker-repo-cleanup
       operationId: deleteDockerOrphanLayers
+      description: >-
+        Deletes the layers no manifest uses any more. The layer rows are removed before the response;
+        the blobs are removed in the background.
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1627,17 +1900,17 @@ paths:
           "$ref": "#/components/responses/TooManyRequests"
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete orphan layers for a Docker repository
+      summary: Delete the orphan layers of a Docker repository
     parameters:
       - name: repoName
         in: path
         required: true
         schema:
           type: string
-  "/api/docker/images/manifests/{repoName}/untagged":
+  "/api/repos/{repoName}/docker/untagged-manifests":
     delete:
       tags:
-        - docker-image-controller
+        - docker-repo-cleanup
       operationId: deleteDockerUntaggedManifests
       description: >-
         Deletes the manifests of the repository that no tag points to, directly or through an index,
@@ -1658,7 +1931,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseUntaggedManifestCleanupResult"
+                "$ref": "#/components/schemas/UntaggedManifestCleanupResult"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -1676,21 +1949,168 @@ paths:
         required: true
         schema:
           type: string
-  "/api/docker/images/{repoName}/{imageName}/summary":
+  "/api/repos/{repoName}/docker/cleanup-policy":
     get:
       tags:
-        - docker-image-controller
-      operationId: getDockerImageSummary
+        - docker-cleanup-policy
+      operationId: getDockerCleanupPolicy
+      description: >-
+        The cleanup policy of a Docker repository. A disabled default policy is created on the
+        first read, so nothing is ever deleted until a policy is enabled. Fails with 400
+        (`repoScopeNotMatched`) when the repository is not a Docker repository.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CleanupPolicyItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: The cleanup policy of a Docker repository
+    put:
+      tags:
+        - docker-cleanup-policy
+      operationId: updateDockerCleanupPolicy
+      description: >-
+        Replaces the rules of the cleanup policy. The policy must be enabled (400
+        `cleanupPolicyDisabled`). A tag is deleted when its name matches `nameRegex` (the whole
+        name), it is older than `keepDays`, it does not match `nameRegexKeep`, it is not `latest`
+        and it is not one of the `keepLastN` newest tags of its image. The untagged manifests of the
+        cleaned images that are older than `keepDays`, and the layers only they used, are deleted
+        with them.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CleanupPolicyForm"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CleanupPolicyItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Replace the rules of the cleanup policy
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/docker/cleanup-policy/status":
+    patch:
+      tags:
+        - docker-cleanup-policy
+      operationId: updateDockerCleanupPolicyStatus
+      description: >-
+        Enables or disables the cleanup policy. Enabling makes the policy due at once, so the next
+        scheduler pass runs it. Disabling clears `nextRunAt`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CleanupPolicyStatusForm"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CleanupPolicyItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Enable or disable the cleanup policy
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/docker/cleanup-policy/actions/run":
+    post:
+      tags:
+        - docker-cleanup-policy
+      operationId: runDockerCleanupPolicy
+      description: >-
+        Makes the cleanup policy due now; the scheduler runs it on its next pass and the work
+        finishes later. The `Location` header is the policy, whose `lastRunAt` reports the outcome.
+        The policy must be enabled (400 `cleanupPolicyDisabled`).
+      responses:
+        '202':
+          "$ref": "#/components/responses/Accepted"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Run the cleanup policy now
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/docker/images/{repoName}/{imageName}":
+    get:
+      tags:
+        - docker-images
+      operationId: getDockerImage
       description: >-
         The image as the list shows it, including how many tags and untagged manifests it has and
         the size of the untagged ones. An image with no tag is still there while it stores a
-        manifest.
+        manifest. A tag's detail is `.../tags/{tagName}`.
       parameters:
         - name: imageName
           in: path
           required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
           schema:
             type: string
+        - "$ref": "#/components/parameters/DockerImage"
       security:
         - { }
         - bearerAuth: []
@@ -1700,14 +2120,42 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseImageListItem"
+                "$ref": "#/components/schemas/ImageListItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: Get a Docker image with its tag and untagged manifest counts
+      summary: Get a Docker image
+    delete:
+      tags:
+        - docker-images
+      operationId: deleteDockerImage
+      parameters:
+        - name: imageName
+          in: path
+          required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/DockerImage"
+      responses:
+        '204':
+          "$ref": "#/components/responses/NoContent"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Delete a Docker image
     parameters:
       - name: repoName
         in: path
@@ -1717,7 +2165,7 @@ paths:
   "/api/docker/images/{repoName}/{imageName}/tags":
     get:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: listDockerImageTags
       description: >-
         Sortable by `id`, `name`, `createdAt` (`property,direction`). The default is `id,desc`.
@@ -1725,13 +2173,17 @@ paths:
         - name: imageName
           in: path
           required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
           schema:
             type: string
+        - "$ref": "#/components/parameters/DockerImage"
         - name: q
           in: query
           required: false
           description: >-
-            Only tags whose name contains this text.
+            Only tags whose name contains this text, case-insensitive.
           schema:
             type: string
         - "$ref": "#/components/parameters/Page"
@@ -1746,7 +2198,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelImageTagListItem"
+                "$ref": "#/components/schemas/PagedModelImageTagListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1762,10 +2214,86 @@ paths:
         required: true
         schema:
           type: string
+  "/api/docker/images/{repoName}/{imageName}/tags/{tagName}":
+    get:
+      tags:
+        - docker-images
+      operationId: getDockerImageTag
+      parameters:
+        - name: imageName
+          in: path
+          required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/DockerImage"
+        - name: tagName
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TagDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a specific Docker image tag
+    delete:
+      tags:
+        - docker-images
+      operationId: deleteDockerTag
+      parameters:
+        - name: imageName
+          in: path
+          required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/DockerImage"
+        - name: tagName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          "$ref": "#/components/responses/NoContent"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Delete a Docker image tag
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
   "/api/docker/images/{repoName}/{imageName}/tags/{tagName}/manifests":
     get:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: listDockerTagManifests
       description: >-
         Sortable by `id`, `name`, `createdAt` (`property,direction`). The default is `id,desc`.
@@ -1773,8 +2301,12 @@ paths:
         - name: imageName
           in: path
           required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
           schema:
             type: string
+        - "$ref": "#/components/parameters/DockerImage"
         - name: tagName
           in: path
           required: true
@@ -1784,7 +2316,7 @@ paths:
           in: query
           required: false
           description: >-
-            Only manifests whose name contains this text.
+            Only manifests whose name contains this text, case-insensitive.
           schema:
             type: string
         - "$ref": "#/components/parameters/Page"
@@ -1799,7 +2331,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelManifestListItem"
+                "$ref": "#/components/schemas/PagedModelManifestListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -1818,14 +2350,19 @@ paths:
   "/api/docker/images/{repoName}/{imageName}/manifests/{reference}":
     get:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: getDockerImageManifest
+      description: The manifest as stored, as a JSON string.
       parameters:
         - name: imageName
           in: path
           required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
           schema:
             type: string
+        - "$ref": "#/components/parameters/DockerImage"
         - name: reference
           in: path
           required: true
@@ -1840,7 +2377,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseString"
+                type: string
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -1854,151 +2391,22 @@ paths:
         required: true
         schema:
           type: string
-  "/api/docker/images/{repoName}/{imageName}":
-    get:
-      tags:
-        - docker-image-controller
-      operationId: getDockerImageDetail
-      parameters:
-        - name: imageName
-          in: path
-          required: true
-          schema:
-            type: string
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseTagDetail"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Get a Docker image
-    delete:
-      tags:
-        - docker-image-controller
-      operationId: deleteDockerImage
-      parameters:
-        - name: imageName
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete a Docker image
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  "/api/docker/images/{repoName}/{imageName}/tags/{tagName}":
-    get:
-      tags:
-        - docker-image-controller
-      operationId: getDockerImageTag
-      parameters:
-        - name: imageName
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: tagName
-          in: path
-          required: true
-          schema:
-            type: string
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseTagDetail"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Get a specific Docker image tag
-    delete:
-      tags:
-        - docker-image-controller
-      operationId: deleteDockerTag
-      parameters:
-        - name: imageName
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: tagName
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete a Docker image tag
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
   "/api/docker/images/{repoName}/{imageName}/configs/{digest}":
     get:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: getDockerImageConfig
+      description: The config blob as stored, as a JSON string.
       parameters:
         - name: imageName
           in: path
           required: true
+          description: >-
+            The image name when it is a single segment. For a name with several segments
+            (`team/app`) pass `-` here (not a valid image name) and the full name in `image`.
           schema:
             type: string
+        - "$ref": "#/components/parameters/DockerImage"
         - name: digest
           in: path
           required: true
@@ -2013,7 +2421,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseString"
+                type: string
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -2031,11 +2439,19 @@ paths:
   "/api/go/modules/{repoName}":
     get:
       tags:
-        - golang-module-controller
+        - golang-modules
       operationId: listGolangModules
       description: >-
         Sortable by `id`, `modulePath`, `createdAt` (`property,direction`). The default is `id,desc`.
+        Takes the text filter `q`; there is no separate search route.
       parameters:
+        - name: q
+          in: query
+          required: false
+          description: >-
+            Only modules whose path contains this text, case-insensitive.
+          schema:
+            type: string
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
@@ -2048,7 +2464,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelGoModuleListItem"
+                "$ref": "#/components/schemas/PagedModelGoModuleListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2057,10 +2473,10 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: List Go modules in a repository
+      summary: List or search Go modules in a repository
     delete:
       tags:
-        - golang-module-controller
+        - golang-modules
       operationId: deleteGolangModule
       parameters:
         - name: modulePath
@@ -2069,12 +2485,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          description: No Content
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2097,7 +2509,7 @@ paths:
   "/api/go/modules/{repoName}/versions":
     get:
       tags:
-        - golang-module-controller
+        - golang-modules
       operationId: listGolangModuleVersions
       description: >-
         Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
@@ -2126,7 +2538,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelGoModuleVersionListItem"
+                "$ref": "#/components/schemas/PagedModelGoModuleVersionListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2138,7 +2550,7 @@ paths:
       summary: List versions of a Go module
     delete:
       tags:
-        - golang-module-controller
+        - golang-modules
       operationId: deleteGolangModuleVersion
       parameters:
         - name: modulePath
@@ -2152,12 +2564,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          description: No Content
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2177,71 +2585,10 @@ paths:
         required: true
         schema:
           type: string
-  "/api/go/modules/{repoName}/sumdb/supported":
-    get:
-      tags:
-        - golang-module-controller
-      operationId: checkGolangSumdbSupported
-      parameters:
-        - name: repoName
-          in: path
-          required: true
-          schema:
-            type: string
-      security: []
-      responses:
-        '404':
-          description: >-
-            Always. This proxy does not relay checksum database requests, so the Go toolchain
-            falls back to sum.golang.org (or GONOSUMDB). The body is empty.
-      summary: Check if sum database is supported
-  "/api/go/modules/{repoName}/search":
-    get:
-      tags:
-        - golang-module-controller
-      operationId: searchGolangModules
-      description: >-
-        Sortable by `id`, `modulePath`, `createdAt` (`property,direction`). The default is `id,desc`.
-      parameters:
-        - name: q
-          in: query
-          required: false
-          description: >-
-            Only modules whose path contains this text, case-insensitive.
-          schema:
-            type: string
-        - "$ref": "#/components/parameters/Page"
-        - "$ref": "#/components/parameters/Size"
-        - "$ref": "#/components/parameters/Sort"
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelGoModuleListItem"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Search Go modules in a repository
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
   "/api/go/modules/{repoName}/info":
     get:
       tags:
-        - golang-module-controller
+        - golang-modules
       operationId: getGolangModuleInfo
       parameters:
         - name: modulePath
@@ -2258,7 +2605,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseGoModuleInfo"
+                "$ref": "#/components/schemas/GoModuleInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2278,7 +2625,7 @@ paths:
   "/api/helm/charts/{repoName}":
     get:
       tags:
-        - helm-chart-controller
+        - helm-charts
       operationId: searchHelmCharts
       description: >-
         Sortable by `name`, `latestVersion`, `updatedAt`, `createdAt`, `lastUpdatedAt`
@@ -2303,7 +2650,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelHelmChartListItem"
+                "$ref": "#/components/schemas/PagedModelHelmChartListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2319,11 +2666,11 @@ paths:
         required: true
         schema:
           type: string
-  "/api/helm/charts/{repoName}/{chartName}":
+  "/api/helm/charts/{repoName}/{packageName}":
     get:
       tags:
-        - helm-chart-controller
-      operationId: getHelmChartVersions
+        - helm-charts
+      operationId: getHelmChart
       parameters: []
       security:
         - { }
@@ -2334,26 +2681,22 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseListHelmChartVersionItem"
+                "$ref": "#/components/schemas/HelmChartSummary"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: List all versions of a chart
+      summary: Get a Helm chart
     delete:
       tags:
-        - helm-chart-controller
+        - helm-charts
       operationId: deleteAllHelmChartVersions
       parameters: []
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -2371,15 +2714,15 @@ paths:
         required: true
         schema:
           type: string
-      - name: chartName
+      - name: packageName
         in: path
         required: true
         schema:
           type: string
-  "/api/helm/charts/{repoName}/{chartName}/tags":
+  "/api/helm/charts/{repoName}/{packageName}/tags":
     get:
       tags:
-        - helm-chart-controller
+        - helm-charts
       operationId: getHelmChartOciTags
       parameters: []
       security:
@@ -2391,7 +2734,9 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseListString"
+                type: array
+                items:
+                  type: string
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -2405,15 +2750,63 @@ paths:
         required: true
         schema:
           type: string
-      - name: chartName
+      - name: packageName
         in: path
         required: true
         schema:
           type: string
-  "/api/helm/charts/{repoName}/{chartName}/{version}":
+  "/api/helm/charts/{repoName}/{packageName}/versions":
     get:
       tags:
-        - helm-chart-controller
+        - helm-charts
+      operationId: listHelmChartVersions
+      description: >-
+        Sortable by `version`, `createdAt` (`property,direction`). The default is `createdAt,desc`.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: >-
+            Only versions that contain this text, case-insensitive.
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PagedModelHelmChartVersionItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: List versions of a Helm chart
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: packageName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/helm/charts/{repoName}/{packageName}/versions/{version}":
+    get:
+      tags:
+        - helm-charts
       operationId: getHelmChartDetail
       parameters: []
       security:
@@ -2425,7 +2818,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseHelmChartDetail"
+                "$ref": "#/components/schemas/HelmChartDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -2435,16 +2828,12 @@ paths:
       summary: Get a specific chart version detail
     delete:
       tags:
-        - helm-chart-controller
+        - helm-charts
       operationId: deleteHelmChartVersion
       parameters: []
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -2462,7 +2851,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: chartName
+      - name: packageName
         in: path
         required: true
         schema:
@@ -2476,7 +2865,7 @@ paths:
   "/api/mvn/artifacts/{repoName}":
     get:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: listMavenGroups
       description: >-
         Sortable by `id`, `groupName`, `artifactName`, `lastUpdatedAt` (`property,direction`). The
@@ -2501,7 +2890,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelArtifactListItem"
+                "$ref": "#/components/schemas/PagedModelArtifactListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2520,7 +2909,7 @@ paths:
   "/api/mvn/artifacts/{repoName}/{groupName}":
     get:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: listMavenArtifacts
       description: >-
         Sortable by `id`, `groupName`, `artifactName`, `lastUpdatedAt` (`property,direction`). The
@@ -2550,7 +2939,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelArtifactListItem"
+                "$ref": "#/components/schemas/PagedModelArtifactListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2562,7 +2951,7 @@ paths:
       summary: List artifacts in a Maven group
     delete:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: deleteMavenGroup
       parameters:
         - name: groupName
@@ -2571,12 +2960,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseDeletedItem"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -2595,7 +2980,7 @@ paths:
   "/api/mvn/groups/{repoName}/{groupName}":
     get:
       tags:
-        - maven-group-controller
+        - maven-groups
       operationId: getMavenGroupSummary
       description: >-
         What deleting the group removes: how many artifacts the group holds and how many versions
@@ -2616,7 +3001,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseMavenGroupSummary"
+                "$ref": "#/components/schemas/MavenGroupSummary"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -2633,7 +3018,7 @@ paths:
   "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}/versions":
     get:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: listMavenArtifactVersions
       description: >-
         Sortable by `id`, `versionName`, `lastUpdatedAt` (`property,direction`). The default is
@@ -2668,7 +3053,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelArtifactVersionListItem"
+                "$ref": "#/components/schemas/PagedModelArtifactVersionListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2687,7 +3072,7 @@ paths:
   "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}":
     get:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: getMavenArtifact
       parameters:
         - name: groupName
@@ -2709,7 +3094,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseArtifactVersionInfo"
+                "$ref": "#/components/schemas/ArtifactVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -2719,7 +3104,7 @@ paths:
       summary: Get a Maven artifact
     delete:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: deleteMavenArtifact
       parameters:
         - name: groupName
@@ -2733,12 +3118,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseDeletedItem"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -2757,7 +3138,7 @@ paths:
   "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}/versions/{version}":
     get:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: getMavenArtifactVersion
       parameters:
         - name: groupName
@@ -2784,7 +3165,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseArtifactVersionInfo"
+                "$ref": "#/components/schemas/ArtifactVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -2794,7 +3175,7 @@ paths:
       summary: Get a specific version of a Maven artifact
     delete:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: deleteMavenArtifactVersion
       parameters:
         - name: groupName
@@ -2813,12 +3194,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseDeletedItem"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -2835,10 +3212,10 @@ paths:
         schema:
           type: string
   # region: mvn-key-stores
-  "/api/mvn/key-stores/allowed-servers":
+  "/api/mvn/allowed-key-servers":
     get:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: listMavenAllowedKeyServers
       responses:
         '200':
@@ -2846,14 +3223,16 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseListAllowedKeyserverItem"
+                type: array
+                items:
+                  "$ref": "#/components/schemas/AllowedKeyserverItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: List allowed keyservers for the authenticated user
   "/api/mvn/key-stores/{repoName}":
     get:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: listMavenKeyStores
       description: >-
         Sortable by `id`, `host`, `displayName` (`property,direction`). The default is `id,desc`.
@@ -2867,7 +3246,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelKeyStoreItem"
+                "$ref": "#/components/schemas/PagedModelKeyStoreItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2881,7 +3260,7 @@ paths:
       summary: List key stores for a Maven repository
     post:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: createMavenKeyStore
       requestBody:
         content:
@@ -2890,12 +3269,20 @@ paths:
               "$ref": "#/components/schemas/KeyStoreForm"
         required: true
       responses:
-        '200':
-          description: OK
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: >-
+                The URL of the created key store, `/api/mvn/key-stores/{repoName}/{keyStoreId}`. Only
+                DELETE is served there; there is no key store detail route.
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseKeyStoreItem"
+                "$ref": "#/components/schemas/KeyStoreItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2918,7 +3305,7 @@ paths:
   "/api/mvn/key-stores/{repoName}/public-keys":
     get:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: listMavenPgpPublicKeys
       parameters:
         - "$ref": "#/components/parameters/Page"
@@ -2930,7 +3317,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPgpPublicKeyItem"
+                "$ref": "#/components/schemas/PagedModelPgpPublicKeyItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2954,7 +3341,7 @@ paths:
         default is `id,desc`.
     post:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: createMavenPgpPublicKey
       requestBody:
         content:
@@ -2963,12 +3350,20 @@ paths:
               "$ref": "#/components/schemas/PgpPublicKeyForm"
         required: true
       responses:
-        '200':
-          description: OK
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: >-
+                The URL of the created key, `/api/mvn/key-stores/{repoName}/public-keys/{publicKeyId}`.
+                Only DELETE is served there; there is no public key detail route.
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePgpPublicKeyItem"
+                "$ref": "#/components/schemas/PgpPublicKeyItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -2993,10 +3388,10 @@ paths:
         schema:
           type: string
   "/api/mvn/key-stores/{repoName}/public-keys/{publicKeyId}":
-    delete:
+    get:
       tags:
-        - key-store-controller
-      operationId: deleteMavenPgpPublicKey
+        - maven-key-stores
+      operationId: getMavenPgpPublicKey
       parameters:
         - name: publicKeyId
           in: path
@@ -3010,7 +3405,32 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+                "$ref": "#/components/schemas/PgpPublicKeyItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a registered PGP public key of a Maven repository
+    delete:
+      tags:
+        - maven-key-stores
+      operationId: deleteMavenPgpPublicKey
+      parameters:
+        - name: publicKeyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: No Content
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3029,10 +3449,10 @@ paths:
         schema:
           type: string
   "/api/mvn/key-stores/{repoName}/{keyStoreId}":
-    delete:
+    get:
       tags:
-        - key-store-controller
-      operationId: deleteMavenKeyStore
+        - maven-key-stores
+      operationId: getMavenKeyStore
       parameters:
         - name: keyStoreId
           in: path
@@ -3046,7 +3466,32 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseKeyStoreItem"
+                "$ref": "#/components/schemas/KeyStoreItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a key store of a Maven repository
+    delete:
+      tags:
+        - maven-key-stores
+      operationId: deleteMavenKeyStore
+      parameters:
+        - name: keyStoreId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: No Content
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3068,7 +3513,7 @@ paths:
   "/api/npm/packages/{repoName}":
     get:
       tags:
-        - npm-package-api-controller
+        - npm-packages
       operationId: listNpmPackages
       description: >-
         Sortable by `id`, `name`, `scope`, `latestVersion`, `updatedAt` (`property,direction`). The
@@ -3091,7 +3536,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
+                "$ref": "#/components/schemas/PagedModelNpmPackageListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3107,10 +3552,118 @@ paths:
         required: true
         schema:
           type: string
+  "/api/npm/packages/{repoName}/{packageName}":
+    get:
+      tags:
+        - npm-packages
+      operationId: getNpmPackage
+      description: >-
+        The package summary: its latest version and when it was created. The detail of one version is `versions/{version}`.
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/NpmPackageInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a npm package
+    delete:
+      tags:
+        - npm-packages
+      operationId: deleteNpmPackage
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: No Content
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Delete a npm package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/{packageName}/versions":
+    get:
+      tags:
+        - npm-packages
+      operationId: listNpmPackageVersions
+      description: >-
+        Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `createdAt,desc`.
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: q
+          in: query
+          required: false
+          description: >-
+            Only versions that contain this text.
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PagedModelPackageVersionListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: List versions of a npm package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
   "/api/npm/packages/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
-        - npm-package-api-controller
+        - npm-packages
       operationId: getNpmPackageVersion
       parameters:
         - name: packageName
@@ -3132,7 +3685,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
+                "$ref": "#/components/schemas/PackageVersionDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -3142,7 +3695,7 @@ paths:
       summary: Get a specific npm package version
     delete:
       tags:
-        - npm-package-api-controller
+        - npm-packages
       operationId: deleteNpmPackageVersion
       parameters:
         - name: packageName
@@ -3156,12 +3709,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3179,93 +3728,11 @@ paths:
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/{scope}/{packageName}/versions/{version}":
+  "/api/npm/packages/{repoName}/{packageName}/tags":
     get:
       tags:
-        - npm-package-api-controller
-      operationId: getNpmScopedPackageVersion
-      parameters:
-        - name: scope
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: version
-          in: path
-          required: true
-          schema:
-            type: string
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Get a specific scoped npm package version
-    delete:
-      tags:
-        - npm-package-api-controller
-      operationId: deleteNpmScopedPackageVersion
-      parameters:
-        - name: scope
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: version
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete a specific scoped npm package version
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  "/api/npm/packages/{repoName}/{packageName}":
-    get:
-      tags:
-        - npm-package-api-controller
-      operationId: getNpmPackage
+        - npm-packages
+      operationId: listNpmPackageTags
       parameters:
         - name: packageName
           in: path
@@ -3281,114 +3748,16 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
+                type: array
+                items:
+                  "$ref": "#/components/schemas/PackageDistributionTagMapListItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: Get an npm package
-    delete:
-      tags:
-        - npm-package-api-controller
-      operationId: deleteNpmPackage
-      parameters:
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete an npm package
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  "/api/npm/packages/{repoName}/{scope}/{packageName}":
-    get:
-      tags:
-        - npm-package-api-controller
-      operationId: getNpmScopedPackage
-      parameters:
-        - name: scope
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Get a scoped npm package
-    delete:
-      tags:
-        - npm-package-api-controller
-      operationId: deleteScopedNpmPackage
-      parameters:
-        - name: scope
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete a scoped npm package
+      summary: List dist-tags for a npm package
     parameters:
       - name: repoName
         in: path
@@ -3398,7 +3767,7 @@ paths:
   "/api/npm/scopes/{repoName}/packages":
     get:
       tags:
-        - npm-scope-api-controller
+        - npm-scopes
       operationId: listUnscopedNpmPackages
       description: >-
         Sortable by `id`, `name`, `scope`, `latestVersion`, `updatedAt` (`property,direction`). The
@@ -3423,7 +3792,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
+                "$ref": "#/components/schemas/PagedModelNpmPackageListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3442,7 +3811,7 @@ paths:
   "/api/npm/scopes/{repoName}/{scope}/packages":
     get:
       tags:
-        - npm-scope-api-controller
+        - npm-scopes
       operationId: listNpmPackagesByScope
       description: >-
         Sortable by `id`, `name`, `scope`, `latestVersion`, `updatedAt` (`property,direction`). The
@@ -3472,7 +3841,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
+                "$ref": "#/components/schemas/PagedModelNpmPackageListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3488,29 +3857,25 @@ paths:
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/package/{packageName}/versions":
+  "/api/npm/scopes/{repoName}/{scope}/packages/{packageName}":
     get:
       tags:
-        - npm-package-api-controller
-      operationId: listNpmPackageVersions
+        - npm-scopes
+      operationId: getNpmScopedPackage
       description: >-
-        Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
+        The package summary: its latest version and when it was created. The detail of one version is `versions/{version}`.
       parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the package is `@scope/packageName`.
+          schema:
+            type: string
         - name: packageName
           in: path
           required: true
           schema:
             type: string
-        - name: q
-          in: query
-          required: false
-          description: >-
-            Only versions that contain this text.
-          schema:
-            type: string
-        - "$ref": "#/components/parameters/Page"
-        - "$ref": "#/components/parameters/Size"
-        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -3520,33 +3885,62 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageVersionListItem"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
+                "$ref": "#/components/schemas/NpmPackageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: List versions of an npm package
+      summary: Get a scoped npm package
+    delete:
+      tags:
+        - npm-scopes
+      operationId: deleteScopedNpmPackage
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the package is `@scope/packageName`.
+          schema:
+            type: string
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: No Content
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Delete a scoped npm package
     parameters:
       - name: repoName
         in: path
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/{scope}/package/{packageName}/versions":
+  "/api/npm/scopes/{repoName}/{scope}/packages/{packageName}/versions":
     get:
       tags:
-        - npm-package-api-controller
+        - npm-scopes
       operationId: listNpmScopedPackageVersions
       description: >-
-        Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
+        Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `createdAt,desc`.
       parameters:
         - name: scope
           in: path
           required: true
+          description: The npm scope without the `@`; the package is `@scope/packageName`.
           schema:
             type: string
         - name: packageName
@@ -3573,7 +3967,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageVersionListItem"
+                "$ref": "#/components/schemas/PagedModelPackageVersionListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3589,13 +3983,24 @@ paths:
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/package/{packageName}/tags":
+  "/api/npm/scopes/{repoName}/{scope}/packages/{packageName}/versions/{version}":
     get:
       tags:
-        - npm-package-api-controller
-      operationId: listNpmPackageTags
+        - npm-scopes
+      operationId: getNpmScopedPackageVersion
       parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the package is `@scope/packageName`.
+          schema:
+            type: string
         - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
           in: path
           required: true
           schema:
@@ -3609,29 +4014,65 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseListPackageDistributionTagMapListItem"
+                "$ref": "#/components/schemas/PackageVersionDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
           "$ref": "#/components/responses/TooManyRequests"
-      summary: List dist-tags for an npm package
+      summary: Get a specific scoped npm package version
+    delete:
+      tags:
+        - npm-scopes
+      operationId: deleteNpmScopedPackageVersion
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          description: The npm scope without the `@`; the package is `@scope/packageName`.
+          schema:
+            type: string
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: No Content
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Delete a specific scoped npm package version
     parameters:
       - name: repoName
         in: path
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/{scope}/package/{packageName}/tags":
+  "/api/npm/scopes/{repoName}/{scope}/packages/{packageName}/tags":
     get:
       tags:
-        - npm-package-api-controller
+        - npm-scopes
       operationId: listNpmScopedPackageTags
       parameters:
         - name: scope
           in: path
           required: true
+          description: The npm scope without the `@`; the package is `@scope/packageName`.
           schema:
             type: string
         - name: packageName
@@ -3648,7 +4089,9 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseListPackageDistributionTagMapListItem"
+                type: array
+                items:
+                  "$ref": "#/components/schemas/PackageDistributionTagMapListItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -3666,7 +4109,7 @@ paths:
   "/api/nuget/packages/{repoName}":
     get:
       tags:
-        - nuget-package-controller
+        - nuget-packages
       operationId: searchNugetPackages
       description: >-
         Sortable by `packageId` (`property,direction`).
@@ -3691,7 +4134,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelNuGetPackageListItem"
+                "$ref": "#/components/schemas/PagedModelNuGetPackageListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3711,7 +4154,7 @@ paths:
   "/api/nuget/packages/{repoName}/{packageName}":
     get:
       tags:
-        - nuget-package-controller
+        - nuget-packages
       operationId: getNugetPackage
       parameters:
         - name: packageName
@@ -3728,7 +4171,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseNuGetPackageInfo"
+                "$ref": "#/components/schemas/NuGetPackageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -3738,7 +4181,7 @@ paths:
       summary: Get a NuGet package
     delete:
       tags:
-        - nuget-package-controller
+        - nuget-packages
       operationId: deleteNugetPackage
       parameters:
         - name: packageName
@@ -3747,12 +4190,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseNuGetDeletedItem"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3772,7 +4211,7 @@ paths:
   "/api/nuget/packages/{repoName}/{packageName}/versions":
     get:
       tags:
-        - nuget-package-controller
+        - nuget-packages
       operationId: listNugetVersions
       description: >-
         Sortable by `version`, `publishedAt` (`property,direction`).
@@ -3802,7 +4241,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelNuGetVersionListItem"
+                "$ref": "#/components/schemas/PagedModelNuGetVersionListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3819,10 +4258,10 @@ paths:
         schema:
           type: string
 
-  "/api/nuget/packages/{repoName}/{packageName}/{version}":
+  "/api/nuget/packages/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
-        - nuget-package-controller
+        - nuget-packages
       operationId: getNugetVersion
       parameters:
         - name: packageName
@@ -3844,7 +4283,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseNuGetVersionInfo"
+                "$ref": "#/components/schemas/NuGetVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -3854,7 +4293,7 @@ paths:
       summary: Get a specific NuGet package version
     delete:
       tags:
-        - nuget-package-controller
+        - nuget-packages
       operationId: deleteNugetVersion
       parameters:
         - name: packageName
@@ -3868,12 +4307,8 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseNuGetDeletedItem"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -3893,7 +4328,7 @@ paths:
   "/api/pypi/packages/{repoName}":
     get:
       tags:
-        - pypi-package-controller
+        - pypi-packages
       operationId: listPypiPackages
       description: >-
         Sortable by `id`, `name`, `latestVersion`, `updatedAt` (`property,direction`). The default is
@@ -3918,7 +4353,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPypiPackageListItem"
+                "$ref": "#/components/schemas/PagedModelPypiPackageListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -3934,274 +4369,15 @@ paths:
         required: true
         schema:
           type: string
-  "/api/pypi/packages/{repoName}/{packageName}/releases":
+  "/api/pypi/packages/{repoName}/{packageName}/versions":
     get:
       tags:
-        - pypi-package-controller
-      operationId: listPypiReleases
+        - pypi-packages
+      operationId: listPypiVersions
       description: >-
         Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
       parameters:
         - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: q
-          in: query
-          required: false
-          description: >-
-            Only releases whose version contains this text.
-          schema:
-            type: string
-        - "$ref": "#/components/parameters/Page"
-        - "$ref": "#/components/parameters/Size"
-        - "$ref": "#/components/parameters/Sort"
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelReleaseListItem"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: List releases of a PyPI package
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  "/api/pypi/packages/{repoName}/{packageName}/releases/{version}":
-    get:
-      tags:
-        - pypi-package-controller
-      operationId: getPypiRelease
-      parameters:
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: version
-          in: path
-          required: true
-          schema:
-            type: string
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseReleaseDetail"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Get a specific PyPI package release
-    delete:
-      tags:
-        - pypi-package-controller
-      operationId: deletePypiRelease
-      parameters:
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: version
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete a specific PyPI package release
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  "/api/pypi/packages/{repoName}/{packageName}":
-    get:
-      tags:
-        - pypi-package-controller
-      operationId: getPypiPackage
-      parameters:
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseReleaseDetail"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Get a PyPI package
-    delete:
-      tags:
-        - pypi-package-controller
-      operationId: deletePypiPackage
-      parameters:
-        - name: packageName
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
-      summary: Delete a PyPI package
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  # region: ruby
-  "/api/ruby/gems/{repoName}":
-    get:
-      tags:
-        - ruby-gem-api-controller
-      operationId: listGems
-      description: >-
-        Sortable by `id`, `name`, `updatedAt` (`property,direction`).
-      parameters:
-        - name: q
-          in: query
-          required: false
-          description: >-
-            Only gems whose name contains this text.
-          schema:
-            type: string
-        - "$ref": "#/components/parameters/Page"
-        - "$ref": "#/components/parameters/Size"
-        - "$ref": "#/components/parameters/Sort"
-      security:
-        - { }
-        - bearerAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelGemListItem"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: List gems in a Ruby repository
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  "/api/ruby/gems/{repoName}/{gemName}":
-    delete:
-      tags:
-        - ruby-gem-api-controller
-      operationId: deleteGem
-      parameters:
-        - name: gemName
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Delete a Ruby gem
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
-  "/api/ruby/gems/{repoName}/{gemName}/versions":
-    get:
-      tags:
-        - ruby-gem-api-controller
-      operationId: listGemVersions
-      description: >-
-        Sortable by `id`, `version`, `createdAt` (`property,direction`).
-      parameters:
-        - name: gemName
           in: path
           required: true
           schema:
@@ -4225,7 +4401,283 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelGemVersionListItem"
+                "$ref": "#/components/schemas/PagedModelReleaseListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: List versions of a PyPI package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/pypi/packages/{repoName}/{packageName}/versions/{version}":
+    get:
+      tags:
+        - pypi-packages
+      operationId: getPypiVersion
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ReleaseDetail"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a version of a PyPI package
+    delete:
+      tags:
+        - pypi-packages
+      operationId: deletePypiVersion
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: No Content
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Delete a version of a PyPI package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/pypi/packages/{repoName}/{packageName}":
+    get:
+      tags:
+        - pypi-packages
+      operationId: getPypiPackage
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PypiPackageInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a PyPI package
+    delete:
+      tags:
+        - pypi-packages
+      operationId: deletePypiPackage
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: No Content
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      summary: Delete a PyPI package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  # region: ruby
+  "/api/ruby/gems/{repoName}":
+    get:
+      tags:
+        - ruby-gems
+      operationId: listGems
+      description: >-
+        Sortable by `id`, `name`, `updatedAt` (`property,direction`).
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: >-
+            Only gems whose name contains this text.
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PagedModelGemListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: List gems in a Ruby repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/ruby/gems/{repoName}/{packageName}":
+    get:
+      tags:
+        - ruby-gems
+      operationId: getGem
+      description: >-
+        The gem summary: its latest version, described by that version's gemspec fields.
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GemPackageInfo"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Get a Ruby gem
+    delete:
+      tags:
+        - ruby-gems
+      operationId: deleteGem
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: No Content
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Delete a Ruby gem
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/ruby/gems/{repoName}/{packageName}/versions":
+    get:
+      tags:
+        - ruby-gems
+      operationId: listGemVersions
+      description: >-
+        Sortable by `id`, `version`, `createdAt` (`property,direction`).
+      parameters:
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: q
+          in: query
+          required: false
+          description: >-
+            Only versions that contain this text.
+          schema:
+            type: string
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
+      security:
+        - { }
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PagedModelGemVersionListItem"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -4241,13 +4693,13 @@ paths:
         required: true
         schema:
           type: string
-  "/api/ruby/gems/{repoName}/{gemName}/versions/{version}":
+  "/api/ruby/gems/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
-        - ruby-gem-api-controller
+        - ruby-gems
       operationId: getGemVersion
       parameters:
-        - name: gemName
+        - name: packageName
           in: path
           required: true
           schema:
@@ -4272,7 +4724,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseGemVersionInfo"
+                "$ref": "#/components/schemas/GemVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -4282,10 +4734,10 @@ paths:
       summary: Get a specific Ruby gem version
     delete:
       tags:
-        - ruby-gem-api-controller
+        - ruby-gems
       operationId: deleteGemVersion
       parameters:
-        - name: gemName
+        - name: packageName
           in: path
           required: true
           schema:
@@ -4302,12 +4754,8 @@ paths:
             type: string
             default: 'ruby'
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          description: No Content
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -4371,6 +4819,16 @@ components:
         type: array
         items:
           type: string
+    # region: docker
+    DockerImage:
+      name: image
+      in: query
+      required: false
+      description: >-
+        The full name of a Docker image whose name has several segments (`team/app`). Pass `-` as
+        `{imageName}` then. Without it, `{imageName}` is the name.
+      schema:
+        type: string
   responses:
     # region: shared
     BadRequest:
@@ -4528,33 +4986,6 @@ components:
             this setting.
         type:
           "$ref": "#/components/schemas/RepoType"
-    RestResponseVoid:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data: { }
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseString:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: string
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     LoginInfo:
       type: object
       properties:
@@ -4563,20 +4994,6 @@ components:
         token:
           type: string
         refreshToken:
-          type: string
-    RestResponseLoginInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/LoginInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
           type: string
     PageMetadata:
       type: object
@@ -4593,31 +5010,6 @@ components:
         totalPages:
           type: integer
           format: int64
-    ResponseType:
-      type: string
-      enum:
-        - ERROR
-        - SUCCESS
-        - WARNING
-    EmptyResponse:
-      type: object
-      description: >-
-        The envelope of a successful request that returns no data: `msgId`, `type`, `text`,
-        `errorCode` (always null) and `data`. Failures do not use it; they are a `ProblemDetail`.
-      properties:
-        msgId:
-          type: string
-          example: userDeleted
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        text:
-          type: string
-        errorCode:
-          type: string
-          format: uuid
-        data:
-          type: string
-          description: A detail about the result, or null when there is none.
     ProblemDetail:
       type: object
       description: >-
@@ -4684,22 +5076,6 @@ components:
       enum:
         - USER
         - ADMIN
-    RestResponseListString:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: array
-          items:
-            type: string
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     RepoType:
       type: string
       description: >-
@@ -4760,20 +5136,6 @@ components:
       required:
         - username
         - role
-    RestResponseUserResponse:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/UserResponse"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     UserResponse:
       type: object
       properties:
@@ -4826,35 +5188,6 @@ components:
             "$ref": "#/components/schemas/UserResponse"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelUserResponse:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelUserResponse"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseLong:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: integer
-          format: int64
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: profile
     UpdateUsernameForm:
       type: object
@@ -4906,20 +5239,6 @@ components:
         - diskUsage
         - createdAt
         - lastLoginAt
-    RestResponseProfileInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/ProfileInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: repos
     RepoSettingsForm:
       type: object
@@ -4937,8 +5256,10 @@ components:
             When false, uploading a version that already exists is refused. Maven: a release, and a
             timestamped snapshot build, cannot be replaced, but a non-unique snapshot (the literal
             -SNAPSHOT file names that sbt and Ivy deploy every time) can always be deployed again,
-            unless snapshots is false. Ignored (not rejected) for Cargo and Go, which never replace
-            a published version.
+            unless snapshots is false. Docker: a tag that points at a manifest cannot be moved to
+            another manifest; pushing the same manifest again, or a manifest by digest, is always
+            accepted. Ignored (not rejected) for Cargo and Go, which never replace a published
+            version.
         releases:
           type: boolean
           nullable: false
@@ -5072,8 +5393,9 @@ components:
             When false, uploading a version that already exists is refused. Maven: a release, and a
             timestamped snapshot build, cannot be replaced, but a non-unique snapshot (the literal
             -SNAPSHOT file names that sbt and Ivy deploy every time) can always be deployed again,
-            unless snapshots is false. Omitted for Cargo and Go, which never replace a published
-            version.
+            unless snapshots is false. Docker: a tag that points at a manifest cannot be moved to
+            another manifest; pushing the same manifest again, or a manifest by digest, is always
+            accepted. Omitted for Cargo and Go, which never replace a published version.
         securityScanEnabled:
           type: boolean
           nullable: false
@@ -5135,20 +5457,6 @@ components:
             answer is 400 `deployTokenExpirationTooLate`. Defaults to 365 days from now.
       required:
         - name
-    RestResponseTokenInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/TokenInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     TokenInfo:
       type: object
       properties:
@@ -5180,20 +5488,6 @@ components:
         - canWrite
         - canManage
         - private
-    RestResponseRepoPermissionInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/RepoPermissionInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     DeployTokenInfoListItem:
       type: object
       properties:
@@ -5227,36 +5521,8 @@ components:
             "$ref": "#/components/schemas/DeployTokenInfoListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelDeployTokenInfoListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelDeployTokenInfoListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ProtocolApiFacadeMavenAdapter: { }
     # region: usage
-    RestResponseTotalUsageInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/TotalUsageInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     TotalUsageInfo:
       type: object
       properties:
@@ -5278,20 +5544,6 @@ components:
       properties:
         diskUsed:
           "$ref": "#/components/schemas/UsageInfo"
-    RestResponseRepoUsageInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/RepoUsageInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: scans
     ScanStatus:
       type: string
@@ -5511,20 +5763,6 @@ components:
       type: object
       additionalProperties:
         "$ref": "#/components/schemas/RepoSecuritySummary"
-    RestResponseSecuritySummary:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/SecuritySummary"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     VersionSecuritySummary:
       type: object
       properties:
@@ -5584,20 +5822,6 @@ components:
       type: object
       additionalProperties:
         "$ref": "#/components/schemas/VersionSecuritySummary"
-    RestResponseVersionSecuritySummaryMap:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/VersionSecuritySummaryMap"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelVulnerabilityScanInfo:
       type: object
       properties:
@@ -5607,20 +5831,6 @@ components:
             "$ref": "#/components/schemas/VulnerabilityScanInfo"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelVulnerabilityScanInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelVulnerabilityScanInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelVulnerabilityFindingInfo:
       type: object
       properties:
@@ -5630,20 +5840,6 @@ components:
             "$ref": "#/components/schemas/VulnerabilityFindingInfo"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelVulnerabilityFindingInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelVulnerabilityFindingInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     RecentScannedVersion:
       type: object
       properties:
@@ -5697,20 +5893,6 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/RecentScannedVersion"
-    RestResponseRepoSecurityDetail:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/RepoSecurityDetail"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     SecurityScansSummary:
       type: object
       properties:
@@ -5732,62 +5914,6 @@ components:
         totalCount:
           type: integer
           format: int32
-    RestResponseSecurityScansSummary:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/SecurityScansSummary"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseVulnerabilityScanInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/VulnerabilityScanInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseVulnerabilityScanDetail:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/VulnerabilityScanDetail"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseScanOverview:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/ScanOverview"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: cargo
     CrateListItem:
       type: object
@@ -5813,20 +5939,6 @@ components:
             "$ref": "#/components/schemas/CrateListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelCrateListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelCrateListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     CrateInfo:
       type: object
       properties:
@@ -5862,20 +5974,6 @@ components:
         totalDownloads:
           type: integer
           format: int64
-    RestResponseCrateInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/CrateInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     CrateVersionInfo:
       type: object
       properties:
@@ -5935,20 +6033,6 @@ components:
           type: string
         packageName:
           type: string
-    RestResponseCrateVersionInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/CrateVersionInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     CrateVersionListItem:
       type: object
       properties:
@@ -5968,21 +6052,76 @@ components:
             "$ref": "#/components/schemas/CrateVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelCrateVersionListItem:
+    # region: docker
+    CleanupPolicyForm:
       type: object
       properties:
-        msgId:
+        enabled:
+          type: boolean
+          description: Ignored; enable or disable the policy through `/status`.
+        cadence:
           type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelCrateVersionListItem"
-        errorCode:
+          enum:
+            - DAILY
+            - WEEKLY
+            - BIWEEKLY
+            - MONTHLY
+            - QUARTERLY
+        keepLastN:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 1
+        keepDays:
+          type: integer
+          format: int32
+          maximum: 90
+          minimum: 7
+        nameRegex:
           type: string
-          nullable: true
-        text:
+        nameRegexKeep:
           type: string
-    # region: docker
+      required:
+        - cadence
+        - nameRegex
+    CleanupPolicyItem:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        cadence:
+          type: string
+          enum:
+            - DAILY
+            - WEEKLY
+            - BIWEEKLY
+            - MONTHLY
+            - QUARTERLY
+        keepLastN:
+          type: integer
+          format: int32
+        keepDays:
+          type: integer
+          format: int32
+        nameRegex:
+          type: string
+        nameRegexKeep:
+          type: string
+        lastRunAt:
+          type: string
+          format: date-time
+          description: When the policy last ran, absent if it never did.
+        nextRunAt:
+          type: string
+          format: date-time
+          description: When the policy runs next, absent while it is disabled.
+    CleanupPolicyStatusForm:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      required:
+        - enabled
     UntaggedManifestCleanupResult:
       type: object
       properties:
@@ -6002,20 +6141,6 @@ components:
           type: integer
           format: int64
           description: Sum of the sizes of those layers; refunded to the usage as the blobs go.
-    RestResponseUntaggedManifestCleanupResult:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/UntaggedManifestCleanupResult"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ImageListItem:
       type: object
       description: >-
@@ -6054,20 +6179,6 @@ components:
             Size of the distinct layers (config blobs included) that untagged manifests link to and
             no manifest a tag reaches (through indexes of any depth) links to. For an image without
             tags, all it stores.
-    RestResponseImageListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/ImageListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelImageListItem:
       type: object
       properties:
@@ -6077,20 +6188,6 @@ components:
             "$ref": "#/components/schemas/ImageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelImageListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelImageListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ImageTagListItem:
       type: object
       properties:
@@ -6110,20 +6207,6 @@ components:
             "$ref": "#/components/schemas/ImageTagListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelImageTagListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelImageTagListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ManifestListItem:
       type: object
       properties:
@@ -6147,34 +6230,6 @@ components:
             "$ref": "#/components/schemas/ManifestListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelManifestListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelManifestListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseTagDetail:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/TagDetail"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     TagDetail:
       type: object
       properties:
@@ -6220,20 +6275,6 @@ components:
             "$ref": "#/components/schemas/GoModuleListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelGoModuleListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelGoModuleListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     GoModuleVersionListItem:
       type: object
       properties:
@@ -6256,20 +6297,6 @@ components:
             "$ref": "#/components/schemas/GoModuleVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelGoModuleVersionListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelGoModuleVersionListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     GoModuleInfo:
       type: object
       properties:
@@ -6287,20 +6314,6 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/GoModuleVersionListItem"
-    RestResponseGoModuleInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/GoModuleInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: helm
     HelmChartListItem:
       type: object
@@ -6340,6 +6353,27 @@ components:
         createdAt:
           type: string
           format: date-time
+    HelmChartSummary:
+      type: object
+      description: >-
+        A chart as its latest version describes it.
+      properties:
+        name:
+          type: string
+        latestVersion:
+          type: string
+        description:
+          type: string
+          nullable: true
+        appVersion:
+          type: string
+          nullable: true
+        type:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
     HelmChartDetail:
       type: object
       properties:
@@ -6368,6 +6402,15 @@ components:
           type: string
           format: date-time
           nullable: true
+    PagedModelHelmChartVersionItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/HelmChartVersionItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
     PagedModelHelmChartListItem:
       type: object
       properties:
@@ -6377,50 +6420,6 @@ components:
             "$ref": "#/components/schemas/HelmChartListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelHelmChartListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelHelmChartListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseListHelmChartVersionItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: array
-          items:
-            "$ref": "#/components/schemas/HelmChartVersionItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseHelmChartDetail:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/HelmChartDetail"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: maven
     ArtifactListItem:
       type: object
@@ -6445,20 +6444,6 @@ components:
             "$ref": "#/components/schemas/ArtifactListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelArtifactListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelArtifactListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     MavenGroupSummary:
       type: object
       description: >-
@@ -6476,20 +6461,6 @@ components:
         - groupName
         - artifactCount
         - versionCount
-    RestResponseMavenGroupSummary:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/MavenGroupSummary"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ArtifactVersionListItem:
       type: object
       properties:
@@ -6513,20 +6484,6 @@ components:
             "$ref": "#/components/schemas/ArtifactVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelArtifactVersionListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelArtifactVersionListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ArtifactVersionInfo:
       type: object
       properties:
@@ -6591,20 +6548,6 @@ components:
             True when the POM signature was verified or, on a repository with
             pgpVerifyAllSignaturesEnabled, when every file of the version has a verified signature
             (for a snapshot, every file of its newest build).
-    RestResponseArtifactVersionInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/ArtifactVersionInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     VersionDeveloperInfo:
       type: object
       properties:
@@ -6618,24 +6561,6 @@ components:
         name:
           type: string
         url:
-          type: string
-    RestResponseDeletedItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: string
-          enum:
-            - VERSION
-            - ARTIFACT
-            - GROUP
-        errorCode:
-          type: string
-          nullable: true
-        text:
           type: string
     # region: mvn-key-stores
     AllowedKeyserverItem:
@@ -6652,22 +6577,6 @@ components:
         - id
         - host
         - displayName
-    RestResponseListAllowedKeyserverItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: array
-          items:
-            "$ref": "#/components/schemas/AllowedKeyserverItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     KeyStoreForm:
       type: object
       properties:
@@ -6694,20 +6603,6 @@ components:
         - allowedKeyserverId
         - host
         - displayName
-    RestResponseKeyStoreItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/KeyStoreItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PgpPublicKeyForm:
       type: object
       properties:
@@ -6740,20 +6635,6 @@ components:
         - keyId
         - fingerprint
         - createdAt
-    RestResponsePgpPublicKeyItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PgpPublicKeyItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelKeyStoreItem:
       type: object
       properties:
@@ -6763,20 +6644,6 @@ components:
             "$ref": "#/components/schemas/KeyStoreItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelKeyStoreItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelKeyStoreItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelPgpPublicKeyItem:
       type: object
       properties:
@@ -6786,20 +6653,6 @@ components:
             "$ref": "#/components/schemas/PgpPublicKeyItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelPgpPublicKeyItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelPgpPublicKeyItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: npm
     NpmPackageListItem:
       type: object
@@ -6813,6 +6666,20 @@ components:
         updatedAt:
           type: string
           format: date-time
+    NpmPackageInfo:
+      type: object
+      properties:
+        scopeName:
+          type: string
+          nullable: true
+          description: The scope without the `@`; absent for an unscoped package.
+        packageName:
+          type: string
+        latestVersion:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
     PagedModelNpmPackageListItem:
       type: object
       properties:
@@ -6822,20 +6689,6 @@ components:
             "$ref": "#/components/schemas/NpmPackageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelNpmPackageListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelNpmPackageListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PackageDistributionTagListItem:
       type: object
       properties:
@@ -6910,20 +6763,6 @@ components:
         createdAt:
           type: string
           format: date-time
-    RestResponsePackageVersionDetail:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PackageVersionDetail"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PackageVersionListItem:
       type: object
       properties:
@@ -6943,42 +6782,12 @@ components:
             "$ref": "#/components/schemas/PackageVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelPackageVersionListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelPackageVersionListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PackageDistributionTagMapListItem:
       type: object
       properties:
         version:
           type: string
         tag:
-          type: string
-    RestResponseListPackageDistributionTagMapListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: array
-          items:
-            "$ref": "#/components/schemas/PackageDistributionTagMapListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
           type: string
     # region: nuget
     NuGetDependencyInfo:
@@ -7107,48 +6916,6 @@ components:
       enum:
         - PACKAGE
         - VERSION
-    RestResponseNuGetDeletedItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/NuGetDeletedItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseNuGetPackageInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/NuGetPackageInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseNuGetVersionInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/NuGetVersionInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelNuGetPackageListItem:
       type: object
       properties:
@@ -7158,20 +6925,6 @@ components:
             "$ref": "#/components/schemas/NuGetPackageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelNuGetPackageListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelNuGetPackageListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelNuGetVersionListItem:
       type: object
       properties:
@@ -7181,20 +6934,6 @@ components:
             "$ref": "#/components/schemas/NuGetVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelNuGetVersionListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelNuGetVersionListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: pypi
     PypiPackageListItem:
       type: object
@@ -7208,6 +6947,20 @@ components:
         updatedAt:
           type: string
           format: date-time
+    PypiPackageInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        stableVersion:
+          type: string
+        latestVersion:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - name
     PagedModelPypiPackageListItem:
       type: object
       properties:
@@ -7217,20 +6970,6 @@ components:
             "$ref": "#/components/schemas/PypiPackageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelPypiPackageListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelPypiPackageListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     PagedModelReleaseListItem:
       type: object
       properties:
@@ -7256,20 +6995,6 @@ components:
           type: boolean
         devRelease:
           type: boolean
-    RestResponsePagedModelReleaseListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelReleaseListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     ReleaseClassifierInfo:
       type: object
       properties:
@@ -7331,20 +7056,6 @@ components:
           type: string
         url:
           type: string
-    RestResponseReleaseDetail:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/ReleaseDetail"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: ruby
     GemListItem:
       type: object
@@ -7365,20 +7076,25 @@ components:
             "$ref": "#/components/schemas/GemListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelGemListItem:
+    GemPackageInfo:
       type: object
       properties:
-        msgId:
+        name:
           type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelGemListItem"
-        errorCode:
+        latestVersion:
           type: string
-          nullable: true
-        text:
+        description:
           type: string
+        authors:
+          type: string
+        homepage:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     GemVersionListItem:
       type: object
       properties:
@@ -7400,20 +7116,6 @@ components:
             "$ref": "#/components/schemas/GemVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelGemVersionListItem:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelGemVersionListItem"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     GemDependencyInfo:
       type: object
       properties:
@@ -7456,17 +7158,3 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/GemDependencyInfo"
-    RestResponseGemVersionInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/GemVersionInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string

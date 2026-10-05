@@ -15,7 +15,7 @@
 
 import { of, Subject, throwError } from 'rxjs';
 
-import { DockerImageControllerService } from '../../../../../../generated/api';
+import { DockerRepoCleanupApi } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { permission } from '../../testing/protocol-service-spec-helpers';
@@ -23,14 +23,12 @@ import { DeleteOrphanLayersComponent } from './delete-orphan-layers.component';
 
 describe('DeleteOrphanLayersComponent', () => {
   let component: DeleteOrphanLayersComponent;
-  let dockerService: jasmine.SpyObj<DockerImageControllerService>;
+  let dockerService: jasmine.SpyObj<DockerRepoCleanupApi>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
 
   beforeEach(() => {
-    dockerService = jasmine.createSpyObj<DockerImageControllerService>('DockerImageControllerService', [
-      'deleteDockerOrphanLayers',
-    ]);
+    dockerService = jasmine.createSpyObj<DockerRepoCleanupApi>('DockerRepoCleanupApi', ['deleteDockerOrphanLayers']);
     dockerService.deleteDockerOrphanLayers.and.returnValue(of({}) as never);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();

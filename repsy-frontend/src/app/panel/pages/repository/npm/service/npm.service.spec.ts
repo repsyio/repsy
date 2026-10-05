@@ -15,11 +15,7 @@
 
 import { TestBed } from '@angular/core/testing';
 
-import {
-  NpmPackageApiControllerService,
-  NpmScopeApiControllerService,
-  ProtocolRepoControllerService,
-} from '../../../../../../generated/api';
+import { NpmPackagesApi, NpmScopesApi, ReposApi } from '../../../../../../generated/api';
 import {
   CallCase,
   describeCalls,
@@ -30,7 +26,6 @@ import {
   PAGE_SIZE,
   PagedCase,
   REPO,
-  restResponse,
   selectRepo,
   SORT,
 } from '../../testing/protocol-service-spec-helpers';
@@ -41,37 +36,35 @@ const PACKAGE = 'widget';
 const VERSION = '1.2.3';
 
 describe('NpmService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let packageApi: jasmine.SpyObj<NpmPackageApiControllerService>;
-  let scopeApi: jasmine.SpyObj<NpmScopeApiControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let packageApi: jasmine.SpyObj<NpmPackagesApi>;
+  let scopeApi: jasmine.SpyObj<NpmScopesApi>;
   let service: NpmService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoPermissions',
-    ]);
-    packageApi = jasmine.createSpyObj<NpmPackageApiControllerService>('NpmPackageApiControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoPermissions']);
+    packageApi = jasmine.createSpyObj<NpmPackagesApi>('NpmPackagesApi', [
       'listNpmPackages',
-      'listNpmScopedPackageVersions',
       'listNpmPackageVersions',
-      'listNpmScopedPackageTags',
       'listNpmPackageTags',
-      'getNpmScopedPackageVersion',
       'getNpmPackageVersion',
-      'deleteScopedNpmPackage',
       'deleteNpmPackage',
-      'deleteNpmScopedPackageVersion',
       'deleteNpmPackageVersion',
     ]);
-    scopeApi = jasmine.createSpyObj<NpmScopeApiControllerService>('NpmScopeApiControllerService', [
+    scopeApi = jasmine.createSpyObj<NpmScopesApi>('NpmScopesApi', [
       'listNpmPackagesByScope',
       'listUnscopedNpmPackages',
+      'listNpmScopedPackageVersions',
+      'listNpmScopedPackageTags',
+      'getNpmScopedPackageVersion',
+      'deleteScopedNpmPackage',
+      'deleteNpmScopedPackageVersion',
     ]);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: NpmPackageApiControllerService, useValue: packageApi },
-        { provide: NpmScopeApiControllerService, useValue: scopeApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: NpmPackagesApi, useValue: packageApi },
+        { provide: NpmScopesApi, useValue: scopeApi },
       ],
     });
     service = TestBed.inject(NpmService);
@@ -95,24 +88,28 @@ describe('NpmService', () => {
         invoke: (s, scope) => s.searchPackages(scope, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => packageApi.listNpmPackages,
         args: (scope) => [REPO, scope, ...PAGE_ARGS],
+        bare: true,
       },
       {
         name: 'searchScopedPackages',
         invoke: (s, name) => s.searchScopedPackages(SCOPE, name, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => scopeApi.listNpmPackagesByScope,
         args: (name) => [SCOPE, REPO, name, ...PAGE_ARGS],
+        bare: true,
       },
       {
         name: 'searchUnscopedPackages',
         invoke: (s, name) => s.searchUnscopedPackages(name, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => scopeApi.listUnscopedNpmPackages,
         args: (name) => [REPO, name, ...PAGE_ARGS],
+        bare: true,
       },
       {
         name: 'searchPackageVersions of a scoped package',
         invoke: (s, version) => s.searchPackageVersions(PACKAGE, SCOPE, version, SORT, PAGE_INDEX, PAGE_SIZE),
-        api: () => packageApi.listNpmScopedPackageVersions,
+        api: () => scopeApi.listNpmScopedPackageVersions,
         args: (version) => [SCOPE, PACKAGE, REPO, version, ...PAGE_ARGS],
+        bare: true,
         notCalled: () => [packageApi.listNpmPackageVersions],
       },
       {
@@ -120,7 +117,8 @@ describe('NpmService', () => {
         invoke: (s, version) => s.searchPackageVersions(PACKAGE, '', version, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => packageApi.listNpmPackageVersions,
         args: (version) => [PACKAGE, REPO, version, ...PAGE_ARGS],
-        notCalled: () => [packageApi.listNpmScopedPackageVersions],
+        bare: true,
+        notCalled: () => [scopeApi.listNpmScopedPackageVersions],
       },
     ];
     describePagedCalls(() => service, paged);
@@ -131,9 +129,9 @@ describe('NpmService', () => {
       {
         name: 'fetchPackageTags of a scoped package',
         invoke: (s) => s.fetchPackageTags(PACKAGE, SCOPE),
-        api: () => packageApi.listNpmScopedPackageTags,
+        api: () => scopeApi.listNpmScopedPackageTags,
         args: [SCOPE, PACKAGE, REPO],
-        response: restResponse(tags),
+        response: tags,
         expected: tags,
         notCalled: () => [packageApi.listNpmPackageTags],
       },
@@ -142,24 +140,24 @@ describe('NpmService', () => {
         invoke: (s) => s.fetchPackageTags(PACKAGE, ''),
         api: () => packageApi.listNpmPackageTags,
         args: [PACKAGE, REPO],
-        response: restResponse(tags),
+        response: tags,
         expected: tags,
-        notCalled: () => [packageApi.listNpmScopedPackageTags],
+        notCalled: () => [scopeApi.listNpmScopedPackageTags],
       },
       {
         name: 'fetchPackageTags without tag data',
         invoke: (s) => s.fetchPackageTags(PACKAGE, ''),
         api: () => packageApi.listNpmPackageTags,
         args: [PACKAGE, REPO],
-        response: restResponse(undefined),
+        response: undefined,
         expected: [],
       },
       {
         name: 'fetchPackageVersion of a scoped package',
         invoke: (s) => s.fetchPackageVersion(PACKAGE, SCOPE, VERSION),
-        api: () => packageApi.getNpmScopedPackageVersion,
+        api: () => scopeApi.getNpmScopedPackageVersion,
         args: [SCOPE, PACKAGE, VERSION, REPO],
-        response: restResponse(detail),
+        response: detail,
         expected: detail,
         notCalled: () => [packageApi.getNpmPackageVersion],
       },
@@ -168,16 +166,16 @@ describe('NpmService', () => {
         invoke: (s) => s.fetchPackageVersion(PACKAGE, '', VERSION),
         api: () => packageApi.getNpmPackageVersion,
         args: [PACKAGE, VERSION, REPO],
-        response: restResponse(detail),
+        response: detail,
         expected: detail,
-        notCalled: () => [packageApi.getNpmScopedPackageVersion],
+        notCalled: () => [scopeApi.getNpmScopedPackageVersion],
       },
       {
         name: 'deletePackage of a scoped package',
         invoke: (s) => s.deletePackage(PACKAGE, SCOPE),
-        api: () => packageApi.deleteScopedNpmPackage,
+        api: () => scopeApi.deleteScopedNpmPackage,
         args: [SCOPE, PACKAGE, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [packageApi.deleteNpmPackage],
       },
@@ -186,16 +184,16 @@ describe('NpmService', () => {
         invoke: (s) => s.deletePackage(PACKAGE, ''),
         api: () => packageApi.deleteNpmPackage,
         args: [PACKAGE, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
-        notCalled: () => [packageApi.deleteScopedNpmPackage],
+        notCalled: () => [scopeApi.deleteScopedNpmPackage],
       },
       {
         name: 'deletePackageVersion of a scoped package',
         invoke: (s) => s.deletePackageVersion(PACKAGE, SCOPE, VERSION),
-        api: () => packageApi.deleteNpmScopedPackageVersion,
+        api: () => scopeApi.deleteNpmScopedPackageVersion,
         args: [SCOPE, PACKAGE, VERSION, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [packageApi.deleteNpmPackageVersion],
       },
@@ -204,9 +202,9 @@ describe('NpmService', () => {
         invoke: (s) => s.deletePackageVersion(PACKAGE, '', VERSION),
         api: () => packageApi.deleteNpmPackageVersion,
         args: [PACKAGE, VERSION, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
-        notCalled: () => [packageApi.deleteNpmScopedPackageVersion],
+        notCalled: () => [scopeApi.deleteNpmScopedPackageVersion],
       },
     ];
     describeCalls(() => service, calls);

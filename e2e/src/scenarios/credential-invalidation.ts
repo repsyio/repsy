@@ -33,7 +33,7 @@
  *    (the credential is unknown, not merely not allowed);
  *  - nothing of the refused version is stored (an admin looks, `isStored`).
  *
- * Events: `PUT /api/profile/password` by the user, `DELETE /api/users/{id}` by an admin, a deploy token
+ * Events: `PATCH /api/profile/password` by the user, `DELETE /api/users/{id}` by an admin, a deploy token
  * revoked, a deploy token rotated. Only the password events go through the cache; the token ones have no
  * cache of their own and are here because the story names them and a real client is the proof that counts.
  *
@@ -44,7 +44,7 @@
  * OS `USER` account, which may use any repo, or a Repsy Cloud collaborator with a read/write grant on it. A
  * tenant that was merely registered has no grant on the repo, so its deploy would be refused for a reason
  * that is not the one under test (RPS-1481). A user that is not the one deploying or logging in (the
- * "other user" of a password change, the successor of a reused name) stays a plain `seeder.createUser()`.
+ * "other user" of a password change, the successor of a reused name is seeded like the deploying user, a grant included, RPS-1890) stays a plain `seeder.createUser()` only when it never uses the repo.
  *
  * RPS-1552 adds {@link registerLoginTokenInvalidation}: the same events seen through the token a client KEEPS
  * after logging in (a Docker `/v2/token` JWT, the token `npm login` stores, the Cargo `/me` token). Those
@@ -348,12 +348,22 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
 
       const formerApi = await createPanelBackend();
       await formerApi.login(former.username, former.password);
-      const renamed = await formerApi.rawRequest('PUT', '/api/profile/username', {
+      const renamed = await formerApi.rawRequest('PATCH', '/api/profile/username', {
         username: seeder.reserveUsername(),
       });
       expect(renamed.status, `rename: ${JSON.stringify(renamed.body)}`).toBe(200);
 
-      const successor = await seeder.createUser({ username: former.username });
+      // The successor deploys and logs in, so it is seeded through the target's `user-password` credential
+      // under the freed name (a Repsy Cloud tenant needs a grant on the repo, RPS-1890), not `createUser()`.
+      const successor = await seeder.backend.seedUserCredential({
+        seeder,
+        repoName: repo.name,
+        repoType: protocol.repoType,
+        username: former.username,
+      });
+      expect(successor.username, 'the successor was seeded under the freed name').toBe(
+        former.username,
+      );
 
       await endedSession(
         repo.name,
@@ -361,7 +371,7 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
         'the old login token, the name now belongs to another user',
       );
 
-      const fresh = await protocol.login(repo.name, successor.username, successor.password);
+      const fresh = await protocol.login(repo.name, former.username, successor.password!);
       await accepted(repo.name, fresh, 'the token of the new owner of the name');
     });
 
@@ -376,13 +386,14 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
         const token = await protocol.login(repo.name, user.username, user.password);
         await accepted(repo.name, token, 'the login token before the reset');
 
-        // The admin's own session (`panelApi`); the reset answers the generated password as the envelope's data.
+        // The admin's own session (`panelApi`); the reset answers the generated password as a bare JSON string.
         const reset = await panelApi.rawRequest(
           'POST',
           `/api/users/${user.id}/actions/reset-password`,
         );
         expect(reset.status, `reset-password: ${JSON.stringify(reset.body)}`).toBe(200);
-        const generated = String(reset.body.data);
+        // The body is the bare string, typed as the generic `{ data?: unknown }` of `rawRequest`.
+        const generated = String(reset.body as unknown);
 
         await endedSession(repo.name, token, 'the login token after the admin reset');
         const fresh = await protocol.login(repo.name, user.username, generated);

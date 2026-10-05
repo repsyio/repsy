@@ -93,7 +93,7 @@ test.describe('panel access token binding (RPS-1604)', { tag: ['@smoke'] }, () =
 
       expect((await call(path, token)).status).toBe(200);
 
-      const renamed = await formerApi.rawRequest('PUT', '/api/profile/username', {
+      const renamed = await formerApi.rawRequest('PATCH', '/api/profile/username', {
         username: seeder.reserveUsername(),
       });
       expect(renamed.status, `rename: ${JSON.stringify(renamed.body)}`).toBe(200);

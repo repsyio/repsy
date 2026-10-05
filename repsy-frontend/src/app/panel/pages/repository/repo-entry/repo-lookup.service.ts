@@ -18,7 +18,7 @@ import { HttpContext } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, finalize, map, Observable, of, share, tap } from 'rxjs';
 
-import { ProtocolRepoControllerService } from '../../../../../generated/api';
+import { ReposApi } from '../../../../../generated/api';
 import { SILENT_ERROR } from '../../../../shared/interceptor/error-handler.interceptor';
 import { RepoRouteSlug, toRouteSlug } from '../../../shared/util/repo-api-type';
 
@@ -48,7 +48,7 @@ export class RepoLookupService {
   private readonly currentRepoSubject = new BehaviorSubject<RepoContext | null>(null);
   public readonly currentRepo$ = this.currentRepoSubject.asObservable();
 
-  constructor(private readonly protocolRepoControllerService: ProtocolRepoControllerService) {}
+  constructor(private readonly reposApi: ReposApi) {}
 
   public get currentRepo(): RepoContext | null {
     return this.currentRepoSubject.getValue();
@@ -99,16 +99,14 @@ export class RepoLookupService {
     // Structural: a route guard or resolver checking whether repoName exists, not a user action. Its
     // caller decides the outcome (canMatch says no, the resolver redirects to /not-found), so a 404 here
     // must not also raise the "Repository not found" toast (RPS-1670).
-    return this.protocolRepoControllerService
-      .getRepo(repoName, 'body', false, { context: new HttpContext().set(SILENT_ERROR, true) })
-      .pipe(
-        map((r) => {
-          const slug = toRouteSlug(r.type);
-          if (!slug) {
-            throw new Error(`Unknown repository type "${r.type}" for ${repoName}`);
-          }
-          return slug;
-        }),
-      );
+    return this.reposApi.getRepo(repoName, 'body', false, { context: new HttpContext().set(SILENT_ERROR, true) }).pipe(
+      map((r) => {
+        const slug = toRouteSlug(r.type);
+        if (!slug) {
+          throw new Error(`Unknown repository type "${r.type}" for ${repoName}`);
+        }
+        return slug;
+      }),
+    );
   }
 }

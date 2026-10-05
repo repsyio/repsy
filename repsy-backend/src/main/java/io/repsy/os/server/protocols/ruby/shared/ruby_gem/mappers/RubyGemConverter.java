@@ -68,6 +68,19 @@ public interface RubyGemConverter {
         .build();
   }
 
+  default io.repsy.os.generated.model.GemPackageInfo toGemPackageInfoDto(
+      final RubyGem gem, final RubyGemVersion latest) {
+    return io.repsy.os.generated.model.GemPackageInfo.builder()
+        .name(gem.getName())
+        .latestVersion(gem.getLatest())
+        .description(latest.getDescription())
+        .authors(latest.getAuthors())
+        .homepage(latest.getHomepage())
+        .createdAt(gem.getCreatedAt())
+        .updatedAt(latest.getCreatedAt())
+        .build();
+  }
+
   default GemInfo toGemInfo(final RubyGem gem, final Repo repo) {
     return GemInfo.builder()
         .id(gem.getId())

@@ -126,7 +126,7 @@ RUN pnpm exec openapi-generator-cli generate \
     -i /tmp/openapi-spec.yaml \
     -g typescript-angular \
     -o src/generated/api \
-    --additional-properties=fileNaming=kebab-case,ngVersion=21.0.0,withInterfaces=true
+    --additional-properties=fileNaming=kebab-case,ngVersion=21.0.0,withInterfaces=true,serviceSuffix=Api,serviceFileSuffix=.api
 
 RUN pnpm run build:prod
 

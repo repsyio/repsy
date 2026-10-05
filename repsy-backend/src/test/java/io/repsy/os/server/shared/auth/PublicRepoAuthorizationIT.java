@@ -31,6 +31,14 @@ import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
+import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
+import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModuleVersion;
+import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
+import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleVersionRepository;
+import io.repsy.os.server.protocols.npm.shared.npm_package.entities.NpmPackage;
+import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageVersion;
+import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
+import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
 import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacadeImpl;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -107,6 +115,10 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private PypiProtocolFacadeImpl pypiProtocolFacade;
+  @Autowired private GoModuleRepository goModuleRepository;
+  @Autowired private GoModuleVersionRepository goModuleVersionRepository;
+  @Autowired private NpmPackageRepository npmPackageRepository;
+  @Autowired private PackageVersionRepository npmPackageVersionRepository;
   @Autowired private ImageTxService imageTxService;
   @Autowired private ImageRepository imageRepository;
 
@@ -224,7 +236,7 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
 
     this.perform(delete(packages + "/demo").header(AUTHORIZATION, user))
         .andExpect(status().isForbidden());
-    this.perform(delete(packages + "/demo/releases/1.0.0").header(AUTHORIZATION, user))
+    this.perform(delete(packages + "/demo/versions/1.0.0").header(AUTHORIZATION, user))
         .andExpect(status().isForbidden());
 
     for (final var authorization : this.callers(user)) {
@@ -235,12 +247,112 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
               .getResponse()
               .getContentAsString();
 
-      assertThat(JsonPath.<List<String>>read(listed, "$.data.content[*].name"))
-          .containsExactly("demo");
+      assertThat(JsonPath.<List<String>>read(listed, "$.content[*].name")).containsExactly("demo");
     }
 
-    this.perform(get(packages + "/demo/releases").header(AUTHORIZATION, user))
+    this.perform(get(packages + "/demo/versions").header(AUTHORIZATION, user))
         .andExpect(status().isOk());
+  }
+
+  // ---- Panel API: npm
+
+  @Test
+  @DisplayName("cannot delete an npm package or version, which stay, but can read them")
+  void userCannotDeleteFromAPublicNpmRepoButCanReadIt() throws Exception {
+    final var repo = this.createRepo(RepoType.NPM, "npm", null);
+    final var user = this.panelToken(UserRole.USER);
+    final var packages = "/api/npm/packages/" + repo.getName();
+    final var scoped = "/api/npm/scopes/" + repo.getName() + "/tools/packages";
+
+    this.seedNpmVersion(repo, null, "demo");
+    this.seedNpmVersion(repo, "tools", "scoped");
+
+    this.perform(delete(packages + "/demo").header(AUTHORIZATION, user))
+        .andExpect(status().isForbidden());
+    this.perform(delete(packages + "/demo/versions/1.0.0").header(AUTHORIZATION, user))
+        .andExpect(status().isForbidden());
+    this.perform(delete(scoped + "/scoped").header(AUTHORIZATION, user))
+        .andExpect(status().isForbidden());
+    this.perform(delete(scoped + "/scoped/versions/1.0.0").header(AUTHORIZATION, user))
+        .andExpect(status().isForbidden());
+
+    for (final var authorization : this.callers(user)) {
+      final var listed =
+          this.getAs(packages, authorization)
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+
+      assertThat(JsonPath.<List<String>>read(listed, "$.content[*].name")).contains("demo");
+      this.getAs(packages + "/demo", authorization).andExpect(status().isOk());
+      this.getAs(packages + "/demo/versions", authorization).andExpect(status().isOk());
+      this.getAs(scoped + "/scoped", authorization).andExpect(status().isOk());
+    }
+
+    assertThat(this.npmPackageRepository.findByRepoIdAndScopeAndName(repo.getId(), null, "demo"))
+        .isPresent();
+    assertThat(
+            this.npmPackageRepository.findByRepoIdAndScopeAndName(repo.getId(), "tools", "scoped"))
+        .isPresent();
+  }
+
+  private void seedNpmVersion(final Repo repo, final String scope, final String name) {
+    final var pkg = new NpmPackage();
+    pkg.setRepo(this.repoRepository.getReferenceById(repo.getId()));
+    pkg.setScope(scope);
+    pkg.setName(name);
+    pkg.setLatest("1.0.0");
+    final var saved = this.npmPackageRepository.save(pkg);
+    final var version = new PackageVersion();
+    version.setNpmPackage(saved);
+    version.setVersion("1.0.0");
+    this.npmPackageVersionRepository.save(version);
+  }
+
+  // ---- Panel API: Go
+
+  @Test
+  @DisplayName("cannot delete a Go module or version, which stay, but can read them")
+  void userCannotDeleteFromAPublicGoRepoButCanReadIt() throws Exception {
+    final var repo = this.createRepo(RepoType.GOLANG, "go", null);
+    final var user = this.panelToken(UserRole.USER);
+    final var modules = "/api/go/modules/" + repo.getName();
+    final var module = "example.com/demo";
+
+    final var goModule = new GoModule();
+    goModule.setRepo(this.repoRepository.getReferenceById(repo.getId()));
+    goModule.setModulePath(module);
+    final var saved = this.goModuleRepository.save(goModule);
+    final var version = new GoModuleVersion();
+    version.setGoModule(saved);
+    version.setVersion("v1.0.0");
+    this.goModuleVersionRepository.save(version);
+
+    this.perform(delete(modules).param("modulePath", module).header(AUTHORIZATION, user))
+        .andExpect(status().isForbidden());
+    this.perform(
+            delete(modules + "/versions")
+                .param("modulePath", module)
+                .param("version", "v1.0.0")
+                .header(AUTHORIZATION, user))
+        .andExpect(status().isForbidden());
+
+    for (final var authorization : this.callers(user)) {
+      final var listed =
+          this.getAs(modules, authorization)
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+
+      assertThat(JsonPath.<List<String>>read(listed, "$.content[*].modulePath")).contains(module);
+      this.getAs(modules + "/versions?modulePath=" + module, authorization)
+          .andExpect(status().isOk());
+      this.getAs(modules + "/info?modulePath=" + module, authorization).andExpect(status().isOk());
+    }
+
+    assertThat(this.goModuleRepository.findByRepoIdAndModulePath(repo.getId(), module)).isPresent();
   }
 
   // ---- Panel API: Docker
@@ -259,11 +371,11 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
     this.perform(delete(images + "/app/tags/latest").header(AUTHORIZATION, user))
         .andExpect(status().isForbidden());
     this.perform(
-            delete("/api/docker/images/manifests/" + repo.getName() + "/untagged")
+            delete("/api/repos/" + repo.getName() + "/docker/untagged-manifests")
                 .header(AUTHORIZATION, user))
         .andExpect(status().isForbidden());
     this.perform(
-            delete("/api/docker/images/blobs/" + repo.getName() + "/orphan-layers")
+            delete("/api/repos/" + repo.getName() + "/docker/orphan-layers")
                 .header(AUTHORIZATION, user))
         .andExpect(status().isForbidden());
 
@@ -299,7 +411,7 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(JsonPath.<List<Object>>read(listed, "$.data.content")).isEmpty();
+    assertThat(JsonPath.<List<Object>>read(listed, "$.content")).isEmpty();
   }
 
   @Test
@@ -324,7 +436,7 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    assertThat(JsonPath.<List<Object>>read(listed, "$.data.content")).isEmpty();
+    assertThat(JsonPath.<List<Object>>read(listed, "$.content")).isEmpty();
   }
 
   // ---- helpers
@@ -430,7 +542,7 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    return JsonPath.read(body, "$.data.content[*].artifactName");
+    return JsonPath.read(body, "$.content[*].artifactName");
   }
 
   private void uploadPypiPackage(final Repo repo, final String name, final String version)

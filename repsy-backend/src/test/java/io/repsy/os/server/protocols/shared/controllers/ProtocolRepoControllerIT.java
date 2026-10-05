@@ -190,20 +190,12 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   // Response helpers
   // ---------------------------------------------------------------------------------------------
 
-  private static Map<String, Object> dataObject(final String body) {
-    return JsonPath.read(body, "$.data");
-  }
-
   private static Map<String, Object> bareObject(final String body) {
     return JsonPath.read(body, "$");
   }
 
   private static List<Map<String, Object>> bareList(final String body) {
     return JsonPath.read(body, "$");
-  }
-
-  private static List<Map<String, Object>> dataList(final String body) {
-    return JsonPath.read(body, "$.data");
   }
 
   private static Instant instantOrNull(final Object json) {
@@ -694,14 +686,12 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
 
       final var body =
-          expectSuccess(
+          expectBare(
               ProtocolRepoControllerIT.this.perform(
                   get(repoUrl(repo, "/permissions"))
-                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-              "repoPermissionsFetched",
-              "Repo permissions of the user have fetched.");
+                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
 
-      assertPermissions(dataObject(body), repo.getName(), null, true, true, true, false);
+      assertPermissions(bareObject(body), repo.getName(), null, true, true, true, false);
     }
 
     @Test
@@ -710,14 +700,12 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
 
       final var body =
-          expectSuccess(
+          expectBare(
               ProtocolRepoControllerIT.this.perform(
                   get(repoUrl(repo, "/permissions"))
-                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())),
-              "repoPermissionsFetched",
-              "Repo permissions of the user have fetched.");
+                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));
 
-      assertPermissions(dataObject(body), repo.getName(), null, true, true, false, false);
+      assertPermissions(bareObject(body), repo.getName(), null, true, true, false, false);
     }
 
     @Test
@@ -729,22 +717,18 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               RepoType.MAVEN, uniqueRepoName("priv"), true, "secret stuff");
 
       final var admin =
-          expectSuccess(
+          expectBare(
               ProtocolRepoControllerIT.this.perform(
                   get(repoUrl(repo, "/permissions"))
-                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-              "repoPermissionsFetched",
-              "Repo permissions of the user have fetched.");
+                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
       final var user =
-          expectSuccess(
+          expectBare(
               ProtocolRepoControllerIT.this.perform(
                   get(repoUrl(repo, "/permissions"))
-                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())),
-              "repoPermissionsFetched",
-              "Repo permissions of the user have fetched.");
+                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));
 
-      assertPermissions(dataObject(admin), repo.getName(), "secret stuff", true, true, true, true);
-      assertPermissions(dataObject(user), repo.getName(), "secret stuff", true, true, false, true);
+      assertPermissions(bareObject(admin), repo.getName(), "secret stuff", true, true, true, true);
+      assertPermissions(bareObject(user), repo.getName(), "secret stuff", true, true, false, true);
     }
 
     @Test
@@ -755,12 +739,9 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               RepoType.MAVEN, uniqueRepoName("pub"), false, "open source");
 
       final var body =
-          expectSuccess(
-              ProtocolRepoControllerIT.this.perform(get(repoUrl(repo, "/permissions"))),
-              "repoPermissionsFetched",
-              "Repo permissions of the user have fetched.");
+          expectBare(ProtocolRepoControllerIT.this.perform(get(repoUrl(repo, "/permissions"))));
 
-      assertPermissions(dataObject(body), repo.getName(), "open source", true, false, false, false);
+      assertPermissions(bareObject(body), repo.getName(), "open source", true, false, false, false);
     }
 
     @Test
@@ -786,13 +767,11 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               json(post("/api/repos"), createBody(name)).header(AUTHORIZATION, token)));
 
       final var body =
-          expectSuccess(
+          expectBare(
               ProtocolRepoControllerIT.this.perform(
-                  get("/api/repos/" + name + "/permissions").header(AUTHORIZATION, token)),
-              "repoPermissionsFetched",
-              "Repo permissions of the user have fetched.");
+                  get("/api/repos/" + name + "/permissions").header(AUTHORIZATION, token)));
 
-      assertPermissions(dataObject(body), name, null, true, true, true, true);
+      assertPermissions(bareObject(body), name, null, true, true, true, true);
     }
 
     @Test
@@ -805,13 +784,11 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               json(patch(repoUrl(repo, "")), descriptionBody("")).header(AUTHORIZATION, token)));
 
       final var body =
-          expectSuccess(
+          expectBare(
               ProtocolRepoControllerIT.this.perform(
-                  get(repoUrl(repo, "/permissions")).header(AUTHORIZATION, token)),
-              "repoPermissionsFetched",
-              "Repo permissions of the user have fetched.");
+                  get(repoUrl(repo, "/permissions")).header(AUTHORIZATION, token)));
 
-      assertPermissions(dataObject(body), repo.getName(), "", true, true, true, false);
+      assertPermissions(bareObject(body), repo.getName(), "", true, true, true, false);
     }
   }
 
@@ -1504,12 +1481,10 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   class Usage {
 
     private String usageOf(final Repo repo) throws Exception {
-      return expectSuccess(
+      return expectBare(
           ProtocolRepoControllerIT.this.perform(
               get(repoUrl(repo, "/usage"))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "usageFetched",
-          "Usage fetched");
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
     }
 
     @Test
@@ -1519,8 +1494,8 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
       final var body = this.usageOf(repo);
 
-      assertThat(dataObject(body)).containsOnlyKeys("diskUsed");
-      assertThat(JsonPath.<Map<String, Object>>read(body, "$.data.diskUsed"))
+      assertThat(bareObject(body)).containsOnlyKeys("diskUsed");
+      assertThat(JsonPath.<Map<String, Object>>read(body, "$.diskUsed"))
           .containsOnlyKeys("value", "text")
           .containsEntry("text", "0 B")
           .containsEntry("value", 0);
@@ -1548,7 +1523,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
       final var body = this.usageOf(repo);
 
-      final Map<String, Object> diskUsed = JsonPath.read(body, "$.data.diskUsed");
+      final Map<String, Object> diskUsed = JsonPath.read(body, "$.diskUsed");
       assertThat(diskUsed).containsOnlyKeys("value", "text").containsEntry("text", text);
       assertThat(((Number) diskUsed.get("value")).longValue()).isEqualTo(bytes);
     }
@@ -1561,10 +1536,8 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       ProtocolRepoControllerIT.this.repoRepository.updateDiskUsage(busy.getId(), 2048);
       ProtocolRepoControllerIT.this.entityManager.clear();
 
-      assertThat(JsonPath.<String>read(this.usageOf(busy), "$.data.diskUsed.text"))
-          .isEqualTo("2.00 KB");
-      assertThat(JsonPath.<String>read(this.usageOf(idle), "$.data.diskUsed.text"))
-          .isEqualTo("0 B");
+      assertThat(JsonPath.<String>read(this.usageOf(busy), "$.diskUsed.text")).isEqualTo("2.00 KB");
+      assertThat(JsonPath.<String>read(this.usageOf(idle), "$.diskUsed.text")).isEqualTo("0 B");
     }
   }
 
@@ -1792,14 +1765,12 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName()).getDescription())
           .isEqualTo("hello world");
       final var permissions =
-          expectSuccess(
+          expectBare(
               ProtocolRepoControllerIT.this.perform(
                   get(repoUrl(repo, "/permissions"))
-                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-              "repoPermissionsFetched",
-              "Repo permissions of the user have fetched.");
+                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
       assertPermissions(
-          dataObject(permissions), repo.getName(), "hello world", true, true, true, false);
+          bareObject(permissions), repo.getName(), "hello world", true, true, true, false);
     }
 
     @Test

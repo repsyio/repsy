@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
+import io.repsy.os.server.shared.http.BareBodyAssertions;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -137,12 +138,10 @@ class DockerImageSizeRefreshIT extends AbstractIntegrationTest {
   }
 
   private void deletePanelTag(final Repo repo, final String tag) throws Exception {
-    this.expectSuccess(
+    BareBodyAssertions.expectNoContent(
         this.perform(
             delete("/api/docker/images/%s/%s/tags/%s".formatted(repo.getName(), IMAGE, tag))
-                .header(AUTHORIZATION, this.panelToken)),
-        "tagDeleted",
-        "Tag deleted.");
+                .header(AUTHORIZATION, this.panelToken)));
   }
 
   private int deleteOnWire(final Repo repo, final String reference) throws Exception {

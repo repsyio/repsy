@@ -88,7 +88,7 @@ export function selectRepo(
   repoName: string,
   flags?: Parameters<typeof permission>[1],
 ): Promise<RepoPermissionInfo> {
-  getPermission.and.returnValue(of(restResponse(permission(repoName, flags))));
+  getPermission.and.returnValue(of(permission(repoName, flags)));
   return firstValueFrom(select(service, repoName));
 }
 
@@ -146,6 +146,8 @@ export interface PagedCase<S> {
   args: (term?: string) => unknown[];
   /** False for a listing without a search term (Go `fetchModules`). */
   searchable?: boolean;
+  /** True once the route answers the bare `PagedModel` instead of the `RestResponse` envelope (API guideline, Decision 5). */
+  bare?: boolean;
   notCalled?: () => jasmine.Spy[];
 }
 
@@ -157,9 +159,11 @@ export function describePagedCalls<S>(service: () => S, cases: PagedCase<S>[]): 
     describe(c.name, () => {
       const searchable = c.searchable ?? true;
       const term = searchable ? 'needle' : undefined;
+      const answer = <T>(content: T[], page = PAGE_METADATA): unknown =>
+        c.bare ? { content, page } : pagedResponse(content, page);
 
       it('passes the sort, the page and the term to the client in order and remaps the page', async () => {
-        c.api().and.returnValue(of(pagedResponse([item])));
+        c.api().and.returnValue(of(answer([item])));
 
         const result = await firstValueFrom(c.invoke(service(), term));
 
@@ -170,7 +174,7 @@ export function describePagedCalls<S>(service: () => S, cases: PagedCase<S>[]): 
 
       if (searchable) {
         it('sends undefined instead of an empty search term', async () => {
-          c.api().and.returnValue(of(pagedResponse([item])));
+          c.api().and.returnValue(of(answer([item])));
 
           await firstValueFrom(c.invoke(service(), ''));
 
@@ -179,13 +183,13 @@ export function describePagedCalls<S>(service: () => S, cases: PagedCase<S>[]): 
       }
 
       it('falls back to an empty content list when the response has no content', async () => {
-        c.api().and.returnValue(of(restResponse({ page: PAGE_METADATA })));
+        c.api().and.returnValue(of(c.bare ? { page: PAGE_METADATA } : restResponse({ page: PAGE_METADATA })));
 
         expectPaged(await firstValueFrom(c.invoke(service(), term)), [], PAGE_METADATA);
       });
 
       it('falls back to an empty page when the response has no data', async () => {
-        c.api().and.returnValue(of(restResponse(undefined)));
+        c.api().and.returnValue(of(c.bare ? undefined : restResponse(undefined)));
 
         expectPaged(await firstValueFrom(c.invoke(service(), term)), [], undefined);
       });

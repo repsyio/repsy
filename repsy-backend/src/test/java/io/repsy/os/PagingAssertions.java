@@ -109,6 +109,6 @@ public final class PagingAssertions {
     final var body =
         result.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
-    return JsonPath.<Number>read(body, "$.data.page.totalElements").intValue();
+    return JsonPath.<Number>read(body, "$.page.totalElements").intValue();
   }
 }

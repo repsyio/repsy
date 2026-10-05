@@ -16,12 +16,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 
-import {
-  MavenArtifactControllerService,
-  MavenGroupControllerService,
-  ProtocolRepoControllerService,
-  RepoSettingsForm,
-} from '../../../../../../generated/api';
+import { MavenArtifactsApi, MavenGroupsApi, ReposApi, RepoSettingsForm } from '../../../../../../generated/api';
 import {
   CallCase,
   describeCalls,
@@ -44,19 +39,19 @@ const VERSION = '1.2.3';
 const PATH = 'io/acme/widget';
 
 describe('MavenService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let mavenApi: jasmine.SpyObj<MavenArtifactControllerService>;
-  let groupApi: jasmine.SpyObj<MavenGroupControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let mavenApi: jasmine.SpyObj<MavenArtifactsApi>;
+  let groupApi: jasmine.SpyObj<MavenGroupsApi>;
   let service: MavenService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', [
       'getRepoPermissions',
       'updateRepoSettings',
       'getPathContent',
       'createDownloadToken',
     ]);
-    mavenApi = jasmine.createSpyObj<MavenArtifactControllerService>('MavenArtifactControllerService', [
+    mavenApi = jasmine.createSpyObj<MavenArtifactsApi>('MavenArtifactsApi', [
       'listMavenGroups',
       'listMavenArtifacts',
       'listMavenArtifactVersions',
@@ -65,14 +60,12 @@ describe('MavenService', () => {
       'deleteMavenArtifact',
       'deleteMavenArtifactVersion',
     ]);
-    groupApi = jasmine.createSpyObj<MavenGroupControllerService>('MavenGroupControllerService', [
-      'getMavenGroupSummary',
-    ]);
+    groupApi = jasmine.createSpyObj<MavenGroupsApi>('MavenGroupsApi', ['getMavenGroupSummary']);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: MavenArtifactControllerService, useValue: mavenApi },
-        { provide: MavenGroupControllerService, useValue: groupApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: MavenArtifactsApi, useValue: mavenApi },
+        { provide: MavenGroupsApi, useValue: groupApi },
       ],
     });
     service = TestBed.inject(MavenService);
@@ -96,25 +89,27 @@ describe('MavenService', () => {
         invoke: (s, group) => s.searchGroups(group, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => mavenApi.listMavenGroups,
         args: (group) => [REPO, group, ...PAGE_ARGS],
+        bare: true,
       },
       {
         name: 'searchArtifacts',
         invoke: (s, artifact) => s.searchArtifacts(GROUP, artifact, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => mavenApi.listMavenArtifacts,
         args: (artifact) => [GROUP, REPO, artifact, ...PAGE_ARGS],
+        bare: true,
       },
       {
         name: 'searchArtifactVersions',
         invoke: (s, version) => s.searchArtifactVersions(GROUP, ARTIFACT, version, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => mavenApi.listMavenArtifactVersions,
         args: (version) => [GROUP, ARTIFACT, REPO, version, ...PAGE_ARGS],
+        bare: true,
       },
     ];
     describePagedCalls(() => service, paged);
 
     const files = [{ name: 'widget-1.2.3.jar', path: `${PATH}/1.2.3` }];
     const info = { version: VERSION };
-    const deleted = { deletedVersionCount: 3 };
     const summary = { groupName: GROUP, artifactCount: 2, versionCount: 5 };
     const settings = { versionPolicy: 'RELEASE' } as unknown as RepoSettingsForm;
     const calls: CallCase<MavenService>[] = [
@@ -139,7 +134,7 @@ describe('MavenService', () => {
         invoke: (s) => s.createDownloadToken(PATH),
         api: () => repoApi.createDownloadToken,
         args: [PATH, REPO],
-        response: restResponse('token-1'),
+        response: 'token-1',
         expected: 'token-1',
       },
       {
@@ -147,7 +142,7 @@ describe('MavenService', () => {
         invoke: (s) => s.fetchArtifactVersion(GROUP, ARTIFACT, VERSION),
         api: () => mavenApi.getMavenArtifactVersion,
         args: [GROUP, ARTIFACT, VERSION, REPO],
-        response: restResponse(info),
+        response: info,
         expected: info,
       },
       {
@@ -155,7 +150,7 @@ describe('MavenService', () => {
         invoke: (s) => s.getGroupSummary(GROUP),
         api: () => groupApi.getMavenGroupSummary,
         args: [GROUP, REPO],
-        response: restResponse(summary),
+        response: summary,
         expected: summary,
         notCalled: () => [mavenApi.deleteMavenGroup],
       },
@@ -164,8 +159,8 @@ describe('MavenService', () => {
         invoke: (s) => s.deleteGroup(GROUP),
         api: () => mavenApi.deleteMavenGroup,
         args: [GROUP, REPO],
-        response: restResponse(deleted),
-        expected: deleted,
+        response: undefined,
+        expected: undefined,
         notCalled: () => [mavenApi.deleteMavenArtifact, mavenApi.deleteMavenArtifactVersion],
       },
       {
@@ -173,8 +168,8 @@ describe('MavenService', () => {
         invoke: (s) => s.deleteArtifact(GROUP, ARTIFACT),
         api: () => mavenApi.deleteMavenArtifact,
         args: [GROUP, ARTIFACT, REPO],
-        response: restResponse(deleted),
-        expected: deleted,
+        response: undefined,
+        expected: undefined,
         notCalled: () => [mavenApi.deleteMavenGroup, mavenApi.deleteMavenArtifactVersion],
       },
       {
@@ -182,8 +177,8 @@ describe('MavenService', () => {
         invoke: (s) => s.deleteVersion(GROUP, ARTIFACT, VERSION),
         api: () => mavenApi.deleteMavenArtifactVersion,
         args: [GROUP, ARTIFACT, VERSION, REPO],
-        response: restResponse(deleted),
-        expected: deleted,
+        response: undefined,
+        expected: undefined,
         notCalled: () => [mavenApi.deleteMavenGroup, mavenApi.deleteMavenArtifact],
       },
     ];
@@ -191,8 +186,10 @@ describe('MavenService', () => {
 
     // RPS-1348: the extra sentence of the delete-version confirmation, from the versions probe and the summary.
     describe('getVersionDeleteWarning', () => {
-      const versionsPage = (count: number) =>
-        restResponse({ content: Array.from({ length: count }, (_, i) => ({ versionName: `${i}.0` })), page: {} });
+      const versionsPage = (count: number) => ({
+        content: Array.from({ length: count }, (_, i) => ({ versionName: `${i}.0` })),
+        page: {},
+      });
 
       function warning(): string | null | undefined {
         let result: string | null | undefined;
@@ -203,7 +200,7 @@ describe('MavenService', () => {
       it('warns that the artifact and the group go too when it is the last version of the only artifact', () => {
         mavenApi.listMavenArtifactVersions.and.returnValue(of(versionsPage(1)) as never);
         groupApi.getMavenGroupSummary.and.returnValue(
-          of(restResponse({ groupName: GROUP, artifactCount: 1, versionCount: 1 })) as never,
+          of({ groupName: GROUP, artifactCount: 1, versionCount: 1 }) as never,
         );
 
         expect(warning()).toBe(
@@ -233,7 +230,7 @@ describe('MavenService', () => {
       it('asks for nothing more when the group has other artifacts', () => {
         mavenApi.listMavenArtifactVersions.and.returnValue(of(versionsPage(1)) as never);
         groupApi.getMavenGroupSummary.and.returnValue(
-          of(restResponse({ groupName: GROUP, artifactCount: 2, versionCount: 3 })) as never,
+          of({ groupName: GROUP, artifactCount: 2, versionCount: 3 }) as never,
         );
 
         expect(warning()).toBeNull();

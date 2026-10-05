@@ -199,7 +199,11 @@
           }
         </div>
         <!-- Pagination -->
-        <app-pagination (pageNumChange)="loadPage($event)" [pageNum]="pageNum" [totalPages]="totalPages" />
+        <app-pagination
+          (pageNumChange)="loadPage($event)"
+          [pageNum]="pageNum"
+          [totalPages]="pagedData.page.totalPages"
+        />
       </div>
     } @else {
       <app-empty-list />

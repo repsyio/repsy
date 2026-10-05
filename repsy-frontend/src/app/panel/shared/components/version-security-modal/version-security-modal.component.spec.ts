@@ -17,21 +17,23 @@ import { SimpleChange } from '@angular/core';
 import { Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
-import { ScanOverview, ScanStatus, VulnerabilityScanControllerService } from '../../../../../generated/api';
+import { ScanOverview, ScanStatus, SecurityScansApi } from '../../../../../generated/api';
 import { VersionSecurityModalComponent } from './version-security-modal.component';
 
 const OVERVIEW = { status: ScanStatus.Completed, lastCompletedAt: '2026-01-01T00:00:00Z' } as ScanOverview;
 
 describe('VersionSecurityModalComponent', () => {
   let component: VersionSecurityModalComponent;
-  let scanService: jasmine.SpyObj<VulnerabilityScanControllerService>;
+  let scanService: jasmine.SpyObj<SecurityScansApi>;
   let router: jasmine.SpyObj<Router>;
 
   beforeEach(() => {
-    scanService = jasmine.createSpyObj<VulnerabilityScanControllerService>('VulnerabilityScanControllerService', [
+    scanService = jasmine.createSpyObj<SecurityScansApi>('SecurityScansApi', [
       'getScanOverview',
+      'getScopedScanOverview',
     ]);
-    scanService.getScanOverview.and.returnValue(of({ data: OVERVIEW }) as never);
+    scanService.getScanOverview.and.returnValue(of(OVERVIEW) as never);
+    scanService.getScopedScanOverview.and.returnValue(of(OVERVIEW) as never);
     router = jasmine.createSpyObj<Router>('Router', ['navigate', 'navigateByUrl']);
     component = new VersionSecurityModalComponent(scanService, router);
     component.repoName = 'repo';
@@ -55,9 +57,19 @@ describe('VersionSecurityModalComponent', () => {
       expect(component.loading).toBeFalse();
     });
 
+    it('loads the overview of a scoped npm package on the scopes route', () => {
+      component.artifactName = '@acme/widget';
+
+      setOpen(true);
+
+      expect(scanService.getScopedScanOverview).toHaveBeenCalledOnceWith('acme', 'widget', '1.0.0', 'repo');
+      expect(scanService.getScanOverview).not.toHaveBeenCalled();
+      expect(component.overview).toBe(OVERVIEW);
+    });
+
     it('shows the loading state, with no stale overview, while it is fetched', () => {
       setOpen(true);
-      const pending = new Subject<{ data: ScanOverview }>();
+      const pending = new Subject<ScanOverview>();
       scanService.getScanOverview.and.returnValue(pending as never);
 
       setOpen(false);
@@ -66,15 +78,15 @@ describe('VersionSecurityModalComponent', () => {
       expect(component.loading).toBeTrue();
       expect(component.overview).toBeNull();
 
-      pending.next({ data: OVERVIEW });
+      pending.next(OVERVIEW);
       pending.complete();
 
       expect(component.loading).toBeFalse();
       expect(component.overview).toBe(OVERVIEW);
     });
 
-    it('has no overview when the response carries no data', () => {
-      scanService.getScanOverview.and.returnValue(of({}) as never);
+    it('has no overview when the response has no body', () => {
+      scanService.getScanOverview.and.returnValue(of(null) as never);
 
       setOpen(true);
 
@@ -127,7 +139,7 @@ describe('VersionSecurityModalComponent', () => {
 
     it('is true while a rescan is unfinished or after it failed', () => {
       for (const status of [ScanStatus.Pending, ScanStatus.Queued, ScanStatus.Running, ScanStatus.Failed]) {
-        scanService.getScanOverview.and.returnValue(of({ data: { ...OVERVIEW, status } }) as never);
+        scanService.getScanOverview.and.returnValue(of({ ...OVERVIEW, status }) as never);
 
         setOpen(true);
 

@@ -7,7 +7,7 @@
 
   <body>
     <#list packages as package>
-      <a href="${repoUri}/simple/${package.getNormalizedName()}/">${package.getName()}</a><br/>
+      <a href="${repoUri?html}/simple/${package.getNormalizedName()?html}/">${package.getName()?html}</a><br/>
     </#list>
   </body>
 </html>

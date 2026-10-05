@@ -22,22 +22,21 @@ import { of } from 'rxjs';
 import {
   ScanOverview,
   ScanStatus,
-  VulnerabilityScanControllerService,
+  SecurityScansApi,
   VulnerabilityScanDetail,
   VulnerabilityScanInfo,
 } from '../../../../../generated/api';
-import { restResponse } from '../../../pages/repository/testing/protocol-service-spec-helpers';
 import { SecurityScanSupportService } from '../../service/security-scan-support.service';
 import { ToastService } from '../toast/toast.service';
 import { SecurityScanSectionComponent } from './security-scan-section.component';
 
 const REPO = 'acme-repo';
-const reply = (data: unknown): never => of(restResponse(data)) as never;
+const reply = (data: unknown): never => of(data) as never;
 
 /** RPS-1339: what the rendered failed state shows next to the Re-scan action. */
 describe('SecurityScanSectionComponent failed state', () => {
   let fixture: ComponentFixture<SecurityScanSectionComponent>;
-  let api: jasmine.SpyObj<VulnerabilityScanControllerService>;
+  let api: jasmine.SpyObj<SecurityScansApi>;
 
   function render(status: ScanStatus, errorMessage?: string): HTMLElement {
     const info: VulnerabilityScanInfo = { id: 'scan-1', status, repoName: REPO, errorMessage };
@@ -61,7 +60,7 @@ describe('SecurityScanSectionComponent failed state', () => {
   }
 
   beforeEach(() => {
-    api = jasmine.createSpyObj<VulnerabilityScanControllerService>('VulnerabilityScanControllerService', [
+    api = jasmine.createSpyObj<SecurityScansApi>('SecurityScansApi', [
       'listVulnerabilityScans',
       'getScanOverview',
       'getVulnerabilityScan',
@@ -74,7 +73,7 @@ describe('SecurityScanSectionComponent failed state', () => {
     TestBed.configureTestingModule({
       imports: [SecurityScanSectionComponent],
       providers: [
-        { provide: VulnerabilityScanControllerService, useValue: api },
+        { provide: SecurityScansApi, useValue: api },
         { provide: SecurityScanSupportService, useValue: support },
         { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
         {

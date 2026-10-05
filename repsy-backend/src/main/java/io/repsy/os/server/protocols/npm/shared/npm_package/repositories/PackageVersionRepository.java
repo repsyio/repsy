@@ -43,7 +43,7 @@ public interface PackageVersionRepository extends JpaRepository<PackageVersion, 
       """
       select pv from PackageVersion pv
       join pv.npmPackage p
-      where pv.version like %:version%
+      where lower(pv.version) like :version escape '\\'
       and p.id = :packageId""")
   Page<PackageVersionListItem> findAllByNpmPackageIdContainsVersion(
       UUID packageId, String version, Pageable pageable);
@@ -58,7 +58,7 @@ public interface PackageVersionRepository extends JpaRepository<PackageVersion, 
       """
       select pv from PackageVersion pv
       join pv.npmPackage p
-      where pv.version like %:version%
+      where lower(pv.version) like :version escape '\\'
       and p.id = :packageId""")
   List<PackageVersionListItem> findAllByNpmPackageIdContainsVersion(UUID packageId, String version);
 }

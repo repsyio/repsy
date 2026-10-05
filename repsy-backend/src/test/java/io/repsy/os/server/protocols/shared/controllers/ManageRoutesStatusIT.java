@@ -107,6 +107,7 @@ class ManageRoutesStatusIT extends AbstractIntegrationTest {
             "mvn/key-stores",
             "mvn/artifacts",
             "npm/packages",
+            "npm/scopes",
             "pypi/packages",
             "docker/images",
             "helm/charts",

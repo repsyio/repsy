@@ -1,0 +1,115 @@
+<section data-testid="settings-cleanup-policy" id="cleanup-policy" class="scroll-mt-[100px]">
+  <div class="flex w-full items-center justify-between rounded-t-[12px] border border-[#404141] bg-[#101112] p-[24px]">
+    <h3 class="font-medium text-[#FDFDFD]">
+      <a [routerLink]="[]" fragment="cleanup-policy"> Container Registry Cleanup Policy </a>
+    </h3>
+    <app-toggle-component
+      data-testid="cleanup-policy-toggle"
+      checkedLabel="Enabled"
+      uncheckedLabel="Disabled"
+      [checked]="enabled"
+      [disabled]="loading || submitting"
+      (checkedChange)="onToggleChange($event)"
+    />
+  </div>
+
+  <div class="rounded-b-[12px] border-r border-b border-l border-[#404141] bg-[#101112] p-[24px]">
+    <div class="mb-6 flex flex-col-reverse items-center justify-between sm:flex-row">
+      <p class="text-[14px] text-[#9FA0A0]">
+        Automatically remove tags, and the untagged manifests and layers they leave behind, based on rules you define.
+        Nothing is deleted while the policy is disabled.
+      </p>
+      @if (!editMode) {
+        <button data-testid="cleanup-policy-edit" (click)="toggleEditMode()" class="repsy-btn-secondary flex-shrink-0">
+          Edit
+        </button>
+      }
+    </div>
+
+    @if (!editMode && policy) {
+      <p data-testid="cleanup-policy-status" class="text-[14px] text-[#FDFDFD]">
+        {{ enabled ? 'Cleanup runs ' + cadenceLabel : 'Cleanup does not run' }}
+      </p>
+    }
+
+    @if (editMode) {
+      <form [formGroup]="form" class="flex flex-col gap-4" (ngSubmit)="save()">
+        <div class="flex flex-col gap-1">
+          <label for="cadence" class="text-sm text-[#9FA0A0]">Run cleanup:</label>
+          <select id="cadence" formControlName="cadence" class="input-text-secondary w-full pr-10">
+            @for (opt of cadenceOptions; track opt.value) {
+              <option [value]="opt.value">{{ opt.label }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <label for="keepLastN" class="text-sm text-[#9FA0A0]">Keep the most recent:</label>
+          <select id="keepLastN" formControlName="keepLastN" class="input-text-secondary w-full">
+            @for (opt of keepNOptions; track opt) {
+              <option [ngValue]="opt">{{ opt }} tag{{ opt === 1 ? '' : 's' }}</option>
+            }
+          </select>
+          <p class="mt-1 text-xs text-[#9FA0A0]">How many tags to always keep for each image.</p>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <label for="nameRegexKeep" class="text-sm text-[#9FA0A0]">Keep tags matching:</label>
+          <input
+            type="text"
+            id="nameRegexKeep"
+            formControlName="nameRegexKeep"
+            class="input-text-secondary w-full"
+            placeholder="e.g., v.+|release-.*"
+          />
+          <p class="mt-1 text-xs text-[#9FA0A0]">
+            A regex that determines which tags to preserve. The latest tag is always preserved. Patterns are anchored
+            (start and end), you do not need ^ or $. Leave empty to not preserve any tags by pattern.
+          </p>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <label for="keepDays" class="text-sm text-[#9FA0A0]">Remove tags older than:</label>
+          <select id="keepDays" formControlName="keepDays" class="input-text-secondary w-full">
+            @for (opt of olderThanOptions; track opt.value) {
+              <option [ngValue]="opt.value">{{ opt.label }}</option>
+            }
+          </select>
+          <p class="mt-1 text-xs text-[#9FA0A0]">
+            Untagged manifests older than this are removed too. Tags matching a keep pattern are never removed.
+          </p>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <label for="nameRegex" class="text-sm text-[#9FA0A0]">Remove tags matching:</label>
+          <input
+            type="text"
+            id="nameRegex"
+            formControlName="nameRegex"
+            class="input-text-secondary w-full"
+            placeholder="e.g., .*"
+          />
+          <p class="mt-1 text-xs text-[#9FA0A0]">
+            A regex that determines which tags to remove. Required: use .* to match all tags.
+          </p>
+          @if (form.controls.nameRegex.hasError('required') && form.controls.nameRegex.touched) {
+            <p class="text-body2 text-error">• This field is required</p>
+          }
+        </div>
+
+        <div class="mt-4 flex justify-end gap-2">
+          <button type="button" (click)="toggleEditMode()" class="repsy-btn-secondary w-full sm:w-auto">Cancel</button>
+          <button
+            type="submit"
+            data-testid="cleanup-policy-save"
+            class="repsy-btn-confirm w-full sm:w-auto"
+            [disabled]="form.invalid || !form.dirty || submitting"
+          >
+            Save changes
+          </button>
+        </div>
+        <p class="text-right text-xs text-[#9FA0A0]">Saving moves the next run to the new cadence.</p>
+      </form>
+    }
+  </div>
+</section>

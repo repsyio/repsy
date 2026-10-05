@@ -17,7 +17,7 @@
 import { HttpContext } from '@angular/common/http';
 import { firstValueFrom, of, Subject, throwError } from 'rxjs';
 
-import { ProtocolRepoControllerService, RepoType } from '../../../../../generated/api';
+import { ReposApi, RepoType } from '../../../../../generated/api';
 import { SILENT_ERROR } from '../../../../shared/interceptor/error-handler.interceptor';
 import { RepoLookupService } from './repo-lookup.service';
 
@@ -29,7 +29,7 @@ describe('RepoLookupService', () => {
     getRepo = jasmine
       .createSpy('getRepo')
       .and.callFake((repoName: string) => of({ type: repoName.startsWith('npm') ? 'NPM' : 'MAVEN' }));
-    service = new RepoLookupService({ getRepo } as unknown as ProtocolRepoControllerService);
+    service = new RepoLookupService({ getRepo } as unknown as ReposApi);
   });
 
   it('has no current repo until one is looked up', () => {

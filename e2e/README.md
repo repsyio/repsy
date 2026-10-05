@@ -2505,7 +2505,7 @@ being valid and a deploy with it must be refused at once:
 
 | Event                                                                      | Old credential | Replacement               |
 | -------------------------------------------------------------------------- | -------------- | ------------------------- |
-| `PUT /api/profile/password` as the user (`PanelBackend.changeOwnPassword`) | refused        | the new password deploys  |
+| `PATCH /api/profile/password` as the user (`PanelBackend.changeOwnPassword`) | refused        | the new password deploys  |
 | `DELETE /api/users/{id}` as admin                                          | refused        | none                      |
 | deploy token revoked                                                       | refused        | none                      |
 | deploy token rotated                                                       | refused        | the rotated token deploys |
@@ -2534,7 +2534,7 @@ A protocol JWT a user logged in with (Docker `/v2/token`, the token `npm login` 
 carries the user's `token_version` as its `tv` claim, and every request compares it with the user row it reads
 anyway. A password change (own or an admin's reset), a username change and an admin edit that renames move the
 version on, so the token ends at once instead of when it expires (30 minutes; npm 90 days). Before RPS-1552 a
-Docker token minted before `PUT /api/profile/password` still started a blob upload (202) until it expired.
+Docker token minted before `PATCH /api/profile/password` still started a blob upload (202) until it expired.
 `registerLoginTokenInvalidation` (same file) pins it per protocol with raw HTTP and the stored token, because a
 real docker client exchanges its Basic credentials again for every operation and never holds a stale one:
 
@@ -3867,7 +3867,7 @@ search`/`install`/`pull <repo>/<chart>`, or a raw `helm pull --repo`) 404s (`cha
   original finding)** — There was no
   `GET /v2/<repo>/<name>/tags/list` handler at all (`404` with OCI code `NAME_UNKNOWN`, msgId
   `unknownPath`), although `HelmFacade.listTags`/`HelmOciTagListDto` exist (used only by the panel's
-  own `GET /api/helm/charts/{repo}/{chartName}/tags`). Helm's own `ValidateReference` calls `Tags(...)`
+  own `GET /api/helm/charts/{repo}/{packageName}/tags`). Helm's own `ValidateReference` calls `Tags(...)`
   whenever `--version` is empty or a semver CONSTRAINT, so a real `helm pull`/`install`/`show
 oci://.../<chart>` without an EXACT version fails outright against Repsy. Confirmed live: "HL2",
   "R8".
@@ -7472,8 +7472,8 @@ of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays o
 
 - `POST /api/auth/login` → `{ data: { token, refreshToken } }`; every other call in `os-panel-backend.ts`
   sends `Authorization: Bearer <token>`. The openapi spec only lists `Authorization` as an explicit
-  parameter for `user-controller` routes; `protocol-repo-controller` and
-  `protocol-deploy-token-controller` routes need it too, just via an argument resolver the spec
+  parameter for `users` routes; `repos` and
+  `deploy-tokens` routes need it too, just via an argument resolver the spec
   does not document.
 - `POST /api/users`, `DELETE /api/users/{userId}`, `GET /api/users` (ADMIN only).
 - `POST /api/repos` (the body carries `name`, `type` (upper-case `RepoType`: `MAVEN`, `NPM`, ...),
@@ -7481,11 +7481,11 @@ of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays o
   `GET /api/repos` (`type`, `q`, `page`, `size` 1-100, `sort`: the paged list; `OsPanelBackend.listRepos` reads a
   page, `listAllRepos` all pages), `GET /api/repos/counts` (`PanelBackend.repoCounts`), `GET`/`PUT
 /api/repos/{repoName}/settings`.
-- `POST /api/repos/{repoName}/deploy-tokens` (`name`, `readOnly`, `expirationDate`, `username`),
-  `DELETE .../deploy-tokens/{tokenId}`, `POST .../deploy-tokens/{tokenId}/actions/rotate` (rotate; the old
+- `POST /api/repos/{repoName}/deploy-tokens` (`name`, `readOnly`, `expirationDate`, `username`; answers `201`
+  with the bare `{ tokenId, ... }` body and `Cache-Control: no-store`; its `Location` names the future detail route, there is none yet),
+  `DELETE .../deploy-tokens/{tokenId}` (`204`), `POST .../deploy-tokens/{tokenId}/actions/rotate` (rotate; the old
   `PUT .../deploy-tokens/{tokenId}` is gone, RPS-1269), `GET
-.../deploy-tokens` (the create response has no token id; `seeder.ts` looks it up by name right
-  after creating it).
+.../deploy-tokens` (a bare `PagedModel`; the rotate response is a bare JSON string with `no-store`).
 - A **past `expirationDate` is accepted** — `DeployTokenService.createDeployToken` does not
   reject it — which is how `seeder.ts` creates an already-expired token.
 - Deleting an already-deleted repo or user answers `404` (`repoNotFound`/`userNotFound`); `Seeder.

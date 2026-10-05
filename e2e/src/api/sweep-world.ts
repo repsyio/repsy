@@ -81,10 +81,6 @@ export interface SweepWorld {
   fresh: { username: string; repoName: string };
 }
 
-interface Envelope {
-  data?: unknown;
-}
-
 async function adminJson(
   adminToken: string,
   method: string,
@@ -99,7 +95,7 @@ async function adminJson(
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  return { status: res.status, data: (res.json as Envelope | undefined)?.data };
+  return { status: res.status, data: res.json };
 }
 
 /** Seeds the world in the calling test's own `seeder`, which removes it all again. */
@@ -121,7 +117,7 @@ export async function seedSweepWorld(
 
   const token = await seeder.createToken(repos.maven.name);
 
-  const servers = await adminJson(adminToken, 'GET', '/api/mvn/key-stores/allowed-servers');
+  const servers = await adminJson(adminToken, 'GET', '/api/mvn/allowed-key-servers');
   const keyserver = (servers.data as { id?: string }[] | undefined)?.[0]?.id;
   if (!keyserver) {
     throw new Error(`no allowed key server to seed a key store with: ${JSON.stringify(servers)}`);
@@ -132,7 +128,7 @@ export async function seedSweepWorld(
   const keyStores = await adminJson(adminToken, 'GET', `/api/mvn/key-stores/${repos.maven.name}`);
   const keyStoreId = ((keyStores.data as { content?: { id: string }[] } | undefined)?.content ??
     [])[0]?.id;
-  if (keyStore.status !== 200 || !keyStoreId) {
+  if (keyStore.status !== 201 || !keyStoreId) {
     throw new Error(`could not seed a key store: ${keyStore.status} ${JSON.stringify(keyStores)}`);
   }
   const { publicKeyArmored } = await generateKeyPair();
@@ -172,11 +168,10 @@ export function valuesFor(op: SpecOperation, world: SweepWorld): Record<string, 
     version: pkg.version,
     groupName: first ?? '',
     artifactName: second ?? pkg.name,
-    scope: isScopedName ? (first ?? '') : '',
+    // A route with {scope} on a non-npm repo still needs a non-empty segment: `/scopes//artifacts` is
+    // normalised away and answers 404 before the authentication the sweep is looking at.
+    scope: isScopedName ? (first ?? '') : 'e2e-sweep-scope',
     packageName: isScopedName ? (second ?? '') : pkg.name,
-    chartName: pkg.name,
-    crateName: pkg.name,
-    gemName: pkg.name,
     imageName: pkg.name,
     tagName: pkg.version,
     reference: pkg.extra.digest ?? pkg.version,
@@ -196,10 +191,8 @@ export function bodyFor(operationId: string, world: Pick<SweepWorld, 'fresh'>): 
       return { name: world.fresh.repoName, type: 'MAVEN', privateRepo: true };
     case 'updateRepoSettings':
       return { privateRepo: false, allowOverride: false };
-    case 'updateRepoDescription':
+    case 'updateRepo':
       return { description: 'changed by the sweep' };
-    case 'renameRepo':
-      return { name: world.fresh.repoName };
     case 'createDeployToken':
       return { name: 'e2e-sweep-token' };
     case 'createMavenKeyStore':
@@ -209,10 +202,10 @@ export function bodyFor(operationId: string, world: Pick<SweepWorld, 'fresh'>): 
   }
 }
 
-/** An error answer carries a fresh `errorCode` (a log correlation id) every time; the rest is the answer. */
+/** An error answer carries a fresh `errorCode` or problem+json `traceId` (a log correlation id) every time; the rest is the answer. */
 function withoutErrorCode(body: unknown): unknown {
   if (body !== null && typeof body === 'object' && !Array.isArray(body)) {
-    const { errorCode: _errorCode, ...rest } = body as Record<string, unknown>;
+    const { errorCode: _errorCode, traceId: _traceId, ...rest } = body as Record<string, unknown>;
     return rest;
   }
   return body;

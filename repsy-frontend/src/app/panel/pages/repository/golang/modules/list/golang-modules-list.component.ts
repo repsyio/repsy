@@ -158,11 +158,8 @@ export class GolangModulesListComponent implements OnDestroy {
   private fetchModules(): void {
     this.loading = true;
 
-    const fetch = this.searchText
-      ? this.golangService.searchModules(this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      : this.golangService.fetchModules(this.sortOption, this.pageNum, this.pageSize);
-
-    fetch
+    this.golangService
+      .fetchModules(this.searchText, this.sortOption, this.pageNum, this.pageSize)
       .pipe(
         finalize(() => {
           this.loading = false;

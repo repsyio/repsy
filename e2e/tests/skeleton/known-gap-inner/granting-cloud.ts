@@ -91,7 +91,9 @@ class GrantingCloudBackend extends FakeCloudPanelBackend {
   /** What the real Cloud backend does: register the collaborator AND grant it read/write on the repo. */
   override async seedUserCredential(ctx: CredentialSeedContext): Promise<MaterializedCredential> {
     registry().seedCalls.push(ctx.repoName);
-    const created = await ctx.seeder.createUser();
+    const created = await ctx.seeder.createUser(
+      ctx.username === undefined ? {} : { username: ctx.username },
+    );
     registry().grants.add(`${created.username}@${ctx.repoName}`);
     return {
       transport: 'basic',

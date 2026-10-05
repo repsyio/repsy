@@ -15,14 +15,14 @@
  */
 package io.repsy.os.server.protocols.helm.ui.controllers;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.HelmChartDetail;
 import io.repsy.os.generated.model.HelmChartListItem;
+import io.repsy.os.generated.model.HelmChartSummary;
 import io.repsy.os.generated.model.HelmChartVersionItem;
 import io.repsy.os.server.protocols.helm.ui.facades.HelmApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -32,12 +32,14 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -67,13 +69,14 @@ public class HelmChartController {
           "createdAt", "createdAt",
           "lastUpdatedAt", "lastUpdatedAt");
 
+  private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("version", "createdAt");
+
   private final HelmApiFacade helmApiFacade;
-  private final RestResponseFactory restResponseFactory;
   private final UsageUpdateService usageUpdateService;
 
   @GetMapping("/{repoName}")
   @RepoOperation
-  public RestResponse<PagedModel<HelmChartListItem>> searchHelmCharts(
+  public ResponseEntity<PagedModel<HelmChartListItem>> searchHelmCharts(
       final RepoInfo repoInfo,
       @RequestParam(name = "q", defaultValue = "") final String query,
       @PageableDefault(sort = "lastUpdatedAt", direction = Sort.Direction.DESC)
@@ -83,63 +86,77 @@ public class HelmChartController {
         this.helmApiFacade.search(
             repoInfo, query, SortValidator.resolveSortPaths(pageable, CHART_SORT_PATHS));
 
-    return this.restResponseFactory.success("chartsFetched", new PagedModel<>(charts));
+    return ResponseEntity.ok(new PagedModel<>(charts));
   }
 
-  @GetMapping("/{repoName}/{chartName}")
+  @GetMapping("/{repoName}/{packageName}")
   @RepoOperation
-  public RestResponse<List<HelmChartVersionItem>> getHelmChartVersions(
-      final RepoInfo repoInfo, @PathVariable final String chartName) {
+  public ResponseEntity<HelmChartSummary> getHelmChart(
+      final RepoInfo repoInfo, @PathVariable final String packageName) {
 
-    final var versions = this.helmApiFacade.getVersions(repoInfo, chartName);
-
-    return this.restResponseFactory.success("chartVersionsFetched", versions);
+    return ResponseEntity.ok(this.helmApiFacade.getChart(repoInfo, packageName));
   }
 
-  @GetMapping("/{repoName}/{chartName}/{version}")
+  @GetMapping("/{repoName}/{packageName}/versions")
   @RepoOperation
-  public RestResponse<HelmChartDetail> getHelmChartDetail(
+  public ResponseEntity<PagedModel<HelmChartVersionItem>> listHelmChartVersions(
       final RepoInfo repoInfo,
-      @PathVariable final String chartName,
+      @PathVariable final String packageName,
+      @RequestParam(name = "q", defaultValue = "") final String query,
+      @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
+          final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
+
+    final var versions = this.helmApiFacade.getVersions(repoInfo, packageName, query, pageable);
+
+    return ResponseEntity.ok(new PagedModel<>(versions));
+  }
+
+  @GetMapping("/{repoName}/{packageName}/versions/{version}")
+  @RepoOperation
+  public ResponseEntity<HelmChartDetail> getHelmChartDetail(
+      final RepoInfo repoInfo,
+      @PathVariable final String packageName,
       @PathVariable final String version) {
 
-    final var detail = this.helmApiFacade.getDetail(repoInfo, chartName, version);
+    final var detail = this.helmApiFacade.getDetail(repoInfo, packageName, version);
 
-    return this.restResponseFactory.success("chartDetailFetched", detail);
+    return ResponseEntity.ok(detail);
   }
 
-  @DeleteMapping("/{repoName}/{chartName}")
+  @DeleteMapping("/{repoName}/{packageName}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> deleteAllHelmChartVersions(
-      final RepoInfo repoInfo, @PathVariable final String chartName) throws IOException {
+  public ResponseEntity<Void> deleteAllHelmChartVersions(
+      final RepoInfo repoInfo, @PathVariable final String packageName) throws IOException {
 
-    final var usages = this.helmApiFacade.deleteAllVersions(repoInfo, chartName);
+    final var usages = this.helmApiFacade.deleteAllVersions(repoInfo, packageName);
     this.usageUpdateService.updateUsage(new UsageChangedInfo(repoInfo.getId(), usages));
 
-    return this.restResponseFactory.success("chartDeleted");
+    return ResponseEntities.noContent();
   }
 
-  @DeleteMapping("/{repoName}/{chartName}/{version}")
+  @DeleteMapping("/{repoName}/{packageName}/versions/{version}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> deleteHelmChart(
+  public ResponseEntity<Void> deleteHelmChart(
       final RepoInfo repoInfo,
-      @PathVariable final String chartName,
+      @PathVariable final String packageName,
       @PathVariable final String version)
       throws IOException {
 
-    final var usages = this.helmApiFacade.delete(repoInfo, chartName, version);
+    final var usages = this.helmApiFacade.delete(repoInfo, packageName, version);
     this.usageUpdateService.updateUsage(new UsageChangedInfo(repoInfo.getId(), usages));
 
-    return this.restResponseFactory.success("chartDeleted");
+    return ResponseEntities.noContent();
   }
 
-  @GetMapping("/{repoName}/{chartName}/tags")
+  @GetMapping("/{repoName}/{packageName}/tags")
   @RepoOperation
-  public RestResponse<List<String>> getHelmChartOciTags(
-      final RepoInfo repoInfo, @PathVariable final String chartName) {
+  public ResponseEntity<List<String>> getHelmChartOciTags(
+      final RepoInfo repoInfo, @PathVariable final String packageName) {
 
-    final var tags = this.helmApiFacade.getOciTags(repoInfo, chartName);
+    final var tags = this.helmApiFacade.getOciTags(repoInfo, packageName);
 
-    return this.restResponseFactory.success("chartTagsFetched", tags);
+    return ResponseEntity.ok(tags);
   }
 }

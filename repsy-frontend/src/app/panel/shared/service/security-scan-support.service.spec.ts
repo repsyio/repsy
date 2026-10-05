@@ -16,7 +16,7 @@
 
 import { firstValueFrom, Observable, of, throwError } from 'rxjs';
 
-import { SecurityScanControllerService } from '../../../../generated/api';
+import { SecurityScansApi } from '../../../../generated/api';
 import { SecurityScanSupportService } from './security-scan-support.service';
 
 describe('SecurityScanSupportService', () => {
@@ -24,30 +24,30 @@ describe('SecurityScanSupportService', () => {
 
   function createService(response: Observable<unknown>): SecurityScanSupportService {
     getSupportedRepoTypes = jasmine.createSpy('getSupportedRepoTypes').and.returnValue(response);
-    return new SecurityScanSupportService({ getSupportedRepoTypes } as unknown as SecurityScanControllerService);
+    return new SecurityScanSupportService({ getSupportedRepoTypes } as unknown as SecurityScansApi);
   }
 
   it('reports a repo type the scanner supports, ignoring case', async () => {
-    const service = createService(of({ data: ['maven', 'NPM'] }));
+    const service = createService(of(['maven', 'NPM']));
 
     expect(await firstValueFrom(service.isSupported('MAVEN'))).toBeTrue();
     expect(await firstValueFrom(service.isSupported('npm'))).toBeTrue();
   });
 
   it('reports a repo type the scanner does not support', async () => {
-    const service = createService(of({ data: ['maven'] }));
+    const service = createService(of(['maven']));
 
     expect(await firstValueFrom(service.isSupported('docker'))).toBeFalse();
   });
 
   it('exposes the supported types upper-cased', async () => {
-    const service = createService(of({ data: ['maven', 'npm'] }));
+    const service = createService(of(['maven', 'npm']));
 
     expect([...(await firstValueFrom(service.getSupportedRepoTypes()))]).toEqual(['MAVEN', 'NPM']);
   });
 
-  it('treats a response without data as nothing supported', async () => {
-    const service = createService(of({}));
+  it('treats a empty response as nothing supported', async () => {
+    const service = createService(of(null));
 
     expect(await firstValueFrom(service.isSupported('maven'))).toBeFalse();
     expect((await firstValueFrom(service.getSupportedRepoTypes())).size).toBe(0);
@@ -61,7 +61,7 @@ describe('SecurityScanSupportService', () => {
   });
 
   it('asks the backend once, however many callers check', async () => {
-    const service = createService(of({ data: ['maven'] }));
+    const service = createService(of(['maven']));
 
     await firstValueFrom(service.isSupported('maven'));
     await firstValueFrom(service.isSupported('npm'));

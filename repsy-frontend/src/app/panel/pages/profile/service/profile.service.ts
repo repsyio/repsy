@@ -15,10 +15,10 @@
 ///
 
 import { Injectable } from '@angular/core';
-import { map, Observable } from 'rxjs';
+import { Observable, tap } from 'rxjs';
 
 import { LoginInfo, ProfileInfo } from '../../../../../generated/api';
-import { ProfileControllerService } from '../../../../../generated/api';
+import { ProfileApi } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
 
 @Injectable({
@@ -26,29 +26,25 @@ import { AuthService } from '../../../../auth/pages/service/auth.service';
 })
 export class ProfileService {
   constructor(
-    private readonly profileControllerService: ProfileControllerService,
+    private readonly profileApi: ProfileApi,
     private readonly authService: AuthService,
   ) {}
 
   public get(): Observable<ProfileInfo> {
-    return this.profileControllerService.getProfile().pipe(map((r) => r.data!));
+    return this.profileApi.getProfile();
   }
 
   public updatePassword(password: string): Observable<LoginInfo> {
-    return this.profileControllerService.updatePassword({ password }).pipe(
-      map((r) => {
-        const loginInfo = r.data!;
-        this.authService.updateLoginInfo(loginInfo);
-        return loginInfo;
-      }),
-    );
+    return this.profileApi
+      .updatePassword({ password })
+      .pipe(tap((loginInfo) => this.authService.updateLoginInfo(loginInfo)));
   }
 
   public updateUsername(username: string): Observable<LoginInfo> {
-    return this.profileControllerService.updateUsername({ username }).pipe(map((r) => r.data!));
+    return this.profileApi.updateUsername({ username });
   }
 
   public deleteAccount(): Observable<void> {
-    return this.profileControllerService.deleteProfile().pipe(map(() => undefined));
+    return this.profileApi.deleteProfile();
   }
 }

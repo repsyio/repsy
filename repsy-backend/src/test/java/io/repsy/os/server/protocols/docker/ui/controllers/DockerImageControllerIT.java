@@ -31,6 +31,7 @@ import io.repsy.os.server.protocols.docker.shared.layer.services.LayerTxService;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.UntaggedManifestFinder;
+import io.repsy.os.server.shared.http.BareBodyAssertions;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -101,7 +102,12 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
   @MockitoBean private UsageUpdateService usageUpdateService;
 
   private static Map<String, Object> data(final String body) {
-    return JsonPath.read(body, "$.data");
+    return JsonPath.read(body, "$");
+  }
+
+  /** A manifest or config body: the stored text as a JSON string literal. */
+  private String text(final String body) {
+    return this.objectMapper.readValue(body, String.class);
   }
 
   private Repo dockerRepo() {
@@ -299,12 +305,10 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
       DockerImageControllerIT.this.seedImage(repo, "library/app", "latest");
 
       final var body =
-          DockerImageControllerIT.this.expectSuccess(
+          BareBodyAssertions.expectBare(
               DockerImageControllerIT.this.perform(
                   get("/api/docker/images/%s".formatted(repo.getName()))
-                      .header(AUTHORIZATION, DockerImageControllerIT.this.userBearerToken())),
-              "imagesFetched",
-              "Packages are fetched.");
+                      .header(AUTHORIZATION, DockerImageControllerIT.this.userBearerToken())));
       final var page = data(body);
       assertThat(page).containsKeys("content", "page");
       assertThat((java.util.List<?>) page.get("content")).hasSize(1);
@@ -313,16 +317,46 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
               "name", "size", "updatedAt", "tagCount", "untaggedManifestCount", "untaggedSize");
     }
 
+    @Test
+    @DisplayName("_ and % in q match literally on the image list and the tag list (RPS-1891)")
+    void likeWildcardsInQMatchLiterally() throws Exception {
+      final var it = DockerImageControllerIT.this;
+      final var repo = it.dockerRepo();
+      for (final var image : List.of("a_b", "axb")) {
+        for (final var tag : List.of("v_1", "vx1")) {
+          it.seedImage(repo, image, tag);
+        }
+      }
+
+      final var images = "/api/docker/images/%s".formatted(repo.getName());
+      final var auth = it.adminBearerToken();
+      final var literalImage =
+          it.perform(get(images).param("q", "a_b").header(AUTHORIZATION, auth));
+      literalImage
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.page.totalElements").value(1))
+          .andExpect(jsonPath("$.content[0].name").value("a_b"));
+      it.perform(get(images).param("q", "%").header(AUTHORIZATION, auth))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.page.totalElements").value(0));
+
+      it.perform(get(images + "/a_b/tags").param("q", "v_1").header(AUTHORIZATION, auth))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.page.totalElements").value(1))
+          .andExpect(jsonPath("$.content[0].name").value("v_1"));
+      it.perform(get(images + "/a_b/tags").param("q", "%").header(AUTHORIZATION, auth))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.page.totalElements").value(0));
+    }
+
     private Map<String, Object> listedImage(final Repo repo, final String imageName)
         throws Exception {
       final var body =
-          DockerImageControllerIT.this.expectSuccess(
+          BareBodyAssertions.expectBare(
               DockerImageControllerIT.this.perform(
                   get("/api/docker/images/%s".formatted(repo.getName()))
-                      .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
-              "imagesFetched",
-              "Packages are fetched.");
-      final List<Map<String, Object>> content = JsonPath.read(body, "$.data.content");
+                      .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())));
+      final List<Map<String, Object>> content = JsonPath.read(body, "$.content");
 
       return content.stream()
           .filter(image -> imageName.equals(image.get("name")))
@@ -332,12 +366,10 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
 
     private void deleteTag(final Repo repo, final String imageName, final String tag)
         throws Exception {
-      DockerImageControllerIT.this.expectSuccess(
+      BareBodyAssertions.expectNoContent(
           DockerImageControllerIT.this.perform(
               delete("/api/docker/images/%s/%s/tags/%s".formatted(repo.getName(), imageName, tag))
-                  .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
-          "tagDeleted",
-          "Tag deleted.");
+                  .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())));
     }
 
     @Test
@@ -410,7 +442,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("the summary of an image is its list row, and 404 imageNotFound when it is gone")
+    @DisplayName("the image detail is its list row, and 404 imageNotFound when it is gone")
     void summarizesOneImage() throws Exception {
       final var repo = DockerImageControllerIT.this.dockerRepo();
       DockerImageControllerIT.this.seedImage(repo, "app", "latest");
@@ -419,12 +451,10 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
       this.deleteTag(repo, "app", "latest");
 
       final var body =
-          DockerImageControllerIT.this.expectSuccess(
+          BareBodyAssertions.expectBare(
               DockerImageControllerIT.this.perform(
-                  get("/api/docker/images/%s/app/summary".formatted(repo.getName()))
-                      .header(AUTHORIZATION, token)),
-              "imageFetched",
-              "Image is fetched.");
+                  get("/api/docker/images/%s/app".formatted(repo.getName()))
+                      .header(AUTHORIZATION, token)));
 
       assertThat(data(body))
           .containsEntry("name", "app")
@@ -432,7 +462,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           .containsEntry("untaggedManifestCount", 1);
       DockerImageControllerIT.this.expectError(
           DockerImageControllerIT.this.perform(
-              get("/api/docker/images/%s/ghost/summary".formatted(repo.getName()))
+              get("/api/docker/images/%s/ghost".formatted(repo.getName()))
                   .header(AUTHORIZATION, token)),
           HttpStatus.NOT_FOUND,
           "imageNotFound",
@@ -448,13 +478,11 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
       final var token = DockerImageControllerIT.this.userBearerToken();
 
       final var detail =
-          DockerImageControllerIT.this.expectSuccess(
+          BareBodyAssertions.expectBare(
               DockerImageControllerIT.this.perform(
                   get("/api/docker/images/%s/%s/tags/%s"
                           .formatted(repo.getName(), image.imageName, image.tag))
-                      .header(AUTHORIZATION, token)),
-              "tagDetailFetched",
-              "Tag detail fetched");
+                      .header(AUTHORIZATION, token)));
       assertThat(data(detail))
           .containsKeys(
               "id",
@@ -467,24 +495,20 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
               "createdAt");
 
       final var manifest =
-          DockerImageControllerIT.this.expectSuccess(
+          BareBodyAssertions.expectBare(
               DockerImageControllerIT.this.perform(
                   get("/api/docker/images/%s/%s/manifests/%s"
                           .formatted(repo.getName(), image.imageName, image.manifestDigest))
-                      .header(AUTHORIZATION, token)),
-              "manifestFetched",
-              "Manifest fetched.");
-      assertThat(JsonPath.<String>read(manifest, "$.data")).isEqualTo(image.manifestJson);
+                      .header(AUTHORIZATION, token)));
+      assertThat(text(manifest)).isEqualTo(image.manifestJson);
 
       final var config =
-          DockerImageControllerIT.this.expectSuccess(
+          BareBodyAssertions.expectBare(
               DockerImageControllerIT.this.perform(
                   get("/api/docker/images/%s/%s/configs/%s"
                           .formatted(repo.getName(), image.imageName, image.configDigest))
-                      .header(AUTHORIZATION, token)),
-              "configFetched",
-              "Config fetched.");
-      assertThat(JsonPath.<String>read(config, "$.data")).contains("architecture");
+                      .header(AUTHORIZATION, token)));
+      assertThat(text(config)).contains("architecture");
     }
 
     @Test
@@ -494,14 +518,12 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
       final var image = DockerImageControllerIT.this.seedImage(repo, "app", "latest");
 
       final var manifest =
-          DockerImageControllerIT.this.expectSuccess(
+          BareBodyAssertions.expectBare(
               DockerImageControllerIT.this.perform(
                   get("/api/docker/images/%s/%s/manifests/%s"
                           .formatted(repo.getName(), image.imageName, image.tag))
-                      .header(AUTHORIZATION, DockerImageControllerIT.this.userBearerToken())),
-              "manifestFetched",
-              "Manifest fetched.");
-      assertThat(JsonPath.<String>read(manifest, "$.data")).isEqualTo(image.manifestJson);
+                      .header(AUTHORIZATION, DockerImageControllerIT.this.userBearerToken())));
+      assertThat(text(manifest)).isEqualTo(image.manifestJson);
     }
 
     @Test
@@ -513,14 +535,12 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
 
       for (int i = 0; i < image.childDigests.size(); i++) {
         final var manifest =
-            DockerImageControllerIT.this.expectSuccess(
+            BareBodyAssertions.expectBare(
                 DockerImageControllerIT.this.perform(
                     get("/api/docker/images/%s/%s/manifests/%s"
                             .formatted(repo.getName(), image.imageName, image.childDigests.get(i)))
-                        .header(AUTHORIZATION, token)),
-                "manifestFetched",
-                "Manifest fetched.");
-        assertThat(JsonPath.<String>read(manifest, "$.data")).isEqualTo(image.childJsons.get(i));
+                        .header(AUTHORIZATION, token)));
+        assertThat(text(manifest)).isEqualTo(image.childJsons.get(i));
       }
     }
 
@@ -533,14 +553,12 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
 
       for (final var reference : List.of(image.tag, image.listDigest)) {
         final var manifest =
-            DockerImageControllerIT.this.expectSuccess(
+            BareBodyAssertions.expectBare(
                 DockerImageControllerIT.this.perform(
                     get("/api/docker/images/%s/%s/manifests/%s"
                             .formatted(repo.getName(), image.imageName, reference))
-                        .header(AUTHORIZATION, token)),
-                "manifestFetched",
-                "Manifest fetched.");
-        assertThat(JsonPath.<String>read(manifest, "$.data")).isEqualTo(image.listJson);
+                        .header(AUTHORIZATION, token)));
+        assertThat(text(manifest)).isEqualTo(image.listJson);
       }
     }
 
@@ -571,15 +589,13 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
       final var token = DockerImageControllerIT.this.userBearerToken();
 
       final var tags =
-          DockerImageControllerIT.this.expectSuccess(
+          BareBodyAssertions.expectBare(
               DockerImageControllerIT.this.perform(
                   get("/api/docker/images/%s/app/tags".formatted(repo.getName()))
                       .param("q", "latest")
                       .param("page", "0")
                       .param("size", "1")
-                      .header(AUTHORIZATION, token)),
-              "imageTagsFetched",
-              "Image tags fetched.");
+                      .header(AUTHORIZATION, token)));
       final var tagPage = data(tags);
       assertThat(tagPage).containsKeys("content", "page");
       assertThat((java.util.List<?>) tagPage.get("content")).hasSize(1);
@@ -591,14 +607,12 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           .containsEntry("totalElements", 1);
 
       final var manifests =
-          DockerImageControllerIT.this.expectSuccess(
+          BareBodyAssertions.expectBare(
               DockerImageControllerIT.this.perform(
                   get("/api/docker/images/%s/app/tags/latest/manifests".formatted(repo.getName()))
                       .param("page", "0")
                       .param("size", "10")
-                      .header(AUTHORIZATION, token)),
-              "tagLayersFetched",
-              "Tag layers fetched.");
+                      .header(AUTHORIZATION, token)));
       final var manifestPage = data(manifests);
       assertThat((java.util.List<?>) manifestPage.get("content")).hasSize(1);
       assertThat((Map<String, Object>) ((java.util.List<?>) manifestPage.get("content")).getFirst())
@@ -606,19 +620,17 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("resolves the default tag through the image route")
-    void resolvesDefaultTag() throws Exception {
+    @DisplayName("the image route returns the image row, not a tag")
+    void imageRouteReturnsTheImageRow() throws Exception {
       final var repo = DockerImageControllerIT.this.dockerRepo();
       DockerImageControllerIT.this.seedImage(repo, "app", "latest");
 
       final var body =
-          DockerImageControllerIT.this.expectSuccess(
+          BareBodyAssertions.expectBare(
               DockerImageControllerIT.this.perform(
                   get("/api/docker/images/%s/app".formatted(repo.getName()))
-                      .header(AUTHORIZATION, DockerImageControllerIT.this.userBearerToken())),
-              "tagDetailFetched",
-              "Tag detail fetched");
-      assertThat(data(body)).containsEntry("name", "latest").containsEntry("imageName", "app");
+                      .header(AUTHORIZATION, DockerImageControllerIT.this.userBearerToken())));
+      assertThat(data(body)).containsEntry("name", "app").containsEntry("tagCount", 1);
     }
 
     @Test
@@ -710,14 +722,12 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
 
       for (final var image : List.of(app, other)) {
         final var config =
-            DockerImageControllerIT.this.expectSuccess(
+            BareBodyAssertions.expectBare(
                 DockerImageControllerIT.this.perform(
                     get("/api/docker/images/%s/%s/configs/%s"
                             .formatted(repo.getName(), image.imageName, image.configDigest))
-                        .header(AUTHORIZATION, token)),
-                "configFetched",
-                "Config fetched.");
-        assertThat(JsonPath.<String>read(config, "$.data")).contains("architecture");
+                        .header(AUTHORIZATION, token)));
+        assertThat(text(config)).contains("architecture");
       }
 
       DockerImageControllerIT.this.expectError(
@@ -827,25 +837,21 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
 
     private void deleteTag(final Repo repo, final String imageName, final String tag)
         throws Exception {
-      DockerImageControllerIT.this.expectSuccess(
+      BareBodyAssertions.expectNoContent(
           DockerImageControllerIT.this.perform(
               delete("/api/docker/images/%s/%s/tags/%s".formatted(repo.getName(), imageName, tag))
-                  .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
-          "tagDeleted",
-          "Tag deleted.");
+                  .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())));
     }
 
     /** The whole first page of the repo's images, by image name. */
     private Map<String, Map<String, Object>> listedImages(final Repo repo) throws Exception {
       final var body =
-          DockerImageControllerIT.this.expectSuccess(
+          BareBodyAssertions.expectBare(
               DockerImageControllerIT.this.perform(
                   get("/api/docker/images/%s".formatted(repo.getName()))
                       .param("size", "100")
-                      .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
-              "imagesFetched",
-              "Packages are fetched.");
-      final List<Map<String, Object>> content = JsonPath.read(body, "$.data.content");
+                      .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())));
+      final List<Map<String, Object>> content = JsonPath.read(body, "$.content");
 
       return content.stream()
           .collect(Collectors.toMap(image -> (String) image.get("name"), image -> image));
@@ -945,7 +951,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("the summary of one image carries the same untagged stats as its list row")
+    @DisplayName("the detail of one image carries the same untagged stats as its list row")
     void summaryMatchesTheListRow() throws Exception {
       final var repo = DockerImageControllerIT.this.dockerRepo();
       DockerImageControllerIT.this.seedImage(repo, "app", "latest");
@@ -953,12 +959,10 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
       this.deleteTag(repo, "app", "latest");
 
       final var body =
-          DockerImageControllerIT.this.expectSuccess(
+          BareBodyAssertions.expectBare(
               DockerImageControllerIT.this.perform(
-                  get("/api/docker/images/%s/app/summary".formatted(repo.getName()))
-                      .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
-              "imageFetched",
-              "Image is fetched.");
+                  get("/api/docker/images/%s/app".formatted(repo.getName()))
+                      .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())));
       final var summary = data(body);
       final var listed = this.listedImages(repo).get("app");
 
@@ -998,18 +1002,14 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("deletes a tag while keeping the image and returns a full success envelope")
+    @DisplayName("deletes a tag with 204 while keeping the image")
     void deletesTag() throws Exception {
       final var repo = DockerImageControllerIT.this.dockerRepo();
       final var fixture = DockerImageControllerIT.this.seedImage(repo, "app", "latest");
-      final var body =
-          DockerImageControllerIT.this.expectSuccess(
-              DockerImageControllerIT.this.perform(
-                  delete("/api/docker/images/%s/app/tags/latest".formatted(repo.getName()))
-                      .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
-              "tagDeleted",
-              "Tag deleted.");
-      assertThat((Object) JsonPath.read(body, "$.data")).isNull();
+      BareBodyAssertions.expectNoContent(
+          DockerImageControllerIT.this.perform(
+              delete("/api/docker/images/%s/app/tags/latest".formatted(repo.getName()))
+                  .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())));
       DockerImageControllerIT.this.expectError(
           DockerImageControllerIT.this.perform(
               delete("/api/docker/images/%s/app/tags/latest".formatted(repo.getName()))
@@ -1027,33 +1027,27 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           .extracting(manifest -> manifest.getDigest())
           .containsExactly(fixture.manifestDigest);
       assertThat(storageDirOf(repo).resolve("manifests").resolve(fixture.manifestDigest)).exists();
-      DockerImageControllerIT.this.expectSuccess(
+      BareBodyAssertions.expectBare(
           DockerImageControllerIT.this.perform(
               get("/api/docker/images/%s/app/manifests/%s"
                       .formatted(repo.getName(), fixture.manifestDigest))
-                  .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
-          "manifestFetched",
-          "Manifest fetched.");
+                  .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())));
     }
 
     @Test
-    @DisplayName("deletes an image and the orphan layer route is not shadowed")
+    @DisplayName("deletes the orphan layers and an image, both 204")
     void deletesImageAndOrphans() throws Exception {
       final var repo = DockerImageControllerIT.this.privateDockerRepo();
       DockerImageControllerIT.this.seedImage(repo, "app", "latest");
       final var token = DockerImageControllerIT.this.adminBearerToken();
-      DockerImageControllerIT.this.expectSuccess(
+      BareBodyAssertions.expectNoContent(
           DockerImageControllerIT.this.perform(
-              delete("/api/docker/images/blobs/%s/orphan-layers".formatted(repo.getName()))
-                  .header(AUTHORIZATION, token)),
-          "orphanLayersDeleted",
-          "Orphan layers deleted.");
-      DockerImageControllerIT.this.expectSuccess(
+              delete("/api/repos/%s/docker/orphan-layers".formatted(repo.getName()))
+                  .header(AUTHORIZATION, token)));
+      BareBodyAssertions.expectNoContent(
           DockerImageControllerIT.this.perform(
               delete("/api/docker/images/%s/app".formatted(repo.getName()))
-                  .header(AUTHORIZATION, token)),
-          "imageDeleted",
-          "Image deleted.");
+                  .header(AUTHORIZATION, token)));
       DockerImageControllerIT.this.expectError(
           DockerImageControllerIT.this.perform(
               get("/api/docker/images/%s/app/tags/latest".formatted(repo.getName()))
@@ -1072,12 +1066,117 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
       final var token = DockerImageControllerIT.this.userBearerToken();
       DockerImageControllerIT.this.expectError(
           DockerImageControllerIT.this.perform(
-              delete("/api/docker/images/blobs/%s/orphan-layers".formatted(repo.getName()))
+              delete("/api/repos/%s/docker/orphan-layers".formatted(repo.getName()))
                   .header(AUTHORIZATION, token)),
           HttpStatus.FORBIDDEN,
           "accessDenied",
           "accessDenied",
           "Access Denied. Please check your credentials.");
+    }
+  }
+
+  @Nested
+  @DisplayName("routes without a literal where a repo name can sit (RPS-1781)")
+  class LiteralFreeRoutes {
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = {
+          "get:/api/docker/images/%s/app/summary",
+          "delete:/api/docker/images/blobs/%s/orphan-layers",
+          "delete:/api/docker/images/manifests/%s/untagged"
+        })
+    @DisplayName("the old routes are gone: 404")
+    void oldRoutesAre404(final String route) throws Exception {
+      final var it = DockerImageControllerIT.this;
+      final var repo = it.dockerRepo();
+      it.seedImage(repo, "app", "latest");
+      final var path = route.substring(route.indexOf(':') + 1).formatted(repo.getName());
+      final var request = route.startsWith("get:") ? get(path) : delete(path);
+
+      it.perform(request.header(AUTHORIZATION, it.adminBearerToken()))
+          .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("a repo named blobs and images named like route literals do not collide")
+    void literalNamesDoNotCollide() throws Exception {
+      final var it = DockerImageControllerIT.this;
+      final var repo = it.seedRepo(RepoType.DOCKER, "blobs");
+      final var token = it.adminBearerToken();
+      for (final var name : List.of("manifests", "tags", "configs", "blobs", "untagged")) {
+        it.seedImage(repo, name, "latest");
+      }
+
+      for (final var name : List.of("manifests", "tags", "configs", "blobs", "untagged")) {
+        final var image =
+            BareBodyAssertions.expectBare(
+                it.perform(
+                    get("/api/docker/images/%s/%s".formatted(repo.getName(), name))
+                        .header(AUTHORIZATION, token)));
+        assertThat(data(image)).containsEntry("name", name);
+        final var tags =
+            BareBodyAssertions.expectBare(
+                it.perform(
+                    get("/api/docker/images/%s/%s/tags".formatted(repo.getName(), name))
+                        .header(AUTHORIZATION, token)));
+        assertThat(data(tags)).containsKey("content");
+      }
+
+      BareBodyAssertions.expectNoContent(
+          it.perform(
+              delete("/api/repos/%s/docker/orphan-layers".formatted(repo.getName()))
+                  .header(AUTHORIZATION, token)));
+      final var cleaned =
+          BareBodyAssertions.expectBare(
+              it.perform(
+                  delete("/api/repos/%s/docker/untagged-manifests".formatted(repo.getName()))
+                      .header(AUTHORIZATION, token)));
+      assertThat(data(cleaned)).containsEntry("deletedManifests", 0);
+    }
+
+    @Test
+    @DisplayName("an image with several segments is addressed by the image query and the - name")
+    void multiSegmentImageUsesTheImageQuery() throws Exception {
+      final var it = DockerImageControllerIT.this;
+      final var repo = it.dockerRepo();
+      final var token = it.adminBearerToken();
+      it.seedImage(repo, "team/app", "latest");
+
+      final var image =
+          BareBodyAssertions.expectBare(
+              it.perform(
+                  get("/api/docker/images/%s/-".formatted(repo.getName()))
+                      .param("image", "team/app")
+                      .header(AUTHORIZATION, token)));
+      assertThat(data(image)).containsEntry("name", "team/app");
+
+      final var tags =
+          BareBodyAssertions.expectBare(
+              it.perform(
+                  get("/api/docker/images/%s/-/tags".formatted(repo.getName()))
+                      .param("image", "team/app")
+                      .header(AUTHORIZATION, token)));
+      assertThat((List<?>) data(tags).get("content")).hasSize(1);
+
+      final var detail =
+          BareBodyAssertions.expectBare(
+              it.perform(
+                  get("/api/docker/images/%s/-/tags/latest".formatted(repo.getName()))
+                      .param("image", "team/app")
+                      .header(AUTHORIZATION, token)));
+      assertThat(data(detail)).containsEntry("imageName", "team/app");
+
+      BareBodyAssertions.expectNoContent(
+          it.perform(
+              delete("/api/docker/images/%s/-".formatted(repo.getName()))
+                  .param("image", "team/app")
+                  .header(AUTHORIZATION, token)));
+      it.perform(
+              get("/api/docker/images/%s/-".formatted(repo.getName()))
+                  .param("image", "team/app")
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isNotFound());
     }
   }
 
@@ -1151,16 +1250,16 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
 
       this.list(repo, IMAGES, "sort", "name,asc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].name").value("app"));
+          .andExpect(jsonPath("$.content[0].name").value("app"));
       this.list(repo, IMAGES, "sort", "name,desc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].name").value("other"));
+          .andExpect(jsonPath("$.content[0].name").value("other"));
       this.list(repo, TAGS, "sort", "name,asc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].name").value("latest"));
+          .andExpect(jsonPath("$.content[0].name").value("latest"));
       this.list(repo, TAGS, "sort", "name,desc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].name").value("stable"));
+          .andExpect(jsonPath("$.content[0].name").value("stable"));
     }
 
     @ParameterizedTest(name = "{0}")

@@ -15,13 +15,20 @@
  */
 package io.repsy.os.server.protocols.shared.controllers;
 
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectBare;
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectCreated;
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectNoContent;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.http.HttpHeaders.CACHE_CONTROL;
+import static org.springframework.http.HttpHeaders.LOCATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
@@ -88,12 +95,6 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
   private static final String REPO_NOT_FOUND_TEXT = "Repository not found";
   private static final String UNAUTHORIZED_TEXT =
       "Please log in: the credentials are missing or invalid, or the account is gone.";
-  private static final Map<String, String> SUCCESS_TEXTS =
-      Map.of(
-          "tokenCreated", "Deploy token created.",
-          "tokenRevoked", "Deploy token revoked.",
-          "tokenRotated", "Deploy token rotated.",
-          "tokensFetched", "Token fetched.");
   private static final Instant BASE_TIME = Instant.parse("2026-01-01T00:00:00Z");
 
   private static final String[] TOKEN_INFO_KEYS = {"token", "username"};
@@ -245,15 +246,6 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
   // Response helpers
   // ---------------------------------------------------------------------------------------------
 
-  /**
-   * Asserts a 200 SUCCESS envelope (exact key set, {@code errorCode} null, {@code text} resolved
-   * from messages.properties) and returns the raw body for further assertions on {@code data}.
-   */
-  private static String expectSuccess(final ResultActions result, final String msgId)
-      throws Exception {
-    return expectSuccess(result, msgId, SUCCESS_TEXTS.get(msgId));
-  }
-
   private static void expectUnsupportedMediaType(final ResultActions result) throws Exception {
     expectError(
         result,
@@ -307,10 +299,10 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final long number,
       final long totalElements,
       final long totalPages) {
-    final Map<String, Object> data = JsonPath.read(body, "$.data");
+    final Map<String, Object> data = JsonPath.read(body, "$");
     assertThat(data).containsOnlyKeys("content", "page");
 
-    final Map<String, Object> page = JsonPath.read(body, "$.data.page");
+    final Map<String, Object> page = JsonPath.read(body, "$.page");
     assertThat(page).containsOnlyKeys(PAGE_KEYS);
     assertThat(number(page.get("size"))).as("size").isEqualTo(size);
     assertThat(number(page.get("number"))).as("number").isEqualTo(number);
@@ -319,7 +311,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
   }
 
   private static List<String> namesOf(final String body) {
-    final List<Map<String, Object>> content = JsonPath.read(body, "$.data.content");
+    final List<Map<String, Object>> content = JsonPath.read(body, "$.content");
     return content.stream().map(node -> (String) node.get("name")).toList();
   }
 
@@ -586,7 +578,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var expiration = Instant.now().plus(10, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MICROS);
 
       final var body =
-          expectSuccess(
+          expectCreated(
               it.perform(
                   post(tokensUrl(repo))
                       .header(AUTHORIZATION, it.adminBearerToken())
@@ -595,10 +587,9 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
                           "{\"name\":\"%s\",\"username\":\"deployer\",\"description\":\"for ci\","
                                   .formatted(name)
                               + "\"readOnly\":true,\"expirationDate\":\"%s\"}"
-                                  .formatted(expiration))),
-              "tokenCreated");
+                                  .formatted(expiration))));
 
-      final Map<String, Object> data = JsonPath.read(body, "$.data");
+      final Map<String, Object> data = JsonPath.read(body, "$");
       assertThat(data).containsOnlyKeys(TOKEN_INFO_KEYS).containsEntry("username", "deployer");
       assertThat((String) data.get("token")).matches(DEPLOY_TOKEN_PATTERN);
 
@@ -617,6 +608,30 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("answers 201 with the token Location and no-store, and rotate answers no-store")
+    void createdHeadersAndBareBodies() throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      final var token = it.adminBearerToken();
+
+      final var created =
+          it.perform(
+                  post(tokensUrl(repo))
+                      .header(AUTHORIZATION, token)
+                      .contentType(MediaType.APPLICATION_JSON)
+                      .content(form("headers")))
+              .andExpect(header().string(CACHE_CONTROL, containsString("no-store")));
+      expectCreated(created);
+
+      final var row = it.tokensOf(repo).getFirst();
+      assertThat(created.andReturn().getResponse().getHeader(LOCATION))
+          .endsWith(tokensUrl(repo) + "/" + row.getId());
+
+      it.perform(post(rotateUrl(repo, row.getId())).header(AUTHORIZATION, token))
+          .andExpect(header().string(CACHE_CONTROL, containsString("no-store")));
+    }
+
+    @Test
     @DisplayName("returns the secret once; only its hash is persisted and never listed again")
     void secretIsReturnedOnceAndStoredHashed() throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
@@ -624,14 +639,13 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var token = it.adminBearerToken();
 
       final var created =
-          expectSuccess(
+          expectCreated(
               it.perform(
                   post(tokensUrl(repo))
                       .header(AUTHORIZATION, token)
                       .contentType(MediaType.APPLICATION_JSON)
-                      .content(form("once"))),
-              "tokenCreated");
-      final String secret = JsonPath.read(created, "$.data.token");
+                      .content(form("once"))));
+      final String secret = JsonPath.read(created, "$.token");
 
       final var row = it.tokensOf(repo).getFirst();
       assertThat(row.getToken()).isEqualTo(DeployTokenHash.hash(secret));
@@ -639,9 +653,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       assertThat(it.deployTokenRepository.findByRepoIdAndToken(repo.getStorageKey(), secret))
           .isEmpty();
 
-      final var listed =
-          expectSuccess(
-              it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, token)), "tokensFetched");
+      final var listed = expectBare(it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, token)));
       assertThat(listed).doesNotContain(secret);
     }
 
@@ -653,15 +665,14 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var before = Instant.now();
 
       final var body =
-          expectSuccess(
+          expectCreated(
               it.perform(
                   post(tokensUrl(repo))
                       .header(AUTHORIZATION, it.adminBearerToken())
                       .contentType(MediaType.APPLICATION_JSON)
-                      .content(form("defaults"))),
-              "tokenCreated");
+                      .content(form("defaults"))));
 
-      final String username = JsonPath.read(body, "$.data.username");
+      final String username = JsonPath.read(body, "$.username");
       assertThat(username).matches(DEPLOY_USERNAME_PATTERN);
 
       final var row = it.tokensOf(repo).getFirst();
@@ -681,15 +692,14 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var repo = it.createRepo(RepoType.MAVEN);
 
       final var body =
-          expectSuccess(
+          expectCreated(
               it.perform(
                   post(tokensUrl(repo))
                       .header(AUTHORIZATION, it.adminBearerToken())
                       .contentType(MediaType.APPLICATION_JSON)
-                      .content("{\"name\":\"blank-user\",\"username\":\"\"}")),
-              "tokenCreated");
+                      .content("{\"name\":\"blank-user\",\"username\":\"\"}")));
 
-      assertThat((String) JsonPath.read(body, "$.data.username")).matches(DEPLOY_USERNAME_PATTERN);
+      assertThat((String) JsonPath.read(body, "$.username")).matches(DEPLOY_USERNAME_PATTERN);
     }
 
     /** {@code expirationDate} in the past is not validated; the duration is clamped to 1 day. */
@@ -700,13 +710,12 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var repo = it.createRepo(RepoType.MAVEN);
       final var past = Instant.now().minus(5, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MICROS);
 
-      expectSuccess(
+      expectCreated(
           it.perform(
               post(tokensUrl(repo))
                   .header(AUTHORIZATION, it.adminBearerToken())
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content("{\"name\":\"past\",\"expirationDate\":\"%s\"}".formatted(past))),
-          "tokenCreated");
+                  .content("{\"name\":\"past\",\"expirationDate\":\"%s\"}".formatted(past))));
 
       final var row = it.tokensOf(repo).getFirst();
       assertThat(row.getExpirationDate()).isEqualTo(past);
@@ -749,14 +758,13 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
           lastDay.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().minusSeconds(1);
       final var startOfNextDay = lastDay.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
 
-      expectSuccess(
+      expectCreated(
           it.perform(
               post(tokensUrl(repo))
                   .header(AUTHORIZATION, it.adminBearerToken())
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(
-                      "{\"name\":\"last\",\"expirationDate\":\"%s\"}".formatted(endOfLastDay))),
-          "tokenCreated");
+                      "{\"name\":\"last\",\"expirationDate\":\"%s\"}".formatted(endOfLastDay))));
       assertThat(it.tokensOf(repo).getFirst().getTokenDurationDay()).isEqualTo(365);
 
       expectError(
@@ -780,13 +788,12 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
 
-      expectSuccess(
+      expectCreated(
           it.perform(
               post(tokensUrl(repo))
                   .header(AUTHORIZATION, it.adminBearerToken())
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(json)),
-          "tokenCreated");
+                  .content(json)));
 
       assertThat(it.tokensOf(repo)).hasSize(1);
     }
@@ -813,13 +820,12 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
 
-      expectSuccess(
+      expectCreated(
           it.perform(
               post(tokensUrl(repo))
                   .header(AUTHORIZATION, it.adminBearerToken())
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(form(name))),
-          "tokenCreated");
+                  .content(form(name))));
 
       assertThat(it.tokensOf(repo)).extracting(RepoDeployToken::getName).containsExactly(name);
     }
@@ -839,24 +845,22 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var token = it.adminBearerToken();
 
       final var first =
-          expectSuccess(
+          expectCreated(
               it.perform(
                   post(tokensUrl(repo))
                       .header(AUTHORIZATION, token)
                       .contentType(MediaType.APPLICATION_JSON)
-                      .content(form("dup"))),
-              "tokenCreated");
+                      .content(form("dup"))));
       final var second =
-          expectSuccess(
+          expectCreated(
               it.perform(
                   post(tokensUrl(repo))
                       .header(AUTHORIZATION, token)
                       .contentType(MediaType.APPLICATION_JSON)
-                      .content(form("dup"))),
-              "tokenCreated");
+                      .content(form("dup"))));
 
-      assertThat((String) JsonPath.read(first, "$.data.token"))
-          .isNotEqualTo((String) JsonPath.read(second, "$.data.token"));
+      assertThat((String) JsonPath.read(first, "$.token"))
+          .isNotEqualTo((String) JsonPath.read(second, "$.token"));
       assertThat(it.tokensOf(repo))
           .extracting(RepoDeployToken::getName)
           .containsExactly("dup", "dup");
@@ -871,13 +875,12 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var token = it.adminBearerToken();
 
       for (final var repo : List.of(repoA, repoB)) {
-        expectSuccess(
+        expectCreated(
             it.perform(
                 post(tokensUrl(repo))
                     .header(AUTHORIZATION, token)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(form("shared"))),
-            "tokenCreated");
+                    .content(form("shared"))));
       }
 
       assertThat(it.tokensOf(repoA)).hasSize(1);
@@ -979,11 +982,9 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var repo = it.createRepo(RepoType.MAVEN);
 
       final var body =
-          expectSuccess(
-              it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, it.adminBearerToken())),
-              "tokensFetched");
+          expectBare(it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, it.adminBearerToken())));
 
-      final List<Object> content = JsonPath.read(body, "$.data.content");
+      final List<Object> content = JsonPath.read(body, "$.content");
       assertThat(content).isEmpty();
       assertPage(body, 10, 0, 0, 0);
     }
@@ -1006,11 +1007,9 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
               .toList();
 
       final var body =
-          expectSuccess(
-              it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, it.adminBearerToken())),
-              "tokensFetched");
+          expectBare(it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, it.adminBearerToken())));
 
-      final List<Map<String, Object>> content = JsonPath.read(body, "$.data.content");
+      final List<Map<String, Object>> content = JsonPath.read(body, "$.content");
       assertThat(content).hasSize(3);
       for (var i = 0; i < expected.size(); i++) {
         final var node = content.get(i);
@@ -1045,11 +1044,9 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       it.reload(seeded.getId());
 
       final var body =
-          expectSuccess(
-              it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, it.adminBearerToken())),
-              "tokensFetched");
+          expectBare(it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, it.adminBearerToken())));
 
-      final List<Map<String, Object>> content = JsonPath.read(body, "$.data.content");
+      final List<Map<String, Object>> content = JsonPath.read(body, "$.content");
       assertThat(content).hasSize(1);
       assertThat(content.getFirst())
           .containsOnlyKeys("id", "name", "readOnly", "expirationDate", "createdAt");
@@ -1065,9 +1062,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       it.seedToken(other, "theirs");
 
       final var body =
-          expectSuccess(
-              it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, it.adminBearerToken())),
-              "tokensFetched");
+          expectBare(it.perform(get(tokensUrl(repo)).header(AUTHORIZATION, it.adminBearerToken())));
 
       assertThat(namesOf(body)).containsExactly("mine");
       assertPage(body, 10, 0, 1, 1);
@@ -1092,13 +1087,12 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
 
       for (final var entry : expectedByPage.entrySet()) {
         final var body =
-            expectSuccess(
+            expectBare(
                 it.perform(
                     get(tokensUrl(repo))
                         .header(AUTHORIZATION, token)
                         .param("page", String.valueOf(entry.getKey()))
-                        .param("size", "2")),
-                "tokensFetched");
+                        .param("size", "2")));
 
         assertThat(namesOf(body)).as("page %d", entry.getKey()).isEqualTo(entry.getValue());
         assertPage(body, 2, entry.getKey(), 5, 3);
@@ -1113,15 +1107,14 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       it.seedToken(repo, "only");
 
       final var body =
-          expectSuccess(
+          expectBare(
               it.perform(
                   get(tokensUrl(repo))
                       .header(AUTHORIZATION, it.adminBearerToken())
                       .param("page", "5")
-                      .param("size", "2")),
-              "tokensFetched");
+                      .param("size", "2")));
 
-      final List<Object> content = JsonPath.read(body, "$.data.content");
+      final List<Object> content = JsonPath.read(body, "$.content");
       assertThat(content).isEmpty();
       assertPage(body, 2, 5, 1, 1);
     }
@@ -1137,17 +1130,15 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       it.seedToken(repo, "charlie");
 
       final var ascending =
-          expectSuccess(
+          expectBare(
               it.perform(
-                  get(tokensUrl(repo)).header(AUTHORIZATION, token).param("sort", "name,asc")),
-              "tokensFetched");
+                  get(tokensUrl(repo)).header(AUTHORIZATION, token).param("sort", "name,asc")));
       assertThat(namesOf(ascending)).containsExactly("alpha", "bravo", "charlie");
 
       final var descending =
-          expectSuccess(
+          expectBare(
               it.perform(
-                  get(tokensUrl(repo)).header(AUTHORIZATION, token).param("sort", "name,desc")),
-              "tokensFetched");
+                  get(tokensUrl(repo)).header(AUTHORIZATION, token).param("sort", "name,desc")));
       assertThat(namesOf(descending)).containsExactly("charlie", "bravo", "alpha");
     }
 
@@ -1172,12 +1163,11 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
 
       for (final var direction : List.of("asc", "desc")) {
         final var body =
-            expectSuccess(
+            expectBare(
                 it.perform(
                     get(tokensUrl(repo))
                         .header(AUTHORIZATION, token)
-                        .param("sort", property + "," + direction)),
-                "tokensFetched");
+                        .param("sort", property + "," + direction)));
 
         assertThat(namesOf(body)).as("%s,%s", property, direction).hasSize(2);
         assertPage(body, 10, 0, 2, 1);
@@ -1195,21 +1185,19 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       it.seedToken(repo, "middle", false, BASE_TIME.plus(200, ChronoUnit.DAYS));
 
       final var ascending =
-          expectSuccess(
+          expectBare(
               it.perform(
                   get(tokensUrl(repo))
                       .header(AUTHORIZATION, token)
-                      .param("sort", "expirationDate,asc")),
-              "tokensFetched");
+                      .param("sort", "expirationDate,asc")));
       assertThat(namesOf(ascending)).containsExactly("early", "middle", "late");
 
       final var descending =
-          expectSuccess(
+          expectBare(
               it.perform(
                   get(tokensUrl(repo))
                       .header(AUTHORIZATION, token)
-                      .param("sort", "expirationDate,desc")),
-              "tokensFetched");
+                      .param("sort", "expirationDate,desc")));
       assertThat(namesOf(descending)).containsExactly("late", "middle", "early");
     }
 
@@ -1287,12 +1275,11 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       it.seedToken(repo, "only");
 
       final var body =
-          expectSuccess(
+          expectBare(
               it.perform(
                   get(tokensUrl(repo))
                       .header(AUTHORIZATION, it.adminBearerToken())
-                      .param("size", "100")),
-              "tokensFetched");
+                      .param("size", "100")));
 
       assertThat(namesOf(body)).containsExactly("only");
       assertPage(body, 100, 0, 1, 1);
@@ -1330,12 +1317,11 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var oldSecret = before.token();
 
       final var body =
-          expectSuccess(
+          expectBare(
               it.perform(
-                  post(rotateUrl(repo, before.id())).header(AUTHORIZATION, it.adminBearerToken())),
-              "tokenRotated");
+                  post(rotateUrl(repo, before.id())).header(AUTHORIZATION, it.adminBearerToken())));
 
-      final String newSecret = JsonPath.read(body, "$.data");
+      final String newSecret = JsonPath.read(body, "$");
       assertThat(newSecret).matches(DEPLOY_TOKEN_PATTERN).isNotEqualTo(oldSecret);
 
       // Only the secret changes; id, name, username, description, readOnly, expiry, duration and
@@ -1363,10 +1349,9 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var before = it.stateOf(seeded.getId());
       final var rotatedAt = Instant.now();
 
-      expectSuccess(
+      expectBare(
           it.perform(
-              post(rotateUrl(repo, before.id())).header(AUTHORIZATION, it.adminBearerToken())),
-          "tokenRotated");
+              post(rotateUrl(repo, before.id())).header(AUTHORIZATION, it.adminBearerToken())));
 
       final var after = it.stateOf(before.id());
       assertThat(after.username()).matches(DEPLOY_USERNAME_PATTERN).isNotEqualTo(before.username());
@@ -1389,10 +1374,9 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var bystander = it.seedToken(repo, "bystander");
       final var bystanderBefore = it.stateOf(bystander.getId());
 
-      expectSuccess(
+      expectBare(
           it.perform(
-              post(rotateUrl(repo, target.getId())).header(AUTHORIZATION, it.adminBearerToken())),
-          "tokenRotated");
+              post(rotateUrl(repo, target.getId())).header(AUTHORIZATION, it.adminBearerToken())));
 
       assertThat(it.stateOf(bystanderBefore.id())).isEqualTo(bystanderBefore);
     }
@@ -1451,7 +1435,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
     @EnumSource(
         value = RepoType.class,
         names = {"MAVEN", "NPM", "DOCKER"})
-    @DisplayName("removes the row and returns a null-data success envelope")
+    @DisplayName("removes the row and answers 204 with an empty body")
     void revokesToken(final RepoType type) throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(type);
@@ -1460,15 +1444,11 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var targetBefore = it.stateOf(target.getId());
       final var bystanderBefore = it.stateOf(bystander.getId());
 
-      final var body =
-          expectSuccess(
-              it.perform(
-                  delete(tokenUrl(repo, targetBefore.id()))
-                      .header(AUTHORIZATION, it.adminBearerToken())),
-              "tokenRevoked");
+      expectNoContent(
+          it.perform(
+              delete(tokenUrl(repo, targetBefore.id()))
+                  .header(AUTHORIZATION, it.adminBearerToken())));
 
-      final Object data = JsonPath.read(body, "$.data");
-      assertThat(data).isNull();
       it.entityManager.flush();
       it.entityManager.clear();
       assertThat(it.deployTokenRepository.findById(targetBefore.id())).isEmpty();
@@ -1486,9 +1466,8 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var repo = it.createRepo(RepoType.MAVEN);
       final var target = it.seedToken(repo, "twice");
       final var token = it.adminBearerToken();
-      expectSuccess(
-          it.perform(delete(tokenUrl(repo, target.getId())).header(AUTHORIZATION, token)),
-          "tokenRevoked");
+      expectNoContent(
+          it.perform(delete(tokenUrl(repo, target.getId())).header(AUTHORIZATION, token)));
       it.entityManager.flush();
 
       expectTokenNotFound(

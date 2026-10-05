@@ -320,7 +320,7 @@ test.describe('AUTH-12 permission failure is not a lost session', { tag: ['@clou
       await userPage.request.get(`${repoUrl}/usage`, { headers: authorization }),
       await userPage.request.get(`${repoUrl}/settings`, { headers: authorization }),
       await userPage.request.get(`${repoUrl}/deploy-tokens`, { headers: authorization }),
-      await userPage.request.patch(`${repoUrl}/description`, {
+      await userPage.request.patch(repoUrl, {
         headers: authorization,
         data: { description: 'not allowed' },
       }),

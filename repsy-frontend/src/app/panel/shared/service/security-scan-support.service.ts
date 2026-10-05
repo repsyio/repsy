@@ -18,7 +18,7 @@ import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { catchError, map, shareReplay } from 'rxjs/operators';
 
-import { SecurityScanControllerService } from '../../../../generated/api';
+import { SecurityScansApi } from '../../../../generated/api';
 import { toApiRepoType } from '../util/repo-api-type';
 
 @Injectable({
@@ -27,9 +27,9 @@ import { toApiRepoType } from '../util/repo-api-type';
 export class SecurityScanSupportService {
   private readonly supportedRepoTypes$: Observable<Set<string>>;
 
-  constructor(private readonly securityScanControllerService: SecurityScanControllerService) {
-    this.supportedRepoTypes$ = this.securityScanControllerService.getSupportedRepoTypes().pipe(
-      map((response) => new Set((response.data ?? []).map((repoType) => toApiRepoType(repoType) ?? repoType))),
+  constructor(private readonly securityScansApi: SecurityScansApi) {
+    this.supportedRepoTypes$ = this.securityScansApi.getSupportedRepoTypes().pipe(
+      map((response) => new Set((response ?? []).map((repoType) => toApiRepoType(repoType) ?? repoType))),
       catchError(() => of(new Set<string>())),
       shareReplay({ bufferSize: 1, refCount: false }),
     );

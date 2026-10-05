@@ -15,8 +15,6 @@
  */
 package io.repsy.os.server.protocols.maven.ui.controllers;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.MavenGroupSummary;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl;
@@ -25,6 +23,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,15 +43,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class MavenGroupController {
 
   private final ArtifactServiceImpl artifactService;
-  private final RestResponseFactory restResponseFactory;
 
   @GetMapping("/{repoName}/{groupName}")
   @RepoOperation
-  public RestResponse<MavenGroupSummary> getSummary(
+  public ResponseEntity<MavenGroupSummary> getSummary(
       final RepoInfo repoInfo, @PathVariable final String groupName) {
 
     final var summary = this.artifactService.getGroupSummary(repoInfo.getStorageKey(), groupName);
 
-    return this.restResponseFactory.success("groupSummaryFetched", summary);
+    return ResponseEntity.ok(summary);
   }
 }

@@ -24,7 +24,6 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
@@ -204,8 +203,7 @@ class GolangLastVersionRemovalIT extends AbstractIntegrationTest {
                 .param("version", version)
                 .with(apiPort())
                 .header(AUTHORIZATION, this.panelToken))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msgId").value("moduleVersionDeleted"));
+        .andExpect(status().isNoContent());
   }
 
   private void deleteModuleThroughThePanel(final RepoInfo repo, final String modulePath)
@@ -216,8 +214,7 @@ class GolangLastVersionRemovalIT extends AbstractIntegrationTest {
                 .param("modulePath", modulePath)
                 .with(apiPort())
                 .header(AUTHORIZATION, this.panelToken))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msgId").value("moduleDeleted"));
+        .andExpect(status().isNoContent());
   }
 
   private Repo entityOf(final RepoInfo repo) {

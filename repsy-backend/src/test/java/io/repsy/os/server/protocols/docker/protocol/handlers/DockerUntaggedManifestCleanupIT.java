@@ -33,6 +33,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
+import io.repsy.os.server.shared.http.BareBodyAssertions;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -149,21 +150,17 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
   }
 
   private void deleteTag(final Repo repo, final String image, final String tag) throws Exception {
-    this.expectSuccess(
+    BareBodyAssertions.expectNoContent(
         this.perform(
             delete("/api/docker/images/%s/%s/tags/%s".formatted(repo.getName(), image, tag))
-                .header(AUTHORIZATION, this.panelToken)),
-        "tagDeleted",
-        "Tag deleted.");
+                .header(AUTHORIZATION, this.panelToken)));
   }
 
   private String cleanup(final Repo repo, final String query) throws Exception {
-    return this.expectSuccess(
+    return BareBodyAssertions.expectBare(
         this.perform(
-            delete("/api/docker/images/manifests/%s/untagged%s".formatted(repo.getName(), query))
-                .header(AUTHORIZATION, this.panelToken)),
-        "untaggedManifestsDeleted",
-        "Untagged manifests deleted.");
+            delete("/api/repos/%s/docker/untagged-manifests%s".formatted(repo.getName(), query))
+                .header(AUTHORIZATION, this.panelToken)));
   }
 
   private String cleanup(final Repo repo) throws Exception {
@@ -172,12 +169,10 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
 
   /** The image as the panel's list shows it. */
   private String summary(final Repo repo) throws Exception {
-    return this.expectSuccess(
+    return BareBodyAssertions.expectBare(
         this.perform(
-            get("/api/docker/images/%s/%s/summary".formatted(repo.getName(), IMAGE))
-                .header(AUTHORIZATION, this.panelToken)),
-        "imageFetched",
-        "Image is fetched.");
+            get("/api/docker/images/%s/%s".formatted(repo.getName(), IMAGE))
+                .header(AUTHORIZATION, this.panelToken)));
   }
 
   private long layerBytes(final Repo repo) {
@@ -189,7 +184,7 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
   }
 
   private static Number number(final String body, final String field) {
-    return JsonPath.read(body, field.startsWith("data.") ? "$." + field : "$.data." + field);
+    return JsonPath.read(body, "$." + field.replaceFirst("^data\\.", ""));
   }
 
   private void assertResult(
@@ -353,7 +348,7 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
     assertThat(this.status(repo, "b", oldB)).as("the other image is untouched").isEqualTo(200);
     this.expectError(
         this.perform(
-            delete("/api/docker/images/manifests/%s/untagged?image=ghost".formatted(repo.getName()))
+            delete("/api/repos/%s/docker/untagged-manifests?image=ghost".formatted(repo.getName()))
                 .header(AUTHORIZATION, this.panelToken)),
         HttpStatus.NOT_FOUND,
         "imageNotFound",
@@ -409,7 +404,7 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
     assertThat(this.imageNames(repo)).containsExactly("b");
     this.expectError(
         this.perform(
-            delete("/api/docker/images/manifests/%s/untagged?image=a".formatted(repo.getName()))
+            delete("/api/repos/%s/docker/untagged-manifests?image=a".formatted(repo.getName()))
                 .header(AUTHORIZATION, this.panelToken)),
         HttpStatus.NOT_FOUND,
         "imageNotFound",
@@ -567,7 +562,7 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
     final var repo = this.dockerRepo();
     final var manifest = this.push(repo, IMAGE, "latest", "layer-one");
     this.push(repo, IMAGE, "latest", "layer-two");
-    final var path = "/api/docker/images/manifests/%s/untagged".formatted(repo.getName());
+    final var path = "/api/repos/%s/docker/untagged-manifests".formatted(repo.getName());
     final var user = this.commitUser(UserRole.USER);
 
     this.expectError(

@@ -32,7 +32,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { callOperation, expectContract } from '../../src/api/contract-checks.js';
+import { callOperation, expectBare } from '../../src/api/contract-checks.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import * as pypi from '../../src/clients/pypi.js';
 import { pipEnv } from '../../src/clients/pypi.js';
@@ -457,9 +457,9 @@ test.describe('PyPI transitive resolution, unpinned selection, Requires-Python f
       );
 
       // Query the panel API to verify metadata was stored
-      const release = expectContract(
-        'getPypiRelease',
-        await callOperation('getPypiRelease', {
+      const release = expectBare(
+        'getPypiVersion',
+        await callOperation('getPypiVersion', {
           repoName: repo.name,
           packageName,
           version,

@@ -15,21 +15,18 @@
  */
 package io.repsy.os.server.protocols.docker.ui.controllers;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.ImageListItem;
 import io.repsy.os.generated.model.ImageTagListItem;
 import io.repsy.os.generated.model.ManifestListItem;
 import io.repsy.os.generated.model.TagDetail;
-import io.repsy.os.generated.model.UntaggedManifestCleanupResult;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
-import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.TagDeletionComponent;
 import io.repsy.os.server.protocols.docker.ui.facades.DockerApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -44,6 +41,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -65,18 +64,26 @@ public class DockerImageController {
 
   private static final Set<String> MANIFEST_SORT_PROPERTIES = Set.of("id", "name", "createdAt");
 
-  private static final String DEFAULT_TAG = "latest";
-
   private final @NonNull ImageTxService imageService;
   private final @NonNull ManifestTxService manifestService;
   private final @NonNull DockerApiFacade dockerApiFacade;
   private final @NonNull TagDeletionComponent tagDeletionComponent;
   private final @NonNull UsageUpdateService usageUpdateService;
-  private final @NonNull RestResponseFactory restResponseFactory;
+
+  /**
+   * The image a nested route addresses: the {@code image} query parameter when given (a name with
+   * several segments such as {@code team/app}, with {@code -} as {@code {imageName}}; a lone {@code
+   * -} is not a valid OCI name, so it never collides with a real image), else the {@code
+   * {imageName}} path segment.
+   */
+  private static String imageNameOf(final String imageName, final String image) {
+
+    return image == null || image.isBlank() ? imageName : image;
+  }
 
   @GetMapping("/{repoName}")
   @RepoOperation
-  public RestResponse<PagedModel<ImageListItem>> list(
+  public ResponseEntity<PagedModel<ImageListItem>> list(
       final RepoInfo repoInfo,
       @RequestParam(name = "q", required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
@@ -86,131 +93,99 @@ public class DockerImageController {
     final var packages =
         this.imageService.findAllByRepoIdAndContainsName(repoInfo.getStorageKey(), name, pageable);
 
-    return this.restResponseFactory.success("imagesFetched", new PagedModel<>(packages));
+    return ResponseEntity.ok(new PagedModel<>(packages));
   }
 
   /**
    * The image as the list shows it (tags, untagged manifests, their size): what the image's page
-   * says when the image has no tag left.
+   * says when the image has no tag left. A tag's detail is {@code .../tags/{tagName}}.
    */
-  @GetMapping("/{repoName}/{imageName}/summary")
+  @GetMapping("/{repoName}/{imageName}")
   @RepoOperation
-  public RestResponse<ImageListItem> getImageSummary(
-      final RepoInfo repoInfo, @PathVariable final String imageName) {
+  public ResponseEntity<ImageListItem> getImage(
+      final RepoInfo repoInfo,
+      @PathVariable final String imageName,
+      @RequestParam(name = "image", required = false) final String image) {
 
-    final var image =
-        this.imageService.findListItemByRepoIdAndName(repoInfo.getStorageKey(), imageName);
+    final var item =
+        this.imageService.findListItemByRepoIdAndName(
+            repoInfo.getStorageKey(), imageNameOf(imageName, image));
 
-    return this.restResponseFactory.success("imageFetched", image);
+    return ResponseEntity.ok(item);
+  }
+
+  @DeleteMapping("/{repoName}/{imageName}")
+  @RepoOperation(permission = Permission.MANAGE)
+  public ResponseEntity<Void> delete(
+      final RepoInfo repoInfo,
+      @PathVariable final String imageName,
+      @RequestParam(name = "image", required = false) final String image) {
+
+    final var usages = this.dockerApiFacade.deleteImage(repoInfo, imageNameOf(imageName, image));
+
+    this.updateUsage(repoInfo, usages);
+
+    return ResponseEntities.noContent();
   }
 
   @GetMapping("/{repoName}/{imageName}/tags")
   @RepoOperation
-  public RestResponse<PagedModel<ImageTagListItem>> listTags(
+  public ResponseEntity<PagedModel<ImageTagListItem>> listTags(
       final RepoInfo repoInfo,
       @PathVariable final String imageName,
+      @RequestParam(name = "image", required = false) final String image,
       @RequestParam(name = "q", required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, TAG_SORT_PROPERTIES);
 
+    final var resolvedName = imageNameOf(imageName, image);
+
     // An image that does not exist answers 404 imageNotFound like every other image route, not an
     // empty page (RPS-1579).
-    this.imageService.findImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
+    this.imageService.findImageInfoByRepoIdAndName(repoInfo.getStorageKey(), resolvedName);
 
     final var imageTags =
         this.manifestService.getImageTagsContainsName(
-            repoInfo.getStorageKey(), imageName, name, pageable);
+            repoInfo.getStorageKey(), resolvedName, name, pageable);
 
-    return this.restResponseFactory.success("imageTagsFetched", new PagedModel<>(imageTags));
-  }
-
-  @DeleteMapping("/blobs/{repoName}/orphan-layers")
-  @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> deleteOrphanLayers(final RepoInfo repoInfo) {
-
-    this.dockerApiFacade.deleteOrphanLayers(repoInfo);
-
-    return this.restResponseFactory.success("orphanLayersDeleted");
-  }
-
-  /**
-   * Deletes the manifests no tag points to, then the layers only they used. The manifest files are
-   * gone, and their bytes refunded, before the response; the layer blobs are deleted in the
-   * background and refund themselves. The literal {@code manifests} segment comes first so the
-   * route is not read as {@code /{repoName}/{imageName}}.
-   */
-  @DeleteMapping("/manifests/{repoName}/untagged")
-  @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<UntaggedManifestCleanupResult> deleteUntaggedManifests(
-      final RepoInfo repoInfo, @RequestParam(required = false) final String image) {
-
-    final var manifests = this.dockerApiFacade.deleteUntaggedManifests(repoInfo, image);
-
-    this.updateUsage(
-        repoInfo, BaseUsages.builder().diskUsage(-1L * manifests.freedBytes()).build());
-
-    final var orphans = this.dockerApiFacade.deleteOrphanLayers(repoInfo);
-
-    final var result =
-        new UntaggedManifestCleanupResult()
-            .deletedManifests(manifests.deletedManifests())
-            .freedManifestBytes(manifests.freedBytes())
-            .orphanLayersScheduled(orphans.size())
-            .orphanLayerBytes(orphans.stream().mapToLong(OrphanLayerInfo::size).sum());
-
-    return this.restResponseFactory.success("untaggedManifestsDeleted", result);
-  }
-
-  @DeleteMapping("/{repoName}/{imageName}")
-  @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> delete(final RepoInfo repoInfo, @PathVariable final String imageName) {
-
-    final var usages = this.dockerApiFacade.deleteImage(repoInfo, imageName);
-
-    this.updateUsage(repoInfo, usages);
-
-    return this.restResponseFactory.success("imageDeleted");
-  }
-
-  @GetMapping("/{repoName}/{imageName}")
-  @RepoOperation
-  public RestResponse<TagDetail> getDefaultTagDetail(
-      final RepoInfo repoInfo, @PathVariable final String imageName) {
-
-    return this.getTagDetail(repoInfo, imageName, DEFAULT_TAG);
+    return ResponseEntity.ok(new PagedModel<>(imageTags));
   }
 
   @GetMapping("/{repoName}/{imageName}/tags/{tagName}")
   @RepoOperation
-  public RestResponse<TagDetail> getTagDetail(
+  public ResponseEntity<TagDetail> getTagDetail(
       final RepoInfo repoInfo,
       @PathVariable final String imageName,
+      @RequestParam(name = "image", required = false) final String image,
       @PathVariable final String tagName) {
 
     final var tagDetail =
-        this.dockerApiFacade.getTagDetail(repoInfo.getStorageKey(), imageName, tagName);
+        this.dockerApiFacade.getTagDetail(
+            repoInfo.getStorageKey(), imageNameOf(imageName, image), tagName);
 
-    return this.restResponseFactory.success("tagDetailFetched", tagDetail);
+    return ResponseEntity.ok(tagDetail);
   }
 
   @DeleteMapping("/{repoName}/{imageName}/tags/{tagName}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> deleteTag(
+  public ResponseEntity<Void> deleteTag(
       final RepoInfo repoInfo,
       @PathVariable final String imageName,
+      @RequestParam(name = "image", required = false) final String image,
       @PathVariable final String tagName) {
 
-    this.tagDeletionComponent.deleteTag(repoInfo, imageName, tagName);
+    this.tagDeletionComponent.deleteTag(repoInfo, imageNameOf(imageName, image), tagName);
 
-    return this.restResponseFactory.success("tagDeleted");
+    return ResponseEntities.noContent();
   }
 
   @GetMapping("/{repoName}/{imageName}/tags/{tagName}/manifests")
   @RepoOperation
-  public RestResponse<PagedModel<ManifestListItem>> listTagManifests(
+  public ResponseEntity<PagedModel<ManifestListItem>> listTagManifests(
       final RepoInfo repoInfo,
       @PathVariable final String imageName,
+      @RequestParam(name = "image", required = false) final String image,
       @PathVariable final String tagName,
       @RequestParam(name = "q", required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
@@ -218,42 +193,48 @@ public class DockerImageController {
     SortValidator.requireSortableBy(pageable, MANIFEST_SORT_PROPERTIES);
 
     final var tagLayers =
-        this.dockerApiFacade.getTagManifestsLikeName(repoInfo, imageName, tagName, name, pageable);
+        this.dockerApiFacade.getTagManifestsLikeName(
+            repoInfo, imageNameOf(imageName, image), tagName, name, pageable);
 
-    return this.restResponseFactory.success("tagLayersFetched", new PagedModel<>(tagLayers));
+    return ResponseEntity.ok(new PagedModel<>(tagLayers));
   }
 
-  @GetMapping("/{repoName}/{imageName}/manifests/{reference}")
+  /** The manifest as stored, as a JSON string literal (the stored bytes stay exact). */
+  @GetMapping(
+      value = "/{repoName}/{imageName}/manifests/{reference}",
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @RepoOperation
-  public RestResponse<String> getManifest(
+  public ResponseEntity<String> getManifest(
       final RepoInfo repoInfo,
       @PathVariable final String imageName,
+      @RequestParam(name = "image", required = false) final String image,
       @PathVariable final String reference)
       throws IOException {
 
     final var fileNames =
         this.manifestService.findManifestFileNamesByReference(
-            repoInfo.getStorageKey(), imageName, reference);
+            repoInfo.getStorageKey(), imageNameOf(imageName, image), reference);
 
-    final var manifest = this.dockerApiFacade.getManifest(repoInfo, fileNames);
-
-    return this.restResponseFactory.success("manifestFetched", manifest);
+    return ResponseEntities.jsonString(this.dockerApiFacade.getManifest(repoInfo, fileNames));
   }
 
-  @GetMapping("/{repoName}/{imageName}/configs/{digest}")
+  /** The config blob as stored, as a JSON string literal. */
+  @GetMapping(
+      value = "/{repoName}/{imageName}/configs/{digest}",
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @RepoOperation
-  public RestResponse<String> getConfig(
+  public ResponseEntity<String> getConfig(
       final RepoInfo repoInfo,
       @PathVariable final String imageName,
+      @RequestParam(name = "image", required = false) final String image,
       @PathVariable final String digest)
       throws IOException {
 
     final var layer =
-        this.dockerApiFacade.findConfigLayerByImageAndDigest(repoInfo, imageName, digest);
+        this.dockerApiFacade.findConfigLayerByImageAndDigest(
+            repoInfo, imageNameOf(imageName, image), digest);
 
-    final var config = this.dockerApiFacade.getConfig(repoInfo, layer.getDigest());
-
-    return this.restResponseFactory.success("configFetched", config);
+    return ResponseEntities.jsonString(this.dockerApiFacade.getConfig(repoInfo, layer.getDigest()));
   }
 
   private void updateUsage(final RepoInfo repoInfo, final BaseUsages usages) {

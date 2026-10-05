@@ -17,11 +17,7 @@ import { HttpContext } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of } from 'rxjs';
 
-import {
-  DockerImageControllerService,
-  ImageListItem,
-  ProtocolRepoControllerService,
-} from '../../../../../../generated/api';
+import { DockerImagesApi, ImageListItem, ReposApi } from '../../../../../../generated/api';
 import { SILENT_ERROR } from '../../../../../shared/interceptor/error-handler.interceptor';
 import {
   CallCase,
@@ -33,31 +29,30 @@ import {
   PAGE_SIZE,
   PagedCase,
   REPO,
-  restResponse,
   selectRepo,
   SORT,
 } from '../../testing/protocol-service-spec-helpers';
 import { DockerService } from './docker.service';
 
+// A name with several segments: `-` takes the path segment and the name goes in the `image` query.
 const IMAGE = 'team/app';
+const IMAGE_PATH = '-';
 const TAG = 'v1';
 const DIGEST = 'sha256:abc';
 
 describe('DockerService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let dockerApi: jasmine.SpyObj<DockerImageControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let dockerApi: jasmine.SpyObj<DockerImagesApi>;
   let service: DockerService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoPermissions',
-    ]);
-    dockerApi = jasmine.createSpyObj<DockerImageControllerService>('DockerImageControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoPermissions']);
+    dockerApi = jasmine.createSpyObj<DockerImagesApi>('DockerImagesApi', [
       'listDockerImages',
       'listDockerImageTags',
       'listDockerTagManifests',
       'deleteDockerImage',
-      'getDockerImageSummary',
+      'getDockerImage',
       'getDockerImageTag',
       'deleteDockerTag',
       'getDockerImageManifest',
@@ -65,8 +60,8 @@ describe('DockerService', () => {
     ]);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: DockerImageControllerService, useValue: dockerApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: DockerImagesApi, useValue: dockerApi },
       ],
     });
     service = TestBed.inject(DockerService);
@@ -92,18 +87,21 @@ describe('DockerService', () => {
         invoke: (s, name) => s.searchImages(name, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => dockerApi.listDockerImages,
         args: (name) => [REPO, name, ...PAGE_ARGS],
+        bare: true,
       },
       {
         name: 'searchTags',
         invoke: (s, name) => s.searchTags(name, SORT, IMAGE, PAGE_INDEX, PAGE_SIZE),
         api: () => dockerApi.listDockerImageTags,
-        args: (name) => [IMAGE, REPO, name, ...PAGE_ARGS],
+        args: (name) => [IMAGE_PATH, REPO, IMAGE, name, ...PAGE_ARGS],
+        bare: true,
       },
       {
         name: 'searchManifests',
         invoke: (s, name) => s.searchManifests(name, SORT, IMAGE, TAG, PAGE_INDEX, PAGE_SIZE),
         api: () => dockerApi.listDockerTagManifests,
-        args: (name) => [IMAGE, TAG, REPO, name, ...PAGE_ARGS],
+        args: (name) => [IMAGE_PATH, TAG, REPO, IMAGE, name, ...PAGE_ARGS],
+        bare: true,
       },
     ];
     describePagedCalls(() => service, paged);
@@ -116,40 +114,40 @@ describe('DockerService', () => {
         name: 'deleteImage',
         invoke: (s) => s.deleteImage(IMAGE),
         api: () => dockerApi.deleteDockerImage,
-        args: [IMAGE, REPO],
-        response: restResponse('ignored'),
+        args: [IMAGE_PATH, REPO, IMAGE],
+        response: undefined,
         expected: undefined,
       },
       {
         name: 'fetchTag',
         invoke: (s) => s.fetchTag(IMAGE, TAG),
         api: () => dockerApi.getDockerImageTag,
-        args: [IMAGE, TAG, REPO],
-        response: restResponse(tag),
+        args: [IMAGE_PATH, TAG, REPO, IMAGE],
+        response: tag,
         expected: tag,
       },
       {
         name: 'deleteTag',
         invoke: (s) => s.deleteTag(IMAGE, TAG),
         api: () => dockerApi.deleteDockerTag,
-        args: [IMAGE, TAG, REPO],
-        response: restResponse('ignored'),
+        args: [IMAGE_PATH, TAG, REPO, IMAGE],
+        response: undefined,
         expected: undefined,
       },
       {
         name: 'fetchManifestText',
         invoke: (s) => s.fetchManifestText(IMAGE, DIGEST),
         api: () => dockerApi.getDockerImageManifest,
-        args: [IMAGE, DIGEST, REPO],
-        response: restResponse(manifestText),
+        args: [IMAGE_PATH, DIGEST, REPO, IMAGE],
+        response: manifestText,
         expected: manifestText,
       },
       {
         name: 'fetchConfigText',
         invoke: (s) => s.fetchConfigText(IMAGE, DIGEST),
         api: () => dockerApi.getDockerImageConfig,
-        args: [IMAGE, DIGEST, REPO],
-        response: restResponse(configText),
+        args: [IMAGE_PATH, DIGEST, REPO, IMAGE],
+        response: configText,
         expected: configText,
       },
     ];
@@ -158,24 +156,33 @@ describe('DockerService', () => {
     describe('fetchImageSummary', () => {
       const summary: ImageListItem = { name: IMAGE, tagCount: 0, untaggedManifestCount: 2, untaggedSize: 2048 };
 
-      it('reads the image of the active repository and unwraps the answer', async () => {
-        dockerApi.getDockerImageSummary.and.returnValue(of(restResponse(summary)) as never);
+      it('reads the image of the active repository', async () => {
+        dockerApi.getDockerImage.and.returnValue(of(summary) as never);
 
         const result = await firstValueFrom(service.fetchImageSummary(IMAGE));
 
         expect(result).toEqual(summary);
-        expect(dockerApi.getDockerImageSummary).toHaveBeenCalledTimes(1);
-        const args = dockerApi.getDockerImageSummary.calls.mostRecent().args as unknown[];
-        expect(args.slice(0, 4)).toEqual([IMAGE, REPO, 'body', false]);
-        expect(args[4]).toEqual({ context: jasmine.any(HttpContext) });
+        expect(dockerApi.getDockerImage).toHaveBeenCalledTimes(1);
+        const args = dockerApi.getDockerImage.calls.mostRecent().args as unknown[];
+        expect(args.slice(0, 5)).toEqual([IMAGE_PATH, REPO, IMAGE, 'body', false]);
+        expect(args[5]).toEqual({ context: jasmine.any(HttpContext) });
+      });
+
+      it('keeps a single segment name in the path and sends no image query', async () => {
+        dockerApi.getDockerImage.and.returnValue(of({ ...summary, name: 'nginx' }) as never);
+
+        await firstValueFrom(service.fetchImageSummary('nginx'));
+
+        const args = dockerApi.getDockerImage.calls.mostRecent().args as unknown[];
+        expect(args.slice(0, 3)).toEqual(['nginx', REPO, undefined]);
       });
 
       it('does not toast a 404, because the page leaves when the image is gone', () => {
-        dockerApi.getDockerImageSummary.and.returnValue(of(restResponse(summary)) as never);
+        dockerApi.getDockerImage.and.returnValue(of(summary) as never);
 
         service.fetchImageSummary(IMAGE).subscribe();
 
-        const options = dockerApi.getDockerImageSummary.calls.mostRecent().args[4] as unknown as {
+        const options = dockerApi.getDockerImage.calls.mostRecent().args[5] as unknown as {
           context: HttpContext;
         };
         expect(options.context.get(SILENT_ERROR)).toBeTrue();

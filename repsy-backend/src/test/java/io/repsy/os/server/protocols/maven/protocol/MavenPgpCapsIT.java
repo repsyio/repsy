@@ -160,7 +160,7 @@ class MavenPgpCapsIT extends AbstractIntegrationTest {
     for (int i = 0; i < cap; i++) {
       assertThat(this.keyStatus(repo, admin, PgpTestKeys.generate()))
           .as("key %s", i + 1)
-          .isEqualTo(200);
+          .isEqualTo(201);
     }
 
     final var refused = this.registerKey(repo, admin, PgpTestKeys.generate()).andReturn();
@@ -183,14 +183,14 @@ class MavenPgpCapsIT extends AbstractIntegrationTest {
     final var other = this.verifyAllRepo();
     final var first = PgpTestKeys.generate();
 
-    assertThat(this.keyStatus(full, admin, first)).isEqualTo(200);
+    assertThat(this.keyStatus(full, admin, first)).isEqualTo(201);
 
     for (int i = 1; i < this.caps.getMaxPublicKeysPerRepo(); i++) {
-      assertThat(this.keyStatus(full, admin, PgpTestKeys.generate())).isEqualTo(200);
+      assertThat(this.keyStatus(full, admin, PgpTestKeys.generate())).isEqualTo(201);
     }
 
     assertThat(this.keyStatus(full, admin, first)).isEqualTo(409);
-    assertThat(this.keyStatus(other, admin, first)).isEqualTo(200);
+    assertThat(this.keyStatus(other, admin, first)).isEqualTo(201);
   }
 
   @Test
@@ -201,7 +201,7 @@ class MavenPgpCapsIT extends AbstractIntegrationTest {
     final var cap = this.caps.getMaxPublicKeysPerRepo();
 
     for (int i = 0; i < cap - 2; i++) {
-      assertThat(this.keyStatus(repo, admin, PgpTestKeys.generate())).isEqualTo(200);
+      assertThat(this.keyStatus(repo, admin, PgpTestKeys.generate())).isEqualTo(201);
     }
 
     final List<PgpTestKeys> racers = new ArrayList<>();
@@ -212,7 +212,7 @@ class MavenPgpCapsIT extends AbstractIntegrationTest {
 
     final var statuses = this.concurrently(racers, keys -> this.keyStatus(repo, admin, keys));
 
-    assertThat(statuses).filteredOn(s -> s == 200).hasSize(2);
+    assertThat(statuses).filteredOn(s -> s == 201).hasSize(2);
     assertThat(statuses).filteredOn(s -> s == 400).hasSize(4);
     assertThat(this.keyCount(repo)).isEqualTo(cap);
   }

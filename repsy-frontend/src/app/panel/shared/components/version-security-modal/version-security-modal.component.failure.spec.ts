@@ -18,16 +18,16 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { of } from 'rxjs';
 
-import { ScanOverview, ScanStatus, VulnerabilityScanControllerService } from '../../../../../generated/api';
+import { ScanOverview, ScanStatus, SecurityScansApi } from '../../../../../generated/api';
 import { VersionSecurityModalComponent } from './version-security-modal.component';
 
 /** RPS-1339: what the rendered modal shows for a version whose newest scan failed. */
 describe('VersionSecurityModalComponent failed state', () => {
   let fixture: ComponentFixture<VersionSecurityModalComponent>;
-  let scanService: jasmine.SpyObj<VulnerabilityScanControllerService>;
+  let scanService: jasmine.SpyObj<SecurityScansApi>;
 
   function render(overview: ScanOverview): HTMLElement {
-    scanService.getScanOverview.and.returnValue(of({ data: overview }) as never);
+    scanService.getScanOverview.and.returnValue(of(overview) as never);
     fixture.componentRef.setInput('repoName', 'repo');
     fixture.componentRef.setInput('repoType', 'maven');
     fixture.componentRef.setInput('artifactName', 'org.acme:lib');
@@ -38,13 +38,11 @@ describe('VersionSecurityModalComponent failed state', () => {
   }
 
   beforeEach(() => {
-    scanService = jasmine.createSpyObj<VulnerabilityScanControllerService>('VulnerabilityScanControllerService', [
-      'getScanOverview',
-    ]);
+    scanService = jasmine.createSpyObj<SecurityScansApi>('SecurityScansApi', ['getScanOverview']);
     TestBed.configureTestingModule({
       imports: [VersionSecurityModalComponent],
       providers: [
-        { provide: VulnerabilityScanControllerService, useValue: scanService },
+        { provide: SecurityScansApi, useValue: scanService },
         { provide: Router, useValue: jasmine.createSpyObj<Router>('Router', ['navigate', 'navigateByUrl']) },
       ],
     });

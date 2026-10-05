@@ -20,10 +20,11 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 
-import { NuGetDeletedItem, NuGetVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { NuGetVersionInfo, NuGetVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { PagedData } from '../../../../../shared/dto/paged-data';
 import { NugetService } from '../../service/nuget.service';
 import { NugetPackagesVersionDetailComponent } from './nuget-packages-version-detail.component';
 
@@ -207,20 +208,35 @@ describe('NugetPackagesVersionDetailComponent delete (RPS-1288)', () => {
     await fixture.whenStable();
     fixture.componentInstance.deleteVersion();
     danger.show.calls.mostRecent().args[2]();
+    // the probe, the delete and the landing are three promises in a row
+    await new Promise<void>((resolve) => setTimeout(resolve));
     await fixture.whenStable();
   }
 
+  function probeOf(count: number): PagedData<NuGetVersionListItem> {
+    return {
+      content: Array.from({ length: count }, () => ({}) as NuGetVersionListItem),
+      page: undefined,
+    } as unknown as PagedData<NuGetVersionListItem>;
+  }
+
   beforeEach(() => {
-    nugetService = jasmine.createSpyObj<NugetService>('NugetService', ['fetchPackageVersion', 'deletePackageVersion'], {
-      repoChanges: new BehaviorSubject<RepoPermissionInfo>({
-        repoName: REPO,
-        canRead: true,
-        canWrite: true,
-        canManage: true,
-        private: false,
-      }),
-    });
+    nugetService = jasmine.createSpyObj<NugetService>(
+      'NugetService',
+      ['fetchPackageVersion', 'fetchPackageVersions', 'deletePackageVersion'],
+      {
+        repoChanges: new BehaviorSubject<RepoPermissionInfo>({
+          repoName: REPO,
+          canRead: true,
+          canWrite: true,
+          canManage: true,
+          private: false,
+        }),
+      },
+    );
     nugetService.fetchPackageVersion.and.resolveTo({ packageId: 'Acme.Lib', version: '1.2.3' } as NuGetVersionInfo);
+    nugetService.fetchPackageVersions.and.resolveTo(probeOf(2));
+    nugetService.deletePackageVersion.and.resolveTo();
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     router.navigate.and.resolveTo(true);
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -243,17 +259,18 @@ describe('NugetPackagesVersionDetailComponent delete (RPS-1288)', () => {
   });
 
   it('goes to the versions page of the package when only the version was deleted', async () => {
-    nugetService.deletePackageVersion.and.resolveTo(NuGetDeletedItem.Version);
+    nugetService.fetchPackageVersions.and.resolveTo(probeOf(2));
 
     await confirmDelete();
 
+    expect(nugetService.fetchPackageVersions).toHaveBeenCalledOnceWith('Acme.Lib', '', jasmine.anything(), 0, 2);
     expect(nugetService.deletePackageVersion).toHaveBeenCalledOnceWith('Acme.Lib', '1.2.3');
     expect(router.navigate).toHaveBeenCalledOnceWith(['..'], { relativeTo: route });
     expect(toast.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
   });
 
   it('goes to the package list of the repository when the package went with its last version', async () => {
-    nugetService.deletePackageVersion.and.resolveTo(NuGetDeletedItem.Package);
+    nugetService.fetchPackageVersions.and.resolveTo(probeOf(1));
 
     await confirmDelete();
 

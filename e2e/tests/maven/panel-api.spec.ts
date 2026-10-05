@@ -32,9 +32,10 @@
 import {
   callOperation,
   contractWorld,
-  expectContract,
+  expectBare,
   expectCovers,
   expectFailure,
+  expectNoContent,
   expectPagingSweep,
 } from '../../src/api/contract-checks.js';
 import { RepoType } from '../../src/api/panel-api.js';
@@ -146,7 +147,7 @@ async function versionNames(d: Deployed, artifactId: string): Promise<string[]> 
     groupName: d.groupId,
     artifactName: artifactId,
   });
-  const page = expectContract('listMavenArtifactVersions', res) as { content: VersionRow[] };
+  const page = expectBare('listMavenArtifactVersions', res) as { content: VersionRow[] };
   return page.content.map((row) => row.versionName).sort();
 }
 
@@ -177,7 +178,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
     const d = await deploy(seeder, { lib: [first, second, snapshot], tool: [first] });
 
     // GET /api/mvn/artifacts/{repo}: one row per artifact of every group.
-    const groups = expectContract(
+    const groups = expectBare(
       'listMavenGroups',
       await callOperation('listMavenGroups', { repoName: d.repoName }),
     ) as { content: ArtifactRow[]; page: { totalElements: number } };
@@ -190,7 +191,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
     expect(groups.content.find((row) => row.artifactName === 'tool')?.latest).toBe(first);
 
     // GET /api/mvn/artifacts/{repo}/{group}: the same rows, narrowed to the group.
-    const artifacts = expectContract(
+    const artifacts = expectBare(
       'listMavenArtifacts',
       await callOperation('listMavenArtifacts', { repoName: d.repoName, groupName: d.groupId }),
     ) as { content: ArtifactRow[] };
@@ -198,7 +199,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
 
     // GET /api/mvn/groups/{repo}/{group}: what deleting the group would remove.
     expect(
-      expectContract(
+      expectBare(
         'getMavenGroupSummary',
         await callOperation('getMavenGroupSummary', { repoName: d.repoName, groupName: d.groupId }),
       ),
@@ -212,7 +213,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
       Array.isArray(onWire) ? [...onWire].sort() : onWire,
       'maven-metadata.xml on the wire',
     ).toEqual(listed);
-    const versions = expectContract(
+    const versions = expectBare(
       'listMavenArtifactVersions',
       await callOperation('listMavenArtifactVersions', artifactValues(d, 'lib')),
     ) as { content: VersionRow[] };
@@ -221,7 +222,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
     }
 
     // GET .../{artifact}: the newest version's detail.
-    const newest = expectContract(
+    const newest = expectBare(
       'getMavenArtifact',
       await callOperation('getMavenArtifact', artifactValues(d, 'lib')),
     ) as VersionInfo;
@@ -237,7 +238,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
 
     // GET .../{artifact}/versions/{version}: each one, its POM equal to the file the wire serves.
     for (const version of [first, second, snapshot]) {
-      const info = expectContract(
+      const info = expectBare(
         'getMavenArtifactVersion',
         await callOperation('getMavenArtifactVersion', { ...artifactValues(d, 'lib'), version }),
       ) as VersionInfo;
@@ -254,7 +255,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
     }
 
     for (const version of [first, second]) {
-      const info = expectContract(
+      const info = expectBare(
         'getMavenArtifactVersion',
         await callOperation('getMavenArtifactVersion', { ...artifactValues(d, 'lib'), version }),
       ) as VersionInfo;
@@ -336,6 +337,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
 
     await expectPagingSweep<ArtifactRow>({
       operationId: 'listMavenGroups',
+      bare: true,
       values: { repoName: repo.name },
       total: 5,
       keyOf: (row) => `${row.groupName}:${row.artifactName}`,
@@ -346,7 +348,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
     });
 
     // `q` narrows by a part of the group or the artifact name.
-    const narrowed = expectContract(
+    const narrowed = expectBare(
       'listMavenGroups',
       await callOperation('listMavenGroups', { repoName: repo.name }, { query: 'q=pkg-4' }),
     ) as { content: ArtifactRow[]; page: { totalElements: number } };
@@ -366,7 +368,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
       ...artifactValues(d, 'lib'),
       version: removed,
     });
-    expect(expectContract('deleteMavenArtifactVersion', res)).toBe('VERSION');
+    expectNoContent('deleteMavenArtifactVersion', res);
 
     // The panel.
     expect(await versionNames(d, 'lib')).toEqual([kept]);
@@ -414,7 +416,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
     const d = await deploy(seeder, { lib: [version, other], tool: [version] });
 
     const artifact = await callOperation('deleteMavenArtifact', artifactValues(d, 'lib'));
-    expect(expectContract('deleteMavenArtifact', artifact)).toBe('ARTIFACT');
+    expectNoContent('deleteMavenArtifact', artifact);
 
     expectFailure(
       'getMavenArtifact',
@@ -431,7 +433,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
     expect(lost.clientExitCode, lost.command).not.toBe(0);
     // Its neighbour in the group is untouched, and the group summary counts only that.
     expect(
-      expectContract(
+      expectBare(
         'getMavenGroupSummary',
         await callOperation('getMavenGroupSummary', { repoName: d.repoName, groupName: d.groupId }),
       ),
@@ -449,7 +451,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
       'artifactNotFound',
     );
     expect(
-      expectContract(
+      expectBare(
         'getMavenGroupSummary',
         await callOperation('getMavenGroupSummary', { repoName: d.repoName, groupName: d.groupId }),
       ),
@@ -473,7 +475,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
       repoName: d.repoName,
       groupName: d.groupId,
     });
-    expect(expectContract('deleteMavenGroup', group)).toBe('GROUP');
+    expectNoContent('deleteMavenGroup', group);
     expect(await wireStatus(d, fileOf(d, 'tool', version, 'jar'))).toBe(404);
     expect(await wireVersions(d, 'tool')).toBe(404);
     const toolLost = await mvn.resolve(world(d, 'tool', version));
@@ -484,7 +486,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
       404,
       'groupNotFound',
     );
-    const rows = expectContract(
+    const rows = expectBare(
       'listMavenGroups',
       await callOperation('listMavenGroups', { repoName: d.repoName }),
     ) as { content: unknown[] };

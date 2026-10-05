@@ -25,11 +25,6 @@ import { env } from '../../../env.js';
 import { repoUrl } from '../../../repo-url.js';
 import { repoApiPath } from '../../routes.js';
 
-/** The `{ data: ... }` envelope of a panel REST response. */
-interface Envelope<T> {
-  data?: T;
-}
-
 export interface RepoPermissions {
   repoName?: string;
   description?: string;
@@ -55,28 +50,25 @@ export interface AllowedKeyserver {
 export class RepoSettingsReadback {
   constructor(private readonly bearerToken: string) {}
 
-  private async get<T>(path: string): Promise<T> {
+  /** A GET whose answer is the bare resource, with no `data` envelope (API guideline, Decision 5). */
+  private async getBare<T>(path: string): Promise<T> {
     const res = await fetch(`${env.apiBaseUrl}${path}`, {
       headers: { Authorization: `Bearer ${this.bearerToken}` },
     });
     if (!res.ok) {
       throw new Error(`GET ${path} answered ${res.status}`);
     }
-    const body = (await res.json()) as Envelope<T>;
-    if (body.data === undefined || body.data === null) {
-      throw new Error(`GET ${path} carried no data`);
-    }
-    return body.data;
+    return (await res.json()) as T;
   }
 
   /** The repo's description, privacy and what the caller may do with it. */
   permissions(repoName: string): Promise<RepoPermissions> {
-    return this.get<RepoPermissions>(repoApiPath(encodeURIComponent(repoName), 'permissions'));
+    return this.getBare<RepoPermissions>(repoApiPath(encodeURIComponent(repoName), 'permissions'));
   }
 
   /** Bytes the repo occupies, as the Storage section's source (`diskUsed.value`). */
   async diskUsedBytes(repoName: string): Promise<number> {
-    const usage = await this.get<{ diskUsed?: { value?: number } }>(
+    const usage = await this.getBare<{ diskUsed?: { value?: number } }>(
       repoApiPath(encodeURIComponent(repoName), 'usage'),
     );
     return usage.diskUsed?.value ?? 0;
@@ -84,12 +76,12 @@ export class RepoSettingsReadback {
 
   /** The key servers a Maven repo may register (the PGP section's selector options). */
   allowedKeyServers(): Promise<AllowedKeyserver[]> {
-    return this.get<AllowedKeyserver[]>('/api/mvn/key-stores/allowed-servers');
+    return this.getBare<AllowedKeyserver[]>('/api/mvn/allowed-key-servers');
   }
 
   /** The key servers registered on a Maven repo (first page of 50). */
   async keyStores(repoName: string): Promise<KeyStore[]> {
-    const page = await this.get<{ content?: KeyStore[] }>(
+    const page = await this.getBare<{ content?: KeyStore[] }>(
       `/api/mvn/key-stores/${encodeURIComponent(repoName)}?page=0&size=50`,
     );
     return page.content ?? [];

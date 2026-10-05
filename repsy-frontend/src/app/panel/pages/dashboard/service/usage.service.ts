@@ -15,18 +15,18 @@
 ///
 
 import { Injectable } from '@angular/core';
-import { map, Observable } from 'rxjs';
+import { Observable } from 'rxjs';
 
 import { TotalUsageInfo } from '../../../../../generated/api';
-import { UsageControllerService } from '../../../../../generated/api';
+import { UsageApi } from '../../../../../generated/api';
 
 @Injectable({
   providedIn: 'root',
 })
 export class UsageService {
-  constructor(private readonly usageControllerService: UsageControllerService) {}
+  constructor(private readonly usageApi: UsageApi) {}
 
   public getTotalUsage(): Observable<TotalUsageInfo> {
-    return this.usageControllerService.getTotalUsage().pipe(map((r) => r.data!));
+    return this.usageApi.getTotalUsage();
   }
 }

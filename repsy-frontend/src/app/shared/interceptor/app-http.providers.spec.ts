@@ -77,7 +77,7 @@ describe('panel HTTP pipeline (provideAppHttpClient)', () => {
     http.get('/api/things').subscribe({ error: () => undefined });
 
     httpTesting.expectOne('/api/things').flush({ code: 'sessionExpired' }, SESSION_EXPIRED);
-    (await nextRefresh()).flush({ data: { username: 'jane', token: 'new-access', refreshToken: 'new-refresh' } });
+    (await nextRefresh()).flush({ username: 'jane', token: 'new-access', refreshToken: 'new-refresh' });
     await settle();
     const retry = httpTesting.expectOne('/api/things');
     expect(retry.request.headers.get('Authorization')).toBe('Bearer new-access');
@@ -115,7 +115,7 @@ describe('panel HTTP pipeline (provideAppHttpClient)', () => {
     http.get('/api/things').subscribe({ error: () => undefined });
 
     httpTesting.expectOne('/api/things').flush({ code: 'sessionExpired' }, SESSION_EXPIRED);
-    (await nextRefresh()).flush({ data: { username: 'jane', token: 'new-access', refreshToken: 'new-refresh' } });
+    (await nextRefresh()).flush({ username: 'jane', token: 'new-access', refreshToken: 'new-refresh' });
     await settle();
     httpTesting.expectOne('/api/things').flush({ detail: 'detail' }, { status: 500, statusText: 'Error' });
 

@@ -15,7 +15,7 @@
 
 import { TestBed } from '@angular/core/testing';
 
-import { ProtocolRepoControllerService, PypiPackageControllerService } from '../../../../../../generated/api';
+import { PypiPackagesApi, ReposApi } from '../../../../../../generated/api';
 import {
   CallCase,
   describeCalls,
@@ -26,7 +26,6 @@ import {
   PAGE_SIZE,
   PagedCase,
   REPO,
-  restResponse,
   selectRepo,
   SORT,
 } from '../../testing/protocol-service-spec-helpers';
@@ -36,25 +35,23 @@ const PACKAGE = 'requests';
 const RELEASE = '2.31.0';
 
 describe('PypiService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let pypiApi: jasmine.SpyObj<PypiPackageControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let pypiApi: jasmine.SpyObj<PypiPackagesApi>;
   let service: PypiService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoPermissions',
-    ]);
-    pypiApi = jasmine.createSpyObj<PypiPackageControllerService>('PypiPackageControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoPermissions']);
+    pypiApi = jasmine.createSpyObj<PypiPackagesApi>('PypiPackagesApi', [
       'listPypiPackages',
-      'listPypiReleases',
+      'listPypiVersions',
       'deletePypiPackage',
-      'getPypiRelease',
-      'deletePypiRelease',
+      'getPypiVersion',
+      'deletePypiVersion',
     ]);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: PypiPackageControllerService, useValue: pypiApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: PypiPackagesApi, useValue: pypiApi },
       ],
     });
     service = TestBed.inject(PypiService);
@@ -79,12 +76,14 @@ describe('PypiService', () => {
         invoke: (s, name) => s.fetchRepositoryPackagesLikeName(name, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => pypiApi.listPypiPackages,
         args: (name) => [REPO, name, ...PAGE_ARGS],
+        bare: true,
       },
       {
         name: 'fetchPackageReleasesLikeName',
         invoke: (s, version) => s.fetchPackageReleasesLikeName(PACKAGE, version, SORT, PAGE_INDEX, PAGE_SIZE),
-        api: () => pypiApi.listPypiReleases,
+        api: () => pypiApi.listPypiVersions,
         args: (version) => [PACKAGE, REPO, version, ...PAGE_ARGS],
+        bare: true,
       },
     ];
     describePagedCalls(() => service, paged);
@@ -96,24 +95,24 @@ describe('PypiService', () => {
         invoke: (s) => s.deletePackage(PACKAGE),
         api: () => pypiApi.deletePypiPackage,
         args: [PACKAGE, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
-        notCalled: () => [pypiApi.deletePypiRelease],
+        notCalled: () => [pypiApi.deletePypiVersion],
       },
       {
         name: 'fetchRelease',
         invoke: (s) => s.fetchRelease(PACKAGE, RELEASE),
-        api: () => pypiApi.getPypiRelease,
+        api: () => pypiApi.getPypiVersion,
         args: [PACKAGE, RELEASE, REPO],
-        response: restResponse(release),
+        response: release,
         expected: release,
       },
       {
         name: 'deleteRelease',
         invoke: (s) => s.deleteRelease(PACKAGE, RELEASE),
-        api: () => pypiApi.deletePypiRelease,
+        api: () => pypiApi.deletePypiVersion,
         args: [PACKAGE, RELEASE, REPO],
-        response: restResponse('ignored'),
+        response: undefined,
         expected: undefined,
         notCalled: () => [pypiApi.deletePypiPackage],
       },

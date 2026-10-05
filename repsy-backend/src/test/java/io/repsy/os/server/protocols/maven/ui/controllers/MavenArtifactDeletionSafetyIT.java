@@ -340,9 +340,7 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
                     "1.0")
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msgId").value("artifactVersionDeleted"))
-        .andExpect(jsonPath("$.data").value("ARTIFACT"));
+        .andExpect(status().isNoContent());
 
     this.assertArtifactGone(group, "alpha");
     this.assertArtifactExists(group, "beta");
@@ -378,9 +376,7 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
                     "1.0")
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msgId").value("artifactVersionDeleted"))
-        .andExpect(jsonPath("$.data").value("GROUP"));
+        .andExpect(status().isNoContent());
 
     // The deleted group and its artifact are gone.
     this.assertArtifactGone(targetGroup, "target");
@@ -430,9 +426,7 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
                     "1.0")
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msgId").value("artifactVersionDeleted"))
-        .andExpect(jsonPath("$.data").value("VERSION"));
+        .andExpect(status().isNoContent());
 
     this.assertVersionGone(artifact, "1.0");
     this.assertVersionExists(group, artifactName, "2.0");
@@ -469,8 +463,7 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
                     "1.0")
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msgId").value("artifactVersionDeleted"));
+        .andExpect(status().isNoContent());
 
     assertThat(ascPath).as("stale maven-metadata.xml.asc").doesNotExist();
     assertThat(ascSha1Path).as("stale maven-metadata.xml.asc.sha1").doesNotExist();
@@ -515,10 +508,7 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
     final var metadataFile = this.artifactDir(group, artifactName).resolve("maven-metadata.xml");
     assertThat(metadataFile).doesNotExist();
 
-    this.deleteVersion(group, artifactName, "1.0")
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msgId").value("artifactVersionDeleted"))
-        .andExpect(jsonPath("$.data").value("VERSION"));
+    this.deleteVersion(group, artifactName, "1.0").andExpect(status().isNoContent());
 
     this.assertVersionGone(artifact, "1.0");
     assertThat(this.versionDir(group, artifactName, "1.0")).doesNotExist();
@@ -551,9 +541,7 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
     this.seedArtifactWithMetadata(group, artifactName, "<metadata/>", "1.0", "2.0");
     final var artifact = this.artifactRow(group, artifactName);
 
-    this.deleteVersion(group, artifactName, "1.0")
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data").value("VERSION"));
+    this.deleteVersion(group, artifactName, "1.0").andExpect(status().isNoContent());
 
     this.assertVersionGone(artifact, "1.0");
     assertThat(this.versionDir(group, artifactName, "1.0")).doesNotExist();
@@ -578,7 +566,7 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
         "2.0",
         "3.0");
 
-    this.deleteVersion(group, artifactName, "3.0").andExpect(status().isOk());
+    this.deleteVersion(group, artifactName, "3.0").andExpect(status().isNoContent());
 
     final var after = this.artifactRow(group, artifactName);
     assertThat(after.getLatest()).as("latest").isEqualTo("2.0");
@@ -673,16 +661,15 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.artifactCount").value(2))
-        .andExpect(jsonPath("$.data.versionCount").value(3));
+        .andExpect(jsonPath("$.artifactCount").value(2))
+        .andExpect(jsonPath("$.versionCount").value(3));
 
     this.mockMvc
         .perform(
             delete("/api/mvn/artifacts/{repo}/{group}", this.repoName, rootGroup)
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data").value("GROUP"));
+        .andExpect(status().isNoContent());
 
     // What the confirmation counted is gone: rows and files.
     this.assertArtifactGone(rootGroup, "alpha");
@@ -711,8 +698,8 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.artifactCount").value(2))
-        .andExpect(jsonPath("$.data.versionCount").value(3));
+        .andExpect(jsonPath("$.artifactCount").value(2))
+        .andExpect(jsonPath("$.versionCount").value(3));
   }
 
   @Test
@@ -738,8 +725,7 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
             delete("/api/mvn/artifacts/{repo}/{group}", this.repoName, rootGroup)
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data").value("GROUP"));
+        .andExpect(status().isNoContent());
 
     assertThat(rootMetadata.resolve("maven-metadata.xml")).as("root group metadata").doesNotExist();
     assertThat(rootMetadata.resolve("maven-metadata.xml.sha1"))
@@ -836,9 +822,7 @@ class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
             delete("/api/mvn/artifacts/{repo}/{group}/{artifact}", this.repoName, group, "real")
                 .header(AUTHORIZATION, this.bearerToken())
                 .with(apiPort()))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msgId").value("artifactDeleted"))
-        .andExpect(jsonPath("$.data").value("GROUP"));
+        .andExpect(status().isNoContent());
 
     this.assertArtifactGone(group, "real");
 

@@ -18,7 +18,7 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
-import { ProtocolRepoControllerService, RepoSettingsForm } from '../../../../../../generated/api';
+import { ReposApi, RepoSettingsForm } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
@@ -43,7 +43,7 @@ export class PackageOverrideComponent implements OnInit {
   public saving = false;
 
   constructor(
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly reposApi: ReposApi,
     private readonly toastService: ToastService,
   ) {}
 
@@ -64,7 +64,7 @@ export class PackageOverrideComponent implements OnInit {
     // Only the field this toggle owns is sent (RPS-1619): the rest of the form was loaded when the page opened.
     const form: RepoSettingsForm = { allowOverride };
 
-    saveRepoSetting(this.protocolRepoControllerService.updateRepoSettings(this.repoName, form), {
+    saveRepoSetting(this.reposApi.updateRepoSettings(this.repoName, form), {
       saved: () => {
         this.parentForm.get('allowOverride')?.setValue(allowOverride);
         this.toastService.show(`Package override is now ${allowOverride ? 'allowed' : 'blocked'}`, 'success');

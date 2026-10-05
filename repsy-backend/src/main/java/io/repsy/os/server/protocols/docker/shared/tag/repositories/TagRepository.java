@@ -38,7 +38,7 @@ public interface TagRepository extends JpaRepository<Tag, UUID> {
         select t from Tag t
         where t.image.name = :imageName
         and t.image.repo.id = :repoId
-        and t.name like %:name%""")
+        and lower(t.name) like :name escape '\\'""")
   Page<ImageTagListItem> findAllByImageRepoIdAndImageNameContainsName(
       UUID repoId, String imageName, String name, Pageable pageable);
 

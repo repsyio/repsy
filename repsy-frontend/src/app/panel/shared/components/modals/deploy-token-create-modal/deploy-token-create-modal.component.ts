@@ -20,7 +20,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import moment, { Moment } from 'moment';
 import { finalize } from 'rxjs/operators';
 
-import { DeployTokenForm, ProtocolDeployTokenControllerService } from '../../../../../../generated/api';
+import { DeployTokenForm, DeployTokensApi } from '../../../../../../generated/api';
 import { idFactory } from '../../../../../shared/util/unique-id';
 import { USERNAME_MESSAGES, usernameValidators } from '../../../../../shared/validators/credentials.validators';
 import {
@@ -68,7 +68,7 @@ export class DeployTokenCreateModalComponent implements OnInit {
   private oneYearLaterUtc = this.todayUtc.clone().add(365, 'days').format('YYYY-MM-DD');
 
   constructor(
-    private readonly protocolDeployTokenControllerService: ProtocolDeployTokenControllerService,
+    private readonly deployTokensApi: DeployTokensApi,
     private readonly fb: FormBuilder,
     private readonly toastService: ToastService,
   ) {
@@ -111,7 +111,7 @@ export class DeployTokenCreateModalComponent implements OnInit {
     this.loading = true;
     this.form.disable();
 
-    this.protocolDeployTokenControllerService
+    this.deployTokensApi
       .createDeployToken(this.repoName, payload)
       .pipe(
         finalize(() => {
@@ -121,7 +121,7 @@ export class DeployTokenCreateModalComponent implements OnInit {
       )
       .subscribe({
         next: (r) => {
-          const tokenInfo = r.data as unknown as TokenCreateInfo;
+          const tokenInfo = r as unknown as TokenCreateInfo;
           this.closeModal();
           this.created.emit(tokenInfo);
           this.toastService.show('Deploy token created successfully.', 'success');

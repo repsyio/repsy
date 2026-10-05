@@ -135,9 +135,9 @@ class PagedListsIT extends AbstractIntegrationTest {
               "latestVersion",
               "updatedAt"),
           list(
-              "listPypiReleases",
+              "listPypiVersions",
               RepoType.PYPI,
-              "/api/pypi/packages/{repo}/alpha/releases",
+              "/api/pypi/packages/{repo}/alpha/versions",
               true,
               "id",
               "version",
@@ -175,7 +175,7 @@ class PagedListsIT extends AbstractIntegrationTest {
           list(
               "listNpmPackageVersions",
               RepoType.NPM,
-              "/api/npm/packages/{repo}/package/alpha/versions",
+              "/api/npm/packages/{repo}/alpha/versions",
               true,
               "id",
               "version",
@@ -183,7 +183,7 @@ class PagedListsIT extends AbstractIntegrationTest {
           list(
               "listNpmScopedPackageVersions",
               RepoType.NPM,
-              "/api/npm/packages/{repo}/tools/package/alpha/versions",
+              "/api/npm/scopes/{repo}/tools/packages/alpha/versions",
               true,
               "id",
               "version",
@@ -231,7 +231,7 @@ class PagedListsIT extends AbstractIntegrationTest {
               "listGolangModules",
               RepoType.GOLANG,
               "/api/go/modules/{repo}",
-              false,
+              true,
               "id",
               "modulePath",
               "createdAt"),
@@ -242,14 +242,6 @@ class PagedListsIT extends AbstractIntegrationTest {
               true,
               "id",
               "version",
-              "createdAt"),
-          list(
-              "searchGolangModules",
-              RepoType.GOLANG,
-              "/api/go/modules/{repo}/search",
-              true,
-              "id",
-              "modulePath",
               "createdAt"),
           list(
               "listDockerImages",
@@ -314,9 +306,22 @@ class PagedListsIT extends AbstractIntegrationTest {
               "createdAt",
               "lastUpdatedAt"),
           list(
+              "listHelmChartVersions",
+              RepoType.HELM,
+              "/api/helm/charts/{repo}/alpha/versions",
+              true,
+              "version",
+              "createdAt"),
+          list(
               "listVulnerabilityScans",
               RepoType.MAVEN,
               "/api/repos/{repo}/artifacts/alpha/versions/1.0.0/scans",
+              false,
+              "createdAt"),
+          list(
+              "listScopedVulnerabilityScans",
+              RepoType.NPM,
+              "/api/repos/{repo}/scopes/acme/artifacts/widget/versions/1.0.0/scans",
               false,
               "createdAt"),
           list(
@@ -500,8 +505,7 @@ class PagedListsIT extends AbstractIntegrationTest {
     if (plain.getResponse().getStatus() == 200) {
       final var body = plain.getResponse().getContentAsString();
 
-      // Bare PagedModel bodies (Decision 5) carry `page` at the root, the rest still in `data`.
-      final var root = body.contains("\"msgId\"") ? "$.data" : "$";
+      final var root = "$";
       assertThat(JsonPath.<Integer>read(body, root + ".page.size")).isEqualTo(10);
       assertThat(JsonPath.<Integer>read(body, root + ".page.number")).isZero();
     }

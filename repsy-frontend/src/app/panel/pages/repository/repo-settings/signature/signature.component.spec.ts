@@ -18,12 +18,7 @@ import { RouterTestingModule } from '@angular/router/testing';
 import { of, Subject, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
-import {
-  AllowedKeyserverItem,
-  KeyStoreControllerService,
-  KeyStoreItem,
-  ProtocolRepoControllerService,
-} from '../../../../../../generated/api';
+import { AllowedKeyserverItem, KeyStoreItem, MavenKeyStoresApi, ReposApi } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { permission } from '../../testing/protocol-service-spec-helpers';
@@ -53,13 +48,13 @@ function publicKey(id: string): PgpPublicKeyItem {
 
 describe('SignatureComponent', () => {
   let component: SignatureComponent;
-  let keyStoreService: jasmine.SpyObj<KeyStoreControllerService>;
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
+  let keyStoreService: jasmine.SpyObj<MavenKeyStoresApi>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
 
   beforeEach(() => {
-    keyStoreService = jasmine.createSpyObj<KeyStoreControllerService>('KeyStoreControllerService', [
+    keyStoreService = jasmine.createSpyObj<MavenKeyStoresApi>('MavenKeyStoresApi', [
       'listMavenAllowedKeyServers',
       'listMavenKeyStores',
       'createMavenKeyStore',
@@ -68,16 +63,14 @@ describe('SignatureComponent', () => {
       'createMavenPgpPublicKey',
       'deleteMavenPgpPublicKey',
     ]);
-    keyStoreService.listMavenAllowedKeyServers.and.returnValue(of({ data: [UBUNTU, OPENPGP] }) as never);
-    keyStoreService.listMavenKeyStores.and.returnValue(of({ data: { content: [keyStore('k1')] } }) as never);
+    keyStoreService.listMavenAllowedKeyServers.and.returnValue(of([UBUNTU, OPENPGP]) as never);
+    keyStoreService.listMavenKeyStores.and.returnValue(of({ content: [keyStore('k1')] }) as never);
     keyStoreService.createMavenKeyStore.and.returnValue(of({}) as never);
     keyStoreService.deleteMavenKeyStore.and.returnValue(of({}) as never);
-    keyStoreService.listMavenPgpPublicKeys.and.returnValue(of({ data: { content: [publicKey('pk1')] } }) as never);
-    keyStoreService.createMavenPgpPublicKey.and.returnValue(of({ data: publicKey('pk2') }) as never);
+    keyStoreService.listMavenPgpPublicKeys.and.returnValue(of({ content: [publicKey('pk1')] }) as never);
+    keyStoreService.createMavenPgpPublicKey.and.returnValue(of(publicKey('pk2')) as never);
     keyStoreService.deleteMavenPgpPublicKey.and.returnValue(of({}) as never);
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'updateRepoSettings',
-    ]);
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['updateRepoSettings']);
     repoApi.updateRepoSettings.and.returnValue(of({}) as never);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
@@ -196,7 +189,7 @@ describe('SignatureComponent', () => {
     });
 
     it('selects nothing when no keyserver is allowed', () => {
-      keyStoreService.listMavenAllowedKeyServers.and.returnValue(of({}) as never);
+      keyStoreService.listMavenAllowedKeyServers.and.returnValue(of([]) as never);
 
       component.ngOnInit();
 
@@ -272,7 +265,7 @@ describe('SignatureComponent', () => {
     beforeEach(() => component.ngOnInit());
 
     it('loadMoreKeyStores appends the next page and moves on', () => {
-      keyStoreService.listMavenKeyStores.and.returnValue(of({ data: { content: [keyStore('k2')] } }) as never);
+      keyStoreService.listMavenKeyStores.and.returnValue(of({ content: [keyStore('k2')] }) as never);
 
       component.loadMoreKeyStores();
 
@@ -406,7 +399,7 @@ describe('SignatureComponent', () => {
     beforeEach(() => component.ngOnInit());
 
     it('loadMorePublicKeys appends the next page and moves on', () => {
-      keyStoreService.listMavenPgpPublicKeys.and.returnValue(of({ data: { content: [publicKey('pk2')] } }) as never);
+      keyStoreService.listMavenPgpPublicKeys.and.returnValue(of({ content: [publicKey('pk2')] }) as never);
 
       component.loadMorePublicKeys();
 
@@ -484,8 +477,8 @@ describe('SignatureComponent', () => {
         providers: [
           { provide: ToastService, useValue: toastService },
           { provide: DangerModalService, useValue: dangerModalService },
-          { provide: KeyStoreControllerService, useValue: keyStoreService },
-          { provide: ProtocolRepoControllerService, useValue: repoApi },
+          { provide: MavenKeyStoresApi, useValue: keyStoreService },
+          { provide: ReposApi, useValue: repoApi },
         ],
       }).compileComponents();
 

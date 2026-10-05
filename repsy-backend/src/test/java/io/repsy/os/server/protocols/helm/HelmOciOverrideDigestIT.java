@@ -175,7 +175,11 @@ class HelmOciOverrideDigestIT extends AbstractIntegrationTest {
       final Repo repo, final String name, final String version, final String panelToken)
       throws Exception {
     return this.perform(
-            delete("/api/helm/charts/{repo}/{name}/{version}", repo.getName(), name, version)
+            delete(
+                    "/api/helm/charts/{repo}/{name}/versions/{version}",
+                    repo.getName(),
+                    name,
+                    version)
                 .header(AUTHORIZATION, panelToken))
         .andReturn()
         .getResponse();

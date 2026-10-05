@@ -14,16 +14,13 @@
 /// limitations under the License.
 
 /**
- * RPS-1483: the panel API of Go (`/api/go/modules/...`), against what the REAL `curl -T` upload (the only publisher
+ * RPS-1483, RPS-1781: the panel API of Go (`/api/go/modules/...`; bare bodies, 204 deletes, the search is `q` on the list), against what the REAL `curl -T` upload (the only publisher
  * Go has) stored. Each response is validated against the response schema of `openapi-spec.yaml`
  * (`src/api/spec-contract.ts`: the schema, and no property the schema does not declare), and the values are matched
  * to the client-side facts: the versions `@v/list` serves, the `@latest` version, the `go` directive of the
  * `go.mod` the client zipped, the module paths (a `/v2` module is a module of its own). The delete operations are
  * judged by their effect on the wire: `@v/list` drops the version (or answers 404), the `.zip` answers 404 and a
  * real `go mod download` fails, while the sibling version still downloads the bytes the client built.
- *
- * The one operation with no data is `checkGolangSumdbSupported`: the panel-port twin of the proxy's `sumdb/.../supported`,
- * which is a bare 404 by design, with or without credentials.
  *
  * Copied from `tests/golang/publish-consume.spec.ts` (the adapter's `seedPublish` and `resolve`) and
  * `tests/pypi/panel-api.spec.ts` (the shared contract helpers). The paging sweeps seed their rows over raw HTTP
@@ -32,12 +29,15 @@
 import {
   callOperation,
   contractWorld,
+  expectBare,
   expectContract,
   expectCovers,
   expectFailure,
+  expectNoContent,
   expectPagingSweep,
 } from '../../src/api/contract-checks.js';
 import { RepoType } from '../../src/api/panel-api.js';
+import { adminBearer, apiUrl, edgeRequest } from '../../src/clients/edge-raw.js';
 import * as go from '../../src/clients/golang.js';
 import {
   adminCredential,
@@ -56,12 +56,10 @@ import type { Seeder } from '../../src/seed/seeder.js';
 /** Every operation of the Go panel API this spec calls; a route the spec gains must be added (or the check below fails). */
 const EXERCISED = [
   'listGolangModules',
-  'searchGolangModules',
   'getGolangModuleInfo',
   'listGolangModuleVersions',
   'deleteGolangModule',
   'deleteGolangModuleVersion',
-  'checkGolangSumdbSupported',
 ];
 
 interface Names {
@@ -112,7 +110,16 @@ async function panelVersions(names: Names, modulePath = names.modulePath): Promi
   const res = await callOperation('listGolangModuleVersions', repoOnly(names), {
     query: `${moduleQuery(modulePath)}&size=100`,
   });
-  return (expectContract('listGolangModuleVersions', res) as { content: VersionRow[] }).content;
+  return (expectBare('listGolangModuleVersions', res) as { content: VersionRow[] }).content;
+}
+
+/** What a route of the pre-RPS-1781 shape answers now: 404. */
+async function expectRemoved(path: string): Promise<void> {
+  const res = await edgeRequest(apiUrl(path), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${await adminBearer()}` },
+  });
+  expect(res.status, `GET ${path} is gone: ${res.text.slice(0, 200)}`).toBe(404);
 }
 
 test.describe('the Go panel API against what the curl upload stored', () => {
@@ -145,7 +152,7 @@ test.describe('the Go panel API against what the curl upload stored', () => {
     expect(restored.contentSha256).toBe(sums.get('v1.1.0'));
 
     // GET /api/go/modules/{repo}: the module and its /v2 module, each a row of its own.
-    const modules = expectContract(
+    const modules = expectBare(
       'listGolangModules',
       await callOperation('listGolangModules', repoOnly(names)),
     ) as {
@@ -160,17 +167,17 @@ test.describe('the Go panel API against what the curl upload stored', () => {
       expect(Date.parse(row.createdAt), `createdAt of ${row.modulePath}`).not.toBeNaN();
     }
 
-    // GET .../search?q=: by a part of the path.
-    const found = expectContract(
-      'searchGolangModules',
-      await callOperation('searchGolangModules', repoOnly(names), { query: 'q=panel' }),
+    // GET /api/go/modules/{repo}?q=: by a part of the path.
+    const found = expectBare(
+      'listGolangModules',
+      await callOperation('listGolangModules', repoOnly(names), { query: 'q=panel' }),
     ) as { content: { modulePath: string }[] };
     expect(found.content.map((row) => row.modulePath).sort()).toEqual(
       [names.modulePath, v2Path].sort(),
     );
-    const none = expectContract(
-      'searchGolangModules',
-      await callOperation('searchGolangModules', repoOnly(names), { query: 'q=no-such-module' }),
+    const none = expectBare(
+      'listGolangModules',
+      await callOperation('listGolangModules', repoOnly(names), { query: 'q=no-such-module' }),
     ) as { content: unknown[] };
     expect(none.content).toEqual([]);
 
@@ -184,7 +191,7 @@ test.describe('the Go panel API against what the curl upload stored', () => {
     expect((await panelVersions(names, v2Path)).map((row) => row.version)).toEqual(['v2.0.0']);
 
     // GET .../info?modulePath=: the module, its newest version and every version.
-    const info = expectContract(
+    const info = expectBare(
       'getGolangModuleInfo',
       await callOperation('getGolangModuleInfo', repoOnly(names), {
         query: moduleQuery(names.modulePath),
@@ -200,18 +207,15 @@ test.describe('the Go panel API against what the curl upload stored', () => {
     expect(info.id).toBe(modules.content.find((row) => row.modulePath === names.modulePath)?.id);
     expect(info.versions.map((row) => row.version).sort()).toEqual([...versions].sort());
     expect(info.latestVersion, '@latest and the panel agree').toBe(parseInfo(latest.body).Version);
-    const v2Info = expectContract(
+    const v2Info = expectBare(
       'getGolangModuleInfo',
       await callOperation('getGolangModuleInfo', repoOnly(names), { query: moduleQuery(v2Path) }),
     ) as { modulePath: string; latestVersion: string };
     expect(v2Info).toMatchObject({ modulePath: v2Path, latestVersion: 'v2.0.0' });
 
-    // GET .../sumdb/supported: a bare 404 by design, needing no credentials.
-    for (const anonymous of [false, true]) {
-      const res = await callOperation('checkGolangSumdbSupported', repoOnly(names), { anonymous });
-      expect(res.status, `checkGolangSumdbSupported (anonymous ${anonymous})`).toBe(404);
-      expect(res.text).toBe('');
-    }
+    // The pre-RPS-1781 routes are gone: the search is `q` on the list, the sumdb probe has no caller.
+    await expectRemoved(`/api/go/modules/${names.repoName}/search?q=panel`);
+    await expectRemoved(`/api/go/modules/${names.repoName}/sumdb/supported`);
   });
 
   test('answers the failures the spec declares, with the schema of an error', async ({
@@ -293,21 +297,23 @@ test.describe('the Go panel API against what the curl upload stored', () => {
     await expectPagingSweep<{ modulePath: string }>({
       operationId: 'listGolangModules',
       values: repoOnly(names),
+      bare: true,
       total: 5,
       keyOf: (row) => row.modulePath,
       sorts: [{ property: 'modulePath', value: (row) => row.modulePath }],
     });
     await expectPagingSweep<{ modulePath: string }>({
-      operationId: 'searchGolangModules',
+      operationId: 'listGolangModules',
       values: repoOnly(names),
       baseQuery: 'q=pkg',
+      bare: true,
       total: 5,
       keyOf: (row) => row.modulePath,
       sorts: [{ property: 'modulePath', value: (row) => row.modulePath }],
     });
-    const narrowed = expectContract(
-      'searchGolangModules',
-      await callOperation('searchGolangModules', repoOnly(names), { query: 'q=pkg-3' }),
+    const narrowed = expectBare(
+      'listGolangModules',
+      await callOperation('listGolangModules', repoOnly(names), { query: 'q=pkg-3' }),
     ) as { content: { modulePath: string }[] };
     expect(narrowed.content).toHaveLength(1);
     expect(narrowed.content[0]?.modulePath).toContain('pkg-3');
@@ -319,12 +325,13 @@ test.describe('the Go panel API against what the curl upload stored', () => {
     await expectPagingSweep<{ version: string }>({
       operationId: 'listGolangModuleVersions',
       values: repoOnly(names),
+      bare: true,
       baseQuery: moduleQuery(names.modulePath),
       total: 5,
       keyOf: (row) => row.version,
       sorts: [{ property: 'version', value: (row) => row.version }],
     });
-    const oneVersion = expectContract(
+    const oneVersion = expectBare(
       'listGolangModuleVersions',
       await callOperation('listGolangModuleVersions', repoOnly(names), {
         query: `${moduleQuery(names.modulePath)}&q=v1.0.3`,
@@ -349,7 +356,7 @@ test.describe('the Go panel API against what the curl upload stored', () => {
     expect(await listedVersions(names)).toEqual([removed, kept]);
     expect(await zipStatus(names, removed)).toBe(200);
 
-    expectContract(
+    expectNoContent(
       'deleteGolangModuleVersion',
       await callOperation('deleteGolangModuleVersion', repoOnly(names), {
         query: moduleQuery(names.modulePath, removed),
@@ -377,7 +384,7 @@ test.describe('the Go panel API against what the curl upload stored', () => {
     );
 
     // Now the whole module: both the panel and the wire forget it, and the /v2 module stays.
-    expectContract(
+    expectNoContent(
       'deleteGolangModule',
       await callOperation('deleteGolangModule', repoOnly(names), {
         query: moduleQuery(names.modulePath),
@@ -400,7 +407,7 @@ test.describe('the Go panel API against what the curl upload stored', () => {
     expect(await listedVersions(names, v2Path)).toEqual(['v2.0.0']);
     const v2 = await go.resolve(worldOf(names, 'v2.0.0', v2Path));
     expect(v2.clientExitCode, v2.command).toBe(0);
-    const rows = expectContract(
+    const rows = expectBare(
       'listGolangModules',
       await callOperation('listGolangModules', repoOnly(names)),
     ) as { content: { modulePath: string }[] };
@@ -415,7 +422,7 @@ test.describe('the Go panel API against what the curl upload stored', () => {
     );
 
     // The last version of a module takes the module with it.
-    expectContract(
+    expectNoContent(
       'deleteGolangModuleVersion',
       await callOperation('deleteGolangModuleVersion', repoOnly(names), {
         query: moduleQuery(v2Path, 'v2.0.0'),
@@ -428,7 +435,7 @@ test.describe('the Go panel API against what the curl upload stored', () => {
       'moduleNotFound',
     );
     expect(await listedVersions(names, v2Path)).toBe(404);
-    const empty = expectContract(
+    const empty = expectBare(
       'listGolangModules',
       await callOperation('listGolangModules', repoOnly(names)),
     ) as { content: unknown[] };

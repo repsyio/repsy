@@ -23,6 +23,7 @@ import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChartVersion;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
+import io.repsy.os.shared.utils.LikePatterns;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
@@ -146,7 +147,7 @@ public class HelmChartService implements ChartService<UUID> {
   public Page<HelmChartInfo> search(
       final UUID repoId, final String query, final Pageable pageable) {
     return this.helmChartVersionRepository
-        .findLatestByRepoIdAndQuery(repoId, query, pageable)
+        .findLatestByRepoIdAndQuery(repoId, LikePatterns.of("%", query, "%"), pageable)
         .map(this::toDetail);
   }
 
@@ -162,6 +163,31 @@ public class HelmChartService implements ChartService<UUID> {
                     .<HelmChartInfo>map(this::toDetail)
                     .toList())
         .orElse(List.of());
+  }
+
+  /** The latest version of the chart, or 404 {@code chartNotFound} when there is no such chart. */
+  public HelmChartInfo findLatestByName(final UUID repoId, final String name) {
+    return this.helmChartRepository
+        .findByRepoIdAndName(repoId, name)
+        .flatMap(this.helmChartVersionRepository::findFirstByChartOrderByCreatedAtDescIdDesc)
+        .<HelmChartInfo>map(this::toDetail)
+        .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+  }
+
+  /**
+   * One page of the versions of the chart whose version contains {@code query}, any case; 404
+   * {@code chartNotFound} when there is no such chart.
+   */
+  public Page<HelmChartInfo> findVersionsByName(
+      final UUID repoId, final String name, final String query, final Pageable pageable) {
+    final var chart =
+        this.helmChartRepository
+            .findByRepoIdAndName(repoId, name)
+            .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+
+    return this.helmChartVersionRepository
+        .findAllByChartAndVersionContainingIgnoreCase(chart, query, pageable)
+        .map(this::toDetail);
   }
 
   public boolean existsByRepoIdAndName(final UUID repoId, final String name) {

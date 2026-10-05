@@ -92,9 +92,11 @@ jobs:
       - name: Wait for the frontend coverage
         id: frontend-report
         continue-on-error: true
-        if: >-
-          github.actor != 'dependabot[bot]'
-          && github.event.pull_request.head.repo.full_name == github.repository
+        # RPS-1877: SonarCloud is disabled until the codebase refactoring is done. A skipped wait
+        # leaves its outcome at "skipped", which also skips the download and the scan below.
+        # To re-enable, restore the condition: github.actor != 'dependabot[bot]' && the head repo
+        # equals github.repository.
+        if: false
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_API: repos/${{ github.repository }}/actions/runs/${{ github.run_id }}

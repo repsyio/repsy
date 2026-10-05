@@ -36,11 +36,14 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
-import { landAfterVersionDelete } from '../../../../../shared/util/version-delete-landing.util';
+import {
+  deleteVersionAndCheckLast$,
+  landAfterVersionDelete,
+  VERSION_PROBE_SIZE,
+} from '../../../../../shared/util/version-delete-landing.util';
 import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
-import { DeletedItem } from '../../dto/deleted-item';
-import { MavenService } from '../../service/maven.service';
+import { MAVEN_VERSION_PROBE_SORT, MavenService } from '../../service/maven.service';
 import { showVersionDeleteDialog } from '../../util/version-delete-warning.util';
 
 /** What the licenses and developers lines show when the POM declares none. */
@@ -215,24 +218,28 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
 
   private confirmDeleteVersion() {
     this.loading = true;
-    this.mavenService
-      .deleteVersion(this.groupName, this.artifactName, this.version.artifactVersionName)
+    // The delete answers 204 and says nothing about what went with the version: the last version of an
+    // artifact takes the artifact (and the last artifact of a group the group) with it. The versions probe
+    // read before the delete tells whether this was the last one.
+    deleteVersionAndCheckLast$(
+      this.mavenService.searchArtifactVersions(
+        this.groupName,
+        this.artifactName,
+        '',
+        MAVEN_VERSION_PROBE_SORT,
+        0,
+        VERSION_PROBE_SIZE,
+      ),
+      () => this.mavenService.deleteVersion(this.groupName, this.artifactName, this.version.artifactVersionName),
+    )
       .pipe(
         finalize(() => {
           this.loading = false;
         }),
       )
       .subscribe({
-        // The server says what went with the version: the last version of an artifact takes the artifact
-        // (and the last artifact of a group takes the group) with it.
-        next: (deletedItem) => {
-          landAfterVersionDelete(
-            this.router,
-            this.route,
-            this.toastService,
-            this.activeRepo.repoName,
-            deletedItem !== DeletedItem.VERSION,
-          );
+        next: (wasLastVersion) => {
+          landAfterVersionDelete(this.router, this.route, this.toastService, this.activeRepo.repoName, wasLastVersion);
         },
         error: () => {},
       });

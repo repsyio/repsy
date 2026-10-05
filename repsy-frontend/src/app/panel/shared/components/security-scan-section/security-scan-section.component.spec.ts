@@ -23,13 +23,12 @@ import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import {
   ScanOverview,
   ScanStatus,
+  SecurityScansApi,
   Severity,
   VulnerabilityFindingInfo,
-  VulnerabilityScanControllerService,
   VulnerabilityScanDetail,
   VulnerabilityScanInfo,
 } from '../../../../../generated/api';
-import { restResponse } from '../../../pages/repository/testing/protocol-service-spec-helpers';
 import { SecurityScanSupportService } from '../../service/security-scan-support.service';
 import { ToastService } from '../toast/toast.service';
 import { SecurityScanSectionComponent } from './security-scan-section.component';
@@ -39,8 +38,8 @@ const ARTIFACT = 'acme-artifact';
 const VERSION = '1.0.0';
 const POLL_INTERVAL_MS = 3000;
 
-/** A successful `RestResponse*` reply; the generated client's overloads make a typed spy return value unusable. */
-const reply = (data: unknown): never => of(restResponse(data)) as never;
+/** A successful bare-body reply; the generated client's overloads make a typed spy return value unusable. */
+const reply = (data: unknown): never => of(data) as never;
 
 function scanInfo(id: string, status: ScanStatus = ScanStatus.Completed): VulnerabilityScanInfo {
   return { id, status, repoName: REPO };
@@ -64,7 +63,7 @@ function overviewOf(scanId: string, status: ScanStatus, counts: Partial<ScanOver
 
 describe('SecurityScanSectionComponent', () => {
   let component: SecurityScanSectionComponent;
-  let api: jasmine.SpyObj<VulnerabilityScanControllerService>;
+  let api: jasmine.SpyObj<SecurityScansApi>;
   let toastService: jasmine.SpyObj<ToastService>;
   let supportService: jasmine.SpyObj<SecurityScanSupportService>;
   let scroller: jasmine.SpyObj<ViewportScroller>;
@@ -86,12 +85,15 @@ describe('SecurityScanSectionComponent', () => {
     };
     findings = [finding('a', Severity.Critical), finding('b', Severity.High), finding('c', Severity.High)];
 
-    api = jasmine.createSpyObj<VulnerabilityScanControllerService>('VulnerabilityScanControllerService', [
+    api = jasmine.createSpyObj<SecurityScansApi>('SecurityScansApi', [
       'listVulnerabilityScans',
       'getScanOverview',
       'getVulnerabilityScan',
       'getVulnerabilityScanFindings',
       'triggerVulnerabilityScan',
+      'triggerScopedVulnerabilityScan',
+      'listScopedVulnerabilityScans',
+      'getScopedScanOverview',
     ]);
     api.listVulnerabilityScans.and.callFake(() => reply({ content: scans, page: { totalPages: 3 } }));
     api.getScanOverview.and.callFake(() => reply(overview));
@@ -100,6 +102,9 @@ describe('SecurityScanSectionComponent', () => {
       reply({ content: findings, page: { totalPages: 2, totalElements: 14 } }),
     );
     api.triggerVulnerabilityScan.and.returnValue(reply(undefined));
+    api.triggerScopedVulnerabilityScan.and.returnValue(reply(undefined));
+    api.listScopedVulnerabilityScans.and.callFake(() => reply({ content: scans, page: { totalPages: 3 } }));
+    api.getScopedScanOverview.and.callFake(() => reply(overview));
 
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     supportService = jasmine.createSpyObj<SecurityScanSupportService>('SecurityScanSupportService', ['isSupported']);
@@ -183,7 +188,7 @@ describe('SecurityScanSectionComponent', () => {
       expect(component.loading).toBeFalse();
     });
 
-    it('tolerates a response without data', () => {
+    it('tolerates a response without a body', () => {
       api.listVulnerabilityScans.and.callFake(() => reply(undefined));
 
       bind();
@@ -434,6 +439,30 @@ describe('SecurityScanSectionComponent', () => {
       component.neverScanned = false;
       component.triggering = true;
       expect(component.canTrigger).toBeFalse();
+    });
+  });
+
+  describe('a scoped npm package', () => {
+    beforeEach(() => {
+      component.artifactName = '@acme/widget';
+    });
+
+    it('lists its scans and loads the overview on the scopes route', () => {
+      bind();
+
+      expect(api.listScopedVulnerabilityScans).toHaveBeenCalledWith('acme', 'widget', VERSION, REPO, 0, 5);
+      expect(api.getScopedScanOverview).toHaveBeenCalledWith('acme', 'widget', VERSION, REPO);
+      expect(api.listVulnerabilityScans).not.toHaveBeenCalled();
+      expect(api.getScanOverview).not.toHaveBeenCalled();
+    });
+
+    it('starts a scan on the scopes route', () => {
+      bind();
+
+      component.triggerScan();
+
+      expect(api.triggerScopedVulnerabilityScan).toHaveBeenCalledOnceWith('acme', 'widget', VERSION, REPO);
+      expect(api.triggerVulnerabilityScan).not.toHaveBeenCalled();
     });
   });
 

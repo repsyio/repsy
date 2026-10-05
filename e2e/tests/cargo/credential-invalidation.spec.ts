@@ -85,13 +85,13 @@ test(
   { tag: ['@smoke'] },
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.CARGO, { privateRepo: true });
-    const user = await seeder.createUser();
-    const cred = {
-      transport: 'basic' as const,
-      username: user.username,
-      password: user.password,
-      kind: 'password' as const,
-    };
+    // The user probes the index of a private repo, so it needs the grant a Repsy Cloud tenant lacks by
+    // default (RPS-1890): the target's `user-password` credential has it on both stacks.
+    const cred = await seeder.backend.seedUserCredential({
+      seeder,
+      repoName: repo.name,
+      repoType: RepoType.CARGO,
+    });
 
     // Get the initial token via /me with Basic auth
     const initialRes = await rawMe(repo.name, cred);

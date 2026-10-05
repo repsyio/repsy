@@ -17,7 +17,7 @@
 import { Router } from '@angular/router';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
-import { ProtocolRepoControllerService, RepoSettingsInfo } from '../../../../../generated/api';
+import { ReposApi, RepoSettingsInfo } from '../../../../../generated/api';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { RepoContext, RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { permission, restResponse } from '../testing/protocol-service-spec-helpers';
@@ -25,9 +25,9 @@ import { RepositorySettingsComponent } from './repository-settings.component';
 
 const REPO = 'acme-repo';
 
-/** A successful `RestResponse*` reply; the generated client's overloads make a typed spy return value unusable. */
+/** A successful bare reply; the generated client's overloads make a typed spy return value unusable. */
 const bare = (data: unknown): never => of(data) as never;
-const reply = (data: unknown): never => of(restResponse(data)) as never;
+const reply = (data: unknown): never => of(data) as never;
 
 function settings(overrides: Partial<RepoSettingsInfo> = {}): RepoSettingsInfo {
   return { privateRepo: true, allowOverride: false, securityScanEnabled: false, ...overrides };
@@ -35,15 +35,12 @@ function settings(overrides: Partial<RepoSettingsInfo> = {}): RepoSettingsInfo {
 
 describe('RepositorySettingsComponent', () => {
   let component: RepositorySettingsComponent;
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
   let router: jasmine.SpyObj<Router>;
   let currentRepo$: BehaviorSubject<RepoContext | null>;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoPermissions',
-      'getRepoSettings',
-    ]);
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoPermissions', 'getRepoSettings']);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     currentRepo$ = new BehaviorSubject<RepoContext | null>(null);
 

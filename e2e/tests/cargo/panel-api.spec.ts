@@ -33,7 +33,8 @@ import path from 'node:path';
 import {
   callOperation,
   contractWorld,
-  expectContract,
+  expectBare,
+  expectNoContent,
   expectCovers,
   expectFailure,
   expectPagingSweep,
@@ -110,7 +111,7 @@ async function newNames(seeder: Seeder): Promise<Names> {
 
 const values = (names: Names, version?: string): Record<string, string> => ({
   repoName: names.repoName,
-  crateName: names.name,
+  packageName: names.name,
   ...(version ? { version } : {}),
 });
 
@@ -131,7 +132,7 @@ async function crateStatus(names: Names, version: string, crate = names.name): P
 
 async function panelVersions(names: Names): Promise<VersionRow[]> {
   const res = await callOperation('listCargoCrateVersions', values(names));
-  return (expectContract('listCargoCrateVersions', res) as { content: VersionRow[] }).content;
+  return (expectBare('listCargoCrateVersions', res) as { content: VersionRow[] }).content;
 }
 
 /** `cargo yank` (or `--undo`) of one version of the crate, with the real client. */
@@ -258,7 +259,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
     expect(fetched.contentSha256).toBe(seeds.get(stable));
 
     // GET /api/cargo/crates/{repo}: the crate and its two dependencies, by name.
-    const crates = expectContract(
+    const crates = expectBare(
       'searchCargoCrates',
       await callOperation('searchCargoCrates', { repoName: names.repoName }),
     ) as {
@@ -280,9 +281,9 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
     expect(Date.parse(listed?.updatedAt ?? ''), 'updatedAt').not.toBeNaN();
 
     // GET .../{crate}: what the newest published manifest says.
-    const crate = expectContract(
+    const crate = expectBare(
       'getCargoCrate',
-      await callOperation('getCargoCrate', { repoName: names.repoName, crateName: names.name }),
+      await callOperation('getCargoCrate', { repoName: names.repoName, packageName: names.name }),
     ) as Record<string, unknown>;
     expect(crate).toMatchObject({
       name: names.name,
@@ -292,11 +293,11 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
       maxVersion: listed?.maxVersion,
     });
     // A `-` is a `_` to the panel, as to the sparse index.
-    const hyphenated = expectContract(
+    const hyphenated = expectBare(
       'getCargoCrate',
       await callOperation('getCargoCrate', {
         repoName: names.repoName,
-        crateName: names.name.replaceAll('_', '-'),
+        packageName: names.name.replaceAll('_', '-'),
       }),
     );
     expect(hyphenated).toEqual(crate);
@@ -313,8 +314,8 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
       expect(Date.parse(row.createdAt), `createdAt of ${row.version}`).not.toBeNaN();
     }
 
-    // GET .../{crate}/{version}: the manifest cargo published, read back.
-    const richDetail = expectContract(
+    // GET .../{crate}/versions/{version}: the manifest cargo published, read back.
+    const richDetail = expectBare(
       'getCargoCrateVersion',
       await callOperation('getCargoCrateVersion', values(names, rich)),
     ) as CrateVersionDetail;
@@ -359,7 +360,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
         .sort(),
     );
 
-    const stableDetail = expectContract(
+    const stableDetail = expectBare(
       'getCargoCrateVersion',
       await callOperation('getCargoCrateVersion', values(names, stable)),
     ) as CrateVersionDetail;
@@ -372,7 +373,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
       hasLib: true,
       yanked: false,
     });
-    const yankedDetail = expectContract(
+    const yankedDetail = expectBare(
       'getCargoCrateVersion',
       await callOperation('getCargoCrateVersion', values(names, prerelease)),
     ) as CrateVersionDetail;
@@ -384,7 +385,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
     // `cargo yank --undo` gives the version back: nothing is yanked, and the newest version by semver order (a
     // prerelease of 2.0.0 is above 1.1.0) is what the list and the crate call `maxVersion`.
     await cargoYank(names, prerelease, true);
-    const undone = expectContract(
+    const undone = expectBare(
       'searchCargoCrates',
       await callOperation('searchCargoCrates', { repoName: names.repoName }, { query: 'q=panel' }),
     ) as { content: { name: string; maxVersion: string }[] };
@@ -397,7 +398,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
     expect((await panelVersions(names)).every((row) => !row.yanked)).toBe(true);
     expect(
       (
-        expectContract(
+        expectBare(
           'getCargoCrateVersion',
           await callOperation('getCargoCrateVersion', values(names, prerelease)),
         ) as CrateVersionDetail
@@ -410,7 +411,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
   }) => {
     const names = await newNames(seeder);
     await cargo.seedPublish(worldOf(names, names.name, '1.0.0'));
-    const missing = { ...values(names), crateName: 'e2e_no_such_crate' };
+    const missing = { ...values(names), packageName: 'e2e_no_such_crate' };
 
     expectFailure(
       'searchCargoCrates',
@@ -472,10 +473,11 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
       operationId: 'searchCargoCrates',
       values: { repoName: names.repoName },
       total: 5,
+      bare: true,
       keyOf: (row) => row.name,
       sorts: [{ property: 'name', value: (row) => row.name }],
     });
-    const narrowed = expectContract(
+    const narrowed = expectBare(
       'searchCargoCrates',
       await callOperation('searchCargoCrates', { repoName: names.repoName }, { query: 'q=pkg_3' }),
     ) as { content: { name: string }[] };
@@ -490,10 +492,11 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
       operationId: 'listCargoCrateVersions',
       values: values(names),
       total: 5,
+      bare: true,
       keyOf: (row) => row.version,
       sorts: [{ property: 'version', value: (row) => row.version }],
     });
-    const oneVersion = expectContract(
+    const oneVersion = expectBare(
       'listCargoCrateVersions',
       await callOperation('listCargoCrateVersions', values(names), { query: 'q=1.0.3' }),
     ) as { content: { version: string }[] };
@@ -516,7 +519,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
     expect(await indexEntries(names)).toEqual({ [removed]: false, [kept]: false });
     expect(await crateStatus(names, removed)).toBe(200);
 
-    expectContract(
+    expectNoContent(
       'deleteCargoCrateVersion',
       await callOperation('deleteCargoCrateVersion', values(names, removed)),
     );
@@ -540,7 +543,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
     expect(resolved.contentSha256).toBe(seeds.get(kept));
     expect(
       (
-        expectContract('getCargoCrate', await callOperation('getCargoCrate', values(names))) as {
+        expectBare('getCargoCrate', await callOperation('getCargoCrate', values(names))) as {
           maxVersion: string;
         }
       ).maxVersion,
@@ -553,7 +556,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
     );
 
     // The last version takes the crate with it.
-    expectContract(
+    expectNoContent(
       'deleteCargoCrateVersion',
       await callOperation('deleteCargoCrateVersion', values(names, kept)),
     );
@@ -572,7 +575,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
       await cargo.seedPublish(worldOf(whole, whole.name, version));
     }
     expect(await indexEntries(whole)).toEqual({ '1.0.0': false, '2.0.0': false });
-    expectContract('deleteCargoCrate', await callOperation('deleteCargoCrate', values(whole)));
+    expectNoContent('deleteCargoCrate', await callOperation('deleteCargoCrate', values(whole)));
     expect(await indexEntries(whole)).toBe(404);
     expect(await crateStatus(whole, '2.0.0')).toBe(404);
     const lost = await cargo.resolve(worldOf(whole, whole.name, '2.0.0'));
@@ -583,7 +586,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
       404,
       'crateNotFound',
     );
-    const rows = expectContract(
+    const rows = expectBare(
       'searchCargoCrates',
       await callOperation('searchCargoCrates', { repoName: names.repoName }),
     ) as { content: unknown[] };

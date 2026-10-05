@@ -171,6 +171,11 @@ export interface CredentialSeedContext {
   seeder: Seeder;
   repoName: string;
   repoType: RepoType;
+  /**
+   * Seed the account under exactly this name (the successor of a freed name, RPS-1890). A backend that cannot
+   * honor it must throw, never answer a different name. Absent: the backend picks one.
+   */
+  username?: string;
 }
 
 /** Which half of a scenario a known gap is about: its publish (with everything before it) or its consume. */
@@ -191,7 +196,7 @@ export interface PanelBackend {
   changeOwnPassword(password: string): Promise<void>;
   /** A panel request the typed operations cannot express (a repo type in another case), as raw HTTP. */
   rawRequest(
-    method: 'GET' | 'POST' | 'PUT',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH',
     path: string,
     body?: unknown,
   ): Promise<{ status: number; body: { data?: unknown } }>;
@@ -299,7 +304,7 @@ export interface PanelBackend {
 
   // Other protocols -------------------------------------------------------------------------------
 
-  deletePypiRelease(repoName: string, packageName: string, version: string): Promise<void>;
+  deletePypiVersion(repoName: string, packageName: string, version: string): Promise<void>;
   deleteGolangModuleVersion(repoName: string, modulePath: string, version: string): Promise<void>;
   deleteRubyGemVersion(
     repoName: string,

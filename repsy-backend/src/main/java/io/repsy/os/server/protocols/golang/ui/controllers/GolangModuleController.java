@@ -15,8 +15,6 @@
  */
 package io.repsy.os.server.protocols.golang.ui.controllers;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.GoModuleInfo;
@@ -24,6 +22,7 @@ import io.repsy.os.generated.model.GoModuleListItem;
 import io.repsy.os.generated.model.GoModuleVersionListItem;
 import io.repsy.os.server.protocols.golang.ui.facades.GolangApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
+import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -40,7 +39,6 @@ import org.springframework.data.web.PagedModel;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -58,35 +56,11 @@ public class GolangModuleController {
   private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
 
   private final GolangApiFacade golangApiFacade;
-  private final RestResponseFactory restResponseFactory;
   private final UsageUpdateService usageUpdateService;
-
-  /**
-   * Signals to the Go toolchain that this proxy does not relay checksum database requests.
-   * Returning 404 causes Go to contact sum.golang.org directly for public modules and to rely on
-   * GONOSUMDB for private modules.
-   */
-  @GetMapping("/{repoName}/sumdb/supported")
-  public ResponseEntity<Void> checkSumdbSupported(@PathVariable final String repoName) {
-    return ResponseEntity.notFound().build();
-  }
 
   @GetMapping("/{repoName}")
   @RepoOperation
-  public RestResponse<PagedModel<GoModuleListItem>> list(
-      final RepoInfo repoInfo,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
-
-    SortValidator.requireSortableBy(pageable, MODULE_SORT_PROPERTIES);
-
-    final var modules = this.golangApiFacade.getModules(repoInfo.getStorageKey(), pageable);
-
-    return this.restResponseFactory.success("modulesFetched", new PagedModel<>(modules));
-  }
-
-  @GetMapping("/{repoName}/search")
-  @RepoOperation
-  public RestResponse<PagedModel<GoModuleListItem>> search(
+  public ResponseEntity<PagedModel<GoModuleListItem>> list(
       final RepoInfo repoInfo,
       @RequestParam(name = "q", required = false, defaultValue = "") final String search,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
@@ -96,12 +70,12 @@ public class GolangModuleController {
     final var modules =
         this.golangApiFacade.searchModules(repoInfo.getStorageKey(), search, pageable);
 
-    return this.restResponseFactory.success("modulesFetched", new PagedModel<>(modules));
+    return ResponseEntity.ok(new PagedModel<>(modules));
   }
 
   @GetMapping("/{repoName}/versions")
   @RepoOperation
-  public RestResponse<PagedModel<GoModuleVersionListItem>> listVersions(
+  public ResponseEntity<PagedModel<GoModuleVersionListItem>> listVersions(
       final RepoInfo repoInfo,
       @RequestParam final String modulePath,
       @RequestParam(name = "q", required = false, defaultValue = "") final String search,
@@ -113,33 +87,34 @@ public class GolangModuleController {
         this.golangApiFacade.getModuleVersions(
             repoInfo.getStorageKey(), modulePath, search, pageable);
 
-    return this.restResponseFactory.success("moduleVersionsFetched", new PagedModel<>(versions));
+    return ResponseEntity.ok(new PagedModel<>(versions));
   }
 
   @GetMapping("/{repoName}/info")
   @RepoOperation
-  public RestResponse<GoModuleInfo> getInfo(
+  public ResponseEntity<GoModuleInfo> getInfo(
       final RepoInfo repoInfo, @RequestParam final String modulePath) {
 
     final var moduleInfo = this.golangApiFacade.getModuleInfo(repoInfo.getStorageKey(), modulePath);
 
-    return this.restResponseFactory.success("moduleInfoFetched", moduleInfo);
+    return ResponseEntity.ok(moduleInfo);
   }
 
   @DeleteMapping("/{repoName}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> delete(final RepoInfo repoInfo, @RequestParam final String modulePath) {
+  public ResponseEntity<Void> delete(
+      final RepoInfo repoInfo, @RequestParam final String modulePath) {
 
     final var usages = this.golangApiFacade.deleteModule(repoInfo, modulePath);
 
     this.updateUsage(repoInfo, usages);
 
-    return this.restResponseFactory.success("moduleDeleted");
+    return ResponseEntities.noContent();
   }
 
   @DeleteMapping("/{repoName}/versions")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> deleteVersion(
+  public ResponseEntity<Void> deleteVersion(
       final RepoInfo repoInfo,
       @RequestParam final String modulePath,
       @RequestParam final String version) {
@@ -148,7 +123,7 @@ public class GolangModuleController {
 
     this.updateUsage(repoInfo, usages);
 
-    return this.restResponseFactory.success("moduleVersionDeleted");
+    return ResponseEntities.noContent();
   }
 
   private void updateUsage(final RepoInfo repoInfo, final BaseUsages usages) {

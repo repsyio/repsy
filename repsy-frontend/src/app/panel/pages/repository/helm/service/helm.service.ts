@@ -18,12 +18,13 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
 
 import {
-  HelmChartControllerService,
   HelmChartDetail,
   HelmChartListItem,
+  HelmChartsApi,
+  HelmChartSummary,
   HelmChartVersionItem,
-  ProtocolRepoControllerService,
   RepoPermissionInfo,
+  ReposApi,
 } from '../../../../../../generated/api';
 import { PagedData } from '../../../../shared/dto/paged-data';
 import { Sort } from '../../../../shared/dto/sort';
@@ -37,8 +38,8 @@ export class HelmService {
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
   constructor(
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
-    private readonly helmChartControllerService: HelmChartControllerService,
+    private readonly reposApi: ReposApi,
+    private readonly helmChartsApi: HelmChartsApi,
   ) {
     this.repoChanges = this.repoSubject.asObservable();
   }
@@ -50,10 +51,7 @@ export class HelmService {
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
-    return this.protocolRepoControllerService.getRepoPermissions(repoName).pipe(
-      map((r) => r.data!),
-      tap((info) => this.repoSubject.next(info)),
-    );
+    return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
   }
 
   private resetActiveRepoIfChanged(repoName: string): void {
@@ -70,34 +68,44 @@ export class HelmService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<HelmChartListItem>> {
-    return this.helmChartControllerService
+    return this.helmChartsApi
       .searchHelmCharts(this.repoName, query || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
-      .pipe(
-        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<HelmChartListItem>),
-      );
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<HelmChartListItem>));
   }
 
-  public getChartVersions(name: string): Observable<HelmChartVersionItem[]> {
-    return this.helmChartControllerService.getHelmChartVersions(this.repoName, name).pipe(map((r) => r.data ?? []));
+  public getChart(name: string): Observable<HelmChartSummary> {
+    return this.helmChartsApi.getHelmChart(this.repoName, name);
+  }
+
+  public fetchChartVersions(
+    name: string,
+    search: string,
+    sortOption: Sort,
+    pageIndex: number,
+    pageSize: number,
+  ): Observable<PagedData<HelmChartVersionItem>> {
+    return this.helmChartsApi
+      .listHelmChartVersions(this.repoName, name, search || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
+      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<HelmChartVersionItem>));
   }
 
   public getChartDetail(name: string, version: string): Observable<HelmChartDetail> {
-    return this.helmChartControllerService.getHelmChartDetail(this.repoName, name, version).pipe(map((r) => r.data!));
+    return this.helmChartsApi.getHelmChartDetail(this.repoName, name, version);
   }
 
   public deleteAllVersions(name: string): Observable<void> {
-    return this.helmChartControllerService.deleteAllHelmChartVersions(this.repoName, name).pipe(map(() => undefined));
+    return this.helmChartsApi.deleteAllHelmChartVersions(this.repoName, name).pipe(map(() => undefined));
   }
 
   public deleteChart(name: string, version: string): Observable<void> {
-    return this.helmChartControllerService
-      .deleteHelmChartVersion(this.repoName, name, version)
-      .pipe(map(() => undefined));
+    return this.helmChartsApi.deleteHelmChartVersion(this.repoName, name, version).pipe(map(() => undefined));
   }
 
   public getOciTags(name: string): Observable<string[]> {
-    return this.helmChartControllerService.getHelmChartOciTags(this.repoName, name).pipe(map((r) => r.data ?? []));
+    return this.helmChartsApi.getHelmChartOciTags(this.repoName, name).pipe(map((r) => r ?? []));
   }
 }

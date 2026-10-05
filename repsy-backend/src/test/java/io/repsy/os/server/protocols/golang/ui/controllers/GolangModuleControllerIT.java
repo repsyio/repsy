@@ -20,7 +20,6 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
-import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -142,28 +141,25 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
     this.mockMvc
         .perform(get("/api/go/modules/{repo}", repo).with(apiPort()).header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.*", hasSize(5)))
-        .andExpect(jsonPath("$.msgId").value("modulesFetched"))
-        .andExpect(jsonPath("$.type").value("SUCCESS"))
-        .andExpect(jsonPath("$.data.content", hasSize(1)))
-        .andExpect(jsonPath("$.data.content[0].id", matchesPattern(UUID_PATTERN)))
-        .andExpect(jsonPath("$.data.content[0].modulePath").value(MODULE))
-        .andExpect(jsonPath("$.data.content[0].createdAt", notNullValue()))
-        .andExpect(jsonPath("$.data.page.size").value(10))
-        .andExpect(jsonPath("$.data.page.number").value(0))
-        .andExpect(jsonPath("$.data.page.totalElements").value(1))
-        .andExpect(jsonPath("$.data.page.totalPages").value(1))
-        .andExpect(jsonPath("$.errorCode").value(nullValue()));
+        .andExpect(jsonPath("$.*", hasSize(2)))
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].id", matchesPattern(UUID_PATTERN)))
+        .andExpect(jsonPath("$.content[0].modulePath").value(MODULE))
+        .andExpect(jsonPath("$.content[0].createdAt", notNullValue()))
+        .andExpect(jsonPath("$.page.size").value(10))
+        .andExpect(jsonPath("$.page.number").value(0))
+        .andExpect(jsonPath("$.page.totalElements").value(1))
+        .andExpect(jsonPath("$.page.totalPages").value(1));
 
     this.mockMvc
         .perform(
-            get("/api/go/modules/{repo}/search", repo)
+            get("/api/go/modules/{repo}", repo)
                 .param("q", "HELLO")
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.content", hasSize(1)))
-        .andExpect(jsonPath("$.data.content[0].modulePath").value(MODULE));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].modulePath").value(MODULE));
 
     this.mockMvc
         .perform(
@@ -172,12 +168,11 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msgId").value("moduleVersionsFetched"))
-        .andExpect(jsonPath("$.data.content", hasSize(2)))
-        .andExpect(jsonPath("$.data.content[0].id", matchesPattern(UUID_PATTERN)))
-        .andExpect(jsonPath("$.data.content[0].version").value("v1.2.0"))
-        .andExpect(jsonPath("$.data.content[0].goVersion").value("1.23"))
-        .andExpect(jsonPath("$.data.content[0].createdAt", notNullValue()));
+        .andExpect(jsonPath("$.content", hasSize(2)))
+        .andExpect(jsonPath("$.content[0].id", matchesPattern(UUID_PATTERN)))
+        .andExpect(jsonPath("$.content[0].version").value("v1.2.0"))
+        .andExpect(jsonPath("$.content[0].goVersion").value("1.23"))
+        .andExpect(jsonPath("$.content[0].createdAt", notNullValue()));
 
     this.mockMvc
         .perform(
@@ -186,13 +181,11 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msgId").value("moduleInfoFetched"))
-        .andExpect(jsonPath("$.data.id", matchesPattern(UUID_PATTERN)))
-        .andExpect(jsonPath("$.data.modulePath").value(MODULE))
-        .andExpect(jsonPath("$.data.latestVersion").value("v1.2.0"))
-        .andExpect(jsonPath("$.data.createdAt", notNullValue()))
-        .andExpect(jsonPath("$.data.versions", hasSize(2)))
-        .andExpect(jsonPath("$.text").value("Module info fetched."));
+        .andExpect(jsonPath("$.id", matchesPattern(UUID_PATTERN)))
+        .andExpect(jsonPath("$.modulePath").value(MODULE))
+        .andExpect(jsonPath("$.latestVersion").value("v1.2.0"))
+        .andExpect(jsonPath("$.createdAt", notNullValue()))
+        .andExpect(jsonPath("$.versions", hasSize(2)));
   }
 
   @Test
@@ -240,8 +233,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(
-            jsonPath("$.data.versions[*].version").value(contains("v1.2.0", "v1.1.0", "v1.0.0")));
+        .andExpect(jsonPath("$.versions[*].version").value(contains("v1.2.0", "v1.1.0", "v1.0.0")));
   }
 
   @Test
@@ -266,27 +258,23 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.*", hasSize(5)))
-        .andExpect(jsonPath("$.msgId").value("modulesFetched"))
-        .andExpect(jsonPath("$.type").value("SUCCESS"))
-        .andExpect(jsonPath("$.data.content", hasSize(2)))
-        .andExpect(jsonPath("$.data.content[*].id", hasSize(2)))
-        .andExpect(jsonPath("$.data.content[*].createdAt", hasSize(2)))
-        .andExpect(jsonPath("$.data.page.size").value(2))
-        .andExpect(jsonPath("$.data.page.totalElements").value(3))
-        .andExpect(jsonPath("$.data.page.totalPages").value(2))
-        .andExpect(jsonPath("$.errorCode").value(nullValue()))
-        .andExpect(jsonPath("$.text").value("Modules fetched."));
+        .andExpect(jsonPath("$.*", hasSize(2)))
+        .andExpect(jsonPath("$.content", hasSize(2)))
+        .andExpect(jsonPath("$.content[*].id", hasSize(2)))
+        .andExpect(jsonPath("$.content[*].createdAt", hasSize(2)))
+        .andExpect(jsonPath("$.page.size").value(2))
+        .andExpect(jsonPath("$.page.totalElements").value(3))
+        .andExpect(jsonPath("$.page.totalPages").value(2));
 
     this.mockMvc
         .perform(
-            get("/api/go/modules/{repo}/search", repo)
+            get("/api/go/modules/{repo}", repo)
                 .param("q", "upper")
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.content", hasSize(1)))
-        .andExpect(jsonPath("$.data.content[0].modulePath").value(UPPERCASE_MODULE));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].modulePath").value(UPPERCASE_MODULE));
 
     this.mockMvc
         .perform(
@@ -296,10 +284,10 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.*", hasSize(5)))
-        .andExpect(jsonPath("$.data.content", hasSize(1)))
-        .andExpect(jsonPath("$.data.content[0].version").value("v1.2.3+incompatible"))
-        .andExpect(jsonPath("$.data.content[0].goVersion").value("1.23"));
+        .andExpect(jsonPath("$.*", hasSize(2)))
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].version").value("v1.2.3+incompatible"))
+        .andExpect(jsonPath("$.content[0].goVersion").value("1.23"));
   }
 
   @Test
@@ -316,10 +304,9 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.*", hasSize(5)))
-        .andExpect(jsonPath("$.data.content", hasSize(0)))
-        .andExpect(jsonPath("$.data.page.totalElements").value(0))
-        .andExpect(jsonPath("$.errorCode").value(nullValue()));
+        .andExpect(jsonPath("$.*", hasSize(2)))
+        .andExpect(jsonPath("$.content", hasSize(0)))
+        .andExpect(jsonPath("$.page.totalElements").value(0));
 
     this.mockMvc
         .perform(
@@ -398,7 +385,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
         .perform(
             get("/api/go/modules/{repo}", publicRepo).with(apiPort()).header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.content[0].modulePath").value(MODULE));
+        .andExpect(jsonPath("$.content[0].modulePath").value(MODULE));
 
     this.mockMvc
         .perform(
@@ -408,8 +395,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                     AUTHORIZATION,
                     this.bearerTokenFor(this.createUser(uniqueUsername("gomod"), UserRole.USER))))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.type").value("SUCCESS"))
-        .andExpect(jsonPath("$.data.content", hasSize(0)));
+        .andExpect(jsonPath("$.content", hasSize(0)));
 
     final var mavenRepo =
         this.repoTxService.createRepo(
@@ -421,8 +407,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.type").value("SUCCESS"))
-        .andExpect(jsonPath("$.data.content", hasSize(0)));
+        .andExpect(jsonPath("$.content", hasSize(0)));
 
     this.mockMvc
         .perform(
@@ -511,9 +496,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .param("version", "v1.0.0")
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msgId").value("moduleVersionDeleted"))
-        .andExpect(jsonPath("$.data").value(nullValue()));
+        .andExpect(status().isNoContent());
 
     this.mockMvc
         .perform(
@@ -522,8 +505,8 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.versions", hasSize(1)))
-        .andExpect(jsonPath("$.data.versions[0].version").value("v1.2.0"));
+        .andExpect(jsonPath("$.versions", hasSize(1)))
+        .andExpect(jsonPath("$.versions[0].version").value("v1.2.0"));
 
     this.mockMvc
         .perform(
@@ -531,8 +514,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .param("modulePath", MODULE)
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msgId").value("moduleDeleted"));
+        .andExpect(status().isNoContent());
 
     this.mockMvc
         .perform(
@@ -564,14 +546,14 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                   .param("version", version)
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
-          .andExpect(status().isOk());
+          .andExpect(status().isNoContent());
 
       final var moduleListed = version.equals("v1.0.0") ? 1 : 0;
       this.mockMvc
           .perform(get("/api/go/modules/{repo}", repo).with(apiPort()).header(AUTHORIZATION, token))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content", hasSize(moduleListed)))
-          .andExpect(jsonPath("$.data.page.totalElements").value(moduleListed));
+          .andExpect(jsonPath("$.content", hasSize(moduleListed)))
+          .andExpect(jsonPath("$.page.totalElements").value(moduleListed));
     }
 
     this.mockMvc
@@ -600,8 +582,79 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
     this.upload(repo, "v1.0.0", this.protocolBearerTokenFor(user));
     this.mockMvc
         .perform(get("/api/go/modules/{repo}", repo).with(apiPort()).header(AUTHORIZATION, token))
-        .andExpect(jsonPath("$.data.content", hasSize(1)))
-        .andExpect(jsonPath("$.data.content[0].modulePath").value(MODULE));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].modulePath").value(MODULE));
+  }
+
+  @Test
+  @DisplayName("the old search and sumdb routes are gone: search is q on the list (RPS-1781)")
+  void oldSearchAndSumdbRoutesAreGone() throws Exception {
+    final var user = this.createUser(uniqueUsername("gomod"), UserRole.USER);
+    final var token = this.bearerTokenFor(user);
+    final var repo = this.createRepo(unique("go"), false);
+    this.upload(repo, "v1.0.0", this.protocolBearerTokenFor(user));
+
+    for (final var path : new String[] {"search", "sumdb/supported"}) {
+      this.mockMvc
+          .perform(
+              get("/api/go/modules/{repo}/" + path, repo)
+                  .param("q", "hello")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isNotFound());
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "a module whose last path element is a route literal is listed, versioned and deleted as itself")
+  void moduleNamedLikeARouteDoesNotCollide() throws Exception {
+    final var user = this.createUser(uniqueUsername("gomod"), UserRole.ADMIN);
+    final var token = this.bearerTokenFor(user);
+    final var protocolToken = this.protocolBearerTokenFor(user);
+    final var repo = this.createRepo(unique("go"), false);
+    this.upload(repo, "example.com/versions", "v1.0.0", protocolToken);
+    this.upload(repo, "example.com/info", "v1.0.0", protocolToken);
+
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}", repo)
+                .param("q", "example.com/versions")
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].modulePath").value("example.com/versions"));
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}/versions", repo)
+                .param("modulePath", "example.com/versions")
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].version").value("v1.0.0"));
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}/info", repo)
+                .param("modulePath", "example.com/info")
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.modulePath").value("example.com/info"));
+
+    this.mockMvc
+        .perform(
+            delete("/api/go/modules/{repo}", repo)
+                .param("modulePath", "example.com/versions")
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isNoContent());
+    this.mockMvc
+        .perform(get("/api/go/modules/{repo}", repo).with(apiPort()).header(AUTHORIZATION, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].modulePath").value("example.com/info"));
   }
 
   @Nested
@@ -609,11 +662,10 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
   class PagingAndSorting {
 
     private static final String MODULES = "/api/go/modules/{repo}";
-    private static final String SEARCH = "/api/go/modules/{repo}/search";
     private static final String VERSIONS = "/api/go/modules/{repo}/versions";
 
     static Stream<String> endpoints() {
-      return Stream.of(MODULES, SEARCH, VERSIONS);
+      return Stream.of(MODULES, VERSIONS);
     }
 
     static Stream<Arguments> acceptedSorts() {
@@ -621,9 +673,6 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
           Arguments.of(MODULES, "id"),
           Arguments.of(MODULES, "modulePath"),
           Arguments.of(MODULES, "createdAt"),
-          Arguments.of(SEARCH, "id"),
-          Arguments.of(SEARCH, "modulePath"),
-          Arguments.of(SEARCH, "createdAt"),
           Arguments.of(VERSIONS, "id"),
           Arguments.of(VERSIONS, "version"),
           Arguments.of(VERSIONS, "createdAt"));
@@ -681,14 +730,14 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
 
       this.list(VERSIONS, repo, token, "sort", "version,asc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].version").value("v1.0.0"));
+          .andExpect(jsonPath("$.content[0].version").value("v1.0.0"));
       this.list(VERSIONS, repo, token, "sort", "version,desc")
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data.content[0].version").value("v1.2.0"));
+          .andExpect(jsonPath("$.content[0].version").value("v1.2.0"));
     }
 
     @ParameterizedTest(name = "{0} {1}")
-    @CsvSource({SEARCH + ",search", VERSIONS + ",search"})
+    @CsvSource({MODULES + ",search", VERSIONS + ",search"})
     @DisplayName("filters by q only: search, the old name of the filter, is an unknown parameter")
     void filtersByQOnly(final String path, final String oldName) throws Exception {
       final var it = GolangModuleControllerIT.this;

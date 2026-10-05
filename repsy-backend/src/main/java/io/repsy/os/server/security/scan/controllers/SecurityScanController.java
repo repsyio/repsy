@@ -17,8 +17,6 @@ package io.repsy.os.server.security.scan.controllers;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
-import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.SecurityScansSummary;
 import io.repsy.os.generated.model.VulnerabilityScanInfo;
@@ -38,6 +36,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -55,10 +54,9 @@ final class SecurityScanController {
   private final @NonNull PanelAuthHelper panelAuthHelper;
   private final @NonNull VulnerabilityScanTxService scanTxService;
   private final @NonNull VulnerabilityScannerRegistry scannerRegistry;
-  private final @NonNull RestResponseFactory resp;
 
   @GetMapping("/scans")
-  public @NonNull RestResponse<PagedModel<VulnerabilityScanInfo>> listScans(
+  public @NonNull ResponseEntity<PagedModel<VulnerabilityScanInfo>> listScans(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestParam(required = false) final @Nullable Severity severity,
       @RequestParam(required = false) final @Nullable RepoType repoType,
@@ -72,11 +70,11 @@ final class SecurityScanController {
 
     final var scans = this.scanTxService.listAllScans(severity, repoType, repoName, pageable);
 
-    return this.resp.success("scansFetched", new PagedModel<>(scans));
+    return ResponseEntity.ok(new PagedModel<>(scans));
   }
 
   @GetMapping("/scans/summary")
-  public @NonNull RestResponse<SecurityScansSummary> getScansSummary(
+  public @NonNull ResponseEntity<SecurityScansSummary> getScansSummary(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestParam(required = false) final @Nullable RepoType repoType,
       @RequestParam(required = false) final @Nullable String repoName) {
@@ -85,12 +83,11 @@ final class SecurityScanController {
 
     final var summary = this.scanTxService.getSecurityScansSummary(repoType, repoName);
 
-    return this.resp.success("scansSummaryFetched", summary);
+    return ResponseEntity.ok(summary);
   }
 
   @GetMapping("/supported-repo-types")
-  public @NonNull RestResponse<List<String>> getSupportedRepoTypes() {
-    return this.resp.success(
-        "supportedRepoTypesFetched", List.copyOf(this.scannerRegistry.getSupportedRepoTypes()));
+  public @NonNull ResponseEntity<List<String>> getSupportedRepoTypes() {
+    return ResponseEntity.ok(List.copyOf(this.scannerRegistry.getSupportedRepoTypes()));
   }
 }

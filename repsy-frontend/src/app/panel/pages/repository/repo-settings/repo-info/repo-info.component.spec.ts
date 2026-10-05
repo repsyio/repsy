@@ -17,7 +17,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 
-import { ProtocolRepoControllerService, RepoPermissionInfo } from '../../../../../../generated/api';
+import { RepoPermissionInfo, ReposApi } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { RepoInfoComponent } from './repo-info.component';
@@ -26,12 +26,7 @@ describe('RepoInfoComponent rename validation', () => {
   let component: RepoInfoComponent;
 
   beforeEach(() => {
-    component = new RepoInfoComponent(
-      {} as ProtocolRepoControllerService,
-      {} as ToastService,
-      {} as DangerModalService,
-      {} as Router,
-    );
+    component = new RepoInfoComponent({} as ReposApi, {} as ToastService, {} as DangerModalService, {} as Router);
   });
 
   const isValid = (name: string): boolean => {
@@ -79,7 +74,7 @@ describe('RepoInfoComponent rename form error messages', () => {
     TestBed.configureTestingModule({
       imports: [RepoInfoComponent],
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: {} },
+        { provide: ReposApi, useValue: {} },
         { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
         {
           provide: DangerModalService,

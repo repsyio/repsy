@@ -24,11 +24,11 @@ import { finalize, switchMap, tap } from 'rxjs/operators';
 import { environment } from '../../../../../../environments/environment';
 import {
   DeployTokenInfoListItem,
-  ProtocolDeployTokenControllerService,
-  ProtocolRepoControllerService,
+  DeployTokensApi,
+  PagedModelDeployTokenInfoListItem,
   RepoPermissionInfo,
+  ReposApi,
   RepoUsageInfo,
-  RestResponsePagedModelDeployTokenInfoListItem,
 } from '../../../../../../generated/api';
 import { EmptyListComponent } from '../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -94,8 +94,8 @@ export class DeployTokenComponent implements OnInit {
   public repoUsage: RepoUsageInfo;
 
   constructor(
-    private readonly protocolDeployTokenControllerService: ProtocolDeployTokenControllerService,
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly deployTokensApi: DeployTokensApi,
+    private readonly reposApi: ReposApi,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
@@ -107,9 +107,9 @@ export class DeployTokenComponent implements OnInit {
   }
 
   private fetchRepoUsage() {
-    this.protocolRepoControllerService.getRepoUsage(this.activeRepository.repoName).subscribe({
+    this.reposApi.getRepoUsage(this.activeRepository.repoName).subscribe({
       next: (r) => {
-        this.repoUsage = r.data!;
+        this.repoUsage = r;
       },
       error: () => {},
     });
@@ -124,16 +124,12 @@ export class DeployTokenComponent implements OnInit {
   }
 
   private listPage(pageNum: number) {
-    return this.protocolDeployTokenControllerService.listDeployTokens(
-      this.activeRepository.repoName,
-      pageNum,
-      this.pageSize,
-    );
+    return this.deployTokensApi.listDeployTokens(this.activeRepository.repoName, pageNum, this.pageSize);
   }
 
-  private showTokens(r: RestResponsePagedModelDeployTokenInfoListItem) {
-    this.pagedData.page = { ...r.data?.page } as PagedData<DeployTokenInfoListItem>['page'];
-    this.deployTokens = r.data?.content ?? [];
+  private showTokens(r: PagedModelDeployTokenInfoListItem) {
+    this.pagedData.page = { ...r.page } as PagedData<DeployTokenInfoListItem>['page'];
+    this.deployTokens = r.content ?? [];
   }
 
   /**
@@ -160,7 +156,7 @@ export class DeployTokenComponent implements OnInit {
     this.dangerModalService.show('Rotate Deploy Token', 'Rotate', () => {
       this.operationLock = true;
 
-      this.protocolDeployTokenControllerService
+      this.deployTokensApi
         .rotateDeployToken(deployToken.id, this.activeRepository.repoName)
         .pipe(
           finalize(() => {
@@ -172,7 +168,7 @@ export class DeployTokenComponent implements OnInit {
             this.fetchDeployTokens();
             this.toastService.show(successMsg, 'success');
             this.createdDeployToken = new TokenCreateInfo();
-            this.createdDeployToken.token = r.data!;
+            this.createdDeployToken.token = r;
             this.createdDeployToken.username = deployToken.username;
             this.createdDeployToken.id = deployToken.id;
             this.showTokenInfoModal = true;
@@ -188,7 +184,7 @@ export class DeployTokenComponent implements OnInit {
     this.dangerModalService.show('Delete Deploy Token', 'Delete', () => {
       this.operationLock = true;
 
-      this.protocolDeployTokenControllerService
+      this.deployTokensApi
         .revokeDeployToken(deployToken.id, this.activeRepository.repoName)
         .pipe(
           tap(() => this.toastService.show('Deploy token revoked successfully', 'success')),

@@ -49,7 +49,6 @@ import type { RepoType as PanelRepoType } from '../api/panel-backend.js';
 import {
   FixStatus,
   RepoType,
-  ResponseType,
   ScanStatus,
   Severity,
   type PagedModelVulnerabilityFindingInfo,
@@ -57,16 +56,6 @@ import {
   type RecentScannedVersion,
   type RepoSecurityDetail,
   type RepoSecuritySummary,
-  type RestResponseListString,
-  type RestResponsePagedModelVulnerabilityFindingInfo,
-  type RestResponsePagedModelVulnerabilityScanInfo,
-  type RestResponseRepoSecurityDetail,
-  type RestResponseScanOverview,
-  type RestResponseSecurityScansSummary,
-  type RestResponseSecuritySummary,
-  type RestResponseVersionSecuritySummaryMap,
-  type RestResponseVulnerabilityScanDetail,
-  type RestResponseVulnerabilityScanInfo,
   type ScanOverview,
   type SecurityScansSummary,
   type VersionSecuritySummary,
@@ -116,14 +105,7 @@ class Handle implements StubHandle {
   }
 }
 
-/** A JSON success response of model `R` (`data` is checked against the model's own `data` type). */
-function success<R extends { type?: ResponseType; data?: unknown }>(
-  data: NonNullable<R['data']>,
-): R {
-  return { type: ResponseType.SUCCESS, data } as R;
-}
-
-/** Answers 200 with `body`, an instance of a generated model (`success<R>` builds one): never `unknown`. */
+/** Answers 200 with `body`, the bare resource (Decision 5: no envelope), an instance of a generated model: never `unknown`. */
 async function json<R extends object>(route: Route, body: R): Promise<void> {
   await fulfillJson<R>(route, 200, body);
 }
@@ -137,8 +119,8 @@ async function stub(
   pattern: RegExp,
   answer: (route: Route, url: URL, params: string[]) => Promise<void>,
   method: 'GET' | 'POST' = 'GET',
+  handle: Handle = new Handle(),
 ): Promise<Handle> {
-  const handle = new Handle();
   await page.route(
     (url) => pattern.test(url.pathname),
     async (route) => {
@@ -153,6 +135,30 @@ async function stub(
       handle.calls.push(url);
       await answer(route, url, params);
     },
+  );
+  return handle;
+}
+
+/**
+ * `stub` for an artifact route, which has two shapes: `/artifacts/{name}/...` and, for a scoped npm
+ * package, `/scopes/{scope}/artifacts/{name}/...`. `answer` always gets `[repo, artifact, ...rest]`, with
+ * the scoped form re-joined to the panel's artifact key `@scope/name`; one handle counts both.
+ */
+async function stubArtifact(
+  page: Page,
+  patterns: { plain: RegExp; scoped: RegExp },
+  answer: (route: Route, url: URL, params: string[]) => Promise<void>,
+  method: 'GET' | 'POST' = 'GET',
+): Promise<Handle> {
+  const handle = new Handle();
+  await stub(page, patterns.plain, answer, method, handle);
+  await stub(
+    page,
+    patterns.scoped,
+    (route, url, [repo, scope, name, ...rest]) =>
+      answer(route, url, [repo, `@${scope}/${name}`, ...rest]),
+    method,
+    handle,
   );
   return handle;
 }
@@ -198,6 +204,22 @@ export const SECURITY_PATHS = {
   },
   get triggerScan() {
     return repoApiPattern('artifacts', ':', 'versions', ':', 'scan');
+  },
+  // A scoped npm package lives under /scopes/{scope}/artifacts/{name}, never as one `@scope%2Fname` segment.
+  get scopedVersionsSummary() {
+    return repoApiPattern('scopes', ':', 'artifacts', ':', 'security-summary');
+  },
+  get scopedArtifactDetail() {
+    return repoApiPattern('scopes', ':', 'artifacts', ':', 'security-detail');
+  },
+  get scopedVersionScans() {
+    return repoApiPattern('scopes', ':', 'artifacts', ':', 'versions', ':', 'scans');
+  },
+  get scopedScanOverview() {
+    return repoApiPattern('scopes', ':', 'artifacts', ':', 'versions', ':', 'scan-overview');
+  },
+  get scopedTriggerScan() {
+    return repoApiPattern('scopes', ':', 'artifacts', ':', 'versions', ':', 'scan');
   },
   get scanDetail() {
     return repoApiPattern('scans', ':');
@@ -310,7 +332,7 @@ export function stubSupportedRepoTypes(
   page: Page,
   types: readonly PanelRepoType[],
 ): Promise<StubHandle> {
-  const body = success<RestResponseListString>([...types]);
+  const body = [...types];
   return stub(page, SECURITY_PATHS.supportedRepoTypes, (route) => json(route, body));
 }
 
@@ -336,7 +358,7 @@ export function stubRepoSecuritySummary(
         data[name] = summaries[name];
       }
     }
-    return json(route, success<RestResponseSecuritySummary>(data));
+    return json(route, data);
   });
 }
 
@@ -350,9 +372,7 @@ export function stubArtifactSecuritySummary(
   summaries: Readonly<Record<string, VersionSecuritySummary>>,
 ): Promise<StubHandle> {
   return stub(page, SECURITY_PATHS.artifactsSummary, (route, _url, [repo]) =>
-    repo === repoName
-      ? json(route, success<RestResponseVersionSecuritySummaryMap>({ ...summaries }))
-      : route.fallback(),
+    repo === repoName ? json(route, { ...summaries }) : route.fallback(),
   );
 }
 
@@ -365,10 +385,10 @@ export function stubVersionSecuritySummary(
   repoName: string,
   summaries: Readonly<Record<string, VersionSecuritySummary>>,
 ): Promise<StubHandle> {
-  return stub(page, SECURITY_PATHS.versionsSummary, (route, _url, [repo]) =>
-    repo === repoName
-      ? json(route, success<RestResponseVersionSecuritySummaryMap>({ ...summaries }))
-      : route.fallback(),
+  return stubArtifact(
+    page,
+    { plain: SECURITY_PATHS.versionsSummary, scoped: SECURITY_PATHS.scopedVersionsSummary },
+    (route, _url, [repo]) => (repo === repoName ? json(route, { ...summaries }) : route.fallback()),
   );
 }
 
@@ -379,9 +399,7 @@ export function stubRepoSecurityDetail(
   detail: RepoSecurityDetail,
 ): Promise<StubHandle> {
   return stub(page, SECURITY_PATHS.repoDetail, (route, _url, [repo]) =>
-    repo === repoName
-      ? json(route, success<RestResponseRepoSecurityDetail>(detail))
-      : route.fallback(),
+    repo === repoName ? json(route, detail) : route.fallback(),
   );
 }
 
@@ -391,10 +409,10 @@ export function stubArtifactSecurityDetail(
   repoName: string,
   detail: RepoSecurityDetail,
 ): Promise<StubHandle> {
-  return stub(page, SECURITY_PATHS.artifactDetail, (route, _url, [repo]) =>
-    repo === repoName
-      ? json(route, success<RestResponseRepoSecurityDetail>(detail))
-      : route.fallback(),
+  return stubArtifact(
+    page,
+    { plain: SECURITY_PATHS.artifactDetail, scoped: SECURITY_PATHS.scopedArtifactDetail },
+    (route, _url, [repo]) => (repo === repoName ? json(route, detail) : route.fallback()),
   );
 }
 
@@ -615,9 +633,9 @@ export async function stubVersionScans(
 ): Promise<VersionScansHandle> {
   const mine = (repo: string): boolean => repo === repoName;
 
-  const list = await stub(
+  const list = await stubArtifact(
     page,
-    SECURITY_PATHS.versionScans,
+    { plain: SECURITY_PATHS.versionScans, scoped: SECURITY_PATHS.scopedVersionScans },
     (route, url, [repo, artifact, version]) => {
       if (!mine(repo)) {
         return route.fallback();
@@ -625,22 +643,21 @@ export async function stubVersionScans(
       script.calls.list++;
       const { page: pageNumber, size } = pagingOf(url);
       const rows = script.scans.map((scan) => script.info(scan, repo, artifact, version, repoType));
-      return json(
-        route,
-        success<RestResponsePagedModelVulnerabilityScanInfo>(
-          pageOf(rows, pageNumber, size) satisfies PagedModelVulnerabilityScanInfo,
-        ),
-      );
+      return json(route, pageOf(rows, pageNumber, size) satisfies PagedModelVulnerabilityScanInfo);
     },
   );
 
-  const overview = await stub(page, SECURITY_PATHS.scanOverview, (route, _url, [repo]) => {
-    if (!mine(repo)) {
-      return route.fallback();
-    }
-    script.calls.overview++;
-    return json(route, success<RestResponseScanOverview>(script.overview()));
-  });
+  const overview = await stubArtifact(
+    page,
+    { plain: SECURITY_PATHS.scanOverview, scoped: SECURITY_PATHS.scopedScanOverview },
+    (route, _url, [repo]) => {
+      if (!mine(repo)) {
+        return route.fallback();
+      }
+      script.calls.overview++;
+      return json(route, script.overview());
+    },
+  );
 
   const detail = await stub(page, SECURITY_PATHS.scanDetail, async (route, _url, [repo, id]) => {
     const scan = script.scanById(id);
@@ -649,12 +666,7 @@ export async function stubVersionScans(
     }
     script.calls.detail++;
     // The path carries no artifact or version; the panel only reads status and timestamps here.
-    return json(
-      route,
-      success<RestResponseVulnerabilityScanDetail>(
-        script.detail(scan, repo, 'artifact', 'version'),
-      ),
-    );
+    return json(route, script.detail(scan, repo, 'artifact', 'version'));
   });
 
   const findingsHandle = await stub(page, SECURITY_PATHS.scanFindings, (route, url, [repo, id]) => {
@@ -671,27 +683,24 @@ export async function stubVersionScans(
     );
     return json(
       route,
-      success<RestResponsePagedModelVulnerabilityFindingInfo>(
-        pageOf(ordered, pageNumber, size) satisfies PagedModelVulnerabilityFindingInfo,
-      ),
+      pageOf(ordered, pageNumber, size) satisfies PagedModelVulnerabilityFindingInfo,
     );
   });
 
-  const trigger = await stub(
+  const trigger = await stubArtifact(
     page,
-    SECURITY_PATHS.triggerScan,
-    (route, _url, [repo, artifact, version]) => {
+    { plain: SECURITY_PATHS.triggerScan, scoped: SECURITY_PATHS.scopedTriggerScan },
+    (route, _url, [repo]) => {
       if (!mine(repo)) {
         return route.fallback();
       }
       script.calls.trigger++;
       const scan = script.rescan();
-      return json(
-        route,
-        success<RestResponseVulnerabilityScanInfo>(
-          script.info(scan, repo, artifact, version, repoType),
-        ),
-      );
+      // 202: the scan runs later; the Location is its status resource and the body is empty.
+      return route.fulfill({
+        status: 202,
+        headers: { Location: repoApiPath(repo, 'scans', scan.id) },
+      });
     },
     'POST',
   );
@@ -724,10 +733,7 @@ export function stubSecurityScans(
       .filter((scan) => !repoType || scan.repoType === repoType)
       .filter((scan) => !repoName || scan.repoName?.toLowerCase().includes(repoName))
       .sort((a, b) => Date.parse(b.createdAt ?? '') - Date.parse(a.createdAt ?? ''));
-    return json(
-      route,
-      success<RestResponsePagedModelVulnerabilityScanInfo>(pageOf(matching, pageNumber, size)),
-    );
+    return json(route, pageOf(matching, pageNumber, size));
   });
 }
 
@@ -736,7 +742,5 @@ export function stubSecurityScansSummary(
   page: Page,
   summary: SecurityScansSummary,
 ): Promise<StubHandle> {
-  return stub(page, SECURITY_PATHS.scansSummary, (route) =>
-    json(route, success<RestResponseSecurityScansSummary>(summary)),
-  );
+  return stub(page, SECURITY_PATHS.scansSummary, (route) => json(route, summary));
 }

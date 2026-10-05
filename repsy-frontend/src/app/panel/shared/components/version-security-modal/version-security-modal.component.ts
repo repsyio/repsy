@@ -19,12 +19,13 @@ import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import { ScanOverview, ScanStatus, VulnerabilityScanControllerService } from '../../../../../generated/api';
+import { ScanOverview, ScanStatus, SecurityScansApi } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
 import { toApiRepoType } from '../../util/repo-api-type';
 import { recentScanNote } from '../../util/rescan-status.util';
+import { splitScopedArtifactName } from '../../util/scoped-artifact.util';
 import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { ScanFailureReasonComponent } from '../scan-failure-reason/scan-failure-reason.component';
@@ -58,7 +59,7 @@ export class VersionSecurityModalComponent implements OnChanges {
   public overview: ScanOverview | null = null;
 
   constructor(
-    private readonly vulnerabilityScanControllerService: VulnerabilityScanControllerService,
+    private readonly securityScansApi: SecurityScansApi,
     private readonly router: Router,
   ) {}
 
@@ -111,14 +112,16 @@ export class VersionSecurityModalComponent implements OnChanges {
     this.loading = true;
     this.overview = null;
 
-    this.vulnerabilityScanControllerService
-      .getScanOverview(this.artifactName, this.artifactVersion, this.repoName)
-      .pipe(finalize(() => (this.loading = false)))
-      .subscribe({
-        next: (response) => {
-          this.overview = response.data ?? null;
-        },
-        error: () => {},
-      });
+    const scoped = splitScopedArtifactName(this.artifactName);
+    const overview$ = scoped
+      ? this.securityScansApi.getScopedScanOverview(scoped.scope, scoped.name, this.artifactVersion, this.repoName)
+      : this.securityScansApi.getScanOverview(this.artifactName, this.artifactVersion, this.repoName);
+
+    overview$.pipe(finalize(() => (this.loading = false))).subscribe({
+      next: (response) => {
+        this.overview = response ?? null;
+      },
+      error: () => {},
+    });
   }
 }

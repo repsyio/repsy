@@ -22,6 +22,7 @@ import { HelmChartDetail, RepoPermissionInfo } from '../../../../../../../genera
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { ByteFormatter } from '../../../../../shared/util/byte-formatter';
+import { VERSION_PROBE_SORT } from '../../../../../shared/util/version-delete-landing.util';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { HelmService } from '../../service/helm.service';
 import { HelmChartsVersionDetailComponent } from './helm-charts-version-detail.component';
@@ -55,13 +56,15 @@ describe('HelmChartsVersionDetailComponent', () => {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
     helmService = jasmine.createSpyObj<HelmService>(
       'HelmService',
-      ['getChartDetail', 'getChartVersions', 'deleteChart'],
+      ['getChartDetail', 'fetchChartVersions', 'deleteChart'],
       {
         repoChanges,
       },
     );
     helmService.getChartDetail.and.returnValue(of(FULL));
-    helmService.getChartVersions.and.returnValue(of([{ version: '1.2.3' }, { version: '1.2.4' }] as never));
+    helmService.fetchChartVersions.and.returnValue(
+      of({ content: [{ version: '1.2.3' }, { version: '1.2.4' }] } as never),
+    );
     helmService.deleteChart.and.returnValue(of(undefined));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
@@ -193,7 +196,7 @@ describe('HelmChartsVersionDetailComponent', () => {
       dangerModalService.call();
       await Promise.resolve();
 
-      expect(helmService.getChartVersions).toHaveBeenCalledOnceWith('nginx');
+      expect(helmService.fetchChartVersions).toHaveBeenCalledOnceWith('nginx', '', VERSION_PROBE_SORT, 0, 2);
       expect(helmService.deleteChart).toHaveBeenCalledOnceWith('nginx', '1.2.3');
       expect(router.navigate).toHaveBeenCalledOnceWith(['..'], { relativeTo: route });
       expect(toastService.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
@@ -201,7 +204,7 @@ describe('HelmChartsVersionDetailComponent', () => {
 
     // RPS-1302: the chart is gone with its last version, so its versions page answers 404.
     it('goes to the chart list, never to the versions page of the removed chart, after the last version', async () => {
-      helmService.getChartVersions.and.returnValue(of([{ version: '1.2.3' }] as never));
+      helmService.fetchChartVersions.and.returnValue(of({ content: [{ version: '1.2.3' }] } as never));
       component.deleteVersion();
 
       dangerModalService.call();
@@ -240,7 +243,7 @@ describe('HelmChartsVersionDetailComponent', () => {
     });
 
     it('deletes nothing when the versions of the chart cannot be read', () => {
-      helmService.getChartVersions.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+      helmService.fetchChartVersions.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
       component.deleteVersion();
 
       dangerModalService.call();

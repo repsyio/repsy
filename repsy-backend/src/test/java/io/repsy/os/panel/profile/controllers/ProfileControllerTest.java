@@ -24,7 +24,6 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
-import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.os.generated.model.PasswordForm;
 import io.repsy.os.generated.model.UpdateUsernameForm;
 import io.repsy.os.panel.profile.services.ProfileService;
@@ -43,6 +42,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.mock.web.MockHttpServletResponse;
 
 @DisplayName("ProfileController")
 class ProfileControllerTest {
@@ -60,11 +60,7 @@ class ProfileControllerTest {
 
   // A real UserTxService over an empty repository: the lookup itself is under test.
   private final ProfileController controller =
-      new ProfileController(
-          this.panelAuthHelper,
-          this.profileService,
-          this.userTxService,
-          Mockito.mock(RestResponseFactory.class));
+      new ProfileController(this.panelAuthHelper, this.profileService, this.userTxService);
 
   /** RPS-990: the token is decoded once, and its session start is handed to the new tokens. */
   @Test
@@ -80,7 +76,7 @@ class ProfileControllerTest {
     when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
     when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
 
-    this.controller.updateUsername(AUTH_HEADER, form);
+    this.controller.updateUsername(AUTH_HEADER, form, new MockHttpServletResponse());
 
     verify(this.profileService).updateUsername(userId, "alice2", sessionStart);
     verify(this.jwtUtils).extractPanelClaims(AUTH_HEADER);
@@ -101,7 +97,7 @@ class ProfileControllerTest {
     when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
     when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
 
-    this.controller.updatePassword(AUTH_HEADER, form);
+    this.controller.updatePassword(AUTH_HEADER, form, new MockHttpServletResponse());
 
     verify(this.profileService).updatePassword(userId, form, sessionStart);
     verify(this.jwtUtils).extractPanelClaims(AUTH_HEADER);
@@ -120,7 +116,8 @@ class ProfileControllerTest {
     when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
     when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
 
-    assertThatThrownBy(() -> this.controller.updatePassword(AUTH_HEADER, form))
+    assertThatThrownBy(
+            () -> this.controller.updatePassword(AUTH_HEADER, form, new MockHttpServletResponse()))
         .isExactlyInstanceOf(UnAuthorizedException.class)
         .hasMessage("sessionExpired");
     verifyNoInteractions(this.profileService);
