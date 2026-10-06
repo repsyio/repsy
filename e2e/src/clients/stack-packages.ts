@@ -173,9 +173,8 @@ export async function expectListedInPanel(
   const path = `${base}/${encodeURIComponent(repoName)}?size=100`;
   const res = await panelApi.rawRequest('GET', path);
   expect(res.status, `${what}: GET ${path}`).toBe(200);
-  // Helm and npm answer the bare PagedModel (API guideline, Decision 5); the others still use the envelope.
-  const bare = pkg.adapter.protocol === 'helm' || pkg.adapter.protocol === 'npm';
-  const page = bare ? res.body : res.body.data;
+  // Every listed format answers the bare PagedModel (API guideline, Decision 5), no RestResponse envelope.
+  const page = res.body;
   const content = (
     page as { content?: { name?: string; latestVersion?: string; digest?: string }[] }
   ).content;

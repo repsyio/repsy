@@ -46,6 +46,8 @@ export interface CallOptions {
   query?: string;
   /** Send no `Authorization` header. */
   anonymous?: boolean;
+  /** A JSON request body (sent with `Content-Type: application/json`). */
+  body?: unknown;
 }
 
 /**
@@ -66,7 +68,11 @@ export async function callOperation(
   bearer ??= adminBearer();
   return edgeRequest(apiUrl(options.query ? `${path}?${options.query}` : path), {
     method: op.method,
-    headers: options.anonymous ? {} : { Authorization: `Bearer ${await bearer}` },
+    headers: {
+      ...(options.anonymous ? {} : { Authorization: `Bearer ${await bearer}` }),
+      ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
 }
 

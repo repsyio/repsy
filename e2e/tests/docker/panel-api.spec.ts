@@ -81,6 +81,10 @@ const EXERCISED = [
   'deleteDockerImage',
   'deleteDockerUntaggedManifests',
   'deleteDockerOrphanLayers',
+  'getDockerCleanupPolicy',
+  'updateDockerCleanupPolicy',
+  'updateDockerCleanupPolicyStatus',
+  'runDockerCleanupPolicy',
 ];
 
 const CRANE_INSECURE = env.insecureRegistry ? ['--insecure'] : [];
@@ -225,6 +229,107 @@ test.describe('the Docker panel API against what crane pushed', () => {
 
   test('names every operation of the Docker panel API', () => {
     expectCovers(EXERCISED, '/api/docker/', '/api/repos/{repoName}/docker/');
+  });
+
+  test('reads, enables, edits and runs the cleanup policy, and refuses it while disabled', async ({
+    seeder,
+  }) => {
+    const repoName = await newDockerRepo(seeder);
+    const rules = {
+      cadence: 'WEEKLY',
+      keepLastN: 3,
+      keepDays: 14,
+      nameRegex: 'e2e-.*',
+      nameRegexKeep: 'keep-.*',
+    };
+
+    // A disabled default policy is created on the first read.
+    const initial = expectBare(
+      'getDockerCleanupPolicy',
+      await callOperation('getDockerCleanupPolicy', { repoName }),
+    ) as { enabled: boolean; nextRunAt?: string };
+    expect(initial.enabled, 'a new policy is disabled').toBe(false);
+    expect(initial.nextRunAt, 'a disabled policy has no next run').toBeUndefined();
+
+    // Nothing but the status changes while it is disabled.
+    expectFailure(
+      'updateDockerCleanupPolicy',
+      await callOperation('updateDockerCleanupPolicy', { repoName }, { body: rules }),
+      400,
+      'cleanupPolicyDisabled',
+    );
+    expectFailure(
+      'runDockerCleanupPolicy',
+      await callOperation('runDockerCleanupPolicy', { repoName }),
+      400,
+      'cleanupPolicyDisabled',
+    );
+
+    const enabled = expectBare(
+      'updateDockerCleanupPolicyStatus',
+      await callOperation(
+        'updateDockerCleanupPolicyStatus',
+        { repoName },
+        { body: { enabled: true } },
+      ),
+    ) as { enabled: boolean; nextRunAt?: string };
+    expect(enabled.enabled).toBe(true);
+    expect(enabled.nextRunAt, 'enabling makes the policy due').toBeDefined();
+
+    const updated = expectBare(
+      'updateDockerCleanupPolicy',
+      await callOperation('updateDockerCleanupPolicy', { repoName }, { body: rules }),
+    );
+    expect(updated).toMatchObject({ enabled: true, ...rules });
+    expect(
+      expectBare(
+        'getDockerCleanupPolicy',
+        await callOperation('getDockerCleanupPolicy', { repoName }),
+      ),
+      'the read answers what the update stored',
+    ).toMatchObject(rules);
+
+    const run = await callOperation('runDockerCleanupPolicy', { repoName });
+    expect(run.status, `runDockerCleanupPolicy: ${run.text.slice(0, 300)}`).toBe(202);
+    expect(run.headers.get('location'), 'Location is the policy').toContain(
+      `/api/repos/${encodeURIComponent(repoName)}/docker/cleanup-policy`,
+    );
+
+    const disabled = expectBare(
+      'updateDockerCleanupPolicyStatus',
+      await callOperation(
+        'updateDockerCleanupPolicyStatus',
+        { repoName },
+        { body: { enabled: false } },
+      ),
+    ) as { enabled: boolean; nextRunAt?: string };
+    expect(disabled.enabled).toBe(false);
+    expect(disabled.nextRunAt, 'disabling clears the next run').toBeUndefined();
+
+    expectFailure(
+      'getDockerCleanupPolicy',
+      await callOperation('getDockerCleanupPolicy', { repoName: 'e2e-no-such-repo' }),
+      404,
+      'repoNotFound',
+    );
+    expectFailure(
+      'getDockerCleanupPolicy',
+      await callOperation('getDockerCleanupPolicy', { repoName }, { anonymous: true }),
+      401,
+      'loginRequired',
+    );
+  });
+
+  test('refuses the cleanup policy of a repository that is not a Docker repository', async ({
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+    expectFailure(
+      'getDockerCleanupPolicy',
+      await callOperation('getDockerCleanupPolicy', { repoName: repo.name }),
+      400,
+      'repoScopeNotMatched',
+    );
   });
 
   test('lists, gets and describes what crane pushed, and every digest matches the client', async ({
