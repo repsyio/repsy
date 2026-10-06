@@ -96,7 +96,13 @@ jobs:
           # REPSY_E2E_OPT_IN, whether the --grep input may replace the default)
           LEGS = {
               "ui": ("ui", "", ["ui"], "", 60, "", True),
-              "wire": ("wire", "", WIRE, "", 150, "", True),
+              # The wire runners, split in three so the slowest does not set the pace of the whole suite: maven alone
+              # is about 30 of the 65 minutes the single leg took on a runner (its catalog is the largest), and the stack
+              # runner restarts, crashes and recreates the Repsy container for another 10. All three belong to the `wire`
+              # suite, so `suite=wire` still runs them together, and each has its own stack, so they run in parallel.
+              "wire": ("wire", "", [r for r in WIRE if r not in ("maven", "stack")], "", 60, "", True),
+              "wire-maven": ("wire", "", ["maven"], "", 75, "", True),
+              "wire-stack": ("wire", "", ["stack"], "", 30, "", True),
               # The panel UI beyond Chromium (RPS-1651, README.md "UI suite: Firefox and WebKit"): the @smoke set, the
               # keyboard walkthrough and the panel-over-https spec (which skips without the TLS stack) in Firefox and
               # in WebKit, on the default stack, each its own runner so a failure names its browser. The project's own
