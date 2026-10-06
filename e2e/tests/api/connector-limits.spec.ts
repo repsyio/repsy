@@ -59,8 +59,20 @@ const OVER_HEADER_LIMIT = 9_000;
 /** A wire path per port whose plain answer is JSON: the repo port has no `/api`, the panel port wants
  *  a login. */
 const HEADER_TARGETS = [
-  { name: 'the repo port', url: () => repoUrl('/api/users'), plain: 404, msgId: 'unknownPath' },
-  { name: 'the api port', url: () => apiUrl('/api/users'), plain: 401, msgId: undefined },
+  {
+    name: 'the repo port',
+    url: () => repoUrl('/api/users'),
+    plain: 404,
+    msgId: 'unknownPath',
+    contentType: 'application/json',
+  },
+  {
+    name: 'the api port',
+    url: () => apiUrl('/api/users'),
+    plain: 401,
+    msgId: undefined,
+    contentType: 'application/problem+json',
+  },
 ] as const;
 
 test.describe('an oversized request header', { tag: '@smoke' }, () => {
@@ -70,7 +82,7 @@ test.describe('an oversized request header', { tag: '@smoke' }, () => {
         headers: { 'X-Padding': 'a'.repeat(UNDER_HEADER_LIMIT) },
       });
       expect(control.status, 'control: a 4 KB header is served as usual').toBe(port.plain);
-      expect(control.headers.get('content-type')).toContain('application/json');
+      expect(control.headers.get('content-type')).toContain(port.contentType);
 
       const refused = await edgeRequest(port.url(), {
         headers: { 'X-Padding': 'a'.repeat(OVER_HEADER_LIMIT) },

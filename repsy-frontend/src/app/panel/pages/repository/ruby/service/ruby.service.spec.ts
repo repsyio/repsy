@@ -15,7 +15,7 @@
 
 import { TestBed } from '@angular/core/testing';
 
-import { ProtocolRepoControllerService, RubyGemApiControllerService } from '../../../../../../generated/api';
+import { ReposApi, RubyGemsApi } from '../../../../../../generated/api';
 import {
   CallCase,
   describeCalls,
@@ -36,15 +36,13 @@ const VERSION = '7.1.0';
 const PLATFORM = 'java';
 
 describe('RubyService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let rubyApi: jasmine.SpyObj<RubyGemApiControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let rubyApi: jasmine.SpyObj<RubyGemsApi>;
   let service: RubyService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoPermissions',
-    ]);
-    rubyApi = jasmine.createSpyObj<RubyGemApiControllerService>('RubyGemApiControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoPermissions']);
+    rubyApi = jasmine.createSpyObj<RubyGemsApi>('RubyGemsApi', [
       'listGems',
       'listGemVersions',
       'getGemVersion',
@@ -53,8 +51,8 @@ describe('RubyService', () => {
     ]);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: RubyGemApiControllerService, useValue: rubyApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: RubyGemsApi, useValue: rubyApi },
       ],
     });
     service = TestBed.inject(RubyService);

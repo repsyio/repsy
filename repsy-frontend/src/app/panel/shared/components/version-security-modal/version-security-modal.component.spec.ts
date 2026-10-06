@@ -17,18 +17,18 @@ import { SimpleChange } from '@angular/core';
 import { Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
-import { ScanOverview, ScanStatus, VulnerabilityScanControllerService } from '../../../../../generated/api';
+import { ScanOverview, ScanStatus, SecurityScansApi } from '../../../../../generated/api';
 import { VersionSecurityModalComponent } from './version-security-modal.component';
 
 const OVERVIEW = { status: ScanStatus.Completed, lastCompletedAt: '2026-01-01T00:00:00Z' } as ScanOverview;
 
 describe('VersionSecurityModalComponent', () => {
   let component: VersionSecurityModalComponent;
-  let scanService: jasmine.SpyObj<VulnerabilityScanControllerService>;
+  let scanService: jasmine.SpyObj<SecurityScansApi>;
   let router: jasmine.SpyObj<Router>;
 
   beforeEach(() => {
-    scanService = jasmine.createSpyObj<VulnerabilityScanControllerService>('VulnerabilityScanControllerService', [
+    scanService = jasmine.createSpyObj<SecurityScansApi>('SecurityScansApi', [
       'getScanOverview',
       'getScopedScanOverview',
     ]);

@@ -18,7 +18,7 @@ import { fakeAsync, flushMicrotasks } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
-import { ProtocolRepoControllerService } from '../../../../../../generated/api';
+import { ReposApi } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { permission } from '../../testing/protocol-service-spec-helpers';
@@ -29,13 +29,13 @@ const REPO = 'acme-repo';
 
 describe('DeleteRepoComponent', () => {
   let component: DeleteRepoComponent;
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['deleteRepo']);
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['deleteRepo']);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     dangerModalService = new DangerModalService();
@@ -103,7 +103,7 @@ describe('DeleteRepoComponent template', () => {
     const { el } = await renderComponent(
       DeleteRepoComponent,
       [
-        { provide: ProtocolRepoControllerService, useValue: {} },
+        { provide: ReposApi, useValue: {} },
         { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
       ],
       { activeRepository: permission('acme-repo', { canManage: true }), repoType: 'NPM' },

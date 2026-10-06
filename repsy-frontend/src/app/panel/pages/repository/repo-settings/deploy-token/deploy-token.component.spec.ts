@@ -18,9 +18,9 @@ import { of, Subject, throwError } from 'rxjs';
 
 import {
   DeployTokenInfoListItem,
-  ProtocolDeployTokenControllerService,
-  ProtocolRepoControllerService,
+  DeployTokensApi,
   RepoPermissionInfo,
+  ReposApi,
 } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
@@ -41,13 +41,13 @@ function listing(tokens: DeployTokenInfoListItem[], totalPages = 1): unknown {
 
 describe('DeployTokenComponent', () => {
   let component: DeployTokenComponent;
-  let tokenService: jasmine.SpyObj<ProtocolDeployTokenControllerService>;
-  let repoService: jasmine.SpyObj<ProtocolRepoControllerService>;
+  let tokenService: jasmine.SpyObj<DeployTokensApi>;
+  let repoService: jasmine.SpyObj<ReposApi>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
 
   beforeEach(() => {
-    tokenService = jasmine.createSpyObj<ProtocolDeployTokenControllerService>('ProtocolDeployTokenControllerService', [
+    tokenService = jasmine.createSpyObj<DeployTokensApi>('DeployTokensApi', [
       'listDeployTokens',
       'rotateDeployToken',
       'revokeDeployToken',
@@ -55,9 +55,7 @@ describe('DeployTokenComponent', () => {
     tokenService.listDeployTokens.and.returnValue(of(listing([token('a'), token('b')], 4)) as never);
     tokenService.rotateDeployToken.and.returnValue(of('new-secret') as never);
     tokenService.revokeDeployToken.and.returnValue(of({}) as never);
-    repoService = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoUsage',
-    ]);
+    repoService = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoUsage']);
     repoService.getRepoUsage.and.returnValue(of(USAGE) as never);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
@@ -328,21 +326,16 @@ describe('DeployTokenComponent', () => {
 
 describe('DeployTokenComponent template', () => {
   async function render(canManage: boolean, tokens: DeployTokenInfoListItem[] = [token('a')]): Promise<HTMLElement> {
-    const tokenService = jasmine.createSpyObj<ProtocolDeployTokenControllerService>(
-      'ProtocolDeployTokenControllerService',
-      ['listDeployTokens'],
-    );
+    const tokenService = jasmine.createSpyObj<DeployTokensApi>('DeployTokensApi', ['listDeployTokens']);
     tokenService.listDeployTokens.and.returnValue(of(listing(tokens)) as never);
-    const repoService = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoUsage',
-    ]);
+    const repoService = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoUsage']);
     repoService.getRepoUsage.and.returnValue(of(USAGE) as never);
 
     const { el } = await renderComponent(
       DeployTokenComponent,
       [
-        { provide: ProtocolDeployTokenControllerService, useValue: tokenService },
-        { provide: ProtocolRepoControllerService, useValue: repoService },
+        { provide: DeployTokensApi, useValue: tokenService },
+        { provide: ReposApi, useValue: repoService },
         { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
       ],
       { activeRepository: permission(REPO, { canManage }), repoType: 'MAVEN' },

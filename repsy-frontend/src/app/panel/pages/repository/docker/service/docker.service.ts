@@ -20,11 +20,11 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
 
 import {
-  DockerImageControllerService,
+  DockerImagesApi,
   ImageListItem,
   ManifestListItem,
-  ProtocolRepoControllerService,
   RepoPermissionInfo,
+  ReposApi,
   TagDetail,
 } from '../../../../../../generated/api';
 import { SILENT_ERROR } from '../../../../../shared/interceptor/error-handler.interceptor';
@@ -49,8 +49,8 @@ export class DockerService {
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
   constructor(
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
-    private readonly dockerImageControllerService: DockerImageControllerService,
+    private readonly reposApi: ReposApi,
+    private readonly dockerImagesApi: DockerImagesApi,
   ) {
     this.repoChanges = this.repoSubject.asObservable();
   }
@@ -62,9 +62,7 @@ export class DockerService {
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
-    return this.protocolRepoControllerService
-      .getRepoPermissions(repoName)
-      .pipe(tap((info) => this.repoSubject.next(info)));
+    return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
   }
 
   private resetActiveRepoIfChanged(repoName: string): void {
@@ -81,7 +79,7 @@ export class DockerService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<ImageListItem>> {
-    return this.dockerImageControllerService
+    return this.dockerImagesApi
       .listDockerImages(this.repoName, name || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
@@ -95,7 +93,7 @@ export class DockerService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<TagListItem>> {
-    return this.dockerImageControllerService
+    return this.dockerImagesApi
       .listDockerImageTags(
         pathName(imageName),
         this.repoName,
@@ -116,7 +114,7 @@ export class DockerService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<ManifestListItem>> {
-    return this.dockerImageControllerService
+    return this.dockerImagesApi
       .listDockerTagManifests(
         pathName(imageName),
         tagName,
@@ -135,7 +133,7 @@ export class DockerService {
    * caller, which leaves the page instead of toasting an error.
    */
   public fetchImageSummary(imageName: string): Observable<ImageListItem> {
-    return this.dockerImageControllerService.getDockerImage(
+    return this.dockerImagesApi.getDockerImage(
       pathName(imageName),
       this.repoName,
       queryName(imageName),
@@ -148,28 +146,23 @@ export class DockerService {
   }
 
   public deleteImage(imageName: string): Observable<void> {
-    return this.dockerImageControllerService
+    return this.dockerImagesApi
       .deleteDockerImage(pathName(imageName), this.repoName, queryName(imageName))
       .pipe(map(() => undefined));
   }
 
   public fetchTag(imageName: string, tagName: string): Observable<TagDetail> {
-    return this.dockerImageControllerService.getDockerImageTag(
-      pathName(imageName),
-      tagName,
-      this.repoName,
-      queryName(imageName),
-    );
+    return this.dockerImagesApi.getDockerImageTag(pathName(imageName), tagName, this.repoName, queryName(imageName));
   }
 
   public deleteTag(imageName: string, tagName: string): Observable<void> {
-    return this.dockerImageControllerService
+    return this.dockerImagesApi
       .deleteDockerTag(pathName(imageName), tagName, this.repoName, queryName(imageName))
       .pipe(map(() => undefined));
   }
 
   public fetchManifestText(imageName: string, digest: string): Observable<string> {
-    return this.dockerImageControllerService.getDockerImageManifest(
+    return this.dockerImagesApi.getDockerImageManifest(
       pathName(imageName),
       digest,
       this.repoName,
@@ -178,11 +171,6 @@ export class DockerService {
   }
 
   public fetchConfigText(imageName: string, digest: string): Observable<string> {
-    return this.dockerImageControllerService.getDockerImageConfig(
-      pathName(imageName),
-      digest,
-      this.repoName,
-      queryName(imageName),
-    );
+    return this.dockerImagesApi.getDockerImageConfig(pathName(imageName), digest, this.repoName, queryName(imageName));
   }
 }

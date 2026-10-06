@@ -23,11 +23,11 @@ import { finalize } from 'rxjs/operators';
 import { environment } from '../../../../../../environments/environment';
 import {
   AllowedKeyserverItem,
-  KeyStoreControllerService,
   KeyStoreForm,
   KeyStoreItem,
-  ProtocolRepoControllerService,
+  MavenKeyStoresApi,
   RepoPermissionInfo,
+  ReposApi,
   RepoSettingsForm,
 } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -77,8 +77,8 @@ export class SignatureComponent implements OnInit {
   constructor(
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
-    private readonly keyStoreControllerService: KeyStoreControllerService,
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly mavenKeyStoresApi: MavenKeyStoresApi,
+    private readonly reposApi: ReposApi,
   ) {
     this.docsBaseUrl = environment.docsBase;
   }
@@ -122,7 +122,7 @@ export class SignatureComponent implements OnInit {
   ): void {
     this.saving = true;
 
-    saveRepoSetting(this.protocolRepoControllerService.updateRepoSettings(this.activeRepository.repoName, form), {
+    saveRepoSetting(this.reposApi.updateRepoSettings(this.activeRepository.repoName, form), {
       saved: () => {
         this.parentForm?.get(controlName)?.setValue(form[controlName]);
         this.toastService.show(message, 'success');
@@ -134,7 +134,7 @@ export class SignatureComponent implements OnInit {
   }
 
   private fetchAllowedKeyservers(): void {
-    this.keyStoreControllerService.listMavenAllowedKeyServers().subscribe({
+    this.mavenKeyStoresApi.listMavenAllowedKeyServers().subscribe({
       next: (r) => {
         this.allowedKeyservers = r;
         this.serverLabels = this.allowedKeyservers.map((s) => `${s.displayName} (${s.host})`);
@@ -159,7 +159,7 @@ export class SignatureComponent implements OnInit {
 
     const keyStoreForm: KeyStoreForm = { allowedKeyserverId: item.id };
 
-    this.keyStoreControllerService
+    this.mavenKeyStoresApi
       .createMavenKeyStore(this.activeRepository.repoName, keyStoreForm)
       .pipe(
         finalize(() => {
@@ -178,7 +178,7 @@ export class SignatureComponent implements OnInit {
 
   public fetchKeyStores(): void {
     this.pageNum = 1;
-    this.keyStoreControllerService.listMavenKeyStores(this.activeRepository.repoName, 0, this.pageSize).subscribe({
+    this.mavenKeyStoresApi.listMavenKeyStores(this.activeRepository.repoName, 0, this.pageSize).subscribe({
       next: (r) => {
         this.keyStores = r.content ?? [];
       },
@@ -187,16 +187,14 @@ export class SignatureComponent implements OnInit {
   }
 
   public loadMoreKeyStores(): void {
-    this.keyStoreControllerService
-      .listMavenKeyStores(this.activeRepository.repoName, this.pageNum, this.pageSize)
-      .subscribe({
-        next: (r) => {
-          const newItems = r.content ?? [];
-          this.keyStores = [...this.keyStores, ...newItems];
-          this.pageNum++;
-        },
-        error: () => {},
-      });
+    this.mavenKeyStoresApi.listMavenKeyStores(this.activeRepository.repoName, this.pageNum, this.pageSize).subscribe({
+      next: (r) => {
+        const newItems = r.content ?? [];
+        this.keyStores = [...this.keyStores, ...newItems];
+        this.pageNum++;
+      },
+      error: () => {},
+    });
   }
 
   public onScroll(event: Event): void {
@@ -209,7 +207,7 @@ export class SignatureComponent implements OnInit {
 
   public deleteKeyStore(id: string): void {
     this.dangerModalService.show('Delete key store', 'Delete', () => {
-      this.keyStoreControllerService.deleteMavenKeyStore(id, this.activeRepository.repoName).subscribe({
+      this.mavenKeyStoresApi.deleteMavenKeyStore(id, this.activeRepository.repoName).subscribe({
         next: () => {
           this.pageNum = 1;
           this.fetchKeyStores();
@@ -235,7 +233,7 @@ export class SignatureComponent implements OnInit {
 
     const request: CreateMavenPgpPublicKeyRequest = { armoredKey: trimmed };
 
-    this.keyStoreControllerService
+    this.mavenKeyStoresApi
       .createMavenPgpPublicKey(this.activeRepository.repoName, request)
       .pipe(
         finalize(() => {
@@ -254,18 +252,16 @@ export class SignatureComponent implements OnInit {
 
   public fetchPublicKeys(): void {
     this.publicKeyPageNum = 1;
-    this.keyStoreControllerService
-      .listMavenPgpPublicKeys(this.activeRepository.repoName, 0, this.publicKeyPageSize)
-      .subscribe({
-        next: (r) => {
-          this.publicKeys = r.content ?? [];
-        },
-        error: () => {},
-      });
+    this.mavenKeyStoresApi.listMavenPgpPublicKeys(this.activeRepository.repoName, 0, this.publicKeyPageSize).subscribe({
+      next: (r) => {
+        this.publicKeys = r.content ?? [];
+      },
+      error: () => {},
+    });
   }
 
   public loadMorePublicKeys(): void {
-    this.keyStoreControllerService
+    this.mavenKeyStoresApi
       .listMavenPgpPublicKeys(this.activeRepository.repoName, this.publicKeyPageNum, this.publicKeyPageSize)
       .subscribe({
         next: (r) => {
@@ -287,7 +283,7 @@ export class SignatureComponent implements OnInit {
 
   public deletePublicKey(uuid: string): void {
     this.dangerModalService.show('Delete Public Key', 'Delete', () => {
-      this.keyStoreControllerService.deleteMavenPgpPublicKey(uuid, this.activeRepository.repoName).subscribe({
+      this.mavenKeyStoresApi.deleteMavenPgpPublicKey(uuid, this.activeRepository.repoName).subscribe({
         next: () => {
           this.publicKeyPageNum = 1;
           this.fetchPublicKeys();

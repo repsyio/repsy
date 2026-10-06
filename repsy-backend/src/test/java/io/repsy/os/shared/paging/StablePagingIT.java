@@ -117,18 +117,7 @@ class StablePagingIT extends AbstractIntegrationTest {
       // RPS-1781);
       // the
       // others still use the envelope
-      final var root =
-          path.endsWith("/deploy-tokens")
-                  || path.startsWith("/api/cargo/")
-                  || path.startsWith("/api/helm/")
-                  || path.startsWith("/api/nuget/")
-                  || path.startsWith("/api/pypi/")
-                  || path.startsWith("/api/ruby/")
-                  || path.startsWith("/api/npm/")
-                  || path.startsWith("/api/mvn/")
-                  || path.startsWith("/api/go/")
-              ? "$"
-              : "$.data";
+      final var root = "$";
       totalPages = JsonPath.<Integer>read(body, root + ".page.totalPages");
       values.addAll(JsonPath.<List<String>>read(body, root + ".content[*]." + field));
     }
@@ -195,8 +184,8 @@ class StablePagingIT extends AbstractIntegrationTest {
               .getResponse()
               .getContentAsString();
 
-      totalPages = JsonPath.<Integer>read(body, "$.data.page.totalPages");
-      values.addAll(JsonPath.<List<String>>read(body, "$.data.content[*].username"));
+      totalPages = JsonPath.<Integer>read(body, "$.page.totalPages");
+      values.addAll(JsonPath.<List<String>>read(body, "$.content[*].username"));
     }
 
     return values;

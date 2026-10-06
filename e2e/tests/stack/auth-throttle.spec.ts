@@ -63,7 +63,12 @@ interface Answer {
 }
 
 async function answerOf(res: Response): Promise<Answer> {
-  const body = (await res.json().catch(() => ({}))) as { msgId?: string; text?: string; code?: string; detail?: string };
+  const body = (await res.json().catch(() => ({}))) as {
+    msgId?: string;
+    text?: string;
+    code?: string;
+    detail?: string;
+  };
   return {
     status: res.status,
     // the panel answers a problem (`code`, `detail`), the protocol routes the envelope (`msgId`, `text`)

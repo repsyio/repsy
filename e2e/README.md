@@ -2503,12 +2503,12 @@ deploy with the credential comes first, so that the Basic-auth cache (`VerifiedP
 password and stored hash) is warm and what is proved is invalidation, not a cold miss. Then the credential stops
 being valid and a deploy with it must be refused at once:
 
-| Event                                                                      | Old credential | Replacement               |
-| -------------------------------------------------------------------------- | -------------- | ------------------------- |
+| Event                                                                        | Old credential | Replacement               |
+| ---------------------------------------------------------------------------- | -------------- | ------------------------- |
 | `PATCH /api/profile/password` as the user (`PanelBackend.changeOwnPassword`) | refused        | the new password deploys  |
-| `DELETE /api/users/{id}` as admin                                          | refused        | none                      |
-| deploy token revoked                                                       | refused        | none                      |
-| deploy token rotated                                                       | refused        | the rotated token deploys |
+| `DELETE /api/users/{id}` as admin                                            | refused        | none                      |
+| deploy token revoked                                                         | refused        | none                      |
+| deploy token rotated                                                         | refused        | the rotated token deploys |
 
 "Refused" means the real client exits non-zero, the raw probe of the same credential (`adapter.publish`) answers 401
 (not 403 or 404), and an admin sees nothing of the refused version stored. `--grep "credential invalidation"`
@@ -7473,8 +7473,8 @@ of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays o
 
 - `POST /api/auth/login` → `{ data: { token, refreshToken } }`; every other call in `os-panel-backend.ts`
   sends `Authorization: Bearer <token>`. The openapi spec only lists `Authorization` as an explicit
-  parameter for `user-controller` routes; `protocol-repo-controller` and
-  `protocol-deploy-token-controller` routes need it too, just via an argument resolver the spec
+  parameter for `users` routes; `repos` and
+  `deploy-tokens` routes need it too, just via an argument resolver the spec
   does not document.
 - `POST /api/users`, `DELETE /api/users/{userId}`, `GET /api/users` (ADMIN only).
 - `POST /api/repos` (the body carries `name`, `type` (upper-case `RepoType`: `MAVEN`, `NPM`, ...),

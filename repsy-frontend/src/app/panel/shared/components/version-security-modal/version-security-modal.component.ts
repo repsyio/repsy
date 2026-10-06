@@ -19,7 +19,7 @@ import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import { ScanOverview, ScanStatus, VulnerabilityScanControllerService } from '../../../../../generated/api';
+import { ScanOverview, ScanStatus, SecurityScansApi } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
@@ -59,7 +59,7 @@ export class VersionSecurityModalComponent implements OnChanges {
   public overview: ScanOverview | null = null;
 
   constructor(
-    private readonly vulnerabilityScanControllerService: VulnerabilityScanControllerService,
+    private readonly securityScansApi: SecurityScansApi,
     private readonly router: Router,
   ) {}
 
@@ -114,13 +114,8 @@ export class VersionSecurityModalComponent implements OnChanges {
 
     const scoped = splitScopedArtifactName(this.artifactName);
     const overview$ = scoped
-      ? this.vulnerabilityScanControllerService.getScopedScanOverview(
-          scoped.scope,
-          scoped.name,
-          this.artifactVersion,
-          this.repoName,
-        )
-      : this.vulnerabilityScanControllerService.getScanOverview(this.artifactName, this.artifactVersion, this.repoName);
+      ? this.securityScansApi.getScopedScanOverview(scoped.scope, scoped.name, this.artifactVersion, this.repoName)
+      : this.securityScansApi.getScanOverview(this.artifactName, this.artifactVersion, this.repoName);
 
     overview$.pipe(finalize(() => (this.loading = false))).subscribe({
       next: (response) => {

@@ -123,12 +123,9 @@ export class OsPanelBackend implements PanelBackend {
   }
 
   async login(username: string, password: string): Promise<LoginInfo> {
-    const res = await this.call((c) =>
-      c.authController.login({ requestBody: { username, password } }),
-    );
-    const data = unwrap(res.data, 'login');
-    this.token = unwrap(data.token, 'login.token');
-    return data;
+    const res = await this.call((c) => c.auth.login({ requestBody: { username, password } }));
+    this.token = unwrap(res.token, 'login.token');
+    return res;
   }
 
   private authorization(): string {
@@ -175,12 +172,12 @@ export class OsPanelBackend implements PanelBackend {
       password: spec.password,
       role: (spec.role ?? UserRole.USER) as UserCreateForm['role'],
     };
-    const res = await this.call((c) => c.userController.createUser({ requestBody: form }));
-    return unwrap(res.data, 'createUser');
+    const res = await this.call((c) => c.users.createUser({ requestBody: form }));
+    return unwrap(res, 'createUser');
   }
 
   async deleteRepoUser(userId: string): Promise<void> {
-    await this.call((c) => c.userController.deleteUser({ userId }));
+    await this.call((c) => c.users.deleteUser({ userId }));
   }
 
   /**
@@ -189,9 +186,7 @@ export class OsPanelBackend implements PanelBackend {
    * change the admin's password. The answer is a fresh session, which this instance adopts.
    */
   async changeOwnPassword(password: string): Promise<void> {
-    const res = await this.call((c) =>
-      c.profileController.updatePassword({ requestBody: { password } }),
-    );
+    const res = await this.call((c) => c.profile.updatePassword({ requestBody: { password } }));
     this.token = unwrap(unwrap(res, 'updatePassword').token, 'updatePassword.token');
   }
 
@@ -202,8 +197,8 @@ export class OsPanelBackend implements PanelBackend {
   async listUsers(
     params: { q?: string; page?: number; size?: number; sort?: string[] } = {},
   ): Promise<UserResponse[]> {
-    const res = await this.call((c) => c.userController.listUsers(params));
-    return unwrap(res.data, 'listUsers').content ?? [];
+    const res = await this.call((c) => c.users.listUsers(params));
+    return unwrap(res, 'listUsers').content ?? [];
   }
 
   /**
@@ -215,10 +210,8 @@ export class OsPanelBackend implements PanelBackend {
     const byId = new Map<string, UserResponse>();
 
     for (let page = 0; ; page += 1) {
-      const res = await this.call((c) =>
-        c.userController.listUsers({ ...filter, page, size: 100 }),
-      );
-      const result = unwrap(res.data, 'listAllUsers');
+      const res = await this.call((c) => c.users.listUsers({ ...filter, page, size: 100 }));
+      const result = unwrap(res, 'listAllUsers');
       for (const user of result.content ?? []) {
         byId.set(user.id, user);
       }
@@ -231,7 +224,7 @@ export class OsPanelBackend implements PanelBackend {
   /** `POST /api/repos`: the repository type travels in the body; the answer is the created repository. */
   async createRepo(repoType: RepoType, form: RepoCreateForm): Promise<RepoListInfo> {
     const res = await this.call((c) =>
-      c.repoCollectionController.createRepository({
+      c.repos.createRepository({
         requestBody: { ...form, type: repoType as GeneratedRepoType },
       }),
     );
@@ -240,7 +233,7 @@ export class OsPanelBackend implements PanelBackend {
 
   /** `GET /api/repos/{repoName}`: the repository's type, in the API's canonical upper case. */
   async getRepoFormat(repoName: string): Promise<RepoType> {
-    const res = await this.call((c) => c.protocolRepoController.getRepo({ repoName }));
+    const res = await this.call((c) => c.repos.getRepo({ repoName }));
     return unwrap(res.type, 'getRepo');
   }
 
@@ -267,7 +260,7 @@ export class OsPanelBackend implements PanelBackend {
 
   /** `GET /api/security/supported-repo-types`: the repo types that have a scanner (empty while it is off), sorted. */
   async supportedScanRepoTypes(): Promise<string[]> {
-    const res = await this.call((c) => c.securityScanController.getSupportedRepoTypes());
+    const res = await this.call((c) => c.securityScans.getSupportedRepoTypes());
     return [...unwrap(res, 'getSupportedRepoTypes')].sort();
   }
 
@@ -298,7 +291,7 @@ export class OsPanelBackend implements PanelBackend {
   /** `GET /api/repos/{repo}/scans/{scanId}/findings`: the findings of one scan (up to 100), worst first. */
   async listScanFindings(repoName: string, scanId: string): Promise<VulnerabilityFindingInfo[]> {
     const res = await this.call((c) =>
-      c.vulnerabilityScanController.getVulnerabilityScanFindings({
+      c.securityScans.getVulnerabilityScanFindings({
         repoName,
         scanId,
         size: 100,
@@ -312,21 +305,19 @@ export class OsPanelBackend implements PanelBackend {
     filter: { repoType?: RepoType; repoName?: string } = {},
   ): Promise<SecurityScansSummary> {
     const res = await this.call((c) =>
-      c.securityScanController.getSecurityScansSummary(filter as GeneratedRepoTypeFilter),
+      c.securityScans.getSecurityScansSummary(filter as GeneratedRepoTypeFilter),
     );
     return unwrap(res, 'getSecurityScansSummary');
   }
 
   /** `GET /api/repos/security-summary[?repoNames=...]`: one entry per repo that has one (all repos when none are named). */
   async repoSecuritySummary(repoNames?: string[]): Promise<Record<string, RepoSecuritySummary>> {
-    const res = await this.call((c) =>
-      c.vulnerabilityScanController.getSecuritySummary({ repoNames }),
-    );
+    const res = await this.call((c) => c.securityScans.getSecuritySummary({ repoNames }));
     return unwrap(res, 'getSecuritySummary');
   }
 
   async deleteRepo(repoName: string): Promise<void> {
-    await this.call((c) => c.protocolRepoController.deleteRepo({ repoName }));
+    await this.call((c) => c.repos.deleteRepo({ repoName }));
   }
 
   /**
@@ -334,9 +325,7 @@ export class OsPanelBackend implements PanelBackend {
    * (server default 10) and `sort` defaults to `createdAt,desc`. Use `listAllRepos` to read everything.
    */
   async listRepos(params: RepoListParams = {}): Promise<PagedModelRepoListInfo> {
-    const res = await this.call((c) =>
-      c.repoCollectionController.listRepos(params as GeneratedRepoListParams),
-    );
+    const res = await this.call((c) => c.repos.listRepos(params as GeneratedRepoListParams));
     return unwrap(res, 'listRepos');
   }
 
@@ -362,24 +351,22 @@ export class OsPanelBackend implements PanelBackend {
 
   /** `GET /api/repos/counts`: how many repositories there are of each type (every type is a key). */
   async repoCounts(): Promise<Record<string, number>> {
-    const res = await this.call((c) => c.repoCollectionController.getRepoCounts());
+    const res = await this.call((c) => c.repos.getRepoCounts());
     return unwrap(res, 'repoCounts');
   }
 
   async getSettings(repoName: string): Promise<RepoSettingsInfo> {
-    const res = await this.call((c) => c.protocolRepoController.getRepoSettings({ repoName }));
+    const res = await this.call((c) => c.repos.getRepoSettings({ repoName }));
     return unwrap(res, 'getRepoSettings');
   }
 
   async updateSettings(repoName: string, form: RepoSettingsForm): Promise<void> {
-    await this.call((c) =>
-      c.protocolRepoController.updateRepoSettings({ repoName, requestBody: form }),
-    );
+    await this.call((c) => c.repos.updateRepoSettings({ repoName, requestBody: form }));
   }
 
   async createDeployToken(repoName: string, form: DeployTokenForm): Promise<TokenInfo> {
     const res = await this.call((c) =>
-      c.protocolDeployTokenController.createDeployToken({
+      c.deployTokens.createDeployToken({
         repoName,
         requestBody: form,
       }),
@@ -388,15 +375,13 @@ export class OsPanelBackend implements PanelBackend {
   }
 
   async revokeDeployToken(repoName: string, tokenId: string): Promise<void> {
-    await this.call((c) =>
-      c.protocolDeployTokenController.revokeDeployToken({ repoName, tokenId }),
-    );
+    await this.call((c) => c.deployTokens.revokeDeployToken({ repoName, tokenId }));
   }
 
   /** Returns the new token value; the old one stops working immediately. */
   async rotateDeployToken(repoName: string, tokenId: string): Promise<string> {
     const res = await this.call((c) =>
-      c.protocolDeployTokenController.rotateDeployToken({
+      c.deployTokens.rotateDeployToken({
         repoName,
         tokenId,
       }),
@@ -415,7 +400,7 @@ export class OsPanelBackend implements PanelBackend {
     size: number,
   ): Promise<DeployTokenPage> {
     const res = await this.call((c) =>
-      c.protocolDeployTokenController.listDeployTokens({
+      c.deployTokens.listDeployTokens({
         repoName,
         page,
         size,
@@ -467,7 +452,7 @@ export class OsPanelBackend implements PanelBackend {
   /** Registers an armored OpenPGP public key directly on a Maven repo's key store (RPS-1189). */
   async registerPgpPublicKey(repoName: string, armoredKey: string): Promise<PgpPublicKeyItem> {
     const res = await this.call((c) =>
-      c.keyStoreController.createMavenPgpPublicKey({
+      c.mavenKeyStores.createMavenPgpPublicKey({
         repoName,
         requestBody: { armoredKey },
       }),
@@ -482,7 +467,7 @@ export class OsPanelBackend implements PanelBackend {
     size: number,
   ): Promise<PgpPublicKeyPage> {
     const res = await this.call((c) =>
-      c.keyStoreController.listMavenPgpPublicKeys({
+      c.mavenKeyStores.listMavenPgpPublicKeys({
         repoName,
         page,
         size,
@@ -518,7 +503,7 @@ export class OsPanelBackend implements PanelBackend {
     versionName: string,
   ): Promise<ArtifactVersionInfo> {
     const res = await this.call((c) =>
-      c.mavenArtifactController.getMavenArtifactVersion({
+      c.mavenArtifacts.getMavenArtifactVersion({
         repoName,
         groupName,
         artifactName,
@@ -531,7 +516,7 @@ export class OsPanelBackend implements PanelBackend {
   /** The artifact names of one Maven group, as the panel lists them (its first page of 100). */
   async listMavenArtifactNames(repoName: string, groupName: string): Promise<string[]> {
     const res = await this.call((c) =>
-      c.mavenArtifactController.listMavenArtifacts({
+      c.mavenArtifacts.listMavenArtifacts({
         repoName,
         groupName,
         size: 100,
@@ -547,7 +532,7 @@ export class OsPanelBackend implements PanelBackend {
     artifactName: string,
   ): Promise<string[]> {
     const res = await this.call((c) =>
-      c.mavenArtifactController.listMavenArtifactVersions({
+      c.mavenArtifacts.listMavenArtifactVersions({
         repoName,
         groupName,
         artifactName,
@@ -565,7 +550,7 @@ export class OsPanelBackend implements PanelBackend {
     versionName: string,
   ): Promise<void> {
     await this.call((c) =>
-      c.mavenArtifactController.deleteMavenArtifactVersion({
+      c.mavenArtifacts.deleteMavenArtifactVersion({
         repoName,
         groupName,
         artifactName,
@@ -576,17 +561,13 @@ export class OsPanelBackend implements PanelBackend {
 
   /** Removes a registered PGP public key from a Maven repo's key store (RPS-1189). */
   async deletePgpPublicKey(repoName: string, id: string): Promise<void> {
-    await this.call((c) =>
-      c.keyStoreController.deleteMavenPgpPublicKey({ repoName, publicKeyId: id }),
-    );
+    await this.call((c) => c.mavenKeyStores.deleteMavenPgpPublicKey({ repoName, publicKeyId: id }));
   }
 
   /** Deletes one PyPI version (`DELETE /api/pypi/packages/{repoName}/{packageName}/versions/{version}`):
    *  PyPI has no wire delete, so this panel call is the only way a published file goes away. */
   async deletePypiVersion(repoName: string, packageName: string, version: string): Promise<void> {
-    await this.call((c) =>
-      c.pypiPackageController.deletePypiVersion({ repoName, packageName, version }),
-    );
+    await this.call((c) => c.pypiPackages.deletePypiVersion({ repoName, packageName, version }));
   }
 
   /**
@@ -661,7 +642,7 @@ export class OsPanelBackend implements PanelBackend {
    */
   async getDockerImageSummary(repoName: string, imageName: string): Promise<ImageListItem> {
     const res = await this.call((c) =>
-      c.dockerImageController.getDockerImage({
+      c.dockerImages.getDockerImage({
         repoName,
         imageName,
       }),

@@ -106,6 +106,7 @@ async function downloadToken(
   return token as string;
 }
 
+// The wire route is a protocol route of the repo port: it keeps the RestResponse envelope (msgId), not problem+json.
 const wire = (repoName: string, path: string, token: string, init: { method?: string } = {}) =>
   edgeRequest(repoUrl(repoName, `${path}?downloadToken=${encodeURIComponent(token)}`), init);
 
@@ -118,20 +119,19 @@ test.describe('the contents of a Maven repo', { tag: ['@smoke'] }, () => {
 
     const root = await contents(setup, '');
     expect(root.status).toBe(200);
-    const rootItems = (root.json as { data: StorageItem[] }).data;
+    const rootItems = root.json as StorageItem[];
     expect(rootItems.find((item) => item.name === `${groupId.split('.')[0]}/`)).toMatchObject({
       directory: true,
     });
 
-    const artifact = (await contents(setup, artifactDir(groupId, artifactId))).json as {
-      data: StorageItem[];
-    };
-    expect(artifact.data.map((item) => item.name)).toEqual(
+    const artifact = (await contents(setup, artifactDir(groupId, artifactId)))
+      .json as StorageItem[];
+    expect(artifact.map((item) => item.name)).toEqual(
       expect.arrayContaining([`${setup.pkg.version}/`, 'maven-metadata.xml']),
     );
 
-    const version = (await contents(setup, setup.dir)).json as { data: StorageItem[] };
-    const byName = new Map(version.data.map((item) => [item.name, item]));
+    const version = (await contents(setup, setup.dir)).json as StorageItem[];
+    const byName = new Map(version.map((item) => [item.name, item]));
     for (const path of [setup.jarPath, setup.pomPath]) {
       const file = path.slice(path.lastIndexOf('/') + 1);
       const stored = await rawGet(setup.repo.name, adminCredential(), path);
@@ -211,7 +211,7 @@ test.describe('the download token', { tag: ['@smoke'] }, () => {
       const res = await wire(setup.repo.name, path, token);
 
       expect(res.status, path).toBe(401);
-      expect(res.json, path).toMatchObject({ code: 'accessNotAllowed' });
+      expect(res.json, path).toMatchObject({ msgId: 'accessNotAllowed' });
     }
   });
 
@@ -222,7 +222,7 @@ test.describe('the download token', { tag: ['@smoke'] }, () => {
     const res = await wire(setup.other.name, setup.jarPath, token);
 
     expect(res.status).toBe(401);
-    expect(res.json).toMatchObject({ code: 'accessNotAllowed' });
+    expect(res.json).toMatchObject({ msgId: 'accessNotAllowed' });
   });
 
   test('is refused when it is not a token at all', async ({ seeder }) => {
@@ -299,6 +299,6 @@ test.describe('the download token', { tag: ['@smoke'] }, () => {
 
     const expired = await wire(setup.repo.name, setup.jarPath, token);
     expect(expired.status).toBe(401);
-    expect(expired.json).toMatchObject({ code: 'downloadTokenExpired' });
+    expect(expired.json).toMatchObject({ msgId: 'downloadTokenExpired' });
   });
 });

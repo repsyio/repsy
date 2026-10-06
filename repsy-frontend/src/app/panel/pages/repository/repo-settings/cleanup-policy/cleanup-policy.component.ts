@@ -22,7 +22,7 @@ import { finalize } from 'rxjs/operators';
 import {
   CleanupPolicyForm,
   CleanupPolicyItem,
-  DockerCleanupPolicyControllerService,
+  DockerCleanupPolicyApi,
   RepoPermissionInfo,
 } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
@@ -61,7 +61,7 @@ export class CleanupPolicyComponent implements OnInit {
 
   constructor(
     private readonly fb: FormBuilder,
-    private readonly api: DockerCleanupPolicyControllerService,
+    private readonly api: DockerCleanupPolicyApi,
     private readonly toastService: ToastService,
   ) {
     this.form = this.buildForm();

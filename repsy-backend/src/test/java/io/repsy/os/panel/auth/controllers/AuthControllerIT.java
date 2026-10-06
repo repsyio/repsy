@@ -16,6 +16,7 @@
 package io.repsy.os.panel.auth.controllers;
 
 import static io.repsy.os.server.shared.http.BareBodyAssertions.expectBare;
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectCreated;
 import static io.repsy.os.server.shared.http.BareBodyAssertions.expectNoContent;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -102,16 +103,6 @@ class AuthControllerIT extends AbstractIntegrationTest {
       "Password is too long. Use at most 72 bytes; non-ASCII characters take more than one.";
   private static final String ACCESS_NOT_ALLOWED_TEXT = "Access isn't allowed.";
   private static final String INTERNAL_ERROR_TEXT = "An error occurred.";
-
-  /** The text messages.properties gives each success id these tests assert on. */
-  private static final Map<String, String> SUCCESS_TEXTS =
-      Map.ofEntries(
-          Map.entry("loginSucceeded", "Log In succeeded."),
-          Map.entry("passwordReset", "Password reset."),
-          Map.entry("tokenRefreshed", "Token refreshed."),
-          Map.entry("userCreated", "User created."),
-          Map.entry("userUpdated", "User updated."),
-          Map.entry("userDeleted", "User deleted."));
 
   private static final String[] LOGIN_INFO_KEYS = {"username", "token", "refreshToken"};
 
@@ -219,15 +210,6 @@ class AuthControllerIT extends AbstractIntegrationTest {
   // Response helpers
   // ---------------------------------------------------------------------------------------------
 
-  /**
-   * Asserts a 200 SUCCESS envelope (exact key set, {@code errorCode} null, {@code text} taken from
-   * {@link #SUCCESS_TEXTS}) and returns the raw body for further assertions on {@code data}.
-   */
-  private static String expectSuccess(final ResultActions result, final String msgId)
-      throws Exception {
-    return expectSuccess(result, msgId, SUCCESS_TEXTS.get(msgId));
-  }
-
   private static void expectValidationError(final ResultActions result) throws Exception {
     expectError(result, HttpStatus.BAD_REQUEST, "validationError", null, VALIDATION_TEXT);
   }
@@ -284,7 +266,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final String expectedUsername,
       final Instant issuedNoEarlierThan,
       final Instant issuedNoLaterThan) {
-    final Map<String, Object> data = JsonPath.read(body, "$.data");
+    final Map<String, Object> data = JsonPath.read(body, "$");
     assertThat(data).containsOnlyKeys(LOGIN_INFO_KEYS).containsEntry("username", expectedUsername);
 
     final var accessToken = (String) data.get("token");
@@ -337,14 +319,12 @@ class AuthControllerIT extends AbstractIntegrationTest {
   class Login {
 
     @Test
-    @DisplayName("returns loginSucceeded with the full LoginInfo and correctly dated JWTs")
+    @DisplayName("returns the bare LoginInfo and correctly dated JWTs")
     void logsIn() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("login"), UserRole.USER);
 
       final var before = Instant.now();
-      final var body =
-          expectSuccess(
-              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
+      final var body = expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
       final var after = Instant.now();
 
       AuthControllerIT.this.assertLoginInfo(body, user.getId(), user.getUsername(), before, after);
@@ -357,9 +337,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
 
       final var before = Instant.now();
       final var body =
-          expectSuccess(
-              AuthControllerIT.this.login(SEEDED_ADMIN_USERNAME, SEEDED_ADMIN_PASSWORD),
-              "loginSucceeded");
+          expectBare(AuthControllerIT.this.login(SEEDED_ADMIN_USERNAME, SEEDED_ADMIN_PASSWORD));
       final var after = Instant.now();
 
       AuthControllerIT.this.assertLoginInfo(
@@ -371,13 +349,12 @@ class AuthControllerIT extends AbstractIntegrationTest {
     void ignoresAuthorizationHeader() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("noauth"), UserRole.USER);
 
-      expectSuccess(
+      expectBare(
           AuthControllerIT.this.perform(
               post("/api/auth/login")
                   .header(AUTHORIZATION, "Bearer not-a-jwt")
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(loginBody(user.getUsername(), VALID_PASSWORD))),
-          "loginSucceeded");
+                  .content(loginBody(user.getUsername(), VALID_PASSWORD))));
     }
 
     @Test
@@ -385,9 +362,8 @@ class AuthControllerIT extends AbstractIntegrationTest {
     void accessTokenWorksOnAuthenticatedEndpoint() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("profile"), UserRole.USER);
       final var loginBody =
-          expectSuccess(
-              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
-      final String accessToken = JsonPath.read(loginBody, "$.data.token");
+          expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
+      final String accessToken = JsonPath.read(loginBody, "$.token");
 
       final var profileBody =
           expectBare(
@@ -429,7 +405,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
             .isNull();
 
         final var before = Instant.now().truncatedTo(ChronoUnit.MILLIS);
-        expectSuccess(AuthControllerIT.this.login(username, VALID_PASSWORD), "loginSucceeded");
+        expectBare(AuthControllerIT.this.login(username, VALID_PASSWORD));
 
         await()
             .atMost(10, TimeUnit.SECONDS)
@@ -579,9 +555,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
       AuthControllerIT.this.entityManager.flush();
 
       final var before = Instant.now();
-      final var body =
-          expectSuccess(
-              AuthControllerIT.this.login(userInfo.getUsername(), password), "loginSucceeded");
+      final var body = expectBare(AuthControllerIT.this.login(userInfo.getUsername(), password));
       final var after = Instant.now();
 
       AuthControllerIT.this.assertLoginInfo(
@@ -663,23 +637,20 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var adminToken = AuthControllerIT.this.adminBearerToken();
       final var username = uniqueUsername("created");
 
-      expectSuccess(
+      expectCreated(
           AuthControllerIT.this.perform(
               post("/api/users")
                   .header(AUTHORIZATION, adminToken)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(
                       "{\"username\":\"%s\",\"password\":\"%s\",\"role\":\"USER\"}"
-                          .formatted(username, OTHER_VALID_PASSWORD))),
-          "userCreated");
+                          .formatted(username, OTHER_VALID_PASSWORD))));
       AuthControllerIT.this.entityManager.flush();
       final var created =
           AuthControllerIT.this.userRepository.findByUsername(username).orElseThrow();
 
       final var before = Instant.now();
-      final var body =
-          expectSuccess(
-              AuthControllerIT.this.login(username, OTHER_VALID_PASSWORD), "loginSucceeded");
+      final var body = expectBare(AuthControllerIT.this.login(username, OTHER_VALID_PASSWORD));
       AuthControllerIT.this.assertLoginInfo(body, created.getId(), username, before, Instant.now());
 
       expectError(
@@ -694,8 +665,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
     @DisplayName("after PATCH /api/profile/password only the new password logs in")
     void passwordChangeReplacesTheOldPassword() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("changepw"), UserRole.USER);
-      expectSuccess(
-          AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
+      expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
 
       expectBare(
           AuthControllerIT.this.perform(
@@ -713,9 +683,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
           INVALID_CREDENTIALS_TEXT);
       final var before = Instant.now();
       final var body =
-          expectSuccess(
-              AuthControllerIT.this.login(user.getUsername(), OTHER_VALID_PASSWORD),
-              "loginSucceeded");
+          expectBare(AuthControllerIT.this.login(user.getUsername(), OTHER_VALID_PASSWORD));
       AuthControllerIT.this.assertLoginInfo(
           body, user.getId(), user.getUsername(), before, Instant.now());
     }
@@ -736,8 +704,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
 
       expectInvalidCredentials(AuthControllerIT.this.login(oldUsername, VALID_PASSWORD));
       final var before = Instant.now();
-      final var body =
-          expectSuccess(AuthControllerIT.this.login(newUsername, VALID_PASSWORD), "loginSucceeded");
+      final var body = expectBare(AuthControllerIT.this.login(newUsername, VALID_PASSWORD));
       AuthControllerIT.this.assertLoginInfo(body, user.getId(), newUsername, before, Instant.now());
     }
 
@@ -746,13 +713,11 @@ class AuthControllerIT extends AbstractIntegrationTest {
     void deletedByAdminCannotLogIn() throws Exception {
       final var adminToken = AuthControllerIT.this.adminBearerToken();
       final var user = AuthControllerIT.this.createUser(uniqueUsername("deladmin"), UserRole.USER);
-      expectSuccess(
-          AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
+      expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
 
-      expectSuccess(
+      expectNoContent(
           AuthControllerIT.this.perform(
-              delete("/api/users/" + user.getId()).header(AUTHORIZATION, adminToken)),
-          "userDeleted");
+              delete("/api/users/" + user.getId()).header(AUTHORIZATION, adminToken)));
       AuthControllerIT.this.entityManager.flush();
 
       expectInvalidCredentials(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
@@ -786,18 +751,16 @@ class AuthControllerIT extends AbstractIntegrationTest {
     void refreshesTokens() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("refresh"), UserRole.USER);
       final var loginBody =
-          expectSuccess(
-              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
-      final String refreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
+          expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
+      final String refreshToken = JsonPath.read(loginBody, "$.refreshToken");
 
       final var before = Instant.now();
-      final var body =
-          expectSuccess(AuthControllerIT.this.refreshWith(refreshToken), "tokenRefreshed");
+      final var body = expectBare(AuthControllerIT.this.refreshWith(refreshToken));
       final var after = Instant.now();
 
       AuthControllerIT.this.assertLoginInfo(body, user.getId(), user.getUsername(), before, after);
       // The refreshed tokens work on an authenticated endpoint.
-      final String newAccessToken = JsonPath.read(body, "$.data.token");
+      final String newAccessToken = JsonPath.read(body, "$.token");
       expectBare(
           AuthControllerIT.this.perform(
               get("/api/profile").header(AUTHORIZATION, AuthUtils.AUTH_BEARER + newAccessToken)));
@@ -808,13 +771,12 @@ class AuthControllerIT extends AbstractIntegrationTest {
     void rejectsReplayAndRevokesFamily() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("replay"), UserRole.USER);
       final var loginBody =
-          expectSuccess(
-              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
-      final String originalRefreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
+          expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
+      final String originalRefreshToken = JsonPath.read(loginBody, "$.refreshToken");
 
       final var firstRefreshBody =
-          expectSuccess(AuthControllerIT.this.refreshWith(originalRefreshToken), "tokenRefreshed");
-      final String childRefreshToken = JsonPath.read(firstRefreshBody, "$.data.refreshToken");
+          expectBare(AuthControllerIT.this.refreshWith(originalRefreshToken));
+      final String childRefreshToken = JsonPath.read(firstRefreshBody, "$.refreshToken");
 
       expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(originalRefreshToken));
       expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(childRefreshToken));
@@ -847,14 +809,12 @@ class AuthControllerIT extends AbstractIntegrationTest {
           AuthControllerIT.this.userRepository.findById(userId).orElseThrow().getUsername();
 
       try {
-        final var loginBody =
-            expectSuccess(AuthControllerIT.this.login(username, VALID_PASSWORD), "loginSucceeded");
-        final String originalRefreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
+        final var loginBody = expectBare(AuthControllerIT.this.login(username, VALID_PASSWORD));
+        final String originalRefreshToken = JsonPath.read(loginBody, "$.refreshToken");
 
         final var firstRefreshBody =
-            expectSuccess(
-                AuthControllerIT.this.refreshWith(originalRefreshToken), "tokenRefreshed");
-        final String childRefreshToken = JsonPath.read(firstRefreshBody, "$.data.refreshToken");
+            expectBare(AuthControllerIT.this.refreshWith(originalRefreshToken));
+        final String childRefreshToken = JsonPath.read(firstRefreshBody, "$.refreshToken");
 
         // Replay the spent original token: refused, and must really revoke the whole family.
         expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(originalRefreshToken));
@@ -872,13 +832,12 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("noauth"), UserRole.USER);
       final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
 
-      expectSuccess(
+      expectBare(
           AuthControllerIT.this.perform(
               post("/api/auth/tokens/refresh")
                   .header(AUTHORIZATION, "Bearer not-a-jwt")
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(refreshBody(refreshToken))),
-          "tokenRefreshed");
+                  .content(refreshBody(refreshToken))));
     }
 
     @Test
@@ -894,8 +853,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
       AuthControllerIT.this.entityManager.flush();
 
       final var before = Instant.now();
-      final var body =
-          expectSuccess(AuthControllerIT.this.refreshWith(refreshToken), "tokenRefreshed");
+      final var body = expectBare(AuthControllerIT.this.refreshWith(refreshToken));
 
       AuthControllerIT.this.assertLoginInfo(body, user.getId(), newUsername, before, Instant.now());
     }
@@ -905,9 +863,8 @@ class AuthControllerIT extends AbstractIntegrationTest {
     void rejectsAnAccessTokenAsRefreshToken() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("access"), UserRole.USER);
       final var loginBody =
-          expectSuccess(
-              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
-      final String accessToken = JsonPath.read(loginBody, "$.data.token");
+          expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
+      final String accessToken = JsonPath.read(loginBody, "$.token");
 
       expectAccessNotAllowed(AuthControllerIT.this.refreshWith(accessToken));
     }
@@ -947,17 +904,15 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var refreshToken =
           AuthControllerIT.this.refreshTokenFor(user, sessionStart, user.getTokenVersion());
 
-      final var first =
-          expectSuccess(AuthControllerIT.this.refreshWith(refreshToken), "tokenRefreshed");
-      final String firstRefreshToken = JsonPath.read(first, "$.data.refreshToken");
-      final var second =
-          expectSuccess(AuthControllerIT.this.refreshWith(firstRefreshToken), "tokenRefreshed");
+      final var first = expectBare(AuthControllerIT.this.refreshWith(refreshToken));
+      final String firstRefreshToken = JsonPath.read(first, "$.refreshToken");
+      final var second = expectBare(AuthControllerIT.this.refreshWith(firstRefreshToken));
 
-      final String secondRefreshToken = JsonPath.read(second, "$.data.refreshToken");
+      final String secondRefreshToken = JsonPath.read(second, "$.refreshToken");
       assertThat(
               AuthControllerIT.this.jwtUtils.verifyRefreshToken(secondRefreshToken).sessionStart())
           .isEqualTo(sessionStart);
-      final String secondAccessToken = JsonPath.read(second, "$.data.token");
+      final String secondAccessToken = JsonPath.read(second, "$.token");
       assertThat(
               AuthControllerIT.this.jwtUtils.extractSessionStart(
                   AuthUtils.AUTH_BEARER + secondAccessToken))
@@ -977,13 +932,12 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var refreshToken =
           AuthControllerIT.this.refreshTokenFor(user, sessionStart, user.getTokenVersion());
 
-      final var body =
-          expectSuccess(AuthControllerIT.this.refreshWith(refreshToken), "tokenRefreshed");
+      final var body = expectBare(AuthControllerIT.this.refreshWith(refreshToken));
 
       // Regular lifetimes (30 / 60 minutes) would run past the session end, which is 10 minutes
       // away.
-      final String newAccessToken = JsonPath.read(body, "$.data.token");
-      final String newRefreshToken = JsonPath.read(body, "$.data.refreshToken");
+      final String newAccessToken = JsonPath.read(body, "$.token");
+      final String newRefreshToken = JsonPath.read(body, "$.refreshToken");
       assertThat(JWT.decode(newAccessToken).getExpiresAtAsInstant()).isBeforeOrEqualTo(sessionEnd);
       assertThat(JWT.decode(newRefreshToken).getExpiresAtAsInstant()).isBeforeOrEqualTo(sessionEnd);
       assertThat(JWT.decode(newRefreshToken).getExpiresAtAsInstant()).isAfter(Instant.now());
@@ -1023,11 +977,10 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var adminToken = AuthControllerIT.this.adminBearerToken();
       final var user = AuthControllerIT.this.createUser(uniqueUsername("reset"), UserRole.USER);
       final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
-      expectSuccess(
+      expectBare(
           AuthControllerIT.this.perform(
               post("/api/users/" + user.getId() + "/actions/reset-password")
-                  .header(AUTHORIZATION, adminToken)),
-          "passwordReset");
+                  .header(AUTHORIZATION, adminToken)));
       AuthControllerIT.this.entityManager.flush();
 
       expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(refreshToken));
@@ -1039,15 +992,14 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var adminToken = AuthControllerIT.this.adminBearerToken();
       final var user = AuthControllerIT.this.createUser(uniqueUsername("rename"), UserRole.USER);
       final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
-      expectSuccess(
+      expectBare(
           AuthControllerIT.this.perform(
               put("/api/users/" + user.getId())
                   .header(AUTHORIZATION, adminToken)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(
                       "{\"username\":\"%s\",\"role\":\"USER\"}"
-                          .formatted(uniqueUsername("renamed")))),
-          "userUpdated");
+                          .formatted(uniqueUsername("renamed")))));
       AuthControllerIT.this.entityManager.flush();
 
       expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(refreshToken));
@@ -1059,17 +1011,16 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var adminToken = AuthControllerIT.this.adminBearerToken();
       final var user = AuthControllerIT.this.createUser(uniqueUsername("samename"), UserRole.USER);
       final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
-      expectSuccess(
+      expectBare(
           AuthControllerIT.this.perform(
               put("/api/users/" + user.getId())
                   .header(AUTHORIZATION, adminToken)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(
-                      "{\"username\":\"%s\",\"role\":\"ADMIN\"}".formatted(user.getUsername()))),
-          "userUpdated");
+                      "{\"username\":\"%s\",\"role\":\"ADMIN\"}".formatted(user.getUsername()))));
       AuthControllerIT.this.entityManager.flush();
 
-      expectSuccess(AuthControllerIT.this.refreshWith(refreshToken), "tokenRefreshed");
+      expectBare(AuthControllerIT.this.refreshWith(refreshToken));
     }
 
     @Test
@@ -1171,13 +1122,11 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var adminToken = AuthControllerIT.this.adminBearerToken();
       final var user = AuthControllerIT.this.createUser(uniqueUsername("deleted"), UserRole.USER);
       final var loginBody =
-          expectSuccess(
-              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
-      final String refreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
-      expectSuccess(
+          expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
+      final String refreshToken = JsonPath.read(loginBody, "$.refreshToken");
+      expectNoContent(
           AuthControllerIT.this.perform(
-              delete("/api/users/" + user.getId()).header(AUTHORIZATION, adminToken)),
-          "userDeleted");
+              delete("/api/users/" + user.getId()).header(AUTHORIZATION, adminToken)));
       AuthControllerIT.this.entityManager.flush();
 
       // The deletion took the user's refresh tokens with it (RPS-1082), so the token is unknown.
@@ -1223,15 +1172,12 @@ class AuthControllerIT extends AbstractIntegrationTest {
       expectAccessNotAllowed(
           AuthControllerIT.this.refreshWith(
               signedRefreshToken("not-a-uuid", "someuser", expiresAt, algorithm)));
-      expectSuccess(
-          AuthControllerIT.this.refreshWith(AuthControllerIT.this.refreshTokenFor(user)),
-          "tokenRefreshed");
+      expectBare(AuthControllerIT.this.refreshWith(AuthControllerIT.this.refreshTokenFor(user)));
 
       assertThat(events.stream(UserLoginEvent.class)).isEmpty();
 
       // Control: the same recorder does see the event that a login publishes.
-      expectSuccess(
-          AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
+      expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
 
       assertThat(events.stream(UserLoginEvent.class))
           .extracting(UserLoginEvent::username)
@@ -1273,9 +1219,8 @@ class AuthControllerIT extends AbstractIntegrationTest {
     void refreshTokenRejectedOnAuthenticatedEndpoint() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("refbearer"), UserRole.USER);
       final var loginBody =
-          expectSuccess(
-              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
-      final String refreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
+          expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
+      final String refreshToken = JsonPath.read(loginBody, "$.refreshToken");
 
       expectAccessNotAllowed(
           AuthControllerIT.this.perform(
@@ -1311,9 +1256,8 @@ class AuthControllerIT extends AbstractIntegrationTest {
     void revokesTheFamily() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("logout"), UserRole.USER);
       final var loginBody =
-          expectSuccess(
-              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
-      final String refreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
+          expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
+      final String refreshToken = JsonPath.read(loginBody, "$.refreshToken");
 
       expectNoContent(AuthControllerIT.this.logoutWith(refreshToken));
 
@@ -1326,12 +1270,10 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var user =
           AuthControllerIT.this.createUser(uniqueUsername("logoutchild"), UserRole.USER);
       final var loginBody =
-          expectSuccess(
-              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
-      final String originalRefreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
-      final var refreshedBody =
-          expectSuccess(AuthControllerIT.this.refreshWith(originalRefreshToken), "tokenRefreshed");
-      final String childRefreshToken = JsonPath.read(refreshedBody, "$.data.refreshToken");
+          expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
+      final String originalRefreshToken = JsonPath.read(loginBody, "$.refreshToken");
+      final var refreshedBody = expectBare(AuthControllerIT.this.refreshWith(originalRefreshToken));
+      final String childRefreshToken = JsonPath.read(refreshedBody, "$.refreshToken");
 
       expectNoContent(AuthControllerIT.this.logoutWith(childRefreshToken));
 
@@ -1368,18 +1310,16 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var user =
           AuthControllerIT.this.createUser(uniqueUsername("logoutother"), UserRole.USER);
       final var firstLogin =
-          expectSuccess(
-              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
-      final String firstRefreshToken = JsonPath.read(firstLogin, "$.data.refreshToken");
+          expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
+      final String firstRefreshToken = JsonPath.read(firstLogin, "$.refreshToken");
       final var secondLogin =
-          expectSuccess(
-              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
-      final String secondRefreshToken = JsonPath.read(secondLogin, "$.data.refreshToken");
+          expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
+      final String secondRefreshToken = JsonPath.read(secondLogin, "$.refreshToken");
 
       expectNoContent(AuthControllerIT.this.logoutWith(firstRefreshToken));
 
       expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(firstRefreshToken));
-      expectSuccess(AuthControllerIT.this.refreshWith(secondRefreshToken), "tokenRefreshed");
+      expectBare(AuthControllerIT.this.refreshWith(secondRefreshToken));
     }
 
     @Test
@@ -1403,9 +1343,8 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var user =
           AuthControllerIT.this.createUser(uniqueUsername("logoutaccess"), UserRole.USER);
       final var loginBody =
-          expectSuccess(
-              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
-      final String accessToken = JsonPath.read(loginBody, "$.data.token");
+          expectBare(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
+      final String accessToken = JsonPath.read(loginBody, "$.token");
 
       expectAccessNotAllowed(AuthControllerIT.this.logoutWith(accessToken));
     }
@@ -1495,13 +1434,13 @@ class AuthControllerIT extends AbstractIntegrationTest {
       final var userId = UserDeletion.this.committedUserWithSessions();
 
       try {
-        expectSuccess(
+        expectNoContent(
             AuthControllerIT.this.perform(
                 delete("/api/users/" + userId)
                     .header(
                         AUTHORIZATION,
-                        AuthControllerIT.this.bearerTokenFor(AuthControllerIT.this.seededAdmin()))),
-            "userDeleted");
+                        AuthControllerIT.this.bearerTokenFor(
+                            AuthControllerIT.this.seededAdmin()))));
 
         assertThat(UserDeletion.this.refreshTokenRows(userId)).isZero();
       } finally {
@@ -1557,8 +1496,8 @@ class AuthControllerIT extends AbstractIntegrationTest {
               .getId();
 
       try {
-        expectSuccess(AuthControllerIT.this.login(username, VALID_PASSWORD), "loginSucceeded");
-        expectSuccess(AuthControllerIT.this.login(username, VALID_PASSWORD), "loginSucceeded");
+        expectBare(AuthControllerIT.this.login(username, VALID_PASSWORD));
+        expectBare(AuthControllerIT.this.login(username, VALID_PASSWORD));
         assertThat(UserDeletion.this.refreshTokenRows(userId)).isEqualTo(2);
       } catch (final Exception | AssertionError e) {
         AuthControllerIT.this.deleteCommittedUsers(List.of(userId));

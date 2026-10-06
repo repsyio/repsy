@@ -22,11 +22,11 @@ import {
   ArtifactListItem,
   ArtifactVersionInfo,
   ArtifactVersionListItem,
-  MavenArtifactControllerService,
-  MavenGroupControllerService,
+  MavenArtifactsApi,
+  MavenGroupsApi,
   MavenGroupSummary,
-  ProtocolRepoControllerService,
   RepoPermissionInfo,
+  ReposApi,
   RepoSettingsForm,
 } from '../../../../../../generated/api';
 import { PagedData } from '../../../../shared/dto/paged-data';
@@ -47,9 +47,9 @@ export class MavenService {
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
   constructor(
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
-    private readonly mavenArtifactControllerService: MavenArtifactControllerService,
-    private readonly mavenGroupControllerService: MavenGroupControllerService,
+    private readonly reposApi: ReposApi,
+    private readonly mavenArtifactsApi: MavenArtifactsApi,
+    private readonly mavenGroupsApi: MavenGroupsApi,
   ) {
     this.repoChanges = this.repoSubject.asObservable();
   }
@@ -61,9 +61,7 @@ export class MavenService {
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
-    return this.protocolRepoControllerService
-      .getRepoPermissions(repoName)
-      .pipe(tap((info) => this.repoSubject.next(info)));
+    return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
   }
 
   private resetActiveRepoIfChanged(repoName: string): void {
@@ -75,17 +73,15 @@ export class MavenService {
   }
 
   public updateRepoSettings(form: RepoSettingsForm): Observable<void> {
-    return this.protocolRepoControllerService.updateRepoSettings(this.repoName, form).pipe(map(() => undefined));
+    return this.reposApi.updateRepoSettings(this.repoName, form).pipe(map(() => undefined));
   }
 
   public getPathContent(path: string): Observable<FsItemInfo[]> {
-    return this.protocolRepoControllerService
-      .getPathContent(path, this.repoName)
-      .pipe(map((r) => r as unknown as FsItemInfo[]));
+    return this.reposApi.getPathContent(path, this.repoName).pipe(map((r) => r as unknown as FsItemInfo[]));
   }
 
   public createDownloadToken(path: string): Observable<string> {
-    return this.protocolRepoControllerService.createDownloadToken(path, this.repoName);
+    return this.reposApi.createDownloadToken(path, this.repoName);
   }
 
   public searchGroups(
@@ -94,7 +90,7 @@ export class MavenService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<ArtifactListItem>> {
-    return this.mavenArtifactControllerService
+    return this.mavenArtifactsApi
       .listMavenGroups(this.repoName, groupName || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
@@ -108,7 +104,7 @@ export class MavenService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<ArtifactListItem>> {
-    return this.mavenArtifactControllerService
+    return this.mavenArtifactsApi
       .listMavenArtifacts(groupName, this.repoName, artifactName || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
@@ -123,11 +119,13 @@ export class MavenService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<ArtifactVersionListItem>> {
-    return this.mavenArtifactControllerService
+    return this.mavenArtifactsApi
       .listMavenArtifactVersions(groupName, artifactName, this.repoName, version || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
-      .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<ArtifactVersionListItem>));
+      .pipe(
+        map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<ArtifactVersionListItem>),
+      );
   }
 
   public fetchArtifactVersion(
@@ -135,17 +133,12 @@ export class MavenService {
     artifactName: string,
     versionName: string,
   ): Observable<ArtifactVersionInfo> {
-    return this.mavenArtifactControllerService.getMavenArtifactVersion(
-      groupName,
-      artifactName,
-      versionName,
-      this.repoName,
-    );
+    return this.mavenArtifactsApi.getMavenArtifactVersion(groupName, artifactName, versionName, this.repoName);
   }
 
   /** What deleting the group removes: how many artifacts and versions it holds. */
   public getGroupSummary(groupName: string): Observable<MavenGroupSummary> {
-    return this.mavenGroupControllerService.getMavenGroupSummary(groupName, this.repoName);
+    return this.mavenGroupsApi.getMavenGroupSummary(groupName, this.repoName);
   }
 
   /**
@@ -172,19 +165,14 @@ export class MavenService {
   }
 
   public deleteGroup(groupName: string): Observable<void> {
-    return this.mavenArtifactControllerService.deleteMavenGroup(groupName, this.repoName);
+    return this.mavenArtifactsApi.deleteMavenGroup(groupName, this.repoName);
   }
 
   public deleteArtifact(groupName: string, artifactName: string): Observable<void> {
-    return this.mavenArtifactControllerService.deleteMavenArtifact(groupName, artifactName, this.repoName);
+    return this.mavenArtifactsApi.deleteMavenArtifact(groupName, artifactName, this.repoName);
   }
 
   public deleteVersion(groupName: string, artifactName: string, versionName: string): Observable<void> {
-    return this.mavenArtifactControllerService.deleteMavenArtifactVersion(
-      groupName,
-      artifactName,
-      versionName,
-      this.repoName,
-    );
+    return this.mavenArtifactsApi.deleteMavenArtifactVersion(groupName, artifactName, versionName, this.repoName);
   }
 }

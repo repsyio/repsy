@@ -16,7 +16,7 @@
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of, throwError } from 'rxjs';
 
-import { LoginInfo, ProfileControllerService, ProfileInfo } from '../../../../../generated/api';
+import { LoginInfo, ProfileApi, ProfileInfo } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { describeNoAuthorizationHeader } from '../../../shared/testing/authorization-header-spec-helpers';
 import { CallCase, describeCalls, httpError } from '../../repository/testing/protocol-service-spec-helpers';
@@ -33,12 +33,12 @@ const PROFILE: ProfileInfo = {
 const LOGIN_INFO: LoginInfo = { username: 'alice', token: 'new-token', refreshToken: 'new-refresh-token' };
 
 describe('ProfileService', () => {
-  let api: jasmine.SpyObj<ProfileControllerService>;
+  let api: jasmine.SpyObj<ProfileApi>;
   let authService: jasmine.SpyObj<AuthService>;
   let service: ProfileService;
 
   beforeEach(() => {
-    api = jasmine.createSpyObj<ProfileControllerService>('ProfileControllerService', [
+    api = jasmine.createSpyObj<ProfileApi>('ProfileApi', [
       'getProfile',
       'updatePassword',
       'updateUsername',
@@ -47,7 +47,7 @@ describe('ProfileService', () => {
     authService = jasmine.createSpyObj<AuthService>('AuthService', ['updateLoginInfo']);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProfileControllerService, useValue: api },
+        { provide: ProfileApi, useValue: api },
         { provide: AuthService, useValue: authService },
       ],
     });
