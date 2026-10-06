@@ -307,9 +307,14 @@ test.describe('Error handling', () => {
       adminPage,
       LIST_URL,
       (route) =>
-        fulfillJson<ErrorResponse>(route, 503, errorBody({ status: 503, code: 'resourceBusy', detail: busy }), {
-          'Retry-After': '1',
-        }),
+        fulfillJson<ErrorResponse>(
+          route,
+          503,
+          errorBody({ status: 503, code: 'resourceBusy', detail: busy }),
+          {
+            'Retry-After': '1',
+          },
+        ),
       async () => {
         const raised = expectToastLater(repos.toasts, busy);
         await adminPage.goto('/repositories');
